@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <script src="https://www.unpkg.com/pocketbase@0.21.1/dist/pocketbase.umd.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    const pb = new PocketBase("http://localhost:8090")
+    const loginWithMicrosoft = async () => {
+      const authData = await pb.collection('users').authWithOAuth2({ provider: 'microsoft' });
+      console.log(authData);
+    }
+    function page () {
+      return {
+        authStore: pb.authStore,
+        logout: () => {
+          console.log('Logging out')
+          pb.authStore.clear()
+        },
+      }
+    }
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-neutral-200" x-data="page()">
+  <header class="w-screen h-10 bg-neutral-700 text-white px-3 flex justify-between">
+    <h1 class="h-full flex flex-col justify-center">Welcome</h1>
+    <template x-if="authStore.isValid">
+      <div>
+      <!-- user is logged in -->
+      <span>
+        <button class="bg-blue-500 hover:bg-blue-700 text-white text-sm py-1 px-2 rounded" @click="logout()">
+          Logout
+        </button>
+        <span x-text="authStore.model.email"></span>
+      </span>
+    </div>
+    </template>
+  </header>
+  <!-- The login box, centered vertically and horizontally using flex -->
+  <div class="flex flex-col justify-center items-center h-screen">
+      <div class="flex flex-col items-center align-center rounded w-96 p-4 bg-neutral-100 border">
+        <h1 class="text-4xl font-bold">Welcome to Tybalt</h1>
+        <p class="text-lg">Login with Microsoft to get started</p>
+        <!-- The login button will call the loginWithMicrosoft() method when
+        clicked -->
+        <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold m-2 py-2 px-4 rounded" onclick="loginWithMicrosoft()">
+            Login
+        </button>
+      </div>
+  </div>
+</body>
+</html>
