@@ -1,9 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <link rel="stylesheet" href="https://unpkg.com/air-datepicker@3.5.3/air-datepicker.css">
   <script src="https://www.unpkg.com/pocketbase@0.21.1/dist/pocketbase.umd.js"></script>
-  <script src="https://unpkg.com/air-datepicker@3.5.3/air-datepicker.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     document.addEventListener('alpine:init', () => {
@@ -12,15 +10,14 @@
         authStore: {},
         loggedIn: false,
         jobs: [],
+        item: { timetype: 'R'}, //a default we can change later
         timetypes: [],
         divisions: [],
         newJob: {},
         init() {
+          // this.$watch('item.timetype', value => console.log(value))
+          // this.$watch('item.division', value => console.log(value))
           this.pb = new PocketBase("http://localhost:8090")
-
-          // Initialize the AirDatepicker
-          new AirDatepicker('#datepicker');
-
           // if the user is already logged in, set the authStore 
           if (this.pb.authStore.isValid) {
             this.authStore = this.pb.authStore
@@ -31,6 +28,40 @@
         logout() {
           this.authStore.clear()
           this.loggedIn = false
+        },
+        get trainingTokensInDescriptionWhileRegularHours () {
+          if (
+            this.item.timetype !== undefined &&
+            this.item.workDescription !== undefined
+          ) {
+            const lowercase = this.item.workDescription.toLowerCase().trim();
+            const lowercaseTokens = lowercase.split(/\s+/);
+            return (
+              this.item.timetype === "R" &&
+              ([
+                "training",
+                "train",
+                "orientation",
+                "course",
+                "whmis",
+                "learning",
+              ].some((token) => lowercaseTokens.includes(token)) ||
+                ["working at heights", "first aid"].some((token) =>
+                  lowercase.includes(token)
+                ))
+            );
+          }
+          return false;
+        },
+        get jobNumbersInDescription() {
+          if (this.item.workDescription !== undefined) {
+            const lowercase = this.item.workDescription.toLowerCase().trim();
+            // look for any instances of XX-YYY where XX is a number between 15 and
+            // 40 and YYY is a zero-padded number between 1 and 999 then return true
+            // if any are found
+            return /(1[5-9]|2[0-9]|3[0-9]|40)-(\d{3})/.test(lowercase);
+          }
+          return false;
         },
         async loginWithMicrosoft () {
           const authData = await this.pb.collection('users').authWithOAuth2({ provider: 'microsoft' });
@@ -90,141 +121,156 @@
   </header>
   <main>
     <template x-if="loggedIn">
-      <form id="editor">
-        <input type="text" id="datepicker"></input>
-        <span class="field">
-          <select class="grow" name="timetype">
-            <template x-for="t in timetypes" :key="t.id">
-              <option x-text="`${t.code} - ${t.name}`"></option>
+      <form class="flex flex-col items-center w-full gap-2 p-2">
+        <input type="text" x-ref="myDatepicker"></input>
+        <span class="flex w-full gap-2">
+          <label for="timetype">Time Type</label>
+          <select id="timetype" name="timetype" x-model="item.timetype">
+            <template x-for="t in timetypes" :key="t.code">
+              <option x-text="`${t.code} - ${t.name}`" :value="t.code"></option>
             </template>
           </select>
         </span>
-        <span v-if="trainingTokensInDescriptionWhileRegularHours" class="attention">
-          ^Should you choose training instead?
-        </span>
+        <template x-if="trainingTokensInDescriptionWhileRegularHours">
+          <span class="flex w-full gap-2 text-red-600 bg-red-200">
+            ^Should you choose training instead?
+          </span>
+        </template>
     
         <!----------------------------------------------->
         <!-- FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
         <!----------------------------------------------->
-        <span v-show="['R', 'RT'].includes(item.timetype)">
-          <span class="field">
-            <select class="grow" name="division">
+        <span class="w-full" x-show="['R', 'RT'].includes(item.timetype)">
+          <span class="flex w-full gap-2">
+            <label for="division">Division</label>
+            <select name="division" x-model="item.division">
               <option disabled selected value="">-- choose division --</option>
               <template x-for="d in divisions" :key="d.id">
-                <option x-text="`${d.code} - ${d.name}`"></option>
+                <option x-text="`${d.code} - ${d.name}`" :value="d.code"></option>
               </template>
             </select>
           </span>
-          <DSJobSelector v-model="item"/>
-          <span class="field" v-if="item.job && item.job !== '' && item.division">
+          <span class="flex w-full gap-2">
+            <label for="job">Job</label>
+            <input
+              class="flex-1"
+              type="text"
+              name="job"
+              x-model="item.job"
+              placeholder="Job Number"
+            />
+          </span>
+          <template x-if="item.job && item.job !== '' && item.division">
+          <span class="flex w-full gap-2">
             <label for="jobHours">Job Hours</label>
             <input
-              class="grow"
+              class="flex-1"
               type="number"
               name="jobHours"
-              v-model.number="item.jobHours"
+              x-model.number="item.jobHours"
               step="0.5"
               min="0"
               max="18"
             />
           </span>
+          </template>
         </span>
     
         <!--------------------------------------------------->
         <!-- END FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
         <!--------------------------------------------------->
     
-        <span
-          class="field"
-          v-if="!['OR', 'OW', 'OTO'].includes(item.timetype) && item.job === undefined"
-        >
-          <label for="hours">
-            {{
-              item.job &&
-              item.job !== "" &&
-              item.division &&
-              ["R", "RT"].includes(item.timetype)
-                ? "Non-Chargeable "
-                : ""
-            }}Hours
-          </label>
-          <input
-            class="grow"
-            type="number"
-            name="hours"
-            v-model.number="item.hours"
-            step="0.5"
-            min="0"
-            max="18"
-          />
-        </span>
+        <!-- TODO: The item.job === undefined below is predecated on the
+        autocomplete clearing the property. Right now we are using a text field
+        so it will never show up after being set once -->
+        <template x-if="!['OR', 'OW', 'OTO'].includes(item.timetype) && item.job === undefined">
+          <span class="flex w-full gap-2">
+            <label for="hours" x-text="`${
+                item.job &&
+                item.job !== '' &&
+                item.division &&
+                ['R', 'RT'].includes(item.timetype)
+                  ? 'Non-Chargeable '
+                  : ''
+              }Hours`"
+            />
+            </label>
+            <input
+              class="flex-1"
+              type="number"
+              name="hours"
+              x-model.number="item.hours"
+              step="0.5"
+              min="0"
+              max="18"
+            />
+          </span>
+        </template>
     
-        <span
-          class="field"
-          v-if="item.division && ['R', 'RT'].includes(item.timetype)"
-        >
-          <label for="mealsHours">Meals Hours</label>
-          <input
-            class="grow"
-            type="number"
-            name="mealsHours"
-            v-model.number="item.mealsHours"
-            step="0.5"
-            min="0"
-            max="2"
-          />
-        </span>
+        <template x-if="item.division && ['R', 'RT'].includes(item.timetype)">
+          <span class="flex w-full gap-2">
+            <label for="mealsHours">Meals Hours</label>
+            <input
+              class="flex-1"
+              type="number"
+              name="mealsHours"
+              x-model.number="item.mealsHours"
+              step="0.5"
+              min="0"
+              max="2"
+            />
+          </span>
+        </template>
     
-        <span
-          class="field"
-          v-if="
-            item.job &&
-            item.job !== '' &&
-            item.division &&
-            ['R', 'RT'].includes(item.timetype)
-          "
-        >
-          <label for="workrecord">Work Record</label>
-          <input
-            class="grow"
-            type="text"
-            name="workrecord"
-            placeholder="Work Record"
-            v-model.trim="item.workrecord"
-          />
-        </span>
-    
-        <span
-          class="field"
-          v-if="!['OR', 'OW', 'OTO', 'RB'].includes(item.timetype)"
-        >
-          <input
-            class="grow"
+        <template x-if="item.job && item.job !== '' && item.division && ['R', 'RT'].includes(item.timetype)">
+          <span class="flex w-full gap-2">
+            <label for="workrecord">Work Record</label>
+            <input
+              class="flex-1"
+              type="text"
+              name="workrecord"
+              placeholder="Work Record"
+              v-model.trim="item.workrecord"
+            />
+          </span>
+        </template>
+        <template x-if="!['OR', 'OW', 'OTO', 'RB'].includes(item.timetype)">
+          <span class="flex w-full gap-2">
+            <label for="workDescription">Work Description</label>
+            <input
+            class="flex-1"
             type="text"
             name="workDescription"
             placeholder="Work Description (5 char minimum)"
-            v-model.trim="item.workDescription"
-          />
-        </span>
-        <span v-if="jobNumbersInDescription" class="attention">
-          Job numbers are not allowed in the work description. Enter jobs numbers in
-          the appropriate field and create one time entry per job.
-        </span>
-        <span class="field" v-if="item.timetype === 'OTO'">
-          $<input
-            class="grow"
+            x-model.trim="item.workDescription"
+            />
+          </span>
+        </template>
+        <template x-if="jobNumbersInDescription">
+          <span class="text-red-600 bg-red-200">
+            Job numbers are not allowed in the work description. Enter jobs numbers in
+            the appropriate field and create one time entry per job.
+          </span>
+        </template>
+        <template x-if="item.timetype === 'OTO'">
+          <span class="flex w-full gap-2">
+            $<input
+            class="flex-1"
             type="number"
             name="payoutRequestAmount"
             placeholder="Amount"
-            v-model.number="item.payoutRequestAmount"
+            x-model.number="item.payoutRequestAmount"
             step="0.01"
-          />
-        </span>
+            />
+          </span>
+        </template>
     
-        <span class="field">
-          <button type="button" v-on:click="save()" v-if="!jobNumbersInDescription">
-            Save
-          </button>
+        <span class="flex w-full gap-2">
+          <template x-if="jobNumbersInDescription">
+            <button type="button" v-on:click="save()">
+              Save
+            </button>
+          </template>
           <button type="button" v-on:click="$router.push(parentPath)">
             Cancel
           </button>
