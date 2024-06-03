@@ -18,10 +18,7 @@
             this.authStore = this.pb.authStore
             this.loggedIn = true
           }
-          // load all of the jobs
-          this.pb.collection('jobs').getFullList().then(jobs => {
-            this.jobs = jobs
-          }).catch(err => { console.error(err) })
+          this.loadData()
         },
         logout() {
           this.authStore.clear()
@@ -33,7 +30,14 @@
           if (this.pb.authStore.isValid) {
             this.authStore = this.pb.authStore
             this.loggedIn = true
+            this.loadData()
           }
+        },
+        loadData() {
+          // load all of the jobs
+          this.pb.collection('jobs').getFullList().then(jobs => {
+            this.jobs = jobs
+          }).catch(err => { console.error(err) })
         },
         async createJob() {
           try {

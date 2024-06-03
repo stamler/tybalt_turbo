@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <link rel="stylesheet" href="https://unpkg.com/air-datepicker@3.5.3/air-datepicker.css">
+  <script src="https://www.unpkg.com/pocketbase@0.21.1/dist/pocketbase.umd.js"></script>
+  <script src="https://unpkg.com/air-datepicker@3.5.3/air-datepicker.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    document.addEventListener('alpine:init', () => {
+      Alpine.data('page', () => ({
+        pb: {},
+        authStore: {},
+        loggedIn: false,
+        jobs: [],
+        timetypes: [],
+        divisions: [],
+        newJob: {},
+        init() {
+          this.pb = new PocketBase("http://localhost:8090")
+
+          // Initialize the AirDatepicker
+          new AirDatepicker('#datepicker');
+
+          // if the user is already logged in, set the authStore 
+          if (this.pb.authStore.isValid) {
+            this.authStore = this.pb.authStore
+            this.loggedIn = true
+          }
+          this.loadData()
+        },
+        logout() {
+          this.authStore.clear()
+          this.loggedIn = false
+        },
+        async loginWithMicrosoft () {
+          const authData = await this.pb.collection('users').authWithOAuth2({ provider: 'microsoft' });
+          // if the user is logged in, set the authStore
+          if (this.pb.authStore.isValid) {
+            this.authStore = this.pb.authStore
+            this.loggedIn = true
+            this.loadData()
+          }
+        },
+        loadData() {
+          // load all of the jobs
+          this.pb.collection('jobs').getFullList().then(jobs => {
+            this.jobs = jobs
+          }).catch(err => { console.error(`loading jobs: ${err}`) })
+
+          // load all of the timetypes
+          this.pb.collection('timetypes').getFullList().then(timetypes => {
+            this.timetypes = timetypes
+          }).catch(err => { console.error(`loading timetypes ${err}`) })
+
+          // load all of the divisions
+          this.pb.collection('divisions').getFullList().then(divisions => {
+            this.divisions = divisions
+          }).catch(err => { console.error(`loading divisions ${err}`) })
+        },
+        async createJob() {
+          try {
+            const record = await this.pb.collection('jobs').create(this.newJob, { returnRecord: true })
+            this.jobs.push(record)
+            this.newJob = {}
+          } catch (err) {
+            console.error(err)
+          }
+        }
+      }));
+    });
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+</head>
+<body class="bg-neutral-200" x-data="page">
+  <header class="w-screen h-10 bg-neutral-700 text-white px-3 flex justify-between">
+    <h1 class="h-full flex flex-col justify-center">Tybalt</h1>
+    <template x-if="loggedIn">
+      <div class="h-full">
+      <!-- user is logged in -->
+      <span class="flex items-center h-full gap-2">
+        <span x-text="authStore.model.email"></span>
+        <button class="bg-blue-500 hover:bg-blue-700 text-white text-sm py-1 px-2 rounded" @click="logout()">
+          <svg class="w-6 h-6" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+            <path fill-rule="evenodd" d="M16.5 3.75a1.5 1.5 0 0 1 1.5 1.5v13.5a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5V15a.75.75 0 0 0-1.5 0v3.75a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V5.25a3 3 0 0 0-3-3h-6a3 3 0 0 0-3 3V9A.75.75 0 1 0 9 9V5.25a1.5 1.5 0 0 1 1.5-1.5h6ZM5.78 8.47a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 0 0 0 1.06l3 3a.75.75 0 0 0 1.06-1.06l-1.72-1.72H15a.75.75 0 0 0 0-1.5H4.06l1.72-1.72a.75.75 0 0 0 0-1.06Z" clip-rule="evenodd" />
+          </svg>    
+        </button>
+      </span>
+    </div>
+    </template>
+  </header>
+  <main>
+    <template x-if="loggedIn">
+      <form id="editor">
+        <input type="text" id="datepicker"></input>
+        <span class="field">
+          <select class="grow" name="timetype">
+            <template x-for="t in timetypes" :key="t.id">
+              <option x-text="`${t.code} - ${t.name}`"></option>
+            </template>
+          </select>
+        </span>
+        <span v-if="trainingTokensInDescriptionWhileRegularHours" class="attention">
+          ^Should you choose training instead?
+        </span>
+    
+        <!----------------------------------------------->
+        <!-- FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
+        <!----------------------------------------------->
+        <span v-show="['R', 'RT'].includes(item.timetype)">
+          <span class="field">
+            <select class="grow" name="division">
+              <option disabled selected value="">-- choose division --</option>
+              <template x-for="d in divisions" :key="d.id">
+                <option x-text="`${d.code} - ${d.name}`"></option>
+              </template>
+            </select>
+          </span>
+          <DSJobSelector v-model="item"/>
+          <span class="field" v-if="item.job && item.job !== '' && item.division">
+            <label for="jobHours">Job Hours</label>
+            <input
+              class="grow"
+              type="number"
+              name="jobHours"
+              v-model.number="item.jobHours"
+              step="0.5"
+              min="0"
+              max="18"
+            />
+          </span>
+        </span>
+    
+        <!--------------------------------------------------->
+        <!-- END FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
+        <!--------------------------------------------------->
+    
+        <span
+          class="field"
+          v-if="!['OR', 'OW', 'OTO'].includes(item.timetype) && item.job === undefined"
+        >
+          <label for="hours">
+            {{
+              item.job &&
+              item.job !== "" &&
+              item.division &&
+              ["R", "RT"].includes(item.timetype)
+                ? "Non-Chargeable "
+                : ""
+            }}Hours
+          </label>
+          <input
+            class="grow"
+            type="number"
+            name="hours"
+            v-model.number="item.hours"
+            step="0.5"
+            min="0"
+            max="18"
+          />
+        </span>
+    
+        <span
+          class="field"
+          v-if="item.division && ['R', 'RT'].includes(item.timetype)"
+        >
+          <label for="mealsHours">Meals Hours</label>
+          <input
+            class="grow"
+            type="number"
+            name="mealsHours"
+            v-model.number="item.mealsHours"
+            step="0.5"
+            min="0"
+            max="2"
+          />
+        </span>
+    
+        <span
+          class="field"
+          v-if="
+            item.job &&
+            item.job !== '' &&
+            item.division &&
+            ['R', 'RT'].includes(item.timetype)
+          "
+        >
+          <label for="workrecord">Work Record</label>
+          <input
+            class="grow"
+            type="text"
+            name="workrecord"
+            placeholder="Work Record"
+            v-model.trim="item.workrecord"
+          />
+        </span>
+    
+        <span
+          class="field"
+          v-if="!['OR', 'OW', 'OTO', 'RB'].includes(item.timetype)"
+        >
+          <input
+            class="grow"
+            type="text"
+            name="workDescription"
+            placeholder="Work Description (5 char minimum)"
+            v-model.trim="item.workDescription"
+          />
+        </span>
+        <span v-if="jobNumbersInDescription" class="attention">
+          Job numbers are not allowed in the work description. Enter jobs numbers in
+          the appropriate field and create one time entry per job.
+        </span>
+        <span class="field" v-if="item.timetype === 'OTO'">
+          $<input
+            class="grow"
+            type="number"
+            name="payoutRequestAmount"
+            placeholder="Amount"
+            v-model.number="item.payoutRequestAmount"
+            step="0.01"
+          />
+        </span>
+    
+        <span class="field">
+          <button type="button" v-on:click="save()" v-if="!jobNumbersInDescription">
+            Save
+          </button>
+          <button type="button" v-on:click="$router.push(parentPath)">
+            Cancel
+          </button>
+        </span>
+      </form>    
+    </template>
+    <!-- The login box, centered vertically and horizontally using flex -->
+    <template x-if="!loggedIn">
+      <div class="flex flex-col justify-center items-center h-screen">
+        <div class="flex flex-col items-center align-center rounded w-96 p-4 bg-neutral-100 border">
+          <h1 class="text-4xl font-bold">Welcome to Tybalt</h1>
+          <p class="text-lg">Login with Microsoft to get started</p>
+          <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold m-2 py-2 px-4 rounded" @click="loginWithMicrosoft()">
+            Login
+          </button>
+        </div>
+      </div>
+    </template>
+  </main>
+</body>
+</html>
