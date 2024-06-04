@@ -141,9 +141,18 @@
             delete this.item.description;
           }
 
-          // delete payoutRequestAmount if it's not a payout request
+          // delete payout_request_amount if it's not a payout request
           if (this.item.time_type !== "OTO") {
-            delete this.item.payoutRequestAmount;
+            delete this.item.payout_request_amount;
+          } else {
+            // if it is a payout request, make sure it's a number multiply it
+            // by 100 to get cents and round to the nearest cent
+            if (typeof this.item.payout_request_amount !== "number") {
+              throw "Invalid Payout Request Amount";
+            }
+            this.item.payout_request_amount = Math.round(
+              this.item.payout_request_amount * 100
+            );
           }
 
           this.item = _.pickBy(this.item, (i) => i !== ""); // strip blank fields
@@ -366,7 +375,7 @@
             type="number"
             name="payoutRequestAmount"
             placeholder="Amount"
-            x-model.number="item.payoutRequestAmount"
+            x-model.number="item.payout_request_amount"
             step="0.01"
             />
           </span>
