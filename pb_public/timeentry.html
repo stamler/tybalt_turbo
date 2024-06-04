@@ -23,7 +23,7 @@
         divisions: [],
         newJob: {},
         init() {
-          this.$watch('item.time_type', value => console.log(value))
+          // this.$watch('item.time_type', value => console.log(value))
           this.pb = new PocketBase("http://localhost:8090")
           // if the user is already logged in, set the authStore 
           if (this.pb.authStore.isValid) {
@@ -148,32 +148,53 @@
           }
 
           // delete payout_request_amount if it's not a payout request
+          // TODO: do this in the backend as a go function in pocketbase
+          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook The hook
+          // will delete the payout_request_amount field if the time_type is not
+          // OTO   
           if (this.item.time_type !== "OTO") {
             delete this.item.payout_request_amount;
           }
 
+          // TODO: do this in the backend as a go function in pocketbase
           this.item = _.pickBy(this.item, (i) => i !== ""); // strip blank fields
 
           // replace the code in item.time_type with the id of the timetype
+          // If it doesn't exist, the backend will throw an error
+          // TODO: do this in the backend as a go function in pocketbase
+          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook
           this.item.time_type = this.timetypes.find(t => t.code === this.item.time_type).id
 
           // replace the code in item.division with the id of the division if
-          // division is set
+          // division is set. If it isn't set, the backend will throw an error
+          // TODO: do this in the backend as a go function in pocketbase
+          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook
           if (this.item.division !== undefined) {
             this.item.division = this.divisions.find(d => d.code === this.item.division).id
           }
 
-          // replace the job number in item.job with the id of the job
-          // if it exists
+          // replace the job number in item.job with the id of the job if it
+          // exists. If it doesn't exist, the backend will throw an error
+          // TODO: do this in the backend as a go function in pocketbase
+          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook
           if (this.item.job !== undefined) {
             this.item.job = this.jobs.find(j => j.job_number === this.item.job).id
           }
 
           // set the uid from the authStore
+          // TODO: do this in the backend as a go function in pocketbase
+          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook
+          // the value will be set to the user id of the logged in user
+          // from the httpContext property of the RecordCreateEvent passed
+          // to the hook
           this.item.uid = this.authStore.model.id
 
           // set the week_ending date based on the first Saturday after the date
           // in this.item.date
+          // TODO: do this in the backend as a go function in pocketbase
+          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook. We will
+          // just send the date as a string in the format YYYY-MM-DD and the
+          // hook will set the week_ending field
           const date = new Date(this.item.date);
           const weekEnding = new Date(date);
           weekEnding.setDate(date.getDate() + (6 - date.getDay()));
