@@ -63,6 +63,9 @@
           }
           return false;
         },
+        get isWorkTime() {
+          return ['R', 'RT'].includes(this.item.timetype);
+        },
         async loginWithMicrosoft () {
           const authData = await this.pb.collection('users').authWithOAuth2({ provider: 'microsoft' });
           // if the user is logged in, set the authStore
@@ -96,7 +99,89 @@
           } catch (err) {
             console.error(err)
           }
-        }
+        },
+        save() {
+          // if timetype isn't R or RT, delete disallowed properties
+          if (!["R", "RT"].includes(this.item.timetype)) {
+            [
+              "division",
+              "job",
+              "jobHours",
+              "mealsHours",
+              "workrecord",
+            ].forEach((x) => delete this.item[x]);
+          } else {
+            // timetype is R or RT, division must be present
+            if (this.item.division === undefined || this.item.division.length === 0) {
+              throw "Division Missing";
+            }
+
+            // remove values of zero in hours fields
+            if (this.item.mealsHours === 0) {
+              delete this.item.mealsHours;
+            }
+
+            if (this.item.jobHours === 0) {
+              delete this.item.jobHours;
+            }
+
+            if (this.item.hours === 0) {
+              delete this.item.hours;
+            }
+
+            // Clear the Job if it's empty or too short, otherwise clear hours
+            // since we don't allow non-chargeable time with a job number
+            // The back end will actually validate that it exists
+            if (!this.item.job || this.item.job.length < 6) {
+              // Clear
+              delete this.item.job;
+              delete this.item.jobHours;
+              delete this.item.workorder;
+            } else {
+              delete this.item.hours;
+            }
+          }
+
+          // if timetype is OW, OR or OTO, delete hours and workDescription
+          // (other properties already deleted in previous if/else statement)
+          if (["OR", "OW", "OTO"].includes(this.item.timetype)) {
+            delete this.item.hours;
+            delete this.item.workDescription;
+          }
+
+          // delete payoutRequestAmount if it's not a payout request
+          if (this.item.timetype !== "OTO") {
+            delete this.item.payoutRequestAmount;
+          }
+
+          this.item = _.pickBy(this.item, (i) => i !== ""); // strip blank fields
+
+          // Write to database
+          if (props.id) {
+            // Editing an existing item
+            setDoc(doc(collectionObject, props.id), this.item)
+              .then(() => {
+                router.push(parentPath.value);
+              })
+              .catch((error) => {
+                if (error instanceof Error) {
+                  alert(`Failed to edit Time Entry: ${error.message}`);
+                } else alert(`Failed to edit Time Entry: ${JSON.stringify(error)}`);
+              });
+          } else {
+            // Creating a new item
+            setDoc(doc(collectionObject), this.item)
+              .then(() => {
+                router.push(parentPath.value);
+              })
+              .catch((error) => {
+                if (error instanceof Error) {
+                  alert(`Failed to create Time Entry: ${error.message}`);
+                } else
+                  alert(`Failed to create Time Entry: ${JSON.stringify(error)}`);
+              });
+          }
+        },
       }));
     });
   </script>
@@ -140,16 +225,18 @@
         <!----------------------------------------------->
         <!-- FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
         <!----------------------------------------------->
-        <span class="w-full" x-show="['R', 'RT'].includes(item.timetype)">
+        <template x-if="isWorkTime">
           <span class="flex w-full gap-2">
             <label for="division">Division</label>
             <select name="division" x-model="item.division">
               <option disabled selected value="">-- choose division --</option>
-              <template x-for="d in divisions" :key="d.id">
+              <template x-for="d in divisions" :key="d.code">
                 <option x-text="`${d.code} - ${d.name}`" :value="d.code"></option>
               </template>
             </select>
           </span>
+        </template>
+        <template x-if="isWorkTime">
           <span class="flex w-full gap-2">
             <label for="job">Job</label>
             <input
@@ -160,7 +247,8 @@
               placeholder="Job Number"
             />
           </span>
-          <template x-if="item.job && item.job !== '' && item.division">
+        </template>
+        <template x-if="isWorkTime && item.job && item.job !== '' && item.division">
           <span class="flex w-full gap-2">
             <label for="jobHours">Job Hours</label>
             <input
@@ -173,8 +261,7 @@
               max="18"
             />
           </span>
-          </template>
-        </span>
+        </template>
     
         <!--------------------------------------------------->
         <!-- END FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
@@ -183,13 +270,13 @@
         <!-- TODO: The item.job === undefined below is predecated on the
         autocomplete clearing the property. Right now we are using a text field
         so it will never show up after being set once -->
-        <template x-if="!['OR', 'OW', 'OTO'].includes(item.timetype) && item.job === undefined">
+        <template x-if="!['OR', 'OW', 'OTO'].includes(item.timetype) && (item.job === undefined || item.job === '')">
           <span class="flex w-full gap-2">
             <label for="hours" x-text="`${
                 item.job &&
                 item.job !== '' &&
                 item.division &&
-                ['R', 'RT'].includes(item.timetype)
+                isWorkTime
                   ? 'Non-Chargeable '
                   : ''
               }Hours`"
@@ -207,7 +294,7 @@
           </span>
         </template>
     
-        <template x-if="item.division && ['R', 'RT'].includes(item.timetype)">
+        <template x-if="item.division && isWorkTime">
           <span class="flex w-full gap-2">
             <label for="mealsHours">Meals Hours</label>
             <input
@@ -222,7 +309,7 @@
           </span>
         </template>
     
-        <template x-if="item.job && item.job !== '' && item.division && ['R', 'RT'].includes(item.timetype)">
+        <template x-if="item.job && item.job !== '' && item.division && isWorkTime">
           <span class="flex w-full gap-2">
             <label for="workrecord">Work Record</label>
             <input
@@ -266,7 +353,7 @@
         </template>
     
         <span class="flex w-full gap-2">
-          <template x-if="jobNumbersInDescription">
+          <template x-if="!jobNumbersInDescription">
             <button type="button" v-on:click="save()">
               Save
             </button>
