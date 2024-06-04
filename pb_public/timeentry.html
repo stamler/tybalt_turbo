@@ -359,14 +359,14 @@
             class="flex-1"
             type="text"
             name="description"
-            placeholder="Work Description (5 char minimum)"
+            placeholder="Description (5 char minimum)"
             x-model.trim="item.description"
             />
           </span>
         </template>
         <template x-if="jobNumbersInDescription">
           <span class="text-red-600 bg-red-200">
-            Job numbers are not allowed in the work description. Enter jobs numbers in
+            Job numbers are not allowed in the description. Enter jobs numbers in
             the appropriate field and create one time entry per job.
           </span>
         </template>
