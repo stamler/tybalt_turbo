@@ -217,6 +217,11 @@
           try {
             const record = await this.pb.collection('time_entries').create(this.item, { returnRecord: true })
           } catch (error) {
+            // TODO: the response property of the error object has a data
+            // property that contains keys for each field that failed validation
+            // and the value is an object with a message property that contains
+            // the error message. We should display these messages to the user
+            // next to the field that failed validation.
             alert(`Failed to create Time Entry: ${JSON.stringify(error)}`);
           }
           // }
