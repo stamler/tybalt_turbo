@@ -3,6 +3,7 @@
 <head>
   <script src="https://www.unpkg.com/pocketbase@0.21.1/dist/pocketbase.umd.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
   <script>
     document.addEventListener('alpine:init', () => {
       Alpine.data('page', () => ({
@@ -32,9 +33,9 @@
         get trainingTokensInDescriptionWhileRegularHours () {
           if (
             this.item.timetype !== undefined &&
-            this.item.workDescription !== undefined
+            this.item.description !== undefined
           ) {
-            const lowercase = this.item.workDescription.toLowerCase().trim();
+            const lowercase = this.item.description.toLowerCase().trim();
             const lowercaseTokens = lowercase.split(/\s+/);
             return (
               this.item.timetype === "R" &&
@@ -54,8 +55,8 @@
           return false;
         },
         get jobNumbersInDescription() {
-          if (this.item.workDescription !== undefined) {
-            const lowercase = this.item.workDescription.toLowerCase().trim();
+          if (this.item.description !== undefined) {
+            const lowercase = this.item.description.toLowerCase().trim();
             // look for any instances of XX-YYY where XX is a number between 15 and
             // 40 and YYY is a zero-padded number between 1 and 999 then return true
             // if any are found
@@ -77,30 +78,21 @@
         },
         loadData() {
           // load all of the jobs
-          this.pb.collection('jobs').getFullList().then(jobs => {
+          this.pb.collection('Jobs').getFullList().then(jobs => {
             this.jobs = jobs
           }).catch(err => { console.error(`loading jobs: ${err}`) })
 
           // load all of the timetypes
-          this.pb.collection('timetypes').getFullList().then(timetypes => {
+          this.pb.collection('TimeTypes').getFullList().then(timetypes => {
             this.timetypes = timetypes
           }).catch(err => { console.error(`loading timetypes ${err}`) })
 
           // load all of the divisions
-          this.pb.collection('divisions').getFullList().then(divisions => {
+          this.pb.collection('Divisions').getFullList().then(divisions => {
             this.divisions = divisions
           }).catch(err => { console.error(`loading divisions ${err}`) })
         },
-        async createJob() {
-          try {
-            const record = await this.pb.collection('jobs').create(this.newJob, { returnRecord: true })
-            this.jobs.push(record)
-            this.newJob = {}
-          } catch (err) {
-            console.error(err)
-          }
-        },
-        save() {
+        async save() {
           // if timetype isn't R or RT, delete disallowed properties
           if (!["R", "RT"].includes(this.item.timetype)) {
             [
@@ -142,11 +134,11 @@
             }
           }
 
-          // if timetype is OW, OR or OTO, delete hours and workDescription
+          // if timetype is OW, OR or OTO, delete hours and description
           // (other properties already deleted in previous if/else statement)
           if (["OR", "OW", "OTO"].includes(this.item.timetype)) {
             delete this.item.hours;
-            delete this.item.workDescription;
+            delete this.item.description;
           }
 
           // delete payoutRequestAmount if it's not a payout request
@@ -156,31 +148,53 @@
 
           this.item = _.pickBy(this.item, (i) => i !== ""); // strip blank fields
 
-          // Write to database
-          if (props.id) {
-            // Editing an existing item
-            setDoc(doc(collectionObject, props.id), this.item)
-              .then(() => {
-                router.push(parentPath.value);
-              })
-              .catch((error) => {
-                if (error instanceof Error) {
-                  alert(`Failed to edit Time Entry: ${error.message}`);
-                } else alert(`Failed to edit Time Entry: ${JSON.stringify(error)}`);
-              });
-          } else {
-            // Creating a new item
-            setDoc(doc(collectionObject), this.item)
-              .then(() => {
-                router.push(parentPath.value);
-              })
-              .catch((error) => {
-                if (error instanceof Error) {
-                  alert(`Failed to create Time Entry: ${error.message}`);
-                } else
-                  alert(`Failed to create Time Entry: ${JSON.stringify(error)}`);
-              });
+          // replace the code in item.timetype with the id of the timetype
+          this.item.timetype = this.timetypes.find(t => t.code === this.item.timetype).id
+
+          // replace the code in item.division with the id of the division
+          this.item.division = this.divisions.find(d => d.code === this.item.division).id
+
+          // replace the job number in item.job with the id of the job
+          // if it exists
+          if (this.item.job) {
+            console.log(this.item.job)
+            console.log(this.jobs)
+            this.item.job = this.jobs.find(j => j.job_number === this.item.job).id
           }
+
+          // set the uid from the authStore
+          this.item.uid = this.authStore.model.id
+
+          // set the weekEnding date based on the first Saturday after the date
+          // in this.item.date
+          console.log(this.item.date)
+          const date = new Date(this.item.date);
+          console.log(date)
+          const weekEnding = new Date(date);
+          weekEnding.setDate(date.getDate() + (6 - date.getDay()));
+          this.item.weekEnding = weekEnding.toISOString().split("T")[0];
+
+          // Write to database
+          // if (props.id) {
+          //   // Editing an existing item
+          //   setDoc(doc(collectionObject, props.id), this.item)
+          //     .then(() => {
+          //       router.push(parentPath.value);
+          //     })
+          //     .catch((error) => {
+          //       if (error instanceof Error) {
+          //         alert(`Failed to edit Time Entry: ${error.message}`);
+          //       } else alert(`Failed to edit Time Entry: ${JSON.stringify(error)}`);
+          //     });
+          // } else {
+            // Creating a new item
+          try {
+            const record = await this.pb.collection('TimeEntries').create(this.item, { returnRecord: true })
+            console.log(record);
+          } catch (error) {
+            alert(`Failed to create Time Entry: ${JSON.stringify(error)}`);
+          }
+          // }
         },
       }));
     });
@@ -207,7 +221,16 @@
   <main>
     <template x-if="loggedIn">
       <form class="flex flex-col items-center w-full gap-2 p-2">
-        <input type="text" x-ref="myDatepicker"></input>
+        <span class="flex w-full gap-2">
+          <label for="description">Date</label>
+          <input
+          class="flex-1"
+          type="text"
+          name="date"
+          placeholder="Date"
+          x-model.trim="item.date"
+          />
+        </span>
         <span class="flex w-full gap-2">
           <label for="timetype">Time Type</label>
           <select id="timetype" name="timetype" x-model="item.timetype">
@@ -323,13 +346,13 @@
         </template>
         <template x-if="!['OR', 'OW', 'OTO', 'RB'].includes(item.timetype)">
           <span class="flex w-full gap-2">
-            <label for="workDescription">Work Description</label>
+            <label for="description">Description</label>
             <input
             class="flex-1"
             type="text"
-            name="workDescription"
+            name="description"
             placeholder="Work Description (5 char minimum)"
-            x-model.trim="item.workDescription"
+            x-model.trim="item.description"
             />
           </span>
         </template>
@@ -354,7 +377,7 @@
     
         <span class="flex w-full gap-2">
           <template x-if="!jobNumbersInDescription">
-            <button type="button" v-on:click="save()">
+            <button type="button" x-on:click="save()">
               Save
             </button>
           </template>
