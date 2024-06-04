@@ -11,7 +11,7 @@
         authStore: {},
         loggedIn: false,
         jobs: [],
-        item: { timetype: 'R'}, //a default we can change later
+        item: { timetype: 'R', division: 'CI' }, //a default we can change later
         timetypes: [],
         divisions: [],
         newJob: {},
@@ -235,7 +235,7 @@
           <label for="timetype">Time Type</label>
           <select id="timetype" name="timetype" x-model="item.timetype">
             <template x-for="t in timetypes" :key="t.code">
-              <option x-text="`${t.code} - ${t.name}`" :value="t.code"></option>
+              <option x-text="`${t.code} - ${t.name}`" :value="t.code" :selected="t.code === item.timetype"></option>
             </template>
           </select>
         </span>
@@ -252,9 +252,8 @@
           <span class="flex w-full gap-2">
             <label for="division">Division</label>
             <select name="division" x-model="item.division">
-              <option disabled selected value="">-- choose division --</option>
               <template x-for="d in divisions" :key="d.code">
-                <option x-text="`${d.code} - ${d.name}`" :value="d.code"></option>
+                <option x-text="`${d.code} - ${d.name}`" :value="d.code" :selected="d.code === item.division"></option>
               </template>
             </select>
           </span>
