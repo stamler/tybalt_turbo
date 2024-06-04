@@ -1,6 +1,8 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://www.unpkg.com/pocketbase@0.21.1/dist/pocketbase.umd.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
@@ -11,13 +13,17 @@
         authStore: {},
         loggedIn: false,
         jobs: [],
-        item: { time_type: 'R', division: 'CI' }, //a default we can change later
+        item: {
+          // date in YYYY-MM-DD format 
+          date: new Date().toISOString().split('T')[0],
+          time_type: 'R', 
+          division: 'CI' 
+        },
         timetypes: [],
         divisions: [],
         newJob: {},
         init() {
           this.$watch('item.time_type', value => console.log(value))
-          // this.$watch('item.division', value => console.log(value))
           this.pb = new PocketBase("http://localhost:8090")
           // if the user is already logged in, set the authStore 
           if (this.pb.authStore.isValid) {
@@ -144,15 +150,6 @@
           // delete payout_request_amount if it's not a payout request
           if (this.item.time_type !== "OTO") {
             delete this.item.payout_request_amount;
-          } else {
-            // if it is a payout request, make sure it's a number multiply it
-            // by 100 to get cents and round to the nearest cent
-            if (typeof this.item.payout_request_amount !== "number") {
-              throw "Invalid Payout Request Amount";
-            }
-            this.item.payout_request_amount = Math.round(
-              this.item.payout_request_amount * 100
-            );
           }
 
           this.item = _.pickBy(this.item, (i) => i !== ""); // strip blank fields
@@ -228,13 +225,18 @@
   <main>
     <template x-if="loggedIn">
       <form class="flex flex-col items-center w-full gap-2 p-2">
-        <span class="flex w-full gap-2">
+        <span class="flex w-full gap-2" x-init="flatpickr($refs.date, {
+          enableTime: false,
+          dateFormat: 'Y-m-d',
+          defaultDate: item.date,
+        });">
           <label for="description">Date</label>
           <input
           class="flex-1"
           type="text"
           name="date"
           placeholder="Date"
+          x-ref="date"
           x-model.trim="item.date"
           />
         </span>
