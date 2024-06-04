@@ -225,19 +225,23 @@
   <main>
     <template x-if="loggedIn">
       <form class="flex flex-col items-center w-full gap-2 p-2">
-        <span class="flex w-full gap-2" x-init="flatpickr($refs.date, {
+        <span class="flex flex-col w-full gap-2" x-init="flatpickr($refs.date, {
+          inline: true,
+          minDate: '2024-06-01',
+          // 2 months from now
+          maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
           enableTime: false,
           dateFormat: 'Y-m-d',
           defaultDate: item.date,
         });">
           <label for="description">Date</label>
           <input
-          class="flex-1"
-          type="text"
-          name="date"
-          placeholder="Date"
-          x-ref="date"
-          x-model.trim="item.date"
+            class="flex-1"
+            type="text"
+            name="date"
+            placeholder="Date"
+            x-ref="date"
+            x-model.trim="item.date"
           />
         </span>
         <span class="flex w-full gap-2">
