@@ -30,9 +30,9 @@ func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) 
 	// Load the allowed fields for the time_type from the time_types collection in
 	// PocketBase. They are stored in the allowed_fields property as a JSON array
 	// of strings.
-	timeTypeRecord, err := app.Dao().FindRecordById("time_types", timeTypeId)
-	if err != nil {
-		return err
+	timeTypeRecord, findError := app.Dao().FindRecordById("time_types", timeTypeId)
+	if findError != nil {
+		return findError
 	}
 
 	// Get the allowed fields from the time_type record with type assertion
@@ -40,9 +40,9 @@ func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) 
 	allowedFieldsJson := timeTypeRecord.Get("allowed_fields").(types.JsonRaw)
 
 	// use json.Unmarshal to convert the JSON array to a Go slice of strings
-	if err = json.Unmarshal(allowedFieldsJson, &allowedFields); err != nil {
-		log.Fatalf("Error unmarshalling JSON: %v", err)
-		return err
+	if unmarshalError := json.Unmarshal(allowedFieldsJson, &allowedFields); unmarshalError != nil {
+		log.Fatalf("Error unmarshalling JSON: %v", unmarshalError)
+		return unmarshalError
 	}
 
 	// Certain fields are always allowed to be set. We add them to the list of
@@ -58,7 +58,6 @@ func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) 
 		}
 	}
 
-	log.Println(allowedFields)
 	return nil
 }
 
@@ -68,8 +67,13 @@ func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) 
 // invalid this function throws an error explaining which field(s) are invalid
 // and why.
 func ValidateTimeEntry(app *pocketbase.PocketBase, record *models.Record) error {
-	// Clean the record before validating it
-	cleanTimeEntry(app, record)
+	// set properties to nil if they are not allowed to be set based on the
+	// time_type
+	if cleanErr := cleanTimeEntry(app, record); cleanErr != nil {
+		return cleanErr
+	}
+
+	// Perform validation here
 	return nil
 }
 
