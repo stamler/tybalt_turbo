@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 
+	"tybalt/hooks"
 	_ "tybalt/migrations"
 
 	"github.com/pocketbase/pocketbase"
@@ -41,6 +42,9 @@ func main() {
 		e.Router.GET("/*", apis.StaticDirectoryHandler(os.DirFS("./pb_public"), indexFallback))
 		return nil
 	})
+
+	// Add the hooks to the app
+	hooks.AddHooks(app)
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)

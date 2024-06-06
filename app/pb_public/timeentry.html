@@ -100,15 +100,17 @@
         },
         async save() {
           // if time_type isn't R or RT, delete disallowed properties
-          if (!["R", "RT"].includes(this.item.time_type)) {
-            [
-              "division",
-              "job",
-              "job_hours",
-              "meals_hours",
-              "workrecord",
-            ].forEach((x) => delete this.item[x]);
-          } else {
+          // EDIT: do this on the backend
+          // if (!["R", "RT"].includes(this.item.time_type)) {
+          //   [
+          //     "division",
+          //     "job",
+          //     "job_hours",
+          //     "meals_hours",
+          //     "work_record",
+          //   ].forEach((x) => delete this.item[x]);
+          // } 
+          if (["R", "RT"].includes(this.item.time_type)) {
             // time_type is R or RT, division must be present
             if (this.item.division === undefined || this.item.division.length === 0) {
               throw "Division Missing";
@@ -372,13 +374,13 @@
     
         <template x-if="item.job && item.job !== '' && item.division && isWorkTime">
           <span class="flex w-full gap-2">
-            <label for="workrecord">Work Record</label>
+            <label for="work_record">Work Record</label>
             <input
               class="flex-1"
               type="text"
-              name="workrecord"
+              name="work_record"
               placeholder="Work Record"
-              v-model.trim="item.workrecord"
+              v-model.trim="item.work_record"
             />
           </span>
         </template>
