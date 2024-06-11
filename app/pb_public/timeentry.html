@@ -16,8 +16,8 @@
         item: {
           // date in YYYY-MM-DD format 
           date: new Date().toISOString().split('T')[0],
-          time_type: 'R', 
-          division: 'CI' 
+          time_type: 'sdyfl3q7j7ap849',
+          division: 'vccd5fo56ctbigh'
         },
         timetypes: [],
         divisions: [],
@@ -71,7 +71,15 @@
           return false;
         },
         get isWorkTime() {
-          return ['R', 'RT'].includes(this.item.time_type);
+          return this.hasTimeType(['R', 'RT'])
+        },
+        hasTimeType (typelist) {
+          if (this.timetypes.length === 0) {
+            return false;
+          }
+          return typelist
+            .map(c => this.timetypes.find(t => t.code === c).id)
+            .includes(this.item.time_type);
         },
         async loginWithMicrosoft () {
           const authData = await this.pb.collection('users').authWithOAuth2({ provider: 'microsoft' });
@@ -99,96 +107,12 @@
           }).catch(err => { console.error(`loading divisions ${err}`) })
         },
         async save() {
-          // if time_type isn't R or RT, delete disallowed properties
-          // EDIT: do this on the backend
-          // if (!["R", "RT"].includes(this.item.time_type)) {
-          //   [
-          //     "division",
-          //     "job",
-          //     "job_hours",
-          //     "meals_hours",
-          //     "work_record",
-          //   ].forEach((x) => delete this.item[x]);
-          // } 
-          if (["R", "RT"].includes(this.item.time_type)) {
-            // time_type is R or RT, division must be present
-            if (this.item.division === undefined || this.item.division.length === 0) {
-              throw "Division Missing";
-            }
-
-            // remove values of zero in hours fields
-            if (this.item.meals_hours === 0) {
-              delete this.item.meals_hours;
-            }
-
-            if (this.item.job_hours === 0) {
-              delete this.item.job_hours;
-            }
-
-            if (this.item.hours === 0) {
-              delete this.item.hours;
-            }
-
-            // Clear the Job if it's empty or too short, otherwise clear hours
-            // since we don't allow non-chargeable time with a job number
-            // The back end will actually validate that it exists
-            if (!this.item.job || this.item.job.length < 6) {
-              // Clear
-              delete this.item.job;
-              delete this.item.job_hours;
-              delete this.item.workorder;
-            } else {
-              delete this.item.hours;
-            }
-          }
-
-          // if time_type is OW, OR or OTO, delete hours and description
-          // (other properties already deleted in previous if/else statement)
-          if (["OR", "OW", "OTO"].includes(this.item.time_type)) {
-            delete this.item.hours;
-            delete this.item.description;
-          }
-
-          // delete payout_request_amount if it's not a payout request
-          // TODO: do this in the backend as a go function in pocketbase
-          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook The hook
-          // will delete the payout_request_amount field if the time_type is not
-          // OTO   
-          if (this.item.time_type !== "OTO") {
-            delete this.item.payout_request_amount;
-          }
-
-          // TODO: do this in the backend as a go function in pocketbase
-          this.item = _.pickBy(this.item, (i) => i !== ""); // strip blank fields
-
-          // replace the code in item.time_type with the id of the timetype
-          // If it doesn't exist, the backend will throw an error
-          // TODO: do this in the backend as a go function in pocketbase
-          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook
-          this.item.time_type = this.timetypes.find(t => t.code === this.item.time_type).id
-
-          // replace the code in item.division with the id of the division if
-          // division is set. If it isn't set, the backend will throw an error
-          // TODO: do this in the backend as a go function in pocketbase
-          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook
-          if (this.item.division !== undefined) {
-            this.item.division = this.divisions.find(d => d.code === this.item.division).id
-          }
-
-          // replace the job number in item.job with the id of the job if it
-          // exists. If it doesn't exist, the backend will throw an error
-          // TODO: do this in the backend as a go function in pocketbase
-          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook
-          if (this.item.job !== undefined) {
-            this.item.job = this.jobs.find(j => j.job_number === this.item.job).id
-          }
-
-          // set the uid from the authStore
-          // TODO: do this in the backend as a go function in pocketbase
-          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook
-          // the value will be set to the user id of the logged in user
-          // from the httpContext property of the RecordCreateEvent passed
-          // to the hook
+          // set the uid from the authStore We do it here rather than the
+          // backend because the
+          // OnRecordBeforeCreateRequest("time_entries").Add() hook runs *AFTER*
+          // schema validation (!)
+          // https://github.com/pocketbase/pocketbase/discussions/2881 so we
+          // need a correct value in the payload just to make it to the hook
           this.item.uid = this.authStore.model.id
 
           // set the week_ending date based on the first Saturday after the date
@@ -259,7 +183,8 @@
           // 2 months from now
           maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
           enableTime: false,
-          dateFormat: 'Y-m-d',
+          // dateFormat: 'Y-m-d',
+          dateFormat: 'Z',
           defaultDate: item.date,
         });">
           <label for="description">Date</label>
@@ -274,9 +199,9 @@
         </span>
         <span class="flex w-full gap-2">
           <label for="timetype">Time Type</label>
-          <select id="timetype" name="timetype" x-model="item.time_type">
-            <template x-for="t in timetypes" :key="t.code">
-              <option x-text="`${t.code} - ${t.name}`" :value="t.code" :selected="t.code === item.time_type"></option>
+          <select name="timetype" x-model="item.time_type">
+            <template x-for="t in timetypes" :key="t.id">
+              <option x-text="`${t.code} - ${t.name}`" :value="t.id" :selected="t.id === item.time_type"></option>
             </template>
           </select>
         </span>
@@ -293,8 +218,8 @@
           <span class="flex w-full gap-2">
             <label for="division">Division</label>
             <select name="division" x-model="item.division">
-              <template x-for="d in divisions" :key="d.code">
-                <option x-text="`${d.code} - ${d.name}`" :value="d.code" :selected="d.code === item.division"></option>
+              <template x-for="d in divisions" :key="d.id">
+                <option x-text="`${d.code} - ${d.name}`" :value="d.id" :selected="d.id === item.division"></option>
               </template>
             </select>
           </span>
@@ -302,14 +227,13 @@
         <template x-if="isWorkTime">
           <span class="flex w-full gap-2">
             <label for="job">Job</label>
-            <input
-              class="flex-1"
-              type="text"
-              name="job"
-              x-model="item.job"
-              placeholder="Job Number"
-            />
-          </span>
+            <select name="job" x-model="item.job">
+              <option value="">No Job</option>
+              <template x-for="j in jobs" :key="j.id">
+                <option x-text="`${j.job_number} -`" :value="j.id" :selected="j.id === item.job"></option>
+              </template>
+            </select>
+          </span>  
         </template>
         <template x-if="isWorkTime && item.job && item.job !== '' && item.division">
           <span class="flex w-full gap-2">
@@ -333,7 +257,7 @@
         <!-- TODO: The item.job === undefined below is predecated on the
         autocomplete clearing the property. Right now we are using a text field
         so it will never show up after being set once -->
-        <template x-if="!['OR', 'OW', 'OTO'].includes(item.time_type) && (item.job === undefined || item.job === '')">
+        <template x-if="!hasTimeType(['OR', 'OW', 'OTO']) && (item.job === undefined || item.job === '')">
           <span class="flex w-full gap-2">
             <label for="hours" x-text="`${
                 item.job &&
@@ -384,7 +308,7 @@
             />
           </span>
         </template>
-        <template x-if="!['OR', 'OW', 'OTO', 'RB'].includes(item.time_type)">
+        <template x-if="!hasTimeType(['OR', 'OW', 'OTO', 'RB'])">
           <span class="flex w-full gap-2">
             <label for="description">Description</label>
             <input
