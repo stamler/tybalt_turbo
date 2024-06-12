@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"encoding/json"
+	"errors"
 	"log"
 	"regexp"
 
@@ -65,28 +66,39 @@ func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) 
 	return timeTypeRecord.GetString("code"), nil
 }
 
-// cross-field validation is performed in this function. If it is already set,
-// the uid property is checked against the uid of the authenticated user. An
-// error is thrown if the uids do not match. Otherwise the uid property is set
-// to the uid of the authenticated user.
-func validateTimeEntry(timeEntryRecord *models.Record, timeTypeCode string) error {
+func isPositiveMultipleOfPointFive(fieldName string) validation.RuleFunc {
+	return func(value interface{}) error {
+		s, _ := value.(float64)
+		if s < 0.5 {
+			return errors.New(fieldName + " must be at least 0.5")
+		}
+		// return error is s is not a multiple of 0.5
+		if s/0.5 != float64(int(s/0.5)) {
+			return errors.New(fieldName + "must be a multiple of 0.5")
+		}
+		return nil
+	}
+}
 
-	// implement this with go-ozzo/ozzo-validation because it is already used by PocketBase
+// cross-field validation is performed in this function.
+func validateTimeEntry(timeEntryRecord *models.Record, timeTypeCode string) error {
 	isWorkTime := list.ExistInSlice(timeTypeCode, []string{"R", "RT"})
 	jobIsPresent := timeEntryRecord.Get("job") != ""
 	isOTO := timeTypeCode == "OTO"
 	hoursRequired := list.ExistInSlice(timeTypeCode, []string{"OB", "OH", "OP", "OS", "OV", "RB"})
 	hoursProhibited := list.ExistInSlice(timeTypeCode, []string{"OR", "OW", "OTO"})
+	totalHours := timeEntryRecord.GetFloat("hours") + timeEntryRecord.GetFloat("job_hours") + timeEntryRecord.GetFloat("meals_hours")
 
 	err := validation.Errors{
-		"division": validation.Validate(timeEntryRecord.Get("division"), validation.When(isWorkTime, validation.Required.Error("division is required when time_type is R or RT"))),
 		"hours": validation.Validate(timeEntryRecord.Get("hours"),
 			validation.When(isWorkTime && jobIsPresent, validation.In(0).Error("hours must be 0 when a job is provided")),
-			validation.When((isWorkTime && !jobIsPresent) || hoursRequired, validation.Required.Error("hours must be at least 0.5"), validation.Min(0.5).Error("hours must be 0.5 or more"), validation.Max(18.0).Error("hours must be 18 or less")),
 			validation.When(hoursProhibited, validation.In(0).Error("hours must be 0 when time_type is OR, OW or OTO")),
+			validation.When((isWorkTime && !jobIsPresent) || hoursRequired, validation.By(isPositiveMultipleOfPointFive("hours"))),
 		),
-		"meals_hours":           validation.Validate(timeEntryRecord.Get("meals_hours"), validation.Max(3).Error("meals_hours must be less than 3")),
-		"job_hours":             validation.Validate(timeEntryRecord.Get("job_hours"), validation.When(jobIsPresent, validation.Min(0.5).Error("job_hours must be at least 0.5 when a job is provided"), validation.Max(18.0).Error("job_hours must be 18 or less")).Else(validation.In(0).Error("job_hours must be 0 when a job is not provided"))),
+		"global":                validation.Validate(totalHours, validation.Max(18.0)),
+		"division":              validation.Validate(timeEntryRecord.Get("division"), validation.When(isWorkTime, validation.Required.Error("division is required when time_type is R or RT")).Else(validation.In("").Error("division must be empty when time_type is not R or RT"))),
+		"meals_hours":           validation.Validate(timeEntryRecord.Get("meals_hours"), validation.When(isWorkTime, validation.Max(3).Error("meals_hours must not exceed 3"))),
+		"job_hours":             validation.Validate(timeEntryRecord.Get("job_hours"), validation.When(jobIsPresent, validation.By(isPositiveMultipleOfPointFive("job_hours"))).Else(validation.In(0).Error("job_hours must be 0 when a job is not provided"))),
 		"description":           validation.Validate(timeEntryRecord.Get("description"), validation.Required, validation.Length(5, 0).Error("description must be at least 5 characters")),
 		"work_record":           validation.Validate(timeEntryRecord.Get("work_record"), validation.When(jobIsPresent, validation.Match(regexp.MustCompile("^[FKQ][0-9]{2}-[0-9]{3,}(-[0-9]+)?$")).Error("work_record must be in the correct format"))),
 		"payout_request_amount": validation.Validate(timeEntryRecord.Get("payout_request_amount"), validation.When(isOTO, validation.Required.Error("payout_request_amount is required when time_type is OTO")).Else(validation.Min(0).Exclusive().Error("payout_request_amount must be greater than 0"))),
@@ -121,15 +133,6 @@ func validateTimeEntry(timeEntryRecord *models.Record, timeTypeCode string) erro
 						)
 					) ||
 					isMissing("job")
-				) &&
-
-				// when provided, division exists in db, Time Type is 'R' or 'RT'
-				// when division is missing, Time Type is not 'R' and is not 'RT'
-				(
-					( isInCollection("division","Divisions") &&
-						(newDoc().timetype == "R" || newDoc().timetype == "RT") ) ||
-					(isMissing("division") &&
-						(newDoc().timetype != "R" && newDoc().timetype != "RT") )
 				) &&
 
 				// at least one hours type is provided OR the timetype is "OR", "OW" or "OTO" or "RB"

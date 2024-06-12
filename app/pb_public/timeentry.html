@@ -13,6 +13,7 @@
         authStore: {},
         loggedIn: false,
         jobs: [],
+        errors: {},
         item: {
           // date in YYYY-MM-DD format 
           date: new Date().toISOString().split('T')[0],
@@ -126,31 +127,23 @@
           weekEnding.setDate(date.getDate() + (6 - date.getDay()));
           this.item.week_ending = weekEnding.toISOString().split("T")[0];
 
-          // Write to database
-          // if (props.id) {
-          //   // Editing an existing item
-          //   setDoc(doc(collectionObject, props.id), this.item)
-          //     .then(() => {
-          //       router.push(parentPath.value);
-          //     })
-          //     .catch((error) => {
-          //       if (error instanceof Error) {
-          //         alert(`Failed to edit Time Entry: ${error.message}`);
-          //       } else alert(`Failed to edit Time Entry: ${JSON.stringify(error)}`);
-          //     });
-          // } else {
-            // Creating a new item
+          // TODO: are we editing an existing record or creating a new one?
+          // right now we are just creating a new one
           try {
             const record = await this.pb.collection('time_entries').create(this.item, { returnRecord: true })
+
+            // submission was successful, clear the errors
+            this.errors = {}
+
+            // clear the item
+            this.item = {
+              date: new Date().toISOString().split('T')[0],
+              time_type: 'sdyfl3q7j7ap849',
+              division: 'vccd5fo56ctbigh'
+            }
           } catch (error) {
-            // TODO: the response property of the error object has a data
-            // property that contains keys for each field that failed validation
-            // and the value is an object with a message property that contains
-            // the error message. We should display these messages to the user
-            // next to the field that failed validation.
-            alert(`Failed to create Time Entry: ${JSON.stringify(error)}`);
+            this.errors = error.data.data
           }
-          // }
         },
       }));
     });
@@ -187,7 +180,7 @@
           dateFormat: 'Z',
           defaultDate: item.date,
         });">
-          <label for="description">Date</label>
+          <label for="date">Date</label>
           <input
             class="flex-1"
             type="text"
@@ -236,18 +229,24 @@
           </span>  
         </template>
         <template x-if="isWorkTime && item.job && item.job !== '' && item.division">
-          <span class="flex w-full gap-2">
-            <label for="jobHours">Job Hours</label>
-            <input
+          <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.job_hours !== undefined}">
+            <span class="flex w-full gap-2">
+              <label for="job_hours">Job Hours</label>
+              <input
               class="flex-1"
               type="number"
-              name="jobHours"
+              name="job_hours"
               x-model.number="item.job_hours"
               step="0.5"
               min="0"
               max="18"
-            />
-          </span>
+              />
+            </span>
+            <template x-if="errors.job_hours !== undefined">
+              <span x-text="errors.job_hours.message" class="text-red-600"></span>
+            </template>
+          </div>
+          </div>
         </template>
     
         <!--------------------------------------------------->
@@ -258,27 +257,23 @@
         autocomplete clearing the property. Right now we are using a text field
         so it will never show up after being set once -->
         <template x-if="!hasTimeType(['OR', 'OW', 'OTO']) && (item.job === undefined || item.job === '')">
-          <span class="flex w-full gap-2">
-            <label for="hours" x-text="`${
-                item.job &&
-                item.job !== '' &&
-                item.division &&
-                isWorkTime
-                  ? 'Non-Chargeable '
-                  : ''
-              }Hours`"
-            />
-            </label>
-            <input
-              class="flex-1"
-              type="number"
-              name="hours"
-              x-model.number="item.hours"
-              step="0.5"
-              min="0"
-              max="18"
-            />
-          </span>
+          <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.hours !== undefined}">
+            <span class="flex w-full gap-2">
+              <label for="hours">Hours</label>
+              <input
+                class="flex-1"
+                type="number"
+                name="hours"
+                x-model.number="item.hours"
+                step="0.5"
+                min="0"
+                max="18"
+              />
+            </span>
+            <template x-if="errors.hours !== undefined">
+              <span x-text="errors.hours.message" class="text-red-600"></span>
+            </template>
+          </div>
         </template>
     
         <template x-if="item.division && isWorkTime">
@@ -298,17 +293,18 @@
     
         <template x-if="item.job && item.job !== '' && item.division && isWorkTime">
           <span class="flex w-full gap-2">
-            <label for="work_record">Work Record</label>
+            <label for="workRecord">Work Record</label>
             <input
               class="flex-1"
               type="text"
-              name="work_record"
+              name="workRecord"
               placeholder="Work Record"
-              v-model.trim="item.work_record"
+              x-model="item.work_record"
             />
           </span>
         </template>
         <template x-if="!hasTimeType(['OR', 'OW', 'OTO', 'RB'])">
+          <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.description !== undefined}">
           <span class="flex w-full gap-2">
             <label for="description">Description</label>
             <input
@@ -319,7 +315,11 @@
             x-model.trim="item.description"
             />
           </span>
-        </template>
+          <template x-if="errors.description !== undefined">
+            <span x-text="errors.description.message" class="text-red-600"></span>
+          </template>
+        </div>
+      </template>
         <template x-if="jobNumbersInDescription">
           <span class="text-red-600 bg-red-200">
             Job numbers are not allowed in the description. Enter jobs numbers in
