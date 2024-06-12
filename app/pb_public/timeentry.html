@@ -45,7 +45,7 @@
             const lowercase = this.item.description.toLowerCase().trim();
             const lowercaseTokens = lowercase.split(/\s+/);
             return (
-              this.item.time_type === "R" &&
+              this.hasTimeType(['R']) &&
               ([
                 "training",
                 "train",
@@ -277,18 +277,23 @@
         </template>
     
         <template x-if="item.division && isWorkTime">
-          <span class="flex w-full gap-2">
-            <label for="mealsHours">Meals Hours</label>
-            <input
-              class="flex-1"
-              type="number"
-              name="mealsHours"
-              x-model.number="item.meals_hours"
-              step="0.5"
-              min="0"
-              max="2"
-            />
-          </span>
+          <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.meals_hours !== undefined}">
+            <span class="flex w-full gap-2">
+              <label for="mealsHours">Meals Hours</label>
+              <input
+                class="flex-1"
+                type="number"
+                name="mealsHours"
+                x-model.number="item.meals_hours"
+                step="0.5"
+                min="0"
+                max="2"
+              />
+            </span>
+            <template x-if="errors.meals_hours !== undefined">
+              <span x-text="errors.meals_hours.message" class="text-red-600"></span>
+            </template>
+          </div>
         </template>
     
         <template x-if="item.job && item.job !== '' && item.division && isWorkTime">
@@ -326,17 +331,22 @@
             the appropriate field and create one time entry per job.
           </span>
         </template>
-        <template x-if="item.time_type === 'OTO'">
-          <span class="flex w-full gap-2">
-            $<input
-            class="flex-1"
-            type="number"
-            name="payoutRequestAmount"
-            placeholder="Amount"
-            x-model.number="item.payout_request_amount"
-            step="0.01"
-            />
-          </span>
+        <template x-if="hasTimeType(['OTO'])">
+          <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.payout_request_amount !== undefined}">
+            <span class="flex w-full gap-2">
+              $<input
+              class="flex-1"
+              type="number"
+              name="payoutRequestAmount"
+              placeholder="Amount"
+              x-model.number="item.payout_request_amount"
+              step="0.01"
+              />
+            </span>
+            <template x-if="errors.payout_request_amount !== undefined">
+              <span x-text="errors.payout_request_amount.message" class="text-red-600"></span>
+            </template>
+          </div>
         </template>
     
         <span class="flex w-full gap-2">
