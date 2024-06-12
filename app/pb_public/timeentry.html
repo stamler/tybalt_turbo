@@ -297,16 +297,21 @@
         </template>
     
         <template x-if="item.job && item.job !== '' && item.division && isWorkTime">
-          <span class="flex w-full gap-2">
-            <label for="workRecord">Work Record</label>
-            <input
-              class="flex-1"
-              type="text"
-              name="workRecord"
-              placeholder="Work Record"
-              x-model="item.work_record"
-            />
-          </span>
+          <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.work_record !== undefined}">
+            <span class="flex w-full gap-2">
+              <label for="workRecord">Work Record</label>
+              <input
+                class="flex-1"
+                type="text"
+                name="workRecord"
+                placeholder="Work Record"
+                x-model="item.work_record"
+              />
+            </span>
+            <template x-if="errors.work_record !== undefined">
+              <span x-text="errors.work_record.message" class="text-red-600"></span>
+            </template>
+          </div>
         </template>
         <template x-if="!hasTimeType(['OR', 'OW', 'OTO', 'RB'])">
           <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.description !== undefined}">
@@ -349,16 +354,21 @@
           </div>
         </template>
     
-        <span class="flex w-full gap-2">
-          <template x-if="!jobNumbersInDescription">
-            <button type="button" x-on:click="save()">
-              Save
+        <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.global !== undefined}">
+          <span class="flex w-full gap-2">
+            <template x-if="!jobNumbersInDescription">
+              <button type="button" x-on:click="save()">
+                Save
+              </button>
+            </template>
+            <button type="button" v-on:click="$router.push(parentPath)">
+              Cancel
             </button>
+          </span>
+          <template x-if="errors.global !== undefined">
+            <span x-text="errors.global.message" class="text-red-600"></span>
           </template>
-          <button type="button" v-on:click="$router.push(parentPath)">
-            Cancel
-          </button>
-        </span>
+        </div>
       </form>    
     </template>
     <!-- The login box, centered vertically and horizontally using flex -->
