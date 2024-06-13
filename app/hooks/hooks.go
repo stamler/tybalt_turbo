@@ -99,7 +99,7 @@ func validateTimeEntry(timeEntryRecord *models.Record, timeTypeCode string) erro
 		"meals_hours":           validation.Validate(timeEntryRecord.Get("meals_hours"), validation.When(isWorkTime, validation.Max(3.0).Error("Meals Hours must not exceed 3"))),
 		"job_hours":             validation.Validate(timeEntryRecord.Get("job_hours"), validation.When(jobIsPresent, validation.By(isPositiveMultipleOfPointFive("Job Hours"))).Else(validation.In(0).Error("Job hours must be 0 when a job is not provided"))),
 		"description":           validation.Validate(timeEntryRecord.Get("description"), validation.When(!hoursProhibited, validation.Required.Error("Description required"), validation.Length(5, 0).Error("Description must be at least 5 characters"))),
-		"work_record":           validation.Validate(timeEntryRecord.Get("work_record"), validation.When(jobIsPresent, validation.Match(regexp.MustCompile("^[FKQ][0-9]{2}-[0-9]{3,}(-[0-9]+)?$")).Error("Work record must be in the correct format"))),
+		"work_record":           validation.Validate(timeEntryRecord.Get("work_record"), validation.When(jobIsPresent, validation.Match(regexp.MustCompile("^[FKQ][0-9]{2}-[0-9]{3,4}(-[0-9]+)?$")).Error("Work record must be in the correct format"))),
 		"payout_request_amount": validation.Validate(timeEntryRecord.Get("payout_request_amount"), validation.When(isOTO, validation.Required.Error("Amount is required when time type is OTO")).Else(validation.Min(0).Exclusive().Error("Payout request amount must be greater than 0"))),
 	}.Filter()
 
