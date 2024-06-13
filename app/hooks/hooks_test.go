@@ -14,7 +14,6 @@ var collection = &models.Collection{
 	System: false,
 }
 
-// TODO: use NewRecordFromNullStringMap() or Load() instead of this
 func buildRecordFromMap(m map[string]any) *models.Record {
 	record := models.NewRecord(collection)
 	record.Load(m)
@@ -24,12 +23,14 @@ func buildRecordFromMap(m map[string]any) *models.Record {
 func TestValidateTimeEntry(t *testing.T) {
 	// Test cases
 	tests := []struct {
-		name   string
-		record *models.Record
-		want   error
+		name         string
+		timeTypeCode string
+		record       *models.Record
+		valid        bool
 	}{
 		{
-			name: "Valid time entry without job",
+			name:         "Valid time entry without job",
+			timeTypeCode: "R",
 			record: buildRecordFromMap(map[string]any{
 				"division":              "DE",
 				"meals_hours":           0,
@@ -40,10 +41,26 @@ func TestValidateTimeEntry(t *testing.T) {
 				"work_record":           "",
 				"payout_request_amount": 0,
 			}),
-			want: nil,
+			valid: true,
 		},
 		{
-			name: "Valid time entry with job",
+			name:         "invalid time entry without job and no hours",
+			timeTypeCode: "R",
+			record: buildRecordFromMap(map[string]any{
+				"division":              "DE",
+				"meals_hours":           0,
+				"hours":                 0,
+				"job_hours":             0,
+				"job":                   "",
+				"description":           "This is more than 5 chars",
+				"work_record":           "",
+				"payout_request_amount": 0,
+			}),
+			valid: false,
+		},
+		{
+			name:         "Valid time entry with job",
+			timeTypeCode: "R",
 			record: buildRecordFromMap(map[string]any{
 				"division":              "DE",
 				"meals_hours":           0,
@@ -54,15 +71,19 @@ func TestValidateTimeEntry(t *testing.T) {
 				"work_record":           "",
 				"payout_request_amount": 0,
 			}),
-			want: nil,
+			valid: true,
 		},
 	}
 
 	// Run tests
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := validateTimeEntry(tt.record, "R"); got != tt.want {
-				t.Errorf("validateTimeEntry() = %v, want %v", got, tt.want)
+			got := validateTimeEntry(tt.record, tt.timeTypeCode)
+			if got != nil && tt.valid {
+				t.Errorf("failed validation (%v) but expected valid", got)
+			}
+			if got == nil && !tt.valid {
+				t.Errorf("passed validation but expected invalid")
 			}
 		})
 	}
