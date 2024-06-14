@@ -1,6 +1,8 @@
 package hooks
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -21,14 +23,22 @@ func buildRecordFromMap(m map[string]any) *models.Record {
 	return record
 }
 
-func extractArbitraryKey(err error) string {
+func extractArbitraryKey(err error) (string, error) {
 	errMap := err.(validation.Errors)
-	var arbitraryKey string
+	keys := make([]string, len(errMap))
+	i := 0
 	for k := range errMap {
-		arbitraryKey = k
-		break
+		keys[i] = k
+		i++
 	}
-	return arbitraryKey
+
+	// if the keys array length is not 1, return an error
+	if len(keys) != 1 {
+		return "", fmt.Errorf("multiple error keys: %v", strings.Join(keys, ", "))
+	}
+
+	// return the first key
+	return keys[0], nil
 }
 
 func TestValidateTimeEntry(t *testing.T) {
@@ -40,20 +50,17 @@ func TestValidateTimeEntry(t *testing.T) {
 		record       *models.Record
 	}{
 		// Regular Time (R)
-		"valid no job":                  {timeTypeCode: "R", valid: true, record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 1.5, "job_hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"valid with job":                {timeTypeCode: "R", valid: true, record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.5, "hours": 0.0, "job_hours": 2.5, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
-		"job hours not multiple of 0.5": {timeTypeCode: "R", valid: false, field: "job_hours", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.5, "hours": 0.0, "job_hours": 2.4, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
-		"hours not multiple of 0.5":     {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 1.4, "job_hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"extraneous payout amount":      {timeTypeCode: "R", valid: false, field: "payout_request_amount", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 1.5, "job_hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 500.0})},
-		"work record without job":       {timeTypeCode: "R", valid: false, field: "work_record", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 1.5, "job_hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
-		"missing division":              {timeTypeCode: "R", valid: false, field: "division", record: buildRecordFromMap(map[string]any{"division": "", "meals_hours": 1.0, "hours": 1.5, "job_hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"too many hours":                {timeTypeCode: "R", valid: false, field: "global", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 18.0, "job_hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"no hours":                      {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.0, "hours": 0.0, "job_hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"both types of hours no job":    {timeTypeCode: "R", valid: false, field: "job_hours", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 3.0, "job_hours": 5.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"both types of hours with job":  {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 3.0, "job_hours": 5.0, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"bad work_record value":         {timeTypeCode: "R", valid: false, field: "work_record", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.5, "hours": 0.0, "job_hours": 2.5, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "F23-137-", "payout_request_amount": 0.0})},
-		"no job, missing hours":         {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.0, "hours": 0.0, "job_hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"description too short":         {timeTypeCode: "R", valid: false, field: "description", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.5, "hours": 0, "job_hours": 2.5, "job": "JOBID1234567890", "description": "tiny", "work_record": "", "payout_request_amount": 0})},
+		"valid no job":              {timeTypeCode: "R", valid: true, record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"valid with job":            {timeTypeCode: "R", valid: true, record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.5, "hours": 6.5, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
+		"hours not multiple of 0.5": {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 1.4, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"extraneous payout amount":  {timeTypeCode: "R", valid: false, field: "payout_request_amount", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 500.0})},
+		"work record without job":   {timeTypeCode: "R", valid: false, field: "work_record", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
+		"missing division":          {timeTypeCode: "R", valid: false, field: "division", record: buildRecordFromMap(map[string]any{"division": "", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"too many hours":            {timeTypeCode: "R", valid: false, field: "global", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 1.0, "hours": 18.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"no hours":                  {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.0, "hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"bad work_record value":     {timeTypeCode: "R", valid: false, field: "work_record", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.5, "hours": 5.0, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "F23-137-", "payout_request_amount": 0.0})},
+		"no job, missing hours":     {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.0, "hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"description too short":     {timeTypeCode: "R", valid: false, field: "description", record: buildRecordFromMap(map[string]any{"division": "DE", "meals_hours": 0.5, "hours": 5.0, "job": "JOBID1234567890", "description": "tiny", "work_record": "", "payout_request_amount": 0})},
 	}
 
 	// Run tests
@@ -64,7 +71,10 @@ func TestValidateTimeEntry(t *testing.T) {
 				// we extract an arbitrary key from the error map. Key order doesn't
 				// exist in Go maps but we expect only one error at a time so arbitrary
 				// works here.
-				field := extractArbitraryKey(got)
+				field, keysError := extractArbitraryKey(got)
+				if keysError != nil {
+					t.Errorf("error extracting key from error map: %v", keysError)
+				}
 				if tt.valid {
 					t.Errorf("failed validation (%v) but expected valid", got)
 				}
