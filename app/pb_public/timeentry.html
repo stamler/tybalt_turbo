@@ -228,24 +228,21 @@
             </select>
           </span>  
         </template>
-        <template x-if="isWorkTime && item.job && item.job !== '' && item.division">
-          <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.job_hours !== undefined}">
+        <template x-if="item.job && item.job !== '' && item.division && isWorkTime">
+          <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.work_record !== undefined}">
             <span class="flex w-full gap-2">
-              <label for="job_hours">Job Hours</label>
+              <label for="workRecord">Work Record</label>
               <input
-              class="flex-1"
-              type="number"
-              name="job_hours"
-              x-model.number="item.job_hours"
-              step="0.5"
-              min="0"
-              max="18"
+                class="flex-1"
+                type="text"
+                name="workRecord"
+                placeholder="Work Record"
+                x-model="item.work_record"
               />
             </span>
-            <template x-if="errors.job_hours !== undefined">
-              <span x-text="errors.job_hours.message" class="text-red-600"></span>
+            <template x-if="errors.work_record !== undefined">
+              <span x-text="errors.work_record.message" class="text-red-600"></span>
             </template>
-          </div>
           </div>
         </template>
     
@@ -256,7 +253,7 @@
         <!-- TODO: The item.job === undefined below is predecated on the
         autocomplete clearing the property. Right now we are using a text field
         so it will never show up after being set once -->
-        <template x-if="!hasTimeType(['OR', 'OW', 'OTO']) && (item.job === undefined || item.job === '')">
+        <template x-if="!hasTimeType(['OR', 'OW', 'OTO'])">
           <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.hours !== undefined}">
             <span class="flex w-full gap-2">
               <label for="hours">Hours</label>
@@ -296,23 +293,6 @@
           </div>
         </template>
     
-        <template x-if="item.job && item.job !== '' && item.division && isWorkTime">
-          <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.work_record !== undefined}">
-            <span class="flex w-full gap-2">
-              <label for="workRecord">Work Record</label>
-              <input
-                class="flex-1"
-                type="text"
-                name="workRecord"
-                placeholder="Work Record"
-                x-model="item.work_record"
-              />
-            </span>
-            <template x-if="errors.work_record !== undefined">
-              <span x-text="errors.work_record.message" class="text-red-600"></span>
-            </template>
-          </div>
-        </template>
         <template x-if="!hasTimeType(['OR', 'OW', 'OTO', 'RB'])">
           <div class="flex flex-col w-full gap-2" :class="{'bg-red-200': errors.description !== undefined}">
           <span class="flex w-full gap-2">
