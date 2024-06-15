@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"log"
 	"regexp"
+	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/labstack/echo/v5"
@@ -79,6 +80,14 @@ func isPositiveMultipleOfPointFive(fieldName string) validation.RuleFunc {
 	}
 }
 
+func isValidDate(value interface{}) error {
+	s, _ := value.(string)
+	if _, err := time.Parse(time.DateOnly, s); err != nil {
+		return validation.NewError("validation_invalid_date", s+" is not a valid date")
+	}
+	return nil
+}
+
 // cross-field validation is performed in this function.
 func validateTimeEntry(timeEntryRecord *models.Record, timeTypeCode string) error {
 	isWorkTime := list.ExistInSlice(timeTypeCode, []string{"R", "RT"})
@@ -93,6 +102,7 @@ func validateTimeEntry(timeEntryRecord *models.Record, timeTypeCode string) erro
 			validation.When(hoursProhibited, validation.In(0).Error("Hours must be 0 when time_type is OR, OW or OTO")),
 			validation.When((isWorkTime) || hoursRequired, validation.By(isPositiveMultipleOfPointFive(""))),
 		),
+		"date":                  validation.Validate(timeEntryRecord.Get("date"), validation.Required, validation.By(isValidDate)),
 		"global":                validation.Validate(totalHours, validation.Max(18.0).Error("Total hours must not exceed 18")),
 		"division":              validation.Validate(timeEntryRecord.Get("division"), validation.When(isWorkTime, validation.Required.Error("required when time_type is R or RT")).Else(validation.In("").Error("Division must be empty when time_type is not R or RT"))),
 		"meals_hours":           validation.Validate(timeEntryRecord.Get("meals_hours"), validation.When(isWorkTime, validation.Max(3.0).Error("Meals Hours must not exceed 3"))),
