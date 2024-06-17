@@ -116,16 +116,10 @@
           // need a correct value in the payload just to make it to the hook
           this.item.uid = this.authStore.model.id
 
-          // set the week_ending date based on the first Saturday after the date
-          // in this.item.date
-          // TODO: do this in the backend as a go function in pocketbase
-          // app.OnRecordBeforeCreateRequest("time_entries").Add() hook. We will
-          // just send the date as a string in the format YYYY-MM-DD and the
-          // hook will set the week_ending field
-          const date = new Date(this.item.date);
-          const weekEnding = new Date(date);
-          weekEnding.setDate(date.getDate() + (6 - date.getDay()));
-          this.item.week_ending = weekEnding.toISOString().split("T")[0];
+          // set a dummy value for week_ending to satisfy the schema non-empty
+          // requirement. This will be changed in the backend to the correct
+          // value every time a record is saved
+          this.item.week_ending = "2006-01-02"
 
           // TODO: are we editing an existing record or creating a new one?
           // right now we are just creating a new one

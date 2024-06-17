@@ -88,6 +88,26 @@ func isValidDate(value interface{}) error {
 	return nil
 }
 
+// generate the week ending date from the date property. The week ending date is
+// the Saturday immediately following the date property. If the argument is
+// already a Saturday, it is returned unchanged. The date property is a string
+// in the format "YYYY-MM-DD".
+func generateWeekEnding(date string) (string, error) {
+	// parse the date string
+	t, err := time.Parse(time.DateOnly, date)
+	if err != nil {
+		return "", err
+	}
+
+	// add days to the date until it is a Saturday
+	for t.Weekday() != time.Saturday {
+		t = t.AddDate(0, 0, 1)
+	}
+
+	// return the date as a string
+	return t.Format(time.DateOnly), nil
+}
+
 // cross-field validation is performed in this function.
 func validateTimeEntry(timeEntryRecord *models.Record, timeTypeCode string) error {
 	isWorkTime := list.ExistInSlice(timeTypeCode, []string{"R", "RT"})
@@ -234,6 +254,14 @@ func ProcessTimeEntry(app *pocketbase.PocketBase, record *models.Record, context
 		return apis.NewBadRequestError("Error cleaning time_entry record", cleanErr)
 	}
 
+	// write the week_ending property to the record. This is derived exclusively
+	// from the date property.
+	weekEnding, wkEndErr := generateWeekEnding(record.GetString("date"))
+	if wkEndErr != nil {
+		return apis.NewBadRequestError("Error generating week_ending", wkEndErr)
+	}
+	record.Set("week_ending", weekEnding)
+
 	// perform the validation for the time_entry record. In this step we also
 	// write the uid property to the record so that we can validate it against the
 	if validationErr := validateTimeEntry(record, timeTypeCode); validationErr != nil {
@@ -247,14 +275,12 @@ func AddHooks(app *pocketbase.PocketBase) {
 	// hooks for time_entries model
 	app.OnRecordBeforeCreateRequest("time_entries").Add(func(e *core.RecordCreateEvent) error {
 		if err := ProcessTimeEntry(app, e.Record, e.HttpContext); err != nil {
-			// return the error to the client
 			return err
 		}
 		return nil
 	})
 	app.OnRecordBeforeUpdateRequest("time_entries").Add(func(e *core.RecordUpdateEvent) error {
 		if err := ProcessTimeEntry(app, e.Record, e.HttpContext); err != nil {
-			// return the error to the client
 			return err
 		}
 		return nil
