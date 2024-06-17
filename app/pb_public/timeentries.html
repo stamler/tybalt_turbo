@@ -1,16 +1,18 @@
 <!DOCTYPE html>
 <html>
 <head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
   <script src="https://www.unpkg.com/pocketbase@0.21.1/dist/pocketbase.umd.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.21/lodash.min.js"></script>
   <script>
     document.addEventListener('alpine:init', () => {
       Alpine.data('page', () => ({
         pb: {},
         authStore: {},
         loggedIn: false,
-        jobs: [],
-        newJob: {},
+        items: [],
         init() {
           this.pb = new PocketBase("http://localhost:8090")
           // if the user is already logged in, set the authStore 
@@ -34,20 +36,19 @@
           }
         },
         loadData() {
-          // load all of the jobs
-          this.pb.collection('jobs').getFullList().then(jobs => {
-            this.jobs = jobs
-          }).catch(err => { console.error(err) })
+          // load all of the items
+          this.pb.collection('time_entries').getFullList({
+            expand: 'job,time_type,division'
+          }).then(items => {
+            this.items = items
+          }).catch(err => { console.error(`loading items ${err}`) })
         },
-        async createJob() {
-          try {
-            const record = await this.pb.collection('jobs').create(this.newJob, { returnRecord: true })
-            this.jobs.push(record)
-            this.newJob = {}
-          } catch (err) {
-            console.error(err)
-          }
-        }
+        hoursString(item) {
+          const hoursArray = [];
+          if (item.hours) hoursArray.push(item.hours + " hrs");
+          if (item.mealsHours) hoursArray.push(item.meals_hours + " hrs meals");
+          return hoursArray.join(" + ");
+        },
       }));
     });
   </script>
@@ -72,19 +73,52 @@
   </header>
   <main>
     <template x-if="loggedIn">
-      <div>
-        <!-- List all of the jobs -->
-        <template x-for="job in jobs">
-          <div x-text="job.number"></div>
+      <!-- Show the list of items here -->
+      <ul class="flex flex-col">
+        <!-- iterate over each key in the object -->
+        <template x-for="item in items">
+          <li class="flex even:bg-neutral-200 odd:bg-neutral-100">
+            <div class="w-32" x-text="item.date"></div>
+            <div class="flex flex-col w-full">
+              <div class="headline_wrapper">
+                <div class="headline">
+                  <template x-if="item.expand.time_type.code === 'R'">
+                    <span x-text="item.expand.division.name"></span>
+                  </template>
+                  <template x-if="item.expand.time_type.code !== 'R'">
+                    <span x-text="item.expand.time_type.name"></span>
+                  </template>
+                </div>
+                <div class="byline">
+                  <template x-if="item.expand.time_type.code === 'OTO'">
+                    <span x-text="`$${item.payoutRequestAmount}`"></span>
+                  </template>
+                </div>
+              </div>
+              <div class="firstline" >
+                <template x-if="['R', 'RT'].includes(item.expand.time_type.code) && item.job !== ''" >
+                  <span x-text="item.expand.job.number"></span>
+                  <template x-if="item.expand.job.category">
+                    <span class="label" x-text="item.expand.job.category"></span>
+                  </template>
+                </template>
+              </div>
+              <div class="secondline" x-text="hoursString(item)"></div>
+              <template x-if="item.description">
+                <div class="thirdline">
+                  <template x-if="item.work_record !== ''">
+                    <span x-text="`Work Record: ${ item.work_record } / `"></span>
+                  </template>
+                  <span x-text="item.description"></span>
+                </div>
+              </template>
+            </div>
+            <div class="rowactionsbox">
+              <a href="/placeholder.html">a link</a>
+            </div>
+          </li>  
         </template>
-        
-        <!-- Create a new job -->
-        <h1>Create Job</h1>
-        <form @submit.prevent>
-          <input type="text" placeholder="Job Number" x-model="newJob.number">
-          <button type="button" @click="createJob()">Create Job</button>
-        </form>
-      </div>
+      </ul>
     </template>
     <!-- The login box, centered vertically and horizontally using flex -->
     <template x-if="!loggedIn">

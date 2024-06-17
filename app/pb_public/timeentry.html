@@ -216,7 +216,7 @@
             <select name="job" x-model="item.job">
               <option value="">No Job</option>
               <template x-for="j in jobs" :key="j.id">
-                <option x-text="`${j.job_number} -`" :value="j.id" :selected="j.id === item.job"></option>
+                <option x-text="`${j.number} -`" :value="j.id" :selected="j.id === item.job"></option>
               </template>
             </select>
           </span>  
