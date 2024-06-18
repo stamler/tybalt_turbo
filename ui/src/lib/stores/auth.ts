@@ -8,9 +8,8 @@ const { subscribe, set, update } = writable<BaseAuthStore | null>(null)
 // The loginWithMicrosoft function is now a method of the AuthStore class
 async function loginWithMicrosoft () {
   const authData = await pb.collection('users').authWithOAuth2({ provider: 'microsoft' });
-  // if the user is logged in, set the authStore
-  // console.log(authData.meta)
-  if (authData.meta?.authStore.isValid) {
+  if (authData.meta?.authStore?.isValid) {
+    // user is logged in
     set(authData.meta.authStore)
   }
 }
