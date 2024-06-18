@@ -3,6 +3,7 @@
   import type { BaseAuthStore } from 'pocketbase'
   import { authStore } from '$lib/stores/auth';
 
+  // subscribe to authStore
   let authStoreValue: BaseAuthStore | null = null;
   authStore.subscribe((value) => {
     authStoreValue = value;
