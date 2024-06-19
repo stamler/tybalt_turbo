@@ -1,13 +1,13 @@
 <script lang="ts">
   import flatpickr from "flatpickr";
-	import { onMount } from "svelte";
-	import type { PageData } from './$types';
-  import { pb } from '$lib/pocketbase'
-  import type { BaseAuthStore } from 'pocketbase'
-  import { authStore } from '$lib/stores/auth';
-	import type { TimeTypesRecord, DivisionsRecord, JobsRecord } from "$lib/pocketbase-types";
+  import { onMount } from "svelte";
+  import type { PageData } from "./$types";
+  import { pb } from "$lib/pocketbase";
+  import type { BaseAuthStore } from "pocketbase";
+  import { authStore } from "$lib/stores/auth";
+  import type { TimeTypesRecord, DivisionsRecord, JobsRecord } from "$lib/pocketbase-types";
 
-	let { data }: { data: PageData } = $props();
+  let { data }: { data: PageData } = $props();
 
   // subscribe to authStore
   let authStoreValue: BaseAuthStore | null = null;
@@ -16,22 +16,15 @@
   });
 
   const trainingTokensInDescriptionWhileRegularHours = $derived.by(() => {
-    if (item.time_type !== undefined && item.description !== undefined ) {
+    if (item.time_type !== undefined && item.description !== undefined) {
       const lowercase = item.description.toLowerCase().trim();
       const lowercaseTokens = lowercase.split(/\s+/);
       return (
-        hasTimeType(['R']) &&
-        ([
-          "training",
-          "train",
-          "orientation",
-          "course",
-          "whmis",
-          "learning",
-        ].some((token) => lowercaseTokens.includes(token)) ||
-          ["working at heights", "first aid"].some((token) =>
-            lowercase.includes(token)
-          ))
+        hasTimeType(["R"]) &&
+        (["training", "train", "orientation", "course", "whmis", "learning"].some((token) =>
+          lowercaseTokens.includes(token),
+        ) ||
+          ["working at heights", "first aid"].some((token) => lowercase.includes(token)))
       );
     }
   });
@@ -46,19 +39,19 @@
     }
   });
 
-  const isWorkTime = $derived(hasTimeType(['R', 'RT']))
+  const isWorkTime = $derived(hasTimeType(["R", "RT"]));
 
   let calendarInput: HTMLInputElement;
   let errors = $state({} as any);
   const defaultItem = {
-    uid: '',
-    // date in YYYY-MM-DD format 
-    date: new Date().toISOString().split('T')[0],
-    time_type: 'sdyfl3q7j7ap849',
-    division: 'vccd5fo56ctbigh',
-    description: '',
-    job: '',
-    work_record: '',
+    uid: "",
+    // date in YYYY-MM-DD format
+    date: new Date().toISOString().split("T")[0],
+    time_type: "sdyfl3q7j7ap849",
+    division: "vccd5fo56ctbigh",
+    description: "",
+    job: "",
+    work_record: "",
     hours: 0,
     meals_hours: 0,
     payout_request_amount: 0,
@@ -68,14 +61,14 @@
 
   // given a list of time type codes, return true if the item's time type is in
   // the list
-  function hasTimeType (typelist: string[]) {
+  function hasTimeType(typelist: string[]) {
     if (!data.timetypes || data.timetypes.length === 0) {
       return false;
     }
     return typelist
-      .map(c => data.timetypes.find(t => t.code === c).id)
+      .map((c) => data.timetypes.find((t) => t.code === c).id)
       .includes(item.time_type);
-  };
+  }
 
   async function save() {
     // set the uid from the authStore We do it here rather than the
@@ -89,12 +82,12 @@
     // set a dummy value for week_ending to satisfy the schema non-empty
     // requirement. This will be changed in the backend to the correct
     // value every time a record is saved
-    item.week_ending = "2006-01-02"
+    item.week_ending = "2006-01-02";
 
     // TODO: are we editing an existing record or creating a new one?
     // right now we are just creating a new one
     try {
-      const record = await pb.collection('time_entries').create(item, { returnRecord: true })
+      const record = await pb.collection("time_entries").create(item, { returnRecord: true });
 
       // submission was successful, clear the errors
       errors = {};
@@ -104,23 +97,23 @@
     } catch (error: any) {
       errors = error.data.data;
     }
-  };
+  }
 
   // initialize flatpickr on the onMount lifecycle event
   onMount(() => {
     flatpickr(calendarInput, {
       inline: true,
-      minDate: '2024-06-01',
+      minDate: "2024-06-01",
       // 2 months from now
       maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
       enableTime: false,
-      dateFormat: 'Y-m-d',
+      dateFormat: "Y-m-d",
       defaultDate: item.date,
     });
-  })
-
+  });
 </script>
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 
 <form class="flex flex-col items-center w-full gap-2 p-2">
   <span class="flex flex-col w-full gap-2">
@@ -137,7 +130,7 @@
   <span class="flex w-full gap-2">
     <label for="timetype">Time Type</label>
     <select name="timetype" bind:value={item.time_type}>
-      {#each (data.timetypes as TimeTypesRecord[]) as t}
+      {#each data.timetypes as TimeTypesRecord[] as t}
         <option value={t.id} selected={t.id === item.time_type}>{t.code} - {t.name}</option>
       {/each}
     </select>
@@ -155,7 +148,7 @@
     <span class="flex w-full gap-2">
       <label for="division">Division</label>
       <select name="division" bind:value={item.division}>
-        {#each (data.divisions as DivisionsRecord[]) as d}
+        {#each data.divisions as DivisionsRecord[] as d}
           <option value={d.id} selected={d.id === item.division}>{d.code} - {d.name}</option>
         {/each}
       </select>
@@ -164,14 +157,14 @@
       <label for="job">Job</label>
       <select name="job" bind:value={item.job}>
         <option value="">No Job</option>
-        {#each (data.jobs as JobsRecord[]) as j}
+        {#each data.jobs as JobsRecord[] as j}
           <option value={j.id} selected={j.id === item.job}>{j.number} - {j.name}</option>
         {/each}
       </select>
-    </span>  
+    </span>
   {/if}
 
-  {#if item.job && item.job !== '' && item.division && isWorkTime}
+  {#if item.job && item.job !== "" && item.division && isWorkTime}
     <div class="flex flex-col w-full gap-2 {errors.work_record !== undefined ? 'bg-red-200' : ''}">
       <span class="flex w-full gap-2">
         <label for="workRecord">Work Record</label>
@@ -196,7 +189,7 @@
   <!-- TODO: The item.job === undefined below is predecated on the
   autocomplete clearing the property. Right now we are using a text field
   so it will never show up after being set once -->
-  {#if !hasTimeType(['OR', 'OW', 'OTO'])}
+  {#if !hasTimeType(["OR", "OW", "OTO"])}
     <div class="flex flex-col w-full gap-2 {errors.hours !== undefined ? 'bg-red-200' : ''}">
       <span class="flex w-full gap-2">
         <label for="hours">Hours</label>
@@ -236,16 +229,16 @@
     </div>
   {/if}
 
-  {#if !hasTimeType(['OR', 'OW', 'OTO', 'RB'])}
+  {#if !hasTimeType(["OR", "OW", "OTO", "RB"])}
     <div class="flex flex-col w-full gap-2 {errors.description !== undefined ? 'bg-red-200' : ''}">
       <span class="flex w-full gap-2">
         <label for="description">Description</label>
         <input
-        class="flex-1"
-        type="text"
-        name="description"
-        placeholder="Description (5 char minimum)"
-        bind:value={item.description}
+          class="flex-1"
+          type="text"
+          name="description"
+          placeholder="Description (5 char minimum)"
+          bind:value={item.description}
         />
       </span>
       {#if errors.description !== undefined}
@@ -255,21 +248,25 @@
   {/if}
   {#if jobNumbersInDescription}
     <span class="flex w-full gap-2 text-red-600 bg-red-200">
-      Job numbers are not allowed in the description. Enter jobs numbers in
-      the appropriate field and create one time entry per job.
+      Job numbers are not allowed in the description. Enter jobs numbers in the appropriate field
+      and create one time entry per job.
     </span>
   {/if}
 
-  {#if hasTimeType(['OTO'])}
-    <div class="flex flex-col w-full gap-2 {errors.payout_request_amount !== undefined ? 'bg-red-200' : ''}">
+  {#if hasTimeType(["OTO"])}
+    <div
+      class="flex flex-col w-full gap-2 {errors.payout_request_amount !== undefined
+        ? 'bg-red-200'
+        : ''}"
+    >
       <span class="flex w-full gap-2">
         $<input
-        class="flex-1"
-        type="number"
-        name="payoutRequestAmount"
-        placeholder="Amount"
-        bind:value={item.payout_request_amount}
-        step="0.01"
+          class="flex-1"
+          type="number"
+          name="payoutRequestAmount"
+          placeholder="Amount"
+          bind:value={item.payout_request_amount}
+          step="0.01"
         />
       </span>
       {#if errors.payout_request_amount !== undefined}
@@ -281,16 +278,12 @@
   <div class="flex flex-col w-full gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       {#if !jobNumbersInDescription}
-        <button type="button" onclick={save}>
-          Save
-        </button>
+        <button type="button" onclick={save}> Save </button>
       {/if}
-      <button type="button">
-        Cancel
-      </button>
+      <button type="button"> Cancel </button>
     </span>
     {#if errors.global !== undefined}
-      <span class="text-red-600">{ errors.global.message }</span>
+      <span class="text-red-600">{errors.global.message}</span>
     {/if}
   </div>
-</form>    
+</form>
