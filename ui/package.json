@@ -35,6 +35,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"flatpickr": "^4.6.13",
 		"pocketbase": "^0.21.3"
 	}
 }
