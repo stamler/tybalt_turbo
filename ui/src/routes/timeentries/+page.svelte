@@ -12,6 +12,11 @@
 	}
 </script>
 
+{#snippet rowactions({id})}
+	<a href="/details/{id}">details</a>
+	<a href="/{id}">delete</a>
+{/snippet}
+	
 <!-- Show the list of items here -->
 <ul class="flex flex-col">
 	<!-- iterate over each key in the object -->
@@ -52,7 +57,7 @@
 				{/if}
 			</div>
 			<div class="rowactionsbox">
-				<a href="/placeholder.html">a link</a>
+				{@render rowactions(item) }
 			</div>
 		</li>
 	{/each}
