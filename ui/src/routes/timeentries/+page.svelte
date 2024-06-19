@@ -2,7 +2,7 @@
 	import type { PageData } from './$types';
 	import type { TimeEntriesRecord } from '$lib/pocketbase-types';
 
-	export let data: PageData;
+	let { data }: { data: PageData } = $props();
 
 	function hoursString(item: TimeEntriesRecord) {
 		const hoursArray = [];
