@@ -9,7 +9,6 @@ export const load: PageLoad = async () => {
 
   try {
     // load required data
-    console.log('loading data')
     jobs = await pb.collection('jobs').getFullList()
     timetypes = await pb.collection('time_types').getFullList()
     divisions = await pb.collection('divisions').getFullList()
