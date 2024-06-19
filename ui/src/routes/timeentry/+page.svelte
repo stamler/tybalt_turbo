@@ -7,7 +7,7 @@
   import { authStore } from '$lib/stores/auth';
 	import type { TimeTypesRecord, DivisionsRecord, JobsRecord } from "$lib/pocketbase-types";
 
-	export let data: PageData;
+	let { data }: { data: PageData } = $props();
 
   // subscribe to authStore
   let authStoreValue: BaseAuthStore | null = null;
@@ -15,32 +15,11 @@
     authStoreValue = value;
   });
 
-  let trainingTokensInDescriptionWhileRegularHours = false;
-  let jobNumbersInDescription = false;
-  let isWorkTime = false;
-  let calendarInput: HTMLInputElement;
-  let errors: any = {};
-  const defaultItem = {
-    uid: '',
-    // date in YYYY-MM-DD format 
-    date: new Date().toISOString().split('T')[0],
-    time_type: 'sdyfl3q7j7ap849',
-    division: 'vccd5fo56ctbigh',
-    description: '',
-    job: '',
-    work_record: '',
-    hours: 0,
-    meals_hours: 0,
-    payout_request_amount: 0,
-    week_ending: "2006-01-02",
-  };
-  let item = { ...defaultItem };
-
-  $: {
+  const trainingTokensInDescriptionWhileRegularHours = $derived.by(() => {
     if (item.time_type !== undefined && item.description !== undefined ) {
       const lowercase = item.description.toLowerCase().trim();
       const lowercaseTokens = lowercase.split(/\s+/);
-      trainingTokensInDescriptionWhileRegularHours = (
+      return (
         hasTimeType(['R']) &&
         ([
           "training",
@@ -55,19 +34,37 @@
           ))
       );
     }
-    trainingTokensInDescriptionWhileRegularHours = false;
-  };
-  $: {
+  });
+
+  const jobNumbersInDescription = $derived.by(() => {
     if (item.description !== undefined) {
       const lowercase = item.description.toLowerCase().trim();
       // look for any instances of XX-YYY where XX is a number between 15 and
       // 40 and YYY is a zero-padded number between 1 and 999 then return true
       // if any are found
-      jobNumbersInDescription = /(1[5-9]|2[0-9]|3[0-9]|40)-(\d{3})/.test(lowercase);
+      return /(1[5-9]|2[0-9]|3[0-9]|40)-(\d{3})/.test(lowercase);
     }
-    jobNumbersInDescription = false;
+  });
+
+  const isWorkTime = $derived(hasTimeType(['R', 'RT']))
+
+  let calendarInput: HTMLInputElement;
+  let errors = $state({} as any);
+  const defaultItem = {
+    uid: '',
+    // date in YYYY-MM-DD format 
+    date: new Date().toISOString().split('T')[0],
+    time_type: 'sdyfl3q7j7ap849',
+    division: 'vccd5fo56ctbigh',
+    description: '',
+    job: '',
+    work_record: '',
+    hours: 0,
+    meals_hours: 0,
+    payout_request_amount: 0,
+    week_ending: "2006-01-02",
   };
-  $: isWorkTime = hasTimeType(['R', 'RT']);
+  let item = $state({ ...defaultItem } as any);
 
   // given a list of time type codes, return true if the item's time type is in
   // the list
@@ -100,12 +97,12 @@
       const record = await pb.collection('time_entries').create(item, { returnRecord: true })
 
       // submission was successful, clear the errors
-      errors = {}
+      errors = {};
 
       // clear the item
-      item = { ...defaultItem }
+      item = { ...defaultItem };
     } catch (error: any) {
-      errors = error.data.data
+      errors = error.data.data;
     }
   };
 
@@ -257,7 +254,7 @@
     </div>
   {/if}
   {#if jobNumbersInDescription}
-    <span class="text-red-600 bg-red-200">
+    <span class="flex w-full gap-2 text-red-600 bg-red-200">
       Job numbers are not allowed in the description. Enter jobs numbers in
       the appropriate field and create one time entry per job.
     </span>
@@ -284,7 +281,7 @@
   <div class="flex flex-col w-full gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       {#if !jobNumbersInDescription}
-        <button type="button" on:click={save}>
+        <button type="button" onclick={save}>
           Save
         </button>
       {/if}
