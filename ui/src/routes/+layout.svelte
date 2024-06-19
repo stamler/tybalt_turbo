@@ -6,6 +6,9 @@
 	import '../app.css';
 
   // children is a function that we will call to render the current route
+	// https://svelte-5-preview.vercel.app/docs/snippets#passing-snippets-to-components
+	// Any content inside the component tags that is not a snippet declaration
+	// implicitly becomes part of the children snippet 
   let { children } = $props();
 
 	// route guards
