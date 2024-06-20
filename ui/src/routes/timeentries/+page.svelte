@@ -27,7 +27,7 @@
 
 {#snippet byline({ expand, payout_request_amount })}
   {#if expand?.time_type.code === "OTO"}
-  <span>${payout_request_amount}</span>
+    <span>${payout_request_amount}</span>
   {/if}
 {/snippet}
 
@@ -44,7 +44,7 @@
   {hoursString(item)}
 {/snippet}
 
-{#snippet line3({ work_record, description})}
+{#snippet line3({ work_record, description })}
   {#if work_record !== ""}
     <span>Work Record: {work_record} / </span>
   {/if}
@@ -56,4 +56,13 @@
   <a href="/{id}">delete</a>
 {/snippet}
 
-<DsList items={data.items as TimeEntriesRecord[]} {anchor} {headline} {byline} {line1} {line2} {line3} {actions}/>
+<DsList
+  items={data.items as TimeEntriesRecord[]}
+  {anchor}
+  {headline}
+  {byline}
+  {line1}
+  {line2}
+  {line3}
+  {actions}
+/>

@@ -1,5 +1,5 @@
 <script lang="ts" generics="T">
-	import type { Snippet } from 'svelte';
+  import type { Snippet } from "svelte";
 
   let {
     items,
@@ -72,7 +72,7 @@
           <div class="firstline">{@render line1(item)}</div>
         {/if}
         {#if line2 !== undefined}
-        <div class="secondline">{@render line2(item)}</div>
+          <div class="secondline">{@render line2(item)}</div>
         {/if}
         {#if line3 !== undefined}
           <div class="opacity-50">{@render line3(item)}</div>
