@@ -47,7 +47,7 @@ export type DivisionsRecord = {
 export type JobsRecord = {
   id: RecordIdString;
   number: string;
-  name: string;
+  description: string;
 };
 
 export type ProfilesRecord = {
