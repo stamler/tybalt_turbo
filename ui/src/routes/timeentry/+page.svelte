@@ -158,7 +158,7 @@
       <select name="job" bind:value={item.job}>
         <option value="">No Job</option>
         {#each data.jobs as JobsRecord[] as j}
-          <option value={j.id} selected={j.id === item.job}>{j.number} - {j.name}</option>
+          <option value={j.id} selected={j.id === item.job}>{j.number} - {j.description}</option>
         {/each}
       </select>
     </span>

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
   import type { TimeEntriesRecord } from "$lib/pocketbase-types";
@@ -10,7 +11,22 @@
     if (item.hours) hoursArray.push(item.hours + " hrs");
     if (item.meals_hours) hoursArray.push(item.meals_hours + " hrs meals");
     return hoursArray.join(" + ");
-  }
+  };
+
+  async function del(id: string): Promise<void>{
+    // return immediately if data.items is not an array
+    if (!Array.isArray(data.items)) return;
+
+    try {
+      const record = await pb.collection("time_entries").delete(id);
+
+      // remove the item from the list
+      data.items = data.items.filter((item) => item.id !== id);
+
+    } catch (error: any) {
+      alert(error.data.message);
+    }
+  };
 </script>
 
 {#snippet anchor(item)}
@@ -53,7 +69,7 @@
 
 {#snippet actions({ id })}
   <a href="/details/{id}">details</a>
-  <a href="/{id}">delete</a>
+  <button type="button" onclick={() => del(id)}>delete</button>
 {/snippet}
 
 <DsList
