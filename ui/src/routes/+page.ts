@@ -7,7 +7,10 @@ export const load: PageLoad = async () => {
 
   try {
     // load required data
-    jobs = await pb.collection("jobs").getFullList();
+    jobs = await pb.collection("jobs").getFullList({
+      // the - symbol means descending order
+      sort: '-number'
+    });
     return {
       jobs,
     };

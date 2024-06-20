@@ -9,9 +9,9 @@ export const load: PageLoad = async () => {
 
   try {
     // load required data
-    jobs = await pb.collection("jobs").getFullList();
-    timetypes = await pb.collection("time_types").getFullList();
-    divisions = await pb.collection("divisions").getFullList();
+    jobs = await pb.collection("jobs").getFullList({sort: "-number"});
+    timetypes = await pb.collection("time_types").getFullList({sort: "code"});
+    divisions = await pb.collection("divisions").getFullList({sort: "code"});
     return {
       jobs,
       timetypes,

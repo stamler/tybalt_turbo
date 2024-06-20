@@ -79,6 +79,13 @@
       <span class="text-red-600">{errors.description.message}</span>
     {/if}
   </div>
-  <button type="button" onclick={save}>Save</button>
-
+  <div class="flex flex-col w-full gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
+    <span class="flex w-full gap-2">
+      <button type="button" onclick={save}> Save </button>
+      <button type="button"> Cancel </button>
+    </span>
+    {#if errors.global !== undefined}
+      <span class="text-red-600">{errors.global.message}</span>
+    {/if}
+  </div>
 </form>

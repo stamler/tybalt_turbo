@@ -9,6 +9,7 @@ export const load: PageLoad = async () => {
     // load required data
     items = await pb.collection("time_entries").getFullList({
       expand: "job,time_type,division",
+      sort: "-date",
     });
     return {
       items,
