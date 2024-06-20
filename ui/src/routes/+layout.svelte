@@ -21,8 +21,8 @@
   });
 </script>
 
-<header class="w-screen h-10 bg-neutral-700 text-white px-3 flex justify-between">
-  <h1 class="h-full flex flex-col justify-center"><a href="/">Tybalt</a></h1>
+<header class="w-screen h-10 bg-neutral-700 text-white px-3 flex items-center justify-between">
+  <a href="/">Tybalt</a>
   <a href="/timeentry">New Entry</a>
   <a href="/timeentries">Entries</a>
   <div class="h-full">

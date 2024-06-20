@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
   import { pb } from "$lib/pocketbase";
   import type { JobsRecord } from "$lib/pocketbase-types";
@@ -32,22 +33,18 @@
 
 <h1 class="text-green-800">Jobs</h1>
 
+{#snippet anchor({ number })}{number}{/snippet}
+{#snippet headline({ description })}{description}{/snippet}
+
+{#snippet actions({ id })}
+  <a href="/details/{id}">details</a>
+  <a href="/{id}">delete</a>
+{/snippet}
+
 <!-- Show the list of items here -->
-<ul class="flex flex-col">
-  {#each data.jobs as JobsRecord[] as item}
-    <li class="flex even:bg-neutral-200 odd:bg-neutral-100">
-      <div class="w-32">{item.number}</div>
-      <div class="flex flex-col w-full">
-        <div class="headline_wrapper">
-          <div class="headline">{item.description}</div>
-        </div>
-      </div>
-    </li>
-  {/each}
-</ul>
+<DsList items={data.jobs as JobsRecord[]} {anchor} {headline} {actions} />
 
 <!-- Create a new job -->
-
 <form class="flex flex-col items-center w-full gap-2 p-2">
   <div class="flex flex-col w-full gap-2 {errors.number !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">

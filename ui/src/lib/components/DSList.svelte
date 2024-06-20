@@ -60,10 +60,10 @@
   {/if}
   {#each processedItems as item}
     <li class="flex even:bg-neutral-200 odd:bg-neutral-100">
-      <div class="w-32">{@render anchor(item)}</div>
-      <div class="flex flex-col w-full">
+      <div class="flex mx-4 items-center justify-center">{@render anchor(item)}</div>
+      <div class="flex my-1 flex-col w-full">
         <div class="headline_wrapper">
-          <div class="headline">{@render headline(item)}</div>
+          <div class="font-bold">{@render headline(item)}</div>
           {#if byline !== undefined}
             <div class="byline">{@render byline(item)}</div>
           {/if}
@@ -75,11 +75,11 @@
         <div class="secondline">{@render line2(item)}</div>
         {/if}
         {#if line3 !== undefined}
-          <div class="thirdline">{@render line3(item)}</div>
+          <div class="opacity-50">{@render line3(item)}</div>
         {/if}
       </div>
       {#if actions !== undefined}
-        <div class="rowactionsbox">{@render actions(item)}</div>
+        <div class="flex items-center gap-1 m-2">{@render actions(item)}</div>
       {/if}
     </li>
   {/each}
