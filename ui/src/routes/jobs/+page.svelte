@@ -31,8 +31,6 @@
   }
 </script>
 
-<h1 class="text-green-800">Jobs</h1>
-
 {#snippet anchor({ number })}{number}{/snippet}
 {#snippet headline({ description })}{description}{/snippet}
 

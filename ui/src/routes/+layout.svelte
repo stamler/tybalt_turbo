@@ -16,7 +16,7 @@
     if (browser && !$authStore?.isValid && $page.url.pathname !== "/login") {
       goto("/login");
     } else if (browser && $authStore?.isValid && $page.url.pathname === "/login") {
-      goto("/");
+      goto("/timeentries");
     }
   });
 </script>
@@ -25,6 +25,8 @@
   <a href="/">Tybalt</a>
   <a href="/timeentry">New Entry</a>
   <a href="/timeentries">Entries</a>
+  <a href="/jobs">Jobs</a>
+  <a href="/timetypes">Time Types</a>
   <div class="h-full">
     {#if $authStore?.isValid}
       <!-- user is logged in -->
