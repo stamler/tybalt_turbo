@@ -1,4 +1,5 @@
 <script lang="ts">
+  import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
   import type { TimeEntriesRecord } from "$lib/pocketbase-types";
 
@@ -12,53 +13,47 @@
   }
 </script>
 
+{#snippet anchor(item)}
+  {item.date}
+{/snippet}
+
+{#snippet headline({ expand })}
+  {#if expand?.time_type.code === "R"}
+    <span>{expand.division.name}</span>
+  {:else}
+    <span>{expand?.time_type.name}</span>
+  {/if}
+{/snippet}
+
+{#snippet byline({ expand, payout_request_amount })}
+  {#if expand?.time_type.code === "OTO"}
+  <span>${payout_request_amount}</span>
+  {/if}
+{/snippet}
+
+{#snippet line1({ expand, job })}
+  {#if ["R", "RT"].includes(expand?.time_type.code) && job !== ""}
+    <span>{expand?.job.number}</span>
+    {#if expand?.job.category}
+      <span class="label">{expand.job.category}</span>
+    {/if}
+  {/if}
+{/snippet}
+
+{#snippet line2(item)}
+  {hoursString(item)}
+{/snippet}
+
+{#snippet line3({ work_record, description})}
+  {#if work_record !== ""}
+    <span>Work Record: {work_record} / </span>
+  {/if}
+  <span>{description}</span>
+{/snippet}
+
 {#snippet actions({ id })}
   <a href="/details/{id}">details</a>
   <a href="/{id}">delete</a>
 {/snippet}
 
-<!-- Show the list of items here -->
-<ul class="flex flex-col">
-  <!-- iterate over each key in the object -->
-  {#each data.items as TimeEntriesRecord[] as item}
-    <li class="flex even:bg-neutral-200 odd:bg-neutral-100">
-      <div class="w-32">{item.date}</div>
-      <div class="flex flex-col w-full">
-        <div class="headline_wrapper">
-          <div class="headline">
-            {#if item.expand?.time_type.code === "R"}
-              <span>{item.expand.division.name}</span>
-            {:else}
-              <span>{item.expand?.time_type.name}</span>
-            {/if}
-          </div>
-          <div class="byline">
-            {#if item.expand?.time_type.code === "OTO"}
-              <span>${item.payout_request_amount}</span>
-            {/if}
-          </div>
-        </div>
-        <div class="firstline">
-          {#if ["R", "RT"].includes(item.expand?.time_type.code) && item.job !== ""}
-            <span>{item.expand?.job.number}</span>
-            {#if item.expand?.job.category}
-              <span class="label">{item.expand.job.category}</span>
-            {/if}
-          {/if}
-        </div>
-        <div class="secondline">{hoursString(item)}</div>
-        {#if item.description}
-          <div class="thirdline">
-            {#if item.work_record !== ""}
-              <span>Work Record: {item.work_record} / </span>
-            {/if}
-            <span>{item.description}</span>
-          </div>
-        {/if}
-      </div>
-      <div class="rowactionsbox">
-        {@render actions(item)}
-      </div>
-    </li>
-  {/each}
-</ul>
+<DsList items={data.items as TimeEntriesRecord[]} {anchor} {headline} {byline} {line1} {line2} {line3} {actions}/>
