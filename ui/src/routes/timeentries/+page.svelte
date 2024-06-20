@@ -12,7 +12,7 @@
   }
 </script>
 
-{#snippet rowactions({ id })}
+{#snippet actions({ id })}
   <a href="/details/{id}">details</a>
   <a href="/{id}">delete</a>
 {/snippet}
@@ -57,7 +57,7 @@
         {/if}
       </div>
       <div class="rowactionsbox">
-        {@render rowactions(item)}
+        {@render actions(item)}
       </div>
     </li>
   {/each}
