@@ -18,7 +18,7 @@
     if (!Array.isArray(data.items)) return;
 
     try {
-      const record = await pb.collection("time_entries").delete(id);
+      await pb.collection("time_entries").delete(id);
 
       // remove the item from the list
       data.items = data.items.filter((item) => item.id !== id);

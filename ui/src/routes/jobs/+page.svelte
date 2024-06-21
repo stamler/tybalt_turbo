@@ -17,8 +17,8 @@
   async function save() {
     try {
       const record = await pb.collection("jobs").create(item, { returnRecord: true });
-      if (data.jobs === undefined) throw new Error("data.jobs is undefined");
-      data.jobs.push(record);
+      if (data.items === undefined) throw new Error("data.items is undefined");
+      data.items.push(record);
 
       // submission was successful, clear the errors
       errors = {};
@@ -29,6 +29,19 @@
       errors = error.data.data;
     }
   }
+  async function del(id: string): Promise<void> {
+    // return immediately if data.items is not an array
+    if (!Array.isArray(data.items)) return;
+
+    try {
+      await pb.collection("jobs").delete(id);
+
+      // remove the item from the list
+      data.items = data.items.filter((item) => item.id !== id);
+    } catch (error: any) {
+      alert(error.data.message);
+    }
+  }
 </script>
 
 {#snippet anchor({ number })}{number}{/snippet}
@@ -36,11 +49,11 @@
 
 {#snippet actions({ id })}
   <a href="/details/{id}">details</a>
-  <a href="/{id}">delete</a>
+  <button type="button" onclick={() => del(id)}>delete</button>
 {/snippet}
 
 <!-- Show the list of items here -->
-<DsList items={data.jobs as JobsRecord[]} {anchor} {headline} {actions} />
+<DsList items={data.items as JobsRecord[]} {anchor} {headline} {actions} />
 
 <!-- Create a new job -->
 <form class="flex flex-col items-center w-full gap-2 p-2">

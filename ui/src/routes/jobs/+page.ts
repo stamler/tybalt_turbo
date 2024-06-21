@@ -3,16 +3,16 @@ import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 
 export const load: PageLoad = async () => {
-  let jobs: JobsRecord[];
+  let items: JobsRecord[];
 
   try {
     // load required data
-    jobs = await pb.collection("jobs").getFullList({
+    items = await pb.collection("jobs").getFullList({
       // the - symbol means descending order
       sort: "-number",
     });
     return {
-      jobs,
+      items,
     };
   } catch (error) {
     console.error(`loading data: ${error}`);
