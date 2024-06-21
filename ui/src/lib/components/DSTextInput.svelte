@@ -32,7 +32,7 @@
       id={`text-input-${thisId}`}
       name={fieldName}
       placeholder={uiName}
-      bind:value={value}
+      bind:value
     />
   </span>
   {#if errors[fieldName] !== undefined}

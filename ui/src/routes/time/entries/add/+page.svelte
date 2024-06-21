@@ -66,7 +66,10 @@
       return false;
     }
     return typelist
-      .map((c) => data.timetypes.find((t) => t.code === c).id)
+      .map((c) => {
+        const foundTimeType = data.timetypes.find((t) => t.code === c);
+        return foundTimeType ? foundTimeType.id : null;
+      })
       .includes(item.time_type);
   }
 

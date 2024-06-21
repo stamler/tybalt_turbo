@@ -39,13 +39,18 @@
 {#snippet line3({ description })}{description}{/snippet}
 
 <!-- Show the list of items here -->
-<DsList items={data.timetypes as TimeTypesRecord[]} {anchor} {headline} {line3}/>
+<DsList items={data.timetypes as TimeTypesRecord[]} {anchor} {headline} {line3} />
 
 <!-- Create a new job -->
 <form class="flex flex-col items-center w-full gap-2 p-2">
-  <DsTextInput bind:value={item.code} errors={errors} fieldName="code" uiName="Code" />
-  <DsTextInput bind:value={item.name} errors={errors} fieldName="name" uiName="Name" />
-  <DsTextInput bind:value={item.description} errors={errors} fieldName="description" uiName="Description" />
+  <DsTextInput bind:value={item.code} {errors} fieldName="code" uiName="Code" />
+  <DsTextInput bind:value={item.name} {errors} fieldName="name" uiName="Name" />
+  <DsTextInput
+    bind:value={item.description}
+    {errors}
+    fieldName="description"
+    uiName="Description"
+  />
   <div class="flex flex-col w-full gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <button type="button" onclick={save}> Save </button>
