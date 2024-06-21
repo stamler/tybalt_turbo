@@ -16,15 +16,15 @@
     if (browser && !$authStore?.isValid && $page.url.pathname !== "/login") {
       goto("/login");
     } else if (browser && $authStore?.isValid && $page.url.pathname === "/login") {
-      goto("/timeentries");
+      goto("/time/entries/list");
     }
   });
 </script>
 
 <header class="w-screen h-10 bg-neutral-700 text-white px-3 flex items-center justify-between">
   <a href="/">Tybalt</a>
-  <a href="/timeentry">New Entry</a>
-  <a href="/timeentries">Entries</a>
+  <a href="/time/entries/add">New Entry</a>
+  <a href="/time/entries/list">Entries</a>
   <a href="/jobs">Jobs</a>
   <a href="/timetypes">Time Types</a>
   <div class="h-full">
