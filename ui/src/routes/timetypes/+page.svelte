@@ -38,13 +38,8 @@
 {#snippet headline({ name })}{name}{/snippet}
 {#snippet line3({ description })}{description}{/snippet}
 
-{#snippet actions({ id })}
-  <a href="/details/{id}">details</a>
-  <a href="/{id}">delete</a>
-{/snippet}
-
 <!-- Show the list of items here -->
-<DsList items={data.timetypes as TimeTypesRecord[]} {anchor} {headline} {actions} {line3}/>
+<DsList items={data.timetypes as TimeTypesRecord[]} {anchor} {headline} {line3}/>
 
 <!-- Create a new job -->
 <form class="flex flex-col items-center w-full gap-2 p-2">
