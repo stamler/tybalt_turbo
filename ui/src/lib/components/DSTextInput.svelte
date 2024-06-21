@@ -25,7 +25,7 @@
 
 <div class="flex flex-col w-full gap-2 {errors[fieldName] !== undefined ? 'bg-red-200' : ''}">
   <span class="flex w-full gap-2">
-    <label for={`text-input-${thisId}`}>&gt;{uiName}</label>
+    <label for={`text-input-${thisId}`}>{uiName}</label>
     <input
       class="flex-1"
       type="text"
