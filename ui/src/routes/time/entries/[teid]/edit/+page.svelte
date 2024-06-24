@@ -92,6 +92,9 @@
 
       // clear the item
       item = { ...defaultItem };
+
+      // redirect to the list page
+      goto("/time/entries/list");
     } catch (error: any) {
       errors = error.data.data;
     }
