@@ -80,10 +80,8 @@
     // value every time a record is saved
     item.week_ending = "2006-01-02";
 
-    // TODO: are we editing an existing record or creating a new one?
-    // right now we are just creating a new one
     try {
-      const record = await pb.collection("time_entries").create(item, { returnRecord: true });
+      await pb.collection("time_entries").create(item);
 
       // submission was successful, clear the errors
       errors = {};
