@@ -8,12 +8,6 @@
   import type { TimeTypesRecord, DivisionsRecord, JobsRecord } from "$lib/pocketbase-types";
   import { goto } from "$app/navigation";
 
-  // subscribe to authStore
-  let authStoreValue: BaseAuthStore | null = null;
-  authStore.subscribe((value) => {
-    authStoreValue = value;
-  });
-
   const trainingTokensInDescriptionWhileRegularHours = $derived.by(() => {
     if (item.time_type !== undefined && item.description !== undefined) {
       const lowercase = item.description.toLowerCase().trim();
@@ -79,7 +73,7 @@
     // schema validation (!)
     // https://github.com/pocketbase/pocketbase/discussions/2881 so we
     // need a correct value in the payload just to make it to the hook
-    item.uid = authStoreValue?.model?.id;
+    item.uid = $authStore?.model?.id;
 
     // set a dummy value for week_ending to satisfy the schema non-empty
     // requirement. This will be changed in the backend to the correct
