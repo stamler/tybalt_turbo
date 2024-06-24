@@ -1,12 +1,15 @@
 <script lang="ts">
   import flatpickr from "flatpickr";
   import { onMount } from "svelte";
+  import type { PageData } from "./$types";
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import type { BaseAuthStore } from "pocketbase";
   import { authStore } from "$lib/stores/auth";
-  import type { TimeTypesRecord, DivisionsRecord, JobsRecord } from "$lib/pocketbase-types";
+  import type { TimeTypesRecord, DivisionsRecord, JobsRecord, TimeEntriesRecord } from "$lib/pocketbase-types";
   import { goto } from "$app/navigation";
+
+  let { data }: { data: PageData } = $props();
 
   // subscribe to authStore
   let authStoreValue: BaseAuthStore | null = null;
@@ -56,7 +59,8 @@
     payout_request_amount: 0,
     week_ending: "2006-01-02",
   };
-  let item = $state({ ...defaultItem } as any);
+  const itemId = (data.item?.id !== undefined ? data.item.id : "") as string;
+  let item = $state((itemId.length > 1 ? data.item : { ...defaultItem }) as TimeEntriesRecord);
 
   // given a list of time type codes, return true if the item's time type is in
   // the list
@@ -89,7 +93,7 @@
     // TODO: are we editing an existing record or creating a new one?
     // right now we are just creating a new one
     try {
-      const record = await pb.collection("time_entries").create(item, { returnRecord: true });
+      const record = await pb.collection("time_entries").update(itemId, item, { returnRecord: true });
 
       // submission was successful, clear the errors
       errors = {};

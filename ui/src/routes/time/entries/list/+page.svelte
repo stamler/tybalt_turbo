@@ -67,7 +67,7 @@
 {/snippet}
 
 {#snippet actions({ id })}
-  <a href="/details/{id}">details</a>
+  <a href="/time/entries/{id}/edit">edit</a>
   <button type="button" onclick={() => del(id)}>delete</button>
 {/snippet}
 

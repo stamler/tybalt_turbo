@@ -62,7 +62,7 @@ export type ProfilesRecord = {
 };
 
 export type TimeEntriesRecord = {
-  id: RecordIdString;
+  id?: RecordIdString;
   category?: string;
   date: string;
   description?: string;
