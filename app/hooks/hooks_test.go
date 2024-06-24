@@ -96,6 +96,8 @@ func TestValidateTimeEntry(t *testing.T) {
 		"valid overtime off request": {timeTypeCode: "OTO", valid: true, record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "payout_request_amount": 100.0})},
 		"bank time missing date":     {timeTypeCode: "RB", valid: false, field: "date", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "hours": 8})},
 		"OTO no amount":              {timeTypeCode: "OTO", valid: false, field: "payout_request_amount", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22"})},
+		"negative OTO amount":        {timeTypeCode: "OTO", valid: false, field: "payout_request_amount", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "payout_request_amount": -100.0})},
+		"fractional OTO amount":      {timeTypeCode: "OTO", valid: false, field: "payout_request_amount", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "payout_request_amount": 132.001})},
 	}
 
 	// Run tests

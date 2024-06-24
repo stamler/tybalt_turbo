@@ -79,18 +79,35 @@ func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) 
 	return requiredFields, nil
 }
 
-func isPositiveMultipleOfPointFive(fieldName string) validation.RuleFunc {
+func isPositiveMultipleOfPointFive() validation.RuleFunc {
 	return func(value interface{}) error {
 		s, _ := value.(float64)
 		if s == 0 {
 			return nil
 		}
 		if s < 0 {
-			return validation.NewError("validation_negative_number", fieldName+" must be a positive number")
+			return validation.NewError("validation_negative_number", "must be a positive number")
 		}
 		// return error is s is not a multiple of 0.5
 		if s/0.5 != float64(int(s/0.5)) {
-			return validation.NewError("validation_not_multiple_of_point_five", fieldName+" must be a multiple of 0.5")
+			return validation.NewError("validation_not_multiple_of_point_five", "must be a multiple of 0.5")
+		}
+		return nil
+	}
+}
+
+func isPositiveMultipleOfPointZeroOne() validation.RuleFunc {
+	return func(value interface{}) error {
+		s, _ := value.(float64)
+		if s == 0 {
+			return nil
+		}
+		if s < 0 {
+			return validation.NewError("validation_negative_number", "must be a positive number")
+		}
+		// return error is s is not a multiple of 0.1
+		if s/0.01 != float64(int(s/0.01)) {
+			return validation.NewError("validation_not_multiple_of_point_zero_one", "must be a multiple of 0.01")
 		}
 		return nil
 	}
@@ -151,13 +168,13 @@ func validateTimeEntry(timeEntryRecord *models.Record, requiredFields []string) 
 	// The second pass performs everything else (cross-field validation, field
 	// values, etc.)
 	otherValidationsErrors := validation.Errors{
-		"hours":                 validation.Validate(timeEntryRecord.Get("hours"), validation.By(isPositiveMultipleOfPointFive(""))),
+		"hours":                 validation.Validate(timeEntryRecord.Get("hours"), validation.By(isPositiveMultipleOfPointFive())),
 		"date":                  validation.Validate(timeEntryRecord.Get("date"), validation.By(isValidDate)),
 		"global":                validation.Validate(totalHours, validation.Max(18.0).Error("Total hours must not exceed 18")),
 		"meals_hours":           validation.Validate(timeEntryRecord.Get("meals_hours"), validation.Max(3.0).Error("Meals Hours must not exceed 3")),
 		"description":           validation.Validate(timeEntryRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
 		"work_record":           validation.Validate(timeEntryRecord.Get("work_record"), validation.When(jobIsPresent, validation.Match(regexp.MustCompile("^[FKQ][0-9]{2}-[0-9]{3,4}(-[0-9]+)?$")).Error("must be in the correct format")).Else(validation.In("").Error("Work Record must be empty when job is not provided"))),
-		"payout_request_amount": validation.Validate(timeEntryRecord.Get("payout_request_amount"), validation.Min(0.0).Exclusive().Error("Amount must be greater than 0")),
+		"payout_request_amount": validation.Validate(timeEntryRecord.Get("payout_request_amount"), validation.Min(0.0).Exclusive().Error("Amount must be greater than 0"), validation.By(isPositiveMultipleOfPointZeroOne())),
 	}.Filter()
 
 	return otherValidationsErrors
