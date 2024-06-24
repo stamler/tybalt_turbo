@@ -4,7 +4,7 @@
   import type { PageData } from "./$types";
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
-  import type { BaseAuthStore } from "pocketbase";
+  import DsTextInput from "$lib/components/DSTextInput.svelte";
   import { authStore } from "$lib/stores/auth";
   import type { TimeTypesRecord, DivisionsRecord, JobsRecord, TimeEntriesRecord } from "$lib/pocketbase-types";
   import { goto } from "$app/navigation";

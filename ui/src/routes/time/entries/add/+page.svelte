@@ -3,7 +3,7 @@
   import { onMount } from "svelte";
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
-  import type { BaseAuthStore } from "pocketbase";
+  import DsTextInput from "$lib/components/DSTextInput.svelte";
   import { authStore } from "$lib/stores/auth";
   import type { TimeTypesRecord, DivisionsRecord, JobsRecord } from "$lib/pocketbase-types";
   import { goto } from "$app/navigation";
@@ -227,21 +227,7 @@
   {/if}
 
   {#if !hasTimeType(["OR", "OW", "OTO", "RB"])}
-    <div class="flex flex-col w-full gap-2 {errors.description !== undefined ? 'bg-red-200' : ''}">
-      <span class="flex w-full gap-2">
-        <label for="description">Description</label>
-        <input
-          class="flex-1"
-          type="text"
-          name="description"
-          placeholder="Description (5 char minimum)"
-          bind:value={item.description}
-        />
-      </span>
-      {#if errors.description !== undefined}
-        <span class="text-red-600">{errors.description.message}</span>
-      {/if}
-    </div>
+    <DsTextInput bind:value={item.description} {errors} fieldName="description" uiName="Description" />
   {/if}
   {#if jobNumbersInDescription}
     <span class="flex w-full gap-2 text-red-600 bg-red-200">
