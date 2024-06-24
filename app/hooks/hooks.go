@@ -124,7 +124,12 @@ func generateWeekEnding(date string) (string, error) {
 	return t.Format(time.DateOnly), nil
 }
 
-// cross-field validation is performed in this function.
+// cross-field validation is performed in this function. It is expected that the
+// time_entry record has already been cleaned by the cleanTimeEntry function.
+// This ensures that only the fields that are allowed to be set are present in
+// the record prior to validation. The requiredFields slice is used to validate
+// the presence of required fields. The function returns an error if the record
+// is invalid, otherwise it returns nil.
 func validateTimeEntry(timeEntryRecord *models.Record, requiredFields []string) error {
 	jobIsPresent := timeEntryRecord.Get("job") != ""
 	totalHours := timeEntryRecord.GetFloat("hours") + timeEntryRecord.GetFloat("meals_hours")
