@@ -29,7 +29,7 @@ import (
 // and to ensure that the record is in a valid state before it is created or
 // updated. It is called by ProcessTimeEntry to reduce the number of fields
 // that need to be validated.
-func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) (string, error) {
+func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) ([]string, error) {
 	timeTypeId := timeEntryRecord.GetString("time_type")
 
 	// Load the allowed fields for the time_type from the time_types collection in
@@ -37,7 +37,7 @@ func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) 
 	// of strings.
 	timeTypeRecord, findError := app.Dao().FindRecordById("time_types", timeTypeId)
 	if findError != nil {
-		return "", findError
+		return nil, findError
 	}
 
 	// Get the allowed fields from the time_type record with type assertion
@@ -45,9 +45,22 @@ func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) 
 	allowedFieldsJson := timeTypeRecord.Get("allowed_fields").(types.JsonRaw)
 
 	// use json.Unmarshal to convert the JSON array to a Go slice of strings
-	if unmarshalError := json.Unmarshal(allowedFieldsJson, &allowedFields); unmarshalError != nil {
-		log.Fatalf("Error unmarshalling JSON: %v", unmarshalError)
-		return "", unmarshalError
+	if unmarshalErrorAllowed := json.Unmarshal(allowedFieldsJson, &allowedFields); unmarshalErrorAllowed != nil {
+		log.Fatalf("Error unmarshalling JSON: %v", unmarshalErrorAllowed)
+		return nil, unmarshalErrorAllowed
+	}
+
+	// Get the required fields from the time_type record with type assertion
+	var requiredFields []string
+	requiredFieldsJson := timeTypeRecord.Get("required_fields").(types.JsonRaw)
+
+	// if requiredFieldsJson has a value of null, "{}", or "[]" then all fields
+	// are required so we set the requiredFields to the allowedFields.
+	if requiredFieldsJson.String() == "null" || requiredFieldsJson.String() == "[]" || requiredFieldsJson.String() == "{}" {
+		requiredFields = allowedFields
+	} else if unmarshalErrorRequired := json.Unmarshal(requiredFieldsJson, &requiredFields); unmarshalErrorRequired != nil {
+		log.Fatalf("Error unmarshalling JSON: %v", unmarshalErrorRequired)
+		return nil, unmarshalErrorRequired
 	}
 
 	// Certain fields are always allowed to be set. We add them to the list of
@@ -63,14 +76,17 @@ func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) 
 		}
 	}
 
-	return timeTypeRecord.GetString("code"), nil
+	return requiredFields, nil
 }
 
 func isPositiveMultipleOfPointFive(fieldName string) validation.RuleFunc {
 	return func(value interface{}) error {
 		s, _ := value.(float64)
-		if s < 0.5 {
-			return validation.NewError("validation_smaller_than_point_five", fieldName+" must be at least 0.5")
+		if s == 0 {
+			return nil
+		}
+		if s < 0 {
+			return validation.NewError("validation_negative_number", fieldName+" must be a positive number")
 		}
 		// return error is s is not a multiple of 0.5
 		if s/0.5 != float64(int(s/0.5)) {
@@ -109,29 +125,37 @@ func generateWeekEnding(date string) (string, error) {
 }
 
 // cross-field validation is performed in this function.
-func validateTimeEntry(timeEntryRecord *models.Record, timeTypeCode string) error {
-	isWorkTime := list.ExistInSlice(timeTypeCode, []string{"R", "RT"})
+func validateTimeEntry(timeEntryRecord *models.Record, requiredFields []string) error {
 	jobIsPresent := timeEntryRecord.Get("job") != ""
-	isOTO := timeTypeCode == "OTO"
-	hoursRequired := list.ExistInSlice(timeTypeCode, []string{"OB", "OH", "OP", "OS", "OV", "RB"})
-	hoursProhibited := list.ExistInSlice(timeTypeCode, []string{"OR", "OW", "OTO"})
 	totalHours := timeEntryRecord.GetFloat("hours") + timeEntryRecord.GetFloat("meals_hours")
 
-	err := validation.Errors{
-		"hours": validation.Validate(timeEntryRecord.Get("hours"),
-			validation.When(hoursProhibited, validation.In(0).Error("Hours must be 0 when time_type is OR, OW or OTO")),
-			validation.When((isWorkTime) || hoursRequired, validation.By(isPositiveMultipleOfPointFive(""))),
-		),
-		"date":                  validation.Validate(timeEntryRecord.Get("date"), validation.Required, validation.By(isValidDate)),
+	// validation is performed in two passes. The first pass is to validate the
+	// presence of required fields. We do this by using the validation.Required
+	// function on each required field from the requiredFields slice using
+	// validation.Errors with the field name as the key.
+	requiredValidationsErrors := validation.Errors{}
+	for _, field := range requiredFields {
+		requiredValidationsErrors[field] = validation.Validate(timeEntryRecord.Get(field), validation.Required.Error("Value required"))
+	}
+
+	// Check for errors in the first pass
+	if err := requiredValidationsErrors.Filter(); err != nil {
+		return err
+	}
+
+	// The second pass performs everything else (cross-field validation, field
+	// values, etc.)
+	otherValidationsErrors := validation.Errors{
+		"hours":                 validation.Validate(timeEntryRecord.Get("hours"), validation.By(isPositiveMultipleOfPointFive(""))),
+		"date":                  validation.Validate(timeEntryRecord.Get("date"), validation.By(isValidDate)),
 		"global":                validation.Validate(totalHours, validation.Max(18.0).Error("Total hours must not exceed 18")),
-		"division":              validation.Validate(timeEntryRecord.Get("division"), validation.When(isWorkTime, validation.Required.Error("required when time_type is R or RT")).Else(validation.In("").Error("Division must be empty when time_type is not R or RT"))),
-		"meals_hours":           validation.Validate(timeEntryRecord.Get("meals_hours"), validation.When(isWorkTime, validation.Max(3.0).Error("Meals Hours must not exceed 3"))),
-		"description":           validation.Validate(timeEntryRecord.Get("description"), validation.When(!hoursProhibited, validation.Required.Error("Description required"), validation.Length(5, 0).Error("must be at least 5 characters"))),
+		"meals_hours":           validation.Validate(timeEntryRecord.Get("meals_hours"), validation.Max(3.0).Error("Meals Hours must not exceed 3")),
+		"description":           validation.Validate(timeEntryRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
 		"work_record":           validation.Validate(timeEntryRecord.Get("work_record"), validation.When(jobIsPresent, validation.Match(regexp.MustCompile("^[FKQ][0-9]{2}-[0-9]{3,4}(-[0-9]+)?$")).Error("must be in the correct format")).Else(validation.In("").Error("Work Record must be empty when job is not provided"))),
-		"payout_request_amount": validation.Validate(timeEntryRecord.Get("payout_request_amount"), validation.When(isOTO, validation.Required.Error("Amount is required when time type is OTO"), validation.Min(0).Exclusive().Error("Amount must be greater than 0")).Else(validation.In(0).Error("must be 0"))),
+		"payout_request_amount": validation.Validate(timeEntryRecord.Get("payout_request_amount"), validation.Min(0.0).Exclusive().Error("Amount must be greater than 0")),
 	}.Filter()
 
-	return err
+	return otherValidationsErrors
 
 	// The following is the firestore rules function that we are trying to
 	// replicate here. It is a simple example of cross-field validation.
@@ -249,7 +273,7 @@ func ProcessTimeEntry(app *pocketbase.PocketBase, record *models.Record, context
 
 	// set properties to nil if they are not allowed to be set based on the
 	// time_type
-	timeTypeCode, cleanErr := cleanTimeEntry(app, record)
+	requiredFields, cleanErr := cleanTimeEntry(app, record)
 	if cleanErr != nil {
 		return apis.NewBadRequestError("Error cleaning time_entry record", cleanErr)
 	}
@@ -264,7 +288,7 @@ func ProcessTimeEntry(app *pocketbase.PocketBase, record *models.Record, context
 
 	// perform the validation for the time_entry record. In this step we also
 	// write the uid property to the record so that we can validate it against the
-	if validationErr := validateTimeEntry(record, timeTypeCode); validationErr != nil {
+	if validationErr := validateTimeEntry(record, requiredFields); validationErr != nil {
 		return apis.NewBadRequestError("Validation error", validationErr)
 	}
 
