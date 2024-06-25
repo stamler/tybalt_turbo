@@ -1,4 +1,4 @@
-import type { TimeEntriesRecord } from '$lib/pocketbase-types';
+import type { TimeEntriesRecord } from "$lib/pocketbase-types";
 
 export interface TimeEntriesPageData {
   item: TimeEntriesRecord;

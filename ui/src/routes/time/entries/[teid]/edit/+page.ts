@@ -22,9 +22,9 @@ export const load: PageLoad<TimeEntriesPageData> = async ({ params }) => {
   let item: TimeEntriesRecord;
   try {
     item = await pb.collection("time_entries").getOne(params.teid);
-    return { item, editing: true, id: params.teid};
+    return { item, editing: true, id: params.teid };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);
-    return { item: { ...defaultItem } as TimeEntriesRecord, editing: false, id: null};
+    return { item: { ...defaultItem } as TimeEntriesRecord, editing: false, id: null };
   }
 };

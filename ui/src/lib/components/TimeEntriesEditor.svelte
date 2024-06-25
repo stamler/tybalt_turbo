@@ -8,7 +8,7 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
-  
+
   let { data }: { data: TimeEntriesPageData } = $props();
 
   const trainingTokensInDescriptionWhileRegularHours = $derived.by(() => {
@@ -119,7 +119,14 @@
   {#snippet optionTemplate(item)}
     {item.code} - {item.name}
   {/snippet}
-  <DsSelector bind:value={item.time_type} items={$globalStore.timetypes} {errors} {optionTemplate} fieldName="time_type" uiName="Time Type" />
+  <DsSelector
+    bind:value={item.time_type}
+    items={$globalStore.timetypes}
+    {errors}
+    {optionTemplate}
+    fieldName="time_type"
+    uiName="Time Type"
+  />
   {#if trainingTokensInDescriptionWhileRegularHours}
     <span class="flex w-full gap-2 text-red-600 bg-red-200">
       ^Should you choose training instead?
@@ -130,15 +137,35 @@
   <!-- FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
   <!----------------------------------------------->
   {#if isWorkTime}
-    <DsSelector bind:value={item.division} items={$globalStore.divisions} {errors} {optionTemplate} fieldName="division" uiName="Division" />
+    <DsSelector
+      bind:value={item.division}
+      items={$globalStore.divisions}
+      {errors}
+      {optionTemplate}
+      fieldName="division"
+      uiName="Division"
+    />
     {#snippet jobOptionTemplate(item)}
       {item.number} - {item.description}
     {/snippet}
-    <DsSelector bind:value={item.job} items={$globalStore.jobs} {errors} optionTemplate={jobOptionTemplate} fieldName="job" uiName="Job" clear={true} />
+    <DsSelector
+      bind:value={item.job}
+      items={$globalStore.jobs}
+      {errors}
+      optionTemplate={jobOptionTemplate}
+      fieldName="job"
+      uiName="Job"
+      clear={true}
+    />
   {/if}
 
   {#if item.job && item.job !== "" && item.division && isWorkTime}
-    <DsTextInput bind:value={item.work_record} {errors} fieldName="work_record" uiName="Work Record" />
+    <DsTextInput
+      bind:value={item.work_record}
+      {errors}
+      fieldName="work_record"
+      uiName="Work Record"
+    />
   {/if}
 
   <!--------------------------------------------------->
@@ -149,15 +176,38 @@
   autocomplete clearing the property. Right now we are using a text field
   so it will never show up after being set once -->
   {#if !hasTimeType(["OR", "OW", "OTO"])}
-    <DsTextInput bind:value={item.hours} {errors} fieldName="hours" uiName="Hours" type="number" step={0.5} min={0} max={18} />
+    <DsTextInput
+      bind:value={item.hours}
+      {errors}
+      fieldName="hours"
+      uiName="Hours"
+      type="number"
+      step={0.5}
+      min={0}
+      max={18}
+    />
   {/if}
 
   {#if item.division && isWorkTime}
-    <DsTextInput bind:value={item.meals_hours} {errors} fieldName="meals_hours" uiName="Meals Hours" type="number" step={0.5} min={0} max={3} />
+    <DsTextInput
+      bind:value={item.meals_hours}
+      {errors}
+      fieldName="meals_hours"
+      uiName="Meals Hours"
+      type="number"
+      step={0.5}
+      min={0}
+      max={3}
+    />
   {/if}
 
   {#if !hasTimeType(["OR", "OW", "OTO", "RB"])}
-    <DsTextInput bind:value={item.description} {errors} fieldName="description" uiName="Description" />
+    <DsTextInput
+      bind:value={item.description}
+      {errors}
+      fieldName="description"
+      uiName="Description"
+    />
   {/if}
   {#if jobNumbersInDescription}
     <span class="flex w-full gap-2 text-red-600 bg-red-200">
@@ -167,7 +217,13 @@
   {/if}
 
   {#if hasTimeType(["OTO"])}
-    <DsTextInput bind:value={item.payout_request_amount} {errors} fieldName="payout_request_amount" uiName="$" type="number" />
+    <DsTextInput
+      bind:value={item.payout_request_amount}
+      {errors}
+      fieldName="payout_request_amount"
+      uiName="$"
+      type="number"
+    />
   {/if}
 
   <div class="flex flex-col w-full gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
@@ -175,7 +231,7 @@
       {#if !jobNumbersInDescription}
         <button type="button" onclick={save}> Save </button>
       {/if}
-      <button type="button" onclick={() => goto('/time/entries/list')}> Cancel </button>
+      <button type="button" onclick={() => goto("/time/entries/list")}> Cancel </button>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

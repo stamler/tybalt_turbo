@@ -28,9 +28,7 @@
   }
 </script>
 
-{#snippet anchor(item)}
-  {item.date}
-{/snippet}
+{#snippet anchor(item)}{item.date}{/snippet}
 
 {#snippet headline({ expand })}
   {#if expand?.time_type.code === "R"}
@@ -55,9 +53,7 @@
   {/if}
 {/snippet}
 
-{#snippet line2(item)}
-  {hoursString(item)}
-{/snippet}
+{#snippet line2(item)}{hoursString(item)}{/snippet}
 
 {#snippet line3({ work_record, description })}
   {#if work_record !== ""}

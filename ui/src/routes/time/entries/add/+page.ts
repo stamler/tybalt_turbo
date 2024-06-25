@@ -18,5 +18,5 @@ export const load: PageLoad<TimeEntriesPageData> = async () => {
     category: "",
     week_ending: "2006-01-02",
   };
-  return { item: { ...defaultItem } as TimeEntriesRecord, editing: false, id: null};
+  return { item: { ...defaultItem } as TimeEntriesRecord, editing: false, id: null };
 };

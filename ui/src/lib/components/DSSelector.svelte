@@ -36,7 +36,6 @@
   function clearValue() {
     value = "";
   }
-
 </script>
 
 <div class="flex w-full gap-2 {errors[fieldName] !== undefined ? 'bg-red-200' : ''}">
@@ -44,11 +43,13 @@
     <label for={`select-input-${thisId}`}>{uiName}</label>
     <select id={`select-input-${thisId}`} name={fieldName} bind:value>
       {#each items as item}
-        <option value={item.id} selected={item.id === value}>{@render optionTemplate(item) }</option>
+        <option value={item.id} selected={item.id === value}>{@render optionTemplate(item)}</option>
       {/each}
     </select>
     {#if clear === true && value !== undefined && value !== ""}
-      <button type="button" onclick={clearValue} class="bg-yellow-200 px-1 hover:underline"> Clear </button>
+      <button type="button" onclick={clearValue} class="bg-yellow-200 px-1 hover:underline">
+        Clear
+      </button>
     {/if}
   </span>
   {#if errors[fieldName] !== undefined}
