@@ -63,18 +63,18 @@ export type ProfilesRecord = {
 
 export type TimeEntriesRecord = {
   id?: RecordIdString;
-  category?: string;
+  category: string;
   date: string;
-  description?: string;
-  division?: RecordIdString;
-  hours?: number;
-  job?: RecordIdString;
-  meals_hours?: number;
-  payout_request_amount?: number;
+  description: string;
+  division: RecordIdString;
+  hours: number;
+  job: RecordIdString;
+  meals_hours: number;
+  payout_request_amount: number;
   time_type: RecordIdString;
   uid: RecordIdString;
   week_ending: string;
-  work_record?: string;
+  work_record: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   expand?: Record<string, any>;
 };
