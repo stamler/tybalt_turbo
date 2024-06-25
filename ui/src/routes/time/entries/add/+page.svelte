@@ -4,8 +4,8 @@
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsSelector from "$lib/components/DSSelector.svelte";
   import { authStore } from "$lib/stores/auth";
-  import type { TimeTypesRecord, DivisionsRecord, JobsRecord } from "$lib/pocketbase-types";
   import { goto } from "$app/navigation";
 
   const trainingTokensInDescriptionWhileRegularHours = $derived.by(() => {
@@ -124,14 +124,10 @@
       bind:value={item.date}
     />
   </span>
-  <span class="flex w-full gap-2">
-    <label for="timetype">Time Type</label>
-    <select name="timetype" bind:value={item.time_type}>
-      {#each $globalStore.timetypes as TimeTypesRecord[] as t}
-        <option value={t.id} selected={t.id === item.time_type}>{t.code} - {t.name}</option>
-      {/each}
-    </select>
-  </span>
+  {#snippet optionTemplate(item)}
+    {item.code} - {item.name}
+  {/snippet}
+  <DsSelector bind:value={item.time_type} items={$globalStore.timetypes} {errors} {optionTemplate} fieldName="time_type" uiName="Time Type" />
   {#if trainingTokensInDescriptionWhileRegularHours}
     <span class="flex w-full gap-2 text-red-600 bg-red-200">
       ^Should you choose training instead?
@@ -142,41 +138,15 @@
   <!-- FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
   <!----------------------------------------------->
   {#if isWorkTime}
-    <span class="flex w-full gap-2">
-      <label for="division">Division</label>
-      <select name="division" bind:value={item.division}>
-        {#each $globalStore.divisions as DivisionsRecord[] as d}
-          <option value={d.id} selected={d.id === item.division}>{d.code} - {d.name}</option>
-        {/each}
-      </select>
-    </span>
-    <span class="flex w-full gap-2">
-      <label for="job">Job</label>
-      <select name="job" bind:value={item.job}>
-        <option value="">No Job</option>
-        {#each $globalStore.jobs as JobsRecord[] as j}
-          <option value={j.id} selected={j.id === item.job}>{j.number} - {j.description}</option>
-        {/each}
-      </select>
-    </span>
+    <DsSelector bind:value={item.division} items={$globalStore.divisions} {errors} {optionTemplate} fieldName="division" uiName="Division" />
+    {#snippet jobOptionTemplate(item)}
+      {item.number} - {item.description}
+    {/snippet}
+    <DsSelector bind:value={item.job} items={$globalStore.jobs} {errors} optionTemplate={jobOptionTemplate} fieldName="job" uiName="Job" clear={true} />
   {/if}
 
   {#if item.job && item.job !== "" && item.division && isWorkTime}
-    <div class="flex flex-col w-full gap-2 {errors.work_record !== undefined ? 'bg-red-200' : ''}">
-      <span class="flex w-full gap-2">
-        <label for="workRecord">Work Record</label>
-        <input
-          class="flex-1"
-          type="text"
-          name="workRecord"
-          placeholder="Work Record"
-          bind:value={item.work_record}
-        />
-      </span>
-      {#if errors.work_record !== undefined}
-        <span class="text-red-600">{errors.work_record.message}</span>
-      {/if}
-    </div>
+    <DsTextInput bind:value={item.work_record} {errors} fieldName="work_record" uiName="Work Record" />
   {/if}
 
   <!--------------------------------------------------->
@@ -187,43 +157,11 @@
   autocomplete clearing the property. Right now we are using a text field
   so it will never show up after being set once -->
   {#if !hasTimeType(["OR", "OW", "OTO"])}
-    <div class="flex flex-col w-full gap-2 {errors.hours !== undefined ? 'bg-red-200' : ''}">
-      <span class="flex w-full gap-2">
-        <label for="hours">Hours</label>
-        <input
-          class="flex-1"
-          type="number"
-          name="hours"
-          bind:value={item.hours}
-          step="0.5"
-          min="0"
-          max="18"
-        />
-      </span>
-      {#if errors.hours !== undefined}
-        <span class="text-red-600">{errors.hours.message}</span>
-      {/if}
-    </div>
+    <DsTextInput bind:value={item.hours} {errors} fieldName="hours" uiName="Hours" type="number" step={0.5} min={0} max={18} />
   {/if}
 
   {#if item.division && isWorkTime}
-    <div class="flex flex-col w-full gap-2 {errors.meals_hours !== undefined ? 'bg-red-200' : ''}">
-      <span class="flex w-full gap-2">
-        <label for="mealsHours">Meals Hours</label>
-        <input
-          class="flex-1"
-          type="number"
-          name="mealsHours"
-          bind:value={item.meals_hours}
-          step="0.5"
-          min="0"
-          max="2"
-        />
-      </span>
-      {#if errors.meals_hours !== undefined}
-        <span class="text-red-600">{errors.meals_hours.message}</span>
-      {/if}
-    </div>
+    <DsTextInput bind:value={item.meals_hours} {errors} fieldName="meals_hours" uiName="Meals Hours" type="number" step={0.5} min={0} max={3} />
   {/if}
 
   {#if !hasTimeType(["OR", "OW", "OTO", "RB"])}
@@ -237,25 +175,7 @@
   {/if}
 
   {#if hasTimeType(["OTO"])}
-    <div
-      class="flex flex-col w-full gap-2 {errors.payout_request_amount !== undefined
-        ? 'bg-red-200'
-        : ''}"
-    >
-      <span class="flex w-full gap-2">
-        $<input
-          class="flex-1"
-          type="number"
-          name="payoutRequestAmount"
-          placeholder="Amount"
-          bind:value={item.payout_request_amount}
-          step="0.01"
-        />
-      </span>
-      {#if errors.payout_request_amount !== undefined}
-        <span class="text-red-600">{errors.payout_request_amount.message}</span>
-      {/if}
-    </div>
+    <DsTextInput bind:value={item.payout_request_amount} {errors} fieldName="payout_request_amount" uiName="$" type="number" />
   {/if}
 
   <div class="flex flex-col w-full gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">

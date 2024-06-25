@@ -12,11 +12,19 @@
 
   let {
     value = $bindable(),
+    type = "text",
+    step = undefined,
+    min = undefined,
+    max = undefined,
     errors,
     fieldName,
     uiName,
   }: {
     value: string | number;
+    type?: "text" | "number" | "password";
+    step?: number;
+    min?: number;
+    max?: number;
     errors: Record<string, { message: string }>;
     fieldName: string;
     uiName: string;
@@ -28,7 +36,10 @@
     <label for={`text-input-${thisId}`}>{uiName}</label>
     <input
       class="flex-1"
-      type="text"
+      {type}
+      step={step || null}
+      min={min || null}
+      max={max || null}
       id={`text-input-${thisId}`}
       name={fieldName}
       placeholder={uiName}

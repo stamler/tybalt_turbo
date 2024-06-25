@@ -137,3 +137,5 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "time_types"): RecordService<TimeTypesResponse>;
   collection(idOrName: "users"): RecordService<UsersResponse>;
 };
+
+export type HasId = { id: RecordIdString };
