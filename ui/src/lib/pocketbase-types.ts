@@ -51,14 +51,13 @@ export type JobsRecord = {
 };
 
 export type ProfilesRecord = {
-  default_charge_out_rate?: number;
+  id: RecordIdString;
   given_name: string;
-  opening_datetime_off: string;
-  opening_op?: number;
-  opening_ov?: number;
   surname: string;
-  timestamp?: IsoDateString;
-  untracked_time_off?: boolean;
+  manager: RecordIdString;
+  alternate_manager: RecordIdString;
+  default_division: RecordIdString;
+  uid: RecordIdString;
 };
 
 export type TimeEntriesRecord = {
@@ -88,8 +87,18 @@ export type TimeTypesRecord<Tallowed_fields = unknown> = {
 };
 
 export type UsersRecord = {
-  avatar?: string;
-  name?: string;
+  name: string;
+  opening_ov: number;
+  opening_op: number;
+  opening_date: string;
+  untracked_time_off: boolean;
+  default_charge_out_rate: number;
+};
+
+export type ManagersRecord = {
+  id: RecordIdString;
+  given_name: string;
+  surname: string;
 };
 
 // Response types include system fields and match responses from the PocketBase API
