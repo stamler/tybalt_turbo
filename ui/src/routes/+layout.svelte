@@ -21,7 +21,7 @@
   });
 </script>
 
-<header class="w-screen h-10 bg-neutral-700 text-white px-3 flex items-center justify-between">
+<header class="flex h-10 w-screen items-center justify-between bg-neutral-700 px-3 text-white">
   <a href="/">Tybalt</a>
   <a href="/time/entries/add">New Entry</a>
   <a href="/time/entries/list">Entries</a>
@@ -30,14 +30,14 @@
   <div class="h-full">
     {#if $authStore?.isValid}
       <!-- user is logged in -->
-      <span class="flex items-center h-full gap-2">
+      <span class="flex h-full items-center gap-2">
         <span><a href="/profile/{$authStore?.model?.id}">{$authStore?.model?.email}</a></span>
         <button
-          class="bg-blue-500 hover:bg-blue-700 text-white text-sm py-1 px-2 rounded"
+          class="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-700"
           onclick={authStore.logout}
         >
           <svg
-            class="w-6 h-6"
+            class="h-6 w-6"
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
             fill="currentColor"
@@ -51,7 +51,7 @@
         </button>
       </span>
     {:else}
-      <span class="flex items-center h-full gap-2">Not logged in</span>
+      <span class="flex h-full items-center gap-2">Not logged in</span>
     {/if}
   </div>
 </header>

@@ -104,8 +104,8 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 
-<form class="flex flex-col items-center w-full gap-2 p-2">
-  <span class="flex flex-col w-full gap-2">
+<form class="flex w-full flex-col items-center gap-2 p-2">
+  <span class="flex w-full flex-col gap-2">
     <label for="date">Date</label>
     <input
       class="flex-1"
@@ -128,7 +128,7 @@
     uiName="Time Type"
   />
   {#if trainingTokensInDescriptionWhileRegularHours}
-    <span class="flex w-full gap-2 text-red-600 bg-red-200">
+    <span class="flex w-full gap-2 bg-red-200 text-red-600">
       ^Should you choose training instead?
     </span>
   {/if}
@@ -210,7 +210,7 @@
     />
   {/if}
   {#if jobNumbersInDescription}
-    <span class="flex w-full gap-2 text-red-600 bg-red-200">
+    <span class="flex w-full gap-2 bg-red-200 text-red-600">
       Job numbers are not allowed in the description. Enter jobs numbers in the appropriate field
       and create one time entry per job.
     </span>
@@ -226,10 +226,16 @@
     />
   {/if}
 
-  <div class="flex flex-col w-full gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
+  <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       {#if !jobNumbersInDescription}
-        <button type="button" onclick={save} class="bg-yellow-200 rounded-sm px-1 hover:bg-yellow-300"> Save </button>
+        <button
+          type="button"
+          onclick={save}
+          class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300"
+        >
+          Save
+        </button>
       {/if}
       <button type="button" onclick={() => goto("/time/entries/list")}> Cancel </button>
     </span>

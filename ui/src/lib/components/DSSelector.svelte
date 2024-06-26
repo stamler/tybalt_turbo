@@ -41,14 +41,22 @@
 <div class="flex w-full gap-2 {errors[fieldName] !== undefined ? 'bg-red-200' : ''}">
   <span class="flex w-full gap-2">
     <label for={`select-input-${thisId}`}>{uiName}</label>
-    <select id={`select-input-${thisId}`} name={fieldName} bind:value class="border rounded border-neutral-300 px-1"
+    <select
+      id={`select-input-${thisId}`}
+      name={fieldName}
+      bind:value
+      class="rounded border border-neutral-300 px-1"
     >
       {#each items as item}
         <option value={item.id} selected={item.id === value}>{@render optionTemplate(item)}</option>
       {/each}
     </select>
     {#if clear === true && value !== undefined && value !== ""}
-      <button type="button" onclick={clearValue} class="bg-yellow-200 rounded-sm px-1 hover:bg-yellow-300">
+      <button
+        type="button"
+        onclick={clearValue}
+        class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300"
+      >
         Clear
       </button>
     {/if}

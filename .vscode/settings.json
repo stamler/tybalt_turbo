@@ -3,4 +3,11 @@
     "editor.defaultFormatter": "golang.go"
   },
   "go.useLanguageServer": true,
+  // Formatting
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  // Svelte
+  "[svelte]": {
+    "editor.defaultFormatter": "svelte.svelte-vscode"
+  }
 }

@@ -59,9 +59,9 @@
     <li class="listheader">{listHeader}</li>
   {/if}
   {#each processedItems as item}
-    <li class="flex even:bg-neutral-200 odd:bg-neutral-100">
-      <div class="flex mx-4 items-center justify-center">{@render anchor(item)}</div>
-      <div class="flex my-1 flex-col w-full">
+    <li class="flex odd:bg-neutral-100 even:bg-neutral-200">
+      <div class="mx-4 flex items-center justify-center">{@render anchor(item)}</div>
+      <div class="my-1 flex w-full flex-col">
         <div class="headline_wrapper">
           <div class="font-bold">{@render headline(item)}</div>
           {#if byline !== undefined}
@@ -79,7 +79,7 @@
         {/if}
       </div>
       {#if actions !== undefined}
-        <div class="flex items-center gap-1 m-2">{@render actions(item)}</div>
+        <div class="m-2 flex items-center gap-1">{@render actions(item)}</div>
       {/if}
     </li>
   {/each}

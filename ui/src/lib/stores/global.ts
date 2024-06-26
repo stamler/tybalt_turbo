@@ -3,7 +3,12 @@
  * app.
  */
 
-import type { TimeTypesRecord, DivisionsRecord, JobsRecord, ManagersRecord } from "$lib/pocketbase-types";
+import type {
+  TimeTypesRecord,
+  DivisionsRecord,
+  JobsRecord,
+  ManagersRecord,
+} from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { ClientResponseError } from "pocketbase";
@@ -25,7 +30,7 @@ const loadData = async () => {
       pb.collection("divisions").getFullList<DivisionsRecord>({ sort: "code", requestKey: "div" }),
       pb.collection("jobs").getFullList<JobsRecord>({ sort: "-number", requestKey: "job" }),
       // managers are all users with a tapr (time approver) claim
-      pb.collection("managers").getFullList<ManagersRecord>({requestKey: "manager" }),
+      pb.collection("managers").getFullList<ManagersRecord>({ requestKey: "manager" }),
     ]);
     set({ timetypes, divisions, jobs, managers, isLoading: false, error: null });
   } catch (error: unknown) {

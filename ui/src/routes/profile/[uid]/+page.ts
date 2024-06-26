@@ -18,7 +18,7 @@ export const load: PageLoad = async ({ params }) => {
   };
   let item: ProfilesRecord;
   try {
-    item = await pb.collection("profiles").getFirstListItem(`uid = '${params.uid}'` );
+    item = await pb.collection("profiles").getFirstListItem(`uid = '${params.uid}'`);
     return { item, editing: true, id: item.id };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);

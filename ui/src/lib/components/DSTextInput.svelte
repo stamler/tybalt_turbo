@@ -31,11 +31,11 @@
   } = $props();
 </script>
 
-<div class="flex flex-col w-full gap-2 {errors[fieldName] !== undefined ? 'bg-red-200' : ''}">
+<div class="flex w-full flex-col gap-2 {errors[fieldName] !== undefined ? 'bg-red-200' : ''}">
   <span class="flex w-full gap-2">
     <label for={`text-input-${thisId}`}>{uiName}</label>
     <input
-      class="flex-1 border rounded border-neutral-300 px-1"
+      class="flex-1 rounded border border-neutral-300 px-1"
       {type}
       step={step || null}
       min={min || null}

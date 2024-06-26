@@ -23,15 +23,13 @@
       errors = {};
 
       // TODO: notify the user that save was successful
-
     } catch (error: any) {
       errors = error.data.data;
     }
   }
-
 </script>
 
-<form class="flex flex-col items-center w-full gap-2 p-2">
+<form class="flex w-full flex-col items-center gap-2 p-2">
   <DsTextInput bind:value={item.given_name} {errors} fieldName="given_name" uiName="Given Name" />
   <DsTextInput bind:value={item.surname} {errors} fieldName="surname" uiName="Surname" />
   {#snippet managerOptionTemplate(item)}
@@ -65,6 +63,7 @@
     uiName="Default Division"
   />
 
-  <button type="button" onclick={save} class="bg-yellow-200 rounded-sm px-1 hover:bg-yellow-300"> Save </button>
-
+  <button type="button" onclick={save} class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300">
+    Save
+  </button>
 </form>
