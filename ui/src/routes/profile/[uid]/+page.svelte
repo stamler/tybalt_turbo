@@ -20,7 +20,12 @@
         await pb.collection("profiles").update(data.id, item);
       } else {
         // create a new item
-        await pb.collection("profiles").create(item);
+        const record = await pb.collection("profiles").create(item, { returnRecord: true });
+        // if the save was successful, the editing property needs to be set to
+        // true if furthers saves are to be successful otherwise we'll have a
+        // duplicate item error from the server
+        data.id = record.id;
+        data.editing = true;
       }
 
       // submission was successful, clear the errors
