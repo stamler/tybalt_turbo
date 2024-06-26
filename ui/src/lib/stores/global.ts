@@ -13,7 +13,9 @@ import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { ClientResponseError } from "pocketbase";
 
-const { subscribe, set, update } = writable({
+const { subscribe, update } = writable({
+  lastRefresh: new Date(),
+  maxAge: 5 * 60 * 1000, // 5 minutes
   timetypes: [] as TimeTypesRecord[],
   divisions: [] as DivisionsRecord[],
   managers: [] as ManagersRecord[],
@@ -22,7 +24,7 @@ const { subscribe, set, update } = writable({
   error: null as ClientResponseError | null,
 });
 
-const loadData = async () => {
+const loadData = async (refreshTime: Date) => {
   update((state) => ({ ...state, isLoading: true, error: null }));
   try {
     const [timetypes, divisions, jobs, managers] = await Promise.all([
@@ -32,7 +34,16 @@ const loadData = async () => {
       // managers are all users with a tapr (time approver) claim
       pb.collection("managers").getFullList<ManagersRecord>({ requestKey: "manager" }),
     ]);
-    set({ timetypes, divisions, jobs, managers, isLoading: false, error: null });
+    update((state) => ({
+      ...state,
+      timetypes,
+      divisions,
+      jobs,
+      managers,
+      lastRefresh: refreshTime,
+      isLoading: false,
+      error: null,
+    }));
   } catch (error: unknown) {
     const typedErr = error as ClientResponseError;
     console.error("Error loading data:", typedErr);
@@ -40,9 +51,20 @@ const loadData = async () => {
   }
 };
 
-loadData();
+const refresh = async (immediate = false) => {
+  // if immediate is true, we will refresh even if the data is not stale
+  update((state) => {
+    const now = new Date();
+    if (!immediate && now.getTime() - state.lastRefresh.getTime() < state.maxAge) {
+      return state;
+    }
+    loadData(now);
+    return { ...state, lastRefresh: now };
+  });
+};
+refresh(true);
 
 export const globalStore = {
   subscribe,
-  refresh: loadData,
+  refresh,
 };

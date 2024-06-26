@@ -9,6 +9,10 @@
   let errors = $state({} as any);
   let item = data.item;
 
+  let globalAge = $derived.by(() => {
+    return Math.round((new Date().getTime() - $globalStore.lastRefresh.getTime()) / 1000);
+  });
+
   async function save() {
     try {
       if (data.editing && data.id !== null) {
@@ -22,6 +26,8 @@
       // submission was successful, clear the errors
       errors = {};
 
+      globalStore.refresh(true);
+
       // TODO: notify the user that save was successful
     } catch (error: any) {
       errors = error.data.data;
@@ -29,7 +35,7 @@
   }
 </script>
 
-<form class="flex w-full flex-col items-center gap-2 p-2">
+<form class="flex w-full flex-col gap-2 p-2">
   <DsTextInput bind:value={item.given_name} {errors} fieldName="given_name" uiName="Given Name" />
   <DsTextInput bind:value={item.surname} {errors} fieldName="surname" uiName="Surname" />
   {#snippet managerOptionTemplate(item)}
@@ -62,8 +68,10 @@
     fieldName="division"
     uiName="Default Division"
   />
-
-  <button type="button" onclick={save} class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300">
-    Save
-  </button>
+  <span class="flex w-full gap-2">
+    <button type="button" onclick={save} class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300">
+      Save
+    </button>
+  </span>
+  <p>Global Store age: {globalAge}s</p>
 </form>

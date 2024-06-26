@@ -3,6 +3,8 @@
   import { goto } from "$app/navigation";
   import { page } from "$app/stores";
   import { authStore } from "$lib/stores/auth";
+  import { globalStore } from "$lib/stores/global";
+  import { afterNavigate } from "$app/navigation";
   import "../app.css";
 
   // children is a function that we will call to render the current route
@@ -10,6 +12,11 @@
   // Any content inside the component tags that is not a snippet declaration
   // implicitly becomes part of the children snippet
   let { children } = $props();
+
+  afterNavigate(() => {
+    // refresh the global store if it's stale
+    globalStore.refresh();
+  });
 
   // route guards
   $effect(() => {
