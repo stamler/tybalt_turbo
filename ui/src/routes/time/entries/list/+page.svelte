@@ -69,6 +69,7 @@
 
 <DsList
   items={data.items as TimeEntriesRecord[]}
+  search={true}
   {anchor}
   {headline}
   {byline}

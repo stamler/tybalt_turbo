@@ -3,6 +3,7 @@
   import type { PageData } from "./$types";
   import { pb } from "$lib/pocketbase";
   import type { JobsRecord } from "$lib/pocketbase-types";
+  import DsTextInput from "$lib/components/DSTextInput.svelte";
 
   let { data }: { data: PageData } = $props();
 
@@ -53,40 +54,17 @@
 {/snippet}
 
 <!-- Show the list of items here -->
-<DsList items={data.items as JobsRecord[]} {anchor} {headline} {actions} />
+<DsList items={data.items as JobsRecord[]} search={true} {anchor} {headline} {actions} />
 
 <!-- Create a new job -->
 <form class="flex w-full flex-col items-center gap-2 p-2">
-  <div class="flex w-full flex-col gap-2 {errors.number !== undefined ? 'bg-red-200' : ''}">
-    <span class="flex w-full gap-2">
-      <label for="number">Job Number</label>
-      <input
-        class="flex-1"
-        type="text"
-        name="number"
-        placeholder="Job Number"
-        bind:value={item.number}
-      />
-    </span>
-    {#if errors.number !== undefined}
-      <span class="text-red-600">{errors.number.message}</span>
-    {/if}
-  </div>
-  <div class="flex w-full flex-col gap-2 {errors.number !== undefined ? 'bg-red-200' : ''}">
-    <span class="flex w-full gap-2">
-      <label for="description">Description</label>
-      <input
-        class="flex-1"
-        type="text"
-        name="description"
-        placeholder="Job Description"
-        bind:value={item.description}
-      />
-    </span>
-    {#if errors.description !== undefined}
-      <span class="text-red-600">{errors.description.message}</span>
-    {/if}
-  </div>
+  <DsTextInput bind:value={item.number} {errors} fieldName="number" uiName="Job Number" />
+  <DsTextInput
+    bind:value={item.description}
+    {errors}
+    fieldName="description"
+    uiName="Description"
+  />
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <button

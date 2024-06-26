@@ -39,7 +39,7 @@
 {#snippet line3({ description })}{description}{/snippet}
 
 <!-- Show the list of items here -->
-<DsList items={data.timetypes as TimeTypesRecord[]} {anchor} {headline} {line3} />
+<DsList items={data.timetypes as TimeTypesRecord[]} search={true} {anchor} {headline} {line3} />
 
 <!-- Create a new job -->
 <form class="flex w-full flex-col items-center gap-2 p-2">
