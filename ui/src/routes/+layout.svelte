@@ -31,7 +31,7 @@
     {#if $authStore?.isValid}
       <!-- user is logged in -->
       <span class="flex items-center h-full gap-2">
-        <span>{$authStore?.model?.email}</span>
+        <span><a href="/profile/{$authStore?.model?.id}">{$authStore?.model?.email}</a></span>
         <button
           class="bg-blue-500 hover:bg-blue-700 text-white text-sm py-1 px-2 rounded"
           onclick={authStore.logout}
