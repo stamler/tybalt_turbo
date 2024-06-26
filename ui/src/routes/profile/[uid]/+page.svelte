@@ -65,6 +65,6 @@
     uiName="Default Division"
   />
 
-  <button type="button" onclick={save}> Save </button>
+  <button type="button" onclick={save} class="bg-yellow-200 rounded-sm px-1 hover:bg-yellow-300"> Save </button>
 
 </form>

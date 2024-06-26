@@ -35,7 +35,7 @@
   <span class="flex w-full gap-2">
     <label for={`text-input-${thisId}`}>{uiName}</label>
     <input
-      class="flex-1"
+      class="flex-1 border rounded border-neutral-300 px-1"
       {type}
       step={step || null}
       min={min || null}

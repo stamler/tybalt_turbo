@@ -229,7 +229,7 @@
   <div class="flex flex-col w-full gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       {#if !jobNumbersInDescription}
-        <button type="button" onclick={save}> Save </button>
+        <button type="button" onclick={save} class="bg-yellow-200 rounded-sm px-1 hover:bg-yellow-300"> Save </button>
       {/if}
       <button type="button" onclick={() => goto("/time/entries/list")}> Cancel </button>
     </span>
