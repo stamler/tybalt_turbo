@@ -3,7 +3,7 @@
   let { value, snippet }: { value: string; snippet?: Snippet<[string]> } = $props();
 </script>
 
-<li class="inlistheader col-span-3 bg-blue-300 p-1 text-neutral-700">
+<li class="inlistheader col-span-3 border-b border-blue-300 bg-blue-200 px-2 text-neutral-700">
   {#if snippet !== undefined}
     {@render snippet(value)}
   {:else}
