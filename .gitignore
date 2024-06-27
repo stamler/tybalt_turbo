@@ -4,4 +4,4 @@ app/pb_data
 app/tybalt
 
 # import data
-import_data
+import_data/*.parquet
