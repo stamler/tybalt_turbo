@@ -2,3 +2,6 @@ app/pb_data
 
 # the built binary
 app/tybalt
+
+# import data
+import_data
