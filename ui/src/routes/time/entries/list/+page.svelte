@@ -67,9 +67,15 @@
   <button type="button" onclick={() => del(id)}>delete</button>
 {/snippet}
 
+{#snippet groupHeader(field)}
+  Week Ending {field}
+{/snippet}
 <DsList
   items={data.items as TimeEntriesRecord[]}
   search={true}
+  inListHeader="Time Entries"
+  groupField="week_ending"
+  {groupHeader}
   {anchor}
   {headline}
   {byline}

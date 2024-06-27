@@ -1,11 +1,14 @@
 <script lang="ts" generics="T extends BaseSystemFields">
   import type { Snippet } from "svelte";
   import type { BaseSystemFields } from "$lib/pocketbase-types";
-
+  import { groupBy } from "lodash";
+  import DSInListHeader from "./DSInListHeader.svelte";
   let {
     items,
     search = false,
-    listHeader = "",
+    inListHeader,
+    groupHeader,
+    groupField, // if groupField is set, group the items by this field
     processorFn,
     anchor,
     headline,
@@ -17,7 +20,9 @@
   }: {
     items: T[];
     search?: boolean;
-    listHeader?: string;
+    inListHeader?: string;
+    groupHeader?: Snippet<[string]>;
+    groupField?: string;
     processorFn?: Function;
     anchor: Snippet<[T]>;
     headline: Snippet<[T]>;
@@ -51,7 +56,13 @@
 
   const processedItems = $derived.by(() => {
     if (processorFn !== undefined && typeof processorFn === "function") {
-      return processorFn(items.slice()); //.map((p) => toRaw(p)));
+      return processorFn(items.slice());
+    }
+    if (groupField !== undefined) {
+      const filteredItems = items
+        .slice()
+        .filter((p) => searchString(p).indexOf(searchTerm.toLowerCase()) >= 0);
+      return groupBy(filteredItems, groupField);
     }
     return items
       .slice() // shallow copy https://github.com/vuejs/vuefire/issues/244
@@ -60,7 +71,7 @@
 </script>
 
 <ul
-  class="grid grid-cols-[auto_1fr_auto] [&>li:nth-child(even)]:bg-neutral-100 [&>li:nth-child(odd)]:bg-neutral-200"
+  class="grid grid-cols-[auto_1fr_auto] [&>li:not(.inlistheader):nth-child(even)]:bg-neutral-100 [&>li:not(.inlistheader):nth-child(odd)]:bg-neutral-200"
 >
   {#if search && processorFn === undefined}
     <li id="listbar" class="col-span-3 flex items-center gap-x-2 p-2">
@@ -74,34 +85,49 @@
       <span>{processedItems.length} items</span>
     </li>
   {/if}
-  {#if listHeader !== ""}
-    <li class="listheader col-span-3">{listHeader}</li>
+  {#if inListHeader !== undefined}
+    <DSInListHeader value={inListHeader} />
   {/if}
-  {#each processedItems as item}
-    <li class="contents">
-      <div class="col-span-3 grid grid-cols-subgrid bg-[inherit]">
-        <div class="flex items-center justify-center px-4 py-2">{@render anchor(item)}</div>
-        <div class="flex flex-col py-2">
-          <div class="headline_wrapper">
-            <div class="font-bold">{@render headline(item)}</div>
-            {#if byline !== undefined}
-              <div class="byline">{@render byline(item)}</div>
+
+  {#snippet itemList(_processedItems)}
+    {#each _processedItems as item}
+      <li class="contents">
+        <div class="col-span-3 grid grid-cols-subgrid bg-[inherit]">
+          <div class="flex items-center justify-center px-4 py-2">{@render anchor(item)}</div>
+          <div class="flex flex-col py-2">
+            <div class="headline_wrapper">
+              <div class="font-bold">{@render headline(item)}</div>
+              {#if byline !== undefined}
+                <div class="byline">{@render byline(item)}</div>
+              {/if}
+            </div>
+            {#if line1 !== undefined}
+              <div class="firstline">{@render line1(item)}</div>
+            {/if}
+            {#if line2 !== undefined}
+              <div class="secondline">{@render line2(item)}</div>
+            {/if}
+            {#if line3 !== undefined}
+              <div class="opacity-50">{@render line3(item)}</div>
             {/if}
           </div>
-          {#if line1 !== undefined}
-            <div class="firstline">{@render line1(item)}</div>
-          {/if}
-          {#if line2 !== undefined}
-            <div class="secondline">{@render line2(item)}</div>
-          {/if}
-          {#if line3 !== undefined}
-            <div class="opacity-50">{@render line3(item)}</div>
+          {#if actions !== undefined}
+            <div class="flex items-center gap-1 px-2 py-2">{@render actions(item)}</div>
           {/if}
         </div>
-        {#if actions !== undefined}
-          <div class="flex items-center gap-1 px-2 py-2">{@render actions(item)}</div>
-        {/if}
-      </div>
-    </li>
-  {/each}
+      </li>
+    {/each}
+  {/snippet}
+  {#if groupField !== undefined}
+    {#each Object.keys(processedItems) as group}
+      {#if groupHeader !== undefined}
+        <DSInListHeader value={group} snippet={groupHeader} />
+      {:else}
+        <DSInListHeader value={group} />
+      {/if}
+      {@render itemList(processedItems[group])}
+    {/each}
+  {:else}
+    {@render itemList(processedItems)}
+  {/if}
 </ul>
