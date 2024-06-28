@@ -5,6 +5,7 @@
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
+  import DsAutoComplete from "./DSAutoComplete.svelte";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
@@ -148,15 +149,17 @@
     {#snippet jobOptionTemplate(item)}
       {item.number} - {item.description}
     {/snippet}
-    <DsSelector
-      bind:value={item.job}
-      items={$globalStore.jobs}
-      {errors}
-      optionTemplate={jobOptionTemplate}
-      fieldName="job"
-      uiName="Job"
-      clear={true}
-    />
+    {#if $globalStore.jobsIndex !== null}
+      <DsAutoComplete
+        bind:value={item.job}
+        index={$globalStore.jobsIndex}
+        {errors}
+        fieldName="job"
+        uiName="Job"
+      >
+        {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+      </DsAutoComplete>
+    {/if}
   {/if}
 
   {#if item.job && item.job !== "" && item.division && isWorkTime}

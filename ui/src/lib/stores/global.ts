@@ -12,6 +12,7 @@ import type {
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { ClientResponseError } from "pocketbase";
+import MiniSearch from 'minisearch'
 
 const { subscribe, update } = writable({
   lastRefresh: new Date(),
@@ -20,11 +21,12 @@ const { subscribe, update } = writable({
   divisions: [] as DivisionsRecord[],
   managers: [] as ManagersRecord[],
   jobs: [] as JobsRecord[],
+  jobsIndex: null as MiniSearch<JobsRecord> | null,
   isLoading: false,
   error: null as ClientResponseError | null,
 });
 
-const loadData = async (refreshTime: Date) => {
+const loadData = async (lastRefresh: Date) => {
   update((state) => ({ ...state, isLoading: true, error: null }));
   try {
     const [timetypes, divisions, jobs, managers] = await Promise.all([
@@ -34,13 +36,24 @@ const loadData = async (refreshTime: Date) => {
       // managers are all users with a tapr (time approver) claim
       pb.collection("managers").getFullList<ManagersRecord>({ requestKey: "manager" }),
     ]);
+    // populate the minisearch index for jobs
+    const jobsIndex = new MiniSearch<JobsRecord>({
+      // id must be indexed because we're using search in the DSAutoComplete
+      // component to get an existing job by id and display it in the ui.
+      fields: ['id', 'number', 'description'],
+      storeFields: ['id', 'number', 'description'],
+    });
+    jobsIndex.addAll(jobs);
+
+    // update the store
     update((state) => ({
       ...state,
       timetypes,
       divisions,
       jobs,
+      jobsIndex,
       managers,
-      lastRefresh: refreshTime,
+      lastRefresh,
       isLoading: false,
       error: null,
     }));

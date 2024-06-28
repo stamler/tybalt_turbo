@@ -46,7 +46,7 @@
 
 {#snippet line1({ expand, job })}
   {#if ["R", "RT"].includes(expand?.time_type.code) && job !== ""}
-    <span>{expand?.job.number}</span>
+    <span>{expand?.job.number} - {expand?.job.description}</span>
     {#if expand?.job.category}
       <span class="label">{expand.job.category}</span>
     {/if}
