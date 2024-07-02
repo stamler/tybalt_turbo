@@ -34,6 +34,7 @@
   <a href="/time/entries/list">Entries</a>
   <a href="/jobs">Jobs</a>
   <a href="/timetypes">Time Types</a>
+  <a href="/divisions">Divisions</a>
   <div class="h-full">
     {#if $authStore?.isValid}
       <!-- user is logged in -->
