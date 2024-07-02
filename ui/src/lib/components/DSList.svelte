@@ -82,7 +82,14 @@
         bind:value={searchTerm}
         class="flex-1 rounded border border-neutral-300 px-1"
       />
-      <span>{processedItems.length} items</span>
+      {#if groupField === undefined}
+        <span>{processedItems.length} items</span>
+      {:else}
+        <span>
+          <!-- when grouping, get the sum of the length of the lists for every key in processed items -->
+          {Object.keys(processedItems).reduce((acc, key) => acc + processedItems[key].length, 0)} items
+        </span>
+      {/if}
     </li>
   {/if}
   {#if inListHeader !== undefined}
