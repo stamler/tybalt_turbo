@@ -13,9 +13,16 @@
   // implicitly becomes part of the children snippet
   let { children } = $props();
 
-  afterNavigate(() => {
-    // refresh the global store if it's stale
-    globalStore.refresh();
+  let firstRun = true;
+  afterNavigate((navigation) => {
+    // afterNavigate may be called multiple times, but we only want to run this
+    // code once so we don't overload the server with requests
+    if (firstRun) {
+      // refresh the global store if it's stale
+      globalStore.refresh();
+      firstRun = false;
+      return;
+    }
   });
 
   // route guards

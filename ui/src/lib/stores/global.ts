@@ -12,72 +12,158 @@ import type {
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { ClientResponseError } from "pocketbase";
-import MiniSearch from 'minisearch'
+import MiniSearch from "minisearch";
+import type { Readable, Invalidator, Subscriber } from "svelte/store";
 
-const { subscribe, update } = writable({
-  lastRefresh: new Date(),
-  maxAge: 5 * 60 * 1000, // 5 minutes
-  timetypes: [] as TimeTypesRecord[],
-  divisions: [] as DivisionsRecord[],
-  managers: [] as ManagersRecord[],
-  jobs: [] as JobsRecord[],
-  jobsIndex: null as MiniSearch<JobsRecord> | null,
-  isLoading: false,
-  error: null as ClientResponseError | null,
-});
+interface StoreItem<T> {
+  items: T;
+  maxAge: number;
+  lastRefresh: Date;
+}
 
-const loadData = async (lastRefresh: Date) => {
-  update((state) => ({ ...state, isLoading: true, error: null }));
-  try {
-    const [timetypes, divisions, jobs, managers] = await Promise.all([
-      pb.collection("time_types").getFullList<TimeTypesRecord>({ sort: "code", requestKey: "tt" }),
-      pb.collection("divisions").getFullList<DivisionsRecord>({ sort: "code", requestKey: "div" }),
-      pb.collection("jobs").getFullList<JobsRecord>({ sort: "-number", requestKey: "job" }),
-      // managers are all users with a tapr (time approver) claim
-      pb.collection("managers").getFullList<ManagersRecord>({ requestKey: "manager" }),
-    ]);
-    // populate the minisearch index for jobs
-    const jobsIndex = new MiniSearch<JobsRecord>({
-      // id must be indexed because we're using search in the DSAutoComplete
-      // component to get an existing job by id and display it in the ui.
-      fields: ['id', 'number', 'description'],
-      storeFields: ['id', 'number', 'description'],
-    });
-    jobsIndex.addAll(jobs);
-
-    // update the store
-    update((state) => ({
-      ...state,
-      timetypes,
-      divisions,
-      jobs,
-      jobsIndex,
-      managers,
-      lastRefresh,
-      isLoading: false,
-      error: null,
-    }));
-  } catch (error: unknown) {
-    const typedErr = error as ClientResponseError;
-    console.error("Error loading data:", typedErr);
-    update((state) => ({ ...state, isLoading: false, error: typedErr }));
-  }
+export type CollectionName = "time_types" | "divisions" | "jobs" | "managers";
+type CollectionType = {
+  time_types: TimeTypesRecord[];
+  divisions: DivisionsRecord[];
+  jobs: JobsRecord[];
+  managers: ManagersRecord[];
 };
 
-const refresh = async (immediate = false) => {
-  // if immediate is true, we will refresh even if the data is not stale
-  update((state) => {
-    const now = new Date();
-    if (!immediate && now.getTime() - state.lastRefresh.getTime() < state.maxAge) {
-      return state;
-    }
-    loadData(now);
-    return { ...state, lastRefresh: now };
+interface StoreState {
+  collections: {
+    [K in CollectionName]: StoreItem<CollectionType[K]>;
+  };
+  jobsIndex: MiniSearch<JobsRecord> | null;
+  isLoading: boolean;
+  error: ClientResponseError | null;
+}
+
+// Define a type for the wrapped store value
+type WrappedStoreValue = {
+  [K in CollectionName]: CollectionType[K];
+} & Omit<StoreState, "collections"> & {
+    collections: StoreState["collections"];
+  };
+
+const createStore = () => {
+  const { subscribe, update } = writable<StoreState>({
+    collections: {
+      time_types: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
+      divisions: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
+      jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
+      managers: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
+    },
+    jobsIndex: null,
+    isLoading: false,
+    error: null,
   });
-};
-refresh(true);
 
-export const globalStore = {
-  subscribe,
-  refresh,
+  const loadData = async <K extends CollectionName>(key: K) => {
+    update((state) => ({ ...state, isLoading: true, error: null }));
+    try {
+      let items: CollectionType[typeof key];
+      switch (key) {
+        case "time_types":
+          items = (await pb.collection("time_types").getFullList<TimeTypesRecord>({
+            sort: "code",
+            requestKey: "tt",
+          })) as CollectionType[typeof key];
+          break;
+        case "divisions":
+          items = (await pb.collection("divisions").getFullList<DivisionsRecord>({
+            sort: "code",
+            requestKey: "div",
+          })) as CollectionType[typeof key];
+          break;
+        case "jobs":
+          items = (await pb.collection("jobs").getFullList<JobsRecord>({
+            sort: "-number",
+            requestKey: "job",
+          })) as CollectionType[typeof key];
+          break;
+        case "managers":
+          items = (await pb
+            .collection("managers")
+            .getFullList<ManagersRecord>({ requestKey: "manager" })) as CollectionType[typeof key];
+          break;
+      }
+
+      update((state) => {
+        const newState = { ...state };
+        newState.collections[key] = {
+          ...newState.collections[key],
+          items,
+          lastRefresh: new Date(),
+        };
+
+        if (key === "jobs") {
+          const jobsIndex = new MiniSearch<JobsRecord>({
+            fields: ["id", "number", "description"],
+            storeFields: ["id", "number", "description"],
+          });
+          jobsIndex.addAll(items as JobsRecord[]);
+          newState.jobsIndex = jobsIndex;
+        }
+
+        return { ...newState, isLoading: false, error: null };
+      });
+    } catch (error: unknown) {
+      const typedErr = error as ClientResponseError;
+      console.error(`Error loading ${key}:`, typedErr);
+      update((state) => ({ ...state, isLoading: false, error: typedErr }));
+    }
+  };
+
+  const refresh = async (key: CollectionName = "" as CollectionName) => {
+    update((state) => {
+      const now = new Date();
+      const newState = { ...state };
+
+      if (key) {
+        // refresh immediately when the key is specified
+        loadData(key);
+      } else {
+        // if the key is not specified, refresh all collections that are older
+        // than their maxAge
+        for (const k of Object.keys(newState.collections) as CollectionName[]) {
+          const item = newState.collections[k];
+          if (now.getTime() - item.lastRefresh.getTime() >= item.maxAge) {
+            loadData(k);
+          }
+        }
+      }
+
+      return newState;
+    });
+  };
+
+  return {
+    subscribe,
+    refresh,
+  };
 };
+
+const _globalStore = createStore();
+
+// Proxy handler to allow access like $globalStore.time_types
+const proxyHandler: ProxyHandler<StoreState> = {
+  get(target, prop: string | symbol) {
+    if (prop in target.collections) {
+      return target.collections[prop as CollectionName].items;
+    }
+    return target[prop as keyof StoreState];
+  },
+};
+
+// Wrapped store that provides access to the collections directly
+const wrappedStore: Readable<WrappedStoreValue> & { refresh: typeof _globalStore.refresh } = {
+  subscribe: (run: Subscriber<WrappedStoreValue>, invalidate?: Invalidator<WrappedStoreValue>) => {
+    return _globalStore.subscribe(
+      (value) => run(new Proxy(value, proxyHandler) as unknown as WrappedStoreValue),
+      invalidate as Invalidator<StoreState> | undefined,
+    );
+  },
+  refresh: _globalStore.refresh,
+};
+
+export const globalStore = wrappedStore;

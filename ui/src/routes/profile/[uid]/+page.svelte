@@ -4,13 +4,22 @@
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import { globalStore } from "$lib/stores/global";
+  import type { CollectionName } from "$lib/stores/global";
 
   let { data }: { data: PageData } = $props();
   let errors = $state({} as any);
   let item = data.item;
 
-  let globalAge = $derived.by(() => {
-    return Math.round((new Date().getTime() - $globalStore.lastRefresh.getTime()) / 1000);
+  const collectionAges = $derived.by(() => {
+    // return an array of objects with the key and age of the corresponding
+    // collection
+    return (Object.keys($globalStore.collections) as CollectionName[]).map((key) => {
+      const collection = $globalStore.collections[key];
+      return {
+        key,
+        age: Math.round((new Date().getTime() - collection.lastRefresh.getTime()) / 1000),
+      };
+    });
   });
 
   async function save() {
@@ -31,7 +40,7 @@
       // submission was successful, clear the errors
       errors = {};
 
-      globalStore.refresh(true);
+      globalStore.refresh("managers");
 
       // TODO: notify the user that save was successful
     } catch (error: any) {
@@ -78,5 +87,10 @@
       Save
     </button>
   </span>
-  <p>Global Store age: {globalAge}s</p>
+  <p>Store ages:</p>
+  <ul>
+    {#each collectionAges as age}
+      <li>{age.key}: {age.age}s</li>
+    {/each}
+  </ul>
 </form>

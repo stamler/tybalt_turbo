@@ -1,12 +1,9 @@
 <script lang="ts">
   import DsList from "$lib/components/DSList.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
-  import type { PageData } from "./$types";
   import { pb } from "$lib/pocketbase";
   import type { BaseSystemFields, DivisionsRecord } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-
-  let { data }: { data: PageData } = $props();
 
   let errors = $state({} as any);
   const defaultItem = {
@@ -17,21 +14,22 @@
 
   let item = $state({ ...defaultItem });
 
-  // async function save() {
-  //   try {
-  //     const record = await pb.collection("time_types").create(item, { returnRecord: true });
-  //     if (data.timetypes === undefined) throw new Error("data.timetypes is undefined");
-  //     data.timetypes.push(record);
+  async function save() {
+    try {
+      await pb.collection("divisions").create(item);
 
-  //     // submission was successful, clear the errors
-  //     errors = {};
+      // save was successful, clear the form and refresh the divisions
+      clearForm();
+      globalStore.refresh("divisions");
+    } catch (error: any) {
+      errors = error.data.data;
+    }
+  }
 
-  //     // clear the item
-  //     item = { ...defaultItem };
-  //   } catch (error: any) {
-  //     errors = error.data.data;
-  //   }
-  // }
+  function clearForm() {
+    item = { ...defaultItem };
+    errors = {};
+  }
 </script>
 
 <!-- Show the list of items here -->
@@ -44,7 +42,7 @@
 <form class="flex w-full flex-col items-center gap-2 p-2">
   <DsTextInput bind:value={item.code} {errors} fieldName="code" uiName="Code" />
   <DsTextInput bind:value={item.name} {errors} fieldName="name" uiName="Name" />
-  <!-- <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
+  <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <button
         type="button"
@@ -53,10 +51,10 @@
       >
         Save
       </button>
-      <button type="button"> Cancel </button>
+      <button type="button" onclick={clearForm}> Cancel </button>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>
     {/if}
-  </div> -->
+  </div>
 </form>

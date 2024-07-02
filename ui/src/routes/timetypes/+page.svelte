@@ -1,11 +1,9 @@
 <script lang="ts">
   import DsList from "$lib/components/DSList.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
-  import type { PageData } from "./$types";
   import { pb } from "$lib/pocketbase";
   import type { TimeTypesRecord } from "$lib/pocketbase-types";
-
-  let { data }: { data: PageData } = $props();
+  import { globalStore } from "$lib/stores/global";
 
   let errors = $state({} as any);
   const defaultItem = {
@@ -19,18 +17,19 @@
 
   async function save() {
     try {
-      const record = await pb.collection("time_types").create(item, { returnRecord: true });
-      if (data.timetypes === undefined) throw new Error("data.timetypes is undefined");
-      data.timetypes.push(record);
+      await pb.collection("time_types").create(item);
 
-      // submission was successful, clear the errors
-      errors = {};
-
-      // clear the item
-      item = { ...defaultItem };
+      // save was successful, clear the form and refresh the divisions
+      clearForm();
+      globalStore.refresh("time_types");
     } catch (error: any) {
       errors = error.data.data;
     }
+  }
+
+  function clearForm() {
+    item = { ...defaultItem };
+    errors = {};
   }
 </script>
 
@@ -39,7 +38,13 @@
 {#snippet line3({ description })}{description}{/snippet}
 
 <!-- Show the list of items here -->
-<DsList items={data.timetypes as TimeTypesRecord[]} search={true} {anchor} {headline} {line3} />
+<DsList
+  items={$globalStore.time_types as TimeTypesRecord[]}
+  search={true}
+  {anchor}
+  {headline}
+  {line3}
+/>
 
 <!-- Create a new job -->
 <form class="flex w-full flex-col items-center gap-2 p-2">
@@ -51,6 +56,7 @@
     fieldName="description"
     uiName="Description"
   />
+  <!-- todo: add allowed_fields editor DsMultiStringInput-->
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <button

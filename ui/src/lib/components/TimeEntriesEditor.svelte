@@ -45,12 +45,12 @@
   // given a list of time type codes, return true if the item's time type is in
   // the list
   function hasTimeType(typelist: string[]) {
-    if ($globalStore.timetypes.length === 0) {
+    if ($globalStore.time_types.length === 0) {
       return false;
     }
     return typelist
       .map((c) => {
-        const foundTimeType = $globalStore.timetypes.find((t) => t.code === c);
+        const foundTimeType = $globalStore.time_types.find((t) => t.code === c);
         return foundTimeType ? foundTimeType.id : null;
       })
       .includes(item.time_type);
@@ -122,7 +122,7 @@
   {/snippet}
   <DsSelector
     bind:value={item.time_type}
-    items={$globalStore.timetypes}
+    items={$globalStore.time_types}
     {errors}
     {optionTemplate}
     fieldName="time_type"
