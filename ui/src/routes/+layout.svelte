@@ -13,16 +13,17 @@
   // implicitly becomes part of the children snippet
   let { children } = $props();
 
-  let firstRun = true;
   afterNavigate((navigation) => {
-    // afterNavigate may be called multiple times, but we only want to run this
-    // code once so we don't overload the server with requests
-    if (firstRun) {
-      // refresh the global store if it's stale
-      globalStore.refresh();
-      firstRun = false;
+    // afterNavigate may be called multiple times, but we only want to run once
+    // per navigation event (i.e. when the URL changes) so we check the type of
+    // the navigation event and don't run if it's the hydration event (enter)
+
+    if (navigation.type === "enter") {
       return;
     }
+
+    // refresh the global store if it's stale
+    globalStore.refresh();
   });
 
   // route guards
