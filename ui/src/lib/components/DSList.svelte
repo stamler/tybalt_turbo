@@ -115,7 +115,7 @@
               <div class="secondline">{@render line2(item)}</div>
             {/if}
             {#if line3 !== undefined}
-              <div class="opacity-50">{@render line3(item)}</div>
+              <div class="thirdline">{@render line3(item)}</div>
             {/if}
           </div>
           {#if actions !== undefined}

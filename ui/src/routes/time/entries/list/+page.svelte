@@ -57,9 +57,9 @@
 
 {#snippet line3({ work_record, description })}
   {#if work_record !== ""}
-    <span>Work Record: {work_record} / </span>
+    <span><span class="opacity-50">Work Record</span> {work_record} / </span>
   {/if}
-  <span>{description}</span>
+  <span class="opacity-50">{description}</span>
 {/snippet}
 
 {#snippet actions({ id })}

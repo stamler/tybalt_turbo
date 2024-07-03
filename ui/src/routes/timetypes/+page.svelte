@@ -35,7 +35,15 @@
 
 {#snippet anchor({ code })}{code}{/snippet}
 {#snippet headline({ name })}{name}{/snippet}
-{#snippet line3({ description })}{description}{/snippet}
+{#snippet line1({ description })}{description}{/snippet}
+{#snippet line2({ allowed_fields })}
+  <span class="opacity-30">allowed</span>
+  {allowed_fields.join(", ")}
+{/snippet}
+{#snippet line3({ required_fields })}
+  <span class="opacity-30">required</span>
+  {required_fields.join(", ")}
+{/snippet}
 
 <!-- Show the list of items here -->
 <DsList
@@ -43,6 +51,8 @@
   search={true}
   {anchor}
   {headline}
+  {line1}
+  {line2}
   {line3}
 />
 
