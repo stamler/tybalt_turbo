@@ -48,10 +48,13 @@ type WrappedStoreValue = {
 const createStore = () => {
   const { subscribe, update } = writable<StoreState>({
     collections: {
-      time_types: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
-      divisions: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
+      // 1 day
+      time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
+      divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
+      // 5 minutes
       jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
-      managers: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
+      // 1 hour
+      managers: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
     },
     jobsIndex: null,
     isLoading: false,
