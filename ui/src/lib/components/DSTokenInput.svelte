@@ -70,12 +70,12 @@
 
 <div class="flex w-full flex-col gap-2 {errors[fieldName] !== undefined ? 'bg-red-200' : ''}">
   <span class="flex w-full gap-2">
-    <label for={`text-input-${thisId}`}>{uiName}</label>
+    <label class="flex shrink-0 items-center" for={`text-input-${thisId}`}>{uiName}</label>
     <div
-      class="focus-within:border-blue-500, flex flex-1 rounded border border-neutral-300 bg-white px-1 focus-within:ring-2 focus-within:ring-blue-500"
+      class="focus-within:border-blue-500, flex w-full flex-wrap gap-1 rounded border border-neutral-300 bg-white p-1 focus-within:ring-2 focus-within:ring-blue-500"
     >
       {#each value as item, i}
-        <span class="my-1 mr-1 flex items-center gap-1 rounded-full bg-neutral-200 px-2">
+        <span class="flex items-center rounded-full bg-neutral-200 px-2">
           <span>{item}</span>
           <button class="text-neutral-500" onclick={preventDefault(() => removeToken(i))}>
             &times;
