@@ -78,9 +78,10 @@ export type TimeEntriesRecord = {
   expand?: Record<string, any>;
 };
 
-export type TimeTypesRecord<Tallowed_fields = unknown> = {
+export type TimeTypesRecord<Tfields = unknown> = {
   id: RecordIdString;
-  allowed_fields?: null | Tallowed_fields;
+  allowed_fields?: null | Tfields;
+  required_fields?: null | Tfields;
   code: string;
   description?: string;
   name: string;
@@ -109,8 +110,8 @@ export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = unknown> = Required<TimeEntriesRecord> &
   BaseSystemFields<Texpand>;
-export type TimeTypesResponse<Tallowed_fields = unknown, Texpand = unknown> = Required<
-  TimeTypesRecord<Tallowed_fields>
+export type TimeTypesResponse<Tfields = unknown, Texpand = unknown> = Required<
+  TimeTypesRecord<Tfields>
 > &
   BaseSystemFields<Texpand>;
 export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>;
