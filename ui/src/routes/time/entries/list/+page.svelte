@@ -70,12 +70,21 @@
 {#snippet groupHeader(field)}
   Week Ending {field}
 {/snippet}
+
+{#snippet groupFooter(groupKey, items)}
+  <div class="flex items-center justify-center px-4 py-2">Totals</div>
+  <div class="flex flex-col py-2">
+    {items.reduce((acc: number, item: TimeEntriesRecord) => acc + (item.hours || 0), 0)}
+  </div>
+  <div class="flex items-center gap-1 px-2 py-2">bundle + submit</div>
+{/snippet}
 <DsList
   items={data.items as TimeEntriesRecord[]}
   search={true}
   inListHeader="Time Entries"
   groupField="week_ending"
   {groupHeader}
+  {groupFooter}
   {anchor}
   {headline}
   {byline}

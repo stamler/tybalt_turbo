@@ -9,6 +9,7 @@
     inListHeader,
     groupHeader,
     groupField, // if groupField is set, group the items by this field
+    groupFooter,
     processorFn,
     anchor,
     headline,
@@ -23,6 +24,7 @@
     inListHeader?: string;
     groupHeader?: Snippet<[string]>;
     groupField?: string;
+    groupFooter?: Snippet<[string, T[]]>; // New group footer snippet that receives the group key and group items
     processorFn?: Function;
     anchor: Snippet<[T]>;
     headline: Snippet<[T]>;
@@ -125,6 +127,7 @@
       </li>
     {/each}
   {/snippet}
+
   {#if groupField !== undefined}
     {#each Object.keys(processedItems) as group}
       {#if groupHeader !== undefined}
@@ -133,6 +136,13 @@
         <DSInListHeader value={group} />
       {/if}
       {@render itemList(processedItems[group])}
+      {#if groupFooter !== undefined}
+        <li class="contents">
+          <div class="col-span-3 grid grid-cols-subgrid bg-[inherit]">
+            {@render groupFooter(group, processedItems[group])}
+          </div>
+        </li>
+      {/if}
     {/each}
   {:else}
     {@render itemList(processedItems)}
