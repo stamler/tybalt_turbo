@@ -11,6 +11,8 @@ import type {
 } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
+import { authStore } from "$lib/stores/auth";
+import { get } from "svelte/store";
 import { ClientResponseError } from "pocketbase";
 import MiniSearch from "minisearch";
 import type { Readable, Invalidator, Subscriber } from "svelte/store";
@@ -117,12 +119,22 @@ const createStore = () => {
     }
   };
 
-  const refresh = async (key: CollectionName = "" as CollectionName) => {
+  const refresh = async (key: CollectionName | null = null) => {
+    // refresh() should no-op if the user is not logged in. Failure to do so
+    // will cause the lastRefresh date to be set to now, which will prevent
+    // subsequent refreshes from happening until maxAge milliseconds have passed
+    // leaving blank data on the UI because calling the backend with no auth
+    // token will return no results.
+    if (!get(authStore)?.isValid) {
+      console.log("User is not logged in, skipping refresh");
+      return;
+    }
+  
     update((state) => {
       const now = new Date();
       const newState = { ...state };
 
-      if (key) {
+      if (key !== null) {
         // refresh immediately when the key is specified
         loadData(key);
       } else {
