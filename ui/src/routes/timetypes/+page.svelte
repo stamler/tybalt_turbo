@@ -1,6 +1,7 @@
 <script lang="ts">
   import DsList from "$lib/components/DSList.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsTokenInput from "$lib/components/DSTokenInput.svelte";
   import { pb } from "$lib/pocketbase";
   import type { TimeTypesRecord } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
@@ -11,6 +12,7 @@
     name: "",
     description: "",
     allowed_fields: [] as string[],
+    required_fields: [] as string[],
   };
 
   let item = $state({ ...defaultItem });
@@ -23,7 +25,13 @@
       clearForm();
       globalStore.refresh("time_types");
     } catch (error: any) {
-      errors = error.data.data;
+      // if error.data.data is not an empty object, then set errors to that,
+      // otherwise set errors to error.data.message
+      if (error.data.data !== undefined && Object.keys(error.data.data).length > 0) {
+        errors = error.data.data;
+      } else {
+        errors = { global: { message: error.data.message } };
+      }
     }
   }
 
@@ -66,7 +74,18 @@
     fieldName="description"
     uiName="Description"
   />
-  <!-- todo: add allowed_fields editor DsMultiStringInput-->
+  <DsTokenInput
+    bind:value={item.allowed_fields}
+    {errors}
+    fieldName="allowed_fields"
+    uiName="Allowed Fields"
+  />
+  <DsTokenInput
+    bind:value={item.required_fields}
+    {errors}
+    fieldName="required_fields"
+    uiName="Required Fields"
+  />
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <button
