@@ -68,9 +68,9 @@
   }
 
   async function bundle(weekEnding: string) {
-    // Implement bundling logic here
+    // TODO: Call the bundle endpoint with the weekEnding date on the backend
+    // here
     console.log(`Bundling timesheet for week ending ${weekEnding}`);
-    // You'll need to implement the actual bundling functionality
   }
 </script>
 
