@@ -7,6 +7,7 @@ import (
 
 	"tybalt/hooks"
 	_ "tybalt/migrations"
+	"tybalt/routes"
 
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
@@ -45,6 +46,9 @@ func main() {
 
 	// Add the hooks to the app
 	hooks.AddHooks(app)
+
+	// Add the routes to the app
+	routes.AddRoutes(app)
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
