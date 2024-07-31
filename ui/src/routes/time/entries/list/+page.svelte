@@ -68,9 +68,18 @@
   }
 
   async function bundle(weekEnding: string) {
-    // TODO: Call the bundle endpoint with the weekEnding date on the backend
-    // here
-    console.log(`Bundling timesheet for week ending ${weekEnding}`);
+    try {
+      const response = await pb.send("/api/bundle-timesheet", {
+        method: "POST",
+        body: JSON.stringify({ weekEnding }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      console.log(response);
+    } catch (error) {
+      console.error("Error:", error);
+    }
   }
 </script>
 

@@ -2,14 +2,17 @@ package routes
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/labstack/echo/v5"
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/daos"
+	"github.com/pocketbase/pocketbase/models"
 )
 
 // Add custom routes to the app
@@ -29,16 +32,29 @@ func AddRoutes(app *pocketbase.PocketBase) {
 					return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 				}
 
-				// Validate the date format (YYYY-MM-DD)
-				if _, err := time.Parse("2006-01-02", req.WeekEnding); err != nil {
+				// Validate the date
+				weekEndingTime, err := time.Parse("2006-01-02", req.WeekEnding)
+				if err != nil {
 					return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid date format. Use YYYY-MM-DD"})
 				}
+
+				// validate weekEndingTime is a Saturday
+				if weekEndingTime.Weekday() != time.Saturday {
+					return c.JSON(http.StatusBadRequest, map[string]string{"error": "Week ending date must be a Saturday"})
+				}
+
+				// Store the week ending date string
+				weekEnding := weekEndingTime.Format("2006-01-02")
+
+				// get the auth record from the context
+				authRecord := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+				userId := authRecord.Id
 
 				/*
 					Should time_sheets be tied to profiles or to users?
 
 					This function will throw an error if a time_sheets record already
-					exists for the user and week ending date. If a timesheet does not
+					exists for the specified uid and week_ending. If a timesheet does not
 					exist, it will validate information across all of the user's time
 					entries records for the week ending date. If the information is valid,
 					it will then create a new time_sheets record for the user with the
@@ -47,33 +63,75 @@ func AddRoutes(app *pocketbase.PocketBase) {
 				*/
 
 				// Start a transaction
-				err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+				err = app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
 
-					/*
-						The time_sheets table has the following columns:
-						- id (string, primary key)
-						- uid (string, foreign key to users table) should this reference profile instead?
-						- manager_id (string, foreign key to profiles table)
-						- work_week_hours (number representing a full week's worth of hours for the user at the time)
-						- salary (boolean representing whether the user was on salary at the time)
-						- week_ending (string representing the week ending date in format YYYY-MM-DD)
-					*/
+					// Check if a time sheet already exists. This is also prevented by the
+					// unique index on the time_sheets table so may not be necessary, but
+					// it does send a more user-friendly error message.
+					existingTimeSheet, err := txDao.FindFirstRecordByFilter("time_sheets", "uid={:userId} && week_ending={:weekEnding}", dbx.Params{
+						"userId":     userId,
+						"weekEnding": weekEnding,
+					})
+					if err == nil && existingTimeSheet != nil {
+						return fmt.Errorf("a time sheet already exists for this user and week ending date")
+					}
 
-					// TODO: Implement your SQLite transaction logic here
-					// For example:
-					// _, err := txDao.DB().NewQuery("YOUR RAW SQL QUERY HERE").Execute()
-					// if err != nil {
-					//     return err
-					// }
+					// Get the candidate time entries
+					timeEntries, err := txDao.FindRecordsByFilter("time_entries", "uid={:userId} && week_ending={:weekEnding}", "", 0, 0, dbx.Params{
+						"userId":     userId,
+						"weekEnding": weekEnding,
+					})
+					if err != nil {
+						return fmt.Errorf("error fetching time entries: %v", err)
+					}
+
+					// Validate the time entries as a group
+					if err := validateTimeEntries(timeEntries); err != nil {
+						return err
+					}
+
+					// Get the collection for time_sheets
+					time_sheets_collection, err := app.Dao().FindCollectionByNameOrId("time_sheets")
+					if err != nil {
+						return fmt.Errorf("error fetching time_sheets collection: %v", err)
+					}
+
+					// Create new time sheet
+					newTimeSheet := models.NewRecord(time_sheets_collection)
+					newTimeSheet.Set("uid", userId)
+					newTimeSheet.Set("week_ending", weekEnding)
+
+					// Get work_week_hours and salary status from the user's
+					// admin_profiles record and set the value in the new time sheet.
+					profile, err := txDao.FindFirstRecordByFilter("admin_profiles", "uid={:userId}", dbx.Params{
+						"userId": userId,
+					})
+					if err != nil {
+						return fmt.Errorf("error fetching user's admin profile: %v", err)
+					}
+					newTimeSheet.Set("work_week_hours", profile.Get("work_week_hours"))
+					newTimeSheet.Set("salary", profile.Get("salary"))
+
+					if err := txDao.SaveRecord(newTimeSheet); err != nil {
+						return fmt.Errorf("error creating new time sheet: %v", err)
+					}
+
+					// Update time entries with new time sheet ID
+					for _, entry := range timeEntries {
+						entry.Set("tsid", newTimeSheet.Id)
+						if err := txDao.SaveRecord(entry); err != nil {
+							return fmt.Errorf("error updating time entry: %v", err)
+						}
+					}
 
 					return nil // Return nil if transaction is successful
 				})
 
 				if err != nil {
-					return c.JSON(http.StatusInternalServerError, map[string]string{"error": "Transaction failed"})
+					return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 				}
 
-				return c.JSON(http.StatusOK, map[string]string{"message": "Transaction successful"})
+				return c.JSON(http.StatusOK, map[string]string{"message": "Time sheet processed successfully"})
 			},
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
@@ -82,4 +140,17 @@ func AddRoutes(app *pocketbase.PocketBase) {
 
 		return nil
 	})
+}
+
+func validateTimeEntries(entries []*models.Record) error {
+	// print the number of entries
+	fmt.Println("Number of entries:", len(entries))
+
+	// Implement your validation logic here
+	// For example:
+	// - Check if all required fields are filled
+	// - Validate that hours are within acceptable ranges
+	// - Ensure total hours match expected values
+	// Return an error if validation fails
+	return nil
 }
