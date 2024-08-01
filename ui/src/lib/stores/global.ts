@@ -8,6 +8,7 @@ import type {
   DivisionsRecord,
   JobsRecord,
   ManagersRecord,
+  TimeSheetsRecord,
 } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
@@ -23,12 +24,13 @@ interface StoreItem<T> {
   lastRefresh: Date;
 }
 
-export type CollectionName = "time_types" | "divisions" | "jobs" | "managers";
+export type CollectionName = "time_types" | "divisions" | "jobs" | "managers" | "time_sheets";
 type CollectionType = {
   time_types: TimeTypesRecord[];
   divisions: DivisionsRecord[];
   jobs: JobsRecord[];
   managers: ManagersRecord[];
+  time_sheets: TimeSheetsRecord[];
 };
 
 interface StoreState {
@@ -53,6 +55,7 @@ const createStore = () => {
       // 1 day
       time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
+      time_sheets: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       // 5 minutes
       jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
       // 1 hour
@@ -90,6 +93,11 @@ const createStore = () => {
           items = (await pb
             .collection("managers")
             .getFullList<ManagersRecord>({ requestKey: "manager" })) as CollectionType[typeof key];
+          break;
+        case "time_sheets":
+          items = (await pb
+            .collection("time_sheets")
+            .getFullList<TimeSheetsRecord>({ requestKey: "time_sheets", expand: "time_entries(tsid)", sort: "-week_ending" })) as CollectionType[typeof key];
           break;
       }
 
