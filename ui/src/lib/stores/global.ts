@@ -4,11 +4,11 @@
  */
 
 import type {
-  TimeTypesRecord,
-  DivisionsRecord,
-  JobsRecord,
-  ManagersRecord,
-  TimeSheetsRecord,
+  TimeTypesResponse,
+  DivisionsResponse,
+  JobsResponse,
+  ManagersResponse,
+  TimeSheetsResponse,
 } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
@@ -26,18 +26,18 @@ interface StoreItem<T> {
 
 export type CollectionName = "time_types" | "divisions" | "jobs" | "managers" | "time_sheets";
 type CollectionType = {
-  time_types: TimeTypesRecord[];
-  divisions: DivisionsRecord[];
-  jobs: JobsRecord[];
-  managers: ManagersRecord[];
-  time_sheets: TimeSheetsRecord[];
+  time_types: TimeTypesResponse[];
+  divisions: DivisionsResponse[];
+  jobs: JobsResponse[];
+  managers: ManagersResponse[];
+  time_sheets: TimeSheetsResponse[];
 };
 
 interface StoreState {
   collections: {
     [K in CollectionName]: StoreItem<CollectionType[K]>;
   };
-  jobsIndex: MiniSearch<JobsRecord> | null;
+  jobsIndex: MiniSearch<JobsResponse> | null;
   isLoading: boolean;
   error: ClientResponseError | null;
 }
@@ -73,19 +73,19 @@ const createStore = () => {
       const userId = get(authStore)?.model?.id || "";
       switch (key) {
         case "time_types":
-          items = (await pb.collection("time_types").getFullList<TimeTypesRecord>({
+          items = (await pb.collection("time_types").getFullList<TimeTypesResponse>({
             sort: "code",
             requestKey: "tt",
           })) as CollectionType[typeof key];
           break;
         case "divisions":
-          items = (await pb.collection("divisions").getFullList<DivisionsRecord>({
+          items = (await pb.collection("divisions").getFullList<DivisionsResponse>({
             sort: "code",
             requestKey: "div",
           })) as CollectionType[typeof key];
           break;
         case "jobs":
-          items = (await pb.collection("jobs").getFullList<JobsRecord>({
+          items = (await pb.collection("jobs").getFullList<JobsResponse>({
             sort: "-number",
             requestKey: "job",
           })) as CollectionType[typeof key];
@@ -93,12 +93,12 @@ const createStore = () => {
         case "managers":
           items = (await pb
             .collection("managers")
-            .getFullList<ManagersRecord>({ requestKey: "manager" })) as CollectionType[typeof key];
+            .getFullList<ManagersResponse>({ requestKey: "manager" })) as CollectionType[typeof key];
           break;
         case "time_sheets":
           items = (await pb
             .collection("time_sheets")
-            .getFullList<TimeSheetsRecord>({ requestKey: "time_sheets", filter: pb.filter("uid={:userId}", { userId }), expand: "time_entries(tsid)", sort: "-week_ending" })) as CollectionType[typeof key];
+            .getFullList<TimeSheetsResponse>({ requestKey: "time_sheets", filter: pb.filter("uid={:userId}", { userId }), expand: "time_entries(tsid)", sort: "-week_ending" })) as CollectionType[typeof key];
           break;
       }
 
@@ -111,11 +111,11 @@ const createStore = () => {
         };
 
         if (key === "jobs") {
-          const jobsIndex = new MiniSearch<JobsRecord>({
+          const jobsIndex = new MiniSearch<JobsResponse>({
             fields: ["id", "number", "description"],
             storeFields: ["id", "number", "description"],
           });
-          jobsIndex.addAll(items as JobsRecord[]);
+          jobsIndex.addAll(items as JobsResponse[]);
           newState.jobsIndex = jobsIndex;
         }
 

@@ -120,7 +120,6 @@ export type UsersRecord = {
 };
 
 export type ManagersRecord = {
-  id: RecordIdString;
   given_name: string;
   surname: string;
 };
