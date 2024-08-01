@@ -70,6 +70,7 @@ const createStore = () => {
     update((state) => ({ ...state, isLoading: true, error: null }));
     try {
       let items: CollectionType[typeof key];
+      const userId = get(authStore)?.model?.id || "";
       switch (key) {
         case "time_types":
           items = (await pb.collection("time_types").getFullList<TimeTypesRecord>({
@@ -97,7 +98,7 @@ const createStore = () => {
         case "time_sheets":
           items = (await pb
             .collection("time_sheets")
-            .getFullList<TimeSheetsRecord>({ requestKey: "time_sheets", expand: "time_entries(tsid)", sort: "-week_ending" })) as CollectionType[typeof key];
+            .getFullList<TimeSheetsRecord>({ requestKey: "time_sheets", filter: pb.filter("uid={:userId}", { userId }), expand: "time_entries(tsid)", sort: "-week_ending" })) as CollectionType[typeof key];
           break;
       }
 
