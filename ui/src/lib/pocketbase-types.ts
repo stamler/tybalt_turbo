@@ -56,19 +56,16 @@ export type ClaimsRecord = {
 };
 
 export type DivisionsRecord = {
-  id: RecordIdString;
   code: string;
   name: string;
 };
 
 export type JobsRecord = {
-  id: RecordIdString;
   number: string;
   description: string;
 };
 
 export type ProfilesRecord = {
-  id: RecordIdString;
   given_name: string;
   surname: string;
   manager: RecordIdString;
@@ -78,7 +75,6 @@ export type ProfilesRecord = {
 };
 
 export type TimeEntriesRecord = {
-  id?: RecordIdString;
   category: string;
   date: string;
   description: string;
@@ -92,9 +88,6 @@ export type TimeEntriesRecord = {
   week_ending: string;
   work_record: string;
   tsid: RecordIdString;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  expand?: Record<string, any>;
-
 };
 
 export type TimeSheetsRecord = {
@@ -104,10 +97,9 @@ export type TimeSheetsRecord = {
   work_week_hours: number;
 };
 
-export type TimeTypesRecord<Tfields = unknown> = {
-  id: RecordIdString;
-  allowed_fields?: null | Tfields;
-  required_fields?: null | Tfields;
+export type TimeTypesRecord = {
+  allowed_fields?: null | string[];
+  required_fields?: null | string[];
   code: string;
   description?: string;
   name: string;
@@ -133,6 +125,12 @@ export type ManagersRecord = {
   surname: string;
 };
 
+type TimeEntriesRecordExpands = {
+  time_type: TimeTypesRecord;
+  division: DivisionsRecord;
+  job: JobsRecord;
+};
+
 // Response types include system fields and match responses from the PocketBase API
 export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRecord> &
   BaseSystemFields<Texpand>;
@@ -144,13 +142,11 @@ export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
   BaseSystemFields<Texpand>;
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
-export type TimeEntriesResponse<Texpand = unknown> = Required<TimeEntriesRecord> &
+export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeSheetsResponse<Texpand = unknown> = Required<TimeSheetsRecord> &
   BaseSystemFields<Texpand>;
-export type TimeTypesResponse<Tfields = unknown, Texpand = unknown> = Required<
-  TimeTypesRecord<Tfields>
-> &
+export type TimeTypesResponse<Texpand = unknown> = Required<TimeTypesRecord> &
   BaseSystemFields<Texpand>;
 export type UserClaimsResponse<Texpand = unknown> = Required<UserClaimsRecord> &
   BaseSystemFields<Texpand>;
