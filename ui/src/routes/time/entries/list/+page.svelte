@@ -3,6 +3,8 @@
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
   import type { TimeEntriesRecord } from "$lib/pocketbase-types";
+  import { globalStore } from "$lib/stores/global";
+  import { invalidate } from "$app/navigation";
 
   let { data }: { data: PageData } = $props();
 
@@ -76,7 +78,12 @@
           "Content-Type": "application/json",
         },
       });
-      console.log(response);
+
+      // refresh the time sheets list in the global store
+      globalStore.refresh("time_sheets");
+
+      // Rerun the load function to refresh the list of time entries
+      await invalidate("app:timeEntries");
     } catch (error) {
       console.error("Error:", error);
     }
