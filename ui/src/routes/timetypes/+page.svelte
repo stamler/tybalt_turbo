@@ -3,7 +3,7 @@
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsTokenInput from "$lib/components/DSTokenInput.svelte";
   import { pb } from "$lib/pocketbase";
-  import type { TimeTypesRecord } from "$lib/pocketbase-types";
+  import type { TimeTypesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
 
   let errors = $state({} as any);
@@ -41,21 +41,25 @@
   }
 </script>
 
-{#snippet anchor({ code })}{code}{/snippet}
-{#snippet headline({ name })}{name}{/snippet}
-{#snippet line1({ description })}{description}{/snippet}
-{#snippet line2({ allowed_fields })}
-  <span class="opacity-30">allowed</span>
-  {allowed_fields.join(", ")}
+{#snippet anchor({ code }: TimeTypesResponse)}{code}{/snippet}
+{#snippet headline({ name }: TimeTypesResponse)}{name}{/snippet}
+{#snippet line1({ description }: TimeTypesResponse)}{description}{/snippet}
+{#snippet line2({ allowed_fields }: TimeTypesResponse)}
+  {#if allowed_fields !== null}
+    <span class="opacity-30">allowed</span>
+    {allowed_fields.join(", ")}
+  {/if}
 {/snippet}
-{#snippet line3({ required_fields })}
-  <span class="opacity-30">required</span>
-  {required_fields.join(", ")}
+{#snippet line3({ required_fields }: TimeTypesResponse)}
+  {#if required_fields !== null}
+    <span class="opacity-30">required</span>
+    {required_fields.join(", ")}
+  {/if}
 {/snippet}
 
 <!-- Show the list of items here -->
 <DsList
-  items={$globalStore.time_types as TimeTypesRecord[]}
+  items={$globalStore.time_types as TimeTypesResponse[]}
   search={true}
   {anchor}
   {headline}

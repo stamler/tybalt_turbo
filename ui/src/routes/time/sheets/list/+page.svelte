@@ -1,7 +1,7 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
-  import type { TimeSheetsRecord } from "$lib/pocketbase-types";
+  import type { TimeSheetsResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
 
   let errors = $state({} as any);
@@ -24,9 +24,9 @@
   }
 </script>
 
-{#snippet anchor({ week_ending })}{week_ending}{/snippet}
+{#snippet anchor({ week_ending }: TimeSheetsResponse)}{week_ending}{/snippet}
 {#snippet headline()}<span>placeholder</span>{/snippet}
-{#snippet actions({ id })}
+{#snippet actions({ id }: TimeSheetsResponse)}
   <button onclick={() => unbundle(id)}>unbundle</button>
   <span>recall</span>
   <span>reject</span>
@@ -35,7 +35,7 @@
 
 <!-- Show the list of items here -->
 <DsList
-  items={$globalStore.time_sheets as TimeSheetsRecord[]}
+  items={$globalStore.time_sheets as TimeSheetsResponse[]}
   search={true}
   {anchor}
   {headline}

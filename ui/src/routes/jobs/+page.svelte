@@ -2,7 +2,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
   import { pb } from "$lib/pocketbase";
-  import type { JobsRecord } from "$lib/pocketbase-types";
+  import type { JobsResponse } from "$lib/pocketbase-types";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
 
   let { data }: { data: PageData } = $props();
@@ -20,6 +20,11 @@
       const record = await pb.collection("jobs").create(item, { returnRecord: true });
       if (data.items === undefined) throw new Error("data.items is undefined");
       data.items.push(record);
+
+      // TODO:
+      // 1. don't use page load function for jobs, get from index instead
+      // 2. find a way to show later items from the index
+      // 3. add the new item to the index on save
 
       // submission was successful, clear the errors
       errors = {};
@@ -45,16 +50,16 @@
   }
 </script>
 
-{#snippet anchor({ number })}{number}{/snippet}
-{#snippet headline({ description })}{description}{/snippet}
+{#snippet anchor({ number }: JobsResponse)}{number}{/snippet}
+{#snippet headline({ description }: JobsResponse)}{description}{/snippet}
 
-{#snippet actions({ id })}
+{#snippet actions({ id }: JobsResponse)}
   <a href="/details/{id}">details</a>
   <button type="button" onclick={() => del(id)}>delete</button>
 {/snippet}
 
 <!-- Show the list of items here -->
-<DsList items={data.items as JobsRecord[]} search={true} {anchor} {headline} {actions} />
+<DsList items={data.items as JobsResponse[]} search={true} {anchor} {headline} {actions} />
 
 <!-- Create a new job -->
 <form class="flex w-full flex-col items-center gap-2 p-2">

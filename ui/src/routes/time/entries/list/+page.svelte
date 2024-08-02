@@ -2,13 +2,13 @@
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
-  import type { TimeEntriesRecord } from "$lib/pocketbase-types";
+  import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { invalidate } from "$app/navigation";
 
   let { data }: { data: PageData } = $props();
 
-  function hoursString(item: TimeEntriesRecord) {
+  function hoursString(item: TimeEntriesResponse) {
     const hoursArray = [];
     if (item.hours) hoursArray.push(item.hours + " hrs");
     if (item.meals_hours) hoursArray.push(item.meals_hours + " hrs meals");
@@ -29,18 +29,22 @@
     }
   }
 
-  function calculateTallies(items: TimeEntriesRecord[]) {
+  function calculateTallies(items: TimeEntriesResponse[]) {
     const tallies = {
       workHoursTally: { jobHours: 0, hours: 0, total: 0 },
       nonWorkHoursTally: { total: 0 } as Record<string, number>,
       mealsHoursTally: 0,
-      bankEntries: [] as TimeEntriesRecord[],
-      payoutRequests: [] as TimeEntriesRecord[],
+      bankEntries: [] as TimeEntriesResponse[],
+      payoutRequests: [] as TimeEntriesResponse[],
       offRotationDates: [] as string[],
       offWeek: [] as string[],
     };
 
     items.forEach((item) => {
+      if (!item.expand) {
+        alert("Error: expand field is missing from time entry record.");
+        return;
+      }
       const timeType = item.expand?.time_type.code;
 
       if (timeType === "R" || timeType === "RT") {
@@ -90,9 +94,9 @@
   }
 </script>
 
-{#snippet anchor(item)}{item.date}{/snippet}
+{#snippet anchor(item: TimeEntriesResponse)}{item.date}{/snippet}
 
-{#snippet headline({ expand })}
+{#snippet headline({ expand }: TimeEntriesResponse)}
   {#if expand?.time_type.code === "R"}
     <span>{expand.division.name}</span>
   {:else}
@@ -100,14 +104,14 @@
   {/if}
 {/snippet}
 
-{#snippet byline({ expand, payout_request_amount })}
+{#snippet byline({ expand, payout_request_amount }: TimeEntriesResponse)}
   {#if expand?.time_type.code === "OTO"}
     <span>${payout_request_amount}</span>
   {/if}
 {/snippet}
 
-{#snippet line1({ expand, job })}
-  {#if ["R", "RT"].includes(expand?.time_type.code) && job !== ""}
+{#snippet line1({ expand, job }: TimeEntriesResponse)}
+  {#if expand?.time_type !== undefined && ["R", "RT"].includes(expand.time_type.code) && job !== ""}
     <span>{expand?.job.number} - {expand?.job.description}</span>
     {#if expand?.job.category}
       <span class="label">{expand.job.category}</span>
@@ -115,25 +119,25 @@
   {/if}
 {/snippet}
 
-{#snippet line2(item)}{hoursString(item)}{/snippet}
+{#snippet line2(item: TimeEntriesResponse)}{hoursString(item)}{/snippet}
 
-{#snippet line3({ work_record, description })}
+{#snippet line3({ work_record, description }: TimeEntriesResponse)}
   {#if work_record !== ""}
     <span><span class="opacity-50">Work Record</span> {work_record} / </span>
   {/if}
   <span class="opacity-50">{description}</span>
 {/snippet}
 
-{#snippet actions({ id })}
+{#snippet actions({ id }: TimeEntriesResponse)}
   <a href="/time/entries/{id}/edit">edit</a>
   <button type="button" onclick={() => del(id)}>delete</button>
 {/snippet}
 
-{#snippet groupHeader(field)}
+{#snippet groupHeader(field: string)}
   Week Ending {field}
 {/snippet}
 
-{#snippet groupFooter(groupKey, items)}
+{#snippet groupFooter(groupKey: string, items: TimeEntriesResponse[])}
   <div class="flex items-center justify-center px-4 py-2">Totals</div>
   <div class="flex flex-col py-2">
     {#if Array.isArray(items)}
@@ -189,7 +193,7 @@
   </div>
 {/snippet}
 <DsList
-  items={data.items as TimeEntriesRecord[]}
+  items={data.items as TimeEntriesResponse[]}
   search={true}
   inListHeader="Time Entries"
   groupField="week_ending"

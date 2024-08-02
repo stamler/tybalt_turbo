@@ -2,7 +2,6 @@
   import DsList from "$lib/components/DSList.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import { pb } from "$lib/pocketbase";
-  import type { BaseSystemFields, DivisionsRecord } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
 
   let errors = $state({} as any);
@@ -33,7 +32,7 @@
 </script>
 
 <!-- Show the list of items here -->
-<DsList items={$globalStore.divisions as (DivisionsRecord & BaseSystemFields)[]} search={true}>
+<DsList items={$globalStore.divisions} search={true}>
   {#snippet anchor({ code })}{code}{/snippet}
   {#snippet headline({ name })}{name}{/snippet}
 </DsList>

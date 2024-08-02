@@ -1,4 +1,5 @@
-<script lang="ts" generics="T extends BaseSystemFields">
+<script lang="ts" generics="T extends BaseSystemFields<any>">
+  // TODO: a better type parameter for BaseSystemFields than any?
   import type { Snippet } from "svelte";
   import type { BaseSystemFields } from "$lib/pocketbase-types";
   import { groupBy } from "lodash";
@@ -41,18 +42,30 @@
     if (item === undefined || item === null) {
       return "";
     }
-    const fields = Object.values(item);
-    // if the item has an expand property, get all the keys from the expand
-    // property, and then for each key, get Object.values(item.expand[key])
-    // and add that to the fields array
+    const fields = [] as string[];
     if (item.expand !== undefined) {
-      const expandKeys = Object.keys(item.expand);
-      expandKeys.forEach((key) => {
-        if (item.expand !== undefined && item.expand[key] !== undefined) {
-          fields.push(...Object.values(item.expand[key]));
-        }
-      });
+      // if the item has an expand property, get all the keys from the expand
+      // property, and then for each key, get Object.values(item.expand[key])
+      // and add that to the fields array
+      const _ex = item.expand as Record<string, Record<string, any>>;
+      if (_ex !== undefined) {
+        const expandKeys = Object.keys(_ex);
+        expandKeys.forEach((key) => {
+          if (_ex[key] !== undefined && _ex[key] !== null) {
+            const y = _ex[key];
+            const vals = Object.values(y).filter((v) => v !== undefined && v !== null);
+            fields.push(...vals);
+          }
+        });
+      }
     }
+    // get all the values from the item object and add them to the fields array
+    const { expand, ...rest } = item;
+    const vals = Object.values(rest)
+      .filter((v) => v !== undefined && v !== null)
+      .map((v) => v.toString());
+    fields.push(...vals);
+
     return fields.join(",").toLowerCase();
   }
 
@@ -98,7 +111,7 @@
     <DSInListHeader value={inListHeader} />
   {/if}
 
-  {#snippet itemList(_processedItems)}
+  {#snippet itemList(_processedItems: T[])}
     {#each _processedItems as item}
       <li class="contents">
         <div class="col-span-3 grid grid-cols-subgrid bg-[inherit]">

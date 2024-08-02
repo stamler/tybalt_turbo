@@ -1,9 +1,9 @@
-import type { JobsRecord } from "$lib/pocketbase-types";
+import type { JobsResponse } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 
 export const load: PageLoad = async () => {
-  let items: JobsRecord[];
+  let items: JobsResponse[];
 
   try {
     // load required data
