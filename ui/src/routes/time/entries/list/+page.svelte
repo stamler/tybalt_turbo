@@ -4,7 +4,7 @@
   import type { PageData } from "./$types";
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { invalidate } from "$app/navigation";
+  import { invalidate, goto } from "$app/navigation";
 
   let { data }: { data: PageData } = $props();
 
@@ -88,6 +88,9 @@
 
       // Rerun the load function to refresh the list of time entries
       await invalidate("app:timeEntries");
+
+      // navigate to the time sheets list to show the bundled time sheets
+      goto(`/time/sheets/list`);
     } catch (error) {
       console.error("Error:", error);
     }

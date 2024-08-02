@@ -3,6 +3,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import type { TimeSheetsResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
+  import { goto } from "$app/navigation";
 
   let errors = $state({} as any);
 
@@ -18,6 +19,9 @@
 
       // refresh the time sheets list in the global store
       globalStore.refresh("time_sheets");
+
+      // navigate to the time entries list to show the unbundled time entries
+      goto(`/time/entries/list`);
     } catch (error) {
       console.error("Error:", error);
     }
