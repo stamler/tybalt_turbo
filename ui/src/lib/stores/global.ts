@@ -93,12 +93,19 @@ const createStore = () => {
         case "managers":
           items = (await pb
             .collection("managers")
-            .getFullList<ManagersResponse>({ requestKey: "manager" })) as CollectionType[typeof key];
+            .getFullList<ManagersResponse>({
+              requestKey: "manager",
+            })) as CollectionType[typeof key];
           break;
         case "time_sheets":
           items = (await pb
             .collection("time_sheets")
-            .getFullList<TimeSheetsResponse>({ requestKey: "time_sheets", filter: pb.filter("uid={:userId}", { userId }), expand: "time_entries(tsid)", sort: "-week_ending" })) as CollectionType[typeof key];
+            .getFullList<TimeSheetsResponse>({
+              requestKey: "time_sheets",
+              filter: pb.filter("uid={:userId}", { userId }),
+              expand: "time_entries(tsid)",
+              sort: "-week_ending",
+            })) as CollectionType[typeof key];
           break;
       }
 
@@ -138,7 +145,7 @@ const createStore = () => {
       console.log("User is not logged in, skipping refresh");
       return;
     }
-  
+
     update((state) => {
       const now = new Date();
       const newState = { ...state };
