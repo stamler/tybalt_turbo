@@ -1,9 +1,10 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
-  import type { TimeSheetsResponse } from "$lib/pocketbase-types";
+  import type { TimeEntriesResponse, TimeSheetsResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { goto } from "$app/navigation";
+  import { calculateTallies, shortDate } from "$lib/utilities";
 
   let errors = $state({} as any);
 
@@ -28,8 +29,15 @@
   }
 </script>
 
-{#snippet anchor({ week_ending }: TimeSheetsResponse)}{week_ending}{/snippet}
+{#snippet anchor({ week_ending }: TimeSheetsResponse)}
+  <a href="/time/sheets/details">{shortDate(week_ending)}</a>
+{/snippet}
 {#snippet headline()}<span>placeholder</span>{/snippet}
+{#snippet line1({ expand }: TimeSheetsResponse)}
+  <span>
+    {JSON.stringify(calculateTallies((expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]))}
+  </span>
+{/snippet}
 {#snippet actions({ id }: TimeSheetsResponse)}
   <button onclick={() => unbundle(id)}>unbundle</button>
   <span>recall</span>
@@ -43,5 +51,6 @@
   search={true}
   {anchor}
   {headline}
+  {line1}
   {actions}
 />
