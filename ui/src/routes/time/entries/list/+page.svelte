@@ -5,6 +5,7 @@
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { invalidate, goto } from "$app/navigation";
+  import { calculateTallies } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
 
@@ -27,50 +28,6 @@
     } catch (error: any) {
       alert(error.data.message);
     }
-  }
-
-  function calculateTallies(items: TimeEntriesResponse[]) {
-    const tallies = {
-      workHoursTally: { jobHours: 0, hours: 0, total: 0 },
-      nonWorkHoursTally: { total: 0 } as Record<string, number>,
-      mealsHoursTally: 0,
-      bankEntries: [] as TimeEntriesResponse[],
-      payoutRequests: [] as TimeEntriesResponse[],
-      offRotationDates: [] as string[],
-      offWeek: [] as string[],
-    };
-
-    items.forEach((item) => {
-      if (!item.expand) {
-        alert("Error: expand field is missing from time entry record.");
-        return;
-      }
-      const timeType = item.expand?.time_type.code;
-
-      if (timeType === "R" || timeType === "RT") {
-        if (item.job === "") {
-          tallies.workHoursTally.hours += item.hours;
-        } else {
-          tallies.workHoursTally.jobHours += item.hours;
-        }
-        tallies.workHoursTally.total += item.hours;
-        tallies.mealsHoursTally += item.meals_hours;
-      } else if (timeType === "OR") {
-        tallies.offRotationDates.push(item.date);
-      } else if (timeType === "OW") {
-        tallies.offWeek.push(item.date);
-      } else if (timeType === "OTO") {
-        tallies.payoutRequests.push(item);
-      } else if (timeType === "RB") {
-        tallies.bankEntries.push(item);
-      } else {
-        tallies.nonWorkHoursTally[timeType] =
-          (tallies.nonWorkHoursTally[timeType] || 0) + item.hours;
-        tallies.nonWorkHoursTally.total += item.hours;
-      }
-    });
-
-    return tallies;
   }
 
   async function bundle(weekEnding: string) {
@@ -116,9 +73,7 @@
 {#snippet line1({ expand, job }: TimeEntriesResponse)}
   {#if expand?.time_type !== undefined && ["R", "RT"].includes(expand.time_type.code) && job !== ""}
     <span>{expand?.job.number} - {expand?.job.description}</span>
-    {#if expand?.job.category}
-      <span class="label">{expand.job.category}</span>
-    {/if}
+    <!-- TODO: add job category with expand?.job.category -->
   {/if}
 {/snippet}
 
