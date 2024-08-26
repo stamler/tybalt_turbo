@@ -59,7 +59,7 @@ const createStore = () => {
       time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       time_sheets: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
-      time_sheets_tallies: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) }, // Add time_sheets_tallies
+      time_sheets_tallies: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       // 5 minutes
       jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
       // 1 hour
@@ -131,7 +131,7 @@ const createStore = () => {
         }
 
         if (key === "time_sheets") {
-          const tallies = items.map((item) => calculateTallies(item as TimeSheetsResponse)); // Cast item to TimeSheetsResponse
+          const tallies = items.map((item) => calculateTallies(item as TimeSheetsResponse));
           newState.collections.time_sheets_tallies = {
             items: tallies,
             lastRefresh: new Date(),
@@ -193,7 +193,8 @@ const _globalStore = createStore();
 const proxyHandler: ProxyHandler<StoreState> = {
   get(target, prop: string | symbol) {
     if (prop in target.collections) {
-      return target.collections[prop as CollectionName].items;
+      const items = target.collections[prop as CollectionName].items;
+      return items || []; // Return an empty array if items is undefined
     }
     return target[prop as keyof StoreState];
   },
