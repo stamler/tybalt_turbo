@@ -51,8 +51,11 @@
   <span>{jobs(tally)}</span>
 {/snippet}
 {#snippet line3(tally: TimeSheetTally)}
-  <!-- TODO: implement rejection message, viewers, reviewed, and payout requests -->
-  <span>RejectionStatus, Viewers, Reviewed, PayoutRequests</span>
+  {#if tally.rejected}
+    <span class="text-red-600">Rejected: {tally.rejection_reason}</span>
+  {/if}
+  <!-- TODO: implement viewers, reviewed, and payout requests -->
+  <span>Viewers, Reviewed, PayoutRequests</span>
 {/snippet}
 {#snippet actions({ id }: TimeSheetTally)}
   <button onclick={() => unbundle(id)}>unbundle</button>
@@ -77,9 +80,6 @@
 <!--
 
     <template #line3="item">
-      <span v-if="item.rejected" style="color: red">
-        Rejected: {{ item.rejectionReason }}
-      </span>
       <span v-if="Object.keys(unreviewed(item)).length > 0">
         Viewers:
         <span

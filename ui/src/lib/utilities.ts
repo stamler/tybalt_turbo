@@ -1,4 +1,9 @@
-import type { TimeEntriesResponse, TimeSheetsResponse, BaseSystemFields, IsoDateString } from "$lib/pocketbase-types";
+import type {
+  TimeEntriesResponse,
+  TimeSheetsResponse,
+  BaseSystemFields,
+  IsoDateString,
+} from "$lib/pocketbase-types";
 import { Collections } from "$lib/pocketbase-types";
 
 export interface TimeSheetTally extends BaseSystemFields {
@@ -7,6 +12,8 @@ export interface TimeSheetTally extends BaseSystemFields {
   week_ending: string;
   salary: boolean;
   work_week_hours: number;
+  rejected: boolean;
+  rejection_reason: string;
 
   // These are the tallies for the time entries
   workHoursTally: {
@@ -41,6 +48,8 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
   let week_ending: string = "";
   let salary: boolean = false;
   let work_week_hours: number = 0;
+  let rejected: boolean = false;
+  let rejection_reason: string = "";
   let created: IsoDateString = "";
   let updated: IsoDateString = "";
   let collectionId: string = "";
@@ -53,17 +62,21 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
     week_ending = arg.week_ending;
     salary = arg.salary;
     work_week_hours = arg.work_week_hours;
+    rejected = arg.rejected;
+    rejection_reason = arg.rejection_reason;
     created = arg.created;
     updated = arg.updated;
     collectionId = arg.collectionId;
     collectionName = arg.collectionName;
-    items = (arg.expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]
+    items = (arg.expand as { "time_entries(tsid)": TimeEntriesResponse[] })["time_entries(tsid)"];
   }
   const tallies: TimeSheetTally = {
     id,
     week_ending,
     salary,
     work_week_hours,
+    rejected,
+    rejection_reason,
     created,
     updated,
     collectionId,
@@ -96,7 +109,8 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
         tallies.workHoursTally.jobHours += item.hours;
         // tally jobs. TODO: include other details about the job besides the
         // number of hours
-        tallies.jobsTally[item.expand.job.number] = (tallies.jobsTally[item.expand.job.number] || 0) + item.hours;
+        tallies.jobsTally[item.expand.job.number] =
+          (tallies.jobsTally[item.expand.job.number] || 0) + item.hours;
       }
       tallies.workHoursTally.total += item.hours;
       tallies.mealsHoursTally += item.meals_hours;
@@ -109,8 +123,7 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
     } else if (timeType === "RB") {
       tallies.bankEntries.push(item);
     } else {
-      tallies.nonWorkHoursTally[timeType] =
-        (tallies.nonWorkHoursTally[timeType] || 0) + item.hours;
+      tallies.nonWorkHoursTally[timeType] = (tallies.nonWorkHoursTally[timeType] || 0) + item.hours;
       tallies.nonWorkHoursTally.total += item.hours;
     }
   });
@@ -119,7 +132,20 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
 }
 
 export function shortDate(dateString: string) {
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
   const dateParts = dateString.split("-");
   // const year = dateParts[0];
   const month = months[parseInt(dateParts[1], 10) - 1];

@@ -26,7 +26,13 @@ interface StoreItem<T> {
   lastRefresh: Date;
 }
 
-export type CollectionName = "time_types" | "divisions" | "jobs" | "managers" | "time_sheets" | "time_sheets_tallies";
+export type CollectionName =
+  | "time_types"
+  | "divisions"
+  | "jobs"
+  | "managers"
+  | "time_sheets"
+  | "time_sheets_tallies";
 type CollectionType = {
   time_types: TimeTypesResponse[];
   divisions: DivisionsResponse[];
@@ -95,21 +101,18 @@ const createStore = () => {
           })) as CollectionType[typeof key];
           break;
         case "managers":
-          items = (await pb
-            .collection("managers")
-            .getFullList<ManagersResponse>({
-              requestKey: "manager",
-            })) as CollectionType[typeof key];
+          items = (await pb.collection("managers").getFullList<ManagersResponse>({
+            requestKey: "manager",
+          })) as CollectionType[typeof key];
           break;
         case "time_sheets":
-          items = (await pb
-            .collection("time_sheets")
-            .getFullList<TimeSheetsResponse>({
-              requestKey: "time_sheets",
-              filter: pb.filter("uid={:userId}", { userId }),
-              expand: "time_entries(tsid).time_type,time_entries(tsid).job,time_entries(tsid).division",
-              sort: "-week_ending",
-            })) as CollectionType[typeof key];
+          items = (await pb.collection("time_sheets").getFullList<TimeSheetsResponse>({
+            requestKey: "time_sheets",
+            filter: pb.filter("uid={:userId}", { userId }),
+            expand:
+              "time_entries(tsid).time_type,time_entries(tsid).job,time_entries(tsid).division",
+            sort: "-week_ending",
+          })) as CollectionType[typeof key];
           break;
       }
 

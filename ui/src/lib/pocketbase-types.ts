@@ -91,6 +91,14 @@ export type TimeEntriesRecord = {
 };
 
 export type TimeSheetsRecord = {
+  approved: boolean;
+  approver: RecordIdString;
+  locked: boolean;
+  locker: RecordIdString;
+  rejected: boolean;
+  rejection_reason: string;
+  rejector: RecordIdString;
+  submitted: boolean;
   uid: RecordIdString;
   salary: boolean;
   week_ending: string;
