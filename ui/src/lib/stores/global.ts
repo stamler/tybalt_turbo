@@ -103,7 +103,7 @@ const createStore = () => {
             .getFullList<TimeSheetsResponse>({
               requestKey: "time_sheets",
               filter: pb.filter("uid={:userId}", { userId }),
-              expand: "time_entries(tsid).time_type",
+              expand: "time_entries(tsid).time_type,time_entries(tsid).job,time_entries(tsid).division",
               sort: "-week_ending",
             })) as CollectionType[typeof key];
           break;
