@@ -17,6 +17,8 @@ import { get } from "svelte/store";
 import { ClientResponseError } from "pocketbase";
 import MiniSearch from "minisearch";
 import type { Readable, Invalidator, Subscriber } from "svelte/store";
+import { calculateTallies } from "$lib/utilities";
+import type { TimeSheetTally } from "$lib/utilities";
 
 interface StoreItem<T> {
   items: T;
@@ -24,13 +26,14 @@ interface StoreItem<T> {
   lastRefresh: Date;
 }
 
-export type CollectionName = "time_types" | "divisions" | "jobs" | "managers" | "time_sheets";
+export type CollectionName = "time_types" | "divisions" | "jobs" | "managers" | "time_sheets" | "time_sheets_tallies";
 type CollectionType = {
   time_types: TimeTypesResponse[];
   divisions: DivisionsResponse[];
   jobs: JobsResponse[];
   managers: ManagersResponse[];
   time_sheets: TimeSheetsResponse[];
+  time_sheets_tallies: TimeSheetTally[];
 };
 
 interface StoreState {
@@ -56,6 +59,7 @@ const createStore = () => {
       time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       time_sheets: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
+      time_sheets_tallies: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) }, // Add time_sheets_tallies
       // 5 minutes
       jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
       // 1 hour
@@ -124,6 +128,15 @@ const createStore = () => {
           });
           jobsIndex.addAll(items as JobsResponse[]);
           newState.jobsIndex = jobsIndex;
+        }
+
+        if (key === "time_sheets") {
+          const tallies = items.map((item) => calculateTallies(item as TimeSheetsResponse)); // Cast item to TimeSheetsResponse
+          newState.collections.time_sheets_tallies = {
+            items: tallies,
+            lastRefresh: new Date(),
+            maxAge: newState.collections.time_sheets.maxAge,
+          };
         }
 
         return { ...newState, isLoading: false, error: null };

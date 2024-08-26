@@ -1,6 +1,14 @@
-import type { TimeEntriesResponse } from "$lib/pocketbase-types";
+import type { TimeEntriesResponse, TimeSheetsResponse, BaseSystemFields, IsoDateString } from "$lib/pocketbase-types";
+import { Collections } from "$lib/pocketbase-types";
 
-interface TimeSheetTally {
+export interface TimeSheetTally extends BaseSystemFields {
+  // These TimeSheetRecord-specific properties will be "" if there is no
+  // corresponding time sheet record for the time entries
+  week_ending: string;
+  salary: boolean;
+  work_week_hours: number;
+
+  // These are the tallies for the time entries
   workHoursTally: {
     jobHours: number;
     hours: number;
@@ -27,8 +35,39 @@ interface TimeSheetTally {
   };
 }
 
-export function calculateTallies(items: TimeEntriesResponse[]): TimeSheetTally {
+export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]): TimeSheetTally {
+  let items: TimeEntriesResponse[];
+  let id: string = "";
+  let week_ending: string = "";
+  let salary: boolean = false;
+  let work_week_hours: number = 0;
+  let created: IsoDateString = "";
+  let updated: IsoDateString = "";
+  let collectionId: string = "";
+  let collectionName = Collections.TimeSheets;
+  if (Array.isArray(arg)) {
+    items = arg;
+  } else {
+    // Existing assignment for TimeSheetsResponse case
+    id = arg.id;
+    week_ending = arg.week_ending;
+    salary = arg.salary;
+    work_week_hours = arg.work_week_hours;
+    created = arg.created;
+    updated = arg.updated;
+    collectionId = arg.collectionId;
+    collectionName = arg.collectionName;
+    items = (arg.expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]
+  }
   const tallies: TimeSheetTally = {
+    id,
+    week_ending,
+    salary,
+    work_week_hours,
+    created,
+    updated,
+    collectionId,
+    collectionName,
     workHoursTally: { jobHours: 0, hours: 0, total: 0 },
     nonWorkHoursTally: { total: 0 },
     mealsHoursTally: 0,

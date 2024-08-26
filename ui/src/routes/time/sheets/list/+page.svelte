@@ -1,17 +1,10 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
-  import type { TimeEntriesResponse, TimeSheetsResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { goto } from "$app/navigation";
-  import {
-    calculateTallies,
-    shortDate,
-    hoursWorked,
-    hoursOff,
-    jobs,
-    divisions,
-  } from "$lib/utilities";
+  import { shortDate, hoursWorked, hoursOff, jobs, divisions } from "$lib/utilities";
+  import type { TimeSheetTally } from "$lib/utilities";
 
   let errors = $state({} as any);
 
@@ -36,46 +29,32 @@
   }
 </script>
 
-{#snippet anchor({ week_ending }: TimeSheetsResponse)}
+{#snippet anchor({ week_ending }: TimeSheetTally)}
   <a class="font-bold hover:underline" href="/time/sheets/details">{shortDate(week_ending)}</a>
 {/snippet}
-{#snippet headline({ expand }: TimeSheetsResponse)}
-  <span>
-    {hoursWorked(calculateTallies((expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]))}
-  </span>
+{#snippet headline(tally: TimeSheetTally)}
+  <span>{hoursWorked(tally)}</span>
 {/snippet}
-{#snippet byline({ expand }: TimeSheetsResponse)}
-  <span>
-    / {hoursOff(calculateTallies((expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]))}
-  </span>
-  {#if calculateTallies((expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]).offRotationDates.length > 0}
-    <span>
-      / {calculateTallies((expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]).offRotationDates.length}
-      day(s) off rotation
-    </span>
+{#snippet byline(tally: TimeSheetTally)}
+  <span>/ {hoursOff(tally)}</span>
+  {#if tally.offRotationDates.length > 0}
+    <span>/ {tally.offRotationDates.length}day(s) off rotation</span>
   {/if}
-  {#if calculateTallies((expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]).bankEntries.length > 0}
-    <span>
-      / {calculateTallies((expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]).bankEntries.reduce((sum, entry) => sum + entry.hours, 0)}
-      hours banked
-    </span>
+  {#if tally.bankEntries.length > 0}
+    <span>/ {tally.bankEntries.reduce((sum, entry) => sum + entry.hours, 0)} hours banked</span>
   {/if}
 {/snippet}
-{#snippet line2({ expand }: TimeSheetsResponse)}
-  <span>
-    {divisions(calculateTallies((expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]))}
-  </span>
+{#snippet line2(tally: TimeSheetTally)}
+  <span>{divisions(tally)}</span>
 {/snippet}
-{#snippet line1({ expand }: TimeSheetsResponse)}
-  <span>
-    {jobs(calculateTallies((expand as { "time_entries(tsid)": TimeEntriesResponse[]})["time_entries(tsid)"]))}
-  </span>
+{#snippet line1(tally: TimeSheetTally)}
+  <span>{jobs(tally)}</span>
 {/snippet}
-{#snippet line3({ expand }: TimeSheetsResponse)}
+{#snippet line3(tally: TimeSheetTally)}
   <!-- TODO: implement rejection message, viewers, reviewed, and payout requests -->
   <span>RejectionStatus, Viewers, Reviewed, PayoutRequests</span>
 {/snippet}
-{#snippet actions({ id }: TimeSheetsResponse)}
+{#snippet actions({ id }: TimeSheetTally)}
   <button onclick={() => unbundle(id)}>unbundle</button>
   <span>recall</span>
   <span>reject</span>
@@ -84,7 +63,7 @@
 
 <!-- Show the list of items here -->
 <DsList
-  items={$globalStore.time_sheets as TimeSheetsResponse[]}
+  items={$globalStore.time_sheets_tallies}
   search={true}
   {anchor}
   {headline}
