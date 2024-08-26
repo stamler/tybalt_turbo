@@ -3,7 +3,14 @@
   import DsList from "$lib/components/DSList.svelte";
   import { globalStore } from "$lib/stores/global";
   import { goto } from "$app/navigation";
-  import { shortDate, hoursWorked, hoursOff, jobs, divisions } from "$lib/utilities";
+  import {
+    shortDate,
+    hoursWorked,
+    hoursOff,
+    jobs,
+    divisions,
+    payoutRequests,
+  } from "$lib/utilities";
   import type { TimeSheetTally } from "$lib/utilities";
 
   let errors = $state({} as any);
@@ -54,8 +61,11 @@
   {#if tally.rejected}
     <span class="text-red-600">Rejected: {tally.rejection_reason}</span>
   {/if}
-  <!-- TODO: implement viewers, reviewed, and payout requests -->
-  <span>Viewers, Reviewed, PayoutRequests</span>
+  {#if tally.payoutRequests.length > 0}
+    <span>{payoutRequests(tally)}</span>
+  {/if}
+  <!-- TODO: implement viewers, reviewed -->
+  <span>Viewers, Reviewed</span>
 {/snippet}
 {#snippet actions({ id }: TimeSheetTally)}
   <button onclick={() => unbundle(id)}>unbundle</button>
