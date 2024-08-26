@@ -38,7 +38,7 @@
 {#snippet byline(tally: TimeSheetTally)}
   <span>/ {hoursOff(tally)}</span>
   {#if tally.offRotationDates.length > 0}
-    <span>/ {tally.offRotationDates.length}day(s) off rotation</span>
+    <span>/ {tally.offRotationDates.length} day(s) off rotation</span>
   {/if}
   {#if tally.bankEntries.length > 0}
     <span>/ {tally.bankEntries.reduce((sum, entry) => sum + entry.hours, 0)} hours banked</span>
