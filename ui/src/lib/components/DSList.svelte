@@ -120,9 +120,9 @@
           </div>
           <div class="flex flex-col py-2">
             <div class="headline_wrapper">
-              <div class="font-bold">{@render headline(item)}</div>
+              <span class="font-bold">{@render headline(item)}</span>
               {#if byline !== undefined}
-                <div class="byline">{@render byline(item)}</div>
+                <span class="byline">{@render byline(item)}</span>
               {/if}
             </div>
             {#if line1 !== undefined}
