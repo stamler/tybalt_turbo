@@ -195,7 +195,10 @@ export const divisions = function (item: TimeSheetTally) {
 };
 
 export const payoutRequests = function (item: TimeSheetTally) {
-  const totalPayoutRequests = item.payoutRequests.reduce((sum, request) => sum + request.payout_request_amount, 0);
+  const totalPayoutRequests = item.payoutRequests.reduce(
+    (sum, request) => sum + request.payout_request_amount,
+    0,
+  );
   if (totalPayoutRequests > 0) {
     return `$${totalPayoutRequests.toFixed(2)} in payout requests`;
   } else {

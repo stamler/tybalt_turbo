@@ -37,6 +37,7 @@
   },
   "type": "module",
   "dependencies": {
+    "@iconify/svelte": "^4.0.2",
     "flatpickr": "^4.6.13",
     "lodash": "^4.17.21",
     "minisearch": "^6.3.0",

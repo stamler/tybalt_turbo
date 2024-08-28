@@ -3,6 +3,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import { globalStore } from "$lib/stores/global";
   import { goto } from "$app/navigation";
+  import ShareModal from "$lib/components/ShareModal.svelte";
   import {
     shortDate,
     hoursWorked,
@@ -14,6 +15,7 @@
   import type { TimeSheetTally } from "$lib/utilities";
 
   let errors = $state({} as any);
+  let shareModal: ShareModal;
 
   async function unbundle(timeSheetId: string) {
     try {
@@ -72,7 +74,12 @@
   <span>recall</span>
   <span>reject</span>
   <span>approve</span>
+  <button title="share with another manager" onclick={() => shareModal?.openModal(id)}>
+    share
+  </button>
 {/snippet}
+
+<ShareModal bind:this={shareModal} collectionName="time_sheet_reviewers" />
 
 <!-- Show the list of items here -->
 <DsList

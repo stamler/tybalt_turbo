@@ -13,6 +13,7 @@ export enum Collections {
   Managers = "managers",
   Profiles = "profiles",
   TimeEntries = "time_entries",
+  TimeSheetReviewers = "time_sheet_reviewers",
   TimeSheets = "time_sheets",
   TimeTypes = "time_types",
   UserClaims = "user_claims",
@@ -105,6 +106,12 @@ export type TimeSheetsRecord = {
   work_week_hours: number;
 };
 
+export type TimeSheetReviewersRecord = {
+  reviewed?: IsoDateString;
+  reviewer: RecordIdString;
+  time_sheet: RecordIdString;
+};
+
 export type TimeTypesRecord = {
   allowed_fields?: null | string[];
   required_fields?: null | string[];
@@ -138,6 +145,11 @@ type TimeEntriesRecordExpands = {
   job: JobsRecord;
 };
 
+type TimeSheetReviewersRecordExpands = {
+  time_sheet: TimeSheetsRecord;
+  reviewer: ManagersRecord;
+};
+
 // Response types include system fields and match responses from the PocketBase API
 export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRecord> &
   BaseSystemFields<Texpand>;
@@ -150,6 +162,8 @@ export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
+	BaseSystemFields<Texpand>;
+export type TimeSheetReviewersResponse<Texpand = TimeSheetReviewersRecordExpands> = Required<TimeSheetReviewersRecord> &
   BaseSystemFields<Texpand>;
 export type TimeSheetsResponse<Texpand = unknown> = Required<TimeSheetsRecord> &
   BaseSystemFields<Texpand>;
@@ -169,6 +183,7 @@ export type CollectionRecords = {
   managers: ManagersRecord;
   profiles: ProfilesRecord;
   time_entries: TimeEntriesRecord;
+  time_sheet_reviewers: TimeSheetReviewersRecord;
   time_sheets: TimeSheetsRecord;
   time_types: TimeTypesRecord;
   user_claims: UserClaimsRecord;
@@ -183,6 +198,7 @@ export type CollectionResponses = {
   managers: ManagersResponse;
   profiles: ProfilesResponse;
   time_entries: TimeEntriesResponse;
+  time_sheet_reviewers: TimeSheetReviewersResponse;
   time_sheets: TimeSheetsResponse;
   time_types: TimeTypesResponse;
   user_claims: UserClaimsResponse;
@@ -200,6 +216,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
   collection(idOrName: "profiles"): RecordService<ProfilesResponse>;
   collection(idOrName: "time_entries"): RecordService<TimeEntriesResponse>;
+  collection(idOrName: "time_sheet_reviewers"): RecordService<TimeSheetReviewersResponse>;
   collection(idOrName: "time_sheets"): RecordService<TimeSheetsResponse>;
   collection(idOrName: "time_types"): RecordService<TimeTypesResponse>;
   collection(idOrName: "user_claims"): RecordService<UserClaimsResponse>;
