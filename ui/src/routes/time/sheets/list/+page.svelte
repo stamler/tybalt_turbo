@@ -36,6 +36,23 @@
       console.error("Error:", error);
     }
   }
+
+  async function approve(timeSheetId: string) {
+    try {
+      const response = await pb.send("/api/approve-timesheet", {
+        method: "POST",
+        body: JSON.stringify({ timeSheetId }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // refresh the time sheets list in the global store
+      globalStore.refresh("time_sheets");
+    } catch (error) {
+      console.error("Error:", error);
+    }
+  }
 </script>
 
 {#snippet anchor({ week_ending }: TimeSheetTally)}
@@ -69,10 +86,12 @@
   <!-- TODO: implement viewers, reviewed -->
   <span>Viewers, Reviewed</span>
 {/snippet}
-{#snippet actions({ id }: TimeSheetTally)}
+{#snippet actions({ id, approved }: TimeSheetTally)}
   <button onclick={() => unbundle(id)}>recall</button>
+  {#if approved === ""}
+    <button onclick={() => approve(id)}>approve</button>
+  {/if}
   <span>reject</span>
-  <span>approve</span>
   <button title="share with another manager" onclick={() => shareModal?.openModal(id)}>
     share
   </button>

@@ -14,6 +14,7 @@ export interface TimeSheetTally extends BaseSystemFields {
   work_week_hours: number;
   rejected: boolean;
   rejection_reason: string;
+  approved: IsoDateString;
 
   // These are the tallies for the time entries
   workHoursTally: {
@@ -50,6 +51,7 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
   let work_week_hours: number = 0;
   let rejected: boolean = false;
   let rejection_reason: string = "";
+  let approved: IsoDateString = "";
   let created: IsoDateString = "";
   let updated: IsoDateString = "";
   let collectionId: string = "";
@@ -68,6 +70,7 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
     updated = arg.updated;
     collectionId = arg.collectionId;
     collectionName = arg.collectionName;
+    approved = arg.approved;
     items = (arg.expand as { "time_entries(tsid)": TimeEntriesResponse[] })["time_entries(tsid)"];
   }
   const tallies: TimeSheetTally = {
@@ -81,6 +84,7 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
     updated,
     collectionId,
     collectionName,
+    approved,
     workHoursTally: { jobHours: 0, hours: 0, total: 0 },
     nonWorkHoursTally: { total: 0 },
     mealsHoursTally: 0,
