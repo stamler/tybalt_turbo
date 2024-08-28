@@ -99,21 +99,31 @@ func AddRoutes(app *pocketbase.PocketBase) {
 						return fmt.Errorf("error fetching time_sheets collection: %v", err)
 					}
 
+					// Get the manager (approver) from the profiles collection
+					profile, err := txDao.FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
+						"userId": userId,
+					})
+					if err != nil {
+						return fmt.Errorf("error fetching user profile: %v", err)
+					}
+					approver := profile.Get("manager")
+
 					// Create new time sheet
 					newTimeSheet := models.NewRecord(time_sheets_collection)
 					newTimeSheet.Set("uid", userId)
 					newTimeSheet.Set("week_ending", weekEnding)
+					newTimeSheet.Set("approver", approver)
 
 					// Get work_week_hours and salary status from the user's
 					// admin_profiles record and set the value in the new time sheet.
-					profile, err := txDao.FindFirstRecordByFilter("admin_profiles", "uid={:userId}", dbx.Params{
+					admin_profile, err := txDao.FindFirstRecordByFilter("admin_profiles", "uid={:userId}", dbx.Params{
 						"userId": userId,
 					})
 					if err != nil {
 						return fmt.Errorf("error fetching user's admin profile: %v", err)
 					}
-					newTimeSheet.Set("work_week_hours", profile.Get("work_week_hours"))
-					newTimeSheet.Set("salary", profile.Get("salary"))
+					newTimeSheet.Set("work_week_hours", admin_profile.Get("work_week_hours"))
+					newTimeSheet.Set("salary", admin_profile.Get("salary"))
 
 					if err := txDao.SaveRecord(newTimeSheet); err != nil {
 						return fmt.Errorf("error creating new time sheet: %v", err)
