@@ -113,6 +113,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 					newTimeSheet.Set("uid", userId)
 					newTimeSheet.Set("week_ending", weekEnding)
 					newTimeSheet.Set("approver", approver)
+					newTimeSheet.Set("submitted", true)
 
 					// Get work_week_hours and salary status from the user's
 					// admin_profiles record and set the value in the new time sheet.
