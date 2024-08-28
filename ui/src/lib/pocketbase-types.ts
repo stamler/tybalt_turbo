@@ -92,7 +92,7 @@ export type TimeEntriesRecord = {
 };
 
 export type TimeSheetsRecord = {
-  approved: boolean;
+  approved: IsoDateString;
   approver: RecordIdString;
   locked: boolean;
   locker: RecordIdString;

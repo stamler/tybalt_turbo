@@ -197,7 +197,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 					}
 
 					// approved time sheets must be rejected before being unbundled
-					if timeSheet.Get("approved") == true {
+					if timeSheet.Get("approved") != "" {
 						if timeSheet.Get("rejected") == false {
 							return fmt.Errorf("approved time sheets must be rejected before being unbundled")
 						}
