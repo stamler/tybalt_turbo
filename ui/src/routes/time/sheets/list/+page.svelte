@@ -70,8 +70,7 @@
   <span>Viewers, Reviewed</span>
 {/snippet}
 {#snippet actions({ id }: TimeSheetTally)}
-  <button onclick={() => unbundle(id)}>unbundle</button>
-  <span>recall</span>
+  <button onclick={() => unbundle(id)}>recall</button>
   <span>reject</span>
   <span>approve</span>
   <button title="share with another manager" onclick={() => shareModal?.openModal(id)}>

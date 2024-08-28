@@ -196,13 +196,14 @@ func AddRoutes(app *pocketbase.PocketBase) {
 						return fmt.Errorf("time sheet does not belong to user")
 					}
 
-					// Check if the time sheet is submitted, approved, or locked
-					if timeSheet.Get("submitted") == true {
-						return fmt.Errorf("submitted time sheets must be recalled before being unbundled")
-					}
+					// approved time sheets must be rejected before being unbundled
 					if timeSheet.Get("approved") == true {
-						return fmt.Errorf("approved time sheets must be rejected before being unbundled")
+						if timeSheet.Get("rejected") == false {
+							return fmt.Errorf("approved time sheets must be rejected before being unbundled")
+						}
 					}
+
+					// locked time sheets cannot be unbundled
 					if timeSheet.Get("locked") == true {
 						return fmt.Errorf("locked time sheets cannot be unbundled")
 					}

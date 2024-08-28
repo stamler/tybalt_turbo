@@ -147,7 +147,7 @@
     {/if}
   </div>
   <div class="flex items-center gap-1 px-2 py-2">
-    <button onclick={() => bundle(groupKey)}>bundle and submit</button>
+    <button onclick={() => bundle(groupKey)}>submit</button>
   </div>
 {/snippet}
 <DsList
