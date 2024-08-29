@@ -1,28 +1,28 @@
 <script lang="ts">
+  import Icon from "@iconify/svelte";
+  import { fade } from "svelte/transition";
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
-  import { fade } from "svelte/transition";
-  import Icon from "@iconify/svelte";
 
-  export let timeSheetId: string = "";
-  let rejectionReason: string = "";
-  let show: boolean = false;
-
-  export function openModal(id: string) {
-    timeSheetId = id;
-    show = true;
-  }
+  let show = $state(false);
+  let itemId = $state("");
+  let rejectionReason = $state("");
 
   function closeModal() {
     show = false;
     rejectionReason = "";
   }
 
+  export function openModal(id: string) {
+    show = true;
+    itemId = id;
+  }
+
   async function rejectTimeSheet() {
     try {
       await pb.send("/api/reject-timesheet", {
         method: "POST",
-        body: JSON.stringify({ timeSheetId, rejectionReason }),
+        body: JSON.stringify({ timeSheetId: itemId, rejectionReason }),
         headers: {
           "Content-Type": "application/json",
         },
@@ -46,8 +46,8 @@
       class="relative z-20 mx-auto my-20 flex w-11/12 flex-col rounded-lg bg-neutral-800 p-4 text-neutral-300 md:w-3/5"
     >
       <div class="flex items-start justify-between">
-        <h1>Reject Time Sheet</h1>
-        <h5>{timeSheetId}</h5>
+        <h1>Reject</h1>
+        <h5>{itemId}</h5>
       </div>
       <div class="my-2 flex flex-col items-stretch gap-2 overflow-auto">
         <textarea
@@ -57,7 +57,7 @@
         ></textarea>
       </div>
       <div class="px-2 pb-2 pt-1">
-        <button onclick={rejectTimeSheet}>Save</button>
+        <button onclick={rejectTimeSheet}>Reject</button>
         <button onclick={closeModal}>Cancel</button>
       </div>
     </div>
