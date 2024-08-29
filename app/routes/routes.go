@@ -13,6 +13,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
+	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 // Define request body for the bundle-timesheet and unbundle-timesheet routes
@@ -197,7 +198,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 					}
 
 					// approved time sheets must be rejected before being unbundled
-					if timeSheet.Get("approved") != "" {
+					if !timeSheet.Get("approved").(types.DateTime).IsZero() {
 						if timeSheet.Get("rejected") == false {
 							return fmt.Errorf("approved time sheets must be rejected before being unbundled")
 						}
