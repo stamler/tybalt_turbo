@@ -15,7 +15,6 @@
   } from "$lib/utilities";
   import type { TimeSheetTally } from "$lib/utilities";
 
-  let errors = $state({} as any);
   let shareModal: ShareModal;
   let rejectModal: RejectModal;
 
@@ -35,7 +34,7 @@
       // navigate to the time entries list to show the unbundled time entries
       goto(`/time/entries/list`);
     } catch (error) {
-      console.error("Error:", error);
+      globalStore.addError(error?.response.error);
     }
   }
 
@@ -52,7 +51,7 @@
       // refresh the time sheets list in the global store
       globalStore.refresh("time_sheets");
     } catch (error) {
-      console.error("Error:", error);
+      globalStore.addError(error?.response.error);
     }
   }
 

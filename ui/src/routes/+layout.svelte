@@ -6,6 +6,7 @@
   import { globalStore } from "$lib/stores/global";
   import { afterNavigate } from "$app/navigation";
   import "../app.css";
+  import ErrorBar from "$lib/components/ErrorBar.svelte";
 
   // children is a function that we will call to render the current route
   // https://svelte-5-preview.vercel.app/docs/snippets#passing-snippets-to-components
@@ -73,5 +74,6 @@
   </div>
 </header>
 <main>
+  <ErrorBar />
   {@render children()}
 </main>

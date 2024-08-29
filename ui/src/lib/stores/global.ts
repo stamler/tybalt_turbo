@@ -42,6 +42,11 @@ type CollectionType = {
   time_sheets_tallies: TimeSheetTally[];
 };
 
+interface ErrorMessage {
+  message: string;
+  id: string;
+}
+
 interface StoreState {
   collections: {
     [K in CollectionName]: StoreItem<CollectionType[K]>;
@@ -49,6 +54,7 @@ interface StoreState {
   jobsIndex: MiniSearch<JobsResponse> | null;
   isLoading: boolean;
   error: ClientResponseError | null;
+  errorMessages: ErrorMessage[];
 }
 
 // Define a type for the wrapped store value
@@ -56,6 +62,9 @@ type WrappedStoreValue = {
   [K in CollectionName]: CollectionType[K];
 } & Omit<StoreState, "collections"> & {
     collections: StoreState["collections"];
+    errorMessages: ErrorMessage[];
+    addError: (message: string) => void;
+    dismissError: (id: string) => void;
   };
 
 const createStore = () => {
@@ -74,6 +83,7 @@ const createStore = () => {
     jobsIndex: null,
     isLoading: false,
     error: null,
+    errorMessages: [],
   });
 
   const loadData = async <K extends CollectionName>(key: K) => {
@@ -184,9 +194,28 @@ const createStore = () => {
     });
   };
 
+  const addError = (message: string) => {
+    update((state) => {
+      const id = crypto.randomUUID();
+      return {
+        ...state,
+        errorMessages: [...state.errorMessages, { message, id }],
+      };
+    });
+  };
+
+  const dismissError = (id: string) => {
+    update((state) => ({
+      ...state,
+      errorMessages: state.errorMessages.filter((error) => error.id !== id),
+    }));
+  };
+
   return {
     subscribe,
     refresh,
+    addError,
+    dismissError,
   };
 };
 
@@ -204,7 +233,11 @@ const proxyHandler: ProxyHandler<StoreState> = {
 };
 
 // Wrapped store that provides access to the collections directly
-const wrappedStore: Readable<WrappedStoreValue> & { refresh: typeof _globalStore.refresh } = {
+const wrappedStore: Readable<WrappedStoreValue> & {
+  refresh: typeof _globalStore.refresh;
+  addError: typeof _globalStore.addError;
+  dismissError: typeof _globalStore.dismissError;
+} = {
   subscribe: (run: Subscriber<WrappedStoreValue>, invalidate?: Invalidator<WrappedStoreValue>) => {
     return _globalStore.subscribe(
       (value) => run(new Proxy(value, proxyHandler) as unknown as WrappedStoreValue),
@@ -212,6 +245,8 @@ const wrappedStore: Readable<WrappedStoreValue> & { refresh: typeof _globalStore
     );
   },
   refresh: _globalStore.refresh,
+  addError: _globalStore.addError,
+  dismissError: _globalStore.dismissError,
 };
 
 export const globalStore = wrappedStore;
