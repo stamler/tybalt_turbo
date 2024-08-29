@@ -162,9 +162,9 @@ export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
-	BaseSystemFields<Texpand>;
-export type TimeSheetReviewersResponse<Texpand = TimeSheetReviewersRecordExpands> = Required<TimeSheetReviewersRecord> &
   BaseSystemFields<Texpand>;
+export type TimeSheetReviewersResponse<Texpand = TimeSheetReviewersRecordExpands> =
+  Required<TimeSheetReviewersRecord> & BaseSystemFields<Texpand>;
 export type TimeSheetsResponse<Texpand = unknown> = Required<TimeSheetsRecord> &
   BaseSystemFields<Texpand>;
 export type TimeTypesResponse<Texpand = unknown> = Required<TimeTypesRecord> &

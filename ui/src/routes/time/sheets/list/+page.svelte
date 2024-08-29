@@ -4,6 +4,7 @@
   import { globalStore } from "$lib/stores/global";
   import { goto } from "$app/navigation";
   import ShareModal from "$lib/components/ShareModal.svelte";
+  import RejectModal from "$lib/components/RejectModal.svelte";
   import {
     shortDate,
     hoursWorked,
@@ -16,6 +17,7 @@
 
   let errors = $state({} as any);
   let shareModal: ShareModal;
+  let rejectModal: RejectModal;
 
   async function unbundle(timeSheetId: string) {
     try {
@@ -52,6 +54,10 @@
     } catch (error) {
       console.error("Error:", error);
     }
+  }
+
+  function openRejectModal(timeSheetId: string) {
+    rejectModal?.openModal(timeSheetId);
   }
 </script>
 
@@ -91,13 +97,14 @@
   {#if approved === ""}
     <button onclick={() => approve(id)}>approve</button>
   {/if}
-  <span>reject</span>
+  <button onclick={() => openRejectModal(id)}>reject</button>
   <button title="share with another manager" onclick={() => shareModal?.openModal(id)}>
     share
   </button>
 {/snippet}
 
 <ShareModal bind:this={shareModal} collectionName="time_sheet_reviewers" />
+<RejectModal bind:this={rejectModal} />
 
 <!-- Show the list of items here -->
 <DsList
