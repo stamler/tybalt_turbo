@@ -89,8 +89,16 @@ func AddRoutes(app *pocketbase.PocketBase) {
 						return fmt.Errorf("error fetching time entries: %v", err)
 					}
 
+					// Load the user's admin_profile record to get values for the new
+					// time_sheets record
+					admin_profile, err := txDao.FindFirstRecordByFilter("admin_profiles", "uid={:userId}", dbx.Params{
+						"userId": userId,
+					})
+					if err != nil {
+						return fmt.Errorf("error fetching user's admin profile: %v", err)
+					}
 					// Validate the time entries as a group
-					if err := validateTimeEntries(timeEntries); err != nil {
+					if err := validateTimeEntries(txDao, admin_profile, timeEntries); err != nil {
 						return err
 					}
 
@@ -116,14 +124,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 					newTimeSheet.Set("approver", approver)
 					newTimeSheet.Set("submitted", true)
 
-					// Get work_week_hours and salary status from the user's
-					// admin_profiles record and set the value in the new time sheet.
-					admin_profile, err := txDao.FindFirstRecordByFilter("admin_profiles", "uid={:userId}", dbx.Params{
-						"userId": userId,
-					})
-					if err != nil {
-						return fmt.Errorf("error fetching user's admin profile: %v", err)
-					}
+					// set values in the new time sheet
 					newTimeSheet.Set("work_week_hours", admin_profile.Get("work_week_hours"))
 					newTimeSheet.Set("salary", admin_profile.Get("salary"))
 
@@ -416,15 +417,36 @@ func AddRoutes(app *pocketbase.PocketBase) {
 
 // This function will validate the time entries as a group. If the validation
 // fails, it will return an error. If the validation passes, it will return nil.
-func validateTimeEntries(entries []*models.Record) error {
-	// print the number of entries
-	fmt.Println("Number of entries:", len(entries))
+func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, entries []*models.Record) error {
+	// Expand the time_type relations of the entries so we can access the
+	// time_type code stored in the time_types collection.
+	if errs := txDao.ExpandRecords(entries, []string{"time_type"}, nil); len(errs) > 0 {
+		return fmt.Errorf("error expanding time_type relations: %v", errs)
+	}
 
-	// Implement your validation logic here
-	// For example:
-	// - Check if all required fields are filled
-	// - Validate that hours are within acceptable ranges
-	// - Ensure total hours match expected values
-	// Return an error if validation fails
+	// --------------------------------
+	// Validate payout request entries
+	// --------------------------------
+	payoutRequests := []*models.Record{}
+
+	for _, entry := range entries {
+		// Access the code from the expanded time_type relation
+		timeType := entry.ExpandedOne("time_type")
+		if timeType != nil && timeType.GetString("code") == "OTO" {
+			payoutRequests = append(payoutRequests, entry)
+		}
+	}
+
+	if len(payoutRequests) > 1 {
+		return fmt.Errorf("only one payout request entry can exist on a timesheet")
+	}
+
+	if len(payoutRequests) == 1 {
+		payoutRequestAmount := payoutRequests[0].GetFloat("payout_request_amount")
+		if payoutRequestAmount > 0 && admin_profile.GetBool("salary") {
+			return fmt.Errorf("salaried staff cannot request overtime payouts. Please speak with management")
+		}
+	}
+
 	return nil
 }
