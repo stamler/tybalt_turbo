@@ -380,6 +380,11 @@ func AddRoutes(app *pocketbase.PocketBase) {
 						return fmt.Errorf("this time sheet is already rejected")
 					}
 
+					// Check if the rejection reason is at least 4 characters long
+					if len(req.RejectionReason) < 4 {
+						return fmt.Errorf("rejection reason must be at least 4 characters long")
+					}
+
 					// Set the rejection timestamp, reason, and rejector
 					timeSheet.Set("rejected", true)
 					timeSheet.Set("rejection_reason", req.RejectionReason)
