@@ -115,6 +115,15 @@ func createBundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 				return fmt.Errorf("error creating new time sheet: %v", err)
 			}
 
+			// if the admin_profile.skip_min_time_check is set to "on_next_bundle",
+			// then we need to change it to "no" and save the record
+			if admin_profile.Get("skip_min_time_check") == "on_next_bundle" {
+				admin_profile.Set("skip_min_time_check", "no")
+				if err := txDao.SaveRecord(admin_profile); err != nil {
+					return fmt.Errorf("error updating admin profile: %v", err)
+				}
+			}
+
 			// Update time entries with new time sheet ID
 			for _, entry := range timeEntries {
 				entry.Set("tsid", newTimeSheet.Id)

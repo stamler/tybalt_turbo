@@ -18,6 +18,7 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, entries 
 
 	salary := admin_profile.GetBool("salary")
 	offRotationPermitted := admin_profile.GetBool("off_rotation_permitted")
+	skipMinTimeCheck := admin_profile.Get("skip_min_time_check")
 	workWeekHours := admin_profile.GetFloat("work_week_hours")
 	workRecordsSet := map[string]bool{}
 	offRotationDateSet := map[string]bool{}
@@ -156,7 +157,28 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, entries 
 		return fmt.Errorf("salaried staff need permission to claim OR entries")
 	}
 
-	// TODO continue from Line 262 in tallyAndValidate.ts
+	// require salaried employees to have at least workWeekHours hours on a
+	// timesheet unless skipMinTimeCheck is set to "yes" or "on_next_bundle"
+	offRotationHours := float64(len(offRotationDateSet)) * 8
+	if salary && nonJobHours+jobHours+nonWorkHoursTotal+offRotationHours < workWeekHours {
+		if skipMinTimeCheck == "no" {
+			return fmt.Errorf("you must have a minimum of %v hours on your time sheet", workWeekHours)
+		}
+	}
+
+	// prevent salaried employees from claiming sick time by reporting an error if
+	// the key "OS" (sick time) exists in the nonWorkHoursTally.
+	if _, ok := nonWorkHoursTally["OS"]; ok && salary {
+		return fmt.Errorf("salaried staff cannot claim OS. Please use OP or OV instead")
+	}
+
+	// prevent salaried employees w/ skipMinTimeCheck: "yes" from claiming OB, OH,
+	// OP, OV
+	if salary && skipMinTimeCheck == "yes" && nonWorkHoursTotal > 0 {
+		return fmt.Errorf("staff with untracked time off are only permitted to create R or RT entries")
+	}
+
+	// TODO continue from Line 302 in tallyAndValidate.ts
 
 	return nil
 }
