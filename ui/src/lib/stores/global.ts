@@ -120,7 +120,7 @@ const createStore = () => {
             requestKey: "time_sheets",
             filter: pb.filter("uid={:userId}", { userId }),
             expand:
-              "time_entries(tsid).time_type,time_entries(tsid).job,time_entries(tsid).division",
+              "time_entries_via_tsid.time_type,time_entries_via_tsid.job,time_entries_via_tsid.division",
             sort: "-week_ending",
           })) as CollectionType[typeof key];
           break;

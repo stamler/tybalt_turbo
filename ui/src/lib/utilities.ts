@@ -71,7 +71,9 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
     collectionId = arg.collectionId;
     collectionName = arg.collectionName;
     approved = arg.approved;
-    items = (arg.expand as { "time_entries(tsid)": TimeEntriesResponse[] })["time_entries(tsid)"];
+    items = (arg.expand as { time_entries_via_tsid: TimeEntriesResponse[] })[
+      "time_entries_via_tsid"
+    ];
   }
   const tallies: TimeSheetTally = {
     id,
