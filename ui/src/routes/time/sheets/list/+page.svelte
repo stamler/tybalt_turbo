@@ -60,12 +60,15 @@
   <span>{hoursWorked(tally)}</span>
 {/snippet}
 {#snippet byline(tally: TimeSheetTally)}
-  <span>/ {tally.nonWorkHoursTally.total} hours off</span>
-  {#if tally.offRotationDates.length > 0}
-    <span>/ {tally.offRotationDates.length} day(s) off rotation</span>
-  {/if}
-  {#if tally.bankEntries.length > 0}
-    <span>/ {tally.bankEntries.reduce((sum, entry) => sum + entry.hours, 0)} hours banked</span>
+  {#if tally.offWeek.length > 0}
+    <span>/ off rotation week</span>
+  {:else}
+    {#if tally.offRotationDates.length > 0}
+      <span>/ {tally.offRotationDates.length} day(s) off rotation</span>
+    {/if}
+    {#if tally.bankEntries.length > 0}
+      <span>/ {tally.bankEntries.reduce((sum, entry) => sum + entry.hours, 0)} hours banked</span>
+    {/if}
   {/if}
 {/snippet}
 {#snippet line2(tally: TimeSheetTally)}

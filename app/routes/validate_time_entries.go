@@ -17,6 +17,7 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, entries 
 	}
 
 	salary := admin_profile.GetBool("salary")
+	offRotationPermitted := admin_profile.GetBool("off_rotation_permitted")
 	workWeekHours := admin_profile.GetFloat("work_week_hours")
 	workRecordsSet := map[string]bool{}
 	offRotationDateSet := map[string]bool{}
@@ -58,6 +59,11 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, entries 
 			// prevent salaried employees from claiming full week off (OW)
 			if salary {
 				return fmt.Errorf("salaried staff cannot claim full week off. use OP or OV")
+			}
+			// Return an error immediately if the total number of entries exceeds 1 since
+			// if an OW entry exists, it should be the only entry on the timesheet.
+			if len(entries) > 1 {
+				return fmt.Errorf("if present, an OW entry must be the only entry on a timesheet")
 			}
 			// Return an error immediately if the entry is of type OW (off rotation week)
 			// and the offRotationWeekEntryCount is greater than 1. If the entry is of
@@ -141,10 +147,16 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, entries 
 	// prevent staff from using vacation or PPTO to raise their timesheet hours
 	// beyond workWeekHours.
 	if discretionaryTimeOff > 0 && nonJobHours+jobHours+nonWorkHoursTotal > workWeekHours {
-		return fmt.Errorf("you cannot claim Vacation or PPTO entries that increase hours beyond %v", workWeekHours)
+		return fmt.Errorf("you cannot claim OV or OP entries that increase hours beyond %v", workWeekHours)
 	}
 
-	// TODO continue from Line 233 in tallyAndValidate.ts
+	// prevent salaried employees from claiming off rotation days (OR) unless
+	// permitted by admin profile.
+	if salary && !offRotationPermitted && len(offRotationDateSet) > 0 {
+		return fmt.Errorf("salaried staff need permission to claim OR entries")
+	}
+
+	// TODO continue from Line 262 in tallyAndValidate.ts
 
 	return nil
 }
