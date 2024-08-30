@@ -63,6 +63,7 @@
   {#if tally.offWeek.length > 0}
     <span>/ off rotation week</span>
   {:else}
+    <span>/ {tally.nonWorkHoursTally.total} hours off</span>
     {#if tally.offRotationDates.length > 0}
       <span>/ {tally.offRotationDates.length} day(s) off rotation</span>
     {/if}
