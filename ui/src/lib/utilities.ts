@@ -170,18 +170,6 @@ export const hoursWorked = function (item: TimeSheetTally) {
   }
 };
 
-export const hoursOff = function (item: TimeSheetTally) {
-  let hoursOff = 0;
-  for (const timetype in item.nonWorkHoursTally) {
-    hoursOff += item.nonWorkHoursTally[timetype];
-  }
-  if (hoursOff > 0) {
-    return `${hoursOff} hours off`;
-  } else {
-    return "no time off";
-  }
-};
-
 export const jobs = function (item: TimeSheetTally) {
   const jobs = Object.keys(item.jobsTally).sort().join(", ");
   if (jobs.length > 0) {

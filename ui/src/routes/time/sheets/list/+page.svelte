@@ -5,14 +5,7 @@
   import { goto } from "$app/navigation";
   import ShareModal from "$lib/components/ShareModal.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
-  import {
-    shortDate,
-    hoursWorked,
-    hoursOff,
-    jobs,
-    divisions,
-    payoutRequests,
-  } from "$lib/utilities";
+  import { shortDate, hoursWorked, jobs, divisions, payoutRequests } from "$lib/utilities";
   import type { TimeSheetTally } from "$lib/utilities";
 
   let shareModal: ShareModal;
@@ -67,7 +60,7 @@
   <span>{hoursWorked(tally)}</span>
 {/snippet}
 {#snippet byline(tally: TimeSheetTally)}
-  <span>/ {hoursOff(tally)}</span>
+  <span>/ {tally.nonWorkHoursTally.total} hours off</span>
   {#if tally.offRotationDates.length > 0}
     <span>/ {tally.offRotationDates.length} day(s) off rotation</span>
   {/if}
