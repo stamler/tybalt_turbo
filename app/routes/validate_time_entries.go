@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
@@ -16,9 +17,13 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, entries 
 		return fmt.Errorf("error expanding time_type relations: %v", errs)
 	}
 
+	// get the weekEnding value from the first entry
+	weekEnding := entries[0].GetString("week_ending")
+
 	salary := admin_profile.GetBool("salary")
+	openingDate := admin_profile.GetString("opening_date")
 	offRotationPermitted := admin_profile.GetBool("off_rotation_permitted")
-	skipMinTimeCheck := admin_profile.Get("skip_min_time_check")
+	skipMinTimeCheck := admin_profile.GetString("skip_min_time_check")
 	workWeekHours := admin_profile.GetFloat("work_week_hours")
 	workRecordsSet := map[string]bool{}
 	offRotationDateSet := map[string]bool{}
@@ -178,7 +183,29 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, entries 
 		return fmt.Errorf("staff with untracked time off are only permitted to create R or RT entries")
 	}
 
-	// TODO continue from Line 302 in tallyAndValidate.ts
+	// return an error if openingDate is not a valid date in the format
+	// "2006-01-02"
+	openingDateAsTime, err := time.Parse("2006-01-02", openingDate)
+	if err != nil {
+		return fmt.Errorf("your admin_profile has an invalid opening_date, contact support")
+	}
 
+	// return an error if weekEnding is not a valid date in the format
+	// "2006-01-02"
+	weekEndingAsTime, err := time.Parse("2006-01-02", weekEnding)
+	if err != nil {
+		return fmt.Errorf("an entry has an invalid week_ending date, contact support")
+	}
+
+	// return an error if openingDate is after the weekEnding. This will prevent
+	// submission of an old timesheet if the openingDateTimeOff value has already
+	// been updated to the next fiscal year. This error is only triggered if PPTO
+	// or Vacation are claimed on this timesheet because the opening balances are
+	// otherwise irrelevant to the validation.
+	if discretionaryTimeOff > 0 && openingDateAsTime.After(weekEndingAsTime) {
+		return fmt.Errorf("your opening balances were set effective %v but you are submitting a timesheet for a prior period, contact support", openingDate)
+	}
+
+	// TODO continue from Line 322 in tallyAndValidate.ts
 	return nil
 }
