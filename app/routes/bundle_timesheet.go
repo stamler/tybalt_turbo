@@ -80,8 +80,48 @@ func createBundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			if err != nil {
 				return fmt.Errorf("error fetching user's admin profile: %v", err)
 			}
+
+			// the time_off_reset_dates collection stores the dates representing the
+			// moment when the PPTO and Vacation balances are reset each year. It is
+			// the last Saturday of the year. The most recent record from this
+			// collection that is less than the weekEnding of the new timesheet is
+			// used to validate the time entries for the new timesheet.This
+			// time_off_reset_dates date must be less than or equal to the
+			// opening_date value in the admin_profile. If it isn't, then the opening
+			// balances are out of date and the timesheet cannot be submitted until
+			// the opening balances are updated by accounting. This is to prevent the
+			// user from claiming expired time off from a previous year on a timesheet
+			// in the following year. This error is only triggered if PPTO or Vacation
+			// are claimed on this timesheet. The actual check is performed in the
+			// validateTimeEntries function but we load a time_off_reset_date record
+			// here then pass it to that function.
+
+			// get the latest time_off_reset_date record that is less than the or
+			// equal to the week_ending of the new timesheet. We use
+			// FindFirstRecordByFilter because we want to order the results by date in
+			// descending order and limit the results to 1. limit the results to 1.
+			timeOffResetDatesRecords, err := txDao.FindRecordsByFilter("time_off_reset_dates", "date <= {:weekEnding}", "-date", 1, 0, dbx.Params{
+				"weekEnding": weekEnding,
+			})
+			if err != nil {
+				return fmt.Errorf("error fetching time off reset dates")
+			}
+			if len(timeOffResetDatesRecords) == 0 {
+				return fmt.Errorf("no time off reset dates found for the week ending %v", weekEnding)
+			}
+			timeOffResetDate := timeOffResetDatesRecords[0].Get("date")
+			timeOffResetDateAsTime, err := time.Parse("2006-01-02", timeOffResetDate.(string))
+			if err != nil {
+				return fmt.Errorf("error parsing time off reset date: %v", err)
+			}
+
+			// verify that the time_off_reset_date is a Saturday
+			if timeOffResetDateAsTime.Weekday() != time.Saturday {
+				return fmt.Errorf("time off reset date %s is not a Saturday, contact support", timeOffResetDate)
+			}
+
 			// Validate the time entries as a group
-			if err := validateTimeEntries(txDao, admin_profile, timeEntries); err != nil {
+			if err := validateTimeEntries(txDao, admin_profile, timeOffResetDateAsTime, timeEntries); err != nil {
 				return err
 			}
 
