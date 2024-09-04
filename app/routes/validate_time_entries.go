@@ -10,7 +10,7 @@ import (
 
 // This function will validate the time entries as a group. If the validation
 // fails, it will return an error. If the validation passes, it will return nil.
-func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, timeOffResetDateAsTime time.Time, entries []*models.Record) error {
+func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollYearEndDateAsTime time.Time, entries []*models.Record) error {
 	// Expand the time_type relations of the entries so we can access the
 	// time_type code stored in the time_types collection.
 	if errs := txDao.ExpandRecords(entries, []string{"time_type"}, nil); len(errs) > 0 {
@@ -190,6 +190,11 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, timeOffR
 		return fmt.Errorf("your admin_profile has an invalid opening_date, contact support")
 	}
 
+	// return an error if openingDate is not a Sunday
+	if openingDateAsTime.Weekday() != time.Sunday {
+		return fmt.Errorf("opening_date on your admin_profile must be a Sunday, contact support")
+	}
+
 	// return an error if weekEnding is not a valid date in the format
 	// "2006-01-02"
 	weekEndingAsTime, err := time.Parse("2006-01-02", weekEnding)
@@ -206,22 +211,31 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, timeOffR
 		return fmt.Errorf("your opening balances were set effective %v but you are submitting a timesheet for a prior period, contact support", openingDate)
 	}
 
-	// Each timesheet submission is checked against the most timeOffResetDate that
-	// is less than the weekEnding of that timesheet. The actual value is passed
-	// as an argument to this function. This most recent date must be less than
-	// or equal to the opening_date value in the admin_profile. If it isn't, then
-	// the opening balances are out of date and the timesheet cannot be submitted
-	// until the opening balances are updated by accounting. This is to prevent
-	// the user from claiming expired time off from a previous year on a timesheet
-	// in the following year. This error is only triggered if PPTO or Vacation are
-	// claimed on this timesheet.
+	// Each timesheet submission is checked against the most payrollYearEndDate
+	// that is less than the weekEnding of that timesheet. The actual value is
+	// passed as an argument to this function. This most recent date must be less
+	// than or equal to the opening_date value in the admin_profile. If it isn't,
+	// then the opening balances are out of date and the timesheet cannot be
+	// submitted until the opening balances are updated by accounting. This is to
+	// prevent the user from claiming expired time off from a previous year on a
+	// timesheet in the following year. This error is only triggered if PPTO or
+	// Vacation are claimed on this timesheet.
 
-	if discretionaryTimeOff > 0 && timeOffResetDateAsTime.After(openingDateAsTime) {
-		//      `Your opening balances were set effective ${opdate.toISOString()} but you are submitting a timesheet for the time-off accounting period beginning on ${mostRecentResetDate.toDate().toISOString()}. Please contact accounting to have your opening balances updated for the new period prior to submitting a timesheet for this period.`
-
-		return fmt.Errorf("your opening balances were set effective %v but you are submitting a timesheet for the time-off accounting period beginning on %v. contact accounting to have your opening balances updated for the new period prior to submitting a timesheet", openingDate, timeOffResetDateAsTime.Format("2006-01-02"))
+	if discretionaryTimeOff > 0 && payrollYearEndDateAsTime.After(openingDateAsTime) {
+		return fmt.Errorf("your opening balances were set effective %v but you are submitting a timesheet for the time-off accounting period beginning on %v. contact accounting to have your opening balances updated for the new period prior to submitting a timesheet", openingDate, payrollYearEndDateAsTime.Format("2006-01-02"))
 	}
 
 	// TODO continue from Line 346 in tallyAndValidate.ts
+
+	// get the total PPTO and Vacation hours used in the period since the
+	// openingDate then check if the sum of the time entries for PPTO and Vacation
+	// is greater than the total PPTO and Vacation hours used. If it is, return an
+	// error. We can probably do this exclusively using the time_entries
+	// collection by querying on the week_ending field ensuring it is within the
+	// period from openingDate to weekEnding then summing the hours for PPTO and
+	// Vacation. Then we can compare that to the opening_op and opening_ov values
+	// from the admin_profile. TODO: Think about this more and then implement it.
+	// Once implemented this will take us to line 413 in tallyAndValidate.ts
+
 	return nil
 }
