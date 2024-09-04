@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 )
@@ -22,6 +23,8 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 
 	salary := admin_profile.GetBool("salary")
 	openingDate := admin_profile.GetString("opening_date")
+	openingOP := admin_profile.GetFloat("opening_op")
+	openingOV := admin_profile.GetFloat("opening_ov")
 	offRotationPermitted := admin_profile.GetBool("off_rotation_permitted")
 	skipMinTimeCheck := admin_profile.GetString("skip_min_time_check")
 	workWeekHours := admin_profile.GetFloat("work_week_hours")
@@ -225,17 +228,68 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 		return fmt.Errorf("your opening balances were set effective %v but you are submitting a timesheet for the time-off accounting period beginning on %v. contact accounting to have your opening balances updated for the new period prior to submitting a timesheet", openingDate, payrollYearEndDateAsTime.Format("2006-01-02"))
 	}
 
-	// TODO continue from Line 346 in tallyAndValidate.ts
-
 	// get the total PPTO and Vacation hours used in the period since the
 	// openingDate then check if the sum of the time entries for PPTO and Vacation
-	// is greater than the total PPTO and Vacation hours used. If it is, return an
-	// error. We can probably do this exclusively using the time_entries
-	// collection by querying on the week_ending field ensuring it is within the
-	// period from openingDate to weekEnding then summing the hours for PPTO and
-	// Vacation. Then we can compare that to the opening_op and opening_ov values
-	// from the admin_profile. TODO: Think about this more and then implement it.
-	// Once implemented this will take us to line 413 in tallyAndValidate.ts
+	// is greater than corresponding opening values. If it is, return an
+	// error.
+
+	// usedVacation is sum of all hours for the time_entries records where
+	// time_type.code is "OV" and week_ending is greater than or equal to
+	// openingDate and less than or equal to weekEnding for the uid of the
+	// admin_profile
+	type SumResult struct {
+		TotalHours float64 `db:"total_hours"`
+	}
+	results := []SumResult{}
+	queryError := txDao.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending >= {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
+		"uid":          admin_profile.Get("uid"),
+		"openingDate":  openingDate,
+		"weekEnding":   weekEnding,
+		"timeTypeCode": "OV",
+	}).All(&results)
+	if queryError != nil {
+		return fmt.Errorf("error querying for used vacation: %v", queryError)
+	}
+	usedOV := 0.0
+	if len(results) == 1 {
+		usedOV = results[0].TotalHours
+	}
+
+	// usedPpto is sum of all hours for the time_entries records where
+	// time_type.code is "OP" and week_ending is greater than or equal to
+	// openingDate and less than or equal to weekEnding
+	results = []SumResult{}
+	queryError = txDao.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending >= {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
+		"uid":          admin_profile.Get("uid"),
+		"openingDate":  openingDate,
+		"weekEnding":   weekEnding,
+		"timeTypeCode": "OP",
+	}).All(&results)
+	if queryError != nil {
+		return fmt.Errorf("error querying for used ppto: %v", queryError)
+	}
+	usedOP := 0.0
+	if len(results) == 1 {
+		usedOP = results[0].TotalHours
+	}
+
+	// return an error if usedVacation exceeds openingOV
+	if usedOV > openingOV {
+		return fmt.Errorf("your vacation claim exceeds your available vacation balance")
+	}
+
+	// return an error if usedPpto exceeds openingOP
+	if usedOP > openingOP {
+		return fmt.Errorf("your PPTO claim exceeds your available PPTO balance")
+	}
+
+	// return an error if OP was claimed on this timesheet and the remaining
+	// available OV is greater than 0.
+	if _, pptoClaimed := nonWorkHoursTally["OP"]; pptoClaimed && openingOV-usedOV > 0 {
+		return fmt.Errorf("exhaust your vacation balance (%v hours) prior to claiming PPTO", openingOV-usedOV)
+	}
+
+	// Once implemented this will take us to line 421 in tallyAndValidate.ts
 
 	return nil
 }
