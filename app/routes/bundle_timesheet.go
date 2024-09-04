@@ -138,6 +138,9 @@ func createBundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			if err != nil {
 				return fmt.Errorf("error fetching user profile: %v", err)
 			}
+
+			// manager is mandatory on the profiles collection in pocketbase
+			// rules so there is no need to check if it exists.
 			approver := profile.Get("manager")
 
 			// Create new time sheet

@@ -289,7 +289,11 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 		return fmt.Errorf("exhaust your vacation balance (%v hours) prior to claiming PPTO", openingOV-usedOV)
 	}
 
-	// Once implemented this will take us to line 421 in tallyAndValidate.ts
+	// default_charge_out_rate is mandatory on the admin_profile in pocketbase
+	// rules so there is no need to check for it.
+
+	// payroll_id is mandatory on the admin_profile in pocketbase rules so there
+	// is no need to check for it.
 
 	return nil
 }
