@@ -15,7 +15,10 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 	// Expand the time_type relations of the entries so we can access the
 	// time_type code stored in the time_types collection.
 	if errs := txDao.ExpandRecords(entries, []string{"time_type"}, nil); len(errs) > 0 {
-		return fmt.Errorf("error expanding time_type relations: %v", errs)
+		return &CodeError{
+			Code:    "error_expanding_time_type_relations",
+			Message: fmt.Sprintf("error expanding time_type relations: %v", errs),
+		}
 	}
 
 	// get the weekEnding value from the first entry
@@ -46,7 +49,10 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 		// the work_record value to the workRecordsSet.
 		if workRecord := entry.GetString("work_record"); workRecord != "" {
 			if _, keyPresent := workRecordsSet[workRecord]; keyPresent {
-				return fmt.Errorf("work record %s appears in multiple entries", workRecord)
+				return &CodeError{
+					Code:    "multiple_work_records",
+					Message: fmt.Sprintf("work record %s appears in multiple entries", workRecord),
+				}
 			}
 			workRecordsSet[workRecord] = true
 		}
@@ -61,49 +67,73 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 			// the date of the entry is already in the offRotationDateSet. If it is not
 			// in the set, add the date to the set.
 			if _, keyPresent := offRotationDateSet[entry.GetString("date")]; keyPresent {
-				return fmt.Errorf("more than one Off-Rotation entry exists for the date: %s", entry.GetString("date"))
+				return &CodeError{
+					Code:    "multiple_off_rotation_entries",
+					Message: fmt.Sprintf("more than one OR entry exists for the date: %s", entry.GetString("date")),
+				}
 			}
 			offRotationDateSet[entry.GetString("date")] = true
 		} else if timeTypeCode == "OW" {
 			// prevent salaried employees from claiming full week off (OW)
 			if salary {
-				return fmt.Errorf("salaried staff cannot claim full week off. use OP or OV")
+				return &CodeError{
+					Code:    "salary_with_time_type_OW",
+					Message: "salaried staff cannot claim full week off, use OP or OV",
+				}
 			}
 			// Return an error immediately if the total number of entries exceeds 1 since
 			// if an OW entry exists, it should be the only entry on the timesheet.
 			if len(entries) > 1 {
-				return fmt.Errorf("if present, an OW entry must be the only entry on a timesheet")
+				return &CodeError{
+					Code:    "multiple_OW_entries",
+					Message: "if present, an OW entry must be the only entry on a timesheet",
+				}
 			}
 			// Return an error immediately if the entry is of type OW (off rotation week)
 			// and the offRotationWeekEntryCount is greater than 1. If the entry is of
 			// type OW, increment the offRotationWeekEntryCount.
 			offRotationWeekEntryCount++
 			if offRotationWeekEntryCount > 1 {
-				return fmt.Errorf("only one off-rotation week entry can exist on a timesheet")
+				return &CodeError{
+					Code:    "multiple_off_rotation_week_entries",
+					Message: "only one off-rotation week entry can exist on a timesheet",
+				}
 			}
 		} else if timeTypeCode == "OTO" {
 			// If the entry is of type OTO (Request Overtime Payout), the user must
 			// not be a salaried staff member.
 			if salary {
-				return fmt.Errorf("salaried staff cannot request overtime payouts")
+				return &CodeError{
+					Code:    "salary_with_time_type_OTO",
+					Message: "salaried staff cannot request overtime payouts",
+				}
 			}
 			payoutRequestCount++
 			// Return an error immediately if there is more than one payout request
 			// entry on the timesheet.
 			if payoutRequestCount > 1 {
-				return fmt.Errorf("only one payout request entry can exist on a timesheet")
+				return &CodeError{
+					Code:    "multiple_payout_request_entries",
+					Message: "only one payout request entry can exist on a timesheet",
+				}
 			}
 		} else if timeTypeCode == "RB" {
 			// If the entry is of type RB (Add Overtime to Bank), the user must
 			// not be a salaried staff member.
 			if salary {
-				return fmt.Errorf("salaried staff cannot bank overtime")
+				return &CodeError{
+					Code:    "salary_with_time_type_RB",
+					Message: "salaried staff cannot bank overtime",
+				}
 			}
 			// Return an error immediately if there is more than one bank entry on
 			// the timesheet.
 			bankEntriesCount++
 			if bankEntriesCount > 1 {
-				return fmt.Errorf("only one overtime banking entry can exist on a timesheet")
+				return &CodeError{
+					Code:    "multiple_overtime_banking_entries",
+					Message: "only one overtime banking entry can exist on a timesheet",
+				}
 			}
 			bankedHours += entryHours
 		} else if timeTypeCode == "R" || timeTypeCode == "RT" {
@@ -116,7 +146,10 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 			}
 		} else {
 			if entryHours == 0 {
-				return fmt.Errorf("a time entry is missing hours")
+				return &CodeError{
+					Code:    "time_entry_missing_hours",
+					Message: "a time entry is missing hours",
+				}
 			}
 			// Initialize the nonWorkHoursTally for the timeTypeCode if it doesn't
 			// already exist.
@@ -132,7 +165,10 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 	// If banked hours exist, the sum of all hours worked minus the banked hours
 	// mustn't be under 44.
 	if bankedHours > 0 && jobHours+nonJobHours-bankedHours < 44 {
-		return fmt.Errorf("banked hours cannot bring your total worked hours below 44 hours on a timesheet")
+		return &CodeError{
+			Code:    "too_many_banked_hours",
+			Message: "banked hours cannot bring your total worked hours below 44 hours on a timesheet",
+		}
 	}
 
 	// sum the values of the nonWorkHoursTally into nonWorkHoursTotal
@@ -156,13 +192,19 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 	// prevent staff from using vacation or PPTO to raise their timesheet hours
 	// beyond workWeekHours.
 	if discretionaryTimeOff > 0 && nonJobHours+jobHours+nonWorkHoursTotal > workWeekHours {
-		return fmt.Errorf("you cannot claim OV or OP entries that increase hours beyond %v", workWeekHours)
+		return &CodeError{
+			Code:    "too_much_discretionary_time_off",
+			Message: fmt.Sprintf("you cannot claim OV or OP entries that increase hours beyond %v", workWeekHours),
+		}
 	}
 
 	// prevent salaried employees from claiming off rotation days (OR) unless
 	// permitted by admin profile.
 	if salary && !offRotationPermitted && len(offRotationDateSet) > 0 {
-		return fmt.Errorf("salaried staff need permission to claim OR entries")
+		return &CodeError{
+			Code:    "salary_with_time_type_OR_without_permission",
+			Message: "salaried staff need permission to claim OR entries",
+		}
 	}
 
 	// require salaried employees to have at least workWeekHours hours on a
@@ -170,39 +212,57 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 	offRotationHours := float64(len(offRotationDateSet)) * 8
 	if salary && nonJobHours+jobHours+nonWorkHoursTotal+offRotationHours < workWeekHours {
 		if skipMinTimeCheck == "no" {
-			return fmt.Errorf("you must have a minimum of %v hours on your time sheet", workWeekHours)
+			return &CodeError{
+				Code:    "too_few_hours_on_timesheet",
+				Message: fmt.Sprintf("you must have a minimum of %v hours on your time sheet", workWeekHours),
+			}
 		}
 	}
 
 	// prevent salaried employees from claiming sick time by reporting an error if
 	// the key "OS" (sick time) exists in the nonWorkHoursTally.
 	if _, ok := nonWorkHoursTally["OS"]; ok && salary {
-		return fmt.Errorf("salaried staff cannot claim OS. Please use OP or OV instead")
+		return &CodeError{
+			Code:    "salary_with_time_type_OS",
+			Message: "salaried staff cannot claim OS. Please use OP or OV instead",
+		}
 	}
 
 	// prevent salaried employees w/ skipMinTimeCheck: "yes" from claiming OB, OH,
 	// OP, OV
 	if salary && skipMinTimeCheck == "yes" && nonWorkHoursTotal > 0 {
-		return fmt.Errorf("staff with untracked time off are only permitted to create R or RT entries")
+		return &CodeError{
+			Code:    "untracked_time_off_restricted",
+			Message: "staff with untracked time off are only permitted to create R or RT entries",
+		}
 	}
 
 	// return an error if openingDate is not a valid date in the format
 	// "2006-01-02"
 	openingDateAsTime, err := time.Parse("2006-01-02", openingDate)
 	if err != nil {
-		return fmt.Errorf("your admin_profile has an invalid opening_date, contact support")
+		return &CodeError{
+			Code:    "invalid_opening_date",
+			Message: "your admin_profile has an invalid opening_date, contact support",
+		}
 	}
 
 	// return an error if openingDate is not a Sunday
 	if openingDateAsTime.Weekday() != time.Sunday {
-		return fmt.Errorf("opening_date on your admin_profile must be a Sunday, contact support")
+		return &CodeError{
+			Code:    "opening_date_not_sunday",
+			Message: "opening_date on your admin_profile must be a Sunday, contact support",
+		}
 	}
 
 	// return an error if weekEnding is not a valid date in the format
 	// "2006-01-02"
 	weekEndingAsTime, err := time.Parse("2006-01-02", weekEnding)
 	if err != nil {
-		return fmt.Errorf("an entry has an invalid week_ending date, contact support")
+		return &CodeError{
+			Code:    "invalid_week_ending_date",
+			Message: "an entry has an invalid week_ending date, contact support",
+		}
 	}
 
 	// return an error if openingDate is after the weekEnding. This will prevent
@@ -211,7 +271,10 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 	// or Vacation are claimed on this timesheet because the opening balances are
 	// otherwise irrelevant to the validation.
 	if discretionaryTimeOff > 0 && openingDateAsTime.After(weekEndingAsTime) {
-		return fmt.Errorf("your opening balances were set effective %v but you are submitting a timesheet for a prior period, contact support", openingDate)
+		return &CodeError{
+			Code:    "timesheet_prior_to_opening_date",
+			Message: fmt.Sprintf("your opening balances were set effective %v but you are submitting a timesheet for a prior period, contact support", openingDate),
+		}
 	}
 
 	// Each timesheet submission is checked against the most payrollYearEndDate
@@ -225,7 +288,10 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 	// Vacation are claimed on this timesheet.
 
 	if discretionaryTimeOff > 0 && payrollYearEndDateAsTime.After(openingDateAsTime) {
-		return fmt.Errorf("your opening balances were set effective %v but you are submitting a timesheet for the time-off accounting period beginning on %v. contact accounting to have your opening balances updated for the new period prior to submitting a timesheet", openingDate, payrollYearEndDateAsTime.Format("2006-01-02"))
+		return &CodeError{
+			Code:    "opening_balances_out_of_date",
+			Message: fmt.Sprintf("your opening balances were set effective %v but you are submitting a timesheet for the time-off accounting period beginning on %v. contact accounting to have your opening balances updated for the new period prior to submitting a timesheet", openingDate, payrollYearEndDateAsTime.Format("2006-01-02")),
+		}
 	}
 
 	// get the total PPTO and Vacation hours used in the period since the
@@ -248,7 +314,10 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 		"timeTypeCode": "OV",
 	}).All(&results)
 	if queryError != nil {
-		return fmt.Errorf("error querying for used vacation: %v", queryError)
+		return &CodeError{
+			Code:    "error_querying_for_used_vacation",
+			Message: fmt.Sprintf("error querying for used vacation: %v", queryError),
+		}
 	}
 	usedOV := 0.0
 	if len(results) == 1 {
@@ -266,7 +335,10 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 		"timeTypeCode": "OP",
 	}).All(&results)
 	if queryError != nil {
-		return fmt.Errorf("error querying for used ppto: %v", queryError)
+		return &CodeError{
+			Code:    "error_querying_for_used_ppto",
+			Message: fmt.Sprintf("error querying for used ppto: %v", queryError),
+		}
 	}
 	usedOP := 0.0
 	if len(results) == 1 {
@@ -275,18 +347,27 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 
 	// return an error if usedVacation exceeds openingOV
 	if usedOV > openingOV {
-		return fmt.Errorf("your vacation claim exceeds your available vacation balance")
+		return &CodeError{
+			Code:    "ov_claim_exceeds_balance",
+			Message: "your vacation claim exceeds your available vacation balance",
+		}
 	}
 
 	// return an error if usedPpto exceeds openingOP
 	if usedOP > openingOP {
-		return fmt.Errorf("your PPTO claim exceeds your available PPTO balance")
+		return &CodeError{
+			Code:    "ppto_claim_exceeds_balance",
+			Message: "your PPTO claim exceeds your available PPTO balance",
+		}
 	}
 
 	// return an error if OP was claimed on this timesheet and the remaining
 	// available OV is greater than 0.
 	if _, pptoClaimed := nonWorkHoursTally["OP"]; pptoClaimed && openingOV-usedOV > 0 {
-		return fmt.Errorf("exhaust your vacation balance (%v hours) prior to claiming PPTO", openingOV-usedOV)
+		return &CodeError{
+			Code:    "ppto_used_before_ov",
+			Message: fmt.Sprintf("exhaust your vacation balance (%v hours) prior to claiming PPTO", openingOV-usedOV),
+		}
 	}
 
 	// default_charge_out_rate is mandatory on the admin_profile in pocketbase

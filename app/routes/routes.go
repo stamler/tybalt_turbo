@@ -17,6 +17,16 @@ type TimeSheetIdRequest struct {
 	TimeSheetId string `json:"timeSheetId"`
 }
 
+// CodeError is a custom error type that includes a code
+type CodeError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e *CodeError) Error() string {
+	return e.Message
+}
+
 // Add custom routes to the app
 func AddRoutes(app *pocketbase.PocketBase) {
 

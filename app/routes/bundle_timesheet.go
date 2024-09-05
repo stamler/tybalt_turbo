@@ -49,6 +49,11 @@ func createBundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			entries record that has the same user id and week ending date.
 		*/
 
+		// transactionError is used to store any error that occurs during the
+		// transaction. If no error occurs, it will be nil.
+		var transactionError error
+		var httpResponseStatusCode int
+
 		// Start a transaction
 		err = app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
 
@@ -122,6 +127,8 @@ func createBundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 
 			// Validate the time entries as a group
 			if err := validateTimeEntries(txDao, admin_profile, payrollYearEndDateAsTime, timeEntries); err != nil {
+				transactionError = err
+				httpResponseStatusCode = http.StatusUnprocessableEntity
 				return err
 			}
 
@@ -179,6 +186,13 @@ func createBundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 		})
 
 		if err != nil {
+			// Check if the error is a CodeError and return the appropriate JSON response
+			if codeError, ok := transactionError.(*CodeError); ok {
+				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+					"message": codeError.Message,
+					"code":    codeError.Code,
+				})
+			}
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
