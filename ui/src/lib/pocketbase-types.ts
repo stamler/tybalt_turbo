@@ -11,8 +11,10 @@ export enum Collections {
   Divisions = "divisions",
   Jobs = "jobs",
   Managers = "managers",
+  PayrollYearEndDates = "payroll_year_end_dates",
   Profiles = "profiles",
   TimeEntries = "time_entries",
+  TimeOff = "time_off",
   TimeSheetReviewers = "time_sheet_reviewers",
   TimeSheets = "time_sheets",
   TimeTypes = "time_types",
@@ -44,11 +46,22 @@ export type AuthSystemFields<T = never> = {
 
 // Record types for each collection
 
+export enum AdminProfilesSkipMinTimeCheckOptions {
+  "no" = "no",
+  "on_next_bundle" = "on_next_bundle",
+  "yes" = "yes",
+}
 export type AdminProfilesRecord = {
   default_charge_out_rate: number;
   salary?: boolean;
   uid: RecordIdString;
   work_week_hours: number;
+  off_rotation_permitted: boolean;
+  opening_date: string;
+  opening_op: number;
+  opening_ov: number;
+  payroll_id: string;
+  skip_min_time_check: AdminProfilesSkipMinTimeCheckOptions;
 };
 
 export type ClaimsRecord = {
@@ -73,6 +86,10 @@ export type ProfilesRecord = {
   alternate_manager: RecordIdString;
   default_division: RecordIdString;
   uid: RecordIdString;
+};
+
+export type PayrollYearEndDatesRecord = {
+  date: string;
 };
 
 export type TimeEntriesRecord = {
@@ -106,6 +123,23 @@ export type TimeSheetsRecord = {
   work_week_hours: number;
 };
 
+export type TimeOffRecord = {
+  given_name: string;
+  last_op: string;
+  last_ov: string;
+  manager_given_name: string;
+  manager_surname: string;
+  manager_uid: RecordIdString;
+  opening_date: string;
+  opening_op: number;
+  opening_ov: number;
+  surname: string;
+  timesheet_op: number;
+  timesheet_ov: number;
+  used_op: number;
+  used_ov: number;
+};
+
 export type TimeSheetReviewersRecord = {
   reviewed?: IsoDateString;
   reviewer: RecordIdString;
@@ -126,12 +160,7 @@ export type UserClaimsRecord = {
 };
 
 export type UsersRecord = {
-  name: string;
-  opening_ov: number;
-  opening_op: number;
-  opening_date: string;
-  untracked_time_off: boolean;
-  default_charge_out_rate: number;
+  name?: string;
 };
 
 export type ManagersRecord = {
@@ -159,9 +188,13 @@ export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
 export type JobsResponse<Texpand = unknown> = Required<JobsRecord> & BaseSystemFields<Texpand>;
 export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
   BaseSystemFields<Texpand>;
+export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYearEndDatesRecord> &
+  BaseSystemFields<Texpand>;
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
+  BaseSystemFields<Texpand>;
+export type TimeOffResponse<Texpand = unknown> = Required<TimeOffRecord> &
   BaseSystemFields<Texpand>;
 export type TimeSheetReviewersResponse<Texpand = TimeSheetReviewersRecordExpands> =
   Required<TimeSheetReviewersRecord> & BaseSystemFields<Texpand>;
@@ -181,8 +214,10 @@ export type CollectionRecords = {
   divisions: DivisionsRecord;
   jobs: JobsRecord;
   managers: ManagersRecord;
+  payroll_year_end_dates: PayrollYearEndDatesRecord;
   profiles: ProfilesRecord;
   time_entries: TimeEntriesRecord;
+  time_off: TimeOffRecord;
   time_sheet_reviewers: TimeSheetReviewersRecord;
   time_sheets: TimeSheetsRecord;
   time_types: TimeTypesRecord;
@@ -196,8 +231,10 @@ export type CollectionResponses = {
   divisions: DivisionsResponse;
   jobs: JobsResponse;
   managers: ManagersResponse;
+  payroll_year_end_dates: PayrollYearEndDatesResponse;
   profiles: ProfilesResponse;
   time_entries: TimeEntriesResponse;
+  time_off: TimeOffResponse;
   time_sheet_reviewers: TimeSheetReviewersResponse;
   time_sheets: TimeSheetsResponse;
   time_types: TimeTypesResponse;
@@ -214,8 +251,10 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
   collection(idOrName: "jobs"): RecordService<JobsResponse>;
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
+  collection(idOrName: "payroll_year_end_dates"): RecordService<PayrollYearEndDatesResponse>;
   collection(idOrName: "profiles"): RecordService<ProfilesResponse>;
   collection(idOrName: "time_entries"): RecordService<TimeEntriesResponse>;
+  collection(idOrName: "time_off"): RecordService<TimeOffResponse>;
   collection(idOrName: "time_sheet_reviewers"): RecordService<TimeSheetReviewersResponse>;
   collection(idOrName: "time_sheets"): RecordService<TimeSheetsResponse>;
   collection(idOrName: "time_types"): RecordService<TimeTypesResponse>;

@@ -42,6 +42,7 @@
   <a href="/time/entries/add">New Entry</a>
   <a href="/time/entries/list">Entries</a>
   <a href="/time/sheets/list">Sheets</a>
+  <a href="/time/off">Off</a>
   <a href="/jobs">Jobs</a>
   <a href="/timetypes">Time Types</a>
   <a href="/divisions">Divisions</a>
