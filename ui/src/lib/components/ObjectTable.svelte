@@ -5,41 +5,54 @@
   import { formatDollars, formatPercent } from "$lib/utilities";
   // import DownloadData from "@/components/DownloadData.svelte";
 
-  export let tableData: Record<string, any>[] = [];
-  export let tableConfig: {
+  type TableData = Record<string, any>[];
+  interface TableConfig {
+    // a function applied to each value in the specified column to format it
     columnFormatters: Record<string, (<T>(value: T) => string | T) | "dollars" | "percent">;
     omitColumns?: string[];
-  } = { columnFormatters: {}, omitColumns: [] };
+  }
 
-  let internalTableData: Record<string, any>[] = [];
-  let filters: { key: string; value: string }[] = [];
-  let sortColumn = "";
-  let order = 0;
-  let instanceId: string;
+  let { tableData = [], tableConfig = { columnFormatters: {}, omitColumns: [] } } = $props<{
+    tableData: TableData;
+    tableConfig?: TableConfig;
+  }>();
 
-  $: columns =
+  let internalTableData = $state<Record<string, any>[]>([]);
+  let filters = $state<{ key: string; value: string }[]>([]);
+  let sortColumn = $state("");
+  let order = $state(0);
+  let instanceId = $state("");
+
+  let columns = $derived(
     internalTableData.length > 0
       ? Object.keys(internalTableData[0]).filter(
           (col) => col !== `_idx_${instanceId}` && !tableConfig.omitColumns.includes(col),
         )
-      : [];
+      : [],
+  );
 
-  $: columnAlignments =
+  let columnAlignments = $derived(
     internalTableData.length > 0
-      ? columns.reduce((acc, col) => {
-          acc[col] = typeof internalTableData[0][col] === "number" ? "text-right" : "text-left";
-          return acc;
-        }, {})
-      : {};
+      ? columns.reduce(
+          (acc, col) => {
+            acc[col] = typeof internalTableData[0][col] === "number" ? "text-right" : "text-left";
+            return acc;
+          },
+          {} as Record<string, string>,
+        )
+      : {},
+  );
 
-  $: columnFormatters = Object.entries(tableConfig.columnFormatters).reduce(
-    (acc, [col, formatter]) => {
-      if (formatter === "dollars") acc[col] = formatDollars;
-      else if (formatter === "percent") acc[col] = formatPercent;
-      else acc[col] = formatter;
-      return acc;
-    },
-    {},
+  let columnFormatters = $derived(
+    Object.entries(tableConfig.columnFormatters).reduce(
+      (acc, [col, formatter]) => {
+        if (formatter === "dollars") acc[col] = formatDollars;
+        else if (formatter === "percent") acc[col] = formatPercent;
+        else acc[col] = formatter as <T>(value: T) => string | T;
+        return acc;
+      },
+      {} as Record<string, <T>(value: T) => string | T>,
+    ),
   );
 
   function indexData(data: Record<string, any>[]) {
@@ -97,11 +110,11 @@
     updateInternalTableData();
   });
 
-  $: {
+  $effect(() => {
     if (tableData) {
       updateInternalTableData();
     }
-  }
+  });
 </script>
 
 {#if Array.isArray(internalTableData) && internalTableData.length > 0}
@@ -109,7 +122,7 @@
   <div class="flex flex-wrap">
     {#each filters as f (f.key)}
       <div class="mb-2 mr-2 flex rounded-sm border border-blue-700 bg-blue-200 px-2 py-1">
-        <Icon icon="mdi:close-circle" class="w-5 pr-1" on:click={() => removeFilter(f)} />
+        <Icon icon="mdi:close-circle" class="w-5 pr-1" onclick={() => removeFilter(f)} />
         {f.key}: {f.value}
       </div>
     {/each}
@@ -121,14 +134,16 @@
           <tr>
             {#each columns as col}
               <th class="align-bottom">
-                <a
-                  href="#"
+                <button
                   class="hover:underline"
                   title="sort"
-                  on:click|preventDefault={() => sort(col)}
+                  onclick={(event) => {
+                    event.preventDefault();
+                    sort(col);
+                  }}
                 >
                   {col}
-                </a>
+                </button>
                 <span class="inline-block h-5 w-4">
                   {#if sortColumn === col}
                     {#if order === 2}
@@ -150,13 +165,9 @@
             <tr>
               {#each columns as col}
                 <td class="pr-4" class:text-right={columnAlignments[col] === "text-right"}>
-                  <a
-                    href="#"
-                    class="hover:underline"
-                    on:click|preventDefault={() => addFilter(col, row[col])}
-                  >
+                  <button class="hover:underline" onclick={() => addFilter(col, row[col])}>
                     {formatCell(col, row[col])}
-                  </a>
+                  </button>
                 </td>
               {/each}
               {#if $$slots.rowActions}

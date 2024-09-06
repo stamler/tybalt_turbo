@@ -18,4 +18,14 @@
   let { data }: { data: PageData } = $props();
 </script>
 
-<ObjectTable tableData={data.items} />
+<ObjectTable
+  tableData={data.items || []}
+  tableConfig={{
+    omitColumns: ["collectionId", "collectionName", "createdBy", "createdAt", "updatedAt"],
+    columnFormatters: {
+      type: (value) => {
+        return value;
+      },
+    },
+  }}
+/>
