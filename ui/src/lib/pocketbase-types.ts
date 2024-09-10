@@ -13,6 +13,7 @@ export enum Collections {
   Managers = "managers",
   PayrollYearEndDates = "payroll_year_end_dates",
   Profiles = "profiles",
+  PurchaseOrders = "purchase_orders",
   TimeEntries = "time_entries",
   TimeOff = "time_off",
   TimeSheetReviewers = "time_sheet_reviewers",
@@ -34,7 +35,7 @@ export type BaseSystemFields<T = never> = {
   updated: IsoDateString;
   collectionId: string;
   collectionName: Collections;
-  expand?: T;
+  expand: T;
 };
 
 export type AuthSystemFields<T = never> = {
@@ -53,7 +54,7 @@ export enum AdminProfilesSkipMinTimeCheckOptions {
 }
 export type AdminProfilesRecord = {
   default_charge_out_rate: number;
-  salary?: boolean;
+  salary: boolean;
   uid: RecordIdString;
   work_week_hours: number;
   off_rotation_permitted: boolean;
@@ -92,6 +93,55 @@ export type PayrollYearEndDatesRecord = {
   date: string;
 };
 
+export enum PurchaseOrdersStatusOptions {
+  "Unapproved" = "Unapproved",
+  "Active" = "Active",
+  "Cancelled" = "Cancelled",
+}
+
+export enum PurchaseOrdersTypeOptions {
+  "Normal" = "Normal",
+  "Cumulative" = "Cumulative",
+  "Recurring" = "Recurring",
+}
+
+export enum PurchaseOrdersFrequencyOptions {
+  "Weekly" = "Weekly",
+  "Biweekly" = "Biweekly",
+  "Monthly" = "Monthly",
+}
+
+export enum PurchaseOrdersPaymentTypeOptions {
+  "OnAccount" = "OnAccount",
+  "Expense" = "Expense",
+  "CorporateCreditCard" = "CorporateCreditCard",
+}
+export type PurchaseOrdersRecord = {
+  approved: IsoDateString;
+  approver: RecordIdString;
+  attachment: string;
+  cancelled: IsoDateString;
+  canceller: RecordIdString;
+  date: string;
+  description: string;
+  division: RecordIdString;
+  end_date: string;
+  frequency: PurchaseOrdersFrequencyOptions;
+  payment_type: PurchaseOrdersPaymentTypeOptions;
+  po_number: string;
+  rejected: IsoDateString;
+  rejection_reason: string;
+  rejector: RecordIdString;
+  second_approval: IsoDateString;
+  second_approver: RecordIdString;
+  second_approver_claim: RecordIdString;
+  status: PurchaseOrdersStatusOptions;
+  total: number;
+  type: PurchaseOrdersTypeOptions;
+  uid: RecordIdString;
+  vendor_name: string;
+};
+
 export type TimeEntriesRecord = {
   category: string;
   date: string;
@@ -124,16 +174,14 @@ export type TimeSheetsRecord = {
 };
 
 export type TimeOffRecord = {
-  given_name: string;
+  name: string;
   last_op: string;
   last_ov: string;
-  manager_given_name: string;
-  manager_surname: string;
+  manager: string;
   manager_uid: RecordIdString;
   opening_date: string;
   opening_op: number;
   opening_ov: number;
-  surname: string;
   timesheet_op: number;
   timesheet_ov: number;
   used_op: number;
@@ -141,16 +189,16 @@ export type TimeOffRecord = {
 };
 
 export type TimeSheetReviewersRecord = {
-  reviewed?: IsoDateString;
+  reviewed: IsoDateString;
   reviewer: RecordIdString;
   time_sheet: RecordIdString;
 };
 
 export type TimeTypesRecord = {
-  allowed_fields?: null | string[];
-  required_fields?: null | string[];
+  allowed_fields: null | string[];
+  required_fields: null | string[];
   code: string;
-  description?: string;
+  description: string;
   name: string;
 };
 
@@ -160,7 +208,7 @@ export type UserClaimsRecord = {
 };
 
 export type UsersRecord = {
-  name?: string;
+  name: string;
 };
 
 export type ManagersRecord = {
@@ -192,6 +240,8 @@ export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYea
   BaseSystemFields<Texpand>;
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
+export type PurchaseOrdersResponse<Texpand = unknown> = Required<PurchaseOrdersRecord> &
+  BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeOffResponse<Texpand = unknown> = Required<TimeOffRecord> &
@@ -216,6 +266,7 @@ export type CollectionRecords = {
   managers: ManagersRecord;
   payroll_year_end_dates: PayrollYearEndDatesRecord;
   profiles: ProfilesRecord;
+  purchase_orders: PurchaseOrdersRecord;
   time_entries: TimeEntriesRecord;
   time_off: TimeOffRecord;
   time_sheet_reviewers: TimeSheetReviewersRecord;
@@ -233,6 +284,7 @@ export type CollectionResponses = {
   managers: ManagersResponse;
   payroll_year_end_dates: PayrollYearEndDatesResponse;
   profiles: ProfilesResponse;
+  purchase_orders: PurchaseOrdersResponse;
   time_entries: TimeEntriesResponse;
   time_off: TimeOffResponse;
   time_sheet_reviewers: TimeSheetReviewersResponse;
@@ -253,6 +305,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
   collection(idOrName: "payroll_year_end_dates"): RecordService<PayrollYearEndDatesResponse>;
   collection(idOrName: "profiles"): RecordService<ProfilesResponse>;
+  collection(idOrName: "purchase_orders"): RecordService<PurchaseOrdersResponse>;
   collection(idOrName: "time_entries"): RecordService<TimeEntriesResponse>;
   collection(idOrName: "time_off"): RecordService<TimeOffResponse>;
   collection(idOrName: "time_sheet_reviewers"): RecordService<TimeSheetReviewersResponse>;
