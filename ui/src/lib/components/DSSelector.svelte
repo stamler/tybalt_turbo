@@ -6,10 +6,6 @@
   import type { Snippet } from "svelte";
   import type { HasId } from "$lib/pocketbase-types";
 
-  interface HasId {
-    id: string;
-  }
-
   // get an id for this instance from the counter in the module context then
   // increment it so the next instance gets a different id
   const thisId = idCounter;
