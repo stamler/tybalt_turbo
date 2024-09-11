@@ -21,8 +21,8 @@
     isRecurring || item.total >= 2500 || (item.total >= 500 && item.total < 2500),
   );
 
-  async function save() {
-    console.log("saving");
+  async function save(event: Event) {
+    event.preventDefault();
     item.uid = $authStore?.model?.id;
 
     try {
@@ -64,7 +64,11 @@
 
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 
-<form class="flex w-full flex-col items-center gap-2 p-2">
+<form
+  class="flex w-full flex-col items-center gap-2 p-2"
+  enctype="multipart/form-data"
+  onsubmit={save}
+>
   <DsSelector
     bind:value={item.type}
     items={[
@@ -178,7 +182,12 @@
   <!-- File upload for attachment -->
   <span class="flex w-full flex-col gap-2">
     <label for="attachment">Attachment</label>
-    <input type="file" id="attachment" name="attachment" />
+    <input
+      id="attachment"
+      type="file"
+      onchange={(e) => (item.attachment = e.target?.files[0])}
+      name="attachment"
+    />
   </span>
 
   {#if requiresSecondApproval}
@@ -189,11 +198,7 @@
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
-      <button
-        type="button"
-        onclick={save}
-        class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300"
-      >
+      <button type="submit" class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300">
         Save
       </button>
       <button type="button" onclick={() => goto("/purchase-orders/list")}>Cancel</button>
