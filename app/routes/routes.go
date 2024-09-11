@@ -17,6 +17,18 @@ type TimeSheetIdRequest struct {
 	TimeSheetId string `json:"timeSheetId"`
 }
 
+type PurchaseOrderRequest struct {
+	Type        string  `json:"type"`
+	Date        string  `json:"date"`
+	EndDate     string  `json:"end_date"`
+	Frequency   string  `json:"frequency"`
+	Division    string  `json:"division"`
+	Description string  `json:"description"`
+	Total       float64 `json:"total"`
+	PaymentType string  `json:"payment_type"`
+	VendorName  string  `json:"vendor_name"`
+}
+
 // CodeError is a custom error type that includes a code
 type CodeError struct {
 	Code    string `json:"code"`
@@ -85,4 +97,75 @@ func AddRoutes(app *pocketbase.PocketBase) {
 
 		return nil
 	})
+
+	// Add the create purchase order route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/po",
+			Handler: createPurchaseOrderHandler(app),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
+	// Add the update purchase order route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPut,
+			Path:    "/api/po/:id",
+			Handler: updatePurchaseOrderHandler(app),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
+	// Add the delete purchase order route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodDelete,
+			Path:    "/api/po/:id",
+			Handler: deletePurchaseOrderHandler(app),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
+	// Add the approve purchase order route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/po/:id/approve",
+			Handler: approvePurchaseOrderHandler(app),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
+	// Add the reject purchase order route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/po/:id/reject",
+			Handler: rejectPurchaseOrderHandler(app),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
 }
