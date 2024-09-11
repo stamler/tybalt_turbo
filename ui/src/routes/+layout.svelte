@@ -39,6 +39,7 @@
 
 <header class="flex h-10 w-screen items-center justify-between bg-neutral-700 px-3 text-white">
   <a href="/">Tybalt</a>
+  <a href="/pos/add">New PO</a>
   <a href="/time/entries/add">New Entry</a>
   <a href="/time/entries/list">Entries</a>
   <a href="/time/sheets/list">Sheets</a>

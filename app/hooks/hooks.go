@@ -26,4 +26,16 @@ func AddHooks(app *pocketbase.PocketBase) {
 		}
 		return nil
 	})
+	app.OnRecordBeforeCreateRequest("purchase_orders").Add(func(e *core.RecordCreateEvent) error {
+		if err := ProcessPurchaseOrder(app, e.Record, e.HttpContext); err != nil {
+			return err
+		}
+		return nil
+	})
+	app.OnRecordBeforeUpdateRequest("purchase_orders").Add(func(e *core.RecordUpdateEvent) error {
+		if err := ProcessPurchaseOrder(app, e.Record, e.HttpContext); err != nil {
+			return err
+		}
+		return nil
+	})
 }

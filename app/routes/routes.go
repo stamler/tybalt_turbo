@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"mime/multipart"
 	"net/http"
 
 	"github.com/labstack/echo/v5"
@@ -18,15 +19,16 @@ type TimeSheetIdRequest struct {
 }
 
 type PurchaseOrderRequest struct {
-	Type        string  `json:"type"`
-	Date        string  `json:"date"`
-	EndDate     string  `json:"end_date"`
-	Frequency   string  `json:"frequency"`
-	Division    string  `json:"division"`
-	Description string  `json:"description"`
-	Total       float64 `json:"total"`
-	PaymentType string  `json:"payment_type"`
-	VendorName  string  `json:"vendor_name"`
+	Type        string                `json:"type"`
+	Date        string                `json:"date"`
+	EndDate     string                `json:"end_date"`
+	Frequency   string                `json:"frequency"`
+	Division    string                `json:"division"`
+	Description string                `json:"description"`
+	Total       float64               `json:"total"`
+	PaymentType string                `json:"payment_type"`
+	VendorName  string                `json:"vendor_name"`
+	Attachment  *multipart.FileHeader `json:"attachment"`
 }
 
 // CodeError is a custom error type that includes a code
