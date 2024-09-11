@@ -11,15 +11,12 @@
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
 
-  let calendarInput: HTMLInputElement;
-  let endDateCalendarInput: HTMLInputElement;
+  let calendarInput = $state<HTMLInputElement | null>(null);
+  let endDateCalendarInput = $state<HTMLInputElement | null>(null);
   let errors = $state({} as any);
   let item = data.item;
 
   const isRecurring = $derived(item.type === "Recurring");
-  const requiresSecondApproval = $derived(
-    isRecurring || item.total >= 2500 || (item.total >= 500 && item.total < 2500),
-  );
 
   async function save(event: Event) {
     event.preventDefault();
@@ -41,24 +38,30 @@
 
   // initialize flatpickr on the onMount lifecycle event
   onMount(() => {
-    flatpickr(calendarInput, {
-      inline: true,
-      minDate: "2024-06-01",
-      // 2 months from now
-      maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
-      enableTime: false,
-      dateFormat: "Y-m-d",
-      defaultDate: new Date(),
-    });
+    if (calendarInput) {
+      flatpickr(calendarInput, {
+        inline: true,
+        minDate: "2024-06-01",
+        // 2 months from now
+        maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
+        enableTime: false,
+        dateFormat: "Y-m-d",
+        defaultDate: new Date(),
+      });
+    }
+  });
 
-    flatpickr(endDateCalendarInput, {
-      inline: true,
-      minDate: "2024-06-01",
-      // 2 months from now
-      maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
-      enableTime: false,
-      dateFormat: "Y-m-d",
-    });
+  // Use a reactive statement to initialize flatpickr for the end date input
+  $effect(() => {
+    if (isRecurring && endDateCalendarInput) {
+      flatpickr(endDateCalendarInput, {
+        inline: true,
+        minDate: "2024-06-01",
+        maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
+        enableTime: false,
+        dateFormat: "Y-m-d",
+      });
+    }
   });
 </script>
 
@@ -189,12 +192,6 @@
       name="attachment"
     />
   </span>
-
-  {#if requiresSecondApproval}
-    <span class="flex w-full gap-2 rounded bg-yellow-200 p-2 text-yellow-800">
-      This purchase order requires additional approval.
-    </span>
-  {/if}
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
