@@ -14,7 +14,7 @@
   let calendarInput = $state<HTMLInputElement | null>(null);
   let endDateCalendarInput = $state<HTMLInputElement | null>(null);
   let errors = $state({} as any);
-  let item = data.item;
+  let item = $state(data.item);
 
   const isRecurring = $derived(item.type === "Recurring");
 
@@ -73,7 +73,7 @@
   onsubmit={save}
 >
   <DsSelector
-    bind:value={item.type}
+    bind:value={item.type as string}
     items={[
       { id: "Normal", name: "Normal" },
       { id: "Cumulative", name: "Cumulative" },
@@ -114,7 +114,7 @@
     </span>
 
     <DsSelector
-      bind:value={item.frequency}
+      bind:value={item.frequency as string}
       items={[
         { id: "Weekly", name: "Weekly" },
         { id: "Biweekly", name: "Biweekly" },
@@ -131,7 +131,7 @@
   {/if}
 
   <DsSelector
-    bind:value={item.division}
+    bind:value={item.division as string}
     items={$globalStore.divisions}
     {errors}
     fieldName="division"
@@ -143,14 +143,14 @@
   </DsSelector>
 
   <DsTextInput
-    bind:value={item.description}
+    bind:value={item.description as string}
     {errors}
     fieldName="description"
     uiName="Description"
   />
 
   <DsTextInput
-    bind:value={item.total}
+    bind:value={item.total as number}
     {errors}
     fieldName="total"
     uiName="Total"
@@ -160,7 +160,7 @@
   />
 
   <DsSelector
-    bind:value={item.payment_type}
+    bind:value={item.payment_type as string}
     items={[
       { id: "OnAccount", name: "On Account" },
       { id: "Expense", name: "Expense" },
@@ -176,7 +176,7 @@
   </DsSelector>
 
   <DsTextInput
-    bind:value={item.vendor_name}
+    bind:value={item.vendor_name as string}
     {errors}
     fieldName="vendor_name"
     uiName="Vendor Name"

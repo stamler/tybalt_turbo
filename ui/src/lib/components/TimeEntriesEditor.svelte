@@ -9,6 +9,7 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
+  import type { JobsRecord, TimeTypesRecord, DivisionsRecord } from "$lib/pocketbase-types";
 
   let { data }: { data: TimeEntriesPageData } = $props();
 
@@ -40,7 +41,7 @@
 
   let calendarInput: HTMLInputElement;
   let errors = $state({} as any);
-  let item = data.item;
+  let item = $state(data.item);
 
   // given a list of time type codes, return true if the item's time type is in
   // the list
@@ -117,11 +118,11 @@
       bind:value={item.date}
     />
   </span>
-  {#snippet optionTemplate(item)}
+  {#snippet optionTemplate(item: TimeTypesRecord | DivisionsRecord)}
     {item.code} - {item.name}
   {/snippet}
   <DsSelector
-    bind:value={item.time_type}
+    bind:value={item.time_type as string}
     items={$globalStore.time_types}
     {errors}
     {optionTemplate}
@@ -139,19 +140,19 @@
   <!----------------------------------------------->
   {#if isWorkTime}
     <DsSelector
-      bind:value={item.division}
+      bind:value={item.division as string}
       items={$globalStore.divisions}
       {errors}
       {optionTemplate}
       fieldName="division"
       uiName="Division"
     />
-    {#snippet jobOptionTemplate(item)}
+    {#snippet jobOptionTemplate(item: JobsRecord)}
       {item.number} - {item.description}
     {/snippet}
     {#if $globalStore.jobsIndex !== null}
       <DsAutoComplete
-        bind:value={item.job}
+        bind:value={item.job as string}
         index={$globalStore.jobsIndex}
         {errors}
         fieldName="job"
@@ -164,7 +165,7 @@
 
   {#if item.job && item.job !== "" && item.division && isWorkTime}
     <DsTextInput
-      bind:value={item.work_record}
+      bind:value={item.work_record as string}
       {errors}
       fieldName="work_record"
       uiName="Work Record"
@@ -180,7 +181,7 @@
   so it will never show up after being set once -->
   {#if !hasTimeType(["OR", "OW", "OTO"])}
     <DsTextInput
-      bind:value={item.hours}
+      bind:value={item.hours as number}
       {errors}
       fieldName="hours"
       uiName="Hours"
@@ -193,7 +194,7 @@
 
   {#if item.division && isWorkTime}
     <DsTextInput
-      bind:value={item.meals_hours}
+      bind:value={item.meals_hours as number}
       {errors}
       fieldName="meals_hours"
       uiName="Meals Hours"
@@ -206,7 +207,7 @@
 
   {#if !hasTimeType(["OR", "OW", "OTO", "RB"])}
     <DsTextInput
-      bind:value={item.description}
+      bind:value={item.description as string}
       {errors}
       fieldName="description"
       uiName="Description"
@@ -221,7 +222,7 @@
 
   {#if hasTimeType(["OTO"])}
     <DsTextInput
-      bind:value={item.payout_request_amount}
+      bind:value={item.payout_request_amount as number}
       {errors}
       fieldName="payout_request_amount"
       uiName="$"
