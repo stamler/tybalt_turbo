@@ -227,6 +227,12 @@ type TimeSheetReviewersRecordExpands = {
   reviewer: ManagersRecord;
 };
 
+type PurchaseOrdersRecordExpands = {
+  division: DivisionsRecord;
+  job: JobsRecord;
+  type: PurchaseOrdersTypeOptions;
+};
+
 // Response types include system fields and match responses from the PocketBase API
 export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRecord> &
   BaseSystemFields<Texpand>;
@@ -240,7 +246,7 @@ export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYea
   BaseSystemFields<Texpand>;
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
-export type PurchaseOrdersResponse<Texpand = unknown> = Required<PurchaseOrdersRecord> &
+export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> = Required<PurchaseOrdersRecord> &
   BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
   BaseSystemFields<Texpand>;
