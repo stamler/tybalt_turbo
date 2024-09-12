@@ -1,20 +1,27 @@
-<script lang="ts">
+<script lang="ts" generics="T extends BaseSystemFields<any>">
+  import type { Snippet } from "svelte";
+  import type { BaseSystemFields } from "$lib/pocketbase-types";
   import { onMount } from "svelte";
   import _ from "lodash";
   import Icon from "@iconify/svelte";
   import { formatDollars, formatPercent } from "$lib/utilities";
   // import DownloadData from "@/components/DownloadData.svelte";
 
-  type TableData = Record<string, any>[];
+  type TableData = Record<string, any>[]; // we do not use T[] because there may be data that does not have an id
   interface TableConfig {
     // a function applied to each value in the specified column to format it
     columnFormatters: Record<string, (<T>(value: T) => string | T) | "dollars" | "percent">;
     omitColumns?: string[];
   }
 
-  let { tableData = [], tableConfig = { columnFormatters: {}, omitColumns: [] } } = $props<{
+  let {
+    tableData = [],
+    tableConfig = { columnFormatters: {}, omitColumns: [] },
+    rowActions,
+  } = $props<{
     tableData: TableData;
     tableConfig?: TableConfig;
+    rowActions?: Snippet<[string, string]>;
   }>();
 
   let internalTableData = $state<Record<string, any>[]>([]);
@@ -22,6 +29,7 @@
   let sortColumn = $state("");
   let order = $state(0);
   let instanceId = $state("");
+  let idVariableName = $state("id");
 
   let columns = $derived(
     internalTableData.length > 0
@@ -56,8 +64,20 @@
   );
 
   function indexData(data: Record<string, any>[]) {
-    if (data.length > 0 && data[0].id !== undefined) return data;
-    return data.map((row, idx) => ({ ...row, [`_idx_${instanceId}`]: idx }));
+    // add an id to each row in the data array. This is useful for identifying
+    // the row when the id is not defined in the data. This is a noop function
+    // if the id is defined in the data.
+
+    // check the first row to see if it has an id field
+    if (data.length > 0 && data[0].id !== undefined) {
+      idVariableName = "id";
+      return data;
+    }
+
+    // if the first row does not have an id field, set the idVariableName to the
+    // derived id field, add an id field to each row
+    idVariableName = `_idx_${instanceId}`;
+    return data.map((row, idx) => ({ ...row, [idVariableName]: idx }));
   }
 
   function flattenData(data: Record<string, any>[]) {
@@ -106,6 +126,8 @@
   }
 
   onMount(() => {
+    // generate an instance id for the component to be used to identify the row
+    // in the slot. This is useful when the id is not defined in the data.
     instanceId = Math.random().toString(36).substring(7);
     updateInternalTableData();
   });
@@ -155,13 +177,15 @@
                 </span>
               </th>
             {/each}
-            {#if $$slots.rowActions}
+            {#if rowActions}
               <th></th>
             {/if}
           </tr>
         </thead>
         <tbody>
-          {#each internalTableData as row (row.id)}
+          <!-- idVariableName is either 'id' or, if the data doesn't contain an
+          id, it's the _idx_ string generated for each row. -->
+          {#each internalTableData as row (row[idVariableName])}
             <tr>
               {#each columns as col}
                 <td class="pr-4" class:text-right={columnAlignments[col] === "text-right"}>
@@ -170,9 +194,20 @@
                   </button>
                 </td>
               {/each}
-              {#if $$slots.rowActions}
+              {#if rowActions}
+                <!-- pass the row id to the snippet and also the index of the
+                row in the external tableData array. This is useful for
+                identifying the row when the id is not defined. To implement
+                this, we should write the original tableData index to the
+                internalTableData array every time the prop is updated. We
+                should ensure that the name of the id doesn't overlap with any
+                of the column names in the tableData array by appending a unique
+                string to the _idx_ name so that each invocation of the
+                component will have a unique id. We will skip over this key when
+                rendering the table.
+               -->
                 <td>
-                  <slot name="rowActions" id={row.id} idx={row[`_idx_${instanceId}`]} />
+                  {@render rowActions(row[idVariableName])}
                 </td>
               {/if}
             </tr>

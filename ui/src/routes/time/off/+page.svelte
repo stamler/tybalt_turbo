@@ -1,8 +1,7 @@
 <script lang="ts">
-  // TODO: Implement the time off page. This shows the contents of the time_off
-  // collection. Because the api rules only allow the viewing of time_off
-  // records they are allowed to see, we can simply fetch all the records and
-  // display them.
+  // The time off page shows the contents of the time_off collection. Because
+  // the api rules only allow the viewing of time_off records they are allowed
+  // to see, we can simply fetch all the records and display them.
 
   // We will depend on a component that we'll recreate in svelte for the display
   // of the table. I used ObjectTable.vue in the past for tybalt, and this was
@@ -28,4 +27,8 @@
       },
     },
   }}
-/>
+>
+  {#snippet rowActions(id)}
+    {id}
+  {/snippet}
+</ObjectTable>
