@@ -3,6 +3,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
   import type { PurchaseOrdersResponse } from "$lib/pocketbase-types";
+  import { shortDate } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
 
@@ -39,7 +40,25 @@
   </span>
 {/snippet}
 
-{#snippet line2(item: PurchaseOrdersResponse)}{JSON.stringify(item)}{/snippet}
+{#snippet line2(item: PurchaseOrdersResponse)}
+  {#if item.approved !== ""}
+    <span>
+      Approved by
+      {item.expand.approver.expand?.profiles_via_uid.given_name}
+      {item.expand.approver.expand?.profiles_via_uid.surname}
+      on {shortDate(item.approved)}
+    </span>
+  {/if}
+  {#if item.second_approver !== "" && item.second_approval !== ""}
+    <span>
+      / Approved by
+      {item.expand.second_approver.expand?.profiles_via_uid.given_name}
+      {item.expand.second_approver.expand?.profiles_via_uid.surname}
+      as {item.second_approver_claim.toUpperCase()} on {shortDate(item.second_approval)}
+    </span>
+  {/if}
+{/snippet}
+{#snippet line3(item: PurchaseOrdersResponse)}{JSON.stringify(item)}{/snippet}
 
 {#snippet actions({ id }: PurchaseOrdersResponse)}
   <a href="/pos/{id}/edit">edit</a>
@@ -55,5 +74,6 @@
   {byline}
   {line1}
   {line2}
+  {line3}
   {actions}
 />
