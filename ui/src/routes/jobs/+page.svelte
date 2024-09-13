@@ -14,12 +14,13 @@
   };
 
   let item = $state({ ...defaultItem });
+  let items = $state(data.items);
 
   async function save() {
     try {
       const record = await pb.collection("jobs").create(item, { returnRecord: true });
-      if (data.items === undefined) throw new Error("data.items is undefined");
-      data.items.push(record);
+      if (items === undefined) throw new Error("items is undefined");
+      items.push(record);
 
       // TODO:
       // 1. don't use page load function for jobs, get from index instead
@@ -36,14 +37,14 @@
     }
   }
   async function del(id: string): Promise<void> {
-    // return immediately if data.items is not an array
-    if (!Array.isArray(data.items)) return;
+    // return immediately if items is not an array
+    if (!Array.isArray(items)) return;
 
     try {
       await pb.collection("jobs").delete(id);
 
       // remove the item from the list
-      data.items = data.items.filter((item) => item.id !== id);
+      items = items.filter((item) => item.id !== id);
     } catch (error: any) {
       alert(error.data.message);
     }
@@ -59,13 +60,13 @@
 {/snippet}
 
 <!-- Show the list of items here -->
-<DsList items={data.items as JobsResponse[]} search={true} {anchor} {headline} {actions} />
+<DsList items={items as JobsResponse[]} search={true} {anchor} {headline} {actions} />
 
 <!-- Create a new job -->
 <form class="flex w-full flex-col items-center gap-2 p-2">
-  <DsTextInput bind:value={item.number} {errors} fieldName="number" uiName="Job Number" />
+  <DsTextInput bind:value={item.number as string} {errors} fieldName="number" uiName="Job Number" />
   <DsTextInput
-    bind:value={item.description}
+    bind:value={item.description as string}
     {errors}
     fieldName="description"
     uiName="Description"

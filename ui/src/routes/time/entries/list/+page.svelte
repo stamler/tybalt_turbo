@@ -8,6 +8,7 @@
   import { calculateTallies } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
+  let items = $state(data.items);
 
   function hoursString(item: TimeEntriesResponse) {
     const hoursArray = [];
@@ -17,14 +18,14 @@
   }
 
   async function del(id: string): Promise<void> {
-    // return immediately if data.items is not an array
-    if (!Array.isArray(data.items)) return;
+    // return immediately if items is not an array
+    if (!Array.isArray(items)) return;
 
     try {
       await pb.collection("time_entries").delete(id);
 
       // remove the item from the list
-      data.items = data.items.filter((item) => item.id !== id);
+      items = items.filter((item) => item.id !== id);
     } catch (error: any) {
       alert(error.data.message);
     }
@@ -151,7 +152,7 @@
   </div>
 {/snippet}
 <DsList
-  items={data.items as TimeEntriesResponse[]}
+  items={items as TimeEntriesResponse[]}
   search={true}
   inListHeader="Time Entries"
   groupField="week_ending"
