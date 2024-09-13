@@ -58,7 +58,11 @@
     </span>
   {/if}
 {/snippet}
-{#snippet line3(item: PurchaseOrdersResponse)}{JSON.stringify(item)}{/snippet}
+{#snippet line3(item: PurchaseOrdersResponse)}
+  <button onclick={() => navigator.clipboard.writeText(JSON.stringify(item))}>
+    Copy JSON to clipboard
+  </button>
+{/snippet}
 
 {#snippet actions({ id }: PurchaseOrdersResponse)}
   <a href="/pos/{id}/edit">edit</a>
