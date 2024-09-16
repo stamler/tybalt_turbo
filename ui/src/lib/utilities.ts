@@ -138,7 +138,7 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
   return tallies;
 }
 
-export function shortDate(dateString: string) {
+export function shortDate(dateString: string, includeYear = false) {
   const months = [
     "Jan",
     "Feb",
@@ -157,7 +157,7 @@ export function shortDate(dateString: string) {
   // const year = dateParts[0];
   const month = months[parseInt(dateParts[1], 10) - 1];
   const day = parseInt(dateParts[2], 10);
-  return `${month} ${day}`;
+  return `${month} ${day}${includeYear ? `, ${dateParts[0]}` : ""}`;
 }
 
 export const hoursWorked = function (item: TimeSheetTally) {

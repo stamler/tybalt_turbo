@@ -1,5 +1,6 @@
 <script lang="ts">
-  import Icon from "@iconify/svelte";
+  import DsFileLink from "$lib/components/DsFileLink.svelte";
+  import DsLabel from "$lib/components/DsLabel.svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
@@ -62,6 +63,14 @@
   {/if}
 {/snippet}
 {#snippet line3(item: PurchaseOrdersResponse)}
+  <!-- if the item is recurring, show the frequency -->
+  {#if item.type === "Recurring"}
+    <DsLabel color="cyan">
+      Recurring {item.frequency} until {shortDate(item.end_date, true)}
+    </DsLabel>
+  {:else if item.type === "Cumulative"}
+    <DsLabel color="teal">Cumulative</DsLabel>
+  {/if}
   <button onclick={() => navigator.clipboard.writeText(JSON.stringify(item))}>
     Copy JSON to clipboard
   </button>
@@ -70,10 +79,7 @@
       href={`${PUBLIC_POCKETBASE_URL}/api/files/${item.collectionId}/${item.id}/${item.attachment}`}
       target="_blank"
     >
-      <span class="flex gap-2 text-neutral-500 hover:text-neutral-800">
-        {item.attachment}
-        <Icon icon="bxs:file-pdf" width="24px" />
-      </span>
+      <DsFileLink filename={item.attachment as string} />
     </a>
   {/if}
 {/snippet}

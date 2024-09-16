@@ -6,6 +6,7 @@
   import Icon from "@iconify/svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import type { BaseSystemFields } from "$lib/pocketbase-types";
+  import DsFileLink from "./DsFileLink.svelte";
 
   // get an id for this instance from the counter in the module context then
   // increment it so the next instance gets a different id
@@ -48,12 +49,7 @@
             href={`${PUBLIC_POCKETBASE_URL}/api/files/${record.collectionId}/${record.id}/${record[fieldName as keyof T]}`}
             target="_blank"
           >
-            {record[fieldName as keyof T]}
-            <Icon
-              icon="bxs:file-pdf"
-              width="24px"
-              class="inline-block text-neutral-500 hover:text-neutral-800"
-            />
+            <DsFileLink filename={record[fieldName as keyof T] as string} />
           </a>
         </span>
       {:else}
