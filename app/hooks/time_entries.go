@@ -109,8 +109,6 @@ func validateTimeEntry(timeEntryRecord *models.Record, requiredFields []string) 
 	}.Filter()
 
 	return otherValidationsErrors
-
-	// return nil
 }
 
 // The ProcessTimeEntry function is used to validate the time_entry record
