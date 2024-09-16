@@ -41,13 +41,11 @@
   onMount(() => {
     if (calendarInput) {
       flatpickr(calendarInput, {
-        inline: true,
         minDate: "2024-06-01",
         // 2 months from now
         maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
         enableTime: false,
         dateFormat: "Y-m-d",
-        defaultDate: new Date(),
       });
     }
   });
@@ -56,7 +54,6 @@
   $effect(() => {
     if (isRecurring && endDateCalendarInput) {
       flatpickr(endDateCalendarInput, {
-        inline: true,
         minDate: "2024-06-01",
         maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
         enableTime: false,
@@ -89,7 +86,7 @@
     {/snippet}
   </DsSelector>
 
-  <span class="flex w-full flex-col gap-2">
+  <span class="flex w-full flex-col gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
     <label for="date">Date</label>
     <input
       class="flex-1"
@@ -99,10 +96,13 @@
       bind:this={calendarInput}
       bind:value={item.date}
     />
+    {#if errors.date !== undefined}
+      <span class="text-red-600">{errors.date.message}</span>
+    {/if}
   </span>
 
   {#if isRecurring}
-    <span class="flex w-full flex-col gap-2">
+    <span class="flex w-full flex-col gap-2 {errors.end_date !== undefined ? 'bg-red-200' : ''}">
       <label for="end_date">End Date</label>
       <input
         class="flex-1"
@@ -112,6 +112,9 @@
         bind:this={endDateCalendarInput}
         bind:value={item.end_date}
       />
+      {#if errors.end_date !== undefined}
+        <span class="text-red-600">{errors.end_date.message}</span>
+      {/if}
     </span>
 
     <DsSelector
