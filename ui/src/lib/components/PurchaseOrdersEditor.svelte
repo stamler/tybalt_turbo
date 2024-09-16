@@ -1,6 +1,5 @@
 <script lang="ts">
-  import flatpickr from "flatpickr";
-  import { onMount } from "svelte";
+  import { flatpickrAction } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
@@ -12,8 +11,6 @@
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
 
-  let calendarInput = $state<HTMLInputElement | null>(null);
-  let endDateCalendarInput = $state<HTMLInputElement | null>(null);
   let errors = $state({} as any);
   let item = $state(data.item);
 
@@ -36,34 +33,11 @@
       errors = error.data.data;
     }
   }
-
-  // initialize flatpickr on the onMount lifecycle event
-  onMount(() => {
-    if (calendarInput) {
-      flatpickr(calendarInput, {
-        minDate: "2024-06-01",
-        // 2 months from now
-        maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
-        enableTime: false,
-        dateFormat: "Y-m-d",
-      });
-    }
-  });
-
-  // Use a reactive statement to initialize flatpickr for the end date input
-  $effect(() => {
-    if (isRecurring && endDateCalendarInput) {
-      flatpickr(endDateCalendarInput, {
-        minDate: "2024-06-01",
-        maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
-        enableTime: false,
-        dateFormat: "Y-m-d",
-      });
-    }
-  });
 </script>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+<svelte:head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+</svelte:head>
 
 <form
   class="flex w-full flex-col items-center gap-2 p-2"
@@ -93,7 +67,7 @@
       type="text"
       name="date"
       placeholder="Date"
-      bind:this={calendarInput}
+      use:flatpickrAction
       bind:value={item.date}
     />
     {#if errors.date !== undefined}
@@ -109,7 +83,7 @@
         type="text"
         name="end_date"
         placeholder="End Date"
-        bind:this={endDateCalendarInput}
+        use:flatpickrAction
         bind:value={item.end_date}
       />
       {#if errors.end_date !== undefined}

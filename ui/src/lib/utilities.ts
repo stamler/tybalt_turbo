@@ -5,6 +5,7 @@ import type {
   IsoDateString,
 } from "$lib/pocketbase-types";
 import { Collections } from "$lib/pocketbase-types";
+import flatpickr from "flatpickr";
 
 export interface TimeSheetTally extends BaseSystemFields {
   // These TimeSheetRecord-specific properties will be "" if there is no
@@ -240,3 +241,18 @@ export const formatNumber = function <T>(value: T) {
   }
   return nFormatter(value, 1);
 };
+
+export function flatpickrAction(node: HTMLElement, options: flatpickr.Options.Options = {}) {
+  const instance = flatpickr(node, {
+    minDate: "2024-06-01",
+    maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
+    enableTime: false,
+    dateFormat: "Y-m-d",
+    ...options,
+  });
+  return {
+    destroy() {
+      instance.destroy();
+    },
+  };
+}

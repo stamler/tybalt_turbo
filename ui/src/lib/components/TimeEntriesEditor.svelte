@@ -1,6 +1,5 @@
 <script lang="ts">
-  import flatpickr from "flatpickr";
-  import { onMount } from "svelte";
+  import { flatpickrAction } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
@@ -39,7 +38,6 @@
 
   const isWorkTime = $derived(hasTimeType(["R", "RT"]));
 
-  let calendarInput: HTMLInputElement;
   let errors = $state({} as any);
   let item = $state(data.item);
 
@@ -89,22 +87,11 @@
       errors = error.data.data;
     }
   }
-
-  // initialize flatpickr on the onMount lifecycle event
-  onMount(() => {
-    flatpickr(calendarInput, {
-      inline: true,
-      minDate: "2024-06-01",
-      // 2 months from now
-      maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
-      enableTime: false,
-      dateFormat: "Y-m-d",
-      defaultDate: item.date,
-    });
-  });
 </script>
 
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+<svelte:head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+</svelte:head>
 
 <form class="flex w-full flex-col items-center gap-2 p-2">
   <span class="flex w-full flex-col gap-2">
@@ -114,7 +101,7 @@
       type="text"
       name="date"
       placeholder="Date"
-      bind:this={calendarInput}
+      use:flatpickrAction
       bind:value={item.date}
     />
   </span>
