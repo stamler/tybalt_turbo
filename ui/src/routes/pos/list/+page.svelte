@@ -1,4 +1,6 @@
 <script lang="ts">
+  import Icon from "@iconify/svelte";
+  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
@@ -63,6 +65,17 @@
   <button onclick={() => navigator.clipboard.writeText(JSON.stringify(item))}>
     Copy JSON to clipboard
   </button>
+  {#if item.attachment}
+    <a
+      href={`${PUBLIC_POCKETBASE_URL}/api/files/${item.collectionId}/${item.id}/${item.attachment}`}
+      target="_blank"
+    >
+      <span class="flex gap-2 text-neutral-500 hover:text-neutral-800">
+        {item.attachment}
+        <Icon icon="bxs:file-pdf" width="24px" />
+      </span>
+    </a>
+  {/if}
 {/snippet}
 
 {#snippet actions({ id }: PurchaseOrdersResponse)}

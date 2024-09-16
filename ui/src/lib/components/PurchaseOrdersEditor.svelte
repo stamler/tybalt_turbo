@@ -5,6 +5,7 @@
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
+  import DsFileSelect from "$lib/components/DsFileSelect.svelte";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { PurchaseOrdersPageData } from "$lib/svelte-types";
@@ -183,22 +184,14 @@
   />
 
   <!-- File upload for attachment -->
-  <span class="flex w-full flex-col gap-2">
-    <label for="attachment">Attachment</label>
-    <input
-      id="attachment"
-      type="file"
-      onchange={(e) => (item.attachment = e.target?.files[0])}
-      name="attachment"
-    />
-  </span>
+  <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <button type="submit" class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300">
         Save
       </button>
-      <button type="button" onclick={() => goto("/purchase-orders/list")}>Cancel</button>
+      <button type="button" onclick={() => goto("/pos/list")}>Cancel</button>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

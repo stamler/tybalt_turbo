@@ -231,6 +231,13 @@ type PurchaseOrdersRecordExpands = {
   division: DivisionsRecord;
   job: JobsRecord;
   type: PurchaseOrdersTypeOptions;
+  uid: UsersResponse;
+  approver: UsersResponse;
+  second_approver: UsersResponse;
+};
+
+type UsersRecordExpands = {
+  profiles_via_uid: ProfilesResponse;
 };
 
 // Response types include system fields and match responses from the PocketBase API
@@ -260,7 +267,8 @@ export type TimeTypesResponse<Texpand = unknown> = Required<TimeTypesRecord> &
   BaseSystemFields<Texpand>;
 export type UserClaimsResponse<Texpand = unknown> = Required<UserClaimsRecord> &
   BaseSystemFields<Texpand>;
-export type UsersResponse<Texpand = unknown> = Required<UsersRecord> & AuthSystemFields<Texpand>;
+export type UsersResponse<Texpand = UsersRecordExpands> = Required<UsersRecord> &
+  AuthSystemFields<Texpand>;
 
 // Types containing all Records and Responses, useful for creating typing helper functions
 
