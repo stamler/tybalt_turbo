@@ -253,8 +253,8 @@ export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYea
   BaseSystemFields<Texpand>;
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
-export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> = Required<PurchaseOrdersRecord> &
-  BaseSystemFields<Texpand>;
+export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> =
+  Required<PurchaseOrdersRecord> & BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeOffResponse<Texpand = unknown> = Required<TimeOffRecord> &
