@@ -24,6 +24,8 @@
     uiName: string;
   } = $props();
 
+  let newFileName = $state("");
+
   // typeguard for BaseSystemFields to narrow the type of record
   const isBaseSystemFields = (obj: any): obj is BaseSystemFields => {
     return obj && typeof obj === "object" && "collectionId" in obj && "id" in obj;
@@ -36,23 +38,39 @@
     <!-- if there is an existing attachment, display it here and provide a way
     to replace or remove it -->
 
-    {#if isBaseSystemFields(record) && record[fieldName as keyof T]}
-      <span>
-        <a
-          href={`${PUBLIC_POCKETBASE_URL}/api/files/${record.collectionId}/${record.id}/${record[fieldName as keyof T]}`}
-          target="_blank"
-        >
-          {typeof record[fieldName as keyof T] === "object"
-            ? record[fieldName as keyof T].name
-            : record[fieldName as keyof T]}
+    {#if record[fieldName as keyof T]}
+      {#if isBaseSystemFields(record) && newFileName === ""}
+        <!-- The file is already stored on the server, so we can link to it
+        directly unless the file name is different than the original file name
+        which happens when the user changes the file -->
+        <span>
+          <a
+            href={`${PUBLIC_POCKETBASE_URL}/api/files/${record.collectionId}/${record.id}/${record[fieldName as keyof T]}`}
+            target="_blank"
+          >
+            {record[fieldName as keyof T]}
+            <Icon
+              icon="bxs:file-pdf"
+              width="24px"
+              class="inline-block text-neutral-500 hover:text-neutral-800"
+            />
+          </a>
+        </span>
+      {:else}
+        <!-- The file is not stored on the server, so we can show the name but
+        not link to it directly -->
+        <span>
+          {newFileName}
           <Icon
             icon="bxs:file-pdf"
             width="24px"
             class="inline-block text-neutral-500 hover:text-neutral-800"
           />
-        </a>
-      </span>
-      <button type="button" onclick={() => (record[fieldName as keyof T] = null)}>
+        </span>
+      {/if}
+      <!-- use the 'as any' type assertion to tell the compiler that we know
+      what we're doing with the assignment -->
+      <button type="button" onclick={() => ((record as any)[fieldName as keyof T] = "")}>
         <Icon
           icon="feather:x-circle"
           width="24px"
@@ -63,7 +81,20 @@
       <input
         id="attachment"
         type="file"
-        onchange={(e) => (record[fieldName as keyof T] = e.target?.files[0])}
+        onchange={(e) => {
+          const target = e.target as HTMLInputElement;
+          if (target.files) {
+            newFileName = target.files[0].name;
+            /*
+              This line produces an ownership_invalid_mutation svelte error in the
+              console at runtime. It's possible this is an issue with Svelte 5, or
+              perhaps we can try to reimplement this component in a way that
+              binds the field itself to the file input rather than the record and
+              fieldName.
+            */
+            (record as any)[fieldName as keyof T] = target.files[0];
+          }
+        }}
         name="attachment"
       />
     {/if}
