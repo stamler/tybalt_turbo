@@ -5,6 +5,7 @@
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DsFileSelect from "$lib/components/DsFileSelect.svelte";
+  import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { PurchaseOrdersPageData } from "$lib/svelte-types";
@@ -59,6 +60,18 @@
       {item.name}
     {/snippet}
   </DsSelector>
+
+  {#if $globalStore.jobsIndex !== null}
+    <DsAutoComplete
+      bind:value={item.job as string}
+      index={$globalStore.jobsIndex}
+      {errors}
+      fieldName="job"
+      uiName="Job"
+    >
+      {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+    </DsAutoComplete>
+  {/if}
 
   <span class="flex w-full flex-col gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
     <label for="date">Date</label>

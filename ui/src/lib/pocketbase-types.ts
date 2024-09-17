@@ -140,6 +140,7 @@ export type PurchaseOrdersRecord = {
   type: PurchaseOrdersTypeOptions;
   uid: RecordIdString;
   vendor_name: string;
+  job: RecordIdString;
 };
 
 export type TimeEntriesRecord = {
