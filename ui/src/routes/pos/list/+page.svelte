@@ -114,8 +114,8 @@
 
 {#snippet actions({ id }: PurchaseOrdersResponse)}
   <a href="/pos/{id}/edit">edit</a>
-  <!-- <button type="button" onclick={() => approve(id)}>approve</button>
-  <button type="button" onclick={() => reject(id)}>reject</button> -->
+  <button type="button" onclick={() => approve(id)}>approve</button>
+  <button type="button" onclick={() => reject(id)}>reject</button>
   <button type="button" onclick={() => del(id)}>delete</button>
 {/snippet}
 
