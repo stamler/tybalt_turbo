@@ -11,13 +11,13 @@ import (
 
 // We need to instantiate a Collection object to be part of the Record object
 // so everything works as expected
-var collection = &models.Collection{
+var timeEntriesCollection = &models.Collection{
 	Name:   "time_entries",
 	Type:   "base",
 	System: false,
 }
 
-func buildRecordFromMap(m map[string]any) *models.Record {
+func buildRecordFromMap(collection *models.Collection, m map[string]any) *models.Record {
 	record := models.NewRecord(collection)
 	record.Load(m)
 	return record
@@ -67,37 +67,37 @@ func TestValidateTimeEntry(t *testing.T) {
 		// NB: the time_type value is arbitrary and is required but otherwise not
 		// validated in this test. It is an id of a relation and is validated by the
 		// pocketbase relation itself.
-		"valid no job":              {timeTypeCode: "R", valid: true, record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"valid with job":            {timeTypeCode: "R", valid: true, record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.5, "hours": 6.5, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
-		"valid leap year":           {timeTypeCode: "R", valid: true, record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-02-29", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"invalid date":              {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-32", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"missing date":              {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"invalid date string":       {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "20240122", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"invalid leap year":         {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2023-02-29", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"hours not multiple of 0.5": {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 1.4, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"work record without job":   {timeTypeCode: "R", valid: false, field: "work_record", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
-		"missing division":          {timeTypeCode: "R", valid: false, field: "division", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"too many hours":            {timeTypeCode: "R", valid: false, field: "global", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 18.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"no hours":                  {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.0, "hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"bad work_record value":     {timeTypeCode: "R", valid: false, field: "work_record", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.5, "hours": 5.0, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "F23-137-", "payout_request_amount": 0.0})},
-		"no job, missing hours":     {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.0, "hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
-		"description too short":     {timeTypeCode: "R", valid: false, field: "description", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.5, "hours": 5.0, "job": "JOBID1234567890", "description": "tiny", "work_record": "", "payout_request_amount": 0})},
+		"valid no job":              {timeTypeCode: "R", valid: true, record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"valid with job":            {timeTypeCode: "R", valid: true, record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.5, "hours": 6.5, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
+		"valid leap year":           {timeTypeCode: "R", valid: true, record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-02-29", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"invalid date":              {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-32", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"missing date":              {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"invalid date string":       {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "20240122", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"invalid leap year":         {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2023-02-29", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"hours not multiple of 0.5": {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 1.4, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"work record without job":   {timeTypeCode: "R", valid: false, field: "work_record", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
+		"missing division":          {timeTypeCode: "R", valid: false, field: "division", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"too many hours":            {timeTypeCode: "R", valid: false, field: "global", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 18.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"no hours":                  {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.0, "hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"bad work_record value":     {timeTypeCode: "R", valid: false, field: "work_record", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.5, "hours": 5.0, "job": "JOBID1234567890", "description": "This is more than 5 chars", "work_record": "F23-137-", "payout_request_amount": 0.0})},
+		"no job, missing hours":     {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.0, "hours": 0.0, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"description too short":     {timeTypeCode: "R", valid: false, field: "description", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 0.5, "hours": 5.0, "job": "JOBID1234567890", "description": "tiny", "work_record": "", "payout_request_amount": 0})},
 
 		// Vacation, Sick, Personal, Holiday, Bereavement
-		"valid vacation":                {timeTypeCode: "OV", valid: true, record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8, "description": "This is more than 5 chars"})},
-		"valid sick":                    {timeTypeCode: "OS", valid: true, record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8, "description": "This is more than 5 chars"})},
-		"valid vacation no description": {timeTypeCode: "OV", valid: true, record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8})},
-		"vacation missing hours":        {timeTypeCode: "OV", valid: false, field: "hours", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "description": "This is more than 5 chars"})},
-		"vac description too short":     {timeTypeCode: "OV", valid: false, field: "description", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8, "description": "tiny"})},
-		"ppto description too short":    {timeTypeCode: "OP", valid: false, field: "description", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8, "description": "tiny"})},
+		"valid vacation":                {timeTypeCode: "OV", valid: true, record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8, "description": "This is more than 5 chars"})},
+		"valid sick":                    {timeTypeCode: "OS", valid: true, record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8, "description": "This is more than 5 chars"})},
+		"valid vacation no description": {timeTypeCode: "OV", valid: true, record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8})},
+		"vacation missing hours":        {timeTypeCode: "OV", valid: false, field: "hours", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "description": "This is more than 5 chars"})},
+		"vac description too short":     {timeTypeCode: "OV", valid: false, field: "description", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8, "description": "tiny"})},
+		"ppto description too short":    {timeTypeCode: "OP", valid: false, field: "description", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8, "description": "tiny"})},
 
 		// Bank Time, Overtime Off Request
-		"valid bank time":            {timeTypeCode: "RB", valid: true, record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8})},
-		"valid overtime off request": {timeTypeCode: "OTO", valid: true, record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "payout_request_amount": 100.0})},
-		"bank time missing date":     {timeTypeCode: "RB", valid: false, field: "date", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "hours": 8})},
-		"OTO no amount":              {timeTypeCode: "OTO", valid: false, field: "payout_request_amount", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22"})},
-		"negative OTO amount":        {timeTypeCode: "OTO", valid: false, field: "payout_request_amount", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "payout_request_amount": -100.0})},
-		"fractional OTO amount":      {timeTypeCode: "OTO", valid: false, field: "payout_request_amount", record: buildRecordFromMap(map[string]any{"time_type": "dummy", "date": "2024-01-22", "payout_request_amount": 132.001})},
+		"valid bank time":            {timeTypeCode: "RB", valid: true, record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "hours": 8})},
+		"valid overtime off request": {timeTypeCode: "OTO", valid: true, record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "payout_request_amount": 100.0})},
+		"bank time missing date":     {timeTypeCode: "RB", valid: false, field: "date", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "hours": 8})},
+		"OTO no amount":              {timeTypeCode: "OTO", valid: false, field: "payout_request_amount", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22"})},
+		"negative OTO amount":        {timeTypeCode: "OTO", valid: false, field: "payout_request_amount", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "payout_request_amount": -100.0})},
+		"fractional OTO amount":      {timeTypeCode: "OTO", valid: false, field: "payout_request_amount", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "payout_request_amount": 132.001})},
 	}
 
 	// Run tests
