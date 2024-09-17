@@ -15,7 +15,7 @@
 @request.auth.id != "" &&
 
 // no po_number is submitted
-@request.data.po_number:isset = false &&
+(@request.data.po_number:isset = false || @request.data.po_number = "") &&
 
 // status is Unapproved
 @request.data.status = "Unapproved" &&
