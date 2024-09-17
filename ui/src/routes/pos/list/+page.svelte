@@ -67,6 +67,12 @@
 {/snippet}
 
 {#snippet line2(item: PurchaseOrdersResponse)}
+  {#if item.job !== ""}
+    <span>
+      {item.expand.job.number} - {item.expand.job.client}
+      {item.expand.job.description}
+    </span>
+  {/if}
   {#if item.approved !== ""}
     <span>
       Approved by
