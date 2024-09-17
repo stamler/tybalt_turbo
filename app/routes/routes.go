@@ -100,48 +100,6 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		return nil
 	})
 
-	// Add the create purchase order route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/po",
-			Handler: createPurchaseOrderHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the update purchase order route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPut,
-			Path:    "/api/po/:id",
-			Handler: updatePurchaseOrderHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the delete purchase order route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodDelete,
-			Path:    "/api/po/:id",
-			Handler: deletePurchaseOrderHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
 	// Add the approve purchase order route
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
@@ -170,4 +128,17 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		return nil
 	})
 
+	// Add the cancel purchase order route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/po/:id/cancel",
+			Handler: cancelPurchaseOrderHandler(app),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
 }

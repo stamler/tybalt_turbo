@@ -24,6 +24,28 @@
       alert(error.data.message);
     }
   }
+
+  async function approve(id: string): Promise<void> {
+    try {
+      await pb.send(`/api/po/${id}/approve`, {
+        method: "POST",
+      });
+    } catch (error: any) {
+      console.error(JSON.stringify(error));
+      alert(error.data.message);
+    }
+  }
+
+  async function reject(id: string): Promise<void> {
+    try {
+      await pb.send(`/api/po/${id}/reject`, {
+        method: "POST",
+      });
+    } catch (error: any) {
+      console.error(JSON.stringify(error));
+      alert(error.data.message);
+    }
+  }
 </script>
 
 {#snippet anchor(item: PurchaseOrdersResponse)}{item.date}{/snippet}
@@ -86,6 +108,8 @@
 
 {#snippet actions({ id }: PurchaseOrdersResponse)}
   <a href="/pos/{id}/edit">edit</a>
+  <!-- <button type="button" onclick={() => approve(id)}>approve</button>
+  <button type="button" onclick={() => reject(id)}>reject</button> -->
   <button type="button" onclick={() => del(id)}>delete</button>
 {/snippet}
 
