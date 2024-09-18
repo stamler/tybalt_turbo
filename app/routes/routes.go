@@ -90,7 +90,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
-			Path:    "/api/reject-timesheet",
+			Path:    "/api/time_sheets/:id/reject",
 			Handler: createRejectTimesheetHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
@@ -104,7 +104,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
-			Path:    "/api/po/:id/approve",
+			Path:    "/api/purchase_orders/:id/approve",
 			Handler: approvePurchaseOrderHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
@@ -118,7 +118,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
-			Path:    "/api/po/:id/reject",
+			Path:    "/api/purchase_orders/:id/reject",
 			Handler: rejectPurchaseOrderHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
@@ -132,7 +132,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
-			Path:    "/api/po/:id/cancel",
+			Path:    "/api/purchase_orders/:id/cancel",
 			Handler: cancelPurchaseOrderHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),

@@ -7,7 +7,10 @@
   import type { PageData } from "./$types";
   import type { PurchaseOrdersResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
+  import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
+
+  let rejectModal: RejectModal;
 
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
@@ -28,7 +31,7 @@
 
   async function approve(id: string): Promise<void> {
     try {
-      await pb.send(`/api/po/${id}/approve`, {
+      await pb.send(`/api/purchase_orders/${id}/approve`, {
         method: "POST",
       });
     } catch (error: any) {
@@ -36,14 +39,8 @@
     }
   }
 
-  async function reject(id: string): Promise<void> {
-    try {
-      await pb.send(`/api/po/${id}/reject`, {
-        method: "POST",
-      });
-    } catch (error: any) {
-      globalStore.addError(error?.response?.message);
-    }
+  function openRejectModal(poId: string) {
+    rejectModal?.openModal(poId);
   }
 </script>
 
@@ -114,10 +111,11 @@
 {#snippet actions({ id }: PurchaseOrdersResponse)}
   <a href="/pos/{id}/edit">edit</a>
   <button type="button" onclick={() => approve(id)}>approve</button>
-  <button type="button" onclick={() => reject(id)}>reject</button>
+  <button type="button" onclick={() => openRejectModal(id)}>reject</button>
   <button type="button" onclick={() => del(id)}>delete</button>
 {/snippet}
 
+<RejectModal collectionName="purchase_orders" bind:this={rejectModal} />
 <DsList
   items={items as PurchaseOrdersResponse[]}
   search={true}

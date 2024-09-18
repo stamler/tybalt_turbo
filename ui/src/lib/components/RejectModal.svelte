@@ -3,7 +3,9 @@
   import { fade } from "svelte/transition";
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
+  import type { CollectionName } from "$lib/stores/global";
 
+  let { collectionName }: { collectionName: string } = $props();
   let show = $state(false);
   let itemId = $state("");
   let rejectionReason = $state("");
@@ -18,20 +20,21 @@
     itemId = id;
   }
 
-  async function rejectTimeSheet() {
+  async function rejectRecord() {
     try {
-      await pb.send("/api/reject-timesheet", {
+      await pb.send(`/api/${collectionName}/${itemId}/reject`, {
         method: "POST",
-        body: JSON.stringify({ timeSheetId: itemId, rejectionReason }),
+        body: JSON.stringify({ rejectionReason }),
         headers: {
           "Content-Type": "application/json",
         },
       });
 
-      globalStore.refresh("time_sheets");
+      globalStore.refresh(collectionName as CollectionName);
       closeModal();
     } catch (error) {
-      console.error("Error rejecting timesheet:", error);
+      globalStore.addError(error?.response?.message);
+      closeModal();
     }
   }
 </script>
@@ -57,7 +60,7 @@
         ></textarea>
       </div>
       <div class="px-2 pb-2 pt-1">
-        <button onclick={rejectTimeSheet}>Reject</button>
+        <button onclick={rejectRecord}>Reject</button>
         <button onclick={closeModal}>Cancel</button>
       </div>
     </div>

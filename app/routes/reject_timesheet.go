@@ -15,19 +15,22 @@ import (
 func createRejectTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 	// This route handles the rejection of a timesheet.
 	// It performs the following actions:
-	// 1. Validates the request body for a valid timesheet ID and rejection reason.
-	// 2. Retrieves the authenticated user's ID.
-	// 3. Runs a database transaction to:
+	// 1. Gets the timesheet ID from the URL.
+	// 2. Validates the request body for a valid rejection reason.
+	// 3. Retrieves the authenticated user's ID.
+	// 4. Runs a database transaction to:
 	//    a. Fetch the timesheet by ID.
 	//    b. Verify that the authenticated user is the assigned approver.
 	//    c. Check if the timesheet is submitted and not locked or already rejected.
 	//    d. Set the rejection timestamp, reason, and rejector.
 	//    e. Save the updated timesheet.
-	// 4. Returns a success message if rejected, or an error message if any checks fail.
+	// 5. Returns a success message if rejected, or an error message if any checks fail.
 	// This ensures that only valid, submitted timesheets can be rejected by the correct user.
 	return func(c echo.Context) error {
+
+		id := c.PathParam("id")
+
 		var req struct {
-			TimeSheetId     string `json:"timeSheetId"`
 			RejectionReason string `json:"rejectionReason"`
 		}
 		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
@@ -38,7 +41,7 @@ func createRejectTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 		userId := authRecord.Id
 
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-			timeSheet, err := txDao.FindRecordById("time_sheets", req.TimeSheetId)
+			timeSheet, err := txDao.FindRecordById("time_sheets", id)
 			if err != nil {
 				return fmt.Errorf("error fetching time sheet: %v", err)
 			}

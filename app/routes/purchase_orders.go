@@ -141,28 +141,37 @@ func rejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 		var req struct {
 			RejectionReason string `json:"rejection_reason"`
 		}
+
 		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
+				"message": "you must provide a rejection reason",
+				"code":    "invalid_request_body",
+			})
 		}
 
 		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
 		userId := authRecord.Id
 
-		var transactionError error
 		var httpResponseStatusCode int
 
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
 			// Fetch existing purchase order
 			po, err := txDao.FindRecordById("purchase_orders", id)
 			if err != nil {
-				return c.JSON(http.StatusNotFound, map[string]string{"error": "Purchase order not found"})
+				httpResponseStatusCode = http.StatusNotFound
+				return &CodeError{
+					Code:    "po_not_found",
+					Message: fmt.Sprintf("error fetching purchase order: %v", err),
+				}
 			}
 
 			// Check if the purchase order is unapproved
 			if po.Get("status") != "Unapproved" {
-				transactionError = fmt.Errorf("only unapproved purchase orders can be rejected")
 				httpResponseStatusCode = http.StatusBadRequest
-				return transactionError
+				return &CodeError{
+					Code:    "po_not_unapproved",
+					Message: "only unapproved purchase orders can be rejected",
+				}
 			}
 
 			// Check if the user is the approver or a qualified second approver
@@ -172,11 +181,15 @@ func rejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			if !isApprover {
 				secondApproverClaim := po.Get("second_approver_claim")
 				if secondApproverClaim != nil {
-					userClaims, err := txDao.FindRecordsByFilter("user_claims", "user = {:userId}", "", 0, 0, dbx.Params{
+					userClaims, err := txDao.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
 						"userId": userId,
 					})
 					if err != nil {
-						return fmt.Errorf("error fetching user claims: %v", err)
+						httpResponseStatusCode = http.StatusInternalServerError
+						return &CodeError{
+							Code:    "error_fetching_user_claims",
+							Message: fmt.Sprintf("error fetching user claims: %v", err),
+						}
 					}
 					for _, claim := range userClaims {
 						if claim.Get("claim") == secondApproverClaim {
@@ -188,9 +201,11 @@ func rejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			}
 
 			if !isApprover && !isSecondApprover {
-				transactionError = fmt.Errorf("you are not authorized to reject this purchase order")
 				httpResponseStatusCode = http.StatusForbidden
-				return transactionError
+				return &CodeError{
+					Code:    "unauthorized_rejection",
+					Message: "you are not authorized to reject this purchase order",
+				}
 			}
 
 			// Update the purchase order
@@ -199,15 +214,22 @@ func rejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			po.Set("rejector", userId)
 
 			if err := txDao.SaveRecord(po); err != nil {
-				return fmt.Errorf("error updating purchase order: %v", err)
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_updating_purchase_order",
+					Message: fmt.Sprintf("error updating purchase order: %v", err),
+				}
 			}
 
 			return nil
 		})
 
 		if err != nil {
-			if transactionError != nil {
-				return c.JSON(httpResponseStatusCode, map[string]string{"error": transactionError.Error()})
+			if codeError, ok := err.(*CodeError); ok {
+				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+					"message": codeError.Message,
+					"code":    codeError.Code,
+				})
 			}
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}

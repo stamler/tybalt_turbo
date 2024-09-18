@@ -100,7 +100,7 @@
 {/snippet}
 
 <ShareModal bind:this={shareModal} collectionName="time_sheet_reviewers" />
-<RejectModal bind:this={rejectModal} />
+<RejectModal collectionName="time_sheets" bind:this={rejectModal} />
 
 <!-- Show the list of items here -->
 <DsList
