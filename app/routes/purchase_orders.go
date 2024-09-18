@@ -107,13 +107,19 @@ func approvePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 				po.Set("status", "Active")
 				poNumber, err := generatePONumber(txDao)
 				if err != nil {
-					return fmt.Errorf("error generating PO number: %v", err)
+					return &CodeError{
+						Code:    "error_generating_po_number",
+						Message: fmt.Sprintf("error generating PO number: %v", err),
+					}
 				}
 				po.Set("po_number", poNumber)
 			}
 
 			if err := txDao.SaveRecord(po); err != nil {
-				return fmt.Errorf("error updating purchase order: %v", err)
+				return &CodeError{
+					Code:    "error_updating_purchase_order",
+					Message: fmt.Sprintf("error updating purchase order: %v", err),
+				}
 			}
 
 			return nil
@@ -130,7 +136,21 @@ func approvePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Purchase order approved successfully"})
+		// return the updated purchase order from the database
+		updatedPO, err := app.Dao().FindRecordById("purchase_orders", id)
+		if err != nil {
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+
+		// Expand the new purchase order
+		if errs := app.Dao().ExpandRecord(updatedPO, []string{"uid.profiles_via_uid", "approver.profiles_via_uid", "division", "job"}, nil); len(errs) > 0 {
+			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+				"message": fmt.Sprintf("error expanding record: %v", errs),
+				"code":    "error_expanding_record",
+			})
+		}
+		// return the updated purchase order as a JSON response
+		return c.JSON(http.StatusOK, updatedPO)
 	}
 }
 
@@ -252,7 +272,7 @@ func generatePONumber(txDao *daos.Dao) (string, error) {
 	existingPOs, err := txDao.FindRecordsByFilter(
 		"purchase_orders",
 		"po_number ~ {:prefix}",
-		"po_number DESC",
+		"-po_number",
 		1,
 		0,
 		dbx.Params{"prefix": prefix},

@@ -31,8 +31,19 @@
 
   async function approve(id: string): Promise<void> {
     try {
-      await pb.send(`/api/purchase_orders/${id}/approve`, {
+      const response = await pb.send(`/api/purchase_orders/${id}/approve`, {
         method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // replace the item in the list with the updated item
+      items = items?.map((item) => {
+        if (item.id === id) {
+          return response as PurchaseOrdersResponse;
+        }
+        return item;
       });
     } catch (error: any) {
       globalStore.addError(error?.response?.message);
