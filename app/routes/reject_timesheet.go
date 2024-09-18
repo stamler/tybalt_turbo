@@ -34,41 +34,70 @@ func createRejectTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			RejectionReason string `json:"rejectionReason"`
 		}
 		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+			return c.JSON(http.StatusBadRequest, map[string]interface{}{
+				"message": "you must provide a rejection reason",
+				"code":    "invalid_request_body",
+			})
 		}
 
 		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
 		userId := authRecord.Id
 
+		var httpResponseStatusCode int
+
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
 			timeSheet, err := txDao.FindRecordById("time_sheets", id)
 			if err != nil {
-				return fmt.Errorf("error fetching time sheet: %v", err)
+				httpResponseStatusCode = http.StatusNotFound
+				return &CodeError{
+					Code:    "record_not_found",
+					Message: fmt.Sprintf("error fetching time sheet: %v", err),
+				}
 			}
 
 			// Check if the user is the approver
 			if timeSheet.GetString("approver") != userId {
-				return fmt.Errorf("you are not authorized to reject this time sheet")
+				httpResponseStatusCode = http.StatusUnauthorized
+				return &CodeError{
+					Code:    "rejection_unauthorized",
+					Message: "you are not authorized to reject this time sheet",
+				}
 			}
 
 			// Check if the timesheet is submitted
 			if !timeSheet.GetBool("submitted") {
-				return fmt.Errorf("only submitted time sheets can be rejected")
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "timesheet_not_submitted",
+					Message: "only submitted time sheets can be rejected",
+				}
 			}
 
 			// Check if the timesheet is locked
 			if timeSheet.GetBool("locked") {
-				return fmt.Errorf("locked time sheets cannot be rejected")
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "timesheet_locked",
+					Message: "locked time sheets cannot be rejected",
+				}
 			}
 
 			// Check if the timesheet is already rejected
 			if timeSheet.GetBool("rejected") {
-				return fmt.Errorf("this time sheet is already rejected")
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "timesheet_already_rejected",
+					Message: "this time sheet is already rejected",
+				}
 			}
 
 			// Check if the rejection reason is at least 4 characters long
 			if len(req.RejectionReason) < 4 {
-				return fmt.Errorf("rejection reason must be at least 4 characters long")
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "rejection_reason_too_short",
+					Message: "rejection reason must be at least 4 characters long",
+				}
 			}
 
 			// Set the rejection timestamp, reason, and rejector
@@ -78,14 +107,24 @@ func createRejectTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 
 			// Save the updated timesheet
 			if err := txDao.SaveRecord(timeSheet); err != nil {
-				return fmt.Errorf("error saving time sheet: %v", err)
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "timesheet_save_error",
+					Message: fmt.Sprintf("error saving time sheet: %v", err),
+				}
 			}
 
 			return nil
 		})
 
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+			if codeError, ok := err.(*CodeError); ok {
+				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+					"message": codeError.Message,
+					"code":    codeError.Code,
+				})
+			}
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
 		return c.JSON(http.StatusOK, map[string]string{"message": "Timesheet rejected successfully"})
