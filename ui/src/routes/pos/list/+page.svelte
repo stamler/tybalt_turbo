@@ -1,4 +1,5 @@
 <script lang="ts">
+  import Icon from "@iconify/svelte";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
@@ -55,7 +56,18 @@
   }
 </script>
 
-{#snippet anchor(item: PurchaseOrdersResponse)}{item.date}{/snippet}
+{#snippet anchor(item: PurchaseOrdersResponse)}
+  <span class="flex flex-col items-center">
+    {#if item.status === "Unapproved"}
+      {item.date}
+    {:else}
+      {item.po_number}
+    {/if}
+    <button onclick={() => navigator.clipboard.writeText(JSON.stringify(item))}>
+      <Icon icon="mdi:clipboard-outline" width="24px" />
+    </button>
+  </span>
+{/snippet}
 
 {#snippet headline({ total, payment_type, vendor_name }: PurchaseOrdersResponse)}
   <span>${total} {payment_type} / {vendor_name}</span>
@@ -65,11 +77,15 @@
   <span>{description}</span>
 {/snippet}
 
-{#snippet line1({ expand }: PurchaseOrdersResponse)}
+{#snippet line1(item: PurchaseOrdersResponse)}
   <span>
-    {expand?.uid.expand?.profiles_via_uid.given_name}
-    {expand?.uid.expand?.profiles_via_uid.surname} / {expand?.division.name}
-    division
+    {item.expand?.uid.expand?.profiles_via_uid.given_name}
+    {item.expand?.uid.expand?.profiles_via_uid.surname}
+    {#if item.status !== "Unapproved"}
+      ({shortDate(item.date)})
+    {/if}
+    / {item.expand?.division.code}
+    {item.expand?.division.name}
   </span>
 {/snippet}
 
@@ -80,43 +96,46 @@
       {item.expand.job.description}
     </span>
   {/if}
-  {#if item.approved !== ""}
-    <span>
-      Approved by
-      {item.expand.approver.expand?.profiles_via_uid.given_name}
-      {item.expand.approver.expand?.profiles_via_uid.surname}
-      on {shortDate(item.approved)}
-    </span>
-  {/if}
-  {#if item.second_approver !== "" && item.second_approval !== ""}
-    <span>
-      / Approved by
-      {item.expand.second_approver.expand?.profiles_via_uid.given_name}
-      {item.expand.second_approver.expand?.profiles_via_uid.surname}
-      as {item.second_approver_claim.toUpperCase()} on {shortDate(item.second_approval)}
-    </span>
-  {/if}
 {/snippet}
 {#snippet line3(item: PurchaseOrdersResponse)}
-  <!-- if the item is recurring, show the frequency -->
-  {#if item.type === "Recurring"}
-    <DsLabel color="cyan">
-      Recurring {item.frequency} until {shortDate(item.end_date, true)}
-    </DsLabel>
-  {:else if item.type === "Cumulative"}
-    <DsLabel color="teal">Cumulative</DsLabel>
-  {/if}
-  <button onclick={() => navigator.clipboard.writeText(JSON.stringify(item))}>
-    Copy JSON to clipboard
-  </button>
-  {#if item.attachment}
-    <a
-      href={`${PUBLIC_POCKETBASE_URL}/api/files/${item.collectionId}/${item.id}/${item.attachment}`}
-      target="_blank"
-    >
-      <DsFileLink filename={item.attachment as string} />
-    </a>
-  {/if}
+  <span class="flex items-center gap-1">
+    <!-- if the item is recurring, show the frequency -->
+    {#if item.type === "Recurring"}
+      <DsLabel color="cyan">
+        <!-- Perhaps use Japanese character for monthly payment-->
+        <Icon icon="mdi:recurring-payment" width="24px" class="inline-block" />
+        {item.frequency} until {shortDate(item.end_date, true)}
+      </DsLabel>
+    {:else if item.type === "Cumulative"}
+      <DsLabel color="teal">
+        <!-- <Icon icon="mdi:chart-bell-curve-cumulative" width="24px" class="inline-block" /> -->
+        <Icon icon="mdi:sigma" width="24px" class="inline-block" />
+      </DsLabel>
+    {/if}
+    {#if item.approved !== ""}
+      <Icon icon="material-symbols:order-approve-outline" width="24px" class="inline-block" />
+      {item.expand.approver.expand?.profiles_via_uid.given_name}
+      {item.expand.approver.expand?.profiles_via_uid.surname}
+      ({shortDate(item.approved)})
+    {/if}
+    {#if item.second_approver !== "" && item.second_approval !== ""}
+      <span class="flex items-center gap-1">
+        /
+        <Icon icon="material-symbols:order-approve-outline" width="24px" class="inline-block" />
+        {item.expand.second_approver.expand?.profiles_via_uid.given_name}
+        {item.expand.second_approver.expand?.profiles_via_uid.surname}
+        as {item.second_approver_claim.toUpperCase()} ({shortDate(item.second_approval)})
+      </span>
+    {/if}
+    {#if item.attachment}
+      <a
+        href={`${PUBLIC_POCKETBASE_URL}/api/files/${item.collectionId}/${item.id}/${item.attachment}`}
+        target="_blank"
+      >
+        <DsFileLink filename={item.attachment as string} />
+      </a>
+    {/if}
+  </span>
 {/snippet}
 
 {#snippet actions({ id }: PurchaseOrdersResponse)}
