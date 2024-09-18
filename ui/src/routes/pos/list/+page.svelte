@@ -6,6 +6,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
   import type { PurchaseOrdersResponse } from "$lib/pocketbase-types";
+  import { globalStore } from "$lib/stores/global";
   import { shortDate } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
@@ -31,8 +32,7 @@
         method: "POST",
       });
     } catch (error: any) {
-      console.error(JSON.stringify(error));
-      alert(error.data.message);
+      globalStore.addError(error?.response?.message);
     }
   }
 
@@ -42,8 +42,7 @@
         method: "POST",
       });
     } catch (error: any) {
-      console.error(JSON.stringify(error));
-      alert(error.data.message);
+      globalStore.addError(error?.response?.message);
     }
   }
 </script>
