@@ -2,6 +2,7 @@
   import Icon from "@iconify/svelte";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import DsActionButton from "$lib/components/DsActionButton.svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
@@ -63,9 +64,12 @@
     {:else}
       {item.po_number}
     {/if}
-    <button onclick={() => navigator.clipboard.writeText(JSON.stringify(item))}>
-      <Icon icon="mdi:clipboard-outline" width="24px" />
-    </button>
+    <DsActionButton
+      action={() => navigator.clipboard.writeText(JSON.stringify(item))}
+      icon="mdi:clipboard-outline"
+      title="Copy"
+      color="blue"
+    />
   </span>
 {/snippet}
 
@@ -139,10 +143,15 @@
 {/snippet}
 
 {#snippet actions({ id }: PurchaseOrdersResponse)}
-  <a href="/pos/{id}/edit">edit</a>
-  <button type="button" onclick={() => approve(id)}>approve</button>
-  <button type="button" onclick={() => openRejectModal(id)}>reject</button>
-  <button type="button" onclick={() => del(id)}>delete</button>
+  <DsActionButton action={`/pos/${id}/edit`} icon="mdi:edit-outline" title="Edit" color="blue" />
+  <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+  <DsActionButton
+    action={() => openRejectModal(id)}
+    icon="icon-park-outline:reject"
+    title="Reject"
+    color="orange"
+  />
+  <DsActionButton action={() => del(id)} icon="mdi:delete-outline" title="Delete" color="red" />
 {/snippet}
 
 <RejectModal collectionName="purchase_orders" bind:this={rejectModal} />
