@@ -147,7 +147,7 @@
   <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
   <DsActionButton
     action={() => openRejectModal(id)}
-    icon="icon-park-outline:reject"
+    icon="mdi:cancel"
     title="Reject"
     color="orange"
   />

@@ -69,7 +69,7 @@
       what we're doing with the assignment -->
       <DsActionButton
         action={() => ((record as any)[fieldName as keyof T] = "")}
-        icon="feather:x-circle"
+        icon="mdi:delete"
         title="Remove"
         color="red"
       />

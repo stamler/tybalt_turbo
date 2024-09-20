@@ -86,7 +86,7 @@
               </span>
               <DsActionButton
                 action={() => deleteViewer(reviewer.id)}
-                icon="feather:x-circle"
+                icon="mdi:delete"
                 color="red"
                 title="Remove Viewer"
               />
