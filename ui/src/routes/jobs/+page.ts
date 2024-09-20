@@ -8,7 +8,7 @@ export const load: PageLoad = async () => {
   try {
     // load required data
     items = await pb.collection("jobs").getFullList({
-      // the - symbol means descending order
+      expand: "categories_via_job",
       sort: "-number",
     });
     return {

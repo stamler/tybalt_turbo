@@ -58,14 +58,20 @@
 
 {#snippet anchor({ number }: JobsResponse)}{number}{/snippet}
 {#snippet headline({ description }: JobsResponse)}{description}{/snippet}
-
+{#snippet line1({ expand }: JobsResponse)}
+  <span class="flex gap-1">
+    {#each expand?.categories_via_job as category}
+      <span class="rounded-sm border border-cyan-100 bg-cyan-50 px-1">{category.name}</span>
+    {/each}
+  </span>
+{/snippet}
 {#snippet actions({ id }: JobsResponse)}
   <DsActionButton action="/details/{id}" icon="mdi:more-circle" title="More Details" color="blue" />
   <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}
 
 <!-- Show the list of items here -->
-<DsList items={items as JobsResponse[]} search={true} {anchor} {headline} {actions} />
+<DsList items={items as JobsResponse[]} search={true} {anchor} {headline} {line1} {actions} />
 
 <!-- Create a new job -->
 <form class="flex w-full flex-col items-center gap-2 p-2">

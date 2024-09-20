@@ -7,6 +7,7 @@ import type { RecordService } from "pocketbase";
 
 export enum Collections {
   AdminProfiles = "admin_profiles",
+  Categories = "categories",
   Claims = "claims",
   Divisions = "divisions",
   Jobs = "jobs",
@@ -63,6 +64,11 @@ export type AdminProfilesRecord = {
   opening_ov: number;
   payroll_id: string;
   skip_min_time_check: AdminProfilesSkipMinTimeCheckOptions;
+};
+
+export type CategoriesRecord = {
+  job: RecordIdString;
+  name: string;
 };
 
 export type ClaimsRecord = {
@@ -241,13 +247,19 @@ type UsersRecordExpands = {
   profiles_via_uid: ProfilesResponse;
 };
 
+type JobsRecordExpands = {
+  categories_via_job: CategoriesResponse[];
+};
 // Response types include system fields and match responses from the PocketBase API
 export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRecord> &
+  BaseSystemFields<Texpand>;
+export type CategoriesResponse<Texpand = unknown> = Required<CategoriesRecord> &
   BaseSystemFields<Texpand>;
 export type ClaimsResponse<Texpand = unknown> = Required<ClaimsRecord> & BaseSystemFields<Texpand>;
 export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
   BaseSystemFields<Texpand>;
-export type JobsResponse<Texpand = unknown> = Required<JobsRecord> & BaseSystemFields<Texpand>;
+export type JobsResponse<Texpand = JobsRecordExpands> = Required<JobsRecord> &
+  BaseSystemFields<Texpand>;
 export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
   BaseSystemFields<Texpand>;
 export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYearEndDatesRecord> &
@@ -275,6 +287,7 @@ export type UsersResponse<Texpand = UsersRecordExpands> = Required<UsersRecord> 
 
 export type CollectionRecords = {
   admin_profiles: AdminProfilesRecord;
+  categories: CategoriesRecord;
   claims: ClaimsRecord;
   divisions: DivisionsRecord;
   jobs: JobsRecord;
@@ -293,6 +306,7 @@ export type CollectionRecords = {
 
 export type CollectionResponses = {
   admin_profiles: AdminProfilesResponse;
+  categories: CategoriesResponse;
   claims: ClaimsResponse;
   divisions: DivisionsResponse;
   jobs: JobsResponse;
@@ -314,6 +328,7 @@ export type CollectionResponses = {
 
 export type TypedPocketBase = PocketBase & {
   collection(idOrName: "admin_profiles"): RecordService<AdminProfilesResponse>;
+  collection(idOrName: "categories"): RecordService<CategoriesResponse>;
   collection(idOrName: "claims"): RecordService<ClaimsResponse>;
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
   collection(idOrName: "jobs"): RecordService<JobsResponse>;
