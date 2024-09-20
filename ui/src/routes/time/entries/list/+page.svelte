@@ -1,6 +1,7 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
+  import DsActionButton from "$lib/components/DSActionButton.svelte";
   import type { PageData } from "./$types";
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
@@ -88,8 +89,13 @@
 {/snippet}
 
 {#snippet actions({ id }: TimeEntriesResponse)}
-  <a href="/time/entries/{id}/edit">edit</a>
-  <button type="button" onclick={() => del(id)}>delete</button>
+  <DsActionButton
+    action={`/time/entries/${id}/edit`}
+    icon="mdi:edit-outline"
+    title="Edit"
+    color="blue"
+  />
+  <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}
 
 {#snippet groupHeader(field: string)}
@@ -148,7 +154,12 @@
     {/if}
   </div>
   <div class="flex items-center gap-1 px-2 py-2">
-    <button onclick={() => bundle(groupKey)}>submit</button>
+    <DsActionButton
+      action={() => bundle(groupKey)}
+      icon="mdi:box-up"
+      title="Submit"
+      color="purple"
+    />
   </div>
 {/snippet}
 <DsList

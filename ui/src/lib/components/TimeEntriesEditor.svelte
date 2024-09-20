@@ -5,6 +5,7 @@
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DsAutoComplete from "./DSAutoComplete.svelte";
+  import DsActionButton from "./DSActionButton.svelte";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
@@ -220,15 +221,9 @@
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       {#if !jobNumbersInDescription}
-        <button
-          type="button"
-          onclick={save}
-          class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300"
-        >
-          Save
-        </button>
+        <DsActionButton action={save}>Save</DsActionButton>
       {/if}
-      <button type="button" onclick={() => goto("/time/entries/list")}> Cancel </button>
+      <DsActionButton action="/time/entries/list">Cancel</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

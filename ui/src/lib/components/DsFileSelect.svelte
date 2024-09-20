@@ -7,6 +7,7 @@
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import type { BaseSystemFields } from "$lib/pocketbase-types";
   import DsFileLink from "./DsFileLink.svelte";
+  import DsActionButton from "./DSActionButton.svelte";
 
   // get an id for this instance from the counter in the module context then
   // increment it so the next instance gets a different id
@@ -66,13 +67,12 @@
       {/if}
       <!-- use the 'as any' type assertion to tell the compiler that we know
       what we're doing with the assignment -->
-      <button type="button" onclick={() => ((record as any)[fieldName as keyof T] = "")}>
-        <Icon
-          icon="feather:x-circle"
-          width="24px"
-          class="inline-block text-neutral-500 hover:text-neutral-800"
-        />
-      </button>
+      <DsActionButton
+        action={() => ((record as any)[fieldName as keyof T] = "")}
+        icon="feather:x-circle"
+        title="Remove"
+        color="red"
+      />
     {:else}
       <input
         id="attachment"

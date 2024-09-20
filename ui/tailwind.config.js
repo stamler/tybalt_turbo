@@ -16,7 +16,7 @@ export default {
     },
     {
       // DsHoverIcon colors
-      pattern: /text-(green|red|blue|yellow|purple|orange|gray)-(500|800)/,
+      pattern: /(text|bg)-(green|red|blue|yellow|purple|orange|gray)-(200|300|500|800)/,
       variants: ["hover", "active"],
     },
     "active:shadow-inner",

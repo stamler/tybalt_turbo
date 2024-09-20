@@ -4,7 +4,7 @@
   import { pb } from "$lib/pocketbase";
   import type { JobsResponse } from "$lib/pocketbase-types";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
-
+  import DsActionButton from "$lib/components/DSActionButton.svelte";
   let { data }: { data: PageData } = $props();
 
   let errors = $state({} as any);
@@ -31,7 +31,7 @@
       errors = {};
 
       // clear the item
-      item = { ...defaultItem };
+      clearForm();
     } catch (error: any) {
       errors = error.data.data;
     }
@@ -49,14 +49,19 @@
       alert(error.data.message);
     }
   }
+
+  function clearForm() {
+    item = { ...defaultItem };
+    errors = {};
+  }
 </script>
 
 {#snippet anchor({ number }: JobsResponse)}{number}{/snippet}
 {#snippet headline({ description }: JobsResponse)}{description}{/snippet}
 
 {#snippet actions({ id }: JobsResponse)}
-  <a href="/details/{id}">details</a>
-  <button type="button" onclick={() => del(id)}>delete</button>
+  <DsActionButton action="/details/{id}" icon="mdi:more-circle" title="More Details" color="blue" />
+  <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}
 
 <!-- Show the list of items here -->
@@ -73,14 +78,8 @@
   />
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
-      <button
-        type="button"
-        onclick={save}
-        class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300"
-      >
-        Save
-      </button>
-      <button type="button"> Cancel </button>
+      <DsActionButton action={save}>Save</DsActionButton>
+      <DsActionButton action={clearForm}>Clear</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

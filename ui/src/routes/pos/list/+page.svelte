@@ -2,7 +2,7 @@
   import Icon from "@iconify/svelte";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
-  import DsActionButton from "$lib/components/DsActionButton.svelte";
+  import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
@@ -151,7 +151,7 @@
     title="Reject"
     color="orange"
   />
-  <DsActionButton action={() => del(id)} icon="mdi:delete-outline" title="Delete" color="red" />
+  <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}
 
 <RejectModal collectionName="purchase_orders" bind:this={rejectModal} />

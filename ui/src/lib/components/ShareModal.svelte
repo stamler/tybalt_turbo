@@ -1,5 +1,6 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
+  import DsActionButton from "./DSActionButton.svelte";
   import { fade } from "svelte/transition";
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
@@ -83,13 +84,12 @@
                 {reviewer.expand?.reviewer.expand["profiles(uid)"].surname},
                 {reviewer.expand?.reviewer.expand["profiles(uid)"].given_name}
               </span>
-              <button onclick={() => deleteViewer(reviewer.id)}>
-                <Icon
-                  icon="feather:x-circle"
-                  width="24px"
-                  class="inline-block text-neutral-500 hover:text-neutral-800"
-                />
-              </button>
+              <DsActionButton
+                action={() => deleteViewer(reviewer.id)}
+                icon="feather:x-circle"
+                color="red"
+                title="Remove Viewer"
+              />
             </span>
           {/each}
         </div>
@@ -103,17 +103,16 @@
               </option>
             {/each}
           </select>
-          <button onclick={addViewer}>
-            <Icon
-              icon="feather:plus-circle"
-              width="24px"
-              class="inline-block text-neutral-500 hover:text-neutral-800"
-            />
-          </button>
+          <DsActionButton
+            action={addViewer}
+            icon="feather:plus-circle"
+            color="green"
+            title="Add Viewer"
+          />
         </span>
       </div>
-      <div class="px-2 pb-2 pt-1">
-        <button onclick={closeModal}>Close</button>
+      <div class="gap-2">
+        <DsActionButton action={closeModal}>Close</DsActionButton>
       </div>
     </div>
   </div>

@@ -6,6 +6,7 @@
   import type { Snippet } from "svelte";
   import MiniSearch from "minisearch";
   import type { SearchResult } from "minisearch";
+  import DsActionButton from "./DSActionButton.svelte";
 
   // get an id for this instance from the counter in the module context then
   // increment it so the next instance gets a different id
@@ -86,13 +87,7 @@
       <label for={`autocomplete-input-${thisId}`}>{uiName}</label>
       {#if value !== ""}
         <span>{@render resultTemplate(item)}</span>
-        <button
-          type="button"
-          onclick={clearValue}
-          class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300"
-        >
-          Clear
-        </button>
+        <DsActionButton action={clearValue}>Clear</DsActionButton>
       {:else}
         <input
           class="flex-1 rounded border border-neutral-300 px-1"

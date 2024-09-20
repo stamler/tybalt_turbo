@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from "@iconify/svelte";
+  import DsActionButton from "./DSActionButton.svelte";
   import { fade } from "svelte/transition";
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
@@ -59,9 +59,9 @@
           class="rounded bg-neutral-700 p-2"
         ></textarea>
       </div>
-      <div class="px-2 pb-2 pt-1">
-        <button onclick={rejectRecord}>Reject</button>
-        <button onclick={closeModal}>Cancel</button>
+      <div class="gap-2">
+        <DsActionButton action={rejectRecord}>Reject</DsActionButton>
+        <DsActionButton action={closeModal}>Cancel</DsActionButton>
       </div>
     </div>
   </div>

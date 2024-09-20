@@ -9,6 +9,7 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { PurchaseOrdersPageData } from "$lib/svelte-types";
+  import DsActionButton from "./DSActionButton.svelte";
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
 
@@ -178,10 +179,8 @@
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
-      <button type="submit" class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300">
-        Save
-      </button>
-      <button type="button" onclick={() => goto("/pos/list")}>Cancel</button>
+      <DsActionButton type="submit">Save</DsActionButton>
+      <DsActionButton action="/pos/list">Cancel</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

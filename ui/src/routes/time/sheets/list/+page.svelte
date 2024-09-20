@@ -1,6 +1,7 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
+  import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { globalStore } from "$lib/stores/global";
   import { goto } from "$app/navigation";
   import ShareModal from "$lib/components/ShareModal.svelte";
@@ -89,14 +90,22 @@
   <span>Viewers, Reviewed</span>
 {/snippet}
 {#snippet actions({ id, approved }: TimeSheetTally)}
-  <button onclick={() => unbundle(id)}>recall</button>
+  <DsActionButton action={() => unbundle(id)} icon="mdi:rewind" title="Recall" color="orange" />
   {#if approved === ""}
-    <button onclick={() => approve(id)}>approve</button>
+    <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
   {/if}
-  <button onclick={() => openRejectModal(id)}>reject</button>
-  <button title="share with another manager" onclick={() => shareModal?.openModal(id)}>
-    share
-  </button>
+  <DsActionButton
+    action={() => openRejectModal(id)}
+    icon="icon-park-outline:reject"
+    title="Reject"
+    color="orange"
+  />
+  <DsActionButton
+    action={() => shareModal?.openModal(id)}
+    icon="mdi:ios-share"
+    title="Share with another manager"
+    color="purple"
+  />
 {/snippet}
 
 <ShareModal bind:this={shareModal} collectionName="time_sheet_reviewers" />

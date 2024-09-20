@@ -2,6 +2,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsTokenInput from "$lib/components/DSTokenInput.svelte";
+  import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { pb } from "$lib/pocketbase";
   import type { TimeTypesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
@@ -70,10 +71,10 @@
 
 <!-- Create a new job -->
 <form class="flex w-full flex-col items-center gap-2 p-2">
-  <DsTextInput bind:value={item.code} {errors} fieldName="code" uiName="Code" />
-  <DsTextInput bind:value={item.name} {errors} fieldName="name" uiName="Name" />
+  <DsTextInput bind:value={item.code as string} {errors} fieldName="code" uiName="Code" />
+  <DsTextInput bind:value={item.name as string} {errors} fieldName="name" uiName="Name" />
   <DsTextInput
-    bind:value={item.description}
+    bind:value={item.description as string}
     {errors}
     fieldName="description"
     uiName="Description"
@@ -92,14 +93,8 @@
   />
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
-      <button
-        type="button"
-        onclick={save}
-        class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300"
-      >
-        Save
-      </button>
-      <button type="button"> Cancel </button>
+      <DsActionButton action={save}>Save</DsActionButton>
+      <DsActionButton action={clearForm}>Cancel</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

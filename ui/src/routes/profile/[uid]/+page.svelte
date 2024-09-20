@@ -3,12 +3,18 @@
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
+  import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { globalStore } from "$lib/stores/global";
   import type { CollectionName } from "$lib/stores/global";
+  import type {
+    ManagersResponse,
+    ProfilesResponse,
+    DivisionsResponse,
+  } from "$lib/pocketbase-types";
 
   let { data }: { data: PageData } = $props();
   let errors = $state({} as any);
-  let item = data.item;
+  let item = data.item as ProfilesResponse;
 
   const collectionAges = $derived.by(() => {
     // return an array of objects with the key and age of the corresponding
@@ -50,13 +56,18 @@
 </script>
 
 <form class="flex w-full flex-col gap-2 p-2">
-  <DsTextInput bind:value={item.given_name} {errors} fieldName="given_name" uiName="Given Name" />
-  <DsTextInput bind:value={item.surname} {errors} fieldName="surname" uiName="Surname" />
-  {#snippet managerOptionTemplate(item)}
+  <DsTextInput
+    bind:value={item.given_name as string}
+    {errors}
+    fieldName="given_name"
+    uiName="Given Name"
+  />
+  <DsTextInput bind:value={item.surname as string} {errors} fieldName="surname" uiName="Surname" />
+  {#snippet managerOptionTemplate(item: ManagersResponse)}
     {item.surname}, {item.given_name}
   {/snippet}
   <DsSelector
-    bind:value={item.manager}
+    bind:value={item.manager as string}
     items={$globalStore.managers}
     {errors}
     optionTemplate={managerOptionTemplate}
@@ -64,18 +75,18 @@
     uiName="Manager"
   />
   <DsSelector
-    bind:value={item.alternate_manager}
+    bind:value={item.alternate_manager as string}
     items={$globalStore.managers}
     {errors}
     optionTemplate={managerOptionTemplate}
     fieldName="alternate_manager"
     uiName="Alternate Manager"
   />
-  {#snippet divisionsOptionTemplate(item)}
+  {#snippet divisionsOptionTemplate(item: DivisionsResponse)}
     {item.code} - {item.name}
   {/snippet}
   <DsSelector
-    bind:value={item.default_division}
+    bind:value={item.default_division as string}
     items={$globalStore.divisions}
     {errors}
     optionTemplate={divisionsOptionTemplate}
@@ -83,9 +94,7 @@
     uiName="Default Division"
   />
   <span class="flex w-full gap-2">
-    <button type="button" onclick={save} class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300">
-      Save
-    </button>
+    <DsActionButton action={save}>Save</DsActionButton>
   </span>
   <p>Store ages:</p>
   <ul>

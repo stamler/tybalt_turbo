@@ -1,6 +1,6 @@
 <script lang="ts">
   import { globalStore } from "$lib/stores/global";
-
+  import DsActionButton from "$lib/components/DSActionButton.svelte";
   function dismissError(id: string) {
     globalStore.dismissError(id);
   }
@@ -11,12 +11,7 @@
     {#each $globalStore.errorMessages as error}
       <div class="mb-2 flex items-center justify-between text-red-800 last:mb-0">
         <span>{error.message}</span>
-        <button
-          class="ml-4 text-red-600 hover:text-red-800"
-          on:click={() => dismissError(error.id)}
-        >
-          Dismiss
-        </button>
+        <DsActionButton action={() => dismissError(error.id)} color="red">Dismiss</DsActionButton>
       </div>
     {/each}
   </div>

@@ -5,7 +5,7 @@
 <script lang="ts" generics="T extends HasId">
   import type { Snippet } from "svelte";
   import type { HasId } from "$lib/pocketbase-types";
-
+  import DsActionButton from "./DSActionButton.svelte";
   // get an id for this instance from the counter in the module context then
   // increment it so the next instance gets a different id
   const thisId = idCounter;
@@ -48,13 +48,7 @@
       {/each}
     </select>
     {#if clear === true && value !== undefined && value !== ""}
-      <button
-        type="button"
-        onclick={clearValue}
-        class="rounded-sm bg-yellow-200 px-1 hover:bg-yellow-300"
-      >
-        Clear
-      </button>
+      <DsActionButton action={clearValue} title="Clear">Clear</DsActionButton>
     {/if}
   </span>
   {#if errors[fieldName] !== undefined}
