@@ -1,9 +1,7 @@
 <script lang="ts">
   import { flatpickrAction } from "$lib/utilities";
-  import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
-  import DsSelector from "$lib/components/DSSelector.svelte";
   import { goto } from "$app/navigation";
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
@@ -29,6 +27,42 @@
     } catch (error: any) {
       errors = error.data.data;
     }
+  }
+  let newCategory = $state("");
+
+  async function addCategory() {
+    if (newCategory.trim() === "") return;
+
+    try {
+      const category = await pb.collection("categories").create(
+        {
+          job: item.id,
+          name: newCategory.trim(),
+        },
+        { returnRecord: true },
+      );
+
+      categories.push(category);
+      newCategory = "";
+    } catch (error: any) {
+      errors.categories = error.data.data;
+    }
+  }
+
+  async function removeCategory(categoryId: string) {
+    try {
+      await pb.collection("categories").delete(categoryId);
+      categories = categories.filter((category) => category.id !== categoryId);
+    } catch (error: any) {
+      alert(error.data.message);
+    }
+  }
+
+  function preventDefault(fn: (event: Event) => void) {
+    return (event: Event) => {
+      event.preventDefault();
+      fn(event);
+    };
   }
 </script>
 
@@ -77,6 +111,40 @@
     uiName="Description"
   />
 
+  <div class="flex w-full flex-col gap-2 {errors.categories !== undefined ? 'bg-red-200' : ''}">
+    <label for="categories">Categories</label>
+    <div class="flex flex-wrap gap-1">
+      {#each categories as category}
+        <span class="flex items-center rounded-full bg-neutral-200 px-2">
+          <span>{category.name}</span>
+          <button
+            class="text-neutral-500"
+            onclick={preventDefault(() => removeCategory(category.id))}
+          >
+            &times;
+          </button>
+        </span>
+      {/each}
+    </div>
+    <div class="flex items-center gap-1">
+      <DsTextInput
+        bind:value={newCategory as string}
+        {errors}
+        fieldName="newCategory"
+        uiName="Add Category"
+      />
+      <DsActionButton
+        action={addCategory}
+        icon="feather:plus-circle"
+        color="green"
+        title="Add Category"
+      />
+    </div>
+    {#if errors.categories !== undefined}
+      <span class="text-red-600">{errors.categories.message}</span>
+    {/if}
+  </div>
+
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <DsActionButton type="submit">Save</DsActionButton>
@@ -87,23 +155,3 @@
     {/if}
   </div>
 </form>
-
-<!-- Create a new job (from the list page) -->
-<!-- <form class="flex w-full flex-col items-center gap-2 p-2">
-  <DsTextInput bind:value={item.number as string} {errors} fieldName="number" uiName="Job Number" />
-  <DsTextInput
-    bind:value={item.description as string}
-    {errors}
-    fieldName="description"
-    uiName="Description"
-  />
-  <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
-    <span class="flex w-full gap-2">
-      <DsActionButton action={save}>Save</DsActionButton>
-      <DsActionButton action={clearForm}>Clear</DsActionButton>
-    </span>
-    {#if errors.global !== undefined}
-      <span class="text-red-600">{errors.global.message}</span>
-    {/if}
-  </div>
-</form> -->
