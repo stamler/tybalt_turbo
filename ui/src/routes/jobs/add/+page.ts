@@ -9,5 +9,10 @@ export const load: PageLoad<JobsPageData> = async () => {
   };
 
   const defaultCategories = [] as string[];
-  return { item: { ...defaultItem } as JobsRecord, editing: false, id: null, categories: defaultCategories };
+  return {
+    item: { ...defaultItem } as JobsRecord,
+    editing: false,
+    id: null,
+    categories: defaultCategories,
+  };
 };

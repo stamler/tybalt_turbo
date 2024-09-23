@@ -16,6 +16,11 @@ export const load: PageLoad<JobsPageData> = async ({ params }) => {
     return { item, editing: true, id: params.jid, categories };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);
-    return { item: { ...defaultItem } as JobsRecord, editing: false, id: null, categories: defaultCategories };
+    return {
+      item: { ...defaultItem } as JobsRecord,
+      editing: false,
+      id: null,
+      categories: defaultCategories,
+    };
   }
 };
