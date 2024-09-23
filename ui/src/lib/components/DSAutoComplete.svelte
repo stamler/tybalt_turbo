@@ -103,12 +103,14 @@
     {#if errors[fieldName] !== undefined}
       <span class="text-red-600">{errors[fieldName].message}</span>
     {/if}
-    <ul class="suggestions">
-      {#each results as choice, index}
-        <li class="result" class:bg-blue-400={index === selectedIndex}>
-          {@render resultTemplate(choice)}
-        </li>
-      {/each}
-    </ul>
+    {#if results.length > 0}
+      <ul class="suggestions">
+        {#each results as choice, index}
+          <li class="result" class:bg-blue-400={index === selectedIndex}>
+            {@render resultTemplate(choice)}
+          </li>
+        {/each}
+      </ul>
+    {/if}
   </div>
 </div>
