@@ -12,14 +12,37 @@
   let item = $state(data.item);
   let categories = $state(data.categories);
 
+  let newCategory = $state("");
+  let newCategories = $state([] as string[]);
+  let categoriesToDelete = $state([] as string[]);
+
   async function save(event: Event) {
     event.preventDefault();
 
     try {
-      if (data.editing && data.id !== null) {
-        await pb.collection("jobs").update(data.id, item);
+      let jobId = data.id;
+
+      if (data.editing && jobId !== null) {
+        await pb.collection("jobs").update(jobId, item);
       } else {
-        await pb.collection("jobs").create(item);
+        const createdJob = await pb.collection("jobs").create(item);
+        jobId = createdJob.id;
+      }
+
+      // Add new categories
+      for (const categoryName of newCategories) {
+        await pb.collection("categories").create(
+          {
+            job: jobId,
+            name: categoryName.trim(),
+          },
+          { returnRecord: true },
+        );
+      }
+
+      // Remove deleted categories
+      for (const categoryId of categoriesToDelete) {
+        await pb.collection("categories").delete(categoryId);
       }
 
       errors = {};
@@ -28,34 +51,17 @@
       errors = error.data.data;
     }
   }
-  let newCategory = $state("");
 
   async function addCategory() {
     if (newCategory.trim() === "") return;
 
-    try {
-      const category = await pb.collection("categories").create(
-        {
-          job: item.id,
-          name: newCategory.trim(),
-        },
-        { returnRecord: true },
-      );
-
-      categories.push(category);
-      newCategory = "";
-    } catch (error: any) {
-      errors.categories = error.data.data;
-    }
+    newCategories.push(newCategory.trim());
+    newCategory = "";
   }
 
   async function removeCategory(categoryId: string) {
-    try {
-      await pb.collection("categories").delete(categoryId);
-      categories = categories.filter((category) => category.id !== categoryId);
-    } catch (error: any) {
-      alert(error.data.message);
-    }
+    categoriesToDelete.push(categoryId);
+    categories = categories.filter((category) => category.id !== categoryId);
   }
 
   function preventDefault(fn: (event: Event) => void) {
@@ -120,6 +126,19 @@
           <button
             class="text-neutral-500"
             onclick={preventDefault(() => removeCategory(category.id))}
+          >
+            &times;
+          </button>
+        </span>
+      {/each}
+      {#each newCategories as categoryName}
+        <span class="flex items-center rounded-full bg-neutral-200 px-2">
+          <span>{categoryName}</span>
+          <button
+            class="text-neutral-500"
+            onclick={preventDefault(
+              () => (newCategories = newCategories.filter((name) => name !== categoryName)),
+            )}
           >
             &times;
           </button>
