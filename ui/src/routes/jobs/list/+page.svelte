@@ -3,7 +3,6 @@
   import type { PageData } from "./$types";
   import { pb } from "$lib/pocketbase";
   import type { JobsResponse } from "$lib/pocketbase-types";
-  import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   let { data }: { data: PageData } = $props();
 
@@ -66,29 +65,10 @@
   </span>
 {/snippet}
 {#snippet actions({ id }: JobsResponse)}
+  <DsActionButton action="/jobs/{id}/edit" icon="mdi:pencil" title="Edit" color="blue" />
   <DsActionButton action="/details/{id}" icon="mdi:more-circle" title="More Details" color="blue" />
   <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}
 
 <!-- Show the list of items here -->
 <DsList items={items as JobsResponse[]} search={true} {anchor} {headline} {line1} {actions} />
-
-<!-- Create a new job -->
-<form class="flex w-full flex-col items-center gap-2 p-2">
-  <DsTextInput bind:value={item.number as string} {errors} fieldName="number" uiName="Job Number" />
-  <DsTextInput
-    bind:value={item.description as string}
-    {errors}
-    fieldName="description"
-    uiName="Description"
-  />
-  <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
-    <span class="flex w-full gap-2">
-      <DsActionButton action={save}>Save</DsActionButton>
-      <DsActionButton action={clearForm}>Clear</DsActionButton>
-    </span>
-    {#if errors.global !== undefined}
-      <span class="text-red-600">{errors.global.message}</span>
-    {/if}
-  </div>
-</form>

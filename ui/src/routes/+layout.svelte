@@ -45,7 +45,8 @@
   <a href="/time/entries/list">Entries</a>
   <a href="/time/sheets/list">Sheets</a>
   <a href="/time/off">Off</a>
-  <a href="/jobs">Jobs</a>
+  <a href="/jobs/list">Jobs</a>
+  <a href="/jobs/add">New Job</a>
   <a href="/timetypes">Time Types</a>
   <a href="/divisions">Divisions</a>
   <div class="h-full">
