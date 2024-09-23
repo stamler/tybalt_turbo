@@ -12,7 +12,10 @@ export const load: PageLoad<JobsPageData> = async ({ params }) => {
   let item: JobsRecord;
   try {
     item = await pb.collection("jobs").getOne(params.jid);
-    const categories = await pb.collection("categories").getFullList();
+    const categories = await pb.collection("categories").getFullList({
+      filter: `job="${params.jid}"`,
+      sort: "name",
+    });
     return { item, editing: true, id: params.jid, categories };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);
