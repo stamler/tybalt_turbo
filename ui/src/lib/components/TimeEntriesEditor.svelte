@@ -9,7 +9,12 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
-  import type { JobsRecord, TimeTypesRecord, DivisionsRecord } from "$lib/pocketbase-types";
+  import type {
+    JobsRecord,
+    TimeTypesRecord,
+    DivisionsRecord,
+    CategoriesResponse,
+  } from "$lib/pocketbase-types";
 
   let { data }: { data: TimeEntriesPageData } = $props();
 
@@ -55,6 +60,29 @@
       })
       .includes(item.time_type);
   }
+
+  let categories = $state([] as CategoriesResponse[]);
+
+  // Fetch categories for the given job
+  async function fetchCategories(jobId: string) {
+    try {
+      const response = await pb.collection("categories").getFullList({
+        filter: `job="${jobId}"`,
+        sort: "name",
+      });
+      categories = response;
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      categories = [];
+    }
+  }
+
+  // Watch for changes to the job and fetch categories accordingly
+  $effect(() => {
+    if (item.job) {
+      fetchCategories(item.job);
+    }
+  });
 
   async function save() {
     // set the uid from the authStore We do it here rather than the
@@ -149,6 +177,20 @@
         {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
       </DsAutoComplete>
     {/if}
+  {/if}
+
+  {#if item.job !== "" && categories.length > 0}
+    <DsSelector
+      bind:value={item.category as string}
+      items={categories}
+      {errors}
+      fieldName="category"
+      uiName="Category"
+    >
+      {#snippet optionTemplate(item: CategoriesResponse)}
+        {item.name}
+      {/snippet}
+    </DsSelector>
   {/if}
 
   {#if item.job && item.job !== "" && item.division && isWorkTime}
