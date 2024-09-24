@@ -55,15 +55,15 @@ export enum AdminProfilesSkipMinTimeCheckOptions {
 }
 export type AdminProfilesRecord = {
   default_charge_out_rate: number;
-  salary: boolean;
-  uid: RecordIdString;
-  work_week_hours: number;
   off_rotation_permitted: boolean;
   opening_date: string;
   opening_op: number;
   opening_ov: number;
   payroll_id: string;
+  salary: boolean;
   skip_min_time_check: AdminProfilesSkipMinTimeCheckOptions;
+  uid: RecordIdString;
+  work_week_hours: number;
 };
 
 export type CategoriesRecord = {
@@ -82,17 +82,22 @@ export type DivisionsRecord = {
 };
 
 export type JobsRecord = {
-  number: string;
   description: string;
+  number: string;
 };
 
 export type ProfilesRecord = {
-  given_name: string;
-  surname: string;
-  manager: RecordIdString;
   alternate_manager: RecordIdString;
   default_division: RecordIdString;
+  given_name: string;
+  manager: RecordIdString;
+  surname: string;
   uid: RecordIdString;
+};
+
+export type ManagersRecord = {
+  given_name: string;
+  surname: string;
 };
 
 export type PayrollYearEndDatesRecord = {
@@ -133,6 +138,7 @@ export type PurchaseOrdersRecord = {
   division: RecordIdString;
   end_date: string;
   frequency: PurchaseOrdersFrequencyOptions;
+  job: RecordIdString;
   payment_type: PurchaseOrdersPaymentTypeOptions;
   po_number: string;
   rejected: IsoDateString;
@@ -146,11 +152,10 @@ export type PurchaseOrdersRecord = {
   type: PurchaseOrdersTypeOptions;
   uid: RecordIdString;
   vendor_name: string;
-  job: RecordIdString;
 };
 
 export type TimeEntriesRecord = {
-  category: string;
+  category: RecordIdString;
   date: string;
   description: string;
   division: RecordIdString;
@@ -159,33 +164,18 @@ export type TimeEntriesRecord = {
   meals_hours: number;
   payout_request_amount: number;
   time_type: RecordIdString;
+  tsid: RecordIdString;
   uid: RecordIdString;
   week_ending: string;
   work_record: string;
-  tsid: RecordIdString;
-};
-
-export type TimeSheetsRecord = {
-  approved: IsoDateString;
-  approver: RecordIdString;
-  locked: boolean;
-  locker: RecordIdString;
-  rejected: boolean;
-  rejection_reason: string;
-  rejector: RecordIdString;
-  submitted: boolean;
-  uid: RecordIdString;
-  salary: boolean;
-  week_ending: string;
-  work_week_hours: number;
 };
 
 export type TimeOffRecord = {
-  name: string;
   last_op: string;
   last_ov: string;
   manager: string;
   manager_uid: RecordIdString;
+  name: string;
   opening_date: string;
   opening_op: number;
   opening_ov: number;
@@ -201,12 +191,27 @@ export type TimeSheetReviewersRecord = {
   time_sheet: RecordIdString;
 };
 
+export type TimeSheetsRecord = {
+  approved: IsoDateString;
+  approver: RecordIdString;
+  locked: boolean;
+  locker: RecordIdString;
+  rejected: boolean;
+  rejection_reason: string;
+  rejector: RecordIdString;
+  salary: boolean;
+  submitted: boolean;
+  uid: RecordIdString;
+  week_ending: string;
+  work_week_hours: number;
+};
+
 export type TimeTypesRecord = {
   allowed_fields: null | string[];
-  required_fields: null | string[];
   code: string;
   description: string;
   name: string;
+  required_fields: null | string[];
 };
 
 export type UserClaimsRecord = {
@@ -216,11 +221,6 @@ export type UserClaimsRecord = {
 
 export type UsersRecord = {
   name: string;
-};
-
-export type ManagersRecord = {
-  given_name: string;
-  surname: string;
 };
 
 type TimeEntriesRecordExpands = {
