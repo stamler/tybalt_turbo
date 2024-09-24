@@ -186,6 +186,7 @@
       {errors}
       fieldName="category"
       uiName="Category"
+      clear={true}
     >
       {#snippet optionTemplate(item: CategoriesResponse)}
         {item.name}

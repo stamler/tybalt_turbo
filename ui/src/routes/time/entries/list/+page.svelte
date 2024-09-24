@@ -77,7 +77,9 @@
   {#if expand?.time_type !== undefined && ["R", "RT"].includes(expand.time_type.code) && job !== ""}
     <span class="flex items-center gap-1">
       {expand?.job.number} - {expand?.job.description}
-      <DsLabel color="teal">{expand?.category.name}</DsLabel>
+      {#if expand?.category !== undefined}
+        <DsLabel color="teal">{expand?.category.name}</DsLabel>
+      {/if}
     </span>
   {/if}
 {/snippet}
