@@ -86,6 +86,7 @@
   rejected,
   expand,
   rejection_reason,
+  status,
 }: PurchaseOrdersResponse)}
   <span class="flex items-center gap-1">
     ${total}
@@ -95,6 +96,14 @@
         <Icon icon="mdi:cancel" width="24px" class="inline-block" />
         {expand?.rejector.expand?.profiles_via_uid.given_name}
         {expand?.rejector.expand?.profiles_via_uid.surname}
+      </DsLabel>
+    {:else if status === "Active"}
+      <DsLabel color="green">
+        <Icon icon="mdi:check" width="24px" class="inline-block" />
+      </DsLabel>
+    {:else if status === "Cancelled"}
+      <DsLabel color="orange">
+        <Icon icon="mdi:cancel" width="24px" class="inline-block" />
       </DsLabel>
     {/if}
   </span>
