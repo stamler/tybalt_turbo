@@ -12,7 +12,7 @@ export default {
     },
     {
       // DsLabel text colors
-      pattern: /text-(cyan|teal)-500/,
+      pattern: /text-(cyan|teal|red)-500/,
     },
     {
       // DsHoverIcon colors
