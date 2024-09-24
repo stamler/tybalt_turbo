@@ -185,6 +185,15 @@ func rejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 				}
 			}
 
+			// Check if the purchase order is already rejected.
+			if !po.GetDateTime("rejected").IsZero() {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "po_already_rejected",
+					Message: "this purchase order has been rejected and cannot be rejected again",
+				}
+			}
+
 			// Check if the purchase order is unapproved
 			if po.Get("status") != "Unapproved" {
 				httpResponseStatusCode = http.StatusBadRequest
@@ -229,7 +238,7 @@ func rejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			}
 
 			// Update the purchase order
-			po.Set("rejected", true)
+			po.Set("rejected", time.Now())
 			po.Set("rejection_reason", req.RejectionReason)
 			po.Set("rejector", userId)
 
