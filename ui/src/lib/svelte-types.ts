@@ -1,4 +1,9 @@
-import type { TimeEntriesRecord, PurchaseOrdersRecord, JobsRecord, CategoriesResponse } from "$lib/pocketbase-types";
+import type {
+  TimeEntriesRecord,
+  PurchaseOrdersRecord,
+  JobsRecord,
+  CategoriesResponse,
+} from "$lib/pocketbase-types";
 
 export interface PageData<T> {
   item: T;

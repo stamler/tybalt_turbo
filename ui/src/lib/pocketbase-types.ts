@@ -227,6 +227,7 @@ type TimeEntriesRecordExpands = {
   time_type: TimeTypesRecord;
   division: DivisionsRecord;
   job: JobsRecord;
+  category: CategoriesRecord;
 };
 
 type TimeSheetReviewersRecordExpands = {

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
+  import DsLabel from "$lib/components/DsLabel.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import type { PageData } from "./$types";
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
@@ -74,8 +75,10 @@
 
 {#snippet line1({ expand, job }: TimeEntriesResponse)}
   {#if expand?.time_type !== undefined && ["R", "RT"].includes(expand.time_type.code) && job !== ""}
-    <span>{expand?.job.number} - {expand?.job.description}</span>
-    <!-- TODO: add job category with expand?.job.category -->
+    <span class="flex items-center gap-1">
+      {expand?.job.number} - {expand?.job.description}
+      <DsLabel color="teal">{expand?.category.name}</DsLabel>
+    </span>
   {/if}
 {/snippet}
 

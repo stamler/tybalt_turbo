@@ -12,7 +12,7 @@ export const load: PageLoad = async ({ depends }) => {
     // load required data
     items = await pb.collection("time_entries").getFullList<TimeEntriesResponse>({
       filter: pb.filter('tsid=""'),
-      expand: "job,time_type,division",
+      expand: "job,time_type,division,category",
       sort: "-date",
     });
     return {
