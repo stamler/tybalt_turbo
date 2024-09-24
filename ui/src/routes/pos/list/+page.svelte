@@ -11,11 +11,17 @@
   import { globalStore } from "$lib/stores/global";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
+  import { invalidate } from "$app/navigation";
 
   let rejectModal: RejectModal;
 
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
+
+  async function refresh() {
+    await invalidate("app:purchaseOrders");
+    items = data.items;
+  }
 
   async function del(id: string): Promise<void> {
     // return immediately if items is not an array
@@ -73,8 +79,25 @@
   </span>
 {/snippet}
 
-{#snippet headline({ total, payment_type, vendor_name }: PurchaseOrdersResponse)}
-  <span>${total} {payment_type} / {vendor_name}</span>
+{#snippet headline({
+  total,
+  payment_type,
+  vendor_name,
+  rejected,
+  expand,
+  rejection_reason,
+}: PurchaseOrdersResponse)}
+  <span class="flex items-center gap-1">
+    ${total}
+    {payment_type} / {vendor_name}
+    {#if rejected !== ""}
+      <DsLabel color="red" title={`${shortDate(rejected)}: ${rejection_reason}`}>
+        <Icon icon="mdi:cancel" width="24px" class="inline-block" />
+        {expand?.rejector.expand?.profiles_via_uid.given_name}
+        {expand?.rejector.expand?.profiles_via_uid.surname}
+      </DsLabel>
+    {/if}
+  </span>
 {/snippet}
 
 {#snippet byline({ description }: PurchaseOrdersResponse)}
@@ -154,7 +177,7 @@
   <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}
 
-<RejectModal collectionName="purchase_orders" bind:this={rejectModal} />
+<RejectModal on:refresh={refresh} collectionName="purchase_orders" bind:this={rejectModal} />
 <DsList
   items={items as PurchaseOrdersResponse[]}
   search={true}

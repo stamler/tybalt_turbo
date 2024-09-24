@@ -4,6 +4,9 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import type { CollectionName } from "$lib/stores/global";
+  import { createEventDispatcher } from "svelte";
+
+  const dispatch = createEventDispatcher();
 
   let { collectionName }: { collectionName: string } = $props();
   let show = $state(false);
@@ -24,7 +27,7 @@
     try {
       await pb.send(`/api/${collectionName}/${itemId}/reject`, {
         method: "POST",
-        body: JSON.stringify({ rejectionReason }),
+        body: JSON.stringify({ rejection_reason: rejectionReason }),
         headers: {
           "Content-Type": "application/json",
         },
@@ -32,6 +35,9 @@
 
       globalStore.refresh(collectionName as CollectionName);
       closeModal();
+
+      // emit event to refresh the page to the parent
+      dispatch("refresh");
     } catch (error) {
       globalStore.addError(error?.response?.message);
       closeModal();

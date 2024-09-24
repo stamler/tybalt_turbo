@@ -242,6 +242,7 @@ type PurchaseOrdersRecordExpands = {
   uid: UsersResponse;
   approver: UsersResponse;
   second_approver: UsersResponse;
+  rejector: UsersResponse;
 };
 
 type UsersRecordExpands = {
