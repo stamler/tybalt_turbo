@@ -1,0 +1,177 @@
+<script lang="ts">
+  import { flatpickrAction, fetchCategories } from "$lib/utilities";
+  import { globalStore } from "$lib/stores/global";
+  import { pb } from "$lib/pocketbase";
+  import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsSelector from "$lib/components/DSSelector.svelte";
+  import DsFileSelect from "$lib/components/DsFileSelect.svelte";
+  import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
+  import { authStore } from "$lib/stores/auth";
+  import { goto } from "$app/navigation";
+  import type { ExpensesPageData } from "$lib/svelte-types";
+  import type { CategoriesResponse } from "$lib/pocketbase-types";
+  import DsActionButton from "./DSActionButton.svelte";
+
+  let { data }: { data: ExpensesPageData } = $props();
+
+  let errors = $state({} as any);
+  let item = $state(data.item);
+
+  let categories = $state([] as CategoriesResponse[]);
+
+  // Watch for changes to the job and fetch categories accordingly
+  $effect(() => {
+    if (item.job) {
+      fetchCategories(item.job).then((c) => (categories = c));
+    }
+  });
+
+  async function save(event: Event) {
+    event.preventDefault();
+    item.uid = $authStore?.model?.id;
+
+    // set a dummy value for week_ending to satisfy the schema non-empty
+    // requirement. This will be changed in the backend to the correct
+    // value every time a record is saved
+    item.pay_period_ending = "2006-01-02";
+
+    // if the job is empty, set the category to empty
+    if (item.job === "") {
+      item.category = "";
+    }
+
+    try {
+      if (data.editing && data.id !== null) {
+        await pb.collection("expenses").update(data.id, item);
+      } else {
+        await pb.collection("expenses").create(item);
+      }
+
+      errors = {};
+      goto("/expenses/list");
+    } catch (error: any) {
+      errors = error.data.data;
+    }
+  }
+</script>
+
+<svelte:head>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
+</svelte:head>
+
+<form
+  class="flex w-full flex-col items-center gap-2 p-2"
+  enctype="multipart/form-data"
+  onsubmit={save}
+>
+  {#if $globalStore.jobsIndex !== null}
+    <DsAutoComplete
+      bind:value={item.job as string}
+      index={$globalStore.jobsIndex}
+      {errors}
+      fieldName="job"
+      uiName="Job"
+    >
+      {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+    </DsAutoComplete>
+  {/if}
+
+  {#if item.job !== "" && categories.length > 0}
+    <DsSelector
+      bind:value={item.category as string}
+      items={categories}
+      {errors}
+      fieldName="category"
+      uiName="Category"
+      clear={true}
+    >
+      {#snippet optionTemplate(item: CategoriesResponse)}
+        {item.name}
+      {/snippet}
+    </DsSelector>
+  {/if}
+
+  <span class="flex w-full flex-col gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
+    <label for="date">Date</label>
+    <input
+      class="flex-1"
+      type="text"
+      name="date"
+      placeholder="Date"
+      use:flatpickrAction
+      bind:value={item.date}
+    />
+    {#if errors.date !== undefined}
+      <span class="text-red-600">{errors.date.message}</span>
+    {/if}
+  </span>
+
+  <DsSelector
+    bind:value={item.division as string}
+    items={$globalStore.divisions}
+    {errors}
+    fieldName="division"
+    uiName="Division"
+  >
+    {#snippet optionTemplate(item)}
+      {item.code} - {item.name}
+    {/snippet}
+  </DsSelector>
+
+  <DsTextInput
+    bind:value={item.description as string}
+    {errors}
+    fieldName="description"
+    uiName="Description"
+  />
+
+  <DsTextInput
+    bind:value={item.total as number}
+    {errors}
+    fieldName="total"
+    uiName="Total"
+    type="number"
+    step={0.01}
+    min={0}
+  />
+
+  <DsSelector
+    bind:value={item.payment_type as string}
+    items={[
+      { id: "OnAccount", name: "On Account" },
+      { id: "Expense", name: "Expense" },
+      { id: "CorporateCreditCard", name: "Corporate Credit Card" },
+      { id: "Allowance", name: "Allowance" },
+      { id: "FuelCard", name: "Fuel Card" },
+      { id: "Mileage", name: "Mileage" },
+      { id: "PersonalReimbursement", name: "Personal Reimbursement" },
+    ]}
+    {errors}
+    fieldName="payment_type"
+    uiName="Payment Type"
+  >
+    {#snippet optionTemplate(item)}
+      {item.name}
+    {/snippet}
+  </DsSelector>
+
+  <DsTextInput
+    bind:value={item.vendor_name as string}
+    {errors}
+    fieldName="vendor_name"
+    uiName="Vendor Name"
+  />
+
+  <!-- File upload for attachment -->
+  <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
+
+  <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
+    <span class="flex w-full gap-2">
+      <DsActionButton type="submit">Save</DsActionButton>
+      <DsActionButton action="/pos/list">Cancel</DsActionButton>
+    </span>
+    {#if errors.global !== undefined}
+      <span class="text-red-600">{errors.global.message}</span>
+    {/if}
+  </div>
+</form>
