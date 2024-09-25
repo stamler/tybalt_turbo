@@ -46,7 +46,7 @@
   {#snippet line2(item: ExpensesResponse)}{JSON.stringify(item)}{/snippet}
   {#snippet actions({ id }: ExpensesResponse)}
     <DsActionButton
-      action={`/time/entries/${id}/edit`}
+      action={`/expenses/${id}/edit`}
       icon="mdi:edit-outline"
       title="Edit"
       color="blue"
