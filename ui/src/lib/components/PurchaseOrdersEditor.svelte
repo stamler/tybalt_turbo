@@ -32,6 +32,11 @@
     event.preventDefault();
     item.uid = $authStore?.model?.id;
 
+    // if the job is empty, set the category to empty
+    if (item.job === "") {
+      item.category = "";
+    }
+
     try {
       if (data.editing && data.id !== null) {
         await pb.collection("purchase_orders").update(data.id, item);
