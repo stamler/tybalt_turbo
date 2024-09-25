@@ -5,6 +5,8 @@ import type {
   IsoDateString,
 } from "$lib/pocketbase-types";
 import { Collections } from "$lib/pocketbase-types";
+import { pb } from "$lib/pocketbase";
+import type { CategoriesResponse } from "$lib/pocketbase-types";
 import flatpickr from "flatpickr";
 
 export interface TimeSheetTally extends BaseSystemFields {
@@ -255,4 +257,22 @@ export function flatpickrAction(node: HTMLElement, options: flatpickr.Options.Op
       instance.destroy();
     },
   };
+}
+
+// Fetch categories for the given job
+export async function fetchCategories(jobId: string): Promise<CategoriesResponse[]> {
+  // if jobId is an empty string, return an empty array
+  if (jobId === "") {
+    return Promise.resolve([] as CategoriesResponse[]);
+  }
+
+  try {
+    return pb.collection("categories").getFullList({
+      filter: `job="${jobId}"`,
+      sort: "name",
+    });
+  } catch (error) {
+    console.error("Error fetching categories:", error);
+    return Promise.resolve([] as CategoriesResponse[]);
+  }
 }

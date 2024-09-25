@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flatpickrAction } from "$lib/utilities";
+  import { flatpickrAction, fetchCategories } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
@@ -63,24 +63,10 @@
 
   let categories = $state([] as CategoriesResponse[]);
 
-  // Fetch categories for the given job
-  async function fetchCategories(jobId: string) {
-    try {
-      const response = await pb.collection("categories").getFullList({
-        filter: `job="${jobId}"`,
-        sort: "name",
-      });
-      categories = response;
-    } catch (error) {
-      console.error("Error fetching categories:", error);
-      categories = [];
-    }
-  }
-
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
     if (item.job) {
-      fetchCategories(item.job);
+      fetchCategories(item.job).then((c) => (categories = c));
     }
   });
 
@@ -97,6 +83,12 @@
     // requirement. This will be changed in the backend to the correct
     // value every time a record is saved
     item.week_ending = "2006-01-02";
+
+    // if the job is empty, set the category and work_record to empty strings
+    if (item.job === "") {
+      item.category = "";
+      item.work_record = "";
+    }
 
     try {
       if (data.editing && data.id !== null) {
