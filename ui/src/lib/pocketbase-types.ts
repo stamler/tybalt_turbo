@@ -10,6 +10,8 @@ export enum Collections {
   Categories = "categories",
   Claims = "claims",
   Divisions = "divisions",
+  ExpenseRates = "expense_rates",
+  Expenses = "expenses",
   Jobs = "jobs",
   Managers = "managers",
   PayrollYearEndDates = "payroll_year_end_dates",
@@ -81,18 +83,61 @@ export type DivisionsRecord = {
   name: string;
 };
 
+export type ExpenseRatesRecord<Tmileage = unknown> = {
+  breakfast: number;
+  dinner: number;
+  effective_date: string;
+  lodging: number;
+  lunch: number;
+  mileage: null | Tmileage;
+};
+
+export enum ExpensesPaymentTypeOptions {
+  "OnAccount" = "OnAccount",
+  "Expense" = "Expense",
+  "CorporateCreditCard" = "CorporateCreditCard",
+  "Allowance" = "Allowance",
+  "FuelCard" = "FuelCard",
+  "Mileage" = "Mileage",
+  "PersonalReimbursement" = "PersonalReimbursement",
+}
+
+export enum ExpensesAllowanceTypesOptions {
+  "Lodging" = "Lodging",
+  "Breakfast" = "Breakfast",
+  "Lunch" = "Lunch",
+  "Dinner" = "Dinner",
+}
+export type ExpensesRecord = {
+  allowance_types: ExpensesAllowanceTypesOptions[];
+  approved: IsoDateString;
+  approver: RecordIdString;
+  attachment: string;
+  category: RecordIdString;
+  cc_last_4_digits: string;
+  committed: IsoDateString;
+  committed_week_ending: string;
+  committer: RecordIdString;
+  date: string;
+  description: string;
+  distance: number;
+  division: RecordIdString;
+  job: RecordIdString;
+  pay_period_ending: string;
+  payment_type: ExpensesPaymentTypeOptions;
+  purchase_order: RecordIdString;
+  rejected: IsoDateString;
+  rejection_reason: string;
+  rejector: RecordIdString;
+  submitted: boolean;
+  total: number;
+  uid: RecordIdString;
+  vendor_name: string;
+};
+
 export type JobsRecord = {
   description: string;
   number: string;
-};
-
-export type ProfilesRecord = {
-  alternate_manager: RecordIdString;
-  default_division: RecordIdString;
-  given_name: string;
-  manager: RecordIdString;
-  surname: string;
-  uid: RecordIdString;
 };
 
 export type ManagersRecord = {
@@ -102,6 +147,15 @@ export type ManagersRecord = {
 
 export type PayrollYearEndDatesRecord = {
   date: string;
+};
+
+export type ProfilesRecord = {
+  alternate_manager: RecordIdString;
+  default_division: RecordIdString;
+  given_name: string;
+  manager: RecordIdString;
+  surname: string;
+  uid: RecordIdString;
 };
 
 export enum PurchaseOrdersStatusOptions {
@@ -262,6 +316,12 @@ export type CategoriesResponse<Texpand = unknown> = Required<CategoriesRecord> &
 export type ClaimsResponse<Texpand = unknown> = Required<ClaimsRecord> & BaseSystemFields<Texpand>;
 export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
   BaseSystemFields<Texpand>;
+export type ExpenseRatesResponse<Tmileage = unknown, Texpand = unknown> = Required<
+  ExpenseRatesRecord<Tmileage>
+> &
+  BaseSystemFields<Texpand>;
+export type ExpensesResponse<Texpand = unknown> = Required<ExpensesRecord> &
+  BaseSystemFields<Texpand>;
 export type JobsResponse<Texpand = JobsRecordExpands> = Required<JobsRecord> &
   BaseSystemFields<Texpand>;
 export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
@@ -294,6 +354,8 @@ export type CollectionRecords = {
   categories: CategoriesRecord;
   claims: ClaimsRecord;
   divisions: DivisionsRecord;
+  expense_rates: ExpenseRatesRecord;
+  expenses: ExpensesRecord;
   jobs: JobsRecord;
   managers: ManagersRecord;
   payroll_year_end_dates: PayrollYearEndDatesRecord;
@@ -313,6 +375,8 @@ export type CollectionResponses = {
   categories: CategoriesResponse;
   claims: ClaimsResponse;
   divisions: DivisionsResponse;
+  expense_rates: ExpenseRatesResponse;
+  expenses: ExpensesResponse;
   jobs: JobsResponse;
   managers: ManagersResponse;
   payroll_year_end_dates: PayrollYearEndDatesResponse;
@@ -335,6 +399,8 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "categories"): RecordService<CategoriesResponse>;
   collection(idOrName: "claims"): RecordService<ClaimsResponse>;
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
+  collection(idOrName: "expense_rates"): RecordService<ExpenseRatesResponse>;
+  collection(idOrName: "expenses"): RecordService<ExpensesResponse>;
   collection(idOrName: "jobs"): RecordService<JobsResponse>;
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
   collection(idOrName: "payroll_year_end_dates"): RecordService<PayrollYearEndDatesResponse>;

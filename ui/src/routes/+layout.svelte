@@ -47,6 +47,7 @@
   <a href="/time/off">Off</a>
   <a href="/jobs/list">Jobs</a>
   <a href="/jobs/add">New Job</a>
+  <a href="/expenses/list">Expenses</a>
   <a href="/timetypes">Time Types</a>
   <a href="/divisions">Divisions</a>
   <div class="h-full">
