@@ -4,13 +4,14 @@
 
 The expenses system depends on the purchase_orders system and the job categories system. So these must be implemented first.
 
-The user can create, edit, delete, and submit expenses with the expenses system. Additionally, the user can view a list of all their expenses. Users who are managers can approve or reject expenses submitted by their direct reports. When an expense is approved, the approved property is set to the current timestamp, otherwise the expense record's approved value is an empty string. When an expense is rejected, the rejected property is set to the current timestamp, the rejector property is set to the id of the user who rejected the expense, and a rejection reason is provided. Expenses must be committed by a user with the commit_expense claim prior to being paid out.
+The user can create, edit, delete, and submit expenses with the expenses system. Additionally, the user can view a list of all their expenses. Each expense has an approver which is set by a hook when the expense is created or updated and is based on the manager of the user who created the expense. This information comes from the user's profile. The approver can approve or reject expenses submitted by their direct reports. When an expense is approved, the approved property is set to the current timestamp, otherwise the expense record's approved value is an empty string. When an expense is rejected, the rejected property is set to the current timestamp, the rejector property is set to the id of the user who rejected the expense, and a rejection reason is provided. Expenses must be committed by a user with the commit_expense claim prior to being paid out.
 
-There are two paths to creating expenses, the first is directly through the new expense page, the second is via submitting an expense against an existing purchase order. There is no facility to specify a PO number when creating an expense from scratch. However,
+There are two paths to creating expenses, the first is directly through the new expense page, the second is via submitting an expense against an existing purchase order. There is no facility to specify a PO number when creating an expense from scratch. If a PO number is required, the user must submit an expense against an existing purchase order.
 
 ### Creating an expense from scratch
 
-The following types of expense can only be created from scratch and a purchase order cannot be specified:
+Remember, a purchase order cannot be specified when creating an expense from scratch.
+The following types of expense can only be created from scratch:
 
 - Allowance
   - Lodging
@@ -18,9 +19,6 @@ The following types of expense can only be created from scratch and a purchase o
 - FuelCard
 - Mileage
 - PersonalReimbursement
-
-The following types of expense can be created from scratch with or without selecting a purchase order:
-
 - CorporateCreditCard under $500
 - Expense under $500
 
