@@ -3,6 +3,7 @@
 package hooks
 
 import (
+	"fmt"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -34,6 +35,45 @@ func generateWeekEnding(date string) (string, error) {
 
 	// return the date as a string
 	return t.Format(time.DateOnly), nil
+}
+
+// generate the pay period ending date from the date property. This is almost
+// exactly the same as generateWeekEnding except that the value returned is
+// every second Saturday rather than every Saturday. Thus we will call
+// generateWeekEnding then check if the result is correct. If it isn't we'll
+// return the date 7 days later.
+func generatePayPeriodEnding(date string) (string, error) {
+	weekEnding, err := generateWeekEnding(date)
+	if err != nil {
+		return "", err
+	}
+
+	// check if the day difference between the weekEnding and the epoch pay period
+	// ending (August 31, 2024) has a remainder of 0 when divided by 14 (modulo
+	// 14). If the remainder is zero, return the week ending. If not, return the
+	// week ending plus 7 days. Remember date is a string in the format
+	// "YYYY-MM-DD" and we don't want to worry about time zones and such.
+	epochPayPeriodEnding, err := time.Parse(time.DateOnly, "2024-08-31")
+	if err != nil {
+		return "", err
+	}
+
+	weekEndingTime, err := time.Parse(time.DateOnly, weekEnding)
+	if err != nil {
+		return "", err
+	}
+
+	intervalHours := weekEndingTime.Sub(epochPayPeriodEnding).Hours()
+	if int(intervalHours/24)%14 == 0 {
+		return weekEnding, nil
+	}
+
+	// check that there isn't an hour error caused by time zone differences
+	if int(intervalHours)%24 != 0 {
+		return "", fmt.Errorf("interval hours is not a multiple of 24")
+	}
+
+	return weekEndingTime.AddDate(0, 0, 7).Format(time.DateOnly), nil
 }
 
 func isPositiveMultipleOfPointFive() validation.RuleFunc {

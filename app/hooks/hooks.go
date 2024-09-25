@@ -38,4 +38,16 @@ func AddHooks(app *pocketbase.PocketBase) {
 		}
 		return nil
 	})
+	app.OnRecordBeforeCreateRequest("expenses").Add(func(e *core.RecordCreateEvent) error {
+		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
+			return err
+		}
+		return nil
+	})
+	app.OnRecordBeforeUpdateRequest("expenses").Add(func(e *core.RecordUpdateEvent) error {
+		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
+			return err
+		}
+		return nil
+	})
 }
