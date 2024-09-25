@@ -133,6 +133,7 @@ export type PurchaseOrdersRecord = {
   attachment: string;
   cancelled: IsoDateString;
   canceller: RecordIdString;
+  category: RecordIdString;
   date: string;
   description: string;
   division: RecordIdString;
@@ -243,6 +244,7 @@ type PurchaseOrdersRecordExpands = {
   approver: UsersResponse;
   second_approver: UsersResponse;
   rejector: UsersResponse;
+  category: CategoriesRecord;
 };
 
 type UsersRecordExpands = {

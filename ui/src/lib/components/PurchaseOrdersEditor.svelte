@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flatpickrAction } from "$lib/utilities";
+  import { flatpickrAction, fetchCategories } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
@@ -9,6 +9,7 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { PurchaseOrdersPageData } from "$lib/svelte-types";
+  import type { CategoriesResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
@@ -17,6 +18,15 @@
   let item = $state(data.item);
 
   const isRecurring = $derived(item.type === "Recurring");
+
+  let categories = $state([] as CategoriesResponse[]);
+
+  // Watch for changes to the job and fetch categories accordingly
+  $effect(() => {
+    if (item.job) {
+      fetchCategories(item.job).then((c) => (categories = c));
+    }
+  });
 
   async function save(event: Event) {
     event.preventDefault();
@@ -72,6 +82,21 @@
     >
       {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
     </DsAutoComplete>
+  {/if}
+
+  {#if item.job !== "" && categories.length > 0}
+    <DsSelector
+      bind:value={item.category as string}
+      items={categories}
+      {errors}
+      fieldName="category"
+      uiName="Category"
+      clear={true}
+    >
+      {#snippet optionTemplate(item: CategoriesResponse)}
+        {item.name}
+      {/snippet}
+    </DsSelector>
   {/if}
 
   <span class="flex w-full flex-col gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
