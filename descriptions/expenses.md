@@ -32,9 +32,9 @@ The following types of expenses can only be created if a purchase order exists:
 ## Pocketbase Collection Schema (expenses)
 
 - date (string, required, YYYY-MM-DD)
-- pay_period_ending (string, required, YYYY-MM-DD, saturday)
+- pay_period_ending (string, required, YYYY-MM-DD, saturday, derived from date)
 - uid (references users collection, required, the user who created the expense)
-- payment_type (enum, required) [Allowance, Expense, FuelCard, Mileage, CorporateCreditCard, PersonalReimbursement] **DEPRECATE FuelOnAccount (do not replace), Meals (replace with Allowance)**
+- payment_type (enum, required) [OnAccount, Expense, CorporateCreditCard, Allowance, FuelCard, Mileage, PersonalReimbursement] **DEPRECATE FuelOnAccount (do not replace), Meals (replace with Allowance)**
 - division (references divisions collection, required)
 - job (references jobs collection)
 - category (references the categories collection, category's job must match the expense's job)
@@ -45,9 +45,9 @@ The following types of expenses can only be created if a purchase order exists:
 - submitted (datetime)
 - committer (references users collection)
 - committed (datetime)
-- committed_week_ending (string, required, YYYY-MM-DD, saturday)
+- committed_week_ending (string, required, YYYY-MM-DD, saturday, derived from committed)
 - description (string, minimum 5 characters)
-- rejected (boolean)
+- rejected (datetime)
 - rejector (references users collection)
 - rejection_reason (string, minimum 5 characters)
 - distance (number)
