@@ -9,7 +9,7 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { ExpensesPageData } from "$lib/svelte-types";
-  import type { CategoriesResponse } from "$lib/pocketbase-types";
+  import type { CategoriesResponse, ExpensesAllowanceTypesOptions } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
 
   let { data }: { data: ExpensesPageData } = $props();
@@ -18,6 +18,14 @@
   let item = $state(data.item);
 
   let categories = $state([] as CategoriesResponse[]);
+
+  // create a local state object to hold the allowance types
+  const allowanceTypes = $state({
+    Breakfast: false,
+    Lunch: false,
+    Dinner: false,
+    Lodging: false,
+  });
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
@@ -39,6 +47,15 @@
     if (item.job === "") {
       item.category = "";
     }
+
+    // set the allowance_types to an array of strings based on the
+    // allowanceTypes object
+    const at = Object.entries(allowanceTypes)
+      .filter(([_, value]) => value)
+      .map(([type]) => type as ExpensesAllowanceTypesOptions);
+
+    // complex types must be assigned using the spread operator
+    item = { ...item, allowance_types: at as ExpensesAllowanceTypesOptions[] };
 
     try {
       if (data.editing && data.id !== null) {
@@ -138,32 +155,47 @@
     </DsSelector>
   {/if}
 
-  <DsTextInput
-    bind:value={item.description as string}
-    {errors}
-    fieldName="description"
-    uiName="Description"
-  />
+  {#if item.payment_type === "Allowance"}
+    <span class="flex w-full gap-4">
+      <label for="allowanceTypes">Type</label>
+      {#each Object.keys(allowanceTypes) as type}
+        <span class="flex items-center gap-1">
+          <input
+            type="checkbox"
+            bind:checked={allowanceTypes[type as keyof typeof allowanceTypes]}
+          />
+          {type}
+        </span>
+      {/each}
+    </span>
+  {:else}
+    <DsTextInput
+      bind:value={item.description as string}
+      {errors}
+      fieldName="description"
+      uiName="Description"
+    />
 
-  <DsTextInput
-    bind:value={item.total as number}
-    {errors}
-    fieldName="total"
-    uiName="Total"
-    type="number"
-    step={0.01}
-    min={0}
-  />
+    <DsTextInput
+      bind:value={item.total as number}
+      {errors}
+      fieldName="total"
+      uiName="Total"
+      type="number"
+      step={0.01}
+      min={0}
+    />
 
-  <DsTextInput
-    bind:value={item.vendor_name as string}
-    {errors}
-    fieldName="vendor_name"
-    uiName="Vendor Name"
-  />
+    <DsTextInput
+      bind:value={item.vendor_name as string}
+      {errors}
+      fieldName="vendor_name"
+      uiName="Vendor Name"
+    />
 
-  <!-- File upload for attachment -->
-  <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
+    <!-- File upload for attachment -->
+    <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
+  {/if}
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">

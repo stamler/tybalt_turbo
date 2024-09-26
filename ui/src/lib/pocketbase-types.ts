@@ -279,26 +279,34 @@ export type UsersRecord = {
 };
 
 type TimeEntriesRecordExpands = {
-  time_type: TimeTypesRecord;
+  category: CategoriesRecord;
   division: DivisionsRecord;
   job: JobsRecord;
-  category: CategoriesRecord;
+  time_type: TimeTypesRecord;
 };
 
 type TimeSheetReviewersRecordExpands = {
-  time_sheet: TimeSheetsRecord;
   reviewer: ManagersRecord;
+  time_sheet: TimeSheetsRecord;
+};
+
+type ExpensesRecordExpands = {
+  approver: UsersResponse;
+  category: CategoriesRecord;
+  division: DivisionsRecord;
+  job: JobsRecord;
+  uid: UsersResponse;
 };
 
 type PurchaseOrdersRecordExpands = {
+  approver: UsersResponse;
+  category: CategoriesRecord;
   division: DivisionsRecord;
   job: JobsRecord;
+  rejector: UsersResponse;
+  second_approver: UsersResponse;
   type: PurchaseOrdersTypeOptions;
   uid: UsersResponse;
-  approver: UsersResponse;
-  second_approver: UsersResponse;
-  rejector: UsersResponse;
-  category: CategoriesRecord;
 };
 
 type UsersRecordExpands = {
@@ -320,7 +328,7 @@ export type ExpenseRatesResponse<Tmileage = unknown, Texpand = unknown> = Requir
   ExpenseRatesRecord<Tmileage>
 > &
   BaseSystemFields<Texpand>;
-export type ExpensesResponse<Texpand = unknown> = Required<ExpensesRecord> &
+export type ExpensesResponse<Texpand = ExpensesRecordExpands> = Required<ExpensesRecord> &
   BaseSystemFields<Texpand>;
 export type JobsResponse<Texpand = JobsRecordExpands> = Required<JobsRecord> &
   BaseSystemFields<Texpand>;

@@ -3,13 +3,12 @@
 package hooks
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"log"
 	"strings"
 	"time"
 
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
@@ -91,24 +90,21 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 			// array of strings. We use this to determine which of the rates to sum
 			// up to get the total allowance for the expense.
 
-			// get the JSON string from the allowance_type property and convert it
-			// to a string slice
-			allowanceType := expenseRecord.GetString("allowance_type")
-			var allowanceTypeAsSlice []string
-			if err := json.Unmarshal([]byte(allowanceType), &allowanceTypeAsSlice); err != nil {
-				return fmt.Errorf("invalid allowance_type format: %v", err)
-			}
+			// get the allowance_types property from the expense record
+			allowanceTypes := expenseRecord.Get("allowance_types").([]string)
 
-			// sum up the rates for the allowance types that are present in the
-			// expense record and build a description of the expense based on the
-			// allowances claimed
+			// sum up the rates for the allowance types that are present
 			total := 0.0
-			allowanceDescription := "Allowance for "
-			for _, allowanceType := range allowanceTypeAsSlice {
-				allowanceDescription += allowanceType + ", "
+			for _, allowanceType := range allowanceTypes {
 				total += expenseRateRecord[0].GetFloat(strings.ToLower(allowanceType))
 			}
 
+			// build a description of the expense by joining the allowance types
+			// with commas
+			allowanceDescription := "Allowance for "
+			allowanceDescription += strings.Join(allowanceTypes, ", ")
+
+			// set the total and description on the expense record
 			expenseRecord.Set("total", total)
 			expenseRecord.Set("description", allowanceDescription)
 		}
@@ -120,7 +116,34 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 // called by ProcessExpense to ensure that the record is in a valid state before
 // it is created or updated.
 func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) error {
-	return nil
+
+	paymentType := expenseRecord.GetString("payment_type")
+	isAllowance := paymentType == "Allowance"
+
+	validationsErrors := validation.Errors{
+		"date": validation.Validate(
+			expenseRecord.Get("date"),
+			validation.Required.Error("date is required"),
+			validation.Date("2006-01-02").Error("must be a valid date"),
+		),
+		"description": validation.Validate(
+			expenseRecord.Get("description"),
+			validation.When(!isAllowance,
+				validation.Required.Error("required for non-allowance expenses"),
+				validation.Length(5, 0).Error("must be at least 5 characters"),
+			),
+		),
+		"vendor_name": validation.Validate(
+			expenseRecord.Get("vendor_name"),
+			validation.When(!isAllowance,
+				validation.Required.Error("vendor_name is required for non-allowance expenses"),
+				validation.Length(2, 0).Error("must be at least 2 characters"),
+			),
+		),
+	}.Filter()
+
+	return validationsErrors
+
 }
 
 // The processExpense function is used to process the expense record. It is
