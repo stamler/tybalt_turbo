@@ -2,7 +2,6 @@ import type { ExpensesRecord } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
 import type { ExpensesPageData } from "$lib/svelte-types";
 
-
 export const load: PageLoad<ExpensesPageData> = async () => {
   const defaultItem = {
     uid: "",
