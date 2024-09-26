@@ -81,7 +81,7 @@
   enctype="multipart/form-data"
   onsubmit={save}
 >
-  <span class="flex w-full flex-col gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
+  <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
     <label for="date">Date</label>
     <input
       class="flex-1"

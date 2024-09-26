@@ -64,6 +64,53 @@
   enctype="multipart/form-data"
   onsubmit={save}
 >
+  <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
+    <label for="date">Date</label>
+    <input
+      class="flex-1"
+      type="text"
+      name="date"
+      placeholder="Date"
+      use:flatpickrAction
+      bind:value={item.date}
+    />
+    {#if errors.date !== undefined}
+      <span class="text-red-600">{errors.date.message}</span>
+    {/if}
+  </span>
+
+  <DsSelector
+    bind:value={item.division as string}
+    items={$globalStore.divisions}
+    {errors}
+    fieldName="division"
+    uiName="Division"
+  >
+    {#snippet optionTemplate(item)}
+      {item.code} - {item.name}
+    {/snippet}
+  </DsSelector>
+
+  <DsSelector
+    bind:value={item.payment_type as string}
+    items={[
+      { id: "OnAccount", name: "On Account" },
+      { id: "Expense", name: "Expense" },
+      { id: "CorporateCreditCard", name: "Corporate Credit Card" },
+      { id: "Allowance", name: "Allowance" },
+      { id: "FuelCard", name: "Fuel Card" },
+      { id: "Mileage", name: "Mileage" },
+      { id: "PersonalReimbursement", name: "Personal Reimbursement" },
+    ]}
+    {errors}
+    fieldName="payment_type"
+    uiName="Payment Type"
+  >
+    {#snippet optionTemplate(item)}
+      {item.name}
+    {/snippet}
+  </DsSelector>
+
   {#if $globalStore.jobsIndex !== null}
     <DsAutoComplete
       bind:value={item.job as string}
@@ -91,33 +138,6 @@
     </DsSelector>
   {/if}
 
-  <span class="flex w-full flex-col gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
-    <label for="date">Date</label>
-    <input
-      class="flex-1"
-      type="text"
-      name="date"
-      placeholder="Date"
-      use:flatpickrAction
-      bind:value={item.date}
-    />
-    {#if errors.date !== undefined}
-      <span class="text-red-600">{errors.date.message}</span>
-    {/if}
-  </span>
-
-  <DsSelector
-    bind:value={item.division as string}
-    items={$globalStore.divisions}
-    {errors}
-    fieldName="division"
-    uiName="Division"
-  >
-    {#snippet optionTemplate(item)}
-      {item.code} - {item.name}
-    {/snippet}
-  </DsSelector>
-
   <DsTextInput
     bind:value={item.description as string}
     {errors}
@@ -134,26 +154,6 @@
     step={0.01}
     min={0}
   />
-
-  <DsSelector
-    bind:value={item.payment_type as string}
-    items={[
-      { id: "OnAccount", name: "On Account" },
-      { id: "Expense", name: "Expense" },
-      { id: "CorporateCreditCard", name: "Corporate Credit Card" },
-      { id: "Allowance", name: "Allowance" },
-      { id: "FuelCard", name: "Fuel Card" },
-      { id: "Mileage", name: "Mileage" },
-      { id: "PersonalReimbursement", name: "Personal Reimbursement" },
-    ]}
-    {errors}
-    fieldName="payment_type"
-    uiName="Payment Type"
-  >
-    {#snippet optionTemplate(item)}
-      {item.name}
-    {/snippet}
-  </DsSelector>
 
   <DsTextInput
     bind:value={item.vendor_name as string}

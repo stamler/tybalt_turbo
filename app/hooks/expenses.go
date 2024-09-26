@@ -3,8 +3,11 @@
 package hooks
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/labstack/echo/v5"
@@ -84,11 +87,30 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 			// breakfast, lunch, dinner, and lodging are all properties on the
 			// expense_rate record. if the paymentType is "Allowance", the
 			// allowance_type property of the expenseRecord will have one or more of
-			// the following values: Breakfast, Lunch, Dinner, Lodging. We use this to
-			// determine which of the rates to sum up to get the total allowance for
-			// the expense.
+			// the following values: Breakfast, Lunch, Dinner, Lodging. It is a JSON
+			// array of strings. We use this to determine which of the rates to sum
+			// up to get the total allowance for the expense.
+
+			// get the JSON string from the allowance_type property and convert it
+			// to a string slice
 			allowanceType := expenseRecord.GetString("allowance_type")
-			expenseRecord.Set("total", expenseRateRecord[0].Get(allowanceType))
+			var allowanceTypeAsSlice []string
+			if err := json.Unmarshal([]byte(allowanceType), &allowanceTypeAsSlice); err != nil {
+				return fmt.Errorf("invalid allowance_type format: %v", err)
+			}
+
+			// sum up the rates for the allowance types that are present in the
+			// expense record and build a description of the expense based on the
+			// allowances claimed
+			total := 0.0
+			allowanceDescription := "Allowance for "
+			for _, allowanceType := range allowanceTypeAsSlice {
+				allowanceDescription += allowanceType + ", "
+				total += expenseRateRecord[0].GetFloat(strings.ToLower(allowanceType))
+			}
+
+			expenseRecord.Set("total", total)
+			expenseRecord.Set("description", allowanceDescription)
 		}
 	}
 	return nil

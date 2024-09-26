@@ -115,7 +115,7 @@
 </svelte:head>
 
 <form class="flex w-full flex-col items-center gap-2 p-2">
-  <span class="flex w-full flex-col gap-2">
+  <span class="flex w-full gap-2">
     <label for="date">Date</label>
     <input
       class="flex-1"
