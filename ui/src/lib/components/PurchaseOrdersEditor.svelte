@@ -77,64 +77,6 @@
     {/snippet}
   </DsSelector>
 
-  <DsSelector
-    bind:value={item.payment_type as string}
-    items={[
-      { id: "OnAccount", name: "On Account" },
-      { id: "Expense", name: "Expense" },
-      { id: "CorporateCreditCard", name: "Corporate Credit Card" },
-    ]}
-    {errors}
-    fieldName="payment_type"
-    uiName="Payment Type"
-  >
-    {#snippet optionTemplate(item)}
-      {item.name}
-    {/snippet}
-  </DsSelector>
-
-  <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
-    <label for="date">Date</label>
-    <input
-      class="flex-1"
-      type="text"
-      name="date"
-      placeholder="Date"
-      use:flatpickrAction
-      bind:value={item.date}
-    />
-    {#if errors.date !== undefined}
-      <span class="text-red-600">{errors.date.message}</span>
-    {/if}
-  </span>
-
-  {#if $globalStore.jobsIndex !== null}
-    <DsAutoComplete
-      bind:value={item.job as string}
-      index={$globalStore.jobsIndex}
-      {errors}
-      fieldName="job"
-      uiName="Job"
-    >
-      {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
-    </DsAutoComplete>
-  {/if}
-
-  {#if item.job !== "" && categories.length > 0}
-    <DsSelector
-      bind:value={item.category as string}
-      items={categories}
-      {errors}
-      fieldName="category"
-      uiName="Category"
-      clear={true}
-    >
-      {#snippet optionTemplate(item: CategoriesResponse)}
-        {item.name}
-      {/snippet}
-    </DsSelector>
-  {/if}
-
   {#if isRecurring}
     <span class="flex w-full gap-2 {errors.end_date !== undefined ? 'bg-red-200' : ''}">
       <label for="end_date">End Date</label>
@@ -168,6 +110,21 @@
     </DsSelector>
   {/if}
 
+  <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
+    <label for="date">Date</label>
+    <input
+      class="flex-1"
+      type="text"
+      name="date"
+      placeholder="Date"
+      use:flatpickrAction
+      bind:value={item.date}
+    />
+    {#if errors.date !== undefined}
+      <span class="text-red-600">{errors.date.message}</span>
+    {/if}
+  </span>
+
   <DsSelector
     bind:value={item.division as string}
     items={$globalStore.divisions}
@@ -179,6 +136,49 @@
       {item.code} - {item.name}
     {/snippet}
   </DsSelector>
+
+  <DsSelector
+    bind:value={item.payment_type as string}
+    items={[
+      { id: "OnAccount", name: "On Account" },
+      { id: "Expense", name: "Expense" },
+      { id: "CorporateCreditCard", name: "Corporate Credit Card" },
+    ]}
+    {errors}
+    fieldName="payment_type"
+    uiName="Payment Type"
+  >
+    {#snippet optionTemplate(item)}
+      {item.name}
+    {/snippet}
+  </DsSelector>
+
+  {#if $globalStore.jobsIndex !== null}
+    <DsAutoComplete
+      bind:value={item.job as string}
+      index={$globalStore.jobsIndex}
+      {errors}
+      fieldName="job"
+      uiName="Job"
+    >
+      {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+    </DsAutoComplete>
+  {/if}
+
+  {#if item.job !== "" && categories.length > 0}
+    <DsSelector
+      bind:value={item.category as string}
+      items={categories}
+      {errors}
+      fieldName="category"
+      uiName="Category"
+      clear={true}
+    >
+      {#snippet optionTemplate(item: CategoriesResponse)}
+        {item.name}
+      {/snippet}
+    </DsSelector>
+  {/if}
 
   <DsTextInput
     bind:value={item.description as string}
