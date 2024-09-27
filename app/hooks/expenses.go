@@ -4,6 +4,7 @@ package hooks
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 	"time"
@@ -15,6 +16,12 @@ import (
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/models"
 )
+
+// This feature flag is used to limit the amount of expenses that don't have a
+// corresponding purchase order. The operation of this will need to be
+// revisited if we ever allow expenses to be created without a PO number.
+const limitNonPoAmounts = true
+const NO_PO_EXPENSE_LIMIT = 500.0
 
 // The cleanExpense function is used to remove properties from the expense
 // record that are not allowed to be set based on the value of the record's
@@ -148,6 +155,12 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 				validation.Length(4, 4).Error("must be 4 digits"),
 			).Else(
 				validation.Length(0, 0).Error("cc_last_4_digits is not applicable for non-corporate credit card expenses"),
+			),
+		),
+		"total": validation.Validate(
+			expenseRecord.Get("total"),
+			validation.When(limitNonPoAmounts && expenseRecord.Get("purchase_order") == "",
+				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
 			),
 		),
 	}.Filter()

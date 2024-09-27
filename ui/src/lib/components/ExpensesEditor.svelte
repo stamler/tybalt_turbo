@@ -48,6 +48,12 @@
       item.category = "";
     }
 
+    // if the payment_type is not CorporateCreditCard, then the cc_last_4_digits
+    // should be empty
+    if (item.payment_type !== "CorporateCreditCard") {
+      item.cc_last_4_digits = "";
+    }
+
     // set the allowance_types to an array of strings based on the
     // allowanceTypes object
     const at = Object.entries(allowanceTypes)
