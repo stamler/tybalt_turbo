@@ -119,6 +119,7 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 
 	paymentType := expenseRecord.GetString("payment_type")
 	isAllowance := paymentType == "Allowance"
+	isCorporateCreditCard := paymentType == "CorporateCreditCard"
 
 	validationsErrors := validation.Errors{
 		"date": validation.Validate(
@@ -138,6 +139,15 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 			validation.When(!isAllowance,
 				validation.Required.Error("vendor_name is required for non-allowance expenses"),
 				validation.Length(2, 0).Error("must be at least 2 characters"),
+			),
+		),
+		"cc_last_4_digits": validation.Validate(
+			expenseRecord.Get("cc_last_4_digits"),
+			validation.When(isCorporateCreditCard,
+				validation.Required.Error("cc_last_4_digits is required for corporate credit card expenses"),
+				validation.Length(4, 4).Error("must be 4 digits"),
+			).Else(
+				validation.Length(0, 0).Error("cc_last_4_digits is not applicable for non-corporate credit card expenses"),
 			),
 		),
 	}.Filter()

@@ -43,14 +43,23 @@
     <span>{item.description}</span>
   {/snippet}
   {#snippet byline(item: ExpensesResponse)}
-    <span>
+    <span class="flex items-center gap-2">
       {#if item.payment_type === "Mileage"}
         {item.distance} km
       {:else}
         ${item.total}
       {/if}
       {#if item.payment_type !== "Allowance"}
-        /vendor: {item.vendor_name}
+        <span class="flex items-center gap-0">
+          <Icon icon="mdi:store" width="24px" class="inline-block" />
+          {item.vendor_name}
+        </span>
+      {/if}
+      {#if item.payment_type === "CorporateCreditCard"}
+        <DsLabel color="cyan">
+          <Icon icon="mdi:credit-card-outline" width="24px" class="inline-block" />
+          **** {item.cc_last_4_digits}
+        </DsLabel>
       {/if}
     </span>
   {/snippet}

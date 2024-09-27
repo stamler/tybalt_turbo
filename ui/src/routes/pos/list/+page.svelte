@@ -79,18 +79,26 @@
   </span>
 {/snippet}
 
-{#snippet headline({
-  total,
-  payment_type,
-  vendor_name,
+{#snippet headline({ total, payment_type, vendor_name }: PurchaseOrdersResponse)}
+  <span class="flex items-center gap-2">
+    ${total}
+    {payment_type}
+    <span class="flex items-center gap-0">
+      <Icon icon="mdi:store" width="24px" class="inline-block" />
+      {vendor_name}
+    </span>
+  </span>
+{/snippet}
+
+{#snippet byline({
+  description,
   rejected,
   expand,
   rejection_reason,
   status,
 }: PurchaseOrdersResponse)}
-  <span class="flex items-center gap-1">
-    ${total}
-    {payment_type} / {vendor_name}
+  <span class="flex items-center gap-2">
+    {description}
     {#if rejected !== ""}
       <DsLabel color="red" title={`${shortDate(rejected)}: ${rejection_reason}`}>
         <Icon icon="mdi:cancel" width="24px" class="inline-block" />
@@ -107,10 +115,6 @@
       </DsLabel>
     {/if}
   </span>
-{/snippet}
-
-{#snippet byline({ description }: PurchaseOrdersResponse)}
-  <span>{description}</span>
 {/snippet}
 
 {#snippet line1(item: PurchaseOrdersResponse)}

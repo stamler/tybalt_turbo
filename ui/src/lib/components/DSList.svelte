@@ -119,7 +119,7 @@
             {@render anchor(item)}
           </div>
           <div class="flex flex-col py-2">
-            <div class="headline_wrapper">
+            <div class="headline_wrapper flex items-center gap-2">
               <span class="font-bold">{@render headline(item)}</span>
               {#if byline !== undefined}
                 <span class="byline">{@render byline(item)}</span>

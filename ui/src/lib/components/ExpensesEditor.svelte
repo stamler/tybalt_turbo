@@ -169,6 +169,16 @@
       {/each}
     </span>
   {:else}
+    {#if item.payment_type === "CorporateCreditCard"}
+      <DsTextInput
+        bind:value={item.cc_last_4_digits as string}
+        {errors}
+        fieldName="cc_last_4_digits"
+        uiName="Credit Card"
+        placeholder="Last 4 Digits of Corporate Credit Card"
+      />
+    {/if}
+
     <DsTextInput
       bind:value={item.description as string}
       {errors}

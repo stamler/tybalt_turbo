@@ -19,6 +19,7 @@
     errors,
     fieldName,
     uiName,
+    placeholder,
   }: {
     value: string | number;
     type?: "text" | "number" | "password";
@@ -28,6 +29,7 @@
     errors: Record<string, { message: string }>;
     fieldName: string;
     uiName: string;
+    placeholder?: string;
   } = $props();
 </script>
 
@@ -42,7 +44,7 @@
       max={max || null}
       id={`text-input-${thisId}`}
       name={fieldName}
-      placeholder={uiName}
+      placeholder={placeholder || uiName}
       bind:value
     />
   </span>
