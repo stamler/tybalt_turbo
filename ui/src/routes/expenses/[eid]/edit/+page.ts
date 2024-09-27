@@ -10,11 +10,6 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     date: new Date().toISOString().split("T")[0],
     division: "vccd5fo56ctbigh",
     description: "",
-    total: 100, // total cannot be 0 due to schema constraint. This number will be
-    // overridden by the backend to the actual total if the payment_type is
-    // Mileage or Allowance because these types are calculated based on current
-    // rates. If the payment_type is not Mileage or Allowance, the total will be
-    // used as is.
     payment_type: "OnAccount",
     vendor_name: "",
     job: "",

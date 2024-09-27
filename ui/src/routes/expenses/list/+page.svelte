@@ -49,7 +49,7 @@
       {:else}
         ${item.total}
       {/if}
-      {#if item.payment_type !== "Allowance"}
+      {#if item.vendor_name !== ""}
         <span class="flex items-center gap-0">
           <Icon icon="mdi:store" width="24px" class="inline-block" />
           {item.vendor_name}

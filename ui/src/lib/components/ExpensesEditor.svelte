@@ -54,14 +54,21 @@
       item.cc_last_4_digits = "";
     }
 
-    // set the allowance_types to an array of strings based on the
-    // allowanceTypes object
-    const at = Object.entries(allowanceTypes)
-      .filter(([_, value]) => value)
-      .map(([type]) => type as ExpensesAllowanceTypesOptions);
+    if (item.payment_type === "Allowance") {
+      // set the total to a default value non-zero value so that it passes
+      // initial validation. It will be updated during processing to the
+      // correct value based on the allowance_types
+      // item.total = 1.0;
 
-    // complex types must be assigned using the spread operator
-    item = { ...item, allowance_types: at as ExpensesAllowanceTypesOptions[] };
+      // set the allowance_types to an array of strings based on the
+      // allowanceTypes object
+      const at = Object.entries(allowanceTypes)
+        .filter(([_, value]) => value)
+        .map(([type]) => type as ExpensesAllowanceTypesOptions);
+
+      // complex types must be assigned using the spread operator
+      item = { ...item, allowance_types: at as ExpensesAllowanceTypesOptions[] };
+    }
 
     try {
       if (data.editing && data.id !== null) {
@@ -162,18 +169,27 @@
   {/if}
 
   {#if item.payment_type === "Allowance"}
-    <span class="flex w-full gap-4">
-      <label for="allowanceTypes">Type</label>
-      {#each Object.keys(allowanceTypes) as type}
-        <span class="flex items-center gap-1">
-          <input
-            type="checkbox"
-            bind:checked={allowanceTypes[type as keyof typeof allowanceTypes]}
-          />
-          {type}
-        </span>
-      {/each}
-    </span>
+    <div
+      class="flex w-full flex-col gap-2 {errors['allowance_types'] !== undefined
+        ? 'bg-red-200'
+        : ''}"
+    >
+      <span class="flex w-full gap-4">
+        <label for="allowanceTypes">Type</label>
+        {#each Object.keys(allowanceTypes) as type}
+          <span class="flex items-center gap-1">
+            <input
+              type="checkbox"
+              bind:checked={allowanceTypes[type as keyof typeof allowanceTypes]}
+            />
+            {type}
+          </span>
+        {/each}
+      </span>
+      {#if errors["allowance_types"] !== undefined}
+        <span class="text-red-600">{errors["allowance_types"].message}</span>
+      {/if}
+    </div>
   {:else}
     {#if item.payment_type === "CorporateCreditCard"}
       <DsTextInput
@@ -216,7 +232,7 @@
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <DsActionButton type="submit">Save</DsActionButton>
-      <DsActionButton action="/pos/list">Cancel</DsActionButton>
+      <DsActionButton action="/expenses/list">Cancel</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

@@ -126,6 +126,7 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 
 	paymentType := expenseRecord.GetString("payment_type")
 	isAllowance := paymentType == "Allowance"
+	isPersonalReimbursement := paymentType == "PersonalReimbursement"
 	isCorporateCreditCard := paymentType == "CorporateCreditCard"
 
 	validationsErrors := validation.Errors{
@@ -143,24 +144,32 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 		),
 		"vendor_name": validation.Validate(
 			expenseRecord.Get("vendor_name"),
-			validation.When(!isAllowance,
-				validation.Required.Error("vendor_name is required for non-allowance expenses"),
+			validation.When(!isAllowance && !isPersonalReimbursement,
+				validation.Required.Error("required for this expense type"),
 				validation.Length(2, 0).Error("must be at least 2 characters"),
 			),
 		),
 		"cc_last_4_digits": validation.Validate(
 			expenseRecord.Get("cc_last_4_digits"),
 			validation.When(isCorporateCreditCard,
-				validation.Required.Error("cc_last_4_digits is required for corporate credit card expenses"),
+				validation.Required.Error("required for corporate credit card expenses"),
 				validation.Length(4, 4).Error("must be 4 digits"),
 			).Else(
 				validation.Length(0, 0).Error("cc_last_4_digits is not applicable for non-corporate credit card expenses"),
 			),
 		),
 		"total": validation.Validate(
-			expenseRecord.Get("total"),
+			expenseRecord.GetFloat("total"),
+			validation.Required.Error("must be greater than 0"),
+			validation.Min(0.01).Error("must be greater than 0"),
 			validation.When(limitNonPoAmounts && expenseRecord.Get("purchase_order") == "",
 				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
+			),
+		),
+		"allowance_types": validation.Validate(
+			expenseRecord.Get("allowance_types").([]string),
+			validation.When(isAllowance,
+				validation.Required.Error("required for allowance expenses"),
 			),
 		),
 	}.Filter()
