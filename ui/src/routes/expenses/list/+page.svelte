@@ -45,7 +45,7 @@
   {#snippet byline(item: ExpensesResponse)}
     <span class="flex items-center gap-2">
       {#if item.payment_type === "Mileage"}
-        {item.distance} km
+        {item.distance} km / ${item.total}
       {:else}
         ${item.total}
       {/if}

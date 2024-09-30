@@ -208,22 +208,34 @@
       uiName="Description"
     />
 
-    <DsTextInput
-      bind:value={item.total as number}
-      {errors}
-      fieldName="total"
-      uiName="Total"
-      type="number"
-      step={0.01}
-      min={0}
-    />
-
-    <DsTextInput
-      bind:value={item.vendor_name as string}
-      {errors}
-      fieldName="vendor_name"
-      uiName="Vendor Name"
-    />
+    {#if item.payment_type !== "Mileage"}
+      <DsTextInput
+        bind:value={item.total as number}
+        {errors}
+        fieldName="total"
+        uiName="Total"
+        type="number"
+        step={0.01}
+        min={0}
+      />
+      <DsTextInput
+        bind:value={item.vendor_name as string}
+        {errors}
+        fieldName="vendor_name"
+        uiName="Vendor Name"
+      />
+    {:else}
+      <DsTextInput
+        bind:value={item.distance as number}
+        {errors}
+        fieldName="distance"
+        uiName="Distance"
+        placeholder="in kilometers"
+        type="number"
+        step={1}
+        min={1}
+      />
+    {/if}
 
     <!-- File upload for attachment -->
     <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />

@@ -58,37 +58,34 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 		}
 
 		// fetch the expense rate record from the expense_rates collection
-		expenseRateRecord, findErr := app.Dao().FindRecordsByFilter("expense_rates", "effective_date <= {:expenseDate}", "-effective_date", 1, 0, dbx.Params{
-			"expenseDate": expenseDateAsTime,
+		expenseRateRecords, findErr := app.Dao().FindRecordsByFilter("expense_rates", "effective_date <= {:expenseDate}", "-effective_date", 1, 0, dbx.Params{
+			"expenseDate": expenseDateAsTime.Format("2006-01-02"),
 		})
 		if findErr != nil {
 			return findErr
 		}
 
 		// if there are no expense rate records, return an error
-		if len(expenseRateRecord) == 0 {
+		if len(expenseRateRecords) == 0 {
 			return errors.New("no expense rate record found for the given date")
 		}
+		expenseRateRecord := expenseRateRecords[0]
 
 		if paymentType == "Mileage" {
-			// if the paymentType is "Mileage", distance must be an integer greater than
-			// 0 and we calculate the total by multiplying distance by the rate
+			// if the paymentType is "Mileage", distance must be a positive integer
+			// and we calculate the total by multiplying distance by the rate
 			distance := expenseRecord.GetFloat("distance")
-			if distance <= 0 {
-				return errors.New("distance must be greater than 0 for mileage expenses")
-			}
 			// check if the distance is an integer
 			if distance != float64(int(distance)) {
 				return errors.New("distance must be an integer for mileage expenses")
 			}
-			// the mileage property on the expense_rate record is a JSON object with
-			// keys that represent the lower bound of the distance band and a value
-			// that represents the rate for that distance band. We extract the mileage
-			// property JSON string into a map[string]interface{} and then set the
-			// total field on the expense record.
-			expenseRate := expenseRateRecord[0].Get("mileage").(map[string]interface{})
-			expenseRecord.Set("rate", expenseRate["rate"])
-			expenseRecord.Set("total", distance*expenseRate["rate"].(float64))
+
+			totalMileageExpense, mileageErr := calculateMileageTotal(distance, expenseRateRecord)
+			if mileageErr != nil {
+				return mileageErr
+			}
+
+			expenseRecord.Set("total", totalMileageExpense)
 		} else if paymentType == "Allowance" {
 			// breakfast, lunch, dinner, and lodging are all properties on the
 			// expense_rate record. if the paymentType is "Allowance", the
@@ -103,7 +100,7 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 			// sum up the rates for the allowance types that are present
 			total := 0.0
 			for _, allowanceType := range allowanceTypes {
-				total += expenseRateRecord[0].GetFloat(strings.ToLower(allowanceType))
+				total += expenseRateRecord.GetFloat(strings.ToLower(allowanceType))
 			}
 
 			// build a description of the expense by joining the allowance types
@@ -127,6 +124,7 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 	paymentType := expenseRecord.GetString("payment_type")
 	isAllowance := paymentType == "Allowance"
 	isPersonalReimbursement := paymentType == "PersonalReimbursement"
+	isMileage := paymentType == "Mileage"
 	isCorporateCreditCard := paymentType == "CorporateCreditCard"
 
 	validationsErrors := validation.Errors{
@@ -144,7 +142,7 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 		),
 		"vendor_name": validation.Validate(
 			expenseRecord.Get("vendor_name"),
-			validation.When(!isAllowance && !isPersonalReimbursement,
+			validation.When(!isAllowance && !isPersonalReimbursement && !isMileage,
 				validation.Required.Error("required for this expense type"),
 				validation.Length(2, 0).Error("must be at least 2 characters"),
 			),
