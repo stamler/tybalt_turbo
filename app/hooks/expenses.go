@@ -80,7 +80,12 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 				return errors.New("distance must be an integer for mileage expenses")
 			}
 
-			totalMileageExpense, mileageErr := calculateMileageTotal(distance, expenseRateRecord)
+			startDate, err := getAnnualPayrollPeriodStartDate(app, expenseDate)
+			if err != nil {
+				return err
+			}
+
+			totalMileageExpense, mileageErr := calculateMileageTotal(app, distance, startDate, expenseDate, expenseRateRecord)
 			if mileageErr != nil {
 				return mileageErr
 			}
@@ -160,7 +165,7 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 			expenseRecord.GetFloat("total"),
 			validation.Required.Error("must be greater than 0"),
 			validation.Min(0.01).Error("must be greater than 0"),
-			validation.When(limitNonPoAmounts && expenseRecord.Get("purchase_order") == "",
+			validation.When(limitNonPoAmounts && expenseRecord.Get("purchase_order") == "" && !isMileage,
 				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
 			),
 		),

@@ -6,11 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"sort"
 	"strconv"
 	"time"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
@@ -116,7 +119,12 @@ func isPositiveMultipleOfPointZeroOne() validation.RuleFunc {
 	}
 }
 
-func calculateMileageTotal(distance float64, expenseRateRecord *models.Record) (float64, error) {
+// arguments:
+// distance: the distance of the expense
+// expenseDate: the date of the expense
+// startDate: the start date of the annual period derived from the payroll_year_end_dates collection
+// expenseRateRecord: the expense rate record retrieved from the expense_rates collection
+func calculateMileageTotal(app *pocketbase.PocketBase, distance float64, startDate string, expenseDate string, expenseRateRecord *models.Record) (float64, error) {
 	// the mileage property on the expense_rate record is a JSON object with
 	// keys that represent the lower bound of the distance band and a value
 	// that represents the rate for that distance band. We extract the mileage
@@ -150,6 +158,10 @@ func calculateMileageTotal(distance float64, expenseRateRecord *models.Record) (
 		distanceBands = append(distanceBands, distanceBandInt)
 	}
 
+	if len(distanceBands) == 0 {
+		return 0, errors.New("no mileage rates found")
+	}
+
 	// sort the distance bands
 	sort.Ints(distanceBands)
 
@@ -162,18 +174,143 @@ func calculateMileageTotal(distance float64, expenseRateRecord *models.Record) (
 	// part that applies to the second distance band. We then multiply each part
 	// by the appropriate rate and sum the results.
 
-	// for now just use the first rate in the list as a proof of concept
-	var expenseRate float64
-	if len(distanceBands) > 0 {
-		firstBand := strconv.Itoa(distanceBands[0])
-		rate, ok := mileageRates[firstBand].(float64)
-		if !ok {
-			return 0, fmt.Errorf("invalid rate for distance band %s", firstBand)
+	// TODO: we're getting some rounding errors as a result of float64 arithmetic
+	// that we should address.
+
+	// First we query the SUM of all mileage expenses that between startDate
+	// inclusive and expenseDate exclusive. We exclude the expenseDate because
+	// the mileage expense hasn't yet been updated in the database prior to
+	// the above query.
+	// TODO: Restrict expenses to one Mileage entry per day similar to OR entries in validate_time_entries.go?
+	type SumResult struct {
+		TotalMileage float64 `db:"total_mileage"`
+	}
+	results := []SumResult{}
+	app.Dao().DB().NewQuery("SELECT COALESCE(SUM(distance), 0) AS total_mileage FROM expenses WHERE payment_type = {:paymentType} AND date >= {:startDate} AND date < {:expenseDate}").Bind(dbx.Params{
+		"paymentType": "Mileage",
+		"startDate":   startDate,
+		"expenseDate": expenseDate,
+	}).All(&results)
+
+	totalMileage := results[0].TotalMileage
+	log.Println("totalMileage", totalMileage)
+
+	// totalMileage represents the total mileage already used in the annual
+	// period. Now we need to determine which distance band(s) apply to the
+	// expense record by finding the largest distance band that is less than
+	// the total mileage already used in the annual period. If the distance
+	// is greater than the next distance band minus the total mileage already
+	// used in the annual period, we need to break the distance into two parts:
+	// the part that applies to the first distance band and the part that
+	// applies to the second distance band. We then multiply each part by the
+	// appropriate rate and sum the results.
+
+	// Find the bounding distance bands that the expense record's distance
+	// property falls into. The lower distance band is the largest distance band
+	// that is less than the total mileage already used in the annual period. The
+	// upper distance band is the largest distance band that is less than the
+	// total mileage already used in the annual period plus the distance of the
+	// expense.
+	var lowerDistanceBand int
+	var upperDistanceBand int
+	for _, band := range distanceBands {
+		if float64(band) <= totalMileage {
+			lowerDistanceBand = band
+			// upperDistanceBand is always at least as large as lowerDistanceBand
+			upperDistanceBand = band
 		}
-		expenseRate = rate
-	} else {
-		return 0, errors.New("no mileage rates found")
+		if float64(band) <= totalMileage+distance {
+			upperDistanceBand = band
+		} else {
+			break
+		}
 	}
 
-	return distance * expenseRate, nil
+	log.Println("lowerDistanceBand", lowerDistanceBand)
+	log.Println("upperDistanceBand", upperDistanceBand)
+
+	// If the lower and upper distance bands are the same, we can use the
+	// mileage rate for that distance band and simply multiply the distance by
+	// the rate.
+	if lowerDistanceBand == upperDistanceBand {
+		log.Println("lowerDistanceBand == upperDistanceBand")
+		expenseRate := mileageRates[strconv.Itoa(lowerDistanceBand)].(float64)
+		return distance * expenseRate, nil
+	} else {
+		// If the lower and upper distance bands are different, There are two possible scenarios:
+		// 1. The expense record's distance property spans two distance bands.
+		// 2. The expense record's distance property spans three or more distance bands.
+		log.Println("lowerDistanceBand != upperDistanceBand")
+
+		for i, band := range distanceBands {
+			if lowerDistanceBand == band {
+				if upperDistanceBand == distanceBands[i+1] {
+					// Scenario 1: The expense record's distance property spans two distance
+					// bands. This means the index of the lower distance band is exactly one
+					// less than the index of the upper distance band. The distance bands are already sorted in ascending order. We need to calculate how
+					// much mileage lies in the first band and multiply it by the rate for the
+					// first band. Then we need to calculate how much mileage lies in the second
+					// band and multiply it by the rate for the second band. Finally, we sum
+					// these two amounts to get the total mileage expense and return it.
+					log.Println("Scenario 1: The expense record's distance property spans two adjacent distance bands.")
+					lowerDistanceBandRate := mileageRates[strconv.Itoa(lowerDistanceBand)].(float64)
+					upperDistanceBandRate := mileageRates[strconv.Itoa(upperDistanceBand)].(float64)
+					lowerDistanceBandMileage := float64(upperDistanceBand) - totalMileage
+					upperDistanceBandMileage := distance - lowerDistanceBandMileage
+					return lowerDistanceBandMileage*lowerDistanceBandRate + upperDistanceBandMileage*upperDistanceBandRate, nil
+
+				} else {
+					// Scenario 2: The expense record's distance property spans three or
+					// more distance bands. We need to calculate how much mileage lies in
+					// the lowest distance band and how much mileage lies in the highest
+					// distance band. For each of the middle distance bands, we need to
+					// calculate how much mileage lies in each of them but this is just
+					// the next distance band minus that distance band. We then multiply
+					// each of these amounts by the rate for the corresponding distance
+					// band. We then sum these amounts to get the total mileage expense
+					// and return it.
+
+					// TODO: This is currently identical to Scenario 1 in implementation.
+					// We need to actually implement the logic to handle three or more
+					// distance bands.
+					log.Println("Scenario 2: The expense record's distance property spans three or more distance bands.")
+					lowerDistanceBandRate := mileageRates[strconv.Itoa(lowerDistanceBand)].(float64)
+					upperDistanceBandRate := mileageRates[strconv.Itoa(upperDistanceBand)].(float64)
+					lowerDistanceBandMileage := float64(upperDistanceBand) - totalMileage
+					upperDistanceBandMileage := distance - lowerDistanceBandMileage
+					return lowerDistanceBandMileage*lowerDistanceBandRate + upperDistanceBandMileage*upperDistanceBandRate, nil
+				}
+			}
+		}
+
+		return 0, errors.New("no mileage rates found for the expense record")
+	}
+}
+
+// when given a date string in the format "YYYY-MM-DD", return the date string
+// representing the first day of the annual payroll period.
+func getAnnualPayrollPeriodStartDate(app *pocketbase.PocketBase, date string) (string, error) {
+	// First we need to determine the current annual period. To do this we use
+	// the expenseDate to find the date property of the payroll_year_end_dates
+	// collection record that is less than the expenseDate. We then use day
+	// after this date as the startDate argument in the calculateMileageTotal
+	// function. (Since the payroll year end dates are the last day of the
+	// year, we need to use the day after this date for the start of the
+	// current annual period.)
+	payrollYearEndDatesRecord, err := app.Dao().FindRecordsByFilter("payroll_year_end_dates", "date < {:date}", "-date", 1, 0, dbx.Params{
+		"date": date,
+	})
+	if err != nil {
+		return "", err
+	}
+	if len(payrollYearEndDatesRecord) == 0 {
+		return "", errors.New("no payroll year end date record found for the given date")
+	}
+	payrollYearEndDate := payrollYearEndDatesRecord[0].GetString("date")
+	payrollYearEndDateAsTime, parseErr := time.Parse(time.DateOnly, payrollYearEndDate)
+	if parseErr != nil {
+		return "", parseErr
+	}
+	startDate := payrollYearEndDateAsTime.AddDate(0, 0, 1)
+	return startDate.Format(time.DateOnly), nil
 }
