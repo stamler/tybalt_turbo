@@ -85,7 +85,7 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 				return err
 			}
 
-			totalMileageExpense, mileageErr := calculateMileageTotal(app, distance, startDate, expenseDate, expenseRateRecord)
+			totalMileageExpense, mileageErr := calculateMileageTotal(app, int(distance), startDate, expenseDate, expenseRateRecord)
 			if mileageErr != nil {
 				return mileageErr
 			}
