@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
 	"sort"
 	"strconv"
 	"time"
@@ -192,8 +191,9 @@ func calculateMileageTotal(app *pocketbase.PocketBase, distance float64, startDa
 		"expenseDate": expenseDate,
 	}).All(&results)
 
+	// total mileage is the sum of all mileage expenses in the annual period
+	// prior to the date of this expense.
 	totalMileage := results[0].TotalMileage
-	log.Println("totalMileage", totalMileage)
 
 	// totalMileage represents the total mileage already used in the annual
 	// period. Now we need to determine which distance band(s) apply to the
@@ -226,21 +226,16 @@ func calculateMileageTotal(app *pocketbase.PocketBase, distance float64, startDa
 		}
 	}
 
-	log.Println("lowerDistanceBand", lowerDistanceBand)
-	log.Println("upperDistanceBand", upperDistanceBand)
-
 	// If the lower and upper distance bands are the same, we can use the
 	// mileage rate for that distance band and simply multiply the distance by
 	// the rate.
 	if lowerDistanceBand == upperDistanceBand {
-		log.Println("lowerDistanceBand == upperDistanceBand")
 		expenseRate := mileageRates[strconv.Itoa(lowerDistanceBand)].(float64)
 		return distance * expenseRate, nil
 	} else {
 		// If the lower and upper distance bands are different, There are two possible scenarios:
 		// 1. The expense record's distance property spans two distance bands.
 		// 2. The expense record's distance property spans three or more distance bands.
-		log.Println("lowerDistanceBand != upperDistanceBand")
 
 		for i, band := range distanceBands {
 			if lowerDistanceBand == band {
@@ -252,7 +247,6 @@ func calculateMileageTotal(app *pocketbase.PocketBase, distance float64, startDa
 					// first band. Then we need to calculate how much mileage lies in the second
 					// band and multiply it by the rate for the second band. Finally, we sum
 					// these two amounts to get the total mileage expense and return it.
-					log.Println("Scenario 1: The expense record's distance property spans two adjacent distance bands.")
 					lowerDistanceBandRate := mileageRates[strconv.Itoa(lowerDistanceBand)].(float64)
 					upperDistanceBandRate := mileageRates[strconv.Itoa(upperDistanceBand)].(float64)
 					lowerDistanceBandMileage := float64(upperDistanceBand) - totalMileage
@@ -270,15 +264,40 @@ func calculateMileageTotal(app *pocketbase.PocketBase, distance float64, startDa
 					// band. We then sum these amounts to get the total mileage expense
 					// and return it.
 
-					// TODO: This is currently identical to Scenario 1 in implementation.
-					// We need to actually implement the logic to handle three or more
-					// distance bands.
-					log.Println("Scenario 2: The expense record's distance property spans three or more distance bands.")
-					lowerDistanceBandRate := mileageRates[strconv.Itoa(lowerDistanceBand)].(float64)
-					upperDistanceBandRate := mileageRates[strconv.Itoa(upperDistanceBand)].(float64)
-					lowerDistanceBandMileage := float64(upperDistanceBand) - totalMileage
-					upperDistanceBandMileage := distance - lowerDistanceBandMileage
-					return lowerDistanceBandMileage*lowerDistanceBandRate + upperDistanceBandMileage*upperDistanceBandRate, nil
+					var totalExpense float64
+					remainingDistance := distance
+					currentMileage := totalMileage
+
+					// Handle the lowest distance band
+					lowestBandRate := mileageRates[strconv.Itoa(lowerDistanceBand)].(float64)
+					lowestBandMileage := float64(distanceBands[i+1]) - currentMileage
+					totalExpense += lowestBandMileage * lowestBandRate
+					remainingDistance -= lowestBandMileage
+					currentMileage += lowestBandMileage
+
+					// Handle middle distance bands. The condition exists to prevent
+					// out-of-bounds errors and simultaneously allow the code after the
+					// for loop to execute for the highest distance band.
+					for j := i + 1; j < len(distanceBands)-1; j++ {
+						// If the next distance band is greater than the remaining
+						// distance plus the current mileage, we break out of the loop
+						// because the highest distance band cannot be greater than the
+						// remaining distance plus the current mileage.
+						if float64(distanceBands[j+1]) > currentMileage+remainingDistance {
+							break
+						}
+						middleBandRate := mileageRates[strconv.Itoa(distanceBands[j])].(float64)
+						middleBandMileage := float64(distanceBands[j+1] - distanceBands[j])
+						totalExpense += middleBandMileage * middleBandRate
+						remainingDistance -= middleBandMileage
+						currentMileage += middleBandMileage
+					}
+
+					// Handle the highest distance band
+					highestBandRate := mileageRates[strconv.Itoa(upperDistanceBand)].(float64)
+					totalExpense += remainingDistance * highestBandRate
+
+					return totalExpense, nil
 				}
 			}
 		}
