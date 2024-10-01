@@ -13,20 +13,20 @@ import (
 	"github.com/pocketbase/pocketbase/models"
 )
 
-func createRejectTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
-	// This route handles the rejection of a timesheet.
+func createRejectExpenseHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+	// This route handles the rejection of an expense.
 	// It performs the following actions:
-	// 1. Gets the timesheet ID from the URL.
+	// 1. Gets the expense ID from the URL.
 	// 2. Validates the request body for a valid rejection reason.
 	// 3. Retrieves the authenticated user's ID.
 	// 4. Runs a database transaction to:
-	//    a. Fetch the timesheet by ID.
+	//    a. Fetch the expense by ID.
 	//    b. Verify that the authenticated user is the assigned approver.
-	//    c. Check if the timesheet is submitted and not locked or already rejected.
+	//    c. Check if the expense is submitted and not committed or already rejected.
 	//    d. Set the rejection timestamp, reason, and rejector.
-	//    e. Save the updated timesheet.
+	//    e. Save the updated expense.
 	// 5. Returns a success message if rejected, or an error message if any checks fail.
-	// This ensures that only valid, submitted timesheets can be rejected by the correct user.
+	// This ensures that only valid, submitted expenses can be rejected by the correct user.
 	return func(c echo.Context) error {
 
 		id := c.PathParam("id")
@@ -45,48 +45,48 @@ func createRejectTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 		var httpResponseStatusCode int
 
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-			timeSheet, err := txDao.FindRecordById("time_sheets", id)
+			expense, err := txDao.FindRecordById("expenses", id)
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
 					Code:    "record_not_found",
-					Message: fmt.Sprintf("error fetching time sheet: %v", err),
+					Message: fmt.Sprintf("error fetching expense: %v", err),
 				}
 			}
 
 			// Check if the user is the approver
-			if timeSheet.GetString("approver") != userId {
+			if expense.GetString("approver") != userId {
 				httpResponseStatusCode = http.StatusUnauthorized
 				return &CodeError{
 					Code:    "rejection_unauthorized",
-					Message: "you are not authorized to reject this time sheet",
+					Message: "you are not authorized to reject this expense",
 				}
 			}
 
-			// Check if the timesheet is submitted
-			if !timeSheet.GetBool("submitted") {
+			// Check if the expense is submitted
+			if !expense.GetBool("submitted") {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "timesheet_not_submitted",
-					Message: "only submitted time sheets can be rejected",
+					Code:    "expense_not_submitted",
+					Message: "only submitted expenses can be rejected",
 				}
 			}
 
-			// Check if the timesheet is locked
-			if timeSheet.GetBool("locked") {
+			// Check if the expense is committed
+			if !expense.GetDateTime("committed").IsZero() {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "timesheet_locked",
-					Message: "locked time sheets cannot be rejected",
+					Code:    "expense_committed",
+					Message: "committed expenses cannot be rejected",
 				}
 			}
 
-			// Check if the timesheet is already rejected
-			if !timeSheet.GetDateTime("rejected").IsZero() {
+			// Check if the expense is already rejected
+			if expense.GetDateTime("rejected").IsZero() {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "timesheet_already_rejected",
-					Message: "this time sheet is already rejected",
+					Code:    "expense_already_rejected",
+					Message: "this expense is already rejected",
 				}
 			}
 
@@ -100,16 +100,16 @@ func createRejectTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			}
 
 			// Set the rejection timestamp, reason, and rejector
-			timeSheet.Set("rejected", time.Now())
-			timeSheet.Set("rejection_reason", req.RejectionReason)
-			timeSheet.Set("rejector", userId)
+			expense.Set("rejected", time.Now())
+			expense.Set("rejection_reason", req.RejectionReason)
+			expense.Set("rejector", userId)
 
-			// Save the updated timesheet
-			if err := txDao.SaveRecord(timeSheet); err != nil {
+			// Save the updated expense
+			if err := txDao.SaveRecord(expense); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
-					Code:    "timesheet_save_error",
-					Message: fmt.Sprintf("error saving time sheet: %v", err),
+					Code:    "expense_save_error",
+					Message: fmt.Sprintf("error saving expense: %v", err),
 				}
 			}
 
@@ -126,6 +126,6 @@ func createRejectTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Timesheet rejected successfully"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Expense rejected successfully"})
 	}
 }

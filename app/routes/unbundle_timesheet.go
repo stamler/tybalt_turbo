@@ -23,7 +23,7 @@ func createUnbundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc
 	// will also error if the submitted, approved, or locked fields are true on
 	// the time sheet record.
 	return func(c echo.Context) error {
-		var req TimeSheetIdRequest
+		var req RecordIdRequest
 		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
 		}
@@ -36,7 +36,7 @@ func createUnbundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
 
 			// Get the time sheet record
-			timeSheet, err := txDao.FindRecordById("time_sheets", req.TimeSheetId)
+			timeSheet, err := txDao.FindRecordById("time_sheets", req.RecordId)
 			if err != nil {
 				return fmt.Errorf("error fetching time sheet: %v", err)
 			}
@@ -65,7 +65,7 @@ func createUnbundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc
 			// Get the time entries
 			timeEntries, err := txDao.FindRecordsByFilter("time_entries", "uid={:userId} && tsid={:timeSheetId}", "", 0, 0, dbx.Params{
 				"userId":      userId,
-				"timeSheetId": req.TimeSheetId,
+				"timeSheetId": req.RecordId,
 			})
 			if err != nil {
 				return fmt.Errorf("error fetching time entries: %v", err)

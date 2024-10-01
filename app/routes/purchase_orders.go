@@ -171,10 +171,7 @@ func rejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.PathParam("id")
 
-		var req struct {
-			RejectionReason string `json:"rejection_reason"`
-		}
-
+		var req RejectionRequest
 		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]interface{}{
 				"message": "you must provide a rejection reason",

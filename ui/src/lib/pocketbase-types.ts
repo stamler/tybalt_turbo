@@ -251,7 +251,7 @@ export type TimeSheetsRecord = {
   approver: RecordIdString;
   locked: boolean;
   locker: RecordIdString;
-  rejected: boolean;
+  rejected: IsoDateString;
   rejection_reason: string;
   rejector: RecordIdString;
   salary: boolean;

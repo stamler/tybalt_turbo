@@ -14,8 +14,13 @@ import (
 type WeekEndingRequest struct {
 	WeekEnding string `json:"weekEnding"`
 }
-type TimeSheetIdRequest struct {
-	TimeSheetId string `json:"timeSheetId"`
+
+type RecordIdRequest struct {
+	RecordId string `json:"recordId"`
+}
+
+type RejectionRequest struct {
+	RejectionReason string `json:"rejectionReason"`
 }
 
 type PurchaseOrderRequest struct {
@@ -134,6 +139,34 @@ func AddRoutes(app *pocketbase.PocketBase) {
 			Method:  http.MethodPost,
 			Path:    "/api/purchase_orders/:id/cancel",
 			Handler: cancelPurchaseOrderHandler(app),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
+	// Add the approve expense route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/expenses/:id/approve",
+			Handler: createApproveExpenseHandler(app),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
+	// Add the reject expense route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/expenses/:id/reject",
+			Handler: createRejectExpenseHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
 			},
