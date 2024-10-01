@@ -110,7 +110,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
 			Path:    "/api/purchase_orders/:id/approve",
-			Handler: approvePurchaseOrderHandler(app),
+			Handler: createApprovePurchaseOrderHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
 			},
@@ -124,7 +124,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
 			Path:    "/api/purchase_orders/:id/reject",
-			Handler: rejectPurchaseOrderHandler(app),
+			Handler: createRejectPurchaseOrderHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
 			},
@@ -138,7 +138,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
 			Path:    "/api/purchase_orders/:id/cancel",
-			Handler: cancelPurchaseOrderHandler(app),
+			Handler: createCancelPurchaseOrderHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
 			},

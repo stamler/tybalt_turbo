@@ -20,7 +20,7 @@ const (
 	VP_PO_LIMIT      = 2500
 )
 
-func approvePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.PathParam("id")
 
@@ -167,7 +167,7 @@ func approvePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 	}
 }
 
-func rejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createRejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.PathParam("id")
 
@@ -277,7 +277,7 @@ func rejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 	}
 }
 
-func cancelPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createCancelPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 	// print the app
 	fmt.Println(app)
 	return nil
