@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -16,13 +15,8 @@ import (
 
 func createBundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 	return func(c echo.Context) error {
-		var req WeekEndingRequest
-		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
-		}
-
 		// Validate the date
-		weekEndingTime, err := time.Parse("2006-01-02", req.WeekEnding)
+		weekEndingTime, err := time.Parse("2006-01-02", c.PathParam("weekEnding"))
 		if err != nil {
 			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid date format. Use YYYY-MM-DD"})
 		}

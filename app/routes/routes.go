@@ -11,10 +11,6 @@ import (
 )
 
 // Define request bodies for the handlers
-type WeekEndingRequest struct {
-	WeekEnding string `json:"weekEnding"`
-}
-
 type RejectionRequest struct {
 	RejectionReason string `json:"rejection_reason"`
 }
@@ -45,11 +41,11 @@ func (e *CodeError) Error() string {
 // Add custom routes to the app
 func AddRoutes(app *pocketbase.PocketBase) {
 
-	// Add the bundle-timesheet route
+	// Add the bundle timesheet route
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
-			Path:    "/api/bundle-timesheet",
+			Path:    "/api/time_sheets/:weekEnding/bundle",
 			Handler: createBundleTimesheetHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
