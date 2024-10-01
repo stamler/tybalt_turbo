@@ -13,7 +13,7 @@ import (
 	"github.com/pocketbase/pocketbase/models"
 )
 
-func createApproveTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createApproveRecordHandler(app *pocketbase.PocketBase, collectionName string) echo.HandlerFunc {
 	// This route handles the approval of a record.
 	// It performs the following actions:
 	// 1. Validates the request body for a valid record ID.
@@ -36,7 +36,7 @@ func createApproveTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc 
 		userId := authRecord.Id
 
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-			record, err := txDao.FindRecordById("time_sheets", req.RecordId)
+			record, err := txDao.FindRecordById(collectionName, req.RecordId)
 			if err != nil {
 				return fmt.Errorf("error fetching record: %v", err)
 			}

@@ -82,7 +82,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
 			Path:    "/api/approve-timesheet",
-			Handler: createApproveTimesheetHandler(app),
+			Handler: createApproveRecordHandler(app, "time_sheets"),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
 			},
@@ -152,7 +152,7 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
 			Path:    "/api/expenses/:id/approve",
-			Handler: createApproveExpenseHandler(app),
+			Handler: createApproveRecordHandler(app, "expenses"),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),
 			},
