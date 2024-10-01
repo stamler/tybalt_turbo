@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -15,19 +14,14 @@ import (
 )
 
 func createUnbundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
-	// This function undoes the bundle-timesheet operation. It will delete the
-	// time_sheets record with the id specified in the request body and clear the
+	// This function undoes the bundle timesheet operation. It will delete the
+	// time_sheets record with the id specified in the request url and clear the
 	// tsid field in all time entries records that have the same time sheet id.
 	// This function will return an error if the time sheet does not exist or if
 	// there is an error deleting the time sheet or updating the time entries. It
 	// will also error if the submitted, approved, or committed fields are true
 	// on the time sheet record.
 	return func(c echo.Context) error {
-		var req RecordIdRequest
-		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
-		}
-
 		// get the auth record from the context
 		authRecord := c.Get(apis.ContextAuthRecordKey).(*models.Record)
 		userId := authRecord.Id
@@ -36,7 +30,7 @@ func createUnbundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
 
 			// Get the time sheet record
-			timeSheet, err := txDao.FindRecordById("time_sheets", req.RecordId)
+			timeSheet, err := txDao.FindRecordById("time_sheets", c.PathParam("id"))
 			if err != nil {
 				return fmt.Errorf("error fetching time sheet: %v", err)
 			}
@@ -65,7 +59,7 @@ func createUnbundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc
 			// Get the time entries
 			timeEntries, err := txDao.FindRecordsByFilter("time_entries", "uid={:userId} && tsid={:timeSheetId}", "", 0, 0, dbx.Params{
 				"userId":      userId,
-				"timeSheetId": req.RecordId,
+				"timeSheetId": c.PathParam("id"),
 			})
 			if err != nil {
 				return fmt.Errorf("error fetching time entries: %v", err)

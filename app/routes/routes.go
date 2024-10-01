@@ -15,10 +15,6 @@ type WeekEndingRequest struct {
 	WeekEnding string `json:"weekEnding"`
 }
 
-type RecordIdRequest struct {
-	RecordId string `json:"recordId"`
-}
-
 type RejectionRequest struct {
 	RejectionReason string `json:"rejection_reason"`
 }
@@ -63,11 +59,11 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		return nil
 	})
 
-	// add the unbundle-timesheet route
+	// add the unbundle timesheet route
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
-			Path:    "/api/unbundle-timesheet",
+			Path:    "/api/time_sheets/:id/unbundle",
 			Handler: createUnbundleTimesheetHandler(app),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),

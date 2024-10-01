@@ -12,11 +12,10 @@
   let shareModal: ShareModal;
   let rejectModal: RejectModal;
 
-  async function unbundle(timeSheetId: string) {
+  async function unbundle(id: string) {
     try {
-      const response = await pb.send("/api/unbundle-timesheet", {
+      const response = await pb.send(`/api/time_sheets/${id}/unbundle`, {
         method: "POST",
-        body: JSON.stringify({ timeSheetId }),
         headers: {
           "Content-Type": "application/json",
         },

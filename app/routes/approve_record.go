@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
@@ -16,27 +15,21 @@ import (
 func createApproveRecordHandler(app *pocketbase.PocketBase, collectionName string) echo.HandlerFunc {
 	// This route handles the approval of a record.
 	// It performs the following actions:
-	// 1. Validates the request body for a valid record ID.
-	// 2. Retrieves the authenticated user's ID.
-	// 3. Runs a database transaction to:
+	// 1. Retrieves the authenticated user's ID.
+	// 2. Runs a database transaction to:
 	//    a. Fetch the record by ID.
 	//    b. Verify that the authenticated user is the assigned approver.
 	//    c. Check if the record is submitted and not committed or already approved.
 	//    d. Set the approval timestamp.
 	//    e. Save the updated record.
-	// 4. Returns a success message if approved, or an error message if any checks fail.
+	// 3. Returns a success message if approved, or an error message if any checks fail.
 	// This ensures that only valid, submitted records can be approved by the correct user.
 	return func(c echo.Context) error {
-		var req RecordIdRequest
-		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
-		}
-
 		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
 		userId := authRecord.Id
 
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-			record, err := txDao.FindRecordById(collectionName, req.RecordId)
+			record, err := txDao.FindRecordById(collectionName, c.PathParam("id"))
 			if err != nil {
 				return fmt.Errorf("error fetching record: %v", err)
 			}
