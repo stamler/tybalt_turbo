@@ -8,11 +8,20 @@
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import type { PageData } from "./$types";
   import type { ExpensesResponse } from "$lib/pocketbase-types";
+  import { globalStore } from "$lib/stores/global";
   import { shortDate } from "$lib/utilities";
-  import { invalidate, goto } from "$app/navigation";
+  import RejectModal from "$lib/components/RejectModal.svelte";
+  import { invalidate } from "$app/navigation";
+
+  let rejectModal: RejectModal;
 
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
+
+  async function refresh() {
+    await invalidate("app:expenses");
+    items = data.items;
+  }
 
   async function del(id: string): Promise<void> {
     // return immediately if items is not an array
@@ -27,8 +36,43 @@
       alert(error.data.message);
     }
   }
+  async function approve(id: string) {
+    try {
+      const response = await pb.send(`/api/expenses/${id}/approve`, {
+        method: "POST",
+        body: JSON.stringify({ recordId: id }),
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      // replace the item in the list with the updated item
+      items = items?.map((item) => {
+        if (item.id === id) {
+          return response as ExpensesResponse;
+        }
+        return item;
+      });
+    } catch (error) {
+      globalStore.addError(error?.response.error);
+    }
+  }
+
+  async function submit(id: string) {
+    try {
+      await pb.send(`/api/expenses/${id}/submit`, {
+        method: "POST",
+      });
+    } catch (error) {
+      globalStore.addError(error?.response.error);
+    }
+  }
+
+  function openRejectModal(recordId: string) {
+    rejectModal?.openModal(recordId);
+  }
 </script>
 
+<RejectModal on:refresh={refresh} collectionName="expenses" bind:this={rejectModal} />
 <DsList
   items={items as ExpensesResponse[]}
   search={true}
@@ -108,6 +152,14 @@
       icon="mdi:edit-outline"
       title="Edit"
       color="blue"
+    />
+    <DsActionButton action={() => submit(id)} icon="mdi:send" title="Submit" color="blue" />
+    <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+    <DsActionButton
+      action={() => openRejectModal(id)}
+      icon="mdi:cancel"
+      title="Reject"
+      color="orange"
     />
     <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
   {/snippet}

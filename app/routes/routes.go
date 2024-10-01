@@ -20,7 +20,7 @@ type RecordIdRequest struct {
 }
 
 type RejectionRequest struct {
-	RejectionReason string `json:"rejectionReason"`
+	RejectionReason string `json:"rejection_reason"`
 }
 
 type PurchaseOrderRequest struct {
@@ -77,11 +77,11 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		return nil
 	})
 
-	// Add the approve-timesheet route
+	// Add the approve timesheet route
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
 			Method:  http.MethodPost,
-			Path:    "/api/approve-timesheet",
+			Path:    "/api/time_sheets/:id/approve",
 			Handler: createApproveRecordHandler(app, "time_sheets"),
 			Middlewares: []echo.MiddlewareFunc{
 				apis.RequireRecordAuth("users"),

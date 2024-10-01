@@ -32,11 +32,11 @@
     }
   }
 
-  async function approve(timeSheetId: string) {
+  async function approve(id: string) {
     try {
-      const response = await pb.send("/api/approve-timesheet", {
+      const response = await pb.send(`/api/time_sheets/${id}/approve`, {
         method: "POST",
-        body: JSON.stringify({ timeSheetId }),
+        body: JSON.stringify({ recordId: id }),
         headers: {
           "Content-Type": "application/json",
         },
@@ -49,8 +49,8 @@
     }
   }
 
-  function openRejectModal(timeSheetId: string) {
-    rejectModal?.openModal(timeSheetId);
+  function openRejectModal(id: string) {
+    rejectModal?.openModal(id);
   }
 </script>
 
