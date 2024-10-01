@@ -13,7 +13,7 @@ import (
 	"github.com/pocketbase/pocketbase/models"
 )
 
-func createRejectExpenseHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createRejectRecordHandler(app *pocketbase.PocketBase, collectionName string) echo.HandlerFunc {
 	// This route handles the rejection of a record.
 	// It performs the following actions:
 	// 1. Gets the record ID from the URL.
@@ -45,7 +45,7 @@ func createRejectExpenseHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 		var httpResponseStatusCode int
 
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-			record, err := txDao.FindRecordById("expenses", id)
+			record, err := txDao.FindRecordById(collectionName, id)
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
