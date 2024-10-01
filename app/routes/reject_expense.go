@@ -14,19 +14,19 @@ import (
 )
 
 func createRejectExpenseHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
-	// This route handles the rejection of an expense.
+	// This route handles the rejection of a record.
 	// It performs the following actions:
-	// 1. Gets the expense ID from the URL.
+	// 1. Gets the record ID from the URL.
 	// 2. Validates the request body for a valid rejection reason.
 	// 3. Retrieves the authenticated user's ID.
 	// 4. Runs a database transaction to:
-	//    a. Fetch the expense by ID.
+	//    a. Fetch the record by ID.
 	//    b. Verify that the authenticated user is the assigned approver.
-	//    c. Check if the expense is submitted and not committed or already rejected.
+	//    c. Check if the record is submitted and not committed or already rejected.
 	//    d. Set the rejection timestamp, reason, and rejector.
-	//    e. Save the updated expense.
+	//    e. Save the updated record.
 	// 5. Returns a success message if rejected, or an error message if any checks fail.
-	// This ensures that only valid, submitted expenses can be rejected by the correct user.
+	// This ensures that only valid, submitted records can be rejected by the correct user.
 	return func(c echo.Context) error {
 
 		id := c.PathParam("id")
@@ -45,48 +45,48 @@ func createRejectExpenseHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 		var httpResponseStatusCode int
 
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-			expense, err := txDao.FindRecordById("expenses", id)
+			record, err := txDao.FindRecordById("expenses", id)
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
 					Code:    "record_not_found",
-					Message: fmt.Sprintf("error fetching expense: %v", err),
+					Message: fmt.Sprintf("error fetching record: %v", err),
 				}
 			}
 
 			// Check if the user is the approver
-			if expense.GetString("approver") != userId {
+			if record.GetString("approver") != userId {
 				httpResponseStatusCode = http.StatusUnauthorized
 				return &CodeError{
 					Code:    "rejection_unauthorized",
-					Message: "you are not authorized to reject this expense",
+					Message: "you are not authorized to reject this record",
 				}
 			}
 
-			// Check if the expense is submitted
-			if !expense.GetBool("submitted") {
+			// Check if the record is submitted
+			if !record.GetBool("submitted") {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "expense_not_submitted",
-					Message: "only submitted expenses can be rejected",
+					Code:    "record_not_submitted",
+					Message: "only submitted records can be rejected",
 				}
 			}
 
-			// Check if the expense is committed
-			if !expense.GetDateTime("committed").IsZero() {
+			// Check if the record is committed
+			if !record.GetDateTime("committed").IsZero() {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "expense_committed",
-					Message: "committed expenses cannot be rejected",
+					Code:    "record_committed",
+					Message: "committed records cannot be rejected",
 				}
 			}
 
-			// Check if the expense is already rejected
-			if expense.GetDateTime("rejected").IsZero() {
+			// Check if the record is already rejected
+			if !record.GetDateTime("rejected").IsZero() {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "expense_already_rejected",
-					Message: "this expense is already rejected",
+					Code:    "record_already_rejected",
+					Message: "this record is already rejected",
 				}
 			}
 
@@ -100,16 +100,16 @@ func createRejectExpenseHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			}
 
 			// Set the rejection timestamp, reason, and rejector
-			expense.Set("rejected", time.Now())
-			expense.Set("rejection_reason", req.RejectionReason)
-			expense.Set("rejector", userId)
+			record.Set("rejected", time.Now())
+			record.Set("rejection_reason", req.RejectionReason)
+			record.Set("rejector", userId)
 
-			// Save the updated expense
-			if err := txDao.SaveRecord(expense); err != nil {
+			// Save the updated record
+			if err := txDao.SaveRecord(record); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
-					Code:    "expense_save_error",
-					Message: fmt.Sprintf("error saving expense: %v", err),
+					Code:    "record_save_error",
+					Message: fmt.Sprintf("error saving record: %v", err),
 				}
 			}
 
@@ -126,6 +126,6 @@ func createRejectExpenseHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Expense rejected successfully"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "record rejected successfully"})
 	}
 }

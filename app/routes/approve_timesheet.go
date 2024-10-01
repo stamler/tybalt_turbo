@@ -21,7 +21,7 @@ func createApproveTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc 
 	// 3. Runs a database transaction to:
 	//    a. Fetch the record by ID.
 	//    b. Verify that the authenticated user is the assigned approver.
-	//    c. Check if the record is submitted and not locked or already approved.
+	//    c. Check if the record is submitted and not committed or already approved.
 	//    d. Set the approval timestamp.
 	//    e. Save the updated record.
 	// 4. Returns a success message if approved, or an error message if any checks fail.
@@ -51,9 +51,9 @@ func createApproveTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc 
 				return fmt.Errorf("only submitted records can be approved")
 			}
 
-			// Check if the record is locked
-			if record.GetBool("locked") {
-				return fmt.Errorf("locked time sheets cannot be approved")
+			// Check if the record is committed
+			if !record.GetDateTime("committed").IsZero() {
+				return fmt.Errorf("committed records cannot be approved")
 			}
 
 			// Check if the record is already approved

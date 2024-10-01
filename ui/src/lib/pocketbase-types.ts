@@ -249,8 +249,8 @@ export type TimeSheetReviewersRecord = {
 export type TimeSheetsRecord = {
   approved: IsoDateString;
   approver: RecordIdString;
-  locked: boolean;
-  locker: RecordIdString;
+  committed: IsoDateString;
+  committer: RecordIdString;
   rejected: IsoDateString;
   rejection_reason: string;
   rejector: RecordIdString;

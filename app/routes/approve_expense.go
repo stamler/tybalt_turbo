@@ -53,7 +53,7 @@ func createApproveExpenseHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
 
 			// Check if the record is committed
 			if !record.GetDateTime("committed").IsZero() {
-				return fmt.Errorf("committed expenses cannot be approved")
+				return fmt.Errorf("committed records cannot be approved")
 			}
 
 			// Check if the record is already approved

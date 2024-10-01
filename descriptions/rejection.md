@@ -22,7 +22,7 @@
     - timeSheetId (string): The ID of the timesheet to reject.
   - like the approve-timesheet route, this route verifies that the requestor's
     auth id matches the approver column in the time_sheet record
-  - If the timesheet is already locked, it throws an error
+  - If the timesheet is already committed, it throws an error
   - If the timesheet is not submitted it throws an error
   - Everything is performed in a transaction. See the approve-timesheet route
     for details of this. If the checks pass, the time_sheets record is updated

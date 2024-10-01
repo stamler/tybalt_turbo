@@ -20,8 +20,8 @@ func createUnbundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc
 	// tsid field in all time entries records that have the same time sheet id.
 	// This function will return an error if the time sheet does not exist or if
 	// there is an error deleting the time sheet or updating the time entries. It
-	// will also error if the submitted, approved, or locked fields are true on
-	// the time sheet record.
+	// will also error if the submitted, approved, or committed fields are true
+	// on the time sheet record.
 	return func(c echo.Context) error {
 		var req RecordIdRequest
 		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
@@ -57,9 +57,9 @@ func createUnbundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc
 				}
 			}
 
-			// locked time sheets cannot be unbundled
-			if timeSheet.Get("locked") == true {
-				return fmt.Errorf("locked time sheets cannot be unbundled")
+			// committed time sheets cannot be unbundled
+			if !timeSheet.GetDateTime("committed").IsZero() {
+				return fmt.Errorf("committed time sheets cannot be unbundled")
 			}
 
 			// Get the time entries
