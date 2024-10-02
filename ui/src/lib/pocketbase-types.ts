@@ -295,6 +295,7 @@ type ExpensesRecordExpands = {
   category: CategoriesRecord;
   division: DivisionsRecord;
   job: JobsRecord;
+  rejector: UsersResponse;
   uid: UsersResponse;
 };
 

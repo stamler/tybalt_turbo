@@ -94,6 +94,14 @@
   {/snippet}
   {#snippet byline(item: ExpensesResponse)}
     <span class="flex items-center gap-2">
+      {#if item.rejected !== ""}
+        <DsLabel color="red" title={`${shortDate(item.rejected)}: ${item.rejection_reason}`}>
+          <Icon icon="mdi:cancel" width="24px" class="inline-block" />
+          {item.expand?.rejector.expand?.profiles_via_uid.given_name}
+          {item.expand?.rejector.expand?.profiles_via_uid.surname}
+        </DsLabel>
+      {/if}
+
       {#if item.payment_type === "Mileage"}
         {item.distance} km / ${item.total}
       {:else}

@@ -17,11 +17,10 @@ import (
 	"github.com/pocketbase/pocketbase/models"
 )
 
-// This feature flag is used to limit the amount of expenses that don't have a
-// corresponding purchase order. The operation of this will need to be
-// revisited if we ever allow expenses to be created without a PO number.
+// This feature flag is used to limit the total of expenses that don't have a
+// corresponding purchase order.
 const limitNonPoAmounts = true
-const NO_PO_EXPENSE_LIMIT = 500.0
+const NO_PO_EXPENSE_LIMIT = 100.0
 
 // The cleanExpense function is used to remove properties from the expense
 // record that are not allowed to be set based on the value of the record's
@@ -126,11 +125,14 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 // it is created or updated.
 func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) error {
 
+	hasJob := expenseRecord.Get("job") != ""
+	hasPurchaseOrder := expenseRecord.Get("purchase_order") != ""
 	paymentType := expenseRecord.GetString("payment_type")
 	isAllowance := paymentType == "Allowance"
 	isPersonalReimbursement := paymentType == "PersonalReimbursement"
 	isMileage := paymentType == "Mileage"
 	isCorporateCreditCard := paymentType == "CorporateCreditCard"
+	isFuelCard := paymentType == "FuelCard"
 
 	validationsErrors := validation.Errors{
 		"date": validation.Validate(
@@ -165,8 +167,14 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 			expenseRecord.GetFloat("total"),
 			validation.Required.Error("must be greater than 0"),
 			validation.Min(0.01).Error("must be greater than 0"),
-			validation.When(limitNonPoAmounts && expenseRecord.Get("purchase_order") == "" && !isMileage,
+			validation.When(limitNonPoAmounts && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
 				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
+			),
+		),
+		"purchase_order": validation.Validate(
+			expenseRecord.Get("purchase_order"),
+			validation.When(hasJob,
+				validation.Required.Error("required for all expenses with a job"),
 			),
 		),
 		"allowance_types": validation.Validate(

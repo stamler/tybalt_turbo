@@ -11,7 +11,7 @@ export const load: PageLoad = async ({ depends }) => {
   try {
     // load required data
     items = await pb.collection("expenses").getFullList<ExpensesResponse>({
-      expand: "job,division,category,uid,approver,uid.profiles_via_uid,approver.profiles_via_uid",
+      expand: "job,division,category,uid,approver,uid.profiles_via_uid,approver.profiles_via_uid,rejector.profiles_via_uid",
       sort: "-date",
     });
     return {
