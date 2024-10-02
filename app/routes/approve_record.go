@@ -28,30 +28,52 @@ func createApproveRecordHandler(app *pocketbase.PocketBase, collectionName strin
 		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
 		userId := authRecord.Id
 
+		var httpResponseStatusCode int
+
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
 			record, err := txDao.FindRecordById(collectionName, c.PathParam("id"))
 			if err != nil {
-				return fmt.Errorf("error fetching record: %v", err)
+				httpResponseStatusCode = http.StatusNotFound
+				return &CodeError{
+					Code:    "record_not_found",
+					Message: fmt.Sprintf("error fetching record: %v", err),
+				}
 			}
 
 			// Check if the user is the approver
 			if record.GetString("approver") != userId {
-				return fmt.Errorf("you are not authorized to approve this record")
+				httpResponseStatusCode = http.StatusForbidden
+				return &CodeError{
+					Code:    "unauthorized",
+					Message: "you are not authorized to approve this record",
+				}
 			}
 
 			// Check if the record is submitted
 			if !record.GetBool("submitted") {
-				return fmt.Errorf("only submitted records can be approved")
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_not_submitted",
+					Message: "only submitted records can be approved",
+				}
 			}
 
 			// Check if the record is committed
 			if !record.GetDateTime("committed").IsZero() {
-				return fmt.Errorf("committed records cannot be approved")
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_committed",
+					Message: "committed records cannot be approved",
+				}
 			}
 
 			// Check if the record is already approved
 			if !record.GetDateTime("approved").IsZero() {
-				return fmt.Errorf("this record is already approved")
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_already_approved",
+					Message: "this record is already approved",
+				}
 			}
 
 			// Set the approved timestamp
@@ -59,14 +81,18 @@ func createApproveRecordHandler(app *pocketbase.PocketBase, collectionName strin
 
 			// Save the updated record
 			if err := txDao.SaveRecord(record); err != nil {
-				return fmt.Errorf("error saving record: %v", err)
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_saving_record",
+					Message: fmt.Sprintf("error saving record: %v", err),
+				}
 			}
 
 			return nil
 		})
 
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return c.JSON(httpResponseStatusCode, map[string]string{"error": err.Error()})
 		}
 
 		return c.JSON(http.StatusOK, map[string]string{"message": "Record approved successfully"})

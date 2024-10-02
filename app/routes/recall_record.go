@@ -19,7 +19,8 @@ func createRecallRecordHandler(app *pocketbase.PocketBase, collectionName string
 	//    a. Fetch the record by ID.
 	//    b. Verify that the authenticated user has the same ID as the record's uid.
 	//    c. Verify the record is submitted.
-	//    d. Verify the record is not yet approved.
+	//    d. Verify the record is not yet approved or is rejected.
+	//		e. Verify the record is not committed.
 	//    e. Set submitted to false.
 	//    f. Save the updated record.
 	// 3. Returns a success message if submitted, or an error message if any checks fail.
@@ -28,35 +29,75 @@ func createRecallRecordHandler(app *pocketbase.PocketBase, collectionName string
 		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
 		userId := authRecord.Id
 
+		var httpResponseStatusCode int
+
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
 			record, err := txDao.FindRecordById(collectionName, c.PathParam("id"))
 			if err != nil {
-				return fmt.Errorf("error fetching record: %v", err)
+				httpResponseStatusCode = http.StatusNotFound
+				return &CodeError{
+					Code:    "record_not_found",
+					Message: fmt.Sprintf("error fetching record: %v", err),
+				}
 			}
 
 			// Verify the caller is the record's owner
 			if record.Get("uid") != userId {
-				return fmt.Errorf("you are not authorized to recall this record")
+				httpResponseStatusCode = http.StatusForbidden
+				return &CodeError{
+					Code:    "unauthorized",
+					Message: "you are not authorized to recall this record",
+				}
 			}
 
 			// Check if the record is submitted
 			if !record.GetBool("submitted") {
-				return fmt.Errorf("this record is not submitted")
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_not_submitted",
+					Message: "this record is not submitted",
+				}
 			}
 
-			// Set submitted to false
+			// if the record is approved but not rejected, return an error
+			if !record.GetDateTime("approved").IsZero() && record.GetDateTime("rejected").IsZero() {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_not_rejected",
+					Message: "approved records cannot be recalled unless rejected",
+				}
+			}
+
+			// if the record is committed, return an error
+			if !record.GetDateTime("committed").IsZero() {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_committed",
+					Message: "committed records cannot be recalled",
+				}
+			}
+
+			// recall the record
+			record.Set("rejected", "")
+			record.Set("rejector", "")
+			record.Set("rejection_reason", "")
+			record.Set("approved", "")
 			record.Set("submitted", false)
 
 			// Save the updated record
 			if err := txDao.SaveRecord(record); err != nil {
-				return fmt.Errorf("error saving record: %v", err)
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_saving_record",
+					Message: fmt.Sprintf("error saving record: %v", err),
+				}
 			}
 
 			return nil
 		})
 
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return c.JSON(httpResponseStatusCode, map[string]string{"error": err.Error()})
 		}
 
 		return c.JSON(http.StatusOK, map[string]string{"message": "Record recalled successfully"})

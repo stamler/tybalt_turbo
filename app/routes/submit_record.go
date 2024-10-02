@@ -28,25 +28,43 @@ func createSubmitRecordHandler(app *pocketbase.PocketBase, collectionName string
 		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
 		userId := authRecord.Id
 
+		var httpResponseStatusCode int
+
 		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
 			record, err := txDao.FindRecordById(collectionName, c.PathParam("id"))
 			if err != nil {
-				return fmt.Errorf("error fetching record: %v", err)
+				httpResponseStatusCode = http.StatusNotFound
+				return &CodeError{
+					Code:    "record_not_found",
+					Message: fmt.Sprintf("error fetching record: %v", err),
+				}
 			}
 
 			// Verify the caller is the record's owner
 			if record.Get("uid") != userId {
-				return fmt.Errorf("you are not authorized to submit this record")
+				httpResponseStatusCode = http.StatusForbidden
+				return &CodeError{
+					Code:    "unauthorized",
+					Message: "you are not authorized to submit this record",
+				}
 			}
 
 			// Check if the record is submitted
 			if record.GetBool("submitted") {
-				return fmt.Errorf("this record is already submitted")
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_submitted",
+					Message: "this record is already submitted",
+				}
 			}
 
 			// Check if the record is rejected
-			if record.Get("rejected") != "" {
-				return fmt.Errorf("rejected records cannot be submitted")
+			if !record.GetDateTime("rejected").IsZero() {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_rejected",
+					Message: "rejected records cannot be submitted",
+				}
 			}
 
 			// Set submitted to true
@@ -54,14 +72,18 @@ func createSubmitRecordHandler(app *pocketbase.PocketBase, collectionName string
 
 			// Save the updated record
 			if err := txDao.SaveRecord(record); err != nil {
-				return fmt.Errorf("error saving record: %v", err)
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_saving_record",
+					Message: fmt.Sprintf("error saving record: %v", err),
+				}
 			}
 
 			return nil
 		})
 
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": err.Error()})
+			return c.JSON(httpResponseStatusCode, map[string]string{"error": err.Error()})
 		}
 
 		return c.JSON(http.StatusOK, map[string]string{"message": "Record submitted successfully"})
