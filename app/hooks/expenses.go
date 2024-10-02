@@ -173,7 +173,7 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 		),
 		"purchase_order": validation.Validate(
 			expenseRecord.Get("purchase_order"),
-			validation.When(hasJob,
+			validation.When(hasJob && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
 				validation.Required.Error("required for all expenses with a job"),
 			),
 		),
