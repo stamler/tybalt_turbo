@@ -4,7 +4,6 @@
 package hooks
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"time"
@@ -175,53 +174,4 @@ func getSecondApproverClaim(app *pocketbase.PocketBase, poType string, total flo
 
 	// If neither condition is met, secondApproverClaim remains an empty string
 	return secondApproverClaim, nil
-}
-
-func generatePONumber(app *pocketbase.PocketBase) (string, error) {
-	currentYear := time.Now().Year()
-	prefix := fmt.Sprintf("%d-", currentYear)
-
-	// Query existing PO numbers in descending order using the prefix as a
-	// filter and get the first result
-	existingPOs, err := app.Dao().FindRecordsByFilter(
-		"purchase_orders",
-		"po_number ~ {:prefix}%",
-		"-po_number",
-		1,
-		0,
-		dbx.Params{"prefix": prefix},
-	)
-	if err != nil {
-		return "", fmt.Errorf("error querying existing PO numbers: %v", err)
-	}
-
-	var lastNumber int
-	if len(existingPOs) > 0 {
-		lastPO := existingPOs[0].Get("po_number").(string)
-		_, err := fmt.Sscanf(lastPO, "%d-%04d", &currentYear, &lastNumber)
-		if err != nil {
-			return "", fmt.Errorf("error parsing last PO number: %v", err)
-		}
-	}
-
-	// Generate the new PO number
-	for i := lastNumber + 1; i < 5000; i++ {
-		newPONumber := fmt.Sprintf("%s%04d", prefix, i)
-
-		// Check if the generated PO number is unique
-		existing, err := app.Dao().FindFirstRecordByFilter(
-			"purchase_orders",
-			"po_number = {:poNumber}",
-			dbx.Params{"poNumber": newPONumber},
-		)
-		if err != nil && err != sql.ErrNoRows {
-			return "", fmt.Errorf("error checking PO number uniqueness: %v", err)
-		}
-
-		if existing == nil {
-			return newPONumber, nil
-		}
-	}
-
-	return "", fmt.Errorf("unable to generate a unique PO number")
 }
