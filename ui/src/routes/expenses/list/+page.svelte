@@ -45,14 +45,8 @@
           "Content-Type": "application/json",
         },
       });
-      // replace the item in the list with the updated item
-      items = items?.map((item) => {
-        if (item.id === id) {
-          return response as ExpensesResponse;
-        }
-        return item;
-      });
-    } catch (error) {
+      await refresh();
+    } catch (error: any) {
       globalStore.addError(error?.response.error);
     }
   }
@@ -62,7 +56,19 @@
       await pb.send(`/api/expenses/${id}/submit`, {
         method: "POST",
       });
-    } catch (error) {
+      await refresh();
+    } catch (error: any) {
+      globalStore.addError(error?.response.error);
+    }
+  }
+
+  async function recall(id: string) {
+    try {
+      await pb.send(`/api/expenses/${id}/recall`, {
+        method: "POST",
+      });
+      await refresh();
+    } catch (error: any) {
       globalStore.addError(error?.response.error);
     }
   }
@@ -146,21 +152,33 @@
       {/if}
     </span>
   {/snippet}
-  {#snippet actions({ id }: ExpensesResponse)}
-    <DsActionButton
-      action={`/expenses/${id}/edit`}
-      icon="mdi:edit-outline"
-      title="Edit"
-      color="blue"
-    />
-    <DsActionButton action={() => submit(id)} icon="mdi:send" title="Submit" color="blue" />
-    <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
-    <DsActionButton
-      action={() => openRejectModal(id)}
-      icon="mdi:cancel"
-      title="Reject"
-      color="orange"
-    />
+  {#snippet actions({ id, submitted, approved, rejected, committed }: ExpensesResponse)}
+    {#if !submitted}
+      <DsActionButton
+        action={`/expenses/${id}/edit`}
+        icon="mdi:edit-outline"
+        title="Edit"
+        color="blue"
+      />
+    {/if}
+    {#if (submitted && approved === "") || rejected !== ""}
+      <DsActionButton action={() => recall(id)} icon="mdi:rewind" title="Recall" color="orange" />
+    {/if}
+    {#if !submitted}
+      <DsActionButton action={() => submit(id)} icon="mdi:send" title="Submit" color="blue" />
+    {/if}
+    {#if submitted && approved === ""}
+      <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+    {/if}
+    <!-- Approved records can be rejected if they haven't been committed or rejected already -->
+    {#if approved !== "" && rejected === "" && committed === ""}
+      <DsActionButton
+        action={() => openRejectModal(id)}
+        icon="mdi:cancel"
+        title="Reject"
+        color="orange"
+      />
+    {/if}
     <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
   {/snippet}
 </DsList>

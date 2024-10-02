@@ -186,6 +186,11 @@ func validateExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) e
 // is in a valid state before it is created or updated.
 func ProcessExpense(app *pocketbase.PocketBase, expenseRecord *models.Record, context echo.Context) error {
 
+	// if the expense record is submitted, return an error
+	if expenseRecord.Get("submitted") == true {
+		return apis.NewBadRequestError("cannot edit submitted expense", nil)
+	}
+
 	// clean the expense record
 	if err := cleanExpense(app, expenseRecord); err != nil {
 		return err

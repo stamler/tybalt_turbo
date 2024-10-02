@@ -139,6 +139,34 @@ func AddRoutes(app *pocketbase.PocketBase) {
 		return nil
 	})
 
+	// Add the submit expense route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/expenses/:id/submit",
+			Handler: createSubmitRecordHandler(app, "expenses"),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
+	// Add the recall expense route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/expenses/:id/recall",
+			Handler: createRecallRecordHandler(app, "expenses"),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
 	// Add the approve expense route
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
