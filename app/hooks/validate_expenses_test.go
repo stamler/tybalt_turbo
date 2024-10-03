@@ -30,14 +30,16 @@ func TestValidateExpense(t *testing.T) {
 	}{
 		"total_too_high_without_po": {
 			valid: false,
+			field: "total",
 			record: buildExpenseRecordFromMap(map[string]any{
+				"allowance_types": []string{},
 				"date":            "2024-01-22",
 				"description":     "Valid description",
-				"vendor_name":     "Valid Vendor",
-				"total":           100.50,
-				"payment_type":    "OnAccount",
 				"job":             "",
-				"allowance_types": []string{},
+				"payment_type":    "OnAccount",
+				"purchase_order":  "",
+				"total":           100.50,
+				"vendor_name":     "Valid Vendor",
 			}),
 		},
 	}
