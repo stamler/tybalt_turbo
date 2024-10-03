@@ -20,6 +20,7 @@
     fieldName,
     uiName,
     placeholder,
+    disabled = false,
   }: {
     value: string | number;
     type?: "text" | "number" | "password";
@@ -30,6 +31,7 @@
     fieldName: string;
     uiName: string;
     placeholder?: string;
+    disabled?: boolean;
   } = $props();
 </script>
 
@@ -37,7 +39,9 @@
   <span class="flex w-full gap-2">
     <label for={`text-input-${thisId}`}>{uiName}</label>
     <input
-      class="flex-1 rounded border border-neutral-300 px-1"
+      class="flex-1 rounded border border-neutral-300 px-1 {disabled ? 'opacity-50' : ''} {disabled
+        ? 'cursor-not-allowed'
+        : ''}"
       {type}
       step={step || null}
       min={min || null}
@@ -46,6 +50,7 @@
       name={fieldName}
       placeholder={placeholder || uiName}
       bind:value
+      {disabled}
     />
   </span>
   {#if errors[fieldName] !== undefined}

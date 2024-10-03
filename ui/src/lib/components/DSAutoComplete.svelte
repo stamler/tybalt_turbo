@@ -20,6 +20,7 @@
     errors,
     fieldName,
     uiName,
+    disabled = false,
   }: {
     value: string;
     index: MiniSearch<T>;
@@ -27,6 +28,7 @@
     errors: Record<string, { message: string }>;
     fieldName: string;
     uiName: string;
+    disabled?: boolean;
   } = $props();
 
   let results = $state([] as SearchResult[]);
@@ -86,16 +88,21 @@
     <span class="flex w-full gap-2">
       <label for={`autocomplete-input-${thisId}`}>{uiName}</label>
       {#if value !== ""}
-        <span>{@render resultTemplate(item)}</span>
-        <DsActionButton action={clearValue}>Clear</DsActionButton>
+        <span class={disabled ? "opacity-50" : ""}>{@render resultTemplate(item)}</span>
+        {#if !disabled}
+          <DsActionButton action={clearValue}>Clear</DsActionButton>
+        {/if}
       {:else}
         <input
-          class="flex-1 rounded border border-neutral-300 px-1"
+          class="flex-1 rounded border border-neutral-300 px-1 {disabled
+            ? 'opacity-50'
+            : ''} {disabled ? 'cursor-not-allowed' : ''}"
           type="text"
           id={`autocomplete-input-${thisId}`}
           name={fieldName}
           placeholder={uiName}
           oninput={updateResults}
+          {disabled}
         />
       {/if}
     </span>

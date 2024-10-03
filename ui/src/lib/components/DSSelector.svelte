@@ -19,6 +19,7 @@
     uiName,
     clear = false,
     optionTemplate,
+    disabled = false,
   }: {
     value: string | number;
     items: T[];
@@ -27,6 +28,7 @@
     uiName: string;
     clear?: boolean;
     optionTemplate: Snippet<[T]>;
+    disabled?: boolean;
   } = $props();
 
   function clearValue() {
@@ -41,13 +43,14 @@
       id={`select-input-${thisId}`}
       name={fieldName}
       bind:value
-      class="rounded border border-neutral-300 px-1"
+      class="rounded border border-neutral-300 px-1 {disabled ? 'opacity-50' : ''}"
+      {disabled}
     >
       {#each items as item}
         <option value={item.id} selected={item.id === value}>{@render optionTemplate(item)}</option>
       {/each}
     </select>
-    {#if clear === true && value !== undefined && value !== ""}
+    {#if clear === true && value !== undefined && value !== "" && !disabled}
       <DsActionButton action={clearValue} title="Clear">Clear</DsActionButton>
     {/if}
   </span>
