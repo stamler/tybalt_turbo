@@ -58,6 +58,12 @@ func validateExpense(expenseRecord *models.Record) error {
 				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
 			),
 		),
+		"distance": validation.Validate(
+			expenseRecord.GetFloat("distance"),
+			validation.When(isMileage,
+				validation.Required.Error("required for mileage expenses"),
+			),
+		),
 		"purchase_order": validation.Validate(
 			expenseRecord.Get("purchase_order"),
 			validation.When(hasJob && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
