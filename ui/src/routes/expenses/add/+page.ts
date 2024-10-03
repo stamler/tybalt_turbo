@@ -10,6 +10,7 @@ export const load: PageLoad<ExpensesPageData> = async () => {
     division: "vccd5fo56ctbigh",
     description: "",
     payment_type: "OnAccount",
+    purchase_order: "",
     vendor_name: "",
     job: "",
     category: "",

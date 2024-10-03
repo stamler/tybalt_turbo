@@ -11,6 +11,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     division: "vccd5fo56ctbigh",
     description: "",
     payment_type: "OnAccount",
+    purchase_order: "",
     vendor_name: "",
     job: "",
     category: "",
@@ -19,7 +20,9 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
   };
   let item: ExpensesRecord;
   try {
-    item = await pb.collection("expenses").getOne(params.eid);
+    item = await pb.collection("expenses").getOne(params.eid, {
+      expand: "purchase_order",
+    });
     return { item, editing: true, id: params.eid };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);
