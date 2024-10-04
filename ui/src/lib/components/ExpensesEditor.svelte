@@ -56,22 +56,6 @@
       item.cc_last_4_digits = "";
     }
 
-    if (item.payment_type === "Allowance") {
-      // set the total to a default value non-zero value so that it passes
-      // initial validation. It will be updated during processing to the
-      // correct value based on the allowance_types
-      // item.total = 1.0;
-
-      // set the allowance_types to an array of strings based on the
-      // allowanceTypes object
-      const at = Object.entries(allowanceTypes)
-        .filter(([_, value]) => value)
-        .map(([type]) => type as ExpensesAllowanceTypesOptions);
-
-      // complex types must be assigned using the spread operator
-      item = { ...item, allowance_types: at as ExpensesAllowanceTypesOptions[] };
-    }
-
     try {
       if (data.editing && data.id !== null) {
         await pb.collection("expenses").update(data.id, item);
@@ -207,7 +191,17 @@
           <span class="flex items-center gap-1">
             <input
               type="checkbox"
-              bind:checked={allowanceTypes[type as keyof typeof allowanceTypes]}
+              checked={item.allowance_types.includes(type as ExpensesAllowanceTypesOptions)}
+              onchange={(e) => {
+                if ((e.target as HTMLInputElement).checked) {
+                  item.allowance_types = [
+                    ...item.allowance_types,
+                    type as ExpensesAllowanceTypesOptions,
+                  ];
+                } else {
+                  item.allowance_types = item.allowance_types.filter((t) => t !== type);
+                }
+              }}
             />
             {type}
           </span>

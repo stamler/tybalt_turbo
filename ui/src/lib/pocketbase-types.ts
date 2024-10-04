@@ -425,6 +425,8 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "users"): RecordService<UsersResponse>;
 };
 
+export type SelectOption = { id: string | number };
+
 // Type guards
 export function isBaseSystemFields(item: unknown): item is BaseSystemFields {
   return (
