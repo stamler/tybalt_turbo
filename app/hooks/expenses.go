@@ -42,80 +42,98 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 	// need to fetch the appropriate expense rate from the expense_rates
 	// collection and set the rate and total fields on the expense record
 	paymentType := expenseRecord.GetString("payment_type")
-	if paymentType == "Mileage" || paymentType == "Allowance" {
 
-		// Expense rates are stored in the expense_rates collection in PocketBase.
-		// The records have an effective_date property that designates the date the
-		// rate is effective. We must fetch the appropriate record from the
-		// expense_rates collection based on the expense record's date property.
+	switch paymentType {
+	case "Mileage":
 		expenseDate := expenseRecord.GetString("date")
-		expenseDateAsTime, parseErr := time.Parse(time.DateOnly, expenseDate)
-		if parseErr != nil {
-			return parseErr
+		expenseRateRecord, err := getExpenseRateRecord(app, expenseRecord)
+		if err != nil {
+			return err
 		}
 
-		// fetch the expense rate record from the expense_rates collection
-		expenseRateRecords, findErr := app.Dao().FindRecordsByFilter("expense_rates", "effective_date <= {:expenseDate}", "-effective_date", 1, 0, dbx.Params{
-			"expenseDate": expenseDateAsTime.Format("2006-01-02"),
-		})
-		if findErr != nil {
-			return findErr
+		// if the paymentType is "Mileage", distance must be a positive integer
+		// and we calculate the total by multiplying distance by the rate
+		distance := expenseRecord.GetFloat("distance")
+		// check if the distance is an integer
+		if distance != float64(int(distance)) {
+			return errors.New("distance must be an integer for mileage expenses")
 		}
 
-		// if there are no expense rate records, return an error
-		if len(expenseRateRecords) == 0 {
-			return errors.New("no expense rate record found for the given date")
+		startDate, err := getAnnualPayrollPeriodStartDate(app, expenseDate)
+		if err != nil {
+			return err
 		}
-		expenseRateRecord := expenseRateRecords[0]
 
-		if paymentType == "Mileage" {
-			// if the paymentType is "Mileage", distance must be a positive integer
-			// and we calculate the total by multiplying distance by the rate
-			distance := expenseRecord.GetFloat("distance")
-			// check if the distance is an integer
-			if distance != float64(int(distance)) {
-				return errors.New("distance must be an integer for mileage expenses")
-			}
-
-			startDate, err := getAnnualPayrollPeriodStartDate(app, expenseDate)
-			if err != nil {
-				return err
-			}
-
-			totalMileageExpense, mileageErr := calculateMileageTotal(app, int(distance), startDate, expenseDate, expenseRateRecord)
-			if mileageErr != nil {
-				return mileageErr
-			}
-
-			expenseRecord.Set("total", totalMileageExpense)
-		} else if paymentType == "Allowance" {
-			// breakfast, lunch, dinner, and lodging are all properties on the
-			// expense_rate record. if the paymentType is "Allowance", the
-			// allowance_type property of the expenseRecord will have one or more of
-			// the following values: Breakfast, Lunch, Dinner, Lodging. It is a JSON
-			// array of strings. We use this to determine which of the rates to sum
-			// up to get the total allowance for the expense.
-
-			// get the allowance_types property from the expense record
-			allowanceTypes := expenseRecord.Get("allowance_types").([]string)
-
-			// sum up the rates for the allowance types that are present
-			total := 0.0
-			for _, allowanceType := range allowanceTypes {
-				total += expenseRateRecord.GetFloat(strings.ToLower(allowanceType))
-			}
-
-			// build a description of the expense by joining the allowance types
-			// with commas
-			allowanceDescription := "Allowance for "
-			allowanceDescription += strings.Join(allowanceTypes, ", ")
-
-			// set the total and description on the expense record
-			expenseRecord.Set("total", total)
-			expenseRecord.Set("description", allowanceDescription)
+		totalMileageExpense, mileageErr := calculateMileageTotal(app, int(distance), startDate, expenseDate, expenseRateRecord)
+		if mileageErr != nil {
+			return mileageErr
 		}
+
+		// update the properties appropriate for a mileage expense
+		expenseRecord.Set("total", totalMileageExpense)
+		expenseRecord.Set("vendor_name", "")
+
+		// TODO: during commit, we need to re-run the mileage calculation
+		// factoring in the entire year's mileage total that is committed. This
+		// solves the issue of out-of-order mileage expenses and acknowledges only
+		// committed expenses as the source of truth.
+
+	case "Allowance":
+		expenseRateRecord, err := getExpenseRateRecord(app, expenseRecord)
+		if err != nil {
+			return err
+		}
+
+		// If the paymentType is "Allowance", the allowance_type property of the
+		// expenseRecord will have one or more of the following values: Breakfast,
+		// Lunch, Dinner, Lodging. It is a JSON array of strings. We use this to
+		// determine which of the rates to sum up to get the total allowance for the
+		// expense.
+		allowanceTypes := expenseRecord.Get("allowance_types").([]string)
+
+		// sum up the rates for the allowance types that are present
+		total := 0.0
+		for _, allowanceType := range allowanceTypes {
+			total += expenseRateRecord.GetFloat(strings.ToLower(allowanceType))
+		}
+
+		// build a description of the expense by joining the allowance types
+		// with commas
+		allowanceDescription := "Allowance for "
+		allowanceDescription += strings.Join(allowanceTypes, ", ")
+
+		// update the properties appropriate for an allowance expense
+		expenseRecord.Set("total", total)
+		expenseRecord.Set("description", allowanceDescription)
+		expenseRecord.Set("vendor_name", "")
 	}
 	return nil
+}
+
+func getExpenseRateRecord(app *pocketbase.PocketBase, expenseRecord *models.Record) (*models.Record, error) {
+	// Expense rates are stored in the expense_rates collection in PocketBase.
+	// The records have an effective_date property that designates the date the
+	// rate is effective. We must fetch the appropriate record from the
+	// expense_rates collection based on the expense record's date property.
+	expenseDate := expenseRecord.GetString("date")
+	expenseDateAsTime, parseErr := time.Parse(time.DateOnly, expenseDate)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	// fetch the expense rate record from the expense_rates collection
+	expenseRateRecords, findErr := app.Dao().FindRecordsByFilter("expense_rates", "effective_date <= {:expenseDate}", "-effective_date", 1, 0, dbx.Params{
+		"expenseDate": expenseDateAsTime.Format("2006-01-02"),
+	})
+	if findErr != nil {
+		return nil, findErr
+	}
+
+	// if there are no expense rate records, return an error
+	if len(expenseRateRecords) == 0 {
+		return nil, errors.New("no expense rate record found for the given date")
+	}
+	return expenseRateRecords[0], nil
 }
 
 // The processExpense function is used to process the expense record. It is
