@@ -295,6 +295,7 @@ type ExpensesRecordExpands = {
   category: CategoriesRecord;
   division: DivisionsRecord;
   job: JobsRecord;
+  purchase_order: PurchaseOrdersRecord;
   rejector: UsersResponse;
   uid: UsersResponse;
 };
@@ -424,4 +425,22 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "users"): RecordService<UsersResponse>;
 };
 
-export type HasId = { id: RecordIdString };
+// Type guards
+export function isBaseSystemFields(item: unknown): item is BaseSystemFields {
+  return (
+    !!item &&
+    typeof item === "object" &&
+    "expand" in item &&
+    !!item.expand &&
+    "id" in item &&
+    typeof item.id === "string"
+  );
+}
+
+export function isExpensesRecord(item: unknown): item is ExpensesRecord {
+  return !!item && typeof item === "object" && "uid" in item && typeof item.uid === "string";
+}
+
+export function isExpensesResponse(item: unknown): item is ExpensesResponse {
+  return isBaseSystemFields(item) && isExpensesRecord(item);
+}

@@ -8,13 +8,13 @@
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate, hoursWorked, jobs, divisions, payoutRequests } from "$lib/utilities";
   import type { TimeSheetTally } from "$lib/utilities";
-
-  let shareModal: ShareModal;
-  let rejectModal: RejectModal;
+  import type { SvelteComponent } from "svelte";
+  let shareModal: SvelteComponent;
+  let rejectModal: SvelteComponent;
 
   async function unbundle(id: string) {
     try {
-      const response = await pb.send(`/api/time_sheets/${id}/unbundle`, {
+      await pb.send(`/api/time_sheets/${id}/unbundle`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -33,7 +33,7 @@
 
   async function approve(id: string) {
     try {
-      const response = await pb.send(`/api/time_sheets/${id}/approve`, {
+      await pb.send(`/api/time_sheets/${id}/approve`, {
         method: "POST",
         body: JSON.stringify({ recordId: id }),
         headers: {

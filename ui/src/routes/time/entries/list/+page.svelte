@@ -35,7 +35,7 @@
 
   async function bundle(weekEnding: string) {
     try {
-      const response = await pb.send(`/api/time_sheets/${weekEnding}/bundle`, {
+      await pb.send(`/api/time_sheets/${weekEnding}/bundle`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

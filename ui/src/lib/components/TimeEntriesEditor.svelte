@@ -155,9 +155,6 @@
       fieldName="division"
       uiName="Division"
     />
-    {#snippet jobOptionTemplate(item: JobsRecord)}
-      {item.number} - {item.description}
-    {/snippet}
     {#if $globalStore.jobsIndex !== null}
       <DsAutoComplete
         bind:value={item.job as string}

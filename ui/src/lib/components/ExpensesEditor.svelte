@@ -3,6 +3,7 @@
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsLabel from "$lib/components/DsLabel.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DsFileSelect from "$lib/components/DsFileSelect.svelte";
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
@@ -10,6 +11,7 @@
   import { goto } from "$app/navigation";
   import type { ExpensesPageData } from "$lib/svelte-types";
   import type { CategoriesResponse, ExpensesAllowanceTypesOptions } from "$lib/pocketbase-types";
+  import { isExpensesResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
 
   let { data }: { data: ExpensesPageData } = $props();
@@ -109,12 +111,19 @@
     {/if}
   </span>
 
+  {#if isExpensesResponse(item) && item.purchase_order !== ""}
+    <span class="flex w-full gap-2">
+      <DsLabel color="cyan">PO {item.expand.purchase_order.po_number}</DsLabel>
+    </span>
+  {/if}
+
   <DsSelector
     bind:value={item.division as string}
     items={$globalStore.divisions}
     {errors}
     fieldName="division"
     uiName="Division"
+    disabled={item.purchase_order !== ""}
   >
     {#snippet optionTemplate(item)}
       {item.code} - {item.name}
@@ -135,12 +144,22 @@
     {errors}
     fieldName="payment_type"
     uiName="Payment Type"
+    disabled={item.purchase_order !== ""}
   >
     {#snippet optionTemplate(item)}
       {item.name}
     {/snippet}
   </DsSelector>
 
+  <!-- Job + category fields are only allowed if a purchase order is present or
+   if the payment type is Allowance, Mileage, FuelCard, or
+   PersonalReimbursement, so we should 
+     1. show them as uneditable fields when creating an expense from an existing
+        purchase order (purchase_order !== "")
+     2. show them as editable if the payment type is Allowance, Mileage,
+        FuelCard, or PersonalReimbursement
+     3. hide them otherwise
+   -->
   {#if $globalStore.jobsIndex !== null}
     <DsAutoComplete
       bind:value={item.job as string}
@@ -148,6 +167,13 @@
       {errors}
       fieldName="job"
       uiName="Job"
+      disabled={item.purchase_order !== "" ||
+        !(
+          item.payment_type === "Allowance" ||
+          item.payment_type === "Mileage" ||
+          item.payment_type === "FuelCard" ||
+          item.payment_type === "PersonalReimbursement"
+        )}
     >
       {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
     </DsAutoComplete>
@@ -161,6 +187,7 @@
       fieldName="category"
       uiName="Category"
       clear={true}
+      disabled={item.purchase_order !== ""}
     >
       {#snippet optionTemplate(item: CategoriesResponse)}
         {item.name}
@@ -206,6 +233,7 @@
       {errors}
       fieldName="description"
       uiName="Description"
+      disabled={item.purchase_order !== ""}
     />
 
     {#if item.payment_type !== "Mileage"}
@@ -223,6 +251,7 @@
         {errors}
         fieldName="vendor_name"
         uiName="Vendor Name"
+        disabled={item.purchase_order !== ""}
       />
     {:else}
       <DsTextInput

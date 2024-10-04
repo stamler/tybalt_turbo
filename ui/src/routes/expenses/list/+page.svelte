@@ -38,7 +38,7 @@
   }
   async function approve(id: string) {
     try {
-      const response = await pb.send(`/api/expenses/${id}/approve`, {
+      await pb.send(`/api/expenses/${id}/approve`, {
         method: "POST",
         body: JSON.stringify({ recordId: id }),
         headers: {

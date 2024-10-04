@@ -1,4 +1,4 @@
-import type { ExpensesRecord } from "$lib/pocketbase-types";
+import type { ExpensesResponse } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
 import type { ExpensesPageData } from "$lib/svelte-types";
 import { pb } from "$lib/pocketbase";
@@ -18,7 +18,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     // approver is configured as not required in pocketbase so we do not have to
     // set it here, but is set by the server side hook
   };
-  let item: ExpensesRecord;
+  let item: ExpensesResponse;
   try {
     item = await pb.collection("expenses").getOne(params.eid, {
       expand: "purchase_order",
@@ -26,6 +26,6 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     return { item, editing: true, id: params.eid };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);
-    return { item: { ...defaultItem } as ExpensesRecord, editing: false, id: null };
+    return { item: { ...defaultItem } as ExpensesResponse, editing: false, id: null };
   }
 };

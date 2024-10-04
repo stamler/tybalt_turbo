@@ -2,9 +2,9 @@
   let idCounter = $state(0);
 </script>
 
-<script lang="ts" generics="T extends HasId">
+<script lang="ts" generics="T extends BaseSystemFields<any>">
   import type { Snippet } from "svelte";
-  import type { HasId } from "$lib/pocketbase-types";
+  import type { BaseSystemFields } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   // get an id for this instance from the counter in the module context then
   // increment it so the next instance gets a different id
