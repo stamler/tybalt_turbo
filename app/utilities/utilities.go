@@ -1,6 +1,6 @@
-// In this file we define utility functions for the hooks.
+// In this file we define utility functions for hooks and routes
 
-package hooks
+package utilities
 
 import (
 	"encoding/json"
@@ -13,11 +13,12 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-func isValidDate(value interface{}) error {
+func IsValidDate(value interface{}) error {
 	s, _ := value.(string)
 	if _, err := time.Parse(time.DateOnly, s); err != nil {
 		return validation.NewError("validation_invalid_date", s+" is not a valid date")
@@ -29,7 +30,7 @@ func isValidDate(value interface{}) error {
 // the Saturday immediately following the date property. If the argument is
 // already a Saturday, it is returned unchanged. The date property is a string
 // in the format "YYYY-MM-DD".
-func generateWeekEnding(date string) (string, error) {
+func GenerateWeekEnding(date string) (string, error) {
 	// parse the date string
 	t, err := time.Parse(time.DateOnly, date)
 	if err != nil {
@@ -50,8 +51,8 @@ func generateWeekEnding(date string) (string, error) {
 // every second Saturday rather than every Saturday. Thus we will call
 // generateWeekEnding then check if the result is correct. If it isn't we'll
 // return the date 7 days later.
-func generatePayPeriodEnding(date string) (string, error) {
-	weekEnding, err := generateWeekEnding(date)
+func GeneratePayPeriodEnding(date string) (string, error) {
+	weekEnding, err := GenerateWeekEnding(date)
 	if err != nil {
 		return "", err
 	}
@@ -84,7 +85,7 @@ func generatePayPeriodEnding(date string) (string, error) {
 	return weekEndingTime.AddDate(0, 0, 7).Format(time.DateOnly), nil
 }
 
-func isPositiveMultipleOfPointFive() validation.RuleFunc {
+func IsPositiveMultipleOfPointFive() validation.RuleFunc {
 	return func(value interface{}) error {
 		s, _ := value.(float64)
 		if s == 0 {
@@ -101,7 +102,7 @@ func isPositiveMultipleOfPointFive() validation.RuleFunc {
 	}
 }
 
-func isPositiveMultipleOfPointZeroOne() validation.RuleFunc {
+func IsPositiveMultipleOfPointZeroOne() validation.RuleFunc {
 	return func(value interface{}) error {
 		s, _ := value.(float64)
 		if s == 0 {
@@ -123,7 +124,7 @@ func isPositiveMultipleOfPointZeroOne() validation.RuleFunc {
 // expenseDate: the date of the expense
 // startDate: the start date of the annual period derived from the payroll_year_end_dates collection
 // expenseRateRecord: the expense rate record retrieved from the expense_rates collection
-func calculateMileageTotal(app *pocketbase.PocketBase, distance int, startDate string, expenseDate string, expenseRateRecord *models.Record) (float64, error) {
+func CalculateMileageTotal(app *pocketbase.PocketBase, distance int, startDate string, expenseDate string, expenseRateRecord *models.Record) (float64, error) {
 	// the mileage property on the expense_rate record is a JSON object with
 	// keys that represent the lower bound of the distance band and a value
 	// that represents the rate for that distance band. We extract the mileage
@@ -310,7 +311,7 @@ func calculateMileageTotal(app *pocketbase.PocketBase, distance int, startDate s
 
 // when given a date string in the format "YYYY-MM-DD", return the date string
 // representing the first day of the annual payroll period.
-func getAnnualPayrollPeriodStartDate(app *pocketbase.PocketBase, date string) (string, error) {
+func GetAnnualPayrollPeriodStartDate(app *pocketbase.PocketBase, date string) (string, error) {
 	// First we need to determine the current annual period. To do this we use
 	// the expenseDate to find the date property of the payroll_year_end_dates
 	// collection record that is less than the expenseDate. We then use day
@@ -334,4 +335,25 @@ func getAnnualPayrollPeriodStartDate(app *pocketbase.PocketBase, date string) (s
 	}
 	startDate := payrollYearEndDateAsTime.AddDate(0, 0, 1)
 	return startDate.Format(time.DateOnly), nil
+}
+
+// this function returns true if the user with uid has the claim with the
+// specified name and false otherwise
+func HasClaim(dao *daos.Dao, uid string, name string) (bool, error) {
+	userClaims, err := dao.FindRecordsByFilter(
+		"user_claims",
+		"uid = {:uid} AND cid.name = {:name}",
+		"",
+		1,
+		0,
+		dbx.Params{
+			"uid":  uid,
+			"name": name,
+		},
+	)
+	if err != nil {
+		return false, err
+	}
+
+	return len(userClaims) > 0, nil
 }

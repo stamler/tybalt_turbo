@@ -7,6 +7,7 @@ import (
 	"log"
 	"strings"
 	"time"
+	"tybalt/utilities"
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
@@ -59,12 +60,12 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 			return errors.New("distance must be an integer for mileage expenses")
 		}
 
-		startDate, err := getAnnualPayrollPeriodStartDate(app, expenseDate)
+		startDate, err := utilities.GetAnnualPayrollPeriodStartDate(app, expenseDate)
 		if err != nil {
 			return err
 		}
 
-		totalMileageExpense, mileageErr := calculateMileageTotal(app, int(distance), startDate, expenseDate, expenseRateRecord)
+		totalMileageExpense, mileageErr := utilities.CalculateMileageTotal(app, int(distance), startDate, expenseDate, expenseRateRecord)
 		if mileageErr != nil {
 			return mileageErr
 		}
@@ -153,7 +154,7 @@ func ProcessExpense(app *pocketbase.PocketBase, expenseRecord *models.Record, co
 
 	// write the pay_period_ending property to the record. This is derived
 	// exclusively from the date property.
-	payPeriodEnding, ppEndErr := generatePayPeriodEnding(expenseRecord.GetString("date"))
+	payPeriodEnding, ppEndErr := utilities.GeneratePayPeriodEnding(expenseRecord.GetString("date"))
 	log.Printf("payPeriodEnding: %s", payPeriodEnding)
 	if ppEndErr != nil {
 		return apis.NewBadRequestError("Error generating pay_period_ending", ppEndErr)

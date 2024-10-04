@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"log"
 	"regexp"
+	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/labstack/echo/v5"
@@ -99,13 +100,13 @@ func validateTimeEntry(timeEntryRecord *models.Record, requiredFields []string) 
 	// The second pass performs everything else (cross-field validation, field
 	// values, etc.)
 	otherValidationsErrors := validation.Errors{
-		"hours":                 validation.Validate(timeEntryRecord.Get("hours"), validation.By(isPositiveMultipleOfPointFive())),
-		"date":                  validation.Validate(timeEntryRecord.Get("date"), validation.By(isValidDate)),
+		"hours":                 validation.Validate(timeEntryRecord.Get("hours"), validation.By(utilities.IsPositiveMultipleOfPointFive())),
+		"date":                  validation.Validate(timeEntryRecord.Get("date"), validation.By(utilities.IsValidDate)),
 		"global":                validation.Validate(totalHours, validation.Max(18.0).Error("Total hours must not exceed 18")),
 		"meals_hours":           validation.Validate(timeEntryRecord.Get("meals_hours"), validation.Max(3.0).Error("Meals Hours must not exceed 3")),
 		"description":           validation.Validate(timeEntryRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
 		"work_record":           validation.Validate(timeEntryRecord.Get("work_record"), validation.When(jobIsPresent, validation.Match(regexp.MustCompile("^[FKQ][0-9]{2}-[0-9]{3,4}(-[0-9]+)?$")).Error("must be in the correct format")).Else(validation.In("").Error("Work Record must be empty when job is not provided"))),
-		"payout_request_amount": validation.Validate(timeEntryRecord.Get("payout_request_amount"), validation.Min(0.0).Exclusive().Error("Amount must be greater than 0"), validation.By(isPositiveMultipleOfPointZeroOne())),
+		"payout_request_amount": validation.Validate(timeEntryRecord.Get("payout_request_amount"), validation.Min(0.0).Exclusive().Error("Amount must be greater than 0"), validation.By(utilities.IsPositiveMultipleOfPointZeroOne())),
 	}.Filter()
 
 	return otherValidationsErrors
@@ -135,7 +136,7 @@ func ProcessTimeEntry(app *pocketbase.PocketBase, record *models.Record, context
 
 	// write the week_ending property to the record. This is derived exclusively
 	// from the date property.
-	weekEnding, wkEndErr := generateWeekEnding(record.GetString("date"))
+	weekEnding, wkEndErr := utilities.GenerateWeekEnding(record.GetString("date"))
 	if wkEndErr != nil {
 		return apis.NewBadRequestError("Error generating week_ending", wkEndErr)
 	}
