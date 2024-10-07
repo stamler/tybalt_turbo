@@ -120,11 +120,20 @@ func IsPositiveMultipleOfPointZeroOne() validation.RuleFunc {
 }
 
 // arguments:
-// distance: the distance of the expense
-// expenseDate: the date of the expense
-// startDate: the start date of the annual period derived from the payroll_year_end_dates collection
+// expenseRecord: the expense record
 // expenseRateRecord: the expense rate record retrieved from the expense_rates collection
-func CalculateMileageTotal(app *pocketbase.PocketBase, distance int, startDate string, expenseDate string, expenseRateRecord *models.Record) (float64, error) {
+func CalculateMileageTotal(app *pocketbase.PocketBase, expenseRecord *models.Record, expenseRateRecord *models.Record) (float64, error) {
+	distance := expenseRecord.GetFloat("distance")
+	// check if the distance is an integer
+	if distance != float64(int(distance)) {
+		return 0, errors.New("distance must be an integer for mileage expenses")
+	}
+
+	startDate, err := GetAnnualPayrollPeriodStartDate(app, expenseRecord.GetString("date"))
+	if err != nil {
+		return 0, err
+	}
+
 	// the mileage property on the expense_rate record is a JSON object with
 	// keys that represent the lower bound of the distance band and a value
 	// that represents the rate for that distance band. We extract the mileage
@@ -186,7 +195,7 @@ func CalculateMileageTotal(app *pocketbase.PocketBase, distance int, startDate s
 	app.Dao().DB().NewQuery("SELECT COALESCE(SUM(distance), 0) AS total_mileage FROM expenses WHERE payment_type = {:paymentType} AND date >= {:startDate} AND date < {:expenseDate}").Bind(dbx.Params{
 		"paymentType": "Mileage",
 		"startDate":   startDate,
-		"expenseDate": expenseDate,
+		"expenseDate": expenseRecord.GetString("date"),
 	}).All(&results)
 
 	// total mileage is the sum of all mileage expenses in the annual period
@@ -217,7 +226,7 @@ func CalculateMileageTotal(app *pocketbase.PocketBase, distance int, startDate s
 			// upperDistanceBand is always at least as large as lowerDistanceBand
 			upperDistanceBand = band
 		}
-		if band <= totalMileage+distance {
+		if band <= totalMileage+int(distance) {
 			upperDistanceBand = band
 		} else {
 			break
@@ -231,7 +240,7 @@ func CalculateMileageTotal(app *pocketbase.PocketBase, distance int, startDate s
 		expenseRate := mileageRates[strconv.Itoa(lowerDistanceBand)]
 		// perform the conversion to float64 at the last possible moment to avoid
 		// potential issues with float64 arithmetic.
-		return float64(distance*int(expenseRate*1000)) / 1000, nil
+		return float64(int(distance)*int(expenseRate*1000)) / 1000, nil
 	} else {
 		// If the lower and upper distance bands are different, There are two possible scenarios:
 		// 1. The expense record's distance property spans two distance bands.
@@ -250,7 +259,7 @@ func CalculateMileageTotal(app *pocketbase.PocketBase, distance int, startDate s
 					lowerDistanceBandRateX1000 := int(mileageRates[strconv.Itoa(lowerDistanceBand)] * 1000)
 					upperDistanceBandRateX1000 := int(mileageRates[strconv.Itoa(upperDistanceBand)] * 1000)
 					lowerDistanceBandMileage := upperDistanceBand - totalMileage
-					upperDistanceBandMileage := distance - lowerDistanceBandMileage
+					upperDistanceBandMileage := int(distance) - lowerDistanceBandMileage
 
 					// perform the arithmetic in integers to avoid issues with float64
 					// arithmetic then convert to float64 at the last possible moment
@@ -268,7 +277,7 @@ func CalculateMileageTotal(app *pocketbase.PocketBase, distance int, startDate s
 					// and return it.
 
 					var totalExpense int
-					remainingDistance := distance
+					remainingDistance := int(distance)
 					currentMileage := totalMileage
 
 					// Handle the lowest distance band
@@ -356,4 +365,30 @@ func HasClaim(dao *daos.Dao, uid string, name string) (bool, error) {
 	}
 
 	return len(userClaims) > 0, nil
+}
+
+func GetExpenseRateRecord(app *pocketbase.PocketBase, expenseRecord *models.Record) (*models.Record, error) {
+	// Expense rates are stored in the expense_rates collection in PocketBase.
+	// The records have an effective_date property that designates the date the
+	// rate is effective. We must fetch the appropriate record from the
+	// expense_rates collection based on the expense record's date property.
+	expenseDate := expenseRecord.GetString("date")
+	expenseDateAsTime, parseErr := time.Parse(time.DateOnly, expenseDate)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	// fetch the expense rate record from the expense_rates collection
+	expenseRateRecords, findErr := app.Dao().FindRecordsByFilter("expense_rates", "effective_date <= {:expenseDate}", "-effective_date", 1, 0, dbx.Params{
+		"expenseDate": expenseDateAsTime.Format("2006-01-02"),
+	})
+	if findErr != nil {
+		return nil, findErr
+	}
+
+	// if there are no expense rate records, return an error
+	if len(expenseRateRecords) == 0 {
+		return nil, errors.New("no expense rate record found for the given date")
+	}
+	return expenseRateRecords[0], nil
 }

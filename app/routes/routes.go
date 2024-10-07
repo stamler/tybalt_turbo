@@ -194,4 +194,18 @@ func AddRoutes(app *pocketbase.PocketBase) {
 
 		return nil
 	})
+
+	// Add the commit expense route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/expenses/:id/commit",
+			Handler: createCommitRecordHandler(app, "expenses"),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
 }

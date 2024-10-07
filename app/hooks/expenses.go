@@ -6,7 +6,6 @@ import (
 	"errors"
 	"log"
 	"strings"
-	"time"
 	"tybalt/utilities"
 
 	"github.com/labstack/echo/v5"
@@ -46,8 +45,7 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 
 	switch paymentType {
 	case "Mileage":
-		expenseDate := expenseRecord.GetString("date")
-		expenseRateRecord, err := getExpenseRateRecord(app, expenseRecord)
+		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {
 			return err
 		}
@@ -60,12 +58,7 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 			return errors.New("distance must be an integer for mileage expenses")
 		}
 
-		startDate, err := utilities.GetAnnualPayrollPeriodStartDate(app, expenseDate)
-		if err != nil {
-			return err
-		}
-
-		totalMileageExpense, mileageErr := utilities.CalculateMileageTotal(app, int(distance), startDate, expenseDate, expenseRateRecord)
+		totalMileageExpense, mileageErr := utilities.CalculateMileageTotal(app, expenseRecord, expenseRateRecord)
 		if mileageErr != nil {
 			return mileageErr
 		}
@@ -74,13 +67,13 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 		expenseRecord.Set("total", totalMileageExpense)
 		expenseRecord.Set("vendor_name", "")
 
-		// TODO: during commit, we need to re-run the mileage calculation
-		// factoring in the entire year's mileage total that is committed. This
-		// solves the issue of out-of-order mileage expenses and acknowledges only
-		// committed expenses as the source of truth.
+		// NOTE: during commit, we re-run the mileage calculation factoring in the
+		// entire year's mileage total that is committed. This solves the issue of
+		// out-of-order mileage expenses and acknowledges only committed expenses as
+		// the source of truth.
 
 	case "Allowance":
-		expenseRateRecord, err := getExpenseRateRecord(app, expenseRecord)
+		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {
 			return err
 		}
@@ -109,32 +102,6 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 		expenseRecord.Set("vendor_name", "")
 	}
 	return nil
-}
-
-func getExpenseRateRecord(app *pocketbase.PocketBase, expenseRecord *models.Record) (*models.Record, error) {
-	// Expense rates are stored in the expense_rates collection in PocketBase.
-	// The records have an effective_date property that designates the date the
-	// rate is effective. We must fetch the appropriate record from the
-	// expense_rates collection based on the expense record's date property.
-	expenseDate := expenseRecord.GetString("date")
-	expenseDateAsTime, parseErr := time.Parse(time.DateOnly, expenseDate)
-	if parseErr != nil {
-		return nil, parseErr
-	}
-
-	// fetch the expense rate record from the expense_rates collection
-	expenseRateRecords, findErr := app.Dao().FindRecordsByFilter("expense_rates", "effective_date <= {:expenseDate}", "-effective_date", 1, 0, dbx.Params{
-		"expenseDate": expenseDateAsTime.Format("2006-01-02"),
-	})
-	if findErr != nil {
-		return nil, findErr
-	}
-
-	// if there are no expense rate records, return an error
-	if len(expenseRateRecords) == 0 {
-		return nil, errors.New("no expense rate record found for the given date")
-	}
-	return expenseRateRecords[0], nil
 }
 
 // The processExpense function is used to process the expense record. It is

@@ -51,6 +51,17 @@
     }
   }
 
+  async function commit(id: string) {
+    try {
+      await pb.send(`/api/expenses/${id}/commit`, {
+        method: "POST",
+      });
+      await refresh();
+    } catch (error: any) {
+      globalStore.addError(error?.response.error);
+    }
+  }
+
   async function submit(id: string) {
     try {
       await pb.send(`/api/expenses/${id}/submit`, {
@@ -188,5 +199,8 @@
       />
     {/if}
     <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
+    {#if committed === "" && approved !== ""}
+      <DsActionButton action={() => commit(id)} icon="mdi:check-all" title="Commit" color="green" />
+    {/if}
   {/snippet}
 </DsList>
