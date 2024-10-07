@@ -40,7 +40,6 @@
     try {
       await pb.send(`/api/expenses/${id}/approve`, {
         method: "POST",
-        body: JSON.stringify({ recordId: id }),
         headers: {
           "Content-Type": "application/json",
         },

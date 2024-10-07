@@ -35,7 +35,6 @@
     try {
       await pb.send(`/api/time_sheets/${id}/approve`, {
         method: "POST",
-        body: JSON.stringify({ recordId: id }),
         headers: {
           "Content-Type": "application/json",
         },
