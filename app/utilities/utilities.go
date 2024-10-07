@@ -342,7 +342,7 @@ func GetAnnualPayrollPeriodStartDate(app *pocketbase.PocketBase, date string) (s
 func HasClaim(dao *daos.Dao, uid string, name string) (bool, error) {
 	userClaims, err := dao.FindRecordsByFilter(
 		"user_claims",
-		"uid = {:uid} AND cid.name = {:name}",
+		"uid={:uid} && cid.name={:name}",
 		"",
 		1,
 		0,
