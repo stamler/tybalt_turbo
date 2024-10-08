@@ -181,9 +181,19 @@
   </span>
 {/snippet}
 
-{#snippet actions({ id }: PurchaseOrdersResponse)}
+{#snippet actions({ id, status }: PurchaseOrdersResponse)}
+  {#if status === "Active"}
+    <DsActionButton
+      action={`/expenses/add/${id}`}
+      icon="mdi:add-bold"
+      title="Create Expense"
+      color="green"
+    />
+  {/if}
   <DsActionButton action={`/pos/${id}/edit`} icon="mdi:edit-outline" title="Edit" color="blue" />
-  <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+  {#if status === "Unapproved"}
+    <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+  {/if}
   <DsActionButton
     action={() => openRejectModal(id)}
     icon="mdi:cancel"

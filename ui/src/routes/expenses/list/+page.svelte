@@ -197,9 +197,15 @@
         color="orange"
       />
     {/if}
-    <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
+    <!-- Commit button is disabled if the record has already been committed or is not approved -->
     {#if committed === "" && approved !== ""}
       <DsActionButton action={() => commit(id)} icon="mdi:check-all" title="Commit" color="green" />
+    {/if}
+    <!-- Delete button is disabled if the record has already been committed -->
+    {#if committed !== ""}
+      <DsLabel color="green">Committed</DsLabel>
+    {:else}
+      <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
     {/if}
   {/snippet}
 </DsList>
