@@ -190,17 +190,17 @@
       color="green"
     />
   {/if}
-  <DsActionButton action={`/pos/${id}/edit`} icon="mdi:edit-outline" title="Edit" color="blue" />
   {#if status === "Unapproved"}
+    <DsActionButton action={`/pos/${id}/edit`} icon="mdi:edit-outline" title="Edit" color="blue" />
     <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+    <DsActionButton
+      action={() => openRejectModal(id)}
+      icon="mdi:cancel"
+      title="Reject"
+      color="orange"
+    />
+    <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
   {/if}
-  <DsActionButton
-    action={() => openRejectModal(id)}
-    icon="mdi:cancel"
-    title="Reject"
-    color="orange"
-  />
-  <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}
 
 <RejectModal on:refresh={refresh} collectionName="purchase_orders" bind:this={rejectModal} />
