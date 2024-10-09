@@ -4,6 +4,7 @@
  */
 
 import type {
+  ClientsResponse,
   TimeTypesResponse,
   DivisionsResponse,
   JobsResponse,
@@ -27,6 +28,7 @@ interface StoreItem<T> {
 }
 
 export type CollectionName =
+  | "clients"
   | "time_types"
   | "divisions"
   | "jobs"
@@ -34,6 +36,7 @@ export type CollectionName =
   | "time_sheets"
   | "time_sheets_tallies";
 type CollectionType = {
+  clients: ClientsResponse[];
   time_types: TimeTypesResponse[];
   divisions: DivisionsResponse[];
   jobs: JobsResponse[];
@@ -52,6 +55,7 @@ interface StoreState {
     [K in CollectionName]: StoreItem<CollectionType[K]>;
   };
   jobsIndex: MiniSearch<JobsResponse> | null;
+  clientsIndex: MiniSearch<ClientsResponse> | null;
   isLoading: boolean;
   error: ClientResponseError | null;
   errorMessages: ErrorMessage[];
@@ -79,8 +83,10 @@ const createStore = () => {
       jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
       // 1 hour
       managers: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
+      clients: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
     },
     jobsIndex: null,
+    clientsIndex: null,
     isLoading: false,
     error: null,
     errorMessages: [],
@@ -92,6 +98,11 @@ const createStore = () => {
       let items: CollectionType[typeof key];
       const userId = get(authStore)?.model?.id || "";
       switch (key) {
+        case "clients":
+          items = (await pb.collection("clients").getFullList<ClientsResponse>({
+            requestKey: "client",
+          })) as CollectionType[typeof key];
+          break;
         case "time_types":
           items = (await pb.collection("time_types").getFullList<TimeTypesResponse>({
             sort: "code",
@@ -141,6 +152,15 @@ const createStore = () => {
           });
           jobsIndex.addAll(items as JobsResponse[]);
           newState.jobsIndex = jobsIndex;
+        }
+
+        if (key === "clients") {
+          const clientsIndex = new MiniSearch<ClientsResponse>({
+            fields: ["id", "name"],
+            storeFields: ["id", "name"],
+          });
+          clientsIndex.addAll(items as ClientsResponse[]);
+          newState.clientsIndex = clientsIndex;
         }
 
         if (key === "time_sheets") {

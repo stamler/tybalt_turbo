@@ -1,20 +1,31 @@
 <script lang="ts">
-  import { flatpickrAction } from "$lib/utilities";
+  import { flatpickrAction, fetchContacts } from "$lib/utilities";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsSelector from "$lib/components/DSSelector.svelte";
+  import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { goto } from "$app/navigation";
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
-
+  import { globalStore } from "$lib/stores/global";
+  import type { ContactsResponse } from "$lib/pocketbase-types";
   let { data }: { data: JobsPageData } = $props();
 
   let errors = $state({} as any);
   let item = $state(data.item);
   let categories = $state(data.categories);
+  let contacts = $state([] as ContactsResponse[]);
 
   let newCategory = $state("");
   let newCategories = $state([] as string[]);
   let categoriesToDelete = $state([] as string[]);
+
+  // Watch for changes to the client and fetch contacts accordingly
+  $effect(() => {
+    if (item.client) {
+      fetchContacts(item.client).then((c) => (contacts = c));
+    }
+  });
 
   async function save(event: Event) {
     event.preventDefault();
@@ -116,6 +127,43 @@
     fieldName="description"
     uiName="Description"
   />
+
+  {#if $globalStore.clientsIndex !== null}
+    <DsAutoComplete
+      bind:value={item.client as string}
+      index={$globalStore.clientsIndex}
+      {errors}
+      fieldName="client"
+      uiName="Client"
+    >
+      {#snippet resultTemplate(item)}{item.name}{/snippet}
+    </DsAutoComplete>
+  {/if}
+
+  <!-- <DsSelector
+    bind:value={item.client as string}
+    items={$globalStore.clients}
+    {errors}
+    fieldName="client"
+    uiName="Client"
+  >
+    {#snippet optionTemplate({ name })}{name}{/snippet}
+  </DsSelector> -->
+
+  {#if item.client !== "" && contacts.length > 0}
+    <DsSelector
+      bind:value={item.contact as string}
+      items={contacts}
+      {errors}
+      fieldName="contact"
+      uiName="Contact"
+      clear={true}
+    >
+      {#snippet optionTemplate(item: ContactsResponse)}
+        {item.surname}, {item.given_name}
+      {/snippet}
+    </DsSelector>
+  {/if}
 
   <div class="flex w-full flex-col gap-2 {errors.categories !== undefined ? 'bg-red-200' : ''}">
     <label for="categories">Categories</label>

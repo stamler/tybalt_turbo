@@ -6,7 +6,7 @@ import type {
 } from "$lib/pocketbase-types";
 import { Collections } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
-import type { CategoriesResponse } from "$lib/pocketbase-types";
+import type { CategoriesResponse, ContactsResponse } from "$lib/pocketbase-types";
 import flatpickr from "flatpickr";
 
 export interface TimeSheetTally extends BaseSystemFields {
@@ -15,7 +15,7 @@ export interface TimeSheetTally extends BaseSystemFields {
   week_ending: string;
   salary: boolean;
   work_week_hours: number;
-  rejected: boolean;
+  rejected: IsoDateString;
   rejection_reason: string;
   approved: IsoDateString;
 
@@ -52,7 +52,7 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
   let week_ending: string = "";
   let salary: boolean = false;
   let work_week_hours: number = 0;
-  let rejected: boolean = false;
+  let rejected: IsoDateString = "";
   let rejection_reason: string = "";
   let approved: IsoDateString = "";
   let created: IsoDateString = "";
@@ -276,3 +276,22 @@ export async function fetchCategories(jobId: string): Promise<CategoriesResponse
     return Promise.resolve([] as CategoriesResponse[]);
   }
 }
+
+// Fetch contacts for the given client
+export async function fetchContacts(clientId: string): Promise<ContactsResponse[]> {
+  // if clientId is an empty string, return an empty array
+  if (clientId === "") {
+    return Promise.resolve([] as ContactsResponse[]);
+  }
+
+  try {
+    return pb.collection("contacts").getFullList({
+      filter: `client="${clientId}"`,
+      sort: "surname,given_name",
+    });
+  } catch (error) {
+    console.error("Error fetching contacts:", error);
+    return Promise.resolve([] as ContactsResponse[]);
+  }
+}
+
