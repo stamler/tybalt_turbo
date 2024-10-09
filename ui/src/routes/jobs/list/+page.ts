@@ -8,7 +8,7 @@ export const load: PageLoad = async () => {
   try {
     // load required data
     items = await pb.collection("jobs").getFullList({
-      expand: "categories_via_job",
+      expand: "categories_via_job,client",
       sort: "-number",
     });
     return {

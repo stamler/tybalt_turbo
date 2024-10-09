@@ -333,6 +333,7 @@ type UsersRecordExpands = {
 
 type JobsRecordExpands = {
   categories_via_job: CategoriesResponse[];
+  client: ClientsResponse;
 };
 
 type ClientsRecordExpands = {
