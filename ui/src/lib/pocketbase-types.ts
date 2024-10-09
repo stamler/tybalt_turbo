@@ -9,6 +9,8 @@ export enum Collections {
   AdminProfiles = "admin_profiles",
   Categories = "categories",
   Claims = "claims",
+  Clients = "clients",
+  Contacts = "contacts",
   Divisions = "divisions",
   ExpenseRates = "expense_rates",
   Expenses = "expenses",
@@ -78,6 +80,17 @@ export type ClaimsRecord = {
   name: string;
 };
 
+export type ClientsRecord = {
+  name: string;
+};
+
+export type ContactsRecord = {
+  client: RecordIdString;
+  email: string;
+  given_name: string;
+  surname: string;
+};
+
 export type DivisionsRecord = {
   code: string;
   name: string;
@@ -136,7 +149,10 @@ export type ExpensesRecord = {
 };
 
 export type JobsRecord = {
+  client: RecordIdString;
+  contact: RecordIdString;
   description: string;
+  manager: RecordIdString;
   number: string;
 };
 
@@ -324,6 +340,10 @@ export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRec
 export type CategoriesResponse<Texpand = unknown> = Required<CategoriesRecord> &
   BaseSystemFields<Texpand>;
 export type ClaimsResponse<Texpand = unknown> = Required<ClaimsRecord> & BaseSystemFields<Texpand>;
+export type ClientsResponse<Texpand = unknown> = Required<ClientsRecord> &
+  BaseSystemFields<Texpand>;
+export type ContactsResponse<Texpand = unknown> = Required<ContactsRecord> &
+  BaseSystemFields<Texpand>;
 export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
   BaseSystemFields<Texpand>;
 export type ExpenseRatesResponse<Tmileage = unknown, Texpand = unknown> = Required<
@@ -363,6 +383,8 @@ export type CollectionRecords = {
   admin_profiles: AdminProfilesRecord;
   categories: CategoriesRecord;
   claims: ClaimsRecord;
+  clients: ClientsRecord;
+  contacts: ContactsRecord;
   divisions: DivisionsRecord;
   expense_rates: ExpenseRatesRecord;
   expenses: ExpensesRecord;
@@ -384,6 +406,8 @@ export type CollectionResponses = {
   admin_profiles: AdminProfilesResponse;
   categories: CategoriesResponse;
   claims: ClaimsResponse;
+  clients: ClientsResponse;
+  contacts: ContactsResponse;
   divisions: DivisionsResponse;
   expense_rates: ExpenseRatesResponse;
   expenses: ExpensesResponse;
@@ -408,6 +432,8 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "admin_profiles"): RecordService<AdminProfilesResponse>;
   collection(idOrName: "categories"): RecordService<CategoriesResponse>;
   collection(idOrName: "claims"): RecordService<ClaimsResponse>;
+  collection(idOrName: "clients"): RecordService<ClientsResponse>;
+  collection(idOrName: "contacts"): RecordService<ContactsResponse>;
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
   collection(idOrName: "expense_rates"): RecordService<ExpenseRatesResponse>;
   collection(idOrName: "expenses"): RecordService<ExpensesResponse>;
