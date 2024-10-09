@@ -50,6 +50,7 @@
   <a href="/expenses/list">Expenses</a>
   <a href="/expenses/add">New Expense</a>
   <a href="/clients/list">Clients</a>
+  <a href="/clients/add">New Client</a>
   <a href="/timetypes">Time Types</a>
   <a href="/divisions">Divisions</a>
   <div class="h-full">
