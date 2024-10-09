@@ -334,13 +334,18 @@ type UsersRecordExpands = {
 type JobsRecordExpands = {
   categories_via_job: CategoriesResponse[];
 };
+
+type ClientsRecordExpands = {
+  contacts_via_client: ContactsResponse[];
+};
+
 // Response types include system fields and match responses from the PocketBase API
 export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRecord> &
   BaseSystemFields<Texpand>;
 export type CategoriesResponse<Texpand = unknown> = Required<CategoriesRecord> &
   BaseSystemFields<Texpand>;
 export type ClaimsResponse<Texpand = unknown> = Required<ClaimsRecord> & BaseSystemFields<Texpand>;
-export type ClientsResponse<Texpand = unknown> = Required<ClientsRecord> &
+export type ClientsResponse<Texpand = ClientsRecordExpands> = Required<ClientsRecord> &
   BaseSystemFields<Texpand>;
 export type ContactsResponse<Texpand = unknown> = Required<ContactsRecord> &
   BaseSystemFields<Texpand>;

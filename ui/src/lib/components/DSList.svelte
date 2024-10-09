@@ -27,7 +27,7 @@
     groupField?: string;
     groupFooter?: Snippet<[string, T[]]>; // New group footer snippet that receives the group key and group items
     processorFn?: Function;
-    anchor: Snippet<[T]>;
+    anchor?: Snippet<[T]>;
     headline: Snippet<[T]>;
     byline?: Snippet<[T]>;
     line1?: Snippet<[T]>;
@@ -115,9 +115,13 @@
     {#each _processedItems as item}
       <li class="contents">
         <div class="col-span-3 grid grid-cols-subgrid bg-[inherit]">
-          <div class="flex min-w-24 items-center justify-center p-2">
-            {@render anchor(item)}
-          </div>
+          {#if anchor !== undefined}
+            <div class="flex min-w-24 items-center justify-center p-2">
+              {@render anchor(item)}
+            </div>
+          {:else}
+            <div class="w-4"></div>
+          {/if}
           <div class="flex flex-col py-2">
             <div class="headline_wrapper flex items-center gap-2">
               <span class="font-bold">{@render headline(item)}</span>
