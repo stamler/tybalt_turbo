@@ -4,7 +4,6 @@ import type { ExpensesPageData } from "$lib/svelte-types";
 import { pb } from "$lib/pocketbase";
 
 export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
-
   const defaultItem = {
     uid: "",
     // date in YYYY-MM-DD format
@@ -25,7 +24,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
   // item
   if (params.poid) {
     console.log("loading", params.poid);
-    const result = await pb.collection('purchase_orders').getOne(params.poid);
+    const result = await pb.collection("purchase_orders").getOne(params.poid);
     defaultItem.division = result.division;
     defaultItem.description = result.description;
 
