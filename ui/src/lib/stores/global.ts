@@ -232,11 +232,29 @@ const createStore = () => {
     }));
   };
 
+  const deleteItem = async <K extends CollectionName>(collectionName: K, id: string) => {
+    try {
+      await pb.collection(collectionName).delete(id);
+
+      // TODO: This is quite inefficient because it reloads the entire
+      // collection, however the collection could change to it makes sense to
+      // just reload the data somewhat frequently. Perhaps we could just delete
+      // the item from the list and keep the rest of the collection state around
+      // to avoid reloading the entire collection, but this will involve a
+      // different function to handle the fact that some collections also have
+      // MiniSearch indexes.
+      refresh(collectionName);
+    } catch (error) {
+      addError(`error deleting item: ${error}`);
+    }
+  };
+
   return {
     subscribe,
     refresh,
     addError,
     dismissError,
+    deleteItem,
   };
 };
 
@@ -258,6 +276,7 @@ const wrappedStore: Readable<WrappedStoreValue> & {
   refresh: typeof _globalStore.refresh;
   addError: typeof _globalStore.addError;
   dismissError: typeof _globalStore.dismissError;
+  deleteItem: typeof _globalStore.deleteItem;
 } = {
   subscribe: (run: Subscriber<WrappedStoreValue>, invalidate?: Invalidator<WrappedStoreValue>) => {
     return _globalStore.subscribe(
@@ -268,6 +287,7 @@ const wrappedStore: Readable<WrappedStoreValue> & {
   refresh: _globalStore.refresh,
   addError: _globalStore.addError,
   dismissError: _globalStore.dismissError,
+  deleteItem: _globalStore.deleteItem,
 };
 
 export const globalStore = wrappedStore;

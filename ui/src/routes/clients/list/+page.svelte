@@ -27,5 +27,11 @@
       title="Edit"
       color="blue"
     />
+    <DsActionButton
+      action={() => globalStore.deleteItem("clients", id)}
+      icon="mdi:delete"
+      title="Delete"
+      color="red"
+    />
   {/snippet}
 </DsList>
