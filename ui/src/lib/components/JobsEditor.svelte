@@ -121,6 +121,18 @@
 
   <DsTextInput bind:value={item.number as string} {errors} fieldName="number" uiName="Number" />
 
+  <DsSelector
+    bind:value={item.manager as string}
+    items={$globalStore.managers}
+    {errors}
+    fieldName="manager"
+    uiName="Manager"
+  >
+    {#snippet optionTemplate(item)}
+      {item.surname}, {item.given_name}
+    {/snippet}
+  </DsSelector>
+
   <DsTextInput
     bind:value={item.description as string}
     {errors}

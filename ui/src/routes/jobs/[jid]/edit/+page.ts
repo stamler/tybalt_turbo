@@ -7,6 +7,9 @@ export const load: PageLoad<JobsPageData> = async ({ params }) => {
   const defaultItem = {
     number: "",
     description: "",
+    client: "",
+    contact: "",
+    manager: "",
   };
   const defaultCategories = [] as CategoriesResponse[];
   let item: JobsRecord;
