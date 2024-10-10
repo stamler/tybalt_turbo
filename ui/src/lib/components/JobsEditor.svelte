@@ -56,6 +56,9 @@
         await pb.collection("categories").delete(categoryId);
       }
 
+      // reload jobs in the global store
+      globalStore.refresh("jobs");
+
       errors = {};
       goto("/jobs/list");
     } catch (error: any) {

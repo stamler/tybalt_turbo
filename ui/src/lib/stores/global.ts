@@ -118,6 +118,7 @@ const createStore = () => {
           break;
         case "jobs":
           items = (await pb.collection("jobs").getFullList<JobsResponse>({
+            expand: "categories_via_job,client",
             sort: "-number",
             requestKey: "job",
           })) as CollectionType[typeof key];
@@ -148,8 +149,8 @@ const createStore = () => {
 
         if (key === "jobs") {
           const jobsIndex = new MiniSearch<JobsResponse>({
-            fields: ["id", "number", "description"],
-            storeFields: ["id", "number", "description"],
+            fields: ["id", "number", "description", "expand.client.name"],
+            storeFields: ["id", "number", "description", "expand.client.name"],
           });
           jobsIndex.addAll(items as JobsResponse[]);
           newState.jobsIndex = jobsIndex;
