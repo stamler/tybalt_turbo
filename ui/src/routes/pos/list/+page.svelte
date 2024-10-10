@@ -58,6 +58,22 @@
     }
   }
 
+  async function cancel(id: string): Promise<void> {
+    try {
+      await pb.send(`/api/purchase_orders/${id}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+
+      // refresh the list
+      await refresh();
+    } catch (error: any) {
+      globalStore.addError(error?.response?.message);
+    }
+  }
+
   function openRejectModal(poId: string) {
     rejectModal?.openModal(poId);
   }
@@ -91,6 +107,8 @@
 {/snippet}
 
 {#snippet byline({
+  cancelled,
+  canceller,
   description,
   rejected,
   expand,
@@ -100,7 +118,7 @@
   <span class="flex items-center gap-2">
     {description}
     {#if rejected !== ""}
-      <DsLabel color="red" title={`${shortDate(rejected)}: ${rejection_reason}`}>
+      <DsLabel color="red" title={`Rejected ${shortDate(rejected)}: ${rejection_reason}`}>
         <Icon icon="mdi:cancel" width="24px" class="inline-block" />
         {expand?.rejector.expand?.profiles_via_uid.given_name}
         {expand?.rejector.expand?.profiles_via_uid.surname}
@@ -110,7 +128,7 @@
         <Icon icon="mdi:check" width="24px" class="inline-block" />
       </DsLabel>
     {:else if status === "Cancelled"}
-      <DsLabel color="orange">
+      <DsLabel color="orange" title={`Cancelled ${shortDate(cancelled)}`}>
         <Icon icon="mdi:cancel" width="24px" class="inline-block" />
       </DsLabel>
     {/if}
@@ -189,6 +207,7 @@
       title="Create Expense"
       color="green"
     />
+    <DsActionButton action={() => cancel(id)} icon="mdi:cancel" title="Cancel" color="orange" />
   {/if}
   {#if status === "Unapproved"}
     <DsActionButton action={`/pos/${id}/edit`} icon="mdi:edit-outline" title="Edit" color="blue" />

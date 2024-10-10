@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"tybalt/utilities"
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
@@ -278,9 +279,96 @@ func createRejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFu
 }
 
 func createCancelPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
-	// print the app
-	fmt.Println(app)
-	return nil
+	return func(c echo.Context) error {
+		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+		userId := authRecord.Id
+
+		var httpResponseStatusCode int
+		id := c.PathParam("id")
+
+		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+			// Fetch existing purchase order
+			po, err := txDao.FindRecordById("purchase_orders", id)
+			if err != nil {
+				httpResponseStatusCode = http.StatusNotFound
+				return &CodeError{
+					Code:    "po_not_found",
+					Message: fmt.Sprintf("error fetching purchase order: %v", err),
+				}
+			}
+
+			// Check if the purchase order is active
+			if po.Get("status") != "Active" {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "po_not_active",
+					Message: "only active purchase orders can be cancelled",
+				}
+			}
+
+			// Check if the user is authorized to cancel the purchase order
+			hasAccountingClaim, err := utilities.HasClaim(txDao, userId, "accounting")
+			if err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_fetching_user_claims",
+					Message: fmt.Sprintf("error fetching user claims: %v", err),
+				}
+			}
+			if !hasAccountingClaim {
+				httpResponseStatusCode = http.StatusForbidden
+				return &CodeError{
+					Code:    "unauthorized_cancellation",
+					Message: "you are not authorized to cancel this purchase order",
+				}
+			}
+
+			// Count the number of associated expenses records. If there are any, the
+			// purchase order cannot be cancelled.
+			expenses, err := txDao.FindRecordsByFilter("expenses", "purchase_order = {:poId}", "", 0, 0, dbx.Params{
+				"poId": po.Id,
+			})
+			if err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_fetching_expenses",
+					Message: fmt.Sprintf("error fetching expenses: %v", err),
+				}
+			}
+			if len(expenses) > 0 {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "po_has_expenses",
+					Message: "this purchase order has associated expenses and cannot be cancelled",
+				}
+			}
+
+			// Cancel the purchase order
+			po.Set("status", "Cancelled")
+			po.Set("cancelled", time.Now())
+			po.Set("canceller", userId)
+
+			if err := txDao.SaveRecord(po); err != nil {
+				return &CodeError{
+					Code:    "error_updating_purchase_order",
+					Message: fmt.Sprintf("error updating purchase order: %v", err),
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			if codeError, ok := err.(*CodeError); ok {
+				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+					"message": codeError.Message,
+					"code":    codeError.Code,
+				})
+			}
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+		return c.JSON(http.StatusOK, map[string]string{"message": "Purchase order cancelled successfully"})
+	}
 }
 
 func generatePONumber(txDao *daos.Dao) (string, error) {
