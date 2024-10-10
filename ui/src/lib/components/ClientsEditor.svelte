@@ -79,6 +79,9 @@
         }
       }
 
+      // reload clients in the global store
+      globalStore.refresh("clients");
+
       errors = {};
       goto("/clients/list");
     } catch (error: any) {
