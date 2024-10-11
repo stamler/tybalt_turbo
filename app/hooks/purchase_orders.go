@@ -50,7 +50,7 @@ func cleanPurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *models.
 	purchaseOrderRecord.Set("approver", approver)
 
 	// set the second_approver_claim field
-	secondApproverClaim, err := getSecondApproverClaim(app, purchaseOrderRecord.GetString("type"), purchaseOrderRecord.GetFloat("total"))
+	secondApproverClaim, err := getSecondApproverClaim(app, purchaseOrderRecord)
 	if err != nil {
 		return err
 	}
@@ -148,11 +148,45 @@ func ProcessPurchaseOrder(app *pocketbase.PocketBase, record *models.Record, con
 	return nil
 }
 
-func getSecondApproverClaim(app *pocketbase.PocketBase, poType string, total float64) (string, error) {
+func getSecondApproverClaim(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record) (string, error) {
 	var secondApproverClaim string
 
-	// Check if the purchase order is recurring or if the total is greater than or equal to VP_PO_LIMIT
-	if poType == "Recurring" || total >= VP_PO_LIMIT {
+	poType := purchaseOrderRecord.GetString("type")
+	total := purchaseOrderRecord.GetFloat("total")
+	startDateString := purchaseOrderRecord.GetString("date")
+	startDate, parseErr := time.Parse(time.DateOnly, startDateString)
+	if parseErr != nil {
+		return "", parseErr
+	}
+	endDateString := purchaseOrderRecord.GetString("end_date")
+	endDate, parseErr := time.Parse(time.DateOnly, endDateString)
+	if parseErr != nil {
+		return "", parseErr
+	}
+	frequency := purchaseOrderRecord.GetString("frequency")
+
+	// Calculate the total value for recurring purchase orders
+	totalValue := total
+	if poType == "Recurring" {
+		daysDiff := endDate.Sub(startDate).Hours() / 24
+		var occurrences float64
+
+		switch frequency {
+		case "Weekly":
+			occurrences = daysDiff / 7
+		case "Biweekly":
+			occurrences = daysDiff / 14
+		case "Monthly":
+			occurrences = daysDiff / 30 // Approximation
+		default:
+			return "", fmt.Errorf("invalid frequency: %s", frequency)
+		}
+
+		// calculate totalValue using the integer value of occurrences
+		totalValue = total * float64(int(occurrences))
+	}
+
+	if totalValue >= VP_PO_LIMIT {
 		// Set second approver claim to 'smg'
 		claim, err := app.Dao().FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": "smg",
@@ -161,7 +195,7 @@ func getSecondApproverClaim(app *pocketbase.PocketBase, poType string, total flo
 			return "", fmt.Errorf("error fetching SMG claim: %v", err)
 		}
 		secondApproverClaim = claim.Id
-	} else if total >= MANAGER_PO_LIMIT {
+	} else if totalValue >= MANAGER_PO_LIMIT {
 		// Set second approver claim to 'vp'
 		claim, err := app.Dao().FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": "vp",
