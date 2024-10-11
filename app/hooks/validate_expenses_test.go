@@ -51,7 +51,8 @@ func TestValidateExpense(t *testing.T) {
 	// Run tests
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			got := validateExpense(tt.record)
+			// TODO: Add tests where a PO record is provided
+			got := validateExpense(tt.record, nil)
 			if got != nil {
 				if tt.valid {
 					t.Errorf("failed validation (%v) but expected valid", got)

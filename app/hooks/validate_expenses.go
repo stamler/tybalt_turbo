@@ -4,13 +4,38 @@ import (
 	"fmt"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/models"
 )
+
+// These constants are used to determine whether an expense is within the
+// allowed percentage or value of the total of a purchase order. The lesser of
+// the two limits is used to determine if the expense is valid.
+const MAX_PURCHASE_ORDER_EXCESS_PERCENT = 0.05
+const MAX_PURCHASE_ORDER_EXCESS_VALUE = 100.0
 
 // The validateExpense function is used to validate the expense record. It is
 // called by ProcessExpense to ensure that the record is in a valid state before
 // it is created or updated.
-func validateExpense(expenseRecord *models.Record) error {
+func validateExpense(expenseRecord *models.Record, poRecord *models.Record) error {
+
+	poTotal := 0.0
+	poType := "Normal"
+	poRecordProvided := false
+	totalLimit := 0.0
+	excessErrorText := fmt.Sprintf("%0.2f%%", MAX_PURCHASE_ORDER_EXCESS_PERCENT*100)
+	if poRecord != nil {
+		poRecordProvided = true
+		poTotal = poRecord.GetFloat("total")
+		poType = poRecord.GetString("type")
+
+		// The maximum allowed amount is the lesser of the value and percent limits
+		totalLimit = poTotal * (1.0 + MAX_PURCHASE_ORDER_EXCESS_PERCENT)
+		if MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*MAX_PURCHASE_ORDER_EXCESS_PERCENT {
+			totalLimit = poTotal + MAX_PURCHASE_ORDER_EXCESS_VALUE
+			excessErrorText = fmt.Sprintf("$%0.2f", MAX_PURCHASE_ORDER_EXCESS_VALUE)
+		}
+	}
 
 	hasJob := expenseRecord.Get("job") != ""
 	hasPurchaseOrder := expenseRecord.Get("purchase_order") != ""
@@ -20,6 +45,11 @@ func validateExpense(expenseRecord *models.Record) error {
 	isMileage := paymentType == "Mileage"
 	isCorporateCreditCard := paymentType == "CorporateCreditCard"
 	isFuelCard := paymentType == "FuelCard"
+
+	// Throw an error if hasPurchaseOrder is true but poRecordProvided is false
+	if hasPurchaseOrder && !poRecordProvided {
+		return apis.NewBadRequestError("an expense against a purchase_order cannot be validated without a corresponding purchase order record", nil)
+	}
 
 	validationsErrors := validation.Errors{
 		"date": validation.Validate(
@@ -57,6 +87,11 @@ func validateExpense(expenseRecord *models.Record) error {
 			validation.When(limitNonPoAmounts && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
 				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
 			),
+			validation.When(hasPurchaseOrder && poType == "Normal",
+				validation.Max(totalLimit).Exclusive().Error(fmt.Sprintf("expense exceeds purchase order total of $%0.2f by more than %s", poTotal, excessErrorText)),
+			),
+			// TODO: Add validation for Cumulative POs
+			// TODO: Add validation for Reccuring POs
 		),
 		"distance": validation.Validate(
 			expenseRecord.GetFloat("distance"),

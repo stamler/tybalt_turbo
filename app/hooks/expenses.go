@@ -128,8 +128,18 @@ func ProcessExpense(app *pocketbase.PocketBase, expenseRecord *models.Record, co
 	}
 	expenseRecord.Set("pay_period_ending", payPeriodEnding)
 
+	// if the expense record has a purchase_order, load it
+	var poRecord *models.Record = nil
+	var err error = nil
+	purchaseOrder := expenseRecord.GetString("purchase_order")
+	if purchaseOrder != "" {
+		poRecord, err = app.Dao().FindRecordById("purchase_orders", purchaseOrder)
+		if err != nil {
+			return err
+		}
+	}
 	// validate the expense record
-	if err := validateExpense(expenseRecord); err != nil {
+	if err := validateExpense(expenseRecord, poRecord); err != nil {
 		return err
 	}
 	return nil
