@@ -158,16 +158,16 @@ func getSecondApproverClaim(app *pocketbase.PocketBase, purchaseOrderRecord *mod
 	if parseErr != nil {
 		return "", parseErr
 	}
-	endDateString := purchaseOrderRecord.GetString("end_date")
-	endDate, parseErr := time.Parse(time.DateOnly, endDateString)
-	if parseErr != nil {
-		return "", parseErr
-	}
-	frequency := purchaseOrderRecord.GetString("frequency")
 
 	// Calculate the total value for recurring purchase orders
 	totalValue := total
 	if poType == "Recurring" {
+		endDateString := purchaseOrderRecord.GetString("end_date")
+		endDate, parseErr := time.Parse(time.DateOnly, endDateString)
+		if parseErr != nil {
+			return "", parseErr
+		}
+		frequency := purchaseOrderRecord.GetString("frequency")
 		daysDiff := endDate.Sub(startDate).Hours() / 24
 		var occurrences float64
 

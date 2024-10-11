@@ -4,7 +4,6 @@ package hooks
 
 import (
 	"errors"
-	"log"
 	"strings"
 	"tybalt/utilities"
 
@@ -122,7 +121,6 @@ func ProcessExpense(app *pocketbase.PocketBase, expenseRecord *models.Record, co
 	// write the pay_period_ending property to the record. This is derived
 	// exclusively from the date property.
 	payPeriodEnding, ppEndErr := utilities.GeneratePayPeriodEnding(expenseRecord.GetString("date"))
-	log.Printf("payPeriodEnding: %s", payPeriodEnding)
 	if ppEndErr != nil {
 		return apis.NewBadRequestError("Error generating pay_period_ending", ppEndErr)
 	}
@@ -138,8 +136,25 @@ func ProcessExpense(app *pocketbase.PocketBase, expenseRecord *models.Record, co
 			return err
 		}
 	}
+	// if the purchase_order record's type property is "Cumulative", get the sum
+	// of the total property of all of the expenses associated with this purchase
+	// order and pass the sum to the validateExpense function. Do this using SQL
+	// via DB().NewQuery() since we just want the sum.
+	existingExpensesTotal := 0.0
+	if poRecord != nil && poRecord.GetString("type") == "Cumulative" {
+		query := app.Dao().DB().NewQuery("SELECT COALESCE(SUM(total), 0) AS total FROM expenses WHERE purchase_order = {:purchaseOrder}")
+		query.Bind(dbx.Params{"purchaseOrder": purchaseOrder})
+		type TotalResult struct {
+			Total float64 `db:"total"`
+		}
+		result := TotalResult{}
+		if err := query.One(&result); err != nil {
+			return err
+		}
+		existingExpensesTotal = result.Total
+	}
 	// validate the expense record
-	if err := validateExpense(expenseRecord, poRecord); err != nil {
+	if err := validateExpense(expenseRecord, poRecord, existingExpensesTotal); err != nil {
 		return err
 	}
 	return nil

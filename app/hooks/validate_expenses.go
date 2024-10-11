@@ -17,7 +17,7 @@ const MAX_PURCHASE_ORDER_EXCESS_VALUE = 100.0
 // The validateExpense function is used to validate the expense record. It is
 // called by ProcessExpense to ensure that the record is in a valid state before
 // it is created or updated.
-func validateExpense(expenseRecord *models.Record, poRecord *models.Record) error {
+func validateExpense(expenseRecord *models.Record, poRecord *models.Record, existingExpensesTotal float64) error {
 
 	poTotal := 0.0
 	poType := "Normal"
@@ -29,11 +29,18 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record) erro
 		poTotal = poRecord.GetFloat("total")
 		poType = poRecord.GetString("type")
 
-		// The maximum allowed amount is the lesser of the value and percent limits
-		totalLimit = poTotal * (1.0 + MAX_PURCHASE_ORDER_EXCESS_PERCENT)
-		if MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*MAX_PURCHASE_ORDER_EXCESS_PERCENT {
-			totalLimit = poTotal + MAX_PURCHASE_ORDER_EXCESS_VALUE
-			excessErrorText = fmt.Sprintf("$%0.2f", MAX_PURCHASE_ORDER_EXCESS_VALUE)
+		// The maximum allowed total for "Normal" and "Recurring" POs is the lesser
+		// of the value and percent limits. For "Cumulative" POs, the totalLimit is
+		// reduced by the existingExpensesTotal.
+		if poType == "Normal" || poType == "Recurring" {
+			totalLimit = poTotal * (1.0 + MAX_PURCHASE_ORDER_EXCESS_PERCENT)
+			if MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*MAX_PURCHASE_ORDER_EXCESS_PERCENT {
+				totalLimit = poTotal + MAX_PURCHASE_ORDER_EXCESS_VALUE
+				excessErrorText = fmt.Sprintf("$%0.2f", MAX_PURCHASE_ORDER_EXCESS_VALUE)
+			}
+		} else if poType == "Cumulative" {
+			// the totalLimit is reduced by the existingExpensesTotal
+			totalLimit = poTotal - existingExpensesTotal
 		}
 	}
 
@@ -87,10 +94,12 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record) erro
 			validation.When(limitNonPoAmounts && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
 				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
 			),
-			validation.When(hasPurchaseOrder && poType == "Normal",
-				validation.Max(totalLimit).Exclusive().Error(fmt.Sprintf("expense exceeds purchase order total of $%0.2f by more than %s", poTotal, excessErrorText)),
+			validation.When(hasPurchaseOrder && (poType == "Normal"),
+				validation.Max(totalLimit).Error(fmt.Sprintf("expense exceeds purchase order total of $%0.2f by more than %s", poTotal, excessErrorText)),
 			),
-			// TODO: Add validation for Cumulative POs
+			validation.When(hasPurchaseOrder && (poType == "Cumulative"),
+				validation.Max(totalLimit).Error(fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, existingExpensesTotal+expenseRecord.GetFloat("total")-poTotal)),
+			),
 			// TODO: Add validation for Reccuring POs
 		),
 		"distance": validation.Validate(
