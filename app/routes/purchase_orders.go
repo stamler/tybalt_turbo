@@ -60,17 +60,17 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 			}
 
 			// Check if the user is the approver and if the record is approved
-			isApprover := po.GetString("approver") == userId
-			isApproved := !po.GetDateTime("approved").IsZero()
+			callerIsApprover := po.GetString("approver") == userId
+			recordIsApproved := !po.GetDateTime("approved").IsZero()
 
 			// Check if the record requires second approval and is second approved
 			secondApproverClaim := po.GetString("second_approver_claim")
-			requiresSecondApproval := secondApproverClaim != ""
-			isSecondApproved := !po.GetDateTime("second_approval").IsZero()
+			recordRequiresSecondApproval := secondApproverClaim != ""
+			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()
 
 			// Check if the user is a qualified second approver
 			isSecondApprover := false
-			if requiresSecondApproval {
+			if recordRequiresSecondApproval {
 				userClaims, err := txDao.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
 					"userId": userId,
 				})
@@ -90,8 +90,8 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 						 payload where the division key has a value that is greater than
 						 or equal to the total.
 				*/
-				for _, claim := range userClaims {
-					if claim.Get("claim") == secondApproverClaim {
+				for _, userClaim := range userClaims {
+					if userClaim.GetString("cid") == secondApproverClaim {
 						isSecondApprover = true
 						break
 					}
@@ -100,39 +100,39 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 
 			now := time.Now()
 
-			if isApprover && isApproved && requiresSecondApproval && !isSecondApproved && !isSecondApprover {
-				// if the user isApprover and approved is already set and the record
-				// requires second approval but the call is not qualified to approve it,
-				// return an error indicating that the purchase order has already been
-				// approved by a manager but requires elevated approval.
+			if callerIsApprover && recordIsApproved && recordRequiresSecondApproval && !recordIsSecondApproved && !isSecondApprover {
+				// if the caller is the approver and approved is already set and the
+				// record requires second approval but the call is not qualified to
+				// approve it, return an error indicating that the purchase order has
+				// already been approved by a manager but requires elevated approval.
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
 					Code:    "po_missing_second_approval",
 					Message: "this purchase order has already been approved by a manager but requires elevated approval",
 				}
-			} else if isApprover {
+			} else if callerIsApprover {
 				// Approve the purchase order
 				po.Set("approved", now)
-				isApproved = true
+				recordIsApproved = true
 			} else if isSecondApprover {
 				// Second-Approve the purchase order
 				po.Set("second_approval", now)
 				po.Set("second_approver", userId)
-				isApproved = true
-				isSecondApproved = true
+				recordIsApproved = true
+				recordIsSecondApproved = true
 			} else {
 				// the user is not the approver or a qualified second approver
 				httpResponseStatusCode = http.StatusForbidden
 				return &CodeError{
 					Code:    "unauthorized_approval",
-					Message: "you are not authorized to approve this purchase order",
+					Message: "you are not authoriz~~ed to approve this purchase order",
 				}
 			}
 
 			// If approved is set and either second_approver_claim is not set or
 			// second_approval is set, the purchase order is fully approved. Set the
 			// status to Active and generate a PO number
-			if isApproved && (!requiresSecondApproval || isSecondApproved) {
+			if recordIsApproved && (!recordRequiresSecondApproval || recordIsSecondApproved) {
 				po.Set("status", "Active")
 				poNumber, err := generatePONumber(txDao)
 				if err != nil {
