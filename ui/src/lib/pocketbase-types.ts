@@ -323,6 +323,7 @@ type PurchaseOrdersRecordExpands = {
   job: JobsRecord;
   rejector: UsersResponse;
   second_approver: UsersResponse;
+  second_approver_claim: ClaimsResponse;
   type: PurchaseOrdersTypeOptions;
   uid: UsersResponse;
 };
