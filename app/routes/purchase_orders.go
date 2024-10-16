@@ -69,7 +69,7 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()
 
 			// Check if the user is a qualified second approver
-			isSecondApprover := false
+			callerIsSecondApprover := false
 			if recordRequiresSecondApproval {
 				userClaims, err := txDao.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
 					"userId": userId,
@@ -92,7 +92,7 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 				*/
 				for _, userClaim := range userClaims {
 					if userClaim.GetString("cid") == secondApproverClaim {
-						isSecondApprover = true
+						callerIsSecondApprover = true
 						break
 					}
 				}
@@ -100,7 +100,7 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 
 			now := time.Now()
 
-			if callerIsApprover && recordIsApproved && recordRequiresSecondApproval && !recordIsSecondApproved && !isSecondApprover {
+			if callerIsApprover && recordIsApproved && recordRequiresSecondApproval && !recordIsSecondApproved && !callerIsSecondApprover {
 				// if the caller is the approver and approved is already set and the
 				// record requires second approval but the call is not qualified to
 				// approve it, return an error indicating that the purchase order has
@@ -108,24 +108,23 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
 					Code:    "po_missing_second_approval",
-					Message: "this purchase order has already been approved by a manager but requires elevated approval",
+					Message: "this purchase order has already been approved by a manager but requires second approval",
 				}
-			} else if callerIsApprover {
-				// Approve the purchase order
-				po.Set("approved", now)
-				recordIsApproved = true
-			} else if isSecondApprover {
+			} else if recordIsApproved && callerIsSecondApprover && recordRequiresSecondApproval && !recordIsSecondApproved {
 				// Second-Approve the purchase order
 				po.Set("second_approval", now)
 				po.Set("second_approver", userId)
-				recordIsApproved = true
 				recordIsSecondApproved = true
+			} else if callerIsApprover && !recordIsApproved {
+				// Approve the purchase order
+				po.Set("approved", now)
+				recordIsApproved = true
 			} else {
 				// the user is not the approver or a qualified second approver
 				httpResponseStatusCode = http.StatusForbidden
 				return &CodeError{
 					Code:    "unauthorized_approval",
-					Message: "you are not authoriz~~ed to approve this purchase order",
+					Message: "you are not authorized to approve this purchase order",
 				}
 			}
 
