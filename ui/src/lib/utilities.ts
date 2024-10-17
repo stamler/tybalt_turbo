@@ -116,8 +116,7 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
         tallies.workHoursTally.hours += item.hours;
       } else {
         tallies.workHoursTally.jobHours += item.hours;
-        // tally jobs. TODO: include other details about the job besides the
-        // number of hours
+        // tally jobs
         tallies.jobsTally[item.expand.job.number] =
           (tallies.jobsTally[item.expand.job.number] || 0) + item.hours;
       }

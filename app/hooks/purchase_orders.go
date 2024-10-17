@@ -144,7 +144,6 @@ func ProcessPurchaseOrder(app *pocketbase.PocketBase, record *models.Record, con
 		return apis.NewBadRequestError("Validation error", validationErr)
 	}
 
-	// TODO: generate the po_number of the purchase_order record is fully approved
 	return nil
 }
 
