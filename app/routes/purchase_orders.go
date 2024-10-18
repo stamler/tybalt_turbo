@@ -59,50 +59,31 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 				}
 			}
 
-			// Check if the user is the approver and if the record is approved
-			callerIsApprover := po.GetString("approver") == userId
-			recordIsApproved := !po.GetDateTime("approved").IsZero()
+			/*
+				The caller may not be the approver but still be qualified to approve
+				the purchase order if they have a po_approver claim and the payload
+				specifies a division that matches the record's division. In this case,
+				callerIsQualifiedApprover is set to true and then during the update we
+				will set approver to the caller's uid.
+			*/
 
-			// Check if the record requires second approval and is second approved
-			secondApproverClaim := po.GetString("second_approver_claim")
-			recordRequiresSecondApproval := secondApproverClaim != ""
+			// Check if the user is the approver, a qualified approver, or a qualified
+			// second approver
+			callerIsApprover, callerIsQualifiedApprover, callerIsQualifiedSecondApprover, err := isApprover(txDao, userId, po)
+			if err != nil {
+				return err
+			}
+			recordIsApproved := !po.GetDateTime("approved").IsZero()
+			recordRequiresSecondApproval := po.GetString("second_approver_claim") != ""
 			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()
 
-			// Check if the user is a qualified second approver
-			callerIsSecondApprover := false
-			if recordRequiresSecondApproval {
-				userClaims, err := txDao.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
-					"userId": userId,
-				})
-				if err != nil {
-					httpResponseStatusCode = http.StatusInternalServerError
-					return &CodeError{
-						Code:    "error_fetching_user_claims",
-						Message: fmt.Sprintf("error fetching user claims: %v", err),
-					}
-				}
-				/*
-					1. It's not clear this code works. Test it. Specific issue may be
-						 that the "claim" property of the user_claims collection doesn't
-						 exist.
-					2. Once it has been fixed, this is where we'll allow a third claim
-						 (not smg or vp) to make an approval if it PO and has a JSON
-						 payload where the division key has a value that is greater than
-						 or equal to the total.
-				*/
-				for _, userClaim := range userClaims {
-					if userClaim.GetString("cid") == secondApproverClaim {
-						callerIsSecondApprover = true
-						break
-					}
-				}
-			}
-
+			// This time will be written to the record if the approval or second
+			// approval status changes
 			now := time.Now()
 
-			if callerIsApprover && recordIsApproved && recordRequiresSecondApproval && !recordIsSecondApproved && !callerIsSecondApprover {
+			if recordIsApproved && callerIsApprover && recordRequiresSecondApproval && !recordIsSecondApproved && !callerIsQualifiedSecondApprover {
 				// if the caller is the approver and approved is already set and the
-				// record requires second approval but the call is not qualified to
+				// record requires second approval but the caller is not qualified to
 				// approve it, return an error indicating that the purchase order has
 				// already been approved by a manager but requires elevated approval.
 				httpResponseStatusCode = http.StatusBadRequest
@@ -110,15 +91,22 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 					Code:    "po_missing_second_approval",
 					Message: "this purchase order has already been approved by a manager but requires second approval",
 				}
-			} else if recordIsApproved && callerIsSecondApprover && recordRequiresSecondApproval && !recordIsSecondApproved {
+			} else if recordIsApproved && callerIsQualifiedSecondApprover && recordRequiresSecondApproval && !recordIsSecondApproved {
 				// Second-Approve the purchase order
 				po.Set("second_approval", now)
 				po.Set("second_approver", userId)
 				recordIsSecondApproved = true
-			} else if callerIsApprover && !recordIsApproved {
-				// Approve the purchase order
-				po.Set("approved", now)
-				recordIsApproved = true
+			} else if !recordIsApproved {
+				if callerIsApprover {
+					// Approve the purchase order as is
+					po.Set("approved", now)
+					recordIsApproved = true
+				} else if callerIsQualifiedApprover {
+					// Approve the purchase order, updating the approver to the caller's uid
+					po.Set("approved", now)
+					po.Set("approver", userId)
+					recordIsApproved = true
+				}
 			} else {
 				// the user is not the approver or a qualified second approver
 				httpResponseStatusCode = http.StatusForbidden
@@ -431,4 +419,69 @@ func generatePONumber(txDao *daos.Dao) (string, error) {
 	}
 
 	return "", fmt.Errorf("unable to generate a unique PO number")
+}
+
+/*
+	the isApprover function with 3 arguments: the txDao, the userId of the
+	caller, and the purchase_orders record. The function performs the following
+	checks and returns 3 boolean values indicating:
+		1. whether the caller is the approver specified in the record
+		2. whether the caller is a qualified approver for another reason as outlined above
+		3. whether the caller is a qualified second approver
+	We will incorporate this function into the approval logic above within the
+	createApprovePurchaseOrderHandler function.
+*/
+
+func isApprover(txDao *daos.Dao, userId string, po *models.Record) (bool, bool, bool, error) {
+	// Check if the caller is the approver specified in the record
+	callerIsApprover := po.GetString("approver") == userId
+	callerIsQualifiedApprover := false
+
+	// if the caller is not the approver, perform additional checks to see if
+	// caller is a qualified approver
+	if !callerIsApprover {
+
+		// Check if the caller is a qualified approver (has the po_approver claim
+		// and that claim has a payload that includes the division of the purchase
+		// order)
+		// TODO: implement this (perhaps HasClaim should also return the payload?)
+		callerIsQualifiedApprover = false
+		hasPoApproverClaim, err := utilities.HasClaim(txDao, userId, "po_approver")
+		if err != nil {
+			return false, false, false, &CodeError{
+				Code:    "error_checking_po_approver_claim",
+				Message: fmt.Sprintf("error checking po_approver claim: %v", err),
+			}
+		}
+		if hasPoApproverClaim {
+			// TODO: check if the payload includes the division of the purchase order
+			callerIsQualifiedApprover = true
+		}
+	}
+
+	// Check if the record requires second approval
+	secondApproverClaim := po.GetString("second_approver_claim")
+	recordRequiresSecondApproval := secondApproverClaim != ""
+
+	// Check if the caller is a qualified second approver
+	callerIsQualifiedSecondApprover := false // initialize to false
+	if recordRequiresSecondApproval {
+		userClaims, err := txDao.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
+			"userId": userId,
+		})
+		if err != nil {
+			return false, false, false, &CodeError{
+				Code:    "error_fetching_user_claims",
+				Message: fmt.Sprintf("error fetching user claims: %v", err),
+			}
+		}
+		for _, userClaim := range userClaims {
+			if userClaim.GetString("cid") == secondApproverClaim {
+				callerIsQualifiedSecondApprover = true
+				break
+			}
+		}
+	}
+
+	return callerIsApprover, callerIsQualifiedApprover, callerIsQualifiedSecondApprover, nil
 }
