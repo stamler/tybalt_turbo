@@ -13,7 +13,7 @@ export const load: PageLoad = async ({ depends }) => {
     items = await pb.collection("purchase_orders").getFullList<PurchaseOrdersResponse>({
       // Note: ensure permissions are set to allow access to the related records.
       expand:
-        "uid.profiles_via_uid,approver.profiles_via_uid,division,job,rejector.profiles_via_uid,category,second_approver.profiles_via_uid,second_approver_claim",
+        "uid.profiles_via_uid,approver.profiles_via_uid,division,job,job.client,rejector.profiles_via_uid,category,second_approver.profiles_via_uid,second_approver_claim",
       sort: "-date",
     });
     return {

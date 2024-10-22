@@ -143,7 +143,7 @@
     {#if item.job !== ""}
       {#if item.expand?.job}
         <span class="flex items-center gap-1">
-          {item.expand.job.number} - {item.expand.job.client}
+          {item.expand.job.number} - {item.expand.job.expand.client.name}:
           {item.expand.job.description}
           {#if item.expand?.category !== undefined}
             <DsLabel color="teal">{item.expand?.category.name}</DsLabel>

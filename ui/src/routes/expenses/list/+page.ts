@@ -12,7 +12,7 @@ export const load: PageLoad = async ({ depends }) => {
     // load required data
     items = await pb.collection("expenses").getFullList<ExpensesResponse>({
       expand:
-        "job,division,category,uid,approver,uid.profiles_via_uid,approver.profiles_via_uid,rejector.profiles_via_uid",
+        "job,job.client,division,category,uid,approver,uid.profiles_via_uid,approver.profiles_via_uid,rejector.profiles_via_uid",
       sort: "-date",
     });
     return {

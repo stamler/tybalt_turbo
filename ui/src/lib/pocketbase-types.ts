@@ -350,7 +350,7 @@ type PurchaseOrdersRecordExpands = {
   approver: UsersResponse;
   category: CategoriesRecord;
   division: DivisionsRecord;
-  job: JobsRecord;
+  job: JobsResponse;
   rejector: UsersResponse;
   second_approver: UsersResponse;
   second_approver_claim: ClaimsResponse;
