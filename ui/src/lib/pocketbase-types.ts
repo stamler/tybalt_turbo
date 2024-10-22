@@ -17,8 +17,10 @@ export enum Collections {
   Jobs = "jobs",
   Managers = "managers",
   PayrollYearEndDates = "payroll_year_end_dates",
+  PoApprovers = "po_approvers",
   Profiles = "profiles",
   PurchaseOrders = "purchase_orders",
+  TimeAmendments = "time_amendments",
   TimeEntries = "time_entries",
   TimeOff = "time_off",
   TimeSheetReviewers = "time_sheet_reviewers",
@@ -165,6 +167,11 @@ export type PayrollYearEndDatesRecord = {
   date: string;
 };
 
+export type PoApproversRecord = {
+  given_name: string;
+  surname: string;
+};
+
 export type ProfilesRecord = {
   alternate_manager: RecordIdString;
   default_division: RecordIdString;
@@ -223,6 +230,28 @@ export type PurchaseOrdersRecord = {
   type: PurchaseOrdersTypeOptions;
   uid: RecordIdString;
   vendor_name: string;
+};
+
+export type TimeAmendmentsRecord = {
+  category: RecordIdString;
+  committed: IsoDateString;
+  committed_week_ending: string;
+  committer: RecordIdString;
+  creator: RecordIdString;
+  date: string;
+  description: string;
+  division: RecordIdString;
+  hours: number;
+  job: RecordIdString;
+  meals_hours: number;
+  payout_request_amount: number;
+  salary: boolean;
+  time_type: RecordIdString;
+  tsid: RecordIdString;
+  uid: RecordIdString;
+  week_ending: string;
+  work_record: string;
+  work_week_hours: number;
 };
 
 export type TimeEntriesRecord = {
@@ -287,6 +316,7 @@ export type TimeTypesRecord = {
 
 export type UserClaimsRecord = {
   cid: RecordIdString;
+  payload: null | string[];
   uid: RecordIdString;
 };
 
@@ -365,10 +395,14 @@ export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
   BaseSystemFields<Texpand>;
 export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYearEndDatesRecord> &
   BaseSystemFields<Texpand>;
+export type PoApproversResponse<Texpand = unknown> = Required<PoApproversRecord> &
+  BaseSystemFields<Texpand>;
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
 export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> =
   Required<PurchaseOrdersRecord> & BaseSystemFields<Texpand>;
+export type TimeAmendmentsResponse<Texpand = unknown> = Required<TimeAmendmentsRecord> &
+  BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeOffResponse<Texpand = unknown> = Required<TimeOffRecord> &
@@ -398,8 +432,10 @@ export type CollectionRecords = {
   jobs: JobsRecord;
   managers: ManagersRecord;
   payroll_year_end_dates: PayrollYearEndDatesRecord;
+  po_approvers: PoApproversRecord;
   profiles: ProfilesRecord;
   purchase_orders: PurchaseOrdersRecord;
+  time_amendments: TimeAmendmentsRecord;
   time_entries: TimeEntriesRecord;
   time_off: TimeOffRecord;
   time_sheet_reviewers: TimeSheetReviewersRecord;
@@ -421,8 +457,10 @@ export type CollectionResponses = {
   jobs: JobsResponse;
   managers: ManagersResponse;
   payroll_year_end_dates: PayrollYearEndDatesResponse;
+  po_approvers: PoApproversResponse;
   profiles: ProfilesResponse;
   purchase_orders: PurchaseOrdersResponse;
+  time_amendments: TimeAmendmentsResponse;
   time_entries: TimeEntriesResponse;
   time_off: TimeOffResponse;
   time_sheet_reviewers: TimeSheetReviewersResponse;
@@ -447,8 +485,10 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "jobs"): RecordService<JobsResponse>;
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
   collection(idOrName: "payroll_year_end_dates"): RecordService<PayrollYearEndDatesResponse>;
+  collection(idOrName: "po_approvers"): RecordService<PoApproversResponse>;
   collection(idOrName: "profiles"): RecordService<ProfilesResponse>;
   collection(idOrName: "purchase_orders"): RecordService<PurchaseOrdersResponse>;
+  collection(idOrName: "time_amendments"): RecordService<TimeAmendmentsResponse>;
   collection(idOrName: "time_entries"): RecordService<TimeEntriesResponse>;
   collection(idOrName: "time_off"): RecordService<TimeOffResponse>;
   collection(idOrName: "time_sheet_reviewers"): RecordService<TimeSheetReviewersResponse>;
