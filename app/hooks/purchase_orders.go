@@ -39,16 +39,6 @@ func cleanPurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *models.
 		purchaseOrderRecord.Set("frequency", "")
 	}
 
-	// get the user's manager and set the approver field
-	profile, err := app.Dao().FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
-		"userId": purchaseOrderRecord.GetString("uid"),
-	})
-	if err != nil {
-		return err
-	}
-	approver := profile.Get("manager")
-	purchaseOrderRecord.Set("approver", approver)
-
 	// set the second_approver_claim field
 	secondApproverClaim, err := getSecondApproverClaim(app, purchaseOrderRecord)
 	if err != nil {

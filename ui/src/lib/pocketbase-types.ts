@@ -168,6 +168,7 @@ export type PayrollYearEndDatesRecord = {
 };
 
 export type PoApproversRecord = {
+  divisions: null | string[];
   given_name: string;
   surname: string;
 };

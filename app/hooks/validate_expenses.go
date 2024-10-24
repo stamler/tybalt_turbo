@@ -101,6 +101,12 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record, exis
 				validation.Max(totalLimit).Error(fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, existingExpensesTotal+expenseRecord.GetFloat("total")-poTotal)),
 			),
 			// TODO: Add validation for Reccuring POs
+
+			// TODO: Prevent a second expense from being created for a Normal PO i.e.
+			// Two Expenses cannot exist for the same purchase_order if the type of
+			// that purchase order is Normal. We could potentially do this by checking
+			// if existingExpensesTotal is greater than 0 and if poType is
+			// Normal then return an error in the "global" field.
 		),
 		"distance": validation.Validate(
 			expenseRecord.GetFloat("distance"),

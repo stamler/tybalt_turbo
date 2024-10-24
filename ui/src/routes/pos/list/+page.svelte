@@ -178,6 +178,10 @@
       {item.expand.approver.expand?.profiles_via_uid.given_name}
       {item.expand.approver.expand?.profiles_via_uid.surname}
       ({shortDate(item.approved)})
+    {:else}
+      <Icon icon="mdi:timer-sand" width="24px" class="inline-block" />
+      {item.expand.approver.expand?.profiles_via_uid.given_name}
+      {item.expand.approver.expand?.profiles_via_uid.surname}
     {/if}
     {#if item.second_approver !== "" && item.second_approval !== ""}
       <span class="flex items-center gap-1">

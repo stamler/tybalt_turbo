@@ -9,7 +9,7 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { PurchaseOrdersPageData } from "$lib/svelte-types";
-  import type { CategoriesResponse } from "$lib/pocketbase-types";
+  import type { CategoriesResponse, PoApproversResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
@@ -20,6 +20,13 @@
   const isRecurring = $derived(item.type === "Recurring");
 
   let categories = $state([] as CategoriesResponse[]);
+
+  const approvers = $derived(
+    data.approvers.filter(
+      (approver: PoApproversResponse) =>
+        approver.divisions?.includes(item.division) || approver.divisions === null,
+    ),
+  );
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
@@ -74,6 +81,18 @@
   >
     {#snippet optionTemplate(item)}
       {item.name}
+    {/snippet}
+  </DsSelector>
+
+  <DsSelector
+    bind:value={item.approver as string}
+    items={approvers}
+    {errors}
+    fieldName="approver"
+    uiName="Approver"
+  >
+    {#snippet optionTemplate(item)}
+      {item.given_name} {item.surname}
     {/snippet}
   </DsSelector>
 

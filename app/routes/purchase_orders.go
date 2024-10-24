@@ -102,7 +102,8 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 					po.Set("approved", now)
 					recordIsApproved = true
 				} else if callerIsQualifiedApprover {
-					// Approve the purchase order, updating the approver to the caller's uid
+					// Approve the purchase order, updating the approver to the caller's
+					// uid since the caller is not the approver specified in the record
 					po.Set("approved", now)
 					po.Set("approver", userId)
 					recordIsApproved = true

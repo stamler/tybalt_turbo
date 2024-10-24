@@ -1,8 +1,10 @@
 import type { PurchaseOrdersRecord } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
 import type { PurchaseOrdersPageData } from "$lib/svelte-types";
-
+import { pb } from "$lib/pocketbase";
 export const load: PageLoad<PurchaseOrdersPageData> = async () => {
+  const allApprovers = await pb.collection("po_approvers").getFullList();
+
   const defaultItem = {
     po_number: "",
     status: "Unapproved",
@@ -22,5 +24,10 @@ export const load: PageLoad<PurchaseOrdersPageData> = async () => {
     // approver is configured as not required in pocketbase so we do not have to
     // set it here, but is set by the server side hook
   };
-  return { item: { ...defaultItem } as PurchaseOrdersRecord, editing: false, id: null };
+  return {
+    item: { ...defaultItem } as PurchaseOrdersRecord,
+    editing: false,
+    id: null,
+    approvers: allApprovers,
+  };
 };

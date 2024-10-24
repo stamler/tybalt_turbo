@@ -26,9 +26,15 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
   let item: PurchaseOrdersRecord;
   try {
     item = await pb.collection("purchase_orders").getOne(params.poid);
-    return { item, editing: true, id: params.poid };
+    const allApprovers = await pb.collection("po_approvers").getFullList();
+    return { item, editing: true, id: params.poid, approvers: allApprovers };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);
-    return { item: { ...defaultItem } as PurchaseOrdersRecord, editing: false, id: null };
+    return {
+      item: { ...defaultItem } as PurchaseOrdersRecord,
+      editing: false,
+      id: null,
+      approvers: [],
+    };
   }
 };
