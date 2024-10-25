@@ -19,28 +19,29 @@ const MAX_PURCHASE_ORDER_EXCESS_VALUE = 100.0
 // it is created or updated.
 func validateExpense(expenseRecord *models.Record, poRecord *models.Record, existingExpensesTotal float64) error {
 
-	poTotal := 0.0
-	poType := "Normal"
-	poRecordProvided := false
-	totalLimit := 0.0
-	excessErrorText := fmt.Sprintf("%0.2f%%", MAX_PURCHASE_ORDER_EXCESS_PERCENT*100)
+	var (
+		poType           string = "Normal"
+		poRecordProvided bool   = false
+		poTotal          float64
+		totalLimit       float64
+		excessErrorText  string = fmt.Sprintf("%0.2f%%", MAX_PURCHASE_ORDER_EXCESS_PERCENT*100)
+	)
 	if poRecord != nil {
 		poRecordProvided = true
 		poTotal = poRecord.GetFloat("total")
 		poType = poRecord.GetString("type")
 
-		// The maximum allowed total for "Normal" and "Recurring" POs is the lesser
-		// of the value and percent limits. For "Cumulative" POs, the totalLimit is
-		// reduced by the existingExpensesTotal.
-		if poType == "Normal" || poType == "Recurring" {
-			totalLimit = poTotal * (1.0 + MAX_PURCHASE_ORDER_EXCESS_PERCENT)
-			if MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*MAX_PURCHASE_ORDER_EXCESS_PERCENT {
-				totalLimit = poTotal + MAX_PURCHASE_ORDER_EXCESS_VALUE
-				excessErrorText = fmt.Sprintf("$%0.2f", MAX_PURCHASE_ORDER_EXCESS_VALUE)
-			}
-		} else if poType == "Cumulative" {
-			// the totalLimit is reduced by the existingExpensesTotal
-			totalLimit = poTotal - existingExpensesTotal
+		// The maximum allowed total for all purchase_orders records is the lesser
+		// of the value and percent limits.
+		totalLimit = poTotal * (1.0 + MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
+		if MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*MAX_PURCHASE_ORDER_EXCESS_PERCENT {
+			totalLimit = poTotal + MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
+			excessErrorText = fmt.Sprintf("$%0.2f", MAX_PURCHASE_ORDER_EXCESS_VALUE)
+		}
+
+		// For Cumulative POs, the totalLimit is reduced by the existingExpensesTotal
+		if poType == "Cumulative" {
+			totalLimit -= existingExpensesTotal
 		}
 	}
 
