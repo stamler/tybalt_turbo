@@ -246,7 +246,7 @@ export const formatNumber = function <T>(value: T) {
 export function flatpickrAction(node: HTMLElement, options: flatpickr.Options.Options = {}) {
   const instance = flatpickr(node, {
     minDate: "2024-06-01",
-    maxDate: new Date(new Date().setMonth(new Date().getMonth() + 3)),
+    maxDate: new Date(new Date().setMonth(new Date().getMonth() + 15)),
     enableTime: false,
     dateFormat: "Y-m-d",
     ...options,

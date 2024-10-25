@@ -18,8 +18,15 @@ import (
 )
 
 const (
+	// The amount of money below which a purchase order does not require a second
+	// approval.
 	MANAGER_PO_LIMIT = 500
-	VP_PO_LIMIT      = 2500
+	// The amount of money below which a purchase order does not require SMG
+	// approval but can be second approved by a VP if necessary.
+	VP_PO_LIMIT = 2500
+	// The maximum number of days between the start and end dates for a recurring
+	// purchase order.
+	RECURRING_MAX_DAYS = 400
 )
 
 // The cleanPurchaseOrder function is used to remove properties from the
@@ -73,7 +80,7 @@ func validatePurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *mode
 			purchaseOrderRecord.Get("end_date"),
 			validation.When(isRecurring,
 				validation.Required.Error("end_date is required for recurring purchase orders"),
-				validation.Date("2006-01-02").Error("must be a valid date").Min(dateAsTime).RangeError("end date must be after start date"),
+				validation.Date("2006-01-02").Error("must be a valid date").Min(dateAsTime).RangeError("end date must be after start date").Max(dateAsTime.AddDate(0, 0, RECURRING_MAX_DAYS)).RangeError(fmt.Sprintf("end date must be within %v days of the start date", RECURRING_MAX_DAYS)),
 			).Else(
 				validation.In("").Error("end_date is not permitted for non-recurring purchase orders"),
 			),
