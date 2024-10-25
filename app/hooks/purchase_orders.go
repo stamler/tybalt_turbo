@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"time"
+	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/labstack/echo/v5"
@@ -54,7 +55,7 @@ func cleanPurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *models.
 // function. This ensures that only the fields that are allowed to be set are
 // present in the record prior to validation. The function returns an error if
 // the record is invalid, otherwise it returns nil.
-func validatePurchaseOrder(purchaseOrderRecord *models.Record) error {
+func validatePurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record) error {
 	isRecurring := purchaseOrderRecord.GetString("type") == "Recurring"
 
 	dateAsTime, parseErr := time.Parse("2006-01-02", purchaseOrderRecord.Get("date").(string))
@@ -84,6 +85,7 @@ func validatePurchaseOrder(purchaseOrderRecord *models.Record) error {
 			).Else(
 				validation.In("").Error("frequency is not permitted for non-recurring purchase orders"))),
 		"description": validation.Validate(purchaseOrderRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
+		"approver":    validation.Validate(purchaseOrderRecord.GetString("approver"), validation.By(utilities.ApproverHasDivisionPermission(app, purchaseOrderRecord.GetString("approver"), purchaseOrderRecord.GetString("division")))),
 		// "global":                validation.Validate(totalHours, validation.Max(18.0).Error("Total hours must not exceed 18")),
 	}.Filter()
 
@@ -130,7 +132,7 @@ func ProcessPurchaseOrder(app *pocketbase.PocketBase, record *models.Record, con
 	}
 
 	// validate the purchase_order record
-	if validationErr := validatePurchaseOrder(record); validationErr != nil {
+	if validationErr := validatePurchaseOrder(app, record); validationErr != nil {
 		return apis.NewBadRequestError("Validation error", validationErr)
 	}
 

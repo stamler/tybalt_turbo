@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
+	"slices"
 	"sort"
 	"strconv"
 	"time"
@@ -83,6 +85,52 @@ func GeneratePayPeriodEnding(date string) (string, error) {
 	}
 
 	return weekEndingTime.AddDate(0, 0, 7).Format(time.DateOnly), nil
+}
+
+// approverHasDivisionPermission returns true if the payload of the user_claims
+// collection record corresponding to the approverId is null or is a JSON list
+// of strings where one list element is the divisionId. Returns false otherwise.
+// To accomplish this, it must first get the id of the claim that has a name of
+// 'po_approver' and then use that id to load the user_claims record
+// corresponding to the approverId and the po_approver claim id. This record is
+// then checked to see if its payload is null or a JSON list of strings where
+// one list element is the divisionId.
+func ApproverHasDivisionPermission(app *pocketbase.PocketBase, approverId string, divisionId string) validation.RuleFunc {
+	return func(value interface{}) error {
+		poApproverClaim, err := app.Dao().FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
+			"claimName": "po_approver",
+		})
+		if err != nil {
+			return validation.NewError("validation_invalid_claim", "po_approver claim not found")
+		}
+		userClaimsRecord, err := app.Dao().FindFirstRecordByFilter("user_claims", "uid = {:uid} && cid = {:cid}", dbx.Params{
+			"uid": approverId,
+			"cid": poApproverClaim.Id,
+		})
+		if err != nil {
+			return validation.NewError("validation_invalid_approver", "approver does not have a po_approver claim")
+		}
+
+		// payload is a JSON list of strings. Load it into a []string slice
+		divisionIds := []string{}
+		divisionIdsJson := userClaimsRecord.Get("payload").(types.JsonRaw)
+
+		// if divisionIdsJson is null, "{}", or "[]" then all divisions are allowed
+		if divisionIdsJson.String() == "null" || divisionIdsJson.String() == "[]" || divisionIdsJson.String() == "{}" {
+			log.Printf("divisionIdsJson is null, [], or {}, so all divisions are allowed")
+			return nil
+		}
+
+		jsonErr := json.Unmarshal(divisionIdsJson, &divisionIds)
+		if jsonErr != nil {
+			return validation.NewError("validation_invalid_division_payload", "division payload is not a valid JSON list of strings")
+		}
+
+		if !slices.Contains(divisionIds, divisionId) {
+			return validation.NewError("validation_invalid_division", "approver does not have permission for the specified division")
+		}
+		return nil
+	}
 }
 
 func IsPositiveMultipleOfPointFive() validation.RuleFunc {
