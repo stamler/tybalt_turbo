@@ -293,4 +293,3 @@ export async function fetchContacts(clientId: string): Promise<ContactsResponse[
     return Promise.resolve([] as ContactsResponse[]);
   }
 }
-
