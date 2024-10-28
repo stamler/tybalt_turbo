@@ -142,16 +142,10 @@ func ProcessExpense(app *pocketbase.PocketBase, expenseRecord *models.Record, co
 	// via DB().NewQuery() since we just want the sum.
 	existingExpensesTotal := 0.0
 	if poRecord != nil && poRecord.GetString("type") == "Cumulative" {
-		query := app.Dao().DB().NewQuery("SELECT COALESCE(SUM(total), 0) AS total FROM expenses WHERE purchase_order = {:purchaseOrder}")
-		query.Bind(dbx.Params{"purchaseOrder": purchaseOrder})
-		type TotalResult struct {
-			Total float64 `db:"total"`
-		}
-		result := TotalResult{}
-		if err := query.One(&result); err != nil {
+		existingExpensesTotal, err = utilities.CumulativeTotalExpensesForPurchaseOrder(app, poRecord, false)
+		if err != nil {
 			return err
 		}
-		existingExpensesTotal = result.Total
 	}
 	// validate the expense record
 	if err := validateExpense(expenseRecord, poRecord, existingExpensesTotal); err != nil {

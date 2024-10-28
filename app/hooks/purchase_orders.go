@@ -151,37 +151,16 @@ func getSecondApproverClaim(app *pocketbase.PocketBase, purchaseOrderRecord *mod
 
 	poType := purchaseOrderRecord.GetString("type")
 	total := purchaseOrderRecord.GetFloat("total")
-	startDateString := purchaseOrderRecord.GetString("date")
-	startDate, parseErr := time.Parse(time.DateOnly, startDateString)
-	if parseErr != nil {
-		return "", parseErr
-	}
 
 	// Calculate the total value for recurring purchase orders
 	totalValue := total
+	var err error
 	if poType == "Recurring" {
-		endDateString := purchaseOrderRecord.GetString("end_date")
-		endDate, parseErr := time.Parse(time.DateOnly, endDateString)
-		if parseErr != nil {
-			return "", parseErr
+		// ignore the number of occurrences, we just want the total value
+		_, totalValue, err = utilities.CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
+		if err != nil {
+			return "", err
 		}
-		frequency := purchaseOrderRecord.GetString("frequency")
-		daysDiff := endDate.Sub(startDate).Hours() / 24
-		var occurrences float64
-
-		switch frequency {
-		case "Weekly":
-			occurrences = daysDiff / 7
-		case "Biweekly":
-			occurrences = daysDiff / 14
-		case "Monthly":
-			occurrences = daysDiff / 30 // Approximation
-		default:
-			return "", fmt.Errorf("invalid frequency: %s", frequency)
-		}
-
-		// calculate totalValue using the integer value of occurrences
-		totalValue = total * float64(int(occurrences))
 	}
 
 	if totalValue >= VP_PO_LIMIT {

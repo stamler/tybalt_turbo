@@ -118,6 +118,61 @@ func createCommitRecordHandler(app *pocketbase.PocketBase, collectionName string
 					}
 					record.Set("total", totalMileageExpense)
 				}
+
+				// Set the `status` property of a referenced purchase_orders record to
+				// "Closed" if an expense with a purchase order is committed and
+				// necessary conditions are met.
+				purchaseOrderId := record.GetString("purchase_order")
+				if purchaseOrderId != "" {
+					purchaseOrderRecord, err := txDao.FindRecordById("purchase_orders", purchaseOrderId)
+					if err != nil {
+						return err
+					}
+					if purchaseOrderRecord.GetString("status") != "Active" {
+						return &CodeError{
+							Code:    "purchase_order_not_active",
+							Message: "purchase order is not active",
+						}
+					}
+
+					// The type field will determine what we do here.
+					/*
+					   - `Normal` type means just set the Status to Closed, returning an
+					     error if it isn't currently `Active`
+
+					   - `Recurring` type means we need to check if an expense has been
+					     committed for each recurrence of the PO and set the Status to
+					     Closed if so, otherwise doing nothing.
+
+					 	 - `Cumulative` type means we need to check if the cumulative total
+					     of all committed expenses against the PO's amount plus the
+					     current expense match or exceed the PO total and set the Status
+					     to Closed if so, otherwise do nothing.
+					*/
+					purchaseOrderType := purchaseOrderRecord.GetString("type")
+					switch purchaseOrderType {
+					case "Normal":
+						purchaseOrderRecord.Set("status", "Closed")
+					case "Recurring":
+						exhausted, err := utilities.RecurringPurchaseOrderExhausted(app, purchaseOrderRecord)
+						if err != nil {
+							return err
+						}
+						if exhausted {
+							purchaseOrderRecord.Set("status", "Closed")
+						}
+					case "Cumulative":
+						existingExpensesTotal, err := utilities.CumulativeTotalExpensesForPurchaseOrder(app, purchaseOrderRecord, true)
+						if err != nil {
+							return err
+						}
+						pendingExpenseTotal := record.GetFloat("total")
+						if existingExpensesTotal+pendingExpenseTotal >= purchaseOrderRecord.GetFloat("total") {
+							purchaseOrderRecord.Set("status", "Closed")
+						}
+					}
+				}
+
 			}
 
 			// Save the updated record

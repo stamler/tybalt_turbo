@@ -186,6 +186,7 @@ export enum PurchaseOrdersStatusOptions {
   "Unapproved" = "Unapproved",
   "Active" = "Active",
   "Cancelled" = "Cancelled",
+  "Closed" = "Closed",
 }
 
 export enum PurchaseOrdersTypeOptions {

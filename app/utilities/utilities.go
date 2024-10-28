@@ -440,3 +440,85 @@ func GetExpenseRateRecord(app *pocketbase.PocketBase, expenseRecord *models.Reco
 	}
 	return expenseRateRecords[0], nil
 }
+
+func CalculateRecurringPurchaseOrderTotalValue(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record) (int, float64, error) {
+	startDateString := purchaseOrderRecord.GetString("date")
+	startDate, parseErr := time.Parse(time.DateOnly, startDateString)
+	if parseErr != nil {
+		return 0, 0, parseErr
+	}
+	total := purchaseOrderRecord.GetFloat("total")
+	endDateString := purchaseOrderRecord.GetString("end_date")
+	endDate, parseErr := time.Parse(time.DateOnly, endDateString)
+	if parseErr != nil {
+		return 0, 0, parseErr
+	}
+	frequency := purchaseOrderRecord.GetString("frequency")
+	daysDiff := endDate.Sub(startDate).Hours() / 24
+	var occurrences float64
+
+	switch frequency {
+	case "Weekly":
+		occurrences = daysDiff / 7
+	case "Biweekly":
+		occurrences = daysDiff / 14
+	case "Monthly":
+		occurrences = daysDiff / 30 // Approximation
+	default:
+		return 0, 0, fmt.Errorf("invalid frequency: %s", frequency)
+	}
+
+	// calculate totalValue using the integer value of occurrences
+	totalValue := total * float64(int(occurrences))
+	return int(occurrences), totalValue, nil
+}
+
+// return true if the recurring purchase order has been exhausted, false otherwise
+func RecurringPurchaseOrderExhausted(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record) (bool, error) {
+	// TODO: implement issue #13, check if an expense has been committed for each
+	// recurrence of the PO and set the Status to Closed if so, otherwise doing nothing.
+
+	// Count the number of committed expenses for the purchase order
+	query := app.Dao().DB().NewQuery("SELECT COUNT(*) AS count FROM expenses WHERE purchase_order = {:purchaseOrder}")
+	query.Bind(dbx.Params{"purchaseOrder": purchaseOrderRecord.Id})
+	type CountResult struct {
+		Count int `db:"count"`
+	}
+	result := CountResult{}
+	if err := query.One(&result); err != nil {
+		return false, err
+	}
+	committedExpensesCount := result.Count
+
+	// Calculate the total number of expenses allowed for the purchase order
+	maxExpenses, _, err := CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
+	if err != nil {
+		return false, err
+	}
+
+	// return true if the committed expenses count is not less than the maximum
+	// allowed, false otherwise
+	return !(committedExpensesCount < maxExpenses), nil
+}
+
+// return the total of all expenses associated with the purchase order. If
+// committedOnly is true, return the total of all committed expenses only. This
+// function DOES NOT check if the purchaseOrderRecord is of type Cumulative.
+// TODO: test this thoroughly.
+func CumulativeTotalExpensesForPurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record, committedOnly bool) (float64, error) {
+	existingExpensesTotal := 0.0
+	query := app.Dao().DB().NewQuery("SELECT COALESCE(SUM(total), 0) AS total FROM expenses WHERE purchase_order = {:purchaseOrder}")
+	if committedOnly {
+		query = app.Dao().DB().NewQuery("SELECT COALESCE(SUM(total), 0) AS total FROM expenses WHERE purchase_order = {:purchaseOrder} AND committed != ''")
+	}
+	query.Bind(dbx.Params{"purchaseOrder": purchaseOrderRecord.Id})
+	type TotalResult struct {
+		Total float64 `db:"total"`
+	}
+	result := TotalResult{}
+	if err := query.One(&result); err != nil {
+		return 0, err
+	}
+	existingExpensesTotal = result.Total
+	return existingExpensesTotal, nil
+}
