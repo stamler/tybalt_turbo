@@ -109,7 +109,8 @@ func ProcessPurchaseOrder(app *pocketbase.PocketBase, record *models.Record, con
 	// (because we're using the admin GUI for example) we'll use the uid from the
 	// record itself.
 
-	// TODO: verify the security implications of this
+	// TODO: verify the security implications of falling back to the uid from the
+	// record itself. This probably isn't safe.
 	authRecordPreCast := context.Get(apis.ContextAuthRecordKey)
 
 	var authId string

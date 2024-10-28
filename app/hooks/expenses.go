@@ -136,6 +136,15 @@ func ProcessExpense(app *pocketbase.PocketBase, expenseRecord *models.Record, co
 			return err
 		}
 	}
+
+	// if the purchaseOrder has a status that is not "Active", return an error
+	if poRecord != nil && poRecord.GetString("status") != "Active" {
+		return apis.NewBadRequestError("purchase order is not active", nil)
+	}
+
+	// TODO: throw an error if the caller is not allowed to create an expense
+	// for this purchase order (define the rules for this)
+
 	// if the purchase_order record's type property is "Cumulative", get the sum
 	// of the total property of all of the expenses associated with this purchase
 	// order and pass the sum to the validateExpense function. Do this using SQL
