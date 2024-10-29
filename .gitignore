@@ -1,4 +1,5 @@
 app/pb_data
+app/test_pb_data
 
 # the built binary
 app/tybalt
