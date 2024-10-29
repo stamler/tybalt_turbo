@@ -7,13 +7,13 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 )
 
-func createBundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		// Validate the date
 		weekEndingTime, err := time.Parse("2006-01-02", c.PathParam("weekEnding"))

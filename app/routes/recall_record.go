@@ -5,13 +5,13 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v5"
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 )
 
-func createRecallRecordHandler(app *pocketbase.PocketBase, collectionName string) echo.HandlerFunc {
+func createRecallRecordHandler(app core.App, collectionName string) echo.HandlerFunc {
 	// This route handles the recall of a record.
 	// It performs the following actions:
 	// 1. Retrieves the authenticated user's ID

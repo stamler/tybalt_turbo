@@ -9,8 +9,8 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/models"
 )
 
@@ -25,7 +25,7 @@ const NO_PO_EXPENSE_LIMIT = 100.0
 // and to ensure that the record is in a valid state before it is created or
 // updated. It is called by ProcessExpense to reduce the number of fields
 // that need to be validated.
-func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) error {
+func cleanExpense(app core.App, expenseRecord *models.Record) error {
 
 	// get the user's manager and set the approver field
 	profile, err := app.Dao().FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
@@ -106,7 +106,7 @@ func cleanExpense(app *pocketbase.PocketBase, expenseRecord *models.Record) erro
 // The processExpense function is used to process the expense record. It is
 // called by the hooks for the expenses collection to ensure that the record
 // is in a valid state before it is created or updated.
-func ProcessExpense(app *pocketbase.PocketBase, expenseRecord *models.Record, context echo.Context) error {
+func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Context) error {
 
 	// if the expense record is submitted, return an error
 	if expenseRecord.Get("submitted") == true {

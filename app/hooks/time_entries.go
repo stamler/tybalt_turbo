@@ -10,8 +10,8 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/labstack/echo/v5"
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/tools/list"
 	"github.com/pocketbase/pocketbase/tools/types"
@@ -23,7 +23,7 @@ import (
 // and to ensure that the record is in a valid state before it is created or
 // updated. It is called by ProcessTimeEntry to reduce the number of fields
 // that need to be validated.
-func cleanTimeEntry(app *pocketbase.PocketBase, timeEntryRecord *models.Record) ([]string, error) {
+func cleanTimeEntry(app core.App, timeEntryRecord *models.Record) ([]string, error) {
 	timeTypeId := timeEntryRecord.GetString("time_type")
 
 	// Load the allowed fields for the time_type from the time_types collection in
@@ -117,7 +117,7 @@ func validateTimeEntry(timeEntryRecord *models.Record, requiredFields []string) 
 // itself so this is for cross-field validation. If the time_entry record is
 // invalid this function throws an error explaining which field(s) are invalid
 // and why.
-func ProcessTimeEntry(app *pocketbase.PocketBase, record *models.Record, context echo.Context) error {
+func ProcessTimeEntry(app core.App, record *models.Record, context echo.Context) error {
 	// get the auth record from the context
 	authRecord := context.Get(apis.ContextAuthRecordKey).(*models.Record)
 

@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v5"
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -39,7 +38,7 @@ func (e *CodeError) Error() string {
 }
 
 // Add custom routes to the app
-func AddRoutes(app *pocketbase.PocketBase) {
+func AddRoutes(app core.App) {
 
 	// Add the bundle timesheet route
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {

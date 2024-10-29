@@ -1,7 +1,6 @@
 package hooks
 
 import (
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -12,7 +11,7 @@ import (
 // OnRecordBeforeUpdateRequest hooks for the time_entries model. These hooks are
 // called before a record is created or updated in the time_entries collection.
 
-func AddHooks(app *pocketbase.PocketBase) {
+func AddHooks(app core.App) {
 	// hooks for time_entries model
 	app.OnRecordBeforeCreateRequest("time_entries").Add(func(e *core.RecordCreateEvent) error {
 		if err := ProcessTimeEntry(app, e.Record, e.HttpContext); err != nil {

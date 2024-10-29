@@ -14,7 +14,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/tools/types"
@@ -95,7 +95,7 @@ func GeneratePayPeriodEnding(date string) (string, error) {
 // corresponding to the approverId and the po_approver claim id. This record is
 // then checked to see if its payload is null or a JSON list of strings where
 // one list element is the divisionId.
-func ApproverHasDivisionPermission(app *pocketbase.PocketBase, approverId string, divisionId string) validation.RuleFunc {
+func ApproverHasDivisionPermission(app core.App, approverId string, divisionId string) validation.RuleFunc {
 	return func(value interface{}) error {
 		poApproverClaim, err := app.Dao().FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": "po_approver",
@@ -170,7 +170,7 @@ func IsPositiveMultipleOfPointZeroOne() validation.RuleFunc {
 // arguments:
 // expenseRecord: the expense record
 // expenseRateRecord: the expense rate record retrieved from the expense_rates collection
-func CalculateMileageTotal(app *pocketbase.PocketBase, expenseRecord *models.Record, expenseRateRecord *models.Record) (float64, error) {
+func CalculateMileageTotal(app core.App, expenseRecord *models.Record, expenseRateRecord *models.Record) (float64, error) {
 	distance := expenseRecord.GetFloat("distance")
 	// check if the distance is an integer
 	if distance != float64(int(distance)) {
@@ -368,7 +368,7 @@ func CalculateMileageTotal(app *pocketbase.PocketBase, expenseRecord *models.Rec
 
 // when given a date string in the format "YYYY-MM-DD", return the date string
 // representing the first day of the annual payroll period.
-func GetAnnualPayrollPeriodStartDate(app *pocketbase.PocketBase, date string) (string, error) {
+func GetAnnualPayrollPeriodStartDate(app core.App, date string) (string, error) {
 	// First we need to determine the current annual period. To do this we use
 	// the expenseDate to find the date property of the payroll_year_end_dates
 	// collection record that is less than the expenseDate. We then use day
@@ -415,7 +415,7 @@ func HasClaim(dao *daos.Dao, uid string, name string) (bool, error) {
 	return len(userClaims) > 0, nil
 }
 
-func GetExpenseRateRecord(app *pocketbase.PocketBase, expenseRecord *models.Record) (*models.Record, error) {
+func GetExpenseRateRecord(app core.App, expenseRecord *models.Record) (*models.Record, error) {
 	// Expense rates are stored in the expense_rates collection in PocketBase.
 	// The records have an effective_date property that designates the date the
 	// rate is effective. We must fetch the appropriate record from the
@@ -441,7 +441,7 @@ func GetExpenseRateRecord(app *pocketbase.PocketBase, expenseRecord *models.Reco
 	return expenseRateRecords[0], nil
 }
 
-func CalculateRecurringPurchaseOrderTotalValue(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record) (int, float64, error) {
+func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord *models.Record) (int, float64, error) {
 	startDateString := purchaseOrderRecord.GetString("date")
 	startDate, parseErr := time.Parse(time.DateOnly, startDateString)
 	if parseErr != nil {
@@ -474,7 +474,7 @@ func CalculateRecurringPurchaseOrderTotalValue(app *pocketbase.PocketBase, purch
 }
 
 // return true if the recurring purchase order has been exhausted, false otherwise
-func RecurringPurchaseOrderExhausted(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record) (bool, error) {
+func RecurringPurchaseOrderExhausted(app core.App, purchaseOrderRecord *models.Record) (bool, error) {
 	// TODO: implement issue #13, check if an expense has been committed for each
 	// recurrence of the PO and set the Status to Closed if so, otherwise doing nothing.
 
@@ -505,7 +505,7 @@ func RecurringPurchaseOrderExhausted(app *pocketbase.PocketBase, purchaseOrderRe
 // committedOnly is true, return the total of all committed expenses only. This
 // function DOES NOT check if the purchaseOrderRecord is of type Cumulative.
 // TODO: test this thoroughly.
-func CumulativeTotalExpensesForPurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record, committedOnly bool) (float64, error) {
+func CumulativeTotalExpensesForPurchaseOrder(app core.App, purchaseOrderRecord *models.Record, committedOnly bool) (float64, error) {
 	existingExpensesTotal := 0.0
 	query := app.Dao().DB().NewQuery("SELECT COALESCE(SUM(total), 0) AS total FROM expenses WHERE purchase_order = {:purchaseOrder}")
 	if committedOnly {

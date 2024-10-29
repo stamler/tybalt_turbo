@@ -12,8 +12,8 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/models"
 )
 
@@ -37,7 +37,7 @@ const (
 // to ensure that the record is in a valid state before it is created or
 // updated. It is called by ProcessPurchaseOrder to reduce the number of fields
 // that need to be validated.
-func cleanPurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record) error {
+func cleanPurchaseOrder(app core.App, purchaseOrderRecord *models.Record) error {
 	typeString := purchaseOrderRecord.GetString("type")
 
 	// Normal and Cumulative Purchase both have empty values for
@@ -62,7 +62,7 @@ func cleanPurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *models.
 // function. This ensures that only the fields that are allowed to be set are
 // present in the record prior to validation. The function returns an error if
 // the record is invalid, otherwise it returns nil.
-func validatePurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record) error {
+func validatePurchaseOrder(app core.App, purchaseOrderRecord *models.Record) error {
 	isRecurring := purchaseOrderRecord.GetString("type") == "Recurring"
 
 	dateAsTime, parseErr := time.Parse("2006-01-02", purchaseOrderRecord.Get("date").(string))
@@ -104,7 +104,7 @@ func validatePurchaseOrder(app *pocketbase.PocketBase, purchaseOrderRecord *mode
 // PocketBase itself so this is for cross-field validation. If the
 // purchase_order record is invalid this function throws an error explaining
 // which field(s) are invalid and why.
-func ProcessPurchaseOrder(app *pocketbase.PocketBase, record *models.Record, context echo.Context) error {
+func ProcessPurchaseOrder(app core.App, record *models.Record, context echo.Context) error {
 	// we need the id of the calling user. If the context doesn't contain an id
 	// (because we're using the admin GUI for example) we'll use the uid from the
 	// record itself.
@@ -147,7 +147,7 @@ func ProcessPurchaseOrder(app *pocketbase.PocketBase, record *models.Record, con
 	return nil
 }
 
-func getSecondApproverClaim(app *pocketbase.PocketBase, purchaseOrderRecord *models.Record) (string, error) {
+func getSecondApproverClaim(app core.App, purchaseOrderRecord *models.Record) (string, error) {
 	var secondApproverClaim string
 
 	poType := purchaseOrderRecord.GetString("type")

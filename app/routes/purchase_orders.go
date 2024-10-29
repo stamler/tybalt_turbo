@@ -10,8 +10,8 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 )
@@ -21,7 +21,7 @@ const (
 	VP_PO_LIMIT      = 2500
 )
 
-func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createApprovePurchaseOrderHandler(app core.App) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.PathParam("id")
 
@@ -171,7 +171,7 @@ func createApprovePurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerF
 	}
 }
 
-func createRejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createRejectPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		id := c.PathParam("id")
 
@@ -281,7 +281,7 @@ func createRejectPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFu
 	}
 }
 
-func createCancelPurchaseOrderHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 	return func(c echo.Context) error {
 		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
 		userId := authRecord.Id

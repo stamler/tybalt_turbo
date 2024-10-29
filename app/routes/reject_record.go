@@ -7,13 +7,13 @@ import (
 	"time"
 
 	"github.com/labstack/echo/v5"
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 )
 
-func createRejectRecordHandler(app *pocketbase.PocketBase, collectionName string) echo.HandlerFunc {
+func createRejectRecordHandler(app core.App, collectionName string) echo.HandlerFunc {
 	// This route handles the rejection of a record.
 	// It performs the following actions:
 	// 1. Gets the record ID from the URL.

@@ -6,14 +6,14 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase"
 	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/daos"
 	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-func createUnbundleTimesheetHandler(app *pocketbase.PocketBase) echo.HandlerFunc {
+func createUnbundleTimesheetHandler(app core.App) echo.HandlerFunc {
 	// This function undoes the bundle timesheet operation. It will delete the
 	// time_sheets record with the id specified in the request url and clear the
 	// tsid field in all time entries records that have the same time sheet id.
