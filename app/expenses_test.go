@@ -770,10 +770,10 @@ func TestExpensesRead(t *testing.T) {
 		{
 			Name:            "caller with the commit claim can read approved expenses records",
 			Method:          http.MethodGet,
-			Url:             "/api/collections/expenses/records/xg2yeucklhgbs3n",
+			Url:             "/api/collections/expenses/records/b4o6xph4ngwx4nw",
 			RequestHeaders:  map[string]string{"Authorization": commitToken},
 			ExpectedStatus:  200,
-			ExpectedContent: []string{`"id":"xg2yeucklhgbs3n"`},
+			ExpectedContent: []string{`"id":"b4o6xph4ngwx4nw"`},
 			ExpectedEvents: map[string]int{
 				"OnModelBeforeRead":         0,
 				"OnModelAfterRead":          0,
