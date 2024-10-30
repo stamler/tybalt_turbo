@@ -1,4 +1,4 @@
-// main_test.go
+// expenses_test.go
 package main
 
 import (
@@ -15,11 +15,6 @@ func TestExpensesCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// adminToken, err := generateAdminToken("test@example.com")
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -836,8 +831,4 @@ func TestExpensesRead(t *testing.T) {
 	for _, scenario := range scenarios {
 		scenario.Test(t)
 	}
-
-	// TODO: caller with the report claim can read all committed expenses records
-	// TODO: caller with the report claim cannot read uncommitted expenses records
-
 }
