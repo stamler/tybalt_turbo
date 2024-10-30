@@ -700,3 +700,92 @@ func TestExpensesDelete(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+func TestExpensesRead(t *testing.T) {
+	creatorToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approverToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	/*
+		committerRejectorToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+		if err != nil {
+			t.Fatal(err)
+		}
+		reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		noClaimToken, err := testutils.GenerateRecordToken("users", "francesco@mac.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+	*/
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:            "caller can read expenses records containing their uid",
+			Method:          http.MethodGet,
+			Url:             "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			RequestHeaders:  map[string]string{"Authorization": creatorToken},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`"id":"2gq9uyxmkcyopa4"`},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeRead":         0,
+				"OnModelAfterRead":          0,
+				"OnRecordBeforeReadRequest": 0,
+				"OnRecordAfterReadRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "caller cannot read unsubmitted expenses records where they are approver",
+			Method:         http.MethodGet,
+			Url:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			RequestHeaders: map[string]string{"Authorization": approverToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeRead":         0,
+				"OnModelAfterRead":          0,
+				"OnRecordBeforeReadRequest": 0,
+				"OnRecordAfterReadRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:            "caller can read submitted expenses records where they are approver",
+			Method:          http.MethodGet,
+			Url:             "/api/collections/expenses/records/xg2yeucklhgbs3n",
+			RequestHeaders:  map[string]string{"Authorization": approverToken},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`"id":"xg2yeucklhgbs3n"`},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeRead":         0,
+				"OnModelAfterRead":          0,
+				"OnRecordBeforeReadRequest": 0,
+				"OnRecordAfterReadRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+
+	// TODO: caller can read approved expenses records where they are committer
+	// TODO: caller cannot read unapproved expenses records where they are committer
+	// TODO: caller can read expenses records where they are rejector
+	// TODO: caller with the report claim can read all expenses records
+
+	// TODO: caller who is not the creator, approver, committer, or rejector of
+	// any records and does not have the report claim cannot read any expenses
+	// records
+}
