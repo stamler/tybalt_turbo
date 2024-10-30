@@ -714,13 +714,10 @@ func TestExpensesRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	/*
-		reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-	*/
+	reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -790,6 +787,38 @@ func TestExpensesRead(t *testing.T) {
 			Method:         http.MethodGet,
 			Url:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
 			RequestHeaders: map[string]string{"Authorization": commitToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeRead":         0,
+				"OnModelAfterRead":          0,
+				"OnRecordBeforeReadRequest": 0,
+				"OnRecordAfterReadRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:            "caller with the report claim can read committed expenses records",
+			Method:          http.MethodGet,
+			Url:             "/api/collections/expenses/records/xg2yeucklhgbs3n",
+			RequestHeaders:  map[string]string{"Authorization": reportToken},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`"id":"xg2yeucklhgbs3n"`},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeRead":         0,
+				"OnModelAfterRead":          0,
+				"OnRecordBeforeReadRequest": 0,
+				"OnRecordAfterReadRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "caller with the report claim cannot read uncommitted expenses records",
+			Method:         http.MethodGet,
+			Url:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			RequestHeaders: map[string]string{"Authorization": reportToken},
 			ExpectedStatus: 404,
 			ExpectedContent: []string{
 				`"message":"The requested resource wasn't found."`,
