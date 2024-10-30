@@ -321,11 +321,6 @@ func TestExpensesUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// adminToken, err := generateAdminToken("test@example.com")
-	// if err != nil {
-	// 	t.Fatal(err)
-	// }
-
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "valid expense gets a correct pay period ending",
@@ -629,6 +624,73 @@ func TestExpensesUpdate(t *testing.T) {
 				"OnModelAfterUpdate":          0,
 				"OnRecordBeforeUpdateRequest": 0,
 				"OnRecordAfterUpdateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestExpensesDelete(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	nonCreatorToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:           "expense cannot be deleted by user whose id does not match uid",
+			Method:         http.MethodDelete,
+			Url:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			RequestHeaders: map[string]string{"Authorization": nonCreatorToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeDelete":         0,
+				"OnModelAfterDelete":          0,
+				"OnRecordBeforeDeleteRequest": 0,
+				"OnRecordAfterDeleteRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "expense can be deleted by user whose id matches uid",
+			Method:         http.MethodDelete,
+			Url:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 204,
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeDelete":         1,
+				"OnModelAfterDelete":          1,
+				"OnRecordBeforeDeleteRequest": 1,
+				"OnRecordAfterDeleteRequest":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "expense cannot be deleted by the creator if it is committed",
+			Method:         http.MethodDelete,
+			Url:            "/api/collections/expenses/records/xg2yeucklhgbs3n",
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeDelete":         0,
+				"OnModelAfterDelete":          0,
+				"OnRecordBeforeDeleteRequest": 0,
+				"OnRecordAfterDeleteRequest":  0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
