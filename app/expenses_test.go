@@ -191,7 +191,7 @@ func TestExpensesCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "setting category with job succeeds",
+			Name:   "setting category with job succeeds if purchase_order is set",
 			Method: http.MethodPost,
 			Url:    "/api/collections/expenses/records",
 			Body: strings.NewReader(`{
@@ -221,9 +221,93 @@ func TestExpensesCreate(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-		// TODO: setting category with job fails if purchase_order is not set
-		// TODO: setting job without category fails if purchase_order is not set
-		// TODO: setting category with job fails if category does not belong to the job
+		{
+			Name:   "setting category with job fails if purchase_order is not set",
+			Method: http.MethodPost,
+			Url:    "/api/collections/expenses/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"purchase_order":{"code":"validation_required"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate":         0,
+				"OnModelAfterCreate":          0,
+				"OnRecordBeforeCreateRequest": 1,
+				"OnRecordAfterCreateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "setting job without category fails if purchase_order is not set",
+			Method: http.MethodPost,
+			Url:    "/api/collections/expenses/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"job": "cjf0kt0defhq480"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"purchase_order":{"code":"validation_required"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate":         0,
+				"OnModelAfterCreate":          0,
+				"OnRecordBeforeCreateRequest": 1,
+				"OnRecordAfterCreateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "setting category with job fails if category does not belong to the job even if purchase_order is set",
+			Method: http.MethodPost,
+			Url:    "/api/collections/expenses/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"category": "he1f7oej613mxh7",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "2plsetqdxht7esg"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"message":"Failed to create record."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate":         0,
+				"OnModelAfterCreate":          0,
+				"OnRecordBeforeCreateRequest": 0,
+				"OnRecordAfterCreateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
