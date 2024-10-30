@@ -18,7 +18,7 @@ func TestExpensesCreate(t *testing.T) {
 
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "valid expense gets a correct pay period ending",
+			Name:   "valid expense gets a correct pay period ending and approver",
 			Method: http.MethodPost,
 			Url:    "/api/collections/expenses/records",
 			Body: strings.NewReader(`{
