@@ -314,3 +314,327 @@ func TestExpensesCreate(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+func TestExpensesUpdate(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// adminToken, err := generateAdminToken("test@example.com")
+	// if err != nil {
+	// 	t.Fatal(err)
+	// }
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "valid expense gets a correct pay period ending",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"approver":"f2j5a8vk006baub"`,
+				`"pay_period_ending":"2024-09-14"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         1,
+				"OnModelAfterUpdate":          1,
+				"OnRecordBeforeUpdateRequest": 1,
+				"OnRecordAfterUpdateRequest":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "unauthenticated request fails",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor"
+				}`),
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate":         0,
+				"OnModelAfterCreate":          0,
+				"OnRecordBeforeCreateRequest": 0,
+				"OnRecordAfterCreateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "fails when uid is present but it does not match existing value",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         0,
+				"OnModelAfterUpdate":          0,
+				"OnRecordBeforeUpdateRequest": 0,
+				"OnRecordAfterUpdateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "succeeds when uid is present and matches existing value",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"uid":"rzr98oadsp9qc11"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         1,
+				"OnModelAfterUpdate":          1,
+				"OnRecordBeforeUpdateRequest": 1,
+				"OnRecordAfterUpdateRequest":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "setting rejector, rejected, and rejection_reason fails",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"rejector": "f2j5a8vk006baub",
+				"rejected": "2024-09-01 15:04:05",
+				"rejection_reason": "This is a rejection"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         0,
+				"OnModelAfterUpdate":          0,
+				"OnRecordBeforeUpdateRequest": 0,
+				"OnRecordAfterUpdateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "setting approved or approver fails",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"approved": "2024-09-01 15:04:05",
+				"approver": "f2j5a8vk006baub"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         0,
+				"OnModelAfterUpdate":          0,
+				"OnRecordBeforeUpdateRequest": 0,
+				"OnRecordAfterUpdateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "setting category without job fails",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"category": "t5nmdl188gtlhz0"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         0,
+				"OnModelAfterUpdate":          0,
+				"OnRecordBeforeUpdateRequest": 0,
+				"OnRecordAfterUpdateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "setting category with job succeeds if purchase_order is set",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "2plsetqdxht7esg"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"category":"t5nmdl188gtlhz0"`,
+				`"job":"cjf0kt0defhq480"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         1,
+				"OnModelAfterUpdate":          1,
+				"OnRecordBeforeUpdateRequest": 1,
+				"OnRecordAfterUpdateRequest":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "setting category with job fails if purchase_order is not set",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"purchase_order":{"code":"validation_required"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         0,
+				"OnModelAfterUpdate":          0,
+				"OnRecordBeforeUpdateRequest": 1,
+				"OnRecordAfterUpdateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "setting job without category fails if purchase_order is not set",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"job": "cjf0kt0defhq480"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"purchase_order":{"code":"validation_required"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         0,
+				"OnModelAfterUpdate":          0,
+				"OnRecordBeforeUpdateRequest": 1,
+				"OnRecordAfterUpdateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "setting category with job fails if category does not belong to the job even if purchase_order is set",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor_name": "The Vendor",
+				"category": "he1f7oej613mxh7",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "2plsetqdxht7esg"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         0,
+				"OnModelAfterUpdate":          0,
+				"OnRecordBeforeUpdateRequest": 0,
+				"OnRecordAfterUpdateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
