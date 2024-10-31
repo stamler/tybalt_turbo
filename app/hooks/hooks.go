@@ -1,8 +1,20 @@
 package hooks
 
 import (
+	"net/http"
+
 	"github.com/pocketbase/pocketbase/core"
 )
+
+// CodeError is a custom error type that includes a code
+type CodeError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
+func (e *CodeError) Error() string {
+	return e.Message
+}
 
 // This file exports the hooks that are available to the PocketBase application.
 // The hooks are called at various points in the application lifecycle.
@@ -39,12 +51,26 @@ func AddHooks(app core.App) {
 	})
 	app.OnRecordBeforeCreateRequest("expenses").Add(func(e *core.RecordCreateEvent) error {
 		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
+			// Check if the error is a CodeError and return the appropriate JSON response
+			if codeError, ok := err.(*CodeError); ok {
+				return e.HttpContext.JSON(http.StatusBadRequest, map[string]interface{}{
+					"message": codeError.Message,
+					"code":    codeError.Code,
+				})
+			}
 			return err
 		}
 		return nil
 	})
 	app.OnRecordBeforeUpdateRequest("expenses").Add(func(e *core.RecordUpdateEvent) error {
 		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
+			// Check if the error is a CodeError and return the appropriate JSON response
+			if codeError, ok := err.(*CodeError); ok {
+				return e.HttpContext.JSON(http.StatusBadRequest, map[string]interface{}{
+					"message": codeError.Message,
+					"code":    codeError.Code,
+				})
+			}
 			return err
 		}
 		return nil

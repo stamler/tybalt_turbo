@@ -47,6 +47,75 @@ func TestExpensesCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "expense created against an Active, Normal purchase_orders record succeeds",
+			Method: http.MethodPost,
+			Url:    "/api/collections/expenses/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 132.10,
+				"vendor_name": "The Vendor",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "2plsetqdxht7esg"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"purchase_order":"2plsetqdxht7esg"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate":         1,
+				"OnModelAfterCreate":          1,
+				"OnRecordBeforeCreateRequest": 1,
+				"OnRecordAfterCreateRequest":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "expense created against a non-Active, Normal purchase_orders record fails",
+			Method: http.MethodPost,
+			Url:    "/api/collections/expenses/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 132.10,
+				"vendor_name": "The Vendor",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "gal6e5la2fa4rpn"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"purchase_order_not_active"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate":        1,
+				"OnModelAfterCreate":         1,
+				"OnRecordAfterCreateRequest": 1,
+				"OnBeforeApiError":           0,
+				"OnAfterApiError":            0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// TODO: valid mileage expense gets a correct total calculated and vendor_name cleared
+		// TODO: valid mileage expense that spans multiple mileage tiers gets a correct total calculated and vendor_name cleared
+		// TODO: unit test for CalculateMileageTotal
+		// TODO: valid allowance expense gets a correct total calculated and vendor_name cleared and description set
+
+		// TODO: expenses created against an Active purchase_orders record for which the caller is not allowed to create an expense fail
+		// TODO: enhance validate_expenses_test.go
+		{
 			Name:   "unauthenticated request fails",
 			Method: http.MethodPost,
 			Url:    "/api/collections/expenses/records",

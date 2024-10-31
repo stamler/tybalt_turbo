@@ -139,7 +139,11 @@ func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Con
 
 	// if the purchaseOrder has a status that is not "Active", return an error
 	if poRecord != nil && poRecord.GetString("status") != "Active" {
-		return apis.NewBadRequestError("purchase order is not active", nil)
+		// return apis.NewBadRequestError("purchase order is not active", nil)
+		return &CodeError{
+			Code:    "purchase_order_not_active",
+			Message: "purchase order is not active",
+		}
 	}
 
 	// TODO: throw an error if the caller is not allowed to create an expense
