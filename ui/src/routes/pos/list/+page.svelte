@@ -12,6 +12,7 @@
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
   import { invalidate } from "$app/navigation";
+  // import { toastStore, type ToastSettings } from "@skeletonlabs/skeleton";
 
   let rejectModal: RejectModal;
 
@@ -76,6 +77,36 @@
 
   function openRejectModal(poId: string) {
     rejectModal?.openModal(poId);
+  }
+
+  async function closePurchaseOrder(id: string) {
+    try {
+      await pb.send(`/api/purchase_orders/${id}/close`, {
+        method: "POST",
+      });
+
+      // Show success toast
+      /*
+      const t: ToastSettings = {
+        message: "Purchase order closed successfully",
+        background: "variant-filled-success",
+      };
+      toastStore.trigger(t);
+      */
+      // Refresh the data
+      await invalidate("app:pos");
+    } catch (error) {
+      console.error("Error closing purchase order:", error);
+
+      // Show error toast
+      /*  
+      const t: ToastSettings = {
+        message: error.message || "Error closing purchase order",
+        background: "variant-filled-error",
+      };
+      toastStore.trigger(t);
+      */
+    }
   }
 </script>
 
@@ -205,7 +236,7 @@
   </span>
 {/snippet}
 
-{#snippet actions({ id, status }: PurchaseOrdersResponse)}
+{#snippet actions({ id, status, type }: PurchaseOrdersResponse)}
   {#if status === "Active"}
     <DsActionButton
       action={`/expenses/add/${id}`}
@@ -214,6 +245,14 @@
       color="green"
     />
     <DsActionButton action={() => cancel(id)} icon="mdi:cancel" title="Cancel" color="orange" />
+    {#if type === "Cumulative"}
+      <DsActionButton
+        action={() => closePurchaseOrder(id)}
+        icon="mdi:curtains-closed"
+        title="Close Purchase Order"
+        color="orange"
+      />
+    {/if}
   {/if}
   {#if status === "Unapproved"}
     <DsActionButton action={`/pos/${id}/edit`} icon="mdi:edit-outline" title="Edit" color="blue" />
