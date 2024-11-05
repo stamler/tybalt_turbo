@@ -207,4 +207,18 @@ func AddRoutes(app core.App) {
 
 		return nil
 	})
+
+	// Add the close purchase order route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/purchase_orders/:id/close",
+			Handler: createClosePurchaseOrderHandler(app),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
 }
