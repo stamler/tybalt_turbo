@@ -96,7 +96,7 @@ func TestExpensesCreate(t *testing.T) {
 			RequestHeaders: map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"code":"purchase_order_not_active"`,
+				`"data":{"purchase_order":{"code":"not_active"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelBeforeCreate":        1,

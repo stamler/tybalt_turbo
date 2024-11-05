@@ -3,13 +3,12 @@
 package hooks
 
 import (
-	"errors"
+	"net/http"
 	"strings"
 	"tybalt/utilities"
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/models"
 )
@@ -32,7 +31,16 @@ func cleanExpense(app core.App, expenseRecord *models.Record) error {
 		"userId": expenseRecord.GetString("uid"),
 	})
 	if err != nil {
-		return err
+		return &HookError{
+			Code:    http.StatusInternalServerError,
+			Message: "hook error when cleaning expense",
+			Data: map[string]CodeError{
+				"uid": {
+					Code:    "error_finding_profile",
+					Message: "error finding profile for user",
+				},
+			},
+		}
 	}
 	approver := profile.Get("manager")
 	expenseRecord.Set("approver", approver)
@@ -46,7 +54,16 @@ func cleanExpense(app core.App, expenseRecord *models.Record) error {
 	case "Mileage":
 		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {
-			return err
+			return &HookError{
+				Code:    http.StatusInternalServerError,
+				Message: "hook error when cleaning expense",
+				Data: map[string]CodeError{
+					"global": {
+						Code:    "error_loading_expense_rate_record",
+						Message: "error loading expense rate record",
+					},
+				},
+			}
 		}
 
 		// if the paymentType is "Mileage", distance must be a positive integer
@@ -54,12 +71,30 @@ func cleanExpense(app core.App, expenseRecord *models.Record) error {
 		distance := expenseRecord.GetFloat("distance")
 		// check if the distance is an integer
 		if distance != float64(int(distance)) {
-			return errors.New("distance must be an integer for mileage expenses")
+			return &HookError{
+				Code:    http.StatusBadRequest,
+				Message: "hook error when cleaning expense",
+				Data: map[string]CodeError{
+					"distance": {
+						Code:    "not_an_integer",
+						Message: "distance must be an integer for mileage expenses",
+					},
+				},
+			}
 		}
 
 		totalMileageExpense, mileageErr := utilities.CalculateMileageTotal(app, expenseRecord, expenseRateRecord)
 		if mileageErr != nil {
-			return mileageErr
+			return &HookError{
+				Code:    http.StatusInternalServerError,
+				Message: "hook error when cleaning expense",
+				Data: map[string]CodeError{
+					"total": {
+						Code:    "error_calculating_mileage_total",
+						Message: "error calculating mileage total",
+					},
+				},
+			}
 		}
 
 		// update the properties appropriate for a mileage expense
@@ -74,7 +109,16 @@ func cleanExpense(app core.App, expenseRecord *models.Record) error {
 	case "Allowance":
 		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {
-			return err
+			return &HookError{
+				Code:    http.StatusInternalServerError,
+				Message: "hook error when cleaning expense",
+				Data: map[string]CodeError{
+					"global": {
+						Code:    "error_loading_expense_rate_record",
+						Message: "error loading expense rate record",
+					},
+				},
+			}
 		}
 
 		// If the paymentType is "Allowance", the allowance_type property of the
@@ -110,7 +154,16 @@ func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Con
 
 	// if the expense record is submitted, return an error
 	if expenseRecord.Get("submitted") == true {
-		return apis.NewBadRequestError("cannot edit submitted expense", nil)
+		return &HookError{
+			Code:    http.StatusBadRequest,
+			Message: "hook error when processing expense",
+			Data: map[string]CodeError{
+				"submitted": {
+					Code:    "is_submitted",
+					Message: "cannot edit submitted expense",
+				},
+			},
+		}
 	}
 
 	// clean the expense record
@@ -122,7 +175,16 @@ func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Con
 	// exclusively from the date property.
 	payPeriodEnding, ppEndErr := utilities.GeneratePayPeriodEnding(expenseRecord.GetString("date"))
 	if ppEndErr != nil {
-		return apis.NewBadRequestError("Error generating pay_period_ending", ppEndErr)
+		return &HookError{
+			Code:    http.StatusInternalServerError,
+			Message: "hook error when processing expense",
+			Data: map[string]CodeError{
+				"pay_period_ending": {
+					Code:    "error_generating",
+					Message: "error generating pay period ending",
+				},
+			},
+		}
 	}
 	expenseRecord.Set("pay_period_ending", payPeriodEnding)
 
@@ -133,16 +195,30 @@ func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Con
 	if purchaseOrder != "" {
 		poRecord, err = app.Dao().FindRecordById("purchase_orders", purchaseOrder)
 		if err != nil {
-			return err
+			return &HookError{
+				Code:    http.StatusInternalServerError,
+				Message: "hook error when processing expense",
+				Data: map[string]CodeError{
+					"purchase_order": {
+						Code:    "not_found",
+						Message: "purchase order not found",
+					},
+				},
+			}
 		}
 	}
 
 	// if the purchaseOrder has a status that is not "Active", return an error
 	if poRecord != nil && poRecord.GetString("status") != "Active" {
-		// return apis.NewBadRequestError("purchase order is not active", nil)
-		return &CodeError{
-			Code:    "purchase_order_not_active",
-			Message: "purchase order is not active",
+		return &HookError{
+			Code:    http.StatusBadRequest,
+			Message: "hook error when processing expense",
+			Data: map[string]CodeError{
+				"purchase_order": {
+					Code:    "not_active",
+					Message: "purchase order must be active",
+				},
+			},
 		}
 	}
 
@@ -157,7 +233,16 @@ func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Con
 	if poRecord != nil && poRecord.GetString("type") == "Cumulative" {
 		existingExpensesTotal, err = utilities.CumulativeTotalExpensesForPurchaseOrder(app, poRecord, false)
 		if err != nil {
-			return err
+			return &HookError{
+				Code:    http.StatusInternalServerError,
+				Message: "hook error when processing expense",
+				Data: map[string]CodeError{
+					"purchase_order": {
+						Code:    "error_calculating",
+						Message: "error calculating cumulative total",
+					},
+				},
+			}
 		}
 	}
 	// validate the expense record

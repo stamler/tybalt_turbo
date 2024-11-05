@@ -1,10 +1,18 @@
 package hooks
 
 import (
-	"net/http"
-
 	"github.com/pocketbase/pocketbase/core"
 )
+
+type HookError struct {
+	Code    int                  `json:"code"`
+	Message string               `json:"message"`
+	Data    map[string]CodeError `json:"data"`
+}
+
+func (e *HookError) Error() string {
+	return e.Message
+}
 
 // CodeError is a custom error type that includes a code
 type CodeError struct {
@@ -52,11 +60,8 @@ func AddHooks(app core.App) {
 	app.OnRecordBeforeCreateRequest("expenses").Add(func(e *core.RecordCreateEvent) error {
 		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
 			// Check if the error is a CodeError and return the appropriate JSON response
-			if codeError, ok := err.(*CodeError); ok {
-				return e.HttpContext.JSON(http.StatusBadRequest, map[string]interface{}{
-					"message": codeError.Message,
-					"code":    codeError.Code,
-				})
+			if hookError, ok := err.(*HookError); ok {
+				return e.HttpContext.JSON(hookError.Code, hookError)
 			}
 			return err
 		}
@@ -65,11 +70,8 @@ func AddHooks(app core.App) {
 	app.OnRecordBeforeUpdateRequest("expenses").Add(func(e *core.RecordUpdateEvent) error {
 		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
 			// Check if the error is a CodeError and return the appropriate JSON response
-			if codeError, ok := err.(*CodeError); ok {
-				return e.HttpContext.JSON(http.StatusBadRequest, map[string]interface{}{
-					"message": codeError.Message,
-					"code":    codeError.Code,
-				})
+			if hookError, ok := err.(*HookError); ok {
+				return e.HttpContext.JSON(hookError.Code, hookError)
 			}
 			return err
 		}
