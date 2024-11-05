@@ -87,6 +87,29 @@ func GeneratePayPeriodEnding(date string) (string, error) {
 	return weekEndingTime.AddDate(0, 0, 7).Format(time.DateOnly), nil
 }
 
+// DateStringMin returns a validation.RuleFunc that validates that the value is
+// a date string that is on or after the date string passed to the function or,
+// if max is true, on or before the date string passed to the function.
+func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
+	return func(value interface{}) error {
+		date, _ := value.(string)
+		dateAsTime, err := time.Parse(time.DateOnly, date)
+		if err != nil {
+			return err
+		}
+		if max {
+			if dateAsTime.After(limit) {
+				return validation.NewError("validation_invalid_date", date+" is too late")
+			}
+		} else {
+			if dateAsTime.Before(limit) {
+				return validation.NewError("validation_invalid_date", date+" is too early")
+			}
+		}
+		return nil
+	}
+}
+
 // approverHasDivisionPermission returns true if the payload of the user_claims
 // collection record corresponding to the approverId is null or is a JSON list
 // of strings where one list element is the divisionId. Returns false otherwise.

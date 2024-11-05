@@ -3,6 +3,8 @@ package hooks
 import (
 	"fmt"
 	"net/http"
+	"time"
+	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase/models"
@@ -23,13 +25,44 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record, exis
 		poType           string = "Normal"
 		poRecordProvided bool   = false
 		poTotal          float64
+		poDate           time.Time
+		poEndDate        time.Time
 		totalLimit       float64
 		excessErrorText  string = fmt.Sprintf("%0.2f%%", MAX_PURCHASE_ORDER_EXCESS_PERCENT*100)
+		parseErr         error
 	)
 	if poRecord != nil {
 		poRecordProvided = true
 		poTotal = poRecord.GetFloat("total")
 		poType = poRecord.GetString("type")
+		poDate, parseErr = time.Parse(time.DateOnly, poRecord.GetString("date"))
+		if parseErr != nil {
+			return &HookError{
+				Code:    http.StatusInternalServerError,
+				Message: "error parsing purchase order date",
+				Data: map[string]CodeError{
+					"purchase_order": {
+						Code:    "error_parsing_date",
+						Message: "error parsing purchase order date",
+					},
+				},
+			}
+		}
+		if poType == "Recurring" {
+			poEndDate, parseErr = time.Parse(time.DateOnly, poRecord.GetString("end_date"))
+			if parseErr != nil {
+				return &HookError{
+					Code:    http.StatusInternalServerError,
+					Message: "error parsing purchase order end date",
+					Data: map[string]CodeError{
+						"purchase_order": {
+							Code:    "error_parsing_date",
+							Message: "error parsing purchase order end date",
+						},
+					},
+				}
+			}
+		}
 
 		// The maximum allowed total for all purchase_orders records is the lesser
 		// of the value and percent limits.
@@ -73,6 +106,14 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record, exis
 			expenseRecord.Get("date"),
 			validation.Required.Error("date is required"),
 			validation.Date("2006-01-02").Error("must be a valid date"),
+			// the date should be on or after the "date" of the PO
+			validation.When(hasPurchaseOrder,
+				validation.By(utilities.DateStringLimit(poDate, false)),
+			),
+			// if the PO is Recurring, the date should be on or before the "end_date" of the PO
+			validation.When(poType == "Recurring",
+				validation.By(utilities.DateStringLimit(poEndDate, true)),
+			),
 		),
 		"description": validation.Validate(
 			expenseRecord.Get("description"),
@@ -104,13 +145,12 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record, exis
 			validation.When(limitNonPoAmounts && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
 				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
 			),
-			validation.When(hasPurchaseOrder && (poType == "Normal"),
+			validation.When(hasPurchaseOrder && (poType == "Normal" || poType == "Recurring"),
 				validation.Max(totalLimit).Error(fmt.Sprintf("expense exceeds purchase order total of $%0.2f by more than %s", poTotal, excessErrorText)),
 			),
 			validation.When(hasPurchaseOrder && (poType == "Cumulative"),
 				validation.Max(totalLimit).Error(fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, existingExpensesTotal+expenseRecord.GetFloat("total")-poTotal)),
 			),
-			// TODO: Add validation for Reccuring POs
 
 			// TODO: Prevent a second expense from being created for a Normal PO i.e.
 			// Two Expenses cannot exist for the same purchase_order if the type of
