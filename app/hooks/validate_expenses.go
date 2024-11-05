@@ -2,9 +2,9 @@ package hooks
 
 import (
 	"fmt"
+	"net/http"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/models"
 )
 
@@ -56,7 +56,16 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record, exis
 
 	// Throw an error if hasPurchaseOrder is true but poRecordProvided is false
 	if hasPurchaseOrder && !poRecordProvided {
-		return apis.NewBadRequestError("an expense against a purchase_order cannot be validated without a corresponding purchase order record", nil)
+		return &HookError{
+			Code:    http.StatusInternalServerError,
+			Message: "an expense against a purchase_orders record cannot be validated without a corresponding purchase order record",
+			Data: map[string]CodeError{
+				"purchase_order": {
+					Code:    "missing_purchase_order",
+					Message: "an expense against a purchase_orders record cannot be validated without a corresponding purchase order record",
+				},
+			},
+		}
 	}
 
 	validationsErrors := validation.Errors{

@@ -129,6 +129,7 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 						return err
 					}
 					if purchaseOrderRecord.GetString("status") != "Active" {
+						httpResponseStatusCode = http.StatusBadRequest
 						return &CodeError{
 							Code:    "purchase_order_not_active",
 							Message: "purchase order is not active",
@@ -169,6 +170,20 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 						pendingExpenseTotal := record.GetFloat("total")
 						if existingExpensesTotal+pendingExpenseTotal >= purchaseOrderRecord.GetFloat("total") {
 							purchaseOrderRecord.Set("status", "Closed")
+						} else {
+							httpResponseStatusCode = http.StatusBadRequest
+							return &CodeError{
+								Code:    "exceeded_purchase_order_total",
+								Message: "the committed expenses total exceeds the total value of the purchase order",
+							}
+						}
+					}
+					// Save the purchase order record
+					if err := txDao.SaveRecord(purchaseOrderRecord); err != nil {
+						httpResponseStatusCode = http.StatusInternalServerError
+						return &CodeError{
+							Code:    "error_saving_purchase_orders_record",
+							Message: fmt.Sprintf("error saving purchase orders record: %v", err),
 						}
 					}
 				}
