@@ -10,12 +10,6 @@ import (
 	"github.com/pocketbase/pocketbase/models"
 )
 
-// These constants are used to determine whether an expense is within the
-// allowed percentage or value of the total of a purchase order. The lesser of
-// the two limits is used to determine if the expense is valid.
-const MAX_PURCHASE_ORDER_EXCESS_PERCENT = 0.05
-const MAX_PURCHASE_ORDER_EXCESS_VALUE = 100.0
-
 // The validateExpense function is used to validate the expense record. It is
 // called by ProcessExpense to ensure that the record is in a valid state before
 // it is created or updated.
@@ -28,7 +22,7 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record, exis
 		poDate           time.Time
 		poEndDate        time.Time
 		totalLimit       float64
-		excessErrorText  string = fmt.Sprintf("%0.2f%%", MAX_PURCHASE_ORDER_EXCESS_PERCENT*100)
+		excessErrorText  string = fmt.Sprintf("%0.2f%%", utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT*100)
 		parseErr         error
 	)
 	if poRecord != nil {
@@ -66,10 +60,10 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record, exis
 
 		// The maximum allowed total for all purchase_orders records is the lesser
 		// of the value and percent limits.
-		totalLimit = poTotal * (1.0 + MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
-		if MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*MAX_PURCHASE_ORDER_EXCESS_PERCENT {
-			totalLimit = poTotal + MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
-			excessErrorText = fmt.Sprintf("$%0.2f", MAX_PURCHASE_ORDER_EXCESS_VALUE)
+		totalLimit = poTotal * (1.0 + utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
+		if utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT {
+			totalLimit = poTotal + utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
+			excessErrorText = fmt.Sprintf("$%0.2f", utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE)
 		}
 
 		// For Cumulative POs, the totalLimit is reduced by the existingExpensesTotal

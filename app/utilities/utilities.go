@@ -20,6 +20,12 @@ import (
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
+// These constants are used to determine whether an expense is within the
+// allowed percentage or value of the total of a purchase order. The lesser of
+// the two limits is used to determine if the expense is valid.
+const MAX_PURCHASE_ORDER_EXCESS_PERCENT = 0.05
+const MAX_PURCHASE_ORDER_EXCESS_VALUE = 100.0
+
 func IsValidDate(value interface{}) error {
 	s, _ := value.(string)
 	if _, err := time.Parse(time.DateOnly, s); err != nil {

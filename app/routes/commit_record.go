@@ -151,9 +151,11 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 					     to Closed if so, otherwise do nothing.
 					*/
 					purchaseOrderType := purchaseOrderRecord.GetString("type")
+					var dirtyPurchaseOrderRecord bool
 					switch purchaseOrderType {
 					case "Normal":
 						purchaseOrderRecord.Set("status", "Closed")
+						dirtyPurchaseOrderRecord = true
 					case "Recurring":
 						exhausted, err := utilities.RecurringPurchaseOrderExhausted(app, purchaseOrderRecord)
 						if err != nil {
@@ -161,6 +163,7 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 						}
 						if exhausted {
 							purchaseOrderRecord.Set("status", "Closed")
+							dirtyPurchaseOrderRecord = true
 						}
 					case "Cumulative":
 						existingExpensesTotal, err := utilities.CumulativeTotalExpensesForPurchaseOrder(app, purchaseOrderRecord, true)
@@ -168,22 +171,34 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 							return err
 						}
 						pendingExpenseTotal := record.GetFloat("total")
-						if existingExpensesTotal+pendingExpenseTotal >= purchaseOrderRecord.GetFloat("total") {
-							purchaseOrderRecord.Set("status", "Closed")
-						} else {
+
+						totalLimit := purchaseOrderRecord.GetFloat("total") * (1.0 + utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
+						if utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE < purchaseOrderRecord.GetFloat("total")*utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT {
+							totalLimit = purchaseOrderRecord.GetFloat("total") + utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
+						}
+
+						if existingExpensesTotal+pendingExpenseTotal > totalLimit {
 							httpResponseStatusCode = http.StatusBadRequest
 							return &CodeError{
 								Code:    "exceeded_purchase_order_total",
-								Message: "the committed expenses total exceeds the total value of the purchase order",
+								Message: "the committed expenses total exceeds the total value of the purchase order beyond the allowed surplus",
 							}
+						} else if existingExpensesTotal+pendingExpenseTotal >= purchaseOrderRecord.GetFloat("total") {
+							// Set the status to Closed since the total of all committed
+							// expenses plus the pending expense matches or exceeds the
+							// purchase order total
+							purchaseOrderRecord.Set("status", "Closed")
+							dirtyPurchaseOrderRecord = true
 						}
 					}
 					// Save the purchase order record
-					if err := txDao.SaveRecord(purchaseOrderRecord); err != nil {
-						httpResponseStatusCode = http.StatusInternalServerError
-						return &CodeError{
-							Code:    "error_saving_purchase_orders_record",
-							Message: fmt.Sprintf("error saving purchase orders record: %v", err),
+					if dirtyPurchaseOrderRecord {
+						if err := txDao.SaveRecord(purchaseOrderRecord); err != nil {
+							httpResponseStatusCode = http.StatusInternalServerError
+							return &CodeError{
+								Code:    "error_saving_purchase_orders_record",
+								Message: fmt.Sprintf("error saving purchase orders record: %v", err),
+							}
 						}
 					}
 				}
@@ -206,6 +221,6 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 			return c.JSON(httpResponseStatusCode, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Record submitted successfully"})
+		return c.JSON(http.StatusOK, map[string]string{"message": "Record committed successfully"})
 	}
 }
