@@ -85,6 +85,9 @@ func createClosePurchaseOrderHandler(app core.App) echo.HandlerFunc {
 
 		if err != nil {
 			if codeError, ok := err.(*CodeError); ok {
+				// return apis.NewApiError(httpResponseStatusCode, "error closing purchase order", codeError)
+				// TODO: can we have the OnBeforeApiError and OnAfterApiError events fire here by returning an different type of error?
+				// How does this relate to HookError?
 				return c.JSON(httpResponseStatusCode, map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
