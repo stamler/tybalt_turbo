@@ -1,5 +1,5 @@
 app/pb_data
-app/test_pb_data
+app/test_pb_data/logs.db
 
 # the built binary
 app/tybalt
