@@ -144,6 +144,20 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:            "Active Non-Cumulative purchase_orders records cannot be closed",
+			Method:          http.MethodPost,
+			Url:             "/api/purchase_orders/2plsetqdxht7esg/close",
+			RequestHeaders:  map[string]string{"Authorization": closeToken},
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"code":"invalid_po_type","message":"only cumulative purchase orders can be closed manually"`},
+			ExpectedEvents: map[string]int{
+				"OnBeforeApiError": 0,
+				"OnAfterApiError":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		// TODO: Non-Active Cumulative purchase_orders records cannot be closed
 	}
 
 	for _, scenario := range scenarios {
