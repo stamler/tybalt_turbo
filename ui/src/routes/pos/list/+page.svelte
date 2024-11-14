@@ -126,13 +126,13 @@
   </span>
 {/snippet}
 
-{#snippet headline({ total, payment_type, vendor_name }: PurchaseOrdersResponse)}
+{#snippet headline({ total, payment_type, expand }: PurchaseOrdersResponse)}
   <span class="flex items-center gap-2">
     ${total}
     {payment_type}
     <span class="flex items-center gap-0">
       <Icon icon="mdi:store" width="24px" class="inline-block" />
-      {vendor_name}
+      {expand?.vendor.name} ({expand?.vendor.alias})
     </span>
   </span>
 {/snippet}

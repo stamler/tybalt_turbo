@@ -28,6 +28,7 @@ export enum Collections {
   TimeTypes = "time_types",
   UserClaims = "user_claims",
   Users = "users",
+  Vendors = "vendors",
 }
 
 // Alias types for improved usability
@@ -147,6 +148,7 @@ export type ExpensesRecord = {
   submitted: boolean;
   total: number;
   uid: RecordIdString;
+  vendor: RecordIdString;
   vendor_name: string;
 };
 
@@ -231,6 +233,7 @@ export type PurchaseOrdersRecord = {
   total: number;
   type: PurchaseOrdersTypeOptions;
   uid: RecordIdString;
+  vendor: RecordIdString;
   vendor_name: string;
 };
 
@@ -316,14 +319,24 @@ export type TimeTypesRecord = {
   required_fields: null | string[];
 };
 
-export type UserClaimsRecord = {
+export type UserClaimsRecord<Tpayload = unknown> = {
   cid: RecordIdString;
-  payload: null | string[];
+  payload: null | Tpayload;
   uid: RecordIdString;
 };
 
 export type UsersRecord = {
   name: string;
+};
+
+export enum VendorsStatusOptions {
+  "Active" = "Active",
+  "Inactive" = "Inactive",
+}
+export type VendorsRecord = {
+  alias: string;
+  name: string;
+  status: VendorsStatusOptions;
 };
 
 type TimeEntriesRecordExpands = {
@@ -346,6 +359,7 @@ type ExpensesRecordExpands = {
   purchase_order: PurchaseOrdersRecord;
   rejector: UsersResponse;
   uid: UsersResponse;
+  vendor: VendorsRecord;
 };
 
 type PurchaseOrdersRecordExpands = {
@@ -358,6 +372,7 @@ type PurchaseOrdersRecordExpands = {
   second_approver_claim: ClaimsResponse;
   type: PurchaseOrdersTypeOptions;
   uid: UsersResponse;
+  vendor: VendorsResponse;
 };
 
 type UsersRecordExpands = {
@@ -419,6 +434,8 @@ export type UserClaimsResponse<Texpand = unknown> = Required<UserClaimsRecord> &
   BaseSystemFields<Texpand>;
 export type UsersResponse<Texpand = UsersRecordExpands> = Required<UsersRecord> &
   AuthSystemFields<Texpand>;
+export type VendorsResponse<Texpand = unknown> = Required<VendorsRecord> &
+  BaseSystemFields<Texpand>;
 
 // Types containing all Records and Responses, useful for creating typing helper functions
 
@@ -445,6 +462,7 @@ export type CollectionRecords = {
   time_types: TimeTypesRecord;
   user_claims: UserClaimsRecord;
   users: UsersRecord;
+  vendors: VendorsRecord;
 };
 
 export type CollectionResponses = {
@@ -470,6 +488,7 @@ export type CollectionResponses = {
   time_types: TimeTypesResponse;
   user_claims: UserClaimsResponse;
   users: UsersResponse;
+  vendors: VendorsResponse;
 };
 
 // Type for usage with type asserted PocketBase instance
@@ -498,6 +517,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "time_types"): RecordService<TimeTypesResponse>;
   collection(idOrName: "user_claims"): RecordService<UserClaimsResponse>;
   collection(idOrName: "users"): RecordService<UsersResponse>;
+  collection(idOrName: "vendors"): RecordService<VendorsResponse>;
 };
 
 export type SelectOption = { id: string | number };

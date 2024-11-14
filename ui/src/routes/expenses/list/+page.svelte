@@ -117,10 +117,10 @@
       {:else}
         ${item.total}
       {/if}
-      {#if item.vendor_name !== ""}
+      {#if item.expand?.vendor}
         <span class="flex items-center gap-0">
           <Icon icon="mdi:store" width="24px" class="inline-block" />
-          {item.vendor_name}
+          {item.expand?.vendor.name} ({item.expand?.vendor.alias})
         </span>
       {/if}
       {#if item.payment_type === "CorporateCreditCard"}

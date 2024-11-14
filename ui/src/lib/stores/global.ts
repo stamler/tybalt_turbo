@@ -10,6 +10,7 @@ import type {
   JobsResponse,
   ManagersResponse,
   TimeSheetsResponse,
+  VendorsResponse,
 } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
@@ -32,6 +33,7 @@ export type CollectionName =
   | "time_types"
   | "divisions"
   | "jobs"
+  | "vendors"
   | "managers"
   | "time_sheets"
   | "time_sheets_tallies";
@@ -40,6 +42,7 @@ type CollectionType = {
   time_types: TimeTypesResponse[];
   divisions: DivisionsResponse[];
   jobs: JobsResponse[];
+  vendors: VendorsResponse[];
   managers: ManagersResponse[];
   time_sheets: TimeSheetsResponse[];
   time_sheets_tallies: TimeSheetTally[];
@@ -56,6 +59,7 @@ interface StoreState {
   };
   jobsIndex: MiniSearch<JobsResponse> | null;
   clientsIndex: MiniSearch<ClientsResponse> | null;
+  vendorsIndex: MiniSearch<VendorsResponse> | null;
   isLoading: boolean;
   error: ClientResponseError | null;
   errorMessages: ErrorMessage[];
@@ -82,11 +86,13 @@ const createStore = () => {
       // 5 minutes
       jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
       // 1 hour
+      vendors: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
       managers: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
       clients: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
     },
     jobsIndex: null,
     clientsIndex: null,
+    vendorsIndex: null,
     isLoading: false,
     error: null,
     errorMessages: [],
@@ -128,6 +134,11 @@ const createStore = () => {
             requestKey: "manager",
           })) as CollectionType[typeof key];
           break;
+        case "vendors":
+          items = (await pb.collection("vendors").getFullList<VendorsResponse>({
+            requestKey: "vendor",
+          })) as CollectionType[typeof key];
+          break;
         case "time_sheets":
           items = (await pb.collection("time_sheets").getFullList<TimeSheetsResponse>({
             requestKey: "time_sheets",
@@ -154,6 +165,15 @@ const createStore = () => {
           });
           jobsIndex.addAll(items as JobsResponse[]);
           newState.jobsIndex = jobsIndex;
+        }
+
+        if (key === "vendors") {
+          const vendorsIndex = new MiniSearch<VendorsResponse>({
+            fields: ["id", "name", "alias"],
+            storeFields: ["id", "name", "alias"],
+          });
+          vendorsIndex.addAll(items as VendorsResponse[]);
+          newState.vendorsIndex = vendorsIndex;
         }
 
         if (key === "clients") {

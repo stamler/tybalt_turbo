@@ -11,7 +11,7 @@ export const load: PageLoad<ExpensesPageData> = async () => {
     description: "",
     payment_type: "OnAccount",
     purchase_order: "",
-    vendor_name: "",
+    vendor: "",
     job: "",
     category: "",
     // approver is configured as not required in pocketbase so we do not have to

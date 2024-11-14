@@ -12,7 +12,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     description: "",
     payment_type: "OnAccount",
     purchase_order: "",
-    vendor_name: "",
+    vendor: "",
     job: "",
     category: "",
     // approver is configured as not required in pocketbase so we do not have to
@@ -29,7 +29,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     defaultItem.description = result.description;
 
     defaultItem.purchase_order = result.id;
-    defaultItem.vendor_name = result.vendor_name ?? "";
+    defaultItem.vendor = result.vendor ?? "";
     defaultItem.job = result.job ?? "";
     defaultItem.category = result.category ?? "";
   }

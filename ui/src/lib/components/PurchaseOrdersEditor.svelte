@@ -216,12 +216,17 @@
     min={0}
   />
 
-  <DsTextInput
-    bind:value={item.vendor_name as string}
-    {errors}
-    fieldName="vendor_name"
-    uiName="Vendor Name"
-  />
+  {#if $globalStore.vendorsIndex !== null}
+    <DsAutoComplete
+      bind:value={item.vendor as string}
+      index={$globalStore.vendorsIndex}
+      {errors}
+      fieldName="vendor"
+      uiName="Vendor"
+    >
+      {#snippet resultTemplate(item)}{item.name} ({item.alias}){/snippet}
+    </DsAutoComplete>
+  {/if}
 
   <!-- File upload for attachment -->
   <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
