@@ -29,7 +29,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor"
+				"vendor": "2zqxtsmymf670ha"
 				}`),
 			RequestHeaders: map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 200,
@@ -58,7 +58,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 132.10,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "2plsetqdxht7esg"
@@ -88,7 +88,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 132.10,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "gal6e5la2fa4rpn"
@@ -108,10 +108,10 @@ func TestExpensesCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 
-		// TODO: valid mileage expense gets a correct total calculated and vendor_name cleared
-		// TODO: valid mileage expense that spans multiple mileage tiers gets a correct total calculated and vendor_name cleared
+		// TODO: valid mileage expense gets a correct total calculated and vendor cleared
+		// TODO: valid mileage expense that spans multiple mileage tiers gets a correct total calculated and vendor cleared
 		// TODO: unit test for CalculateMileageTotal
-		// TODO: valid allowance expense gets a correct total calculated and vendor_name cleared and description set
+		// TODO: valid allowance expense gets a correct total calculated and vendor cleared and description set
 
 		// TODO: expenses created against an Active purchase_orders record for which the caller is not allowed to create an expense fail
 		// TODO: enhance validate_expenses_test.go
@@ -127,7 +127,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor"
+				"vendor": "2zqxtsmymf670ha"
 				}`),
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
@@ -152,7 +152,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor"
+				"vendor": "2zqxtsmymf670ha"
 				}`),
 			RequestHeaders: map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
@@ -179,7 +179,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"rejector": "f2j5a8vk006baub",
 				"rejected": "2024-09-01 15:04:05",
 				"rejection_reason": "This is a rejection"
@@ -209,7 +209,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"approved": "2024-09-01 15:04:05",
 				"approver": "f2j5a8vk006baub"
 				}`),
@@ -238,7 +238,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0"
 				}`),
 			RequestHeaders: map[string]string{"Authorization": recordToken},
@@ -266,7 +266,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "2plsetqdxht7esg"
@@ -297,7 +297,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480"
 				}`),
@@ -326,7 +326,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"job": "cjf0kt0defhq480"
 				}`),
 			RequestHeaders: map[string]string{"Authorization": recordToken},
@@ -354,7 +354,7 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "he1f7oej613mxh7",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "2plsetqdxht7esg"
@@ -397,7 +397,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor"
+				"vendor": "2zqxtsmymf670ha"
 				}`),
 			RequestHeaders: map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 200,
@@ -425,7 +425,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor"
+				"vendor": "2zqxtsmymf670ha"
 				}`),
 			ExpectedStatus: 404,
 			ExpectedContent: []string{
@@ -451,7 +451,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor"
+				"vendor": "2zqxtsmymf670ha"
 				}`),
 			RequestHeaders: map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 404,
@@ -478,7 +478,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor"
+				"vendor": "2zqxtsmymf670ha"
 				}`),
 			RequestHeaders: map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 200,
@@ -504,7 +504,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"rejector": "f2j5a8vk006baub",
 				"rejected": "2024-09-01 15:04:05",
 				"rejection_reason": "This is a rejection"
@@ -533,7 +533,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"approved": "2024-09-01 15:04:05",
 				"approver": "f2j5a8vk006baub"
 				}`),
@@ -561,7 +561,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0"
 				}`),
 			RequestHeaders: map[string]string{"Authorization": recordToken},
@@ -588,7 +588,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "2plsetqdxht7esg"
@@ -618,7 +618,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480"
 				}`),
@@ -646,7 +646,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"job": "cjf0kt0defhq480"
 				}`),
 			RequestHeaders: map[string]string{"Authorization": recordToken},
@@ -673,7 +673,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor_name": "The Vendor",
+				"vendor": "2zqxtsmymf670ha",
 				"category": "he1f7oej613mxh7",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "2plsetqdxht7esg"
