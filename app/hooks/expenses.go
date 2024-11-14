@@ -99,7 +99,7 @@ func cleanExpense(app core.App, expenseRecord *models.Record) error {
 
 		// update the properties appropriate for a mileage expense
 		expenseRecord.Set("total", totalMileageExpense)
-		expenseRecord.Set("vendor_name", "")
+		expenseRecord.Set("vendor", "")
 
 		// NOTE: during commit, we re-run the mileage calculation factoring in the
 		// entire year's mileage total that is committed. This solves the issue of
@@ -142,7 +142,7 @@ func cleanExpense(app core.App, expenseRecord *models.Record) error {
 		// update the properties appropriate for an allowance expense
 		expenseRecord.Set("total", total)
 		expenseRecord.Set("description", allowanceDescription)
-		expenseRecord.Set("vendor_name", "")
+		expenseRecord.Set("vendor", "")
 	}
 	return nil
 }

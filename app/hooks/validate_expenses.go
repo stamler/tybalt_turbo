@@ -116,11 +116,11 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record, exis
 				validation.Length(5, 0).Error("must be at least 5 characters"),
 			),
 		),
-		"vendor_name": validation.Validate(
-			expenseRecord.Get("vendor_name"),
+		"vendor": validation.Validate(
+			expenseRecord.Get("vendor"),
 			validation.When(!isAllowance && !isPersonalReimbursement && !isMileage,
 				validation.Required.Error("required for this expense type"),
-				validation.Length(2, 0).Error("must be at least 2 characters"),
+				// validation.Length(2, 0).Error("must be at least 2 characters"),
 			),
 		),
 		"cc_last_4_digits": validation.Validate(
