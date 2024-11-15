@@ -77,15 +77,67 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 }
 
 func TestPurchaseOrdersUpdate(t *testing.T) {
-	/*
-		recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
-		if err != nil {
-			t.Fatal(err)
-		}
-	*/
+
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	scenarios := []tests.ApiScenario{
-		// TODO: Add test scenarios for purchase order updates
+		{
+			Name:   "valid purchase order is updated",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body: strings.NewReader(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": 2234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Cumulative"
+			}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"approver":"etysnrlup2f6bak"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         1,
+				"OnModelAfterUpdate":          1,
+				"OnRecordBeforeUpdateRequest": 1,
+				"OnRecordAfterUpdateRequest":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "otherwise valid purchase order with Inactive vendor fails",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body: strings.NewReader(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": 2234.56,
+				"vendor": "ctswqva5onxj75q",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Cumulative"
+			}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"code":404,"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
