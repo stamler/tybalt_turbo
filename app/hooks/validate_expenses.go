@@ -13,7 +13,7 @@ import (
 // The validateExpense function is used to validate the expense record. It is
 // called by ProcessExpense to ensure that the record is in a valid state before
 // it is created or updated.
-func validateExpense(expenseRecord *models.Record, poRecord *models.Record, existingExpensesTotal float64) error {
+func validateExpense(expenseRecord *models.Record, poRecord *models.Record, existingExpensesTotal float64, byPassTotalLimit bool) error {
 
 	var (
 		poType           string = "Normal"
@@ -136,7 +136,7 @@ func validateExpense(expenseRecord *models.Record, poRecord *models.Record, exis
 			expenseRecord.GetFloat("total"),
 			validation.Required.Error("must be greater than 0"),
 			validation.Min(0.01).Error("must be greater than 0"),
-			validation.When(limitNonPoAmounts && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
+			validation.When(!(byPassTotalLimit && paymentType == "OnAccount") && limitNonPoAmounts && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
 				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
 			),
 			validation.When(hasPurchaseOrder && (poType == "Normal" || poType == "Recurring"),

@@ -9,6 +9,7 @@ import (
 
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/models"
 )
@@ -245,8 +246,24 @@ func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Con
 			}
 		}
 	}
+
+	// Check if user has payables_admin claim
+	hasPayablesAdminClaim, err := utilities.HasClaim(app.Dao(), context.Get(apis.ContextAuthRecordKey).(*models.Record).Id, "payables_admin")
+	if err != nil {
+		return &HookError{
+			Code:    http.StatusInternalServerError,
+			Message: "error checking claim",
+			Data: map[string]CodeError{
+				"global": {
+					Code:    "error_checking_claim",
+					Message: "error checking payables_admin claim",
+				},
+			},
+		}
+	}
+
 	// validate the expense record
-	if err := validateExpense(expenseRecord, poRecord, existingExpensesTotal); err != nil {
+	if err := validateExpense(expenseRecord, poRecord, existingExpensesTotal, hasPayablesAdminClaim); err != nil {
 		return err
 	}
 	return nil
