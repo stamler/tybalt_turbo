@@ -51,6 +51,8 @@
   <a href="/expenses/add">New Expense</a>
   <a href="/clients/list">Clients</a>
   <a href="/clients/add">New Client</a>
+  <a href="/vendors/list">Vendors</a>
+  <a href="/vendors/add">New Vendor</a>
   <a href="/timetypes">Time Types</a>
   <a href="/divisions">Divisions</a>
   <div class="h-full">
@@ -61,6 +63,7 @@
         <button
           class="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-700"
           onclick={authStore.logout}
+          aria-label="Logout"
         >
           <svg
             class="h-6 w-6"

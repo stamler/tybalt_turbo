@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { PageData } from "./$types";
+  import type { ExpensesPageData } from "$lib/svelte-types";
   import ExpensesEditor from "$lib/components/ExpensesEditor.svelte";
-  let { data }: { data: PageData } = $props();
+  let { data }: { data: ExpensesPageData } = $props();
 </script>
 
 <ExpensesEditor {data} />

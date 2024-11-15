@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { PageData } from "./$types";
+  import type { ClientsPageData } from "$lib/svelte-types";
   import ClientsEditor from "$lib/components/ClientsEditor.svelte";
-  let { data }: { data: PageData } = $props();
+  let { data }: { data: ClientsPageData } = $props();
 </script>
 
 <ClientsEditor {data} />

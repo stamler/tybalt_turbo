@@ -8,6 +8,8 @@ import type {
   ClientsRecord,
   ContactsResponse,
   PoApproversResponse,
+  VendorsRecord,
+  VendorsResponse,
 } from "$lib/pocketbase-types";
 
 export interface PageData<T> {
@@ -23,3 +25,4 @@ export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord> & {
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse>;
 export type JobsPageData = PageData<JobsRecord> & { categories: CategoriesResponse[] };
 export type ClientsPageData = PageData<ClientsRecord> & { contacts: ContactsResponse[] };
+export type VendorsPageData = PageData<VendorsRecord | VendorsResponse>;
