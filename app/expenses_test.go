@@ -47,6 +47,28 @@ func TestExpensesCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "otherwise valid expense with Inactive vendor fails",
+			Method: http.MethodPost,
+			Url:    "/api/collections/expenses/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "ctswqva5onxj75q"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`{"code":400,"message":"Failed to create record."`,
+			},
+			ExpectedEvents: map[string]int{},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "expense created against an Active, Normal purchase_orders record succeeds",
 			Method: http.MethodPost,
 			Url:    "/api/collections/expenses/records",
@@ -412,6 +434,27 @@ func TestExpensesUpdate(t *testing.T) {
 				"OnRecordBeforeUpdateRequest": 1,
 				"OnRecordAfterUpdateRequest":  1,
 			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "otherwise valid expense update with Inactive vendor fails",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "ctswqva5onxj75q"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{

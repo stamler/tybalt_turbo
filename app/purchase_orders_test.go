@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"tybalt/internal/testutils"
 
@@ -9,14 +10,65 @@ import (
 )
 
 func TestPurchaseOrdersCreate(t *testing.T) {
-	/*
-		recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
-		if err != nil {
-			t.Fatal(err)
-		}
-	*/
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
 	scenarios := []tests.ApiScenario{
-		// TODO: Add test scenarios for purchase order creation
+		{
+			Name:   "valid purchase order is created",
+			Method: http.MethodPost,
+			Url:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": 1234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal"
+			}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"approver":"etysnrlup2f6bak"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate":         1,
+				"OnModelAfterCreate":          1,
+				"OnRecordBeforeCreateRequest": 1,
+				"OnRecordAfterCreateRequest":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "otherwise valid purchase order with Inactive vendor fails",
+			Method: http.MethodPost,
+			Url:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": 1234.56,
+				"vendor": "ctswqva5onxj75q",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal"
+			}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`{"code":400,"message":"Failed to create record."`,
+			},
+			ExpectedEvents: map[string]int{},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {

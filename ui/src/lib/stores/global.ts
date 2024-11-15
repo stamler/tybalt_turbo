@@ -172,7 +172,11 @@ const createStore = () => {
             fields: ["id", "name", "alias"],
             storeFields: ["id", "name", "alias"],
           });
-          vendorsIndex.addAll(items as VendorsResponse[]);
+          // only index Active vendors so users don't see inactive vendors in
+          // the vendor dropdown
+          vendorsIndex.addAll(
+            (items as VendorsResponse[]).filter((item) => item.status === "Active"),
+          );
           newState.vendorsIndex = vendorsIndex;
         }
 
