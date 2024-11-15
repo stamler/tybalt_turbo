@@ -374,6 +374,95 @@ func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 	}
 }
 
+/*
+createConvertToCumulativePurchaseOrderHandler is a function that converts a
+status=Active type=Normal purchase_orders record to a type=Cumulative
+purchase_orders record. It may only be called by a user with the
+payables_admin claim.
+*/
+func createConvertToCumulativePurchaseOrderHandler(app core.App) echo.HandlerFunc {
+	return func(c echo.Context) error {
+		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+		userId := authRecord.Id
+
+		var httpResponseStatusCode int
+		id := c.PathParam("id")
+
+		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+			// Fetch existing purchase order
+			po, err := txDao.FindRecordById("purchase_orders", id)
+			if err != nil {
+				httpResponseStatusCode = http.StatusNotFound
+				return &CodeError{
+					Code:    "po_not_found",
+					Message: fmt.Sprintf("error fetching purchase order: %v", err),
+				}
+			}
+
+			// Check if the purchase order is active
+			if po.Get("status") != "Active" {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "po_not_active",
+					Message: "only active purchase orders can be converted to Cumulative",
+				}
+			}
+
+			// check if the purchase order has type=Normal
+			if po.GetString("type") != "Normal" {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "po_not_normal",
+					Message: "only Normal purchase orders can be converted to Cumulative",
+				}
+			}
+
+			// Check if the user is authorized to cancel the purchase order
+			hasPayablesAdminClaim, err := utilities.HasClaim(txDao, userId, "payables_admin")
+			if err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_fetching_user_claims",
+					Message: fmt.Sprintf("error fetching user claims: %v", err),
+				}
+			}
+			if !hasPayablesAdminClaim {
+				httpResponseStatusCode = http.StatusForbidden
+				return &CodeError{
+					Code:    "unauthorized_conversion",
+					Message: "you are not authorized to convert this purchase order to Cumulative",
+				}
+			}
+
+			// Update the type to Cumulative
+			po.Set("type", "Cumulative")
+
+			// Save the updated purchase order record
+			if err := txDao.SaveRecord(po); err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_updating_purchase_order",
+					Message: fmt.Sprintf("error updating purchase order: %v", err),
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			if codeError, ok := err.(*CodeError); ok {
+				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+					"message": codeError.Message,
+					"code":    codeError.Code,
+				})
+			}
+			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+
+		return c.NoContent(http.StatusNoContent)
+	}
+}
+
 func generatePONumber(txDao *daos.Dao) (string, error) {
 	currentYear := time.Now().Year()
 	prefix := fmt.Sprintf("%d-", currentYear)

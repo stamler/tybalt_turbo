@@ -222,6 +222,70 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		// - /api/purchase_orders/{id}/approve
 		// - /api/purchase_orders/{id}/reject
 		{
+			Name:            "caller with the payables_admin claim can convert Active Normal purchase_orders to Cumulative",
+			Method:          http.MethodPost,
+			Url:             "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
+			RequestHeaders:  map[string]string{"Authorization": closeToken},
+			ExpectedStatus:  204,
+			ExpectedContent: []string{},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate": 1,
+				"OnModelAfterUpdate":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "caller with the payables_admin claim cannot convert non-Active Normal purchase_orders to Cumulative",
+			Method:         http.MethodPost,
+			Url:            "/api/purchase_orders/gal6e5la2fa4rpn/make_cumulative",
+			RequestHeaders: map[string]string{"Authorization": closeToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"po_not_active"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate": 0,
+				"OnModelAfterUpdate":  0,
+				"OnBeforeApiError":    0,
+				"OnAfterApiError":     0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "caller with the payables_admin claim cannot convert Active non-Normal purchase_orders to Cumulative",
+			Method:         http.MethodPost,
+			Url:            "/api/purchase_orders/ly8xyzpuj79upq1/make_cumulative",
+			RequestHeaders: map[string]string{"Authorization": closeToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"po_not_normal"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate": 0,
+				"OnModelAfterUpdate":  0,
+				"OnBeforeApiError":    0,
+				"OnAfterApiError":     0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "caller without the payables_admin claim cannot convert Active Normal purchase_orders to Cumulative",
+			Method:         http.MethodPost,
+			Url:            "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
+			RequestHeaders: map[string]string{"Authorization": nonCloseToken},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"code":"unauthorized_conversion"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate": 0,
+				"OnModelAfterUpdate":  0,
+				"OnBeforeApiError":    0,
+				"OnAfterApiError":     0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:            "caller with the payables_admin claim can cancel Active purchase_orders records with no expenses against them",
 			Method:          http.MethodPost,
 			Url:             "/api/purchase_orders/2plsetqdxht7esg/cancel",
