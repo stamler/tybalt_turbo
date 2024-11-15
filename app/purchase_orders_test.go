@@ -221,7 +221,36 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		// TODO: Add test scenarios for custom routes:
 		// - /api/purchase_orders/{id}/approve
 		// - /api/purchase_orders/{id}/reject
-		// - /api/purchase_orders/{id}/cancel
+		{
+			Name:            "caller with the payables_admin claim can cancel Active purchase_orders records with no expenses against them",
+			Method:          http.MethodPost,
+			Url:             "/api/purchase_orders/2plsetqdxht7esg/cancel",
+			RequestHeaders:  map[string]string{"Authorization": closeToken},
+			ExpectedStatus:  204,
+			ExpectedContent: []string{},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate": 1,
+				"OnModelAfterUpdate":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "caller without the payables_admin claim cannot cancel Active purchase_orders records with no expenses against them",
+			Method:         http.MethodPost,
+			Url:            "/api/purchase_orders/2plsetqdxht7esg/cancel",
+			RequestHeaders: map[string]string{"Authorization": nonCloseToken},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"code":"unauthorized_cancellation"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate": 0,
+				"OnModelAfterUpdate":  0,
+				"OnBeforeApiError":    0,
+				"OnAfterApiError":     0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 		{
 			Name:            "caller without the payables_admin claim cannot close Active Cumulative purchase_orders records",
 			Method:          http.MethodPost,

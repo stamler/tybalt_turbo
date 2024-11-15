@@ -310,7 +310,7 @@ func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 			}
 
 			// Check if the user is authorized to cancel the purchase order
-			hasAccountingClaim, err := utilities.HasClaim(txDao, userId, "accounting")
+			hasPayablesAdminClaim, err := utilities.HasClaim(txDao, userId, "payables_admin")
 			if err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
@@ -318,7 +318,7 @@ func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 					Message: fmt.Sprintf("error fetching user claims: %v", err),
 				}
 			}
-			if !hasAccountingClaim {
+			if !hasPayablesAdminClaim {
 				httpResponseStatusCode = http.StatusForbidden
 				return &CodeError{
 					Code:    "unauthorized_cancellation",
@@ -370,7 +370,7 @@ func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 			}
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
-		return c.JSON(http.StatusOK, map[string]string{"message": "Purchase order cancelled successfully"})
+		return c.NoContent(http.StatusNoContent)
 	}
 }
 
