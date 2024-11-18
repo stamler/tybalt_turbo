@@ -68,12 +68,25 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 				}
 			}
 
-			// Check if the record is submitted and approved
-			if !record.GetBool("submitted") || record.GetDateTime("approved").IsZero() {
+			// If the record is not in the time_amendments collection, check if the
+			// record is submitted. time_amendments records don't have a submitted
+			// property.
+			if collectionName != "time_amendments" {
+				if !record.GetBool("submitted") {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "record_not_submitted",
+						Message: "this record is not submitted",
+					}
+				}
+			}
+
+			// Check if the record is approved.
+			if record.GetDateTime("approved").IsZero() {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "record_not_submitted_or_approved",
-					Message: "this record is not submitted or approved",
+					Code:    "record_not_approved",
+					Message: "this record is not approved",
 				}
 			}
 
