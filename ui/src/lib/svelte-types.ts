@@ -10,6 +10,7 @@ import type {
   PoApproversResponse,
   VendorsRecord,
   VendorsResponse,
+  TimeAmendmentsRecord,
 } from "$lib/pocketbase-types";
 
 export interface PageData<T> {
@@ -19,6 +20,7 @@ export interface PageData<T> {
 }
 
 export type TimeEntriesPageData = PageData<TimeEntriesRecord>;
+export type TimeAmendmentsPageData = PageData<TimeAmendmentsRecord>;
 export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord> & {
   approvers: PoApproversResponse[];
 };

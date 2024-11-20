@@ -346,6 +346,16 @@ type TimeEntriesRecordExpands = {
   time_type: TimeTypesRecord;
 };
 
+type TimeAmendmentsRecordExpands = {
+  category: CategoriesResponse;
+  committer: UsersResponse;
+  creator: UsersResponse;
+  uid: UsersResponse;
+  division: DivisionsRecord;
+  job: JobsRecord;
+  time_type: TimeTypesRecord;
+};
+
 type TimeSheetReviewersRecordExpands = {
   reviewer: ManagersRecord;
   time_sheet: TimeSheetsRecord;
@@ -418,8 +428,8 @@ export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
 export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> =
   Required<PurchaseOrdersRecord> & BaseSystemFields<Texpand>;
-export type TimeAmendmentsResponse<Texpand = unknown> = Required<TimeAmendmentsRecord> &
-  BaseSystemFields<Texpand>;
+export type TimeAmendmentsResponse<Texpand = TimeAmendmentsRecordExpands> =
+  Required<TimeAmendmentsRecord> & BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeOffResponse<Texpand = unknown> = Required<TimeOffRecord> &
