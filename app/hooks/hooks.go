@@ -45,6 +45,28 @@ func AddHooks(app core.App) {
 		}
 		return nil
 	})
+	// hooks for time_amendments model
+	app.OnRecordBeforeCreateRequest("time_amendments").Add(func(e *core.RecordCreateEvent) error {
+		if err := ProcessTimeAmendment(app, e.Record, e.HttpContext); err != nil {
+			// Check if the error is a HookError and return the appropriate JSON response
+			if hookError, ok := err.(*HookError); ok {
+				return e.HttpContext.JSON(hookError.Code, hookError)
+			}
+			return err
+		}
+		return nil
+	})
+	app.OnRecordBeforeUpdateRequest("time_amendments").Add(func(e *core.RecordUpdateEvent) error {
+		if err := ProcessTimeAmendment(app, e.Record, e.HttpContext); err != nil {
+			// Check if the error is a HookError and return the appropriate JSON response
+			if hookError, ok := err.(*HookError); ok {
+				return e.HttpContext.JSON(hookError.Code, hookError)
+			}
+			return err
+		}
+		return nil
+	})
+	// hooks for purchase_orders model
 	app.OnRecordBeforeCreateRequest("purchase_orders").Add(func(e *core.RecordCreateEvent) error {
 		if err := ProcessPurchaseOrder(app, e.Record, e.HttpContext); err != nil {
 			return err
@@ -57,9 +79,10 @@ func AddHooks(app core.App) {
 		}
 		return nil
 	})
+	// hooks for expenses model
 	app.OnRecordBeforeCreateRequest("expenses").Add(func(e *core.RecordCreateEvent) error {
 		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
-			// Check if the error is a CodeError and return the appropriate JSON response
+			// Check if the error is a HookError and return the appropriate JSON response
 			if hookError, ok := err.(*HookError); ok {
 				return e.HttpContext.JSON(hookError.Code, hookError)
 			}
@@ -69,7 +92,7 @@ func AddHooks(app core.App) {
 	})
 	app.OnRecordBeforeUpdateRequest("expenses").Add(func(e *core.RecordUpdateEvent) error {
 		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
-			// Check if the error is a CodeError and return the appropriate JSON response
+			// Check if the error is a HookError and return the appropriate JSON response
 			if hookError, ok := err.(*HookError); ok {
 				return e.HttpContext.JSON(hookError.Code, hookError)
 			}
