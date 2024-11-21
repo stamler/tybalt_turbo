@@ -43,6 +43,8 @@
   <a href="/pos/add">New PO</a>
   <a href="/time/entries/add">New Entry</a>
   <a href="/time/entries/list">Entries</a>
+  <a href="/time/amendments/add">New Amendment</a>
+  <a href="/time/amendments/list">Amendments</a>
   <a href="/time/sheets/list">Sheets</a>
   <a href="/time/off">Off</a>
   <a href="/jobs/list">Jobs</a>
