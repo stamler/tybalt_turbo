@@ -154,7 +154,16 @@ func ProcessTimeAmendment(app core.App, record *models.Record, context echo.Cont
 		"weekEnding": weekEnding,
 	})
 	if timeSheetErr != nil {
-		return apis.NewBadRequestError("Error finding time_sheet record", timeSheetErr)
+		return &HookError{
+			Code:    http.StatusInternalServerError,
+			Message: "Error finding time_sheet record",
+			Data: map[string]CodeError{
+				"global": {
+					Code:    "error_finding_time_sheet",
+					Message: "Error finding time_sheet record",
+				},
+			},
+		}
 	}
 	// throw an error if no time_sheet record is found
 	if len(timeSheetRecords) == 0 {
@@ -173,12 +182,30 @@ func ProcessTimeAmendment(app core.App, record *models.Record, context echo.Cont
 	}
 	// throw an error if more than one time_sheet record is found
 	if len(timeSheetRecords) > 1 {
-		return apis.NewBadRequestError("More than one time_sheets record found", nil)
+		return &HookError{
+			Code:    http.StatusInternalServerError,
+			Message: "More than one time_sheets record found",
+			Data: map[string]CodeError{
+				"global": {
+					Code:    "multiple_time_sheets",
+					Message: "More than one time_sheets record found",
+				},
+			},
+		}
 	}
 	// throw if the time_sheet record hasn't yet been committed, alerting the user
 	// to instead create a time_entry record.
 	if timeSheetRecords[0].GetDateTime("committed").IsZero() {
-		return apis.NewBadRequestError("Found time_sheets record has not been committed. Create a time_entries record instead.", nil)
+		return &HookError{
+			Code:    http.StatusBadRequest,
+			Message: "Found time_sheets record has not been committed. Create a time_entries record instead.",
+			Data: map[string]CodeError{
+				"global": {
+					Code:    "time_sheet_not_committed",
+					Message: "Found time_sheets record has not been committed. Create a time_entries record instead.",
+				},
+			},
+		}
 	}
 
 	record.Set("tsid", timeSheetRecords[0].Id)
