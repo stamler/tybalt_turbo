@@ -61,7 +61,7 @@ func cleanTimeAmendment(app core.App, timeAmendmentRecord *models.Record) ([]str
 
 	// Certain fields are always allowed to be set. We add them to the list of
 	// allowed fields here.
-	allowedFields = append(allowedFields, "id", "uid", "created", "creator", "updated", "salary", "work_week_hours")
+	allowedFields = append(allowedFields, "id", "uid", "created", "creator", "updated", "skip_tsid_check")
 
 	// remove any fields from the time_amendment record that are not in
 	// allowedFields. I'm not sure if this is the best way to do this but let's
@@ -154,66 +154,49 @@ func ProcessTimeAmendment(app core.App, record *models.Record, context echo.Cont
 		"weekEnding": weekEnding,
 	})
 	if timeSheetErr != nil {
-		return &HookError{
-			Code:    http.StatusInternalServerError,
-			Message: "Error finding time_sheet record",
-			Data: map[string]CodeError{
-				"global": {
-					Code:    "error_finding_time_sheet",
-					Message: "Error finding time_sheet record",
-				},
-			},
-		}
-	}
-	// throw an error if no time_sheet record is found
-	if len(timeSheetRecords) == 0 {
-		// return apis.NewBadRequestError("No time_sheets record found, create one instead", nil)
-		return &HookError{
-			Code:    http.StatusBadRequest,
-			Message: "No time_sheets record found, create one instead",
-			Data: map[string]CodeError{
-				"global": {
-					Code:    "error_finding_time_sheet",
-					Message: "No time_sheets record found, create one instead",
-				},
-			},
-		}
-
-	}
-	// throw an error if more than one time_sheet record is found
-	if len(timeSheetRecords) > 1 {
-		return &HookError{
-			Code:    http.StatusInternalServerError,
-			Message: "More than one time_sheets record found",
-			Data: map[string]CodeError{
-				"global": {
-					Code:    "multiple_time_sheets",
-					Message: "More than one time_sheets record found",
-				},
-			},
-		}
-	}
-	// throw if the time_sheet record hasn't yet been committed, alerting the user
-	// to instead create a time_entry record.
-	if timeSheetRecords[0].GetDateTime("committed").IsZero() {
-		return &HookError{
-			Code:    http.StatusBadRequest,
-			Message: "Found time_sheets record has not been committed. Create a time_entries record instead.",
-			Data: map[string]CodeError{
-				"global": {
-					Code:    "time_sheet_not_committed",
-					Message: "Found time_sheets record has not been committed. Create a time_entries record instead.",
-				},
-			},
-		}
+		return apis.NewApiError(http.StatusInternalServerError, "Error finding time_sheet record", map[string]validation.Error{
+			"global": validation.NewError(
+				"error_finding_time_sheet",
+				"Error finding time_sheet record",
+			),
+		})
 	}
 
-	record.Set("tsid", timeSheetRecords[0].Id)
-	// TODO: since the salary and work_week_hours properties are already set in
-	// the time_sheets collection, do we need to set them on the time_amendment
-	// record.
-	record.Set("salary", timeSheetRecords[0].GetFloat("salary"))
-	record.Set("work_week_hours", timeSheetRecords[0].GetFloat("work_week_hours"))
+	if !record.GetBool("skip_tsid_check") {
+		// throw an error if no time_sheet record is found
+		if len(timeSheetRecords) == 0 {
+			return apis.NewApiError(http.StatusBadRequest, "No time_sheets record found, create one instead", map[string]validation.Error{
+				"global": validation.NewError(
+					"no_time_sheet",
+					"No time_sheets record found, create one instead",
+				),
+			})
+
+		}
+		// throw an error if more than one time_sheet record is found
+		if len(timeSheetRecords) > 1 {
+			return apis.NewApiError(http.StatusInternalServerError, "More than one time_sheets record found", map[string]validation.Error{
+				"global": validation.NewError(
+					"multiple_time_sheets",
+					"More than one time_sheets record found",
+				),
+			})
+		}
+
+		// throw if the found time_sheet record hasn't yet been committed, alerting
+		// the user to instead create a time_entry record.
+		if timeSheetRecords[0].GetDateTime("committed").IsZero() {
+			return apis.NewApiError(http.StatusBadRequest, "Found time_sheets record has not been committed. Create a time_entries record instead.", map[string]validation.Error{
+				"global": validation.NewError(
+					"time_sheet_not_committed",
+					"Found time_sheets record has not been committed. Create a time_entries record instead.",
+				),
+			})
+		}
+
+		// set the tsid property to the id of the found time_sheet record
+		record.Set("tsid", timeSheetRecords[0].Id)
+	}
 
 	// perform the validation for the time_amendment record. In this step we also
 	// write the uid property to the record so that we can validate it against the

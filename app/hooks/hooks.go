@@ -48,20 +48,12 @@ func AddHooks(app core.App) {
 	// hooks for time_amendments model
 	app.OnRecordBeforeCreateRequest("time_amendments").Add(func(e *core.RecordCreateEvent) error {
 		if err := ProcessTimeAmendment(app, e.Record, e.HttpContext); err != nil {
-			// Check if the error is a HookError and return the appropriate JSON response
-			if hookError, ok := err.(*HookError); ok {
-				return e.HttpContext.JSON(hookError.Code, hookError)
-			}
 			return err
 		}
 		return nil
 	})
 	app.OnRecordBeforeUpdateRequest("time_amendments").Add(func(e *core.RecordUpdateEvent) error {
 		if err := ProcessTimeAmendment(app, e.Record, e.HttpContext); err != nil {
-			// Check if the error is a HookError and return the appropriate JSON response
-			if hookError, ok := err.(*HookError); ok {
-				return e.HttpContext.JSON(hookError.Code, hookError)
-			}
 			return err
 		}
 		return nil

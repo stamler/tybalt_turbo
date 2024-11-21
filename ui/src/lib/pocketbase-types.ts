@@ -251,6 +251,7 @@ export type TimeAmendmentsRecord = {
   meals_hours: number;
   payout_request_amount: number;
   salary: boolean;
+  skip_tsid_check: boolean;
   time_type: RecordIdString;
   tsid: RecordIdString;
   uid: RecordIdString;

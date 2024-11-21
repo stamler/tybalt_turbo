@@ -3,6 +3,7 @@
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsCheck from "$lib/components/DsCheck.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DsAutoComplete from "./DSAutoComplete.svelte";
   import DsActionButton from "./DSActionButton.svelte";
@@ -34,7 +35,6 @@
       storeFields: ["uid", "given_name", "surname"],
     });
     profilesIndex.addAll(profiles as ProfilesResponse[]);
-    console.log(profilesIndex.search("f"));
   });
 
   const trainingTokensInDescriptionWhileRegularHours = $derived.by(() => {
@@ -282,6 +282,13 @@
       type="number"
     />
   {/if}
+
+  <DsCheck
+    bind:value={item.skip_tsid_check as boolean}
+    {errors}
+    fieldName="skip_tsid_check"
+    uiName="Do not check for existing time_sheets record (don't do this unless you know what you are doing)"
+  />
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
