@@ -21,6 +21,7 @@
     fieldName,
     uiName,
     disabled = false,
+    idField = "id", // the field in the index that is the id, defaults to "id"
   }: {
     value: string;
     index: MiniSearch<T>;
@@ -29,6 +30,7 @@
     fieldName: string;
     uiName: string;
     disabled?: boolean;
+    idField?: string;
   } = $props();
 
   let results = $state([] as SearchResult[]);
@@ -56,7 +58,7 @@
       event.preventDefault();
       event.stopPropagation();
       if (selectedIndex !== -1) {
-        value = results[selectedIndex].id;
+        value = results[selectedIndex][idField];
         results = [];
         selectedIndex = -1;
       }
@@ -65,12 +67,12 @@
 
   function getDocumentById(index: MiniSearch<T>, id: string) {
     const results = index.search(id.toString(), {
-      fields: ["id"],
+      fields: [idField],
       prefix: true,
       combineWith: "AND",
     });
     if (results.length === 0) {
-      throw new Error(`No document found with id ${id}`);
+      throw new Error(`No document found with ${idField} ${id}`);
     }
     return results[0];
   }
