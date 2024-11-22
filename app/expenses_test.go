@@ -47,6 +47,34 @@ func TestExpensesCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "writing the committed property is forbidden",
+			Method: http.MethodPost,
+			Url:    "/api/collections/expenses/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"committed": "2024-11-01 00:00:00",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":400,"message":"Failed to create record."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate":         0,
+				"OnModelAfterCreate":          0,
+				"OnRecordBeforeCreateRequest": 0,
+				"OnRecordAfterCreateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "otherwise valid expense with Inactive vendor fails",
 			Method: http.MethodPost,
 			Url:    "/api/collections/expenses/records",
@@ -433,6 +461,33 @@ func TestExpensesUpdate(t *testing.T) {
 				"OnModelAfterUpdate":          1,
 				"OnRecordBeforeUpdateRequest": 1,
 				"OnRecordAfterUpdateRequest":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "writing the committed property is forbidden",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+			Body: strings.NewReader(`{
+				"committed": "2024-11-01 00:00:00",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"code":404,"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         0,
+				"OnModelAfterUpdate":          0,
+				"OnRecordBeforeUpdateRequest": 0,
+				"OnRecordAfterUpdateRequest":  0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
