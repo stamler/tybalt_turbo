@@ -68,6 +68,20 @@ func AddRoutes(app core.App) {
 		return nil
 	})
 
+	// Add the commit time_amendment route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/time_amendments/:id/commit",
+			Handler: createCommitRecordHandler(app, "time_amendments"),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
 	// Add the reject-timesheet route
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{

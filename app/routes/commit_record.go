@@ -6,6 +6,7 @@ import (
 	"time"
 	"tybalt/utilities"
 
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -62,15 +63,17 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 			}
 			if !hasCommitClaim {
 				httpResponseStatusCode = http.StatusForbidden
-				return &CodeError{
-					Code:    "unauthorized",
-					Message: "you are not authorized to commit this record",
-				}
+				return apis.NewApiError(http.StatusForbidden, "you are not authorized to commit this record", map[string]validation.Error{
+					"global": validation.NewError(
+						"unauthorized",
+						"you are not authorized to commit this record",
+					),
+				})
 			}
 
 			// If the record is not in the time_amendments collection, check if the
-			// record is submitted. time_amendments records don't have a submitted
-			// property.
+			// record is submitted and approved. time_amendments records don't have
+			// submitted, approved, or rejected properties.
 			if collectionName != "time_amendments" {
 				if !record.GetBool("submitted") {
 					httpResponseStatusCode = http.StatusBadRequest
@@ -79,23 +82,23 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 						Message: "this record is not submitted",
 					}
 				}
-			}
 
-			// Check if the record is approved.
-			if record.GetDateTime("approved").IsZero() {
-				httpResponseStatusCode = http.StatusBadRequest
-				return &CodeError{
-					Code:    "record_not_approved",
-					Message: "this record is not approved",
+				// Check if the record is approved.
+				if record.GetDateTime("approved").IsZero() {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "record_not_approved",
+						Message: "this record is not approved",
+					}
 				}
-			}
 
-			// Check if the record is rejected
-			if !record.GetDateTime("rejected").IsZero() {
-				httpResponseStatusCode = http.StatusBadRequest
-				return &CodeError{
-					Code:    "record_rejected",
-					Message: "rejected records cannot be committed",
+				// Check if the record is rejected
+				if !record.GetDateTime("rejected").IsZero() {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "record_rejected",
+						Message: "rejected records cannot be committed",
+					}
 				}
 			}
 

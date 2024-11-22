@@ -166,3 +166,49 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+func TestTimeAmendmentsRoutes(t *testing.T) {
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	nonCommitToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:            "caller with the commit claim can commit time_amendments records",
+			Method:          http.MethodPost,
+			Url:             "/api/time_amendments/qn4jyrkxp3pfjom/commit",
+			RequestHeaders:  map[string]string{"Authorization": commitToken},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`"message":"Record committed successfully"`},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate": 1,
+				"OnModelAfterUpdate":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:            "caller without the commit claim cannot commit time_amendments records",
+			Method:          http.MethodPost,
+			Url:             "/api/time_amendments/qn4jyrkxp3pfjom/commit",
+			RequestHeaders:  map[string]string{"Authorization": nonCommitToken},
+			ExpectedStatus:  403,
+			ExpectedContent: []string{`"error":"You are not authorized to commit this record."`},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate": 0,
+				"OnModelAfterUpdate":  0,
+				"OnBeforeApiError":    0,
+				"OnAfterApiError":     0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
