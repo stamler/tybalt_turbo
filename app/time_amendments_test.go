@@ -74,6 +74,34 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "a time_amendment's creator property must match the authenticated user's id",
+			Method: http.MethodPost,
+			Url:    "/api/collections/time_amendments/records",
+			Body: strings.NewReader(`{
+				"creator": "tqqf7q0f3378rvp",
+				"time_type": "sdyfl3q7j7ap849",
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-02",
+				"division": "vccd5fo56ctbigh",
+				"description": "test time_amendment",
+				"hours": 1,
+				"skip_tsid_check": true,
+				"week_ending": "2006-01-02"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": creatorToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"creator":{"code":"creator_mismatch"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate":         0,
+				"OnModelAfterCreate":          0,
+				"OnRecordBeforeCreateRequest": 1,
+				"OnRecordAfterCreateRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
