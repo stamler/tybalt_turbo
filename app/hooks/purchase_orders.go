@@ -5,7 +5,6 @@ package hooks
 
 import (
 	"fmt"
-	"log"
 	"time"
 	"tybalt/utilities"
 
@@ -105,31 +104,12 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *models.Record) err
 // purchase_order record is invalid this function throws an error explaining
 // which field(s) are invalid and why.
 func ProcessPurchaseOrder(app core.App, record *models.Record, context echo.Context) error {
-	// we need the id of the calling user. If the context doesn't contain an id
-	// (because we're using the admin GUI for example) we'll use the uid from the
-	// record itself.
-
-	// TODO: verify the security implications of falling back to the uid from the
-	// record itself. This probably isn't safe.
-	authRecordPreCast := context.Get(apis.ContextAuthRecordKey)
-
-	var authId string
-	// try to cast the authRecord to a *models.Record
-	authRecord, ok := authRecordPreCast.(*models.Record)
-	if !ok {
-		// try to get the uid from the record
-		authId = record.GetString("uid")
-
-		// log that the auth record could not be cast and that the uid was used
-		// instead
-		log.Printf("authRecord could not be cast to *models.Record, using uid: %s", authId)
-	} else {
-		authId = authRecord.Id
-	}
+	// get the auth record from the context
+	authRecord := context.Get(apis.ContextAuthRecordKey).(*models.Record)
 
 	// If the uid property is not equal to the authenticated user's uid, return an
 	// error.
-	if record.GetString("uid") != authId {
+	if record.GetString("uid") != authRecord.Id {
 		return apis.NewApiError(400, "uid property must be equal to the authenticated user's id", map[string]validation.Error{})
 	}
 
