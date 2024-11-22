@@ -167,6 +167,56 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 	}
 }
 
+func TestTimeAmendmentsUpdate(t *testing.T) {
+	creatorToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "a requester can update a time_amendments record they created",
+			Method: http.MethodPatch,
+			Url:    "/api/collections/time_amendments/records/qn4jyrkxp3pfjom",
+			Body: strings.NewReader(`{
+				"creator": "f2j5a8vk006baub",
+				"time_type": "sdyfl3q7j7ap849",
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-09-25",
+				"division": "ffn8dik7anwg6ir",
+				"description": "test time_amendment",
+				"hours": 1,
+				"job": "tt4eipt6wapu9zh",
+				"tsid": "j1lr2oddjongtoj",
+				"week_ending": "2006-01-02"
+				}`),
+			RequestHeaders: map[string]string{"Authorization": creatorToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"committed":""`,
+				`"week_ending":"2024-09-28"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeUpdate":         1,
+				"OnModelAfterUpdate":          1,
+				"OnRecordBeforeUpdateRequest": 1,
+				"OnRecordAfterUpdateRequest":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		// TODO: if a person creates a time_amendments record and it is not yet
+		// committed, should only that person be allowed to edit the time_amendments
+		// record, or can any `tame` claim holder edit it as long as it hasn't been
+		// committed?
+
+		// TODO: write more tests
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
 func TestTimeAmendmentsRoutes(t *testing.T) {
 	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
 	if err != nil {

@@ -124,8 +124,8 @@ func ProcessTimeAmendment(app core.App, record *models.Record, context echo.Cont
 	// get the auth record from the context
 	authRecord := context.Get(apis.ContextAuthRecordKey).(*models.Record)
 
-	// If the uid property is not equal to the authenticated user's uid, return an
-	// error.
+	// If the creator property is not equal to the authenticated user's id, return
+	// an error.
 	if record.GetString("creator") != authRecord.Id {
 		return apis.NewApiError(400, "creator property must be equal to the authenticated user's id", map[string]validation.Error{
 			"creator": validation.NewError(
