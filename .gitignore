@@ -7,3 +7,5 @@ app/tybalt
 
 # import data
 import_data/*.parquet
+
+.env
