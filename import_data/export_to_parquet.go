@@ -13,6 +13,10 @@ import (
 	"golang.org/x/crypto/ssh"
 )
 
+// The tablesToDump variable is used to specify the tables that should be
+// exported to Parquet format.
+var tablesToDump = []string{"TimeEntries", "TimeSheets", "Expenses"}
+
 func main() {
 	err := godotenv.Load()
 	if err != nil {
@@ -89,17 +93,18 @@ func main() {
 		log.Fatalf("Failed to attach MySQL database: %v", err)
 	}
 
-	// Read from MySQL and export to Parquet
-	mysqlTable := os.Getenv("MYSQL_TABLE")
-	query := fmt.Sprintf(`
+	for _, table := range tablesToDump {
+		// Read from MySQL and export to Parquet
+		query := fmt.Sprintf(`
     COPY (
       SELECT * FROM mysql_db.%s
 		) TO '%s' (FORMAT PARQUET)`,
-		mysqlTable, mysqlTable+".parquet")
+			table, table+".parquet")
 
-	_, err = db.Exec(query)
-	if err != nil {
-		log.Fatalf("Failed to export to Parquet: %v", err)
+		_, err = db.Exec(query)
+		if err != nil {
+			log.Fatalf("Failed to export to Parquet: %v", err)
+		}
 	}
 }
 
