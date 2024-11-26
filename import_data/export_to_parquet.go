@@ -106,6 +106,35 @@ func main() {
 			log.Fatalf("Failed to export to Parquet: %v", err)
 		}
 	}
+
+	// Now we will create a duckdb database containing a table for each parquet
+	// file. We will then assign primary keys and foreign keys to the tables to
+	// establish the relationships between the tables. Finally we can write the
+	// database to a file.
+
+	// Create a new database on disk
+	db, err = sql.Open("duckdb", "mysql_tables.duckdb")
+	if err != nil {
+		log.Fatal("Failed to connect to DuckDB:", err)
+	}
+	defer db.Close()
+
+	// Create a table for each parquet file
+	for _, table := range tablesToDump {
+		db.Exec(fmt.Sprintf("CREATE TABLE %s AS SELECT * FROM read_parquet('%s.parquet')", table, table))
+	}
+
+	// Assign primary keys to the tables
+	for _, table := range tablesToDump {
+		db.Exec(fmt.Sprintf("ALTER TABLE %s ADD PRIMARY KEY (id)", table))
+	}
+
+	// TODO: add foreign keys to the tables
+
+	// Delete the parquet files
+	for _, table := range tablesToDump {
+		os.Remove(table + ".parquet")
+	}
 }
 
 func copyData(dst net.Conn, src net.Conn) {

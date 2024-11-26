@@ -7,5 +7,6 @@ app/tybalt
 
 # import data
 import_data/*.parquet
+import_data/*.duckdb
 
 .env
