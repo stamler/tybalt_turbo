@@ -47,7 +47,9 @@ func main() {
 	if err != nil {
 		log.Fatal("Failed to set up local listener:", err)
 	}
-	defer listener.Close()
+	// I need to comment this out because it closes the listener before the
+	// forwarding is done. Why?
+	// defer listener.Close()
 
 	// Start forwarding in a separate goroutine
 	go func() {
@@ -110,6 +112,37 @@ func main() {
 	// TODO: shape the data into the target form then ATTACH the sqlite database
 	// and write the data to the corresponding tables in the sqlite database,
 	// honouring foreign key constraints and primary keys.
+
+	// https://duckdb.org/2024/01/26/multi-database-support-in-duckdb.html
+
+	// Jobs and Clients (related by foreign key) First get all distinct clients
+	// from the Jobs table and insert them into the clients table in sqlite. We
+	// also need to get the resulting id of the client so we can update the Jobs
+	// table with the client id. Then we can insert the Jobs referencing the
+	// client id. There will be duplicated clients and clients will have duplicate
+	// contacts at first. This will be cleaned up later using merge functions.
+
+	splitTable("Jobs", "Clients", []string{"client", "clientContact"}, "client")
+
+	// WE WILL NEED A MERGE CONTACTS FUNCTION TO MERGE DUPLICATE CONTACTS WITHIN
+	// THE SAME CLIENT AND THEN UPDATE ALL THE JOBS THAT REFERENCE THE OLD
+	// CONTACT TO REFERENCE THE NEWLY MERGED CONTACT.
+
+	// WE WILL NEED A MERGE CLIENTS FUNCTION TO MERGE DUPLICATE CLIENTS AND THEN
+	// UPDATE ALL THE JOBS THAT REFERENCE THE OLD CLIENT TO REFERENCE THE NEWLY
+	// MERGED CLIENT.
+
+	// Independent Collections (Profiles, Jobs) must be loaded first.
+	// TimeSheets can be loaded next because TimeEntries references TimeSheets.
+	// TimeEntries can be loaded next because it references TimeSheets and Jobs.
+	// TimeAmendments can be loaded next because it references TimeSheets and Profiles.
+	// Expenses can be loaded last because it references TimeSheets and Jobs.
+
+	// For TimeEntries:
+	// LEFT JOIN sqlite.time_types ON sqlite.time_types.code = main.TimeEntries.timetype
+	// LEFT JOIN sqlite.divisions ON sqlite.divisions.code = main.TimeEntries.division
+	// This will allow us to write the id of the time_types and divisions tables
+	// to the TimeEntries table rather than the code from the parquet file.
 }
 
 func copyData(dst net.Conn, src net.Conn) {
