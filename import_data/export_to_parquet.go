@@ -122,7 +122,16 @@ func main() {
 	// client id. There will be duplicated clients and clients will have duplicate
 	// contacts at first. This will be cleaned up later using merge functions.
 
-	splitTable("Jobs", "Clients", []string{"client", "clientContact"}, "client")
+	splitTable("Jobs.parquet", "Clients", []string{"client", "clientContact"}, "client")
+
+	// Split the Contacts table out of the Clients table.
+
+	// TODO: should we write the client id to the Contacts table? This would allow
+	// us to merge contacts within the same client and seems like a good idea. By
+	// not doing this a contact could associated with multiple clients or the
+	// wrong client, but by doing it we can merge contacts within the same client
+	// and it will be more efficient to load in the UI.
+	splitTable("Clients.parquet", "Contacts", []string{"clientContact"}, "clientContact")
 
 	// WE WILL NEED A MERGE CONTACTS FUNCTION TO MERGE DUPLICATE CONTACTS WITHIN
 	// THE SAME CLIENT AND THEN UPDATE ALL THE JOBS THAT REFERENCE THE OLD

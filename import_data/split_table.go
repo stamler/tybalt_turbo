@@ -14,9 +14,7 @@ import (
 // the id of the corresponding row in the newly-created destination parquet
 // file.
 
-// Source and destination are table names inside duckdb and when we add .parquet
-// to the end they become parquet files.
-func splitTable(source string, destination string, columnsToSplit []string, keyColumn string) {
+func splitTable(sourceParquetFile string, destination string, columnsToSplit []string, keyColumn string) {
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
@@ -24,26 +22,26 @@ func splitTable(source string, destination string, columnsToSplit []string, keyC
 	defer db.Close()
 
 	// import the source parquet file into a table in duckdb
-	createSourceTableQuery := "CREATE TABLE " + source + " AS SELECT * FROM read_parquet('" + source + ".parquet');"
+	createSourceTableQuery := "CREATE TABLE source AS SELECT * FROM read_parquet('" + sourceParquetFile + "');"
 	if _, err := db.Exec(createSourceTableQuery); err != nil {
 		log.Fatalf("Failed to create source table: %v", err)
 	}
 
 	// create a destination table in duckdb with distinct combinations and
 	// generate random IDs
-	createDestTableQuery := "CREATE TABLE " + destination + " AS " +
+	createDestTableQuery := "CREATE TABLE destination AS " +
 		"SELECT substr(lower(to_base64(CAST(sha256(random()::text) AS BLOB))), 1, 15) as id, " +
 		strings.Join(columnsToSplit, ", ") +
 		" FROM (" +
 		"SELECT DISTINCT " + strings.Join(trimColumns(columnsToSplit, true), ", ") +
-		" FROM " + source + //");"
-		" WHERE " + keyColumn + " IS NOT NULL);"
+		" FROM source WHERE " + keyColumn + " IS NOT NULL);"
 
 	if _, err := db.Exec(createDestTableQuery); err != nil {
 		log.Fatalf("Failed to create destination table: %v", err)
 	}
 
-	copyDestTableQuery := "COPY " + destination + " TO '" + destination + ".parquet' (FORMAT PARQUET);"
+	// write the destination table to parquet files
+	copyDestTableQuery := "COPY destination TO '" + destination + ".parquet' (FORMAT PARQUET);"
 	if _, err := db.Exec(copyDestTableQuery); err != nil {
 		log.Fatalf("Failed to copy destination table to parquet: %v", err)
 	}
@@ -56,9 +54,9 @@ func splitTable(source string, destination string, columnsToSplit []string, keyC
 	// d.clientContact could be NULL and thus the equality will fail. How can we
 	// handle this? Perhaps IS NOT DISTINCT FROM? That's what I've done but it
 	// needs to be validated.
-	createNewSourceTableQuery := "CREATE TABLE " + source + "_new AS " +
+	createNewSourceTableQuery := "CREATE TABLE source_new AS " +
 		"SELECT s.*, d.id AS " + destination + "_id " +
-		"FROM " + source + " s LEFT JOIN " + destination + " d ON " +
+		"FROM source s LEFT JOIN destination d ON " +
 		joinItems("s", "d", columnsToSplit) + ";"
 	if _, err := db.Exec(createNewSourceTableQuery); err != nil {
 		log.Fatalf("Failed to create new source table: %v", err)
@@ -66,18 +64,17 @@ func splitTable(source string, destination string, columnsToSplit []string, keyC
 
 	// for each column to split, drop it from the new source table
 	for _, col := range columnsToSplit {
-		dropColumnQuery := "ALTER TABLE " + source + "_new DROP " + col + ";"
+		dropColumnQuery := "ALTER TABLE source_new DROP " + col + ";"
 		if _, err := db.Exec(dropColumnQuery); err != nil {
 			log.Fatalf("Failed to drop column from new source table: %v", err)
 		}
 	}
 
-	// drop the old source table and rename the new one
-	db.Exec("DROP TABLE " + source)
-	db.Exec("ALTER TABLE " + source + "_new RENAME TO " + source)
+	// drop the old source table
+	db.Exec("DROP TABLE source;")
 
-	// write the source and destination tables to parquet files
-	db.Exec("COPY " + source + " TO '" + source + ".parquet' (FORMAT PARQUET)")
+	// write the source_new table to parquet files
+	db.Exec("COPY source_new TO '" + sourceParquetFile + "' (FORMAT PARQUET)")
 }
 
 // joinItems takes a list of columns and returns a string of SQL that specifies
