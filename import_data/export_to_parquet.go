@@ -122,7 +122,10 @@ func main() {
 	// client id. There will be duplicated clients and clients will have duplicate
 	// contacts at first. This will be cleaned up later using merge functions.
 
-	splitTable("Jobs.parquet", "Clients", []string{"client", "clientContact"}, "client")
+	//splitTable("Jobs", "Clients", []string{"client", "clientContact"}, "client", false)
+	//splitTable("Jobs", "Clients", []string{"client"}, "client", false)
+
+	jobsToClientsAndContacts()
 
 	// Split the Contacts table out of the Clients table.
 
@@ -131,7 +134,19 @@ func main() {
 	// not doing this a contact could associated with multiple clients or the
 	// wrong client, but by doing it we can merge contacts within the same client
 	// and it will be more efficient to load in the UI.
-	splitTable("Clients.parquet", "Contacts", []string{"clientContact"}, "clientContact")
+	//splitTable("Clients", "Contacts", []string{"clientContact"}, "clientContact", true)
+
+	/*
+		--- This is probably closer to what I want ---
+		SELECT
+				client,
+				list(DISTINCT clientContact) AS clientContacts
+		FROM
+				Jobs
+		GROUP BY
+				client
+
+	*/
 
 	// WE WILL NEED A MERGE CONTACTS FUNCTION TO MERGE DUPLICATE CONTACTS WITHIN
 	// THE SAME CLIENT AND THEN UPDATE ALL THE JOBS THAT REFERENCE THE OLD

@@ -14,7 +14,7 @@ import (
 // the id of the corresponding row in the newly-created destination parquet
 // file.
 
-func splitTable(sourceParquetFile string, destination string, columnsToSplit []string, keyColumn string) {
+func splitTable(source string, destination string, columnsToSplit []string, keyColumn string, backref bool) {
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
@@ -22,20 +22,31 @@ func splitTable(sourceParquetFile string, destination string, columnsToSplit []s
 	defer db.Close()
 
 	// import the source parquet file into a table in duckdb
-	createSourceTableQuery := "CREATE TABLE source AS SELECT * FROM read_parquet('" + sourceParquetFile + "');"
+	createSourceTableQuery := "CREATE TABLE source AS SELECT * FROM read_parquet('" + source + ".parquet');"
 	if _, err := db.Exec(createSourceTableQuery); err != nil {
 		log.Fatalf("Failed to create source table: %v", err)
 	}
 
-	// create a destination table in duckdb with distinct combinations and
-	// generate random IDs
-	createDestTableQuery := "CREATE TABLE destination AS " +
-		"SELECT substr(lower(to_base64(CAST(sha256(random()::text) AS BLOB))), 1, 15) as id, " +
-		strings.Join(columnsToSplit, ", ") +
-		" FROM (" +
-		"SELECT DISTINCT " + strings.Join(trimColumns(columnsToSplit, true), ", ") +
-		" FROM source WHERE " + keyColumn + " IS NOT NULL);"
-
+	var createDestTableQuery string
+	if !backref {
+		// create a destination table in duckdb with distinct combinations and
+		// generate random IDs
+		createDestTableQuery = "CREATE TABLE destination AS " +
+			"SELECT uuid() as id, " +
+			strings.Join(columnsToSplit, ", ") +
+			" FROM (" +
+			"SELECT DISTINCT " + strings.Join(trimColumns(columnsToSplit, true), ", ") +
+			" FROM source WHERE " + keyColumn + " IS NOT NULL);"
+	} else {
+		createDestTableQuery = "CREATE TABLE destination AS " +
+			"SELECT uuid() as id, " +
+			source + "_id, " +
+			strings.Join(columnsToSplit, ", ") +
+			" FROM (" +
+			"SELECT id AS " + source + "_id, " + strings.Join(trimColumns(columnsToSplit, true), ", ") +
+			" FROM source WHERE " + keyColumn + " IS NOT NULL);"
+		log.Println(createDestTableQuery)
+	}
 	if _, err := db.Exec(createDestTableQuery); err != nil {
 		log.Fatalf("Failed to create destination table: %v", err)
 	}
@@ -74,7 +85,7 @@ func splitTable(sourceParquetFile string, destination string, columnsToSplit []s
 	db.Exec("DROP TABLE source;")
 
 	// write the source_new table to parquet files
-	db.Exec("COPY source_new TO '" + sourceParquetFile + "' (FORMAT PARQUET)")
+	db.Exec("COPY source_new TO '" + source + ".parquet' (FORMAT PARQUET)")
 }
 
 // joinItems takes a list of columns and returns a string of SQL that specifies
