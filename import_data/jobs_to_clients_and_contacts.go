@@ -18,31 +18,23 @@ func jobsToClientsAndContacts() {
 	splitQuery := `
 		 -- Load Jobs.parquet into a table called jobs
 		 CREATE TABLE jobs AS
-		 SELECT * FROM read_parquet('Jobs.parquet');
+		 SELECT *, TRIM(client) AS t_client, TRIM(clientContact) AS t_clientContact FROM read_parquet('Jobs.parquet');
 
-	   -- Create the clients table, trimming each name and removing duplicates
+	   -- Create the clients table, removing duplicate names
 	   CREATE TABLE clients AS
-	   SELECT uuid() AS id, tc AS name
-	   FROM (
-	   	SELECT DISTINCT tc
-	   	FROM (SELECT *, TRIM(client) AS tc FROM jobs)
-	   );
+	   SELECT uuid() AS id, t_client AS name
+	   FROM (SELECT DISTINCT t_client FROM jobs);
 
 	   COPY clients TO 'Clients.parquet' (FORMAT PARQUET);
 
 	   -- Create the contacts table where name is trimmed
 	   CREATE TABLE contacts AS
-	   SELECT
-
-	   	uuid() AS id,
-	   	TRIM(clientContact) AS name,
-	   	c.id AS client_id
-
+	   SELECT uuid() AS id, clientContact AS name, c.id AS client_id
 	   FROM (
-	       SELECT DISTINCT TRIM(clientContact) AS clientContact, TRIM(client) AS client
+	       SELECT DISTINCT t_clientContact AS clientContact, t_client AS client
 	       FROM jobs
-	       WHERE clientContact IS NOT NULL AND TRIM(clientContact) != '' 
-	         AND client IS NOT NULL AND TRIM(client) != ''
+	       WHERE t_clientContact IS NOT NULL AND t_clientContact != '' 
+	         AND t_client IS NOT NULL AND t_client != ''
 	   ) unique_contacts
 	   JOIN clients c ON unique_contacts.client = c.name;
 
@@ -52,8 +44,8 @@ func jobsToClientsAndContacts() {
 		 ALTER TABLE jobs ADD COLUMN client_id uuid;
 		 ALTER TABLE jobs ADD COLUMN contact_id uuid;
 
-		 UPDATE jobs SET client_id = clients.id FROM clients WHERE TRIM(jobs.client) = clients.name;
-		 UPDATE jobs SET contact_id = contacts.id FROM contacts WHERE TRIM(jobs.clientContact) = contacts.name;
+		 UPDATE jobs SET client_id = clients.id FROM clients WHERE jobs.t_client = clients.name;
+		 UPDATE jobs SET contact_id = contacts.id FROM contacts WHERE jobs.t_clientContact = contacts.name;
 
 		 -- ALTER TABLE jobs DROP client;
 		 -- ALTER TABLE jobs DROP clientContact;
