@@ -115,46 +115,18 @@ func main() {
 
 	// https://duckdb.org/2024/01/26/multi-database-support-in-duckdb.html
 
-	// Jobs and Clients (related by foreign key) First get all distinct clients
-	// from the Jobs table and insert them into the clients table in sqlite. We
-	// also need to get the resulting id of the client so we can update the Jobs
-	// table with the client id. Then we can insert the Jobs referencing the
-	// client id. There will be duplicated clients and clients will have duplicate
-	// contacts at first. This will be cleaned up later using merge functions.
-
-	//splitTable("Jobs", "Clients", []string{"client", "clientContact"}, "client", false)
-	//splitTable("Jobs", "Clients", []string{"client"}, "client", false)
-
+	// Normalize the Jobs.parquet data by creating Clients.parquet and
+	// Contacts.parquet and updating Jobs.parquet to reference clients and
+	// contacts via UUID foreign keys.
 	jobsToClientsAndContacts()
 
-	// Split the Contacts table out of the Clients table.
+	// We will need a merge clients function to merge duplicate clients and then
+	// update all the jobs that reference the old client to reference the newly
+	// merged client.
 
-	// TODO: should we write the client id to the Contacts table? This would allow
-	// us to merge contacts within the same client and seems like a good idea. By
-	// not doing this a contact could associated with multiple clients or the
-	// wrong client, but by doing it we can merge contacts within the same client
-	// and it will be more efficient to load in the UI.
-	//splitTable("Clients", "Contacts", []string{"clientContact"}, "clientContact", true)
-
-	/*
-		--- This is probably closer to what I want ---
-		SELECT
-				client,
-				list(DISTINCT clientContact) AS clientContacts
-		FROM
-				Jobs
-		GROUP BY
-				client
-
-	*/
-
-	// WE WILL NEED A MERGE CONTACTS FUNCTION TO MERGE DUPLICATE CONTACTS WITHIN
-	// THE SAME CLIENT AND THEN UPDATE ALL THE JOBS THAT REFERENCE THE OLD
-	// CONTACT TO REFERENCE THE NEWLY MERGED CONTACT.
-
-	// WE WILL NEED A MERGE CLIENTS FUNCTION TO MERGE DUPLICATE CLIENTS AND THEN
-	// UPDATE ALL THE JOBS THAT REFERENCE THE OLD CLIENT TO REFERENCE THE NEWLY
-	// MERGED CLIENT.
+	// We will need a merge contacts function to merge duplicate contacts within
+	// the same client and then update all the jobs that reference the old contact
+	// to reference the newly merged contact.
 
 	// Independent Collections (Profiles, Jobs) must be loaded first.
 	// TimeSheets can be loaded next because TimeEntries references TimeSheets.
