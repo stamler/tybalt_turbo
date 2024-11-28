@@ -20,16 +20,12 @@ func jobsToClientsAndContacts() {
 		 CREATE TABLE jobs AS
 		 SELECT * FROM read_parquet('Jobs.parquet');
 
-	   -- Create the clients table where name is trimmed
+	   -- Create the clients table, trimming each name and removing duplicates
 	   CREATE TABLE clients AS
-	   SELECT
-
-	   	uuid() AS id,
-	   	TRIM(client) AS name
-
+	   SELECT uuid() AS id, tc AS name
 	   FROM (
-	   	SELECT DISTINCT client
-	   	FROM jobs
+	   	SELECT DISTINCT tc
+	   	FROM (SELECT *, TRIM(client) AS tc FROM jobs)
 	   );
 
 	   COPY clients TO 'Clients.parquet' (FORMAT PARQUET);
@@ -42,9 +38,13 @@ func jobsToClientsAndContacts() {
 	   	TRIM(clientContact) AS name,
 	   	c.id AS client_id
 
-	   FROM jobs
-	   JOIN clients c ON TRIM(jobs.client) = c.name
-	   WHERE jobs.clientContact IS NOT NULL AND TRIM(jobs.clientContact) != '' AND jobs.client IS NOT NULL AND TRIM(jobs.client) != '';
+	   FROM (
+	       SELECT DISTINCT TRIM(clientContact) AS clientContact, TRIM(client) AS client
+	       FROM jobs
+	       WHERE clientContact IS NOT NULL AND TRIM(clientContact) != '' 
+	         AND client IS NOT NULL AND TRIM(client) != ''
+	   ) unique_contacts
+	   JOIN clients c ON unique_contacts.client = c.name;
 
 	   COPY contacts TO 'Contacts.parquet' (FORMAT PARQUET);
 		 
