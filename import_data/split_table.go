@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 	"strings"
 
@@ -34,7 +35,7 @@ func splitTable(source string, destination string, columnsToSplit []string, keyC
 		"SELECT substr(lower(to_base64(CAST(sha256(random()::text) AS BLOB))), 1, 15) as id, " +
 		strings.Join(columnsToSplit, ", ") +
 		" FROM (" +
-		"SELECT DISTINCT " + strings.Join(columnsToSplit, ", ") +
+		"SELECT DISTINCT " + strings.Join(trimColumns(columnsToSplit, true), ", ") +
 		" FROM " + source + //");"
 		" WHERE " + keyColumn + " IS NOT NULL);"
 
@@ -50,6 +51,11 @@ func splitTable(source string, destination string, columnsToSplit []string, keyC
 	// create a new version of the source table with the columnsToSplit removed
 	// and replaced with a destination_id column that references the destination
 	// table
+
+	// TODO: This query may be posing some problems because s.clientContact /
+	// d.clientContact could be NULL and thus the equality will fail. How can we
+	// handle this? Perhaps IS NOT DISTINCT FROM? That's what I've done but it
+	// needs to be validated.
 	createNewSourceTableQuery := "CREATE TABLE " + source + "_new AS " +
 		"SELECT s.*, d.id AS " + destination + "_id " +
 		"FROM " + source + " s LEFT JOIN " + destination + " d ON " +
@@ -74,10 +80,28 @@ func splitTable(source string, destination string, columnsToSplit []string, keyC
 	db.Exec("COPY " + source + " TO '" + source + ".parquet' (FORMAT PARQUET)")
 }
 
+// joinItems takes a list of columns and returns a string of SQL that specifies
+// that the source and destination tables are equivalent if the specified
+// columns are equivalent.
 func joinItems(sourceToken string, destinationToken string, cols []string) string {
 	comparisons := []string{}
 	for _, col := range cols {
-		comparisons = append(comparisons, sourceToken+"."+col+" = "+destinationToken+"."+col)
+		comparisons = append(comparisons, "TRIM("+sourceToken+"."+col+") IS NOT DISTINCT FROM TRIM("+destinationToken+"."+col+")")
 	}
 	return strings.Join(comparisons, " AND ")
+}
+
+// trimColumns wraps each column name with the SQL TRIM() function. It takes a
+// slice of column names and returns a new slice where each column is formatted
+// as TRIM(column_name).
+func trimColumns(cols []string, alias bool) []string {
+	trimmedCols := []string{}
+	for _, col := range cols {
+		if alias {
+			trimmedCols = append(trimmedCols, fmt.Sprintf("TRIM(%s) AS %s", col, col))
+		} else {
+			trimmedCols = append(trimmedCols, fmt.Sprintf("TRIM(%s)", col))
+		}
+	}
+	return trimmedCols
 }
