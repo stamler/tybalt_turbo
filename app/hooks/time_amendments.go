@@ -68,7 +68,7 @@ func cleanTimeAmendment(app core.App, timeAmendmentRecord *models.Record) ([]str
 	// try it.
 	for key := range timeAmendmentRecord.ColumnValueMap() {
 		if !list.ExistInSlice(key, allowedFields) {
-			log.Println("Removing field: ", key)
+			//log.Println("Removing field: ", key)
 			timeAmendmentRecord.Set(key, nil)
 		}
 	}

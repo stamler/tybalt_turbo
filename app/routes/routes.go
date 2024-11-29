@@ -235,4 +235,32 @@ func AddRoutes(app core.App) {
 
 		return nil
 	})
+
+	// Add the absorb clients route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/clients/:id/absorb",
+			Handler: CreateAbsorbRecordsHandler(app, "clients"),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
+	// Add the absorb client contacts route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/client_contacts/:id/absorb",
+			Handler: CreateAbsorbRecordsHandler(app, "client_contacts"),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
 }

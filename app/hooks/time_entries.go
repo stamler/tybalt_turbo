@@ -65,7 +65,7 @@ func cleanTimeEntry(app core.App, timeEntryRecord *models.Record) ([]string, err
 	// I'm not sure if this is the best way to do this but let's try it.
 	for key := range timeEntryRecord.ColumnValueMap() {
 		if !list.ExistInSlice(key, allowedFields) {
-			log.Println("Removing field: ", key)
+			//log.Println("Removing field: ", key)
 			timeEntryRecord.Set(key, nil)
 		}
 	}
