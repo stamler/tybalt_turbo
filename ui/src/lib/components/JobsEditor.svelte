@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flatpickrAction, fetchContacts } from "$lib/utilities";
+  import { flatpickrAction, fetchClientContacts } from "$lib/utilities";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
@@ -8,13 +8,13 @@
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
   import { globalStore } from "$lib/stores/global";
-  import type { ContactsResponse } from "$lib/pocketbase-types";
+  import type { ClientContactsResponse } from "$lib/pocketbase-types";
   let { data }: { data: JobsPageData } = $props();
 
   let errors = $state({} as any);
   let item = $state(data.item);
   let categories = $state(data.categories);
-  let contacts = $state([] as ContactsResponse[]);
+  let client_contacts = $state([] as ClientContactsResponse[]);
 
   let newCategory = $state("");
   let newCategories = $state([] as string[]);
@@ -23,7 +23,7 @@
   // Watch for changes to the client and fetch contacts accordingly
   $effect(() => {
     if (item.client) {
-      fetchContacts(item.client).then((c) => (contacts = c));
+      fetchClientContacts(item.client).then((c) => (client_contacts = c));
     }
   });
 
@@ -155,26 +155,16 @@
     </DsAutoComplete>
   {/if}
 
-  <!-- <DsSelector
-    bind:value={item.client as string}
-    items={$globalStore.clients}
-    {errors}
-    fieldName="client"
-    uiName="Client"
-  >
-    {#snippet optionTemplate({ name })}{name}{/snippet}
-  </DsSelector> -->
-
-  {#if item.client !== "" && contacts.length > 0}
+  {#if item.client !== "" && client_contacts.length > 0}
     <DsSelector
       bind:value={item.contact as string}
-      items={contacts}
+      items={client_contacts}
       {errors}
       fieldName="contact"
       uiName="Contact"
       clear={true}
     >
-      {#snippet optionTemplate(item: ContactsResponse)}
+      {#snippet optionTemplate(item: ClientContactsResponse)}
         {item.surname}, {item.given_name}
       {/snippet}
     </DsSelector>

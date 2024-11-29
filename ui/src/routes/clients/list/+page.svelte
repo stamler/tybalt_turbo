@@ -9,7 +9,7 @@
   {#snippet headline({ name })}{name}{/snippet}
   {#snippet line1({ expand })}
     <span class="opacity-30">contacts</span>
-    {#each expand?.contacts_via_client as contact}
+    {#each expand?.client_contacts_via_client as contact}
       <a
         href="mailto:{contact.email}"
         class="rounded-md p-1 hover:cursor-pointer hover:bg-neutral-300"

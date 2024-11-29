@@ -3,10 +3,11 @@ import type {
   TimeSheetsResponse,
   BaseSystemFields,
   IsoDateString,
+  CategoriesResponse,
+  ClientContactsResponse,
 } from "$lib/pocketbase-types";
 import { Collections } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
-import type { CategoriesResponse, ContactsResponse } from "$lib/pocketbase-types";
 import flatpickr from "flatpickr";
 
 export interface TimeSheetTally extends BaseSystemFields {
@@ -276,20 +277,20 @@ export async function fetchCategories(jobId: string): Promise<CategoriesResponse
   }
 }
 
-// Fetch contacts for the given client
-export async function fetchContacts(clientId: string): Promise<ContactsResponse[]> {
+// Fetch associated client_contacts
+export async function fetchClientContacts(clientId: string): Promise<ClientContactsResponse[]> {
   // if clientId is an empty string, return an empty array
   if (clientId === "") {
-    return Promise.resolve([] as ContactsResponse[]);
+    return Promise.resolve([] as ClientContactsResponse[]);
   }
 
   try {
-    return pb.collection("contacts").getFullList({
+    return pb.collection("client_contacts").getFullList({
       filter: `client="${clientId}"`,
       sort: "surname,given_name",
     });
   } catch (error) {
-    console.error("Error fetching contacts:", error);
-    return Promise.resolve([] as ContactsResponse[]);
+    console.error("Error fetching client_contacts:", error);
+    return Promise.resolve([] as ClientContactsResponse[]);
   }
 }

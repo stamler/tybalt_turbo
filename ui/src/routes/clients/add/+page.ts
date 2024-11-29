@@ -1,4 +1,4 @@
-import type { ClientsRecord, ContactsResponse } from "$lib/pocketbase-types";
+import type { ClientContactsResponse, ClientsRecord } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
 import type { ClientsPageData } from "$lib/svelte-types";
 
@@ -7,11 +7,11 @@ export const load: PageLoad<ClientsPageData> = async () => {
     name: "",
   };
 
-  const defaultContacts = [] as ContactsResponse[];
+  const defaultContacts = [] as ClientContactsResponse[];
   return {
     item: { ...defaultItem } as ClientsRecord,
     editing: false,
     id: null,
-    contacts: defaultContacts,
+    client_contacts: defaultContacts,
   };
 };

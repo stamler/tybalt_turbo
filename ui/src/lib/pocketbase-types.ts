@@ -10,7 +10,7 @@ export enum Collections {
   Categories = "categories",
   Claims = "claims",
   Clients = "clients",
-  Contacts = "contacts",
+  ClientContacts = "client_contacts",
   Divisions = "divisions",
   ExpenseRates = "expense_rates",
   Expenses = "expenses",
@@ -87,7 +87,7 @@ export type ClientsRecord = {
   name: string;
 };
 
-export type ContactsRecord = {
+export type ClientContactsRecord = {
   client: RecordIdString;
   email: string;
   given_name: string;
@@ -396,7 +396,7 @@ type JobsRecordExpands = {
 };
 
 type ClientsRecordExpands = {
-  contacts_via_client: ContactsResponse[];
+  client_contacts_via_client: ClientContactsResponse[];
 };
 
 // Response types include system fields and match responses from the PocketBase API
@@ -407,7 +407,7 @@ export type CategoriesResponse<Texpand = unknown> = Required<CategoriesRecord> &
 export type ClaimsResponse<Texpand = unknown> = Required<ClaimsRecord> & BaseSystemFields<Texpand>;
 export type ClientsResponse<Texpand = ClientsRecordExpands> = Required<ClientsRecord> &
   BaseSystemFields<Texpand>;
-export type ContactsResponse<Texpand = unknown> = Required<ContactsRecord> &
+export type ClientContactsResponse<Texpand = unknown> = Required<ClientContactsRecord> &
   BaseSystemFields<Texpand>;
 export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
   BaseSystemFields<Texpand>;
@@ -455,7 +455,7 @@ export type CollectionRecords = {
   categories: CategoriesRecord;
   claims: ClaimsRecord;
   clients: ClientsRecord;
-  contacts: ContactsRecord;
+  client_contacts: ClientContactsRecord;
   divisions: DivisionsRecord;
   expense_rates: ExpenseRatesRecord;
   expenses: ExpensesRecord;
@@ -481,7 +481,7 @@ export type CollectionResponses = {
   categories: CategoriesResponse;
   claims: ClaimsResponse;
   clients: ClientsResponse;
-  contacts: ContactsResponse;
+  client_contacts: ClientContactsResponse;
   divisions: DivisionsResponse;
   expense_rates: ExpenseRatesResponse;
   expenses: ExpensesResponse;
@@ -510,7 +510,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "categories"): RecordService<CategoriesResponse>;
   collection(idOrName: "claims"): RecordService<ClaimsResponse>;
   collection(idOrName: "clients"): RecordService<ClientsResponse>;
-  collection(idOrName: "contacts"): RecordService<ContactsResponse>;
+  collection(idOrName: "client_contacts"): RecordService<ClientContactsResponse>;
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
   collection(idOrName: "expense_rates"): RecordService<ExpenseRatesResponse>;
   collection(idOrName: "expenses"): RecordService<ExpensesResponse>;

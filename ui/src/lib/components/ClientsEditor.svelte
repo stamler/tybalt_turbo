@@ -4,32 +4,32 @@
   import { goto } from "$app/navigation";
   import type { ClientsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
-  import type { ContactsRecord, ContactsResponse } from "$lib/pocketbase-types";
+  import type { ClientContactsRecord, ClientContactsResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
 
   let { data }: { data: ClientsPageData } = $props();
 
   let errors = $state({} as any);
   let item = $state(data.item);
-  let contacts = $state(data.contacts || []);
+  let client_contacts = $state(data.client_contacts || []);
 
-  interface ContactWithTempId extends ContactsRecord {
+  interface ClientContactWithTempId extends ClientContactsRecord {
     tempId: string;
   }
 
-  function isContactWithTempId(
-    contact: ContactsResponse | ContactWithTempId,
-  ): contact is ContactWithTempId {
-    return (contact as ContactWithTempId).tempId !== undefined;
+  function isClientContactWithTempId(
+    contact: ClientContactsResponse | ClientContactWithTempId,
+  ): contact is ClientContactWithTempId {
+    return (contact as ClientContactWithTempId).tempId !== undefined;
   }
 
   let newContact = $state({
     given_name: "",
     surname: "",
     email: "",
-  } as ContactsRecord);
-  let newContacts = $state([] as ContactWithTempId[]);
-  let contactsToDelete = $state([] as (ContactsResponse | ContactWithTempId)[]);
+  } as ClientContactsRecord);
+  let newContacts = $state([] as ClientContactWithTempId[]);
+  let clientContactsToDelete = $state([] as (ClientContactsResponse | ClientContactWithTempId)[]);
 
   async function save(event: Event) {
     event.preventDefault();
@@ -48,10 +48,10 @@
         globalStore.addError(`error saving client: ${error}`);
       }
 
-      // Add new contacts
+      // Add new client_contacts
       for (const contact of newContacts) {
         try {
-          await pb.collection("contacts").create(
+          await pb.collection("client_contacts").create(
             {
               ...contact,
               client: clientId,
@@ -65,13 +65,13 @@
         }
       }
 
-      // Remove deleted contacts
-      for (const contact of contactsToDelete) {
-        if (isContactWithTempId(contact)) {
+      // Remove deleted client_contacts
+      for (const contact of clientContactsToDelete) {
+        if (isClientContactWithTempId(contact)) {
           continue;
         }
         try {
-          await pb.collection("contacts").delete(contact.id);
+          await pb.collection("client_contacts").delete(contact.id);
         } catch (error: any) {
           globalStore.addError(
             `error deleting contact ${contact.surname}, ${contact.given_name}: ${error}`,
@@ -92,7 +92,7 @@
   async function addContact() {
     if (newContact.given_name.trim() === "" || newContact.surname.trim() === "") return;
 
-    newContacts.push({ ...newContact, tempId: Date.now().toString() } as ContactWithTempId);
+    newContacts.push({ ...newContact, tempId: Date.now().toString() } as ClientContactWithTempId);
     newContact = {
       given_name: "",
       surname: "",
@@ -102,12 +102,12 @@
   }
 
   async function removeContact(contactId: string) {
-    const contact = contacts.find((c) => c.id === contactId);
+    const contact = client_contacts.find((c) => c.id === contactId);
     if (contact !== undefined) {
       // The contact is already in the database, so we need to delete it from
       // the database
-      contactsToDelete.push(contact);
-      contacts = contacts.filter((contact) => contact.id !== contactId);
+      clientContactsToDelete.push(contact);
+      client_contacts = client_contacts.filter((contact) => contact.id !== contactId);
     } else {
       // The contact is not in the database, so we need to delete it from
       // the new contacts list
@@ -130,14 +130,16 @@
 >
   <DsTextInput bind:value={item.name as string} {errors} fieldName="name" uiName="Name" />
 
-  <div class="flex w-full flex-col gap-2 {errors.contacts !== undefined ? 'bg-red-200' : ''}">
-    <label for="contacts">Contacts</label>
+  <div
+    class="flex w-full flex-col gap-2 {errors.client_contacts !== undefined ? 'bg-red-200' : ''}"
+  >
+    <label for="client_contacts">Contacts</label>
     <div class="flex flex-col gap-2">
-      {#each [...contacts, ...newContacts] as contact}
+      {#each [...client_contacts, ...newContacts] as contact}
         <div class="flex items-center gap-2 rounded bg-neutral-100 p-2">
           <span>{contact.surname}, {contact.given_name}</span>
           <span>{contact.email}</span>
-          {#if isContactWithTempId(contact)}
+          {#if isClientContactWithTempId(contact)}
             <button
               class="ml-auto text-neutral-500"
               onclick={preventDefault(() => removeContact(contact.tempId))}
@@ -181,8 +183,8 @@
         title="Add Contact"
       />
     </div>
-    {#if errors.contacts !== undefined}
-      <span class="text-red-600">{errors.contacts.message}</span>
+    {#if errors.client_contacts !== undefined}
+      <span class="text-red-600">{errors.client_contacts.message}</span>
     {/if}
   </div>
 

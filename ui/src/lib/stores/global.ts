@@ -107,7 +107,7 @@ const createStore = () => {
         case "clients":
           items = (await pb.collection("clients").getFullList<ClientsResponse>({
             requestKey: "client",
-            expand: "contacts_via_client",
+            expand: "client_contacts_via_client",
           })) as CollectionType[typeof key];
           break;
         case "time_types":

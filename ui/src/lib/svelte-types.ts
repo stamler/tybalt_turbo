@@ -6,7 +6,7 @@ import type {
   JobsRecord,
   CategoriesResponse,
   ClientsRecord,
-  ContactsResponse,
+  ClientContactsResponse,
   PoApproversResponse,
   VendorsRecord,
   VendorsResponse,
@@ -26,5 +26,5 @@ export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord> & {
 };
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse>;
 export type JobsPageData = PageData<JobsRecord> & { categories: CategoriesResponse[] };
-export type ClientsPageData = PageData<ClientsRecord> & { contacts: ContactsResponse[] };
+export type ClientsPageData = PageData<ClientsRecord> & { client_contacts: ClientContactsResponse[] };
 export type VendorsPageData = PageData<VendorsRecord | VendorsResponse>;
