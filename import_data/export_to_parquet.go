@@ -115,6 +115,18 @@ func main() {
 
 	// https://duckdb.org/2024/01/26/multi-database-support-in-duckdb.html
 
+	/*
+		Anticipated order of operations:
+		1. Upload Clients.parquet to the sqlite database
+		2. Upload Contacts.parquet to the sqlite database (these reference clients)
+		3. Upload Jobs.parquet to the sqlite database (these reference clients and contacts)
+		4. Upload Profiles.parquet to the sqlite database (these reference divisions and time types)
+		5. Upload TimeSheets.parquet to the sqlite database (these reference profiles)
+		6. Upload TimeEntries.parquet to the sqlite database (these reference timesheets, jobs, and profiles)
+		7. Upload TimeAmendments.parquet to the sqlite database (these reference timesheets, jobs, divisions, time types, and profiles)
+		8. Upload Expenses.parquet to the sqlite database (these reference jobs, profiles, and purchase orders) We may not do this because there aren't many purchase orders and we can archive the attachments.
+	*/
+
 	// Normalize the Jobs.parquet data by creating Clients.parquet and
 	// Contacts.parquet and updating Jobs.parquet to reference clients and
 	// contacts via UUID foreign keys.
