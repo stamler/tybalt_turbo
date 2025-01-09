@@ -28,6 +28,12 @@
       color="blue"
     />
     <DsActionButton
+      action={`/clients/${id}/absorb`}
+      icon="mdi:merge"
+      title="Absorb other clients into this one"
+      color="yellow"
+    />
+    <DsActionButton
       action={() => globalStore.deleteItem("clients", id)}
       icon="mdi:delete"
       title="Delete"
