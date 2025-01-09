@@ -17,7 +17,14 @@
 
   let errors = $state<Record<string, { message: string }>>({});
   let recordsToAbsorb = $state<string[]>([]);
-  let searchResults = $state<ClientsResponse[]>([]);
+  let selectedRecord = $state<string>("");
+
+  $effect(() => {
+    if (selectedRecord && !recordsToAbsorb.includes(selectedRecord)) {
+      recordsToAbsorb = [...recordsToAbsorb, selectedRecord];
+      selectedRecord = ""; // Reset selection after adding
+    }
+  });
 
   async function handleAbsorb() {
     try {
@@ -57,8 +64,10 @@
   <div class="flex flex-col gap-2">
     <h2 class="text-xl font-bold">Records to Absorb</h2>
     <DsSelector
-      bind:value={recordsToAbsorb[recordsToAbsorb.length]}
-      items={$globalStore.clients}
+      bind:value={selectedRecord}
+      items={$globalStore.clients.filter(
+        (c) => c.id !== targetRecordId && !recordsToAbsorb.includes(c.id),
+      )}
       {errors}
       fieldName="records_to_absorb"
       uiName="Select Record"
