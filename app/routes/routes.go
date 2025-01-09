@@ -250,6 +250,20 @@ func AddRoutes(app core.App) {
 		return nil
 	})
 
+	// Add the undo absorb clients route
+	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		e.Router.AddRoute(echo.Route{
+			Method:  http.MethodPost,
+			Path:    "/api/clients/undo_absorb",
+			Handler: CreateUndoAbsorbHandler(app, "clients"),
+			Middlewares: []echo.MiddlewareFunc{
+				apis.RequireRecordAuth("users"),
+			},
+		})
+
+		return nil
+	})
+
 	// Add the absorb client contacts route
 	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
 		e.Router.AddRoute(echo.Route{
