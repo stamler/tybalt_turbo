@@ -20,7 +20,13 @@
   function isClientContactWithTempId(
     contact: ClientContactsResponse | ClientContactWithTempId,
   ): contact is ClientContactWithTempId {
-    return (contact as ClientContactWithTempId).tempId !== undefined;
+    return "tempId" in contact;
+  }
+
+  function isClientContactsResponse(
+    contact: ClientContactsResponse | ClientContactWithTempId,
+  ): contact is ClientContactsResponse {
+    return "id" in contact;
   }
 
   let newContact = $state({
@@ -139,21 +145,30 @@
         <div class="flex items-center gap-2 rounded bg-neutral-100 p-2">
           <span>{contact.surname}, {contact.given_name}</span>
           <span>{contact.email}</span>
-          {#if isClientContactWithTempId(contact)}
-            <button
-              class="ml-auto text-neutral-500"
-              onclick={preventDefault(() => removeContact(contact.tempId))}
-            >
-              &times;
-            </button>
-          {:else}
-            <button
-              class="ml-auto text-neutral-500"
-              onclick={preventDefault(() => removeContact(contact.id))}
-            >
-              &times;
-            </button>
-          {/if}
+          <div class="ml-auto flex gap-2">
+            {#if isClientContactWithTempId(contact)}
+              <button
+                class="text-neutral-500"
+                onclick={preventDefault(() => removeContact(contact.tempId))}
+              >
+                &times;
+              </button>
+            {:else if isClientContactsResponse(contact)}
+              <DsActionButton
+                action={() =>
+                  (window.location.href = `/clients/${data.id}/contacts/${contact.id}/absorb`)}
+                icon="mdi:merge"
+                title="Absorb other contacts into this one"
+                color="yellow"
+              />
+              <DsActionButton
+                action={() => removeContact(contact.id)}
+                icon="mdi:delete"
+                title="Delete"
+                color="red"
+              />
+            {/if}
+          </div>
         </div>
       {/each}
     </div>

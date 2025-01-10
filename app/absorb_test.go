@@ -1,16 +1,21 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"reflect"
 	"strings"
 	"testing"
 	"tybalt/internal/testutils"
 	"tybalt/routes"
 
 	"github.com/labstack/echo/v5"
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/daos"
+	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -119,7 +124,7 @@ func TestAbsorbRecords(t *testing.T) {
 
 				// Step 4: Capture the initial state of all reference tables
 				// These tables contain foreign keys pointing to our records
-				refConfigs, err := routes.GetConfigsAndTable(tt.collectionName)
+				refConfigs, _, err := routes.GetConfigsAndTable(tt.collectionName)
 				if err != nil {
 					t.Fatalf("failed to get ref configs: %v", err)
 				}
@@ -192,7 +197,7 @@ func TestAbsorbRecords(t *testing.T) {
 				}
 
 				// Step 6d: Verify all references were properly updated
-				refConfigs, err := routes.GetConfigsAndTable(tt.collectionName)
+				refConfigs, _, err := routes.GetConfigsAndTable(tt.collectionName)
 				if err != nil {
 					t.Fatalf("failed to get ref configs: %v", err)
 				}
@@ -369,6 +374,12 @@ func TestAbsorbRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"Successfully absorbed 2 records into lb0fnenkeyitsny"`,
 			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate": 1,
+				"OnModelAfterCreate":  1,
+				"OnModelBeforeUpdate": 1,
+				"OnModelAfterUpdate":  1,
+			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
@@ -467,9 +478,259 @@ func TestAbsorbRoutes(t *testing.T) {
 			},
 			TestAppFactory: claimCheckFailureTestApp,
 		},
+		{
+			Name:   "undo absorb unauthorized user",
+			Method: http.MethodPost,
+			Url:    "/api/clients/undo_absorb",
+			RequestHeaders: map[string]string{
+				"Authorization": userToken,
+			},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"message":"User does not have permission to undo absorb."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "undo absorb no action exists",
+			Method: http.MethodPost,
+			Url:    "/api/clients/undo_absorb",
+			RequestHeaders: map[string]string{
+				"Authorization": bookKeeperToken,
+			},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"No absorb action found for collection."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "undo absorb successful",
+			Method: http.MethodPost,
+			Url:    "/api/clients/undo_absorb",
+			RequestHeaders: map[string]string{
+				"Authorization": bookKeeperToken,
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"message":"Successfully undid absorb operation"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeCreate": 2,
+				"OnModelAfterCreate":  2,
+				"OnModelBeforeUpdate": 1,
+				"OnModelAfterUpdate":  1,
+				"OnModelBeforeDelete": 1,
+				"OnModelAfterDelete":  1,
+			},
+			TestAppFactory: func(t *testing.T) *tests.TestApp {
+				app := testutils.SetupTestApp(t)
+				// Create an absorb action to undo
+				err := routes.AbsorbRecords(app, "clients", "lb0fnenkeyitsny", []string{"eldtxi3i4h00k8r"})
+				if err != nil {
+					t.Fatal(err)
+				}
+				return app
+			},
+		},
+		/*
+			{
+				Name:   "undo absorb claim check failure",
+				Method: http.MethodPost,
+				Url:    "/api/clients/undo_absorb",
+				RequestHeaders: map[string]string{
+					"Authorization": bookKeeperToken,
+				},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"message":"Failed to check user claims."`,
+				},
+				TestAppFactory: claimCheckFailureTestApp,
+			},
+		*/
 	}
 
 	for _, scenario := range scenarios {
 		scenario.Test(t)
+	}
+}
+
+// TestUndoAbsorb verifies the undo functionality of record absorption.
+// The test ensures that when an absorb operation is undone:
+// 1. The absorbed records are restored with their original data
+// 2. All references are restored to their original values
+// 3. The absorb action record is deleted
+// 4. The system returns to its original state
+func TestUndoAbsorb(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// First perform an absorption to create the state we want to undo
+	collectionName := "clients"
+	targetID := "lb0fnenkeyitsny"
+	idsToAbsorb := []string{"eldtxi3i4h00k8r", "pqpd90fqd5ohjcs"}
+
+	// Store initial state
+	initialState := make(map[string]map[string]interface{})
+	initialRefCounts := make(map[string]int64)
+
+	// Get reference configs for the collection
+	refConfigs, _, err := routes.GetConfigsAndTable(collectionName)
+	if err != nil {
+		t.Fatalf("failed to get ref configs: %v", err)
+	}
+
+	// Store initial record data
+	for _, id := range append(idsToAbsorb, targetID) {
+		record, err := app.Dao().FindRecordById(collectionName, id)
+		if err != nil {
+			t.Fatalf("failed to find record %s: %v", id, err)
+		}
+		recordData := make(map[string]interface{})
+		for _, field := range record.Collection().Schema.Fields() {
+			recordData[field.Name] = record.Get(field.Name)
+		}
+		initialState[id] = recordData
+	}
+
+	// Store initial reference counts
+	for _, ref := range refConfigs {
+		var result CountResult
+		query := fmt.Sprintf(
+			"SELECT COUNT(*) as count FROM %s WHERE %s IN (%s)",
+			ref.Table,
+			ref.Column,
+			"'"+strings.Join(append(idsToAbsorb, targetID), "','")+"'",
+		)
+		err = app.Dao().DB().NewQuery(query).One(&result)
+		if err != nil {
+			t.Fatalf("failed to get reference count for %s: %v", ref.Table, err)
+		}
+		initialRefCounts[ref.Table] = result.Count
+	}
+
+	// Perform the absorption
+	err = routes.AbsorbRecords(app, collectionName, targetID, idsToAbsorb)
+	if err != nil {
+		t.Fatalf("failed to absorb records: %v", err)
+	}
+
+	// Verify absorption was successful
+	for _, id := range idsToAbsorb {
+		record, err := app.Dao().FindRecordById(collectionName, id)
+		if err == nil || record != nil {
+			t.Errorf("absorbed record %s still exists", id)
+		}
+	}
+
+	// Now perform the undo operation
+	err = app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+		// Get the absorb action record
+		record, err := txDao.FindFirstRecordByData("absorb_actions", "collection_name", collectionName)
+		if err != nil {
+			return err
+		}
+		if record == nil {
+			return fmt.Errorf("no absorb action found")
+		}
+
+		// Parse the absorb action data
+		var absorbedRecords []map[string]interface{}
+		if err := json.Unmarshal([]byte(record.GetString("absorbed_records")), &absorbedRecords); err != nil {
+			return err
+		}
+
+		var updatedRefs map[string]map[string]string
+		if err := json.Unmarshal([]byte(record.GetString("updated_references")), &updatedRefs); err != nil {
+			return err
+		}
+
+		collection, err := txDao.FindCollectionByNameOrId(collectionName)
+		if err != nil {
+			return err
+		}
+
+		// Recreate absorbed records
+		for _, recordData := range absorbedRecords {
+			record := models.NewRecord(collection)
+			for field, value := range recordData {
+				record.Set(field, value)
+			}
+			if err := txDao.SaveRecord(record); err != nil {
+				return err
+			}
+		}
+
+		// Restore references
+		for table, updates := range updatedRefs {
+			for recordID, oldValue := range updates {
+				updateQuery := fmt.Sprintf("UPDATE %s SET %s = {:old_value} WHERE id = {:record_id}", table, refConfigs[0].Column)
+				_, err = txDao.DB().NewQuery(updateQuery).Bind(dbx.Params{
+					"old_value": oldValue,
+					"record_id": recordID,
+				}).Execute()
+				if err != nil {
+					return err
+				}
+			}
+		}
+
+		// Delete absorb action
+		if err := txDao.DeleteRecord(record); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("failed to undo absorb: %v", err)
+	}
+
+	// Verify the undo operation restored everything correctly
+	// 1. Check all records exist with original data
+	for id, originalData := range initialState {
+		record, err := app.Dao().FindRecordById(collectionName, id)
+		if err != nil {
+			t.Errorf("failed to find restored record %s: %v", id, err)
+			continue
+		}
+		if record == nil {
+			t.Errorf("restored record %s is nil", id)
+			continue
+		}
+		for field, originalValue := range originalData {
+			currentValue := record.Get(field)
+			if !reflect.DeepEqual(currentValue, originalValue) {
+				t.Errorf("field %s of record %s has value %v, want %v", field, id, currentValue, originalValue)
+			}
+		}
+	}
+
+	// 2. Check reference counts are restored
+	for _, ref := range refConfigs {
+		var result CountResult
+		query := fmt.Sprintf(
+			"SELECT COUNT(*) as count FROM %s WHERE %s IN (%s)",
+			ref.Table,
+			ref.Column,
+			"'"+strings.Join(append(idsToAbsorb, targetID), "','")+"'",
+		)
+		err = app.Dao().DB().NewQuery(query).One(&result)
+		if err != nil {
+			t.Errorf("failed to get reference count for %s: %v", ref.Table, err)
+			continue
+		}
+		if result.Count != initialRefCounts[ref.Table] {
+			t.Errorf("reference count for %s is %d, want %d", ref.Table, result.Count, initialRefCounts[ref.Table])
+		}
+	}
+
+	// 3. Verify absorb action record is deleted
+	record, err := app.Dao().FindFirstRecordByData("absorb_actions", "collection_name", collectionName)
+	if err != nil && err.Error() != "sql: no rows in result set" {
+		t.Errorf("error checking absorb action: %v", err)
+	}
+	if record != nil {
+		t.Error("absorb action still exists after undo")
 	}
 }

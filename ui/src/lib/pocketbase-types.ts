@@ -6,6 +6,7 @@ import type PocketBase from "pocketbase";
 import type { RecordService } from "pocketbase";
 
 export enum Collections {
+  AbsorbActions = "absorb_actions",
   AdminProfiles = "admin_profiles",
   Categories = "categories",
   Claims = "claims",
@@ -54,6 +55,13 @@ export type AuthSystemFields<T = never> = {
 } & BaseSystemFields<T>;
 
 // Record types for each collection
+
+export type AbsorbActionsRecord<Tabsorbed_records = unknown, Tupdated_references = unknown> = {
+  absorbed_records: null | Tabsorbed_records;
+  collection_name: string;
+  target_id: string;
+  updated_references: null | Tupdated_references;
+};
 
 export enum AdminProfilesSkipMinTimeCheckOptions {
   "no" = "no",
@@ -250,14 +258,12 @@ export type TimeAmendmentsRecord = {
   job: RecordIdString;
   meals_hours: number;
   payout_request_amount: number;
-  salary: boolean;
   skip_tsid_check: boolean;
   time_type: RecordIdString;
   tsid: RecordIdString;
   uid: RecordIdString;
   week_ending: string;
   work_record: string;
-  work_week_hours: number;
 };
 
 export type TimeEntriesRecord = {
@@ -400,6 +406,12 @@ type ClientsRecordExpands = {
 };
 
 // Response types include system fields and match responses from the PocketBase API
+export type AbsorbActionsResponse<
+  Tabsorbed_records = unknown,
+  Tupdated_references = unknown,
+  Texpand = unknown,
+> = Required<AbsorbActionsRecord<Tabsorbed_records, Tupdated_references>> &
+  BaseSystemFields<Texpand>;
 export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRecord> &
   BaseSystemFields<Texpand>;
 export type CategoriesResponse<Texpand = unknown> = Required<CategoriesRecord> &
@@ -451,6 +463,7 @@ export type VendorsResponse<Texpand = unknown> = Required<VendorsRecord> &
 // Types containing all Records and Responses, useful for creating typing helper functions
 
 export type CollectionRecords = {
+  absorb_actions: AbsorbActionsRecord;
   admin_profiles: AdminProfilesRecord;
   categories: CategoriesRecord;
   claims: ClaimsRecord;
@@ -477,6 +490,7 @@ export type CollectionRecords = {
 };
 
 export type CollectionResponses = {
+  absorb_actions: AbsorbActionsResponse;
   admin_profiles: AdminProfilesResponse;
   categories: CategoriesResponse;
   claims: ClaimsResponse;
@@ -506,6 +520,7 @@ export type CollectionResponses = {
 // https://github.com/pocketbase/js-sdk#specify-typescript-definitions
 
 export type TypedPocketBase = PocketBase & {
+  collection(idOrName: "absorb_actions"): RecordService<AbsorbActionsResponse>;
   collection(idOrName: "admin_profiles"): RecordService<AdminProfilesResponse>;
   collection(idOrName: "categories"): RecordService<CategoriesResponse>;
   collection(idOrName: "claims"): RecordService<ClaimsResponse>;

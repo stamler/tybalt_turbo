@@ -66,23 +66,35 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) echo.Handle
 			return apis.NewForbiddenError("User does not have permission to absorb records", nil)
 		}
 
-		// Check if the collection is supported
-		_, err = GetConfigsAndTable(collectionName)
+		// Check if the collection is supported and get configs
+		_, parentConstraint, err := GetConfigsAndTable(collectionName)
 		if err != nil {
 			return apis.NewApiError(http.StatusInternalServerError, "Failed to absorb records", err)
 		}
 
 		// First verify that the target record exists
-		_, err = app.Dao().FindRecordById(collectionName, targetId)
+		targetRecord, err := app.Dao().FindRecordById(collectionName, targetId)
 		if err != nil {
 			return apis.NewNotFoundError("Failed to find target record", err)
 		}
 
-		// Then verify that all records to absorb exist
+		// Then verify that all records to absorb exist and satisfy parent constraint
 		for _, id := range request.IdsToAbsorb {
-			_, err := app.Dao().FindRecordById(collectionName, id)
+			record, err := app.Dao().FindRecordById(collectionName, id)
 			if err != nil {
 				return apis.NewNotFoundError("Failed to find record to absorb", err)
+			}
+
+			// Check parent constraint if it exists
+			if parentConstraint != nil {
+				targetParent := targetRecord.GetString(parentConstraint.Field)
+				recordParent := record.GetString(parentConstraint.Field)
+				if targetParent != recordParent {
+					return apis.NewBadRequestError(
+						fmt.Sprintf("Cannot absorb records with different %s values", parentConstraint.Field),
+						nil,
+					)
+				}
 			}
 		}
 
@@ -100,24 +112,9 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) echo.Handle
 
 func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAbsorb []string) error {
 	// Get reference configs based on collection name
-	refConfigs, err := GetConfigsAndTable(collectionName)
+	refConfigs, _, err := GetConfigsAndTable(collectionName)
 	if err != nil {
 		return fmt.Errorf("error getting reference configs: %w", err)
-	}
-
-	// Check for existing absorb action
-	existingAction, err := getAbsorbAction(app.Dao(), collectionName)
-	if err != nil {
-		return fmt.Errorf("error checking existing absorb action: %w", err)
-	}
-	if existingAction != nil {
-		return fmt.Errorf("there is an existing absorb action for collection %s that must be undone or deleted first", collectionName)
-	}
-
-	// Serialize the records to be absorbed
-	absorbedRecords, err := serializeRecords(app.Dao(), collectionName, idsToAbsorb)
-	if err != nil {
-		return fmt.Errorf("error serializing records: %w", err)
 	}
 
 	// Create reference tracker
@@ -125,17 +122,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 
 	// Absorb the records in a transaction
 	err = app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-		// First record the absorb action
-		updatedRefs, err := refTracker.serialize()
-		if err != nil {
-			return fmt.Errorf("error serializing reference updates: %w", err)
-		}
-
-		if err := recordAbsorbAction(txDao, collectionName, targetID, absorbedRecords, updatedRefs); err != nil {
-			return fmt.Errorf("error recording absorb action: %w", err)
-		}
-
-		// create the temp table to store the ids to be absorbed
+		// First create the temp table to validate IDs
 		_, err = txDao.DB().NewQuery(`
 			CREATE TEMPORARY TABLE ids_to_absorb (old_id TEXT NOT NULL)
 		`).Execute()
@@ -157,6 +144,31 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 		_, err = txDao.DB().NewQuery(insertQuery).Execute()
 		if err != nil {
 			return fmt.Errorf("populating temp table: %w", err)
+		}
+
+		// Check for existing absorb action
+		existingAction, err := getAbsorbAction(txDao, collectionName)
+		if err != nil {
+			return fmt.Errorf("error checking existing absorb action: %w", err)
+		}
+		if existingAction != nil {
+			return fmt.Errorf("there is an existing absorb action for collection %s that must be undone or deleted first", collectionName)
+		}
+
+		// Serialize the records to be absorbed
+		absorbedRecords, err := serializeRecords(txDao, collectionName, idsToAbsorb)
+		if err != nil {
+			return fmt.Errorf("error serializing records: %w", err)
+		}
+
+		// Record the absorb action
+		updatedRefs, err := refTracker.serialize()
+		if err != nil {
+			return fmt.Errorf("error serializing reference updates: %w", err)
+		}
+
+		if err := recordAbsorbAction(txDao, collectionName, targetID, absorbedRecords, updatedRefs); err != nil {
+			return fmt.Errorf("error recording absorb action: %w", err)
 		}
 
 		// Update all references using EXISTS
@@ -330,7 +342,7 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) echo.HandlerFu
 			// Step 4b: Restore References
 			// For each table where references were updated, restore the original
 			// references that pointed to the absorbed records
-			refConfigs, err := GetConfigsAndTable(collectionName)
+			refConfigs, _, err := GetConfigsAndTable(collectionName)
 			if err != nil {
 				return fmt.Errorf("error getting reference configs: %w", err)
 			}
@@ -395,7 +407,13 @@ type RefConfig struct {
 	Column string
 }
 
-func GetConfigsAndTable(collectionName string) ([]RefConfig, error) {
+// Add parent constraint configuration
+type ParentConstraint struct {
+	Collection string // The collection that must match (e.g., "clients")
+	Field      string // The field that must match (e.g., "client")
+}
+
+func GetConfigsAndTable(collectionName string) ([]RefConfig, *ParentConstraint, error) {
 	// TODO: Write configs for each collection that we want to be able to absorb
 	// against. This is a list of tables and their corresponding columns that need
 	// to be updated for each record based on the collection name.
@@ -404,17 +422,20 @@ func GetConfigsAndTable(collectionName string) ([]RefConfig, error) {
 		return []RefConfig{
 			{"client_contacts", "client"},
 			{"jobs", "client"},
-		}, nil
+		}, nil, nil
 
-	case "contacts":
+	case "client_contacts":
 		return []RefConfig{
-			{"jobs", "contact"},
-		}, nil
+				{"jobs", "contact"},
+			}, &ParentConstraint{
+				Collection: "clients",
+				Field:      "client",
+			}, nil
 
 	// Add more cases as needed
 	default:
 		// return an error if the collection is not supported
-		return nil, fmt.Errorf("unknown collection: %s", collectionName)
+		return nil, nil, fmt.Errorf("unknown collection: %s", collectionName)
 	}
 }
 

@@ -1,31 +1,78 @@
-<script lang="ts">
-  import type { ClientsResponse } from "$lib/pocketbase-types";
+<script lang="ts" generics="T extends BaseSystemFields<any>">
+  import type {
+    ClientsResponse,
+    ClientContactsResponse,
+    AbsorbActionsResponse,
+  } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import DsSelector from "./DSSelector.svelte";
   import DsActionButton from "./DSActionButton.svelte";
   import { pb } from "$lib/pocketbase";
+  import { page } from "$app/stores";
+  import type { Snippet } from "svelte";
+  import type { BaseSystemFields } from "$lib/pocketbase-types";
 
   let {
     collectionName,
     targetRecordId,
-    targetRecordSnippet,
+    recordSnippet,
   }: {
     collectionName: string;
     targetRecordId: string;
-    targetRecordSnippet: any;
+    recordSnippet: Snippet<[T]>;
   } = $props();
 
   let errors = $state<Record<string, { message: string }>>({});
   let recordsToAbsorb = $state<string[]>([]);
   let selectedRecord = $state<string>("");
-  let existingAbsorbAction = $state<any>(null);
+  let existingAbsorbAction = $state<AbsorbActionsResponse | null>(null);
   let showUndoConfirm = $state(false);
   let showCommitConfirm = $state(false);
+  let availableRecords = $state<(ClientsResponse | ClientContactsResponse)[]>([]);
+  let items = $state<(ClientsResponse | ClientContactsResponse)[]>([]);
+  let targetRecord = $state<T | null>(null);
+
+  // Update items whenever availableRecords or recordsToAbsorb changes
+  $effect(() => {
+    items = availableRecords.filter(
+      (c) => c.id !== targetRecordId && !recordsToAbsorb.includes(c.id),
+    );
+  });
+
+  // Get available records based on collection and context
+  $effect(() => {
+    if (collectionName === "client_contacts" && $page.params.cid) {
+      // For client contacts, filter by the current client
+      pb.collection("client_contacts")
+        .getFullList<ClientContactsResponse>({ filter: `client = "${$page.params.cid}"` })
+        .then((contacts) => {
+          availableRecords = contacts;
+        });
+    } else if (collectionName === "clients") {
+      availableRecords = $globalStore.clients || [];
+    }
+  });
 
   // Check for existing absorb action on mount
   $effect(() => {
     checkExistingAbsorbAction();
   });
+
+  // Get target record
+  $effect(() => {
+    const record = availableRecords.find((r) => r.id === targetRecordId);
+    if (record) {
+      targetRecord = record as unknown as T;
+    }
+  });
+
+  function redirectBack() {
+    if (collectionName === "client_contacts") {
+      window.location.href = `/clients/${$page.params.cid}/edit`;
+    } else {
+      window.location.href = `/${collectionName}/list`;
+    }
+  }
 
   async function checkExistingAbsorbAction() {
     try {
@@ -44,7 +91,7 @@
       await pb.send(`/api/${collectionName}/undo_absorb`, {
         method: "POST",
       });
-      window.location.href = `/${collectionName}/list`;
+      redirectBack();
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };
@@ -55,9 +102,10 @@
   }
 
   async function handleCommit() {
+    if (existingAbsorbAction === null) return;
     try {
       await pb.collection("absorb_actions").delete(existingAbsorbAction.id);
-      window.location.href = `/${collectionName}/list`;
+      redirectBack();
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };
@@ -84,7 +132,7 @@
       });
 
       // Redirect back to the list view after successful absorption
-      window.location.href = `/${collectionName}/list`;
+      redirectBack();
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };
@@ -92,10 +140,6 @@
         errors = { global: { message: "An unknown error occurred" } };
       }
     }
-  }
-
-  function handleCancel() {
-    window.location.href = `/${collectionName}/list`;
   }
 
   function removeRecord(id: string) {
@@ -146,31 +190,35 @@
   {:else}
     <div class="flex flex-col gap-2">
       <h2 class="text-xl font-bold">Target Record</h2>
-      {@render targetRecordSnippet()}
+      {#if targetRecord}
+        {@render recordSnippet(targetRecord)}
+      {/if}
     </div>
 
     <div class="flex flex-col gap-2">
       <h2 class="text-xl font-bold">Records to Absorb</h2>
-      <DsSelector
-        bind:value={selectedRecord}
-        items={$globalStore.clients.filter(
-          (c) => c.id !== targetRecordId && !recordsToAbsorb.includes(c.id),
-        )}
-        {errors}
-        fieldName="records_to_absorb"
-        uiName="Select Record"
-      >
-        {#snippet optionTemplate(item: ClientsResponse)}
-          {item.name}
-        {/snippet}
-      </DsSelector>
+      {#if items.length > 0}
+        <DsSelector
+          bind:value={selectedRecord}
+          {items}
+          {errors}
+          fieldName="records_to_absorb"
+          uiName="Select Record"
+        >
+          {#snippet optionTemplate(item)}
+            {@render recordSnippet(item as unknown as T)}
+          {/snippet}
+        </DsSelector>
+      {:else}
+        <p class="text-neutral-500">No more records available to absorb</p>
+      {/if}
 
       {#if recordsToAbsorb.length > 0}
         <ul class="flex flex-col gap-2">
           {#each recordsToAbsorb as recordId}
-            {#each $globalStore.clients.filter((c: ClientsResponse) => c.id === recordId) as record}
+            {#each availableRecords.filter((c) => c.id === recordId) as record}
               <li class="flex items-center gap-2 rounded bg-neutral-100 p-2">
-                <span>{record.name}</span>
+                {@render recordSnippet(record as unknown as T)}
                 <DsActionButton
                   action={() => removeRecord(record.id)}
                   icon="mdi:delete"
@@ -186,7 +234,7 @@
 
     <div class="flex gap-2">
       <DsActionButton action={handleAbsorb}>Absorb</DsActionButton>
-      <DsActionButton action={handleCancel}>Cancel</DsActionButton>
+      <DsActionButton action={redirectBack}>Cancel</DsActionButton>
     </div>
 
     {#if errors.global}
