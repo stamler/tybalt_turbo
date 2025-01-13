@@ -16,6 +16,25 @@ const (
 	VP_PO_LIMIT      = 2500
 )
 
+// recordFinder defines the minimal interface needed for PO number generation operations.
+//
+// This interface exists for two main reasons:
+//  1. Interface Segregation: It specifies only the database operations required for PO number
+//     generation, making the code's dependencies explicit and minimal.
+//  2. Testability: It enables testing of PO number generation logic without requiring a full
+//     database connection. The production code uses *daos.Dao while tests can use a mock
+//     implementation that only implements these specific methods.
+//
+// Note: While this interface is primarily useful for testing, it lives in the production
+// code (not in test packages) because it represents a real business capability that the
+// production code depends on. This maintains proper dependency direction - tests depend
+// on production code, not vice versa.
+type recordFinder interface {
+	FindRecordById(collectionModelOrIdentifier any, id string, expands ...func(*dbx.SelectQuery) error) (*core.Record, error)
+	FindRecordsByFilter(collectionModelOrIdentifier any, filter string, sort string, limit int, offset int, params ...dbx.Params) ([]*core.Record, error)
+	FindFirstRecordByFilter(collectionModelOrIdentifier any, filter string, params ...dbx.Params) (*core.Record, error)
+}
+
 func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		id := e.Request.PathValue("id")
@@ -117,7 +136,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			// status to Active and generate a PO number
 			if recordIsApproved && (!recordRequiresSecondApproval || recordIsSecondApproved) {
 				po.Set("status", "Active")
-				poNumber, err := generatePONumber(txApp)
+				poNumber, err := GeneratePONumber(txApp, po)
 				if err != nil {
 					return &CodeError{
 						Code:    "error_generating_po_number",
@@ -458,18 +477,95 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) func(e *core.Re
 	}
 }
 
-func generatePONumber(txApp core.App) (string, error) {
+// GeneratePONumber generates a unique PO number in one of two formats:
+// 1. Parent PO format: YYYY-NNNN (e.g., 2024-0001)
+// 2. Child PO format:  YYYY-NNNN-XX (e.g., 2024-0001-01)
+// where YYYY is the current year, NNNN is a sequential number,
+// and XX is a sequential suffix for child POs (01-99).
+func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) (string, error) {
 	currentYear := time.Now().Year()
+	if len(testYear) > 0 {
+		currentYear = testYear[0]
+	}
 	prefix := fmt.Sprintf("%d-", currentYear)
 
-	// Query existing PO numbers for the current year
+	// If this is a child PO, handle differently
+	if record.GetString("parent_po") != "" {
+		parentId := record.GetString("parent_po")
+		// don't bother storing the error since the parent will be nil both if it
+		// doesn't exist and for any other error
+		parent, _ := txApp.FindRecordById("purchase_orders", parentId)
+		if parent == nil {
+			return "", fmt.Errorf("parent PO not found")
+		}
+		parentNumber := parent.GetString("po_number")
+		if parentNumber == "" {
+			return "", fmt.Errorf("parent PO does not have a PO number")
+		}
+
+		// Find highest child suffix for this parent. Do this by filtering on
+		// parentId and sorting by po_number descending then taking the first
+		// record.
+		children, err := txApp.FindRecordsByFilter(
+			"purchase_orders",
+			"parent_po = {:parentId}",
+			"-po_number",
+			1,
+			0,
+			dbx.Params{"parentId": parentId},
+		)
+		if err != nil {
+			return "", fmt.Errorf("error querying child PO numbers: %v", err)
+		}
+
+		// If there are no children, the next suffix is 1. If there are children,
+		// find the highest suffix and increment it.
+
+		nextSuffix := 1
+		if len(children) > 0 {
+			lastChild := children[0].GetString("po_number")
+			suffix := lastChild[len(lastChild)-2:]
+
+			// Convert the suffix to an integer and increment it
+			fmt.Sscanf(suffix, "%d", &nextSuffix)
+			nextSuffix++
+		}
+
+		if nextSuffix > 99 {
+			return "", fmt.Errorf("maximum number of child POs reached (99) for parent %s", parentNumber)
+		}
+
+		childNumber := fmt.Sprintf("%s-%02d", parentNumber, nextSuffix)
+
+		// Double check uniqueness
+		existing, err := txApp.FindFirstRecordByFilter(
+			"purchase_orders",
+			"po_number = {:poNumber}",
+			dbx.Params{"poNumber": childNumber},
+		)
+		if err != nil && err != sql.ErrNoRows {
+			return "", fmt.Errorf("error checking child PO number uniqueness: %v", err)
+		}
+		if existing != nil {
+			return "", fmt.Errorf("generated child PO number %s already exists", childNumber)
+		}
+
+		return childNumber, nil
+	}
+
+	// Handle parent PO number generation
+	// We can just filter over all POs and get the last one regardless of whether
+	// it's a parent or child PO because all children POs have a parent PO with
+	// a PO number and the same prefix. We do however need to filter by the current
+	// year otherwise we may create a lastNumber that is sequential for a previous
+	// year rather than the current year.
 	existingPOs, err := txApp.FindRecordsByFilter(
 		"purchase_orders",
-		"po_number ~ {:prefix}",
+		`po_number ~ '{:current_year}-%'`,
 		"-po_number",
 		1,
 		0,
-		dbx.Params{"prefix": prefix},
+		dbx.Params{"current_year": currentYear},
 	)
 	if err != nil {
 		return "", fmt.Errorf("error querying existing PO numbers: %v", err)

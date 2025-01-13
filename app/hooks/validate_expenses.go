@@ -66,8 +66,27 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 			excessErrorText = fmt.Sprintf("$%0.2f", utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE)
 		}
 
-		// For Cumulative POs, the totalLimit is reduced by the existingExpensesTotal
+		// For Cumulative POs, we check for overflow before other validations.
+		// This is done here (rather than in the "total" validation) because:
+		// 1. It allows early detection and a specific, actionable error for the child PO workflow
+		// 2. We can provide rich error data (overflow amount, parent PO) that the validation framework doesn't support
+		// 3. This represents a special case that can lead to child PO creation, not just rejection
+		// 4. It makes testing clearer by distinctly separating this special case
 		if poType == "Cumulative" {
+			newTotal := existingExpensesTotal + expenseRecord.GetFloat("total")
+			if newTotal > poTotal {
+				overflowAmount := newTotal - poTotal
+				return &HookError{
+					Code:    http.StatusUnprocessableEntity,
+					Message: fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, overflowAmount),
+					Data: map[string]CodeError{
+						"total": {
+							Code:    "cumulative_po_overflow",
+							Message: fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, overflowAmount),
+						},
+					},
+				}
+			}
 			totalLimit -= existingExpensesTotal
 		}
 	}
@@ -142,10 +161,6 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 			validation.When(hasPurchaseOrder && (poType == "Normal" || poType == "Recurring"),
 				validation.Max(totalLimit).Error(fmt.Sprintf("expense exceeds purchase order total of $%0.2f by more than %s", poTotal, excessErrorText)),
 			),
-			validation.When(hasPurchaseOrder && (poType == "Cumulative"),
-				validation.Max(totalLimit).Error(fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, existingExpensesTotal+expenseRecord.GetFloat("total")-poTotal)),
-			),
-
 			// TODO: Prevent a second expense from being created for a Normal PO i.e.
 			// Two Expenses cannot exist for the same purchase_order if the type of
 			// that purchase order is Normal. We could potentially do this by checking

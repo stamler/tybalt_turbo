@@ -19,7 +19,9 @@ func TestValidateExpense(t *testing.T) {
 		field                 string
 		record                *core.Record
 		po                    *core.Record
+		existingExpensesTotal float64
 		hasPayablesAdminClaim bool
+		expectedErrorCode     string
 	}{
 		"total_too_high_without_po":                                    {valid: false, field: "total", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "OnAccount", "purchase_order": "", "total": NO_PO_EXPENSE_LIMIT, "vendor": "2zqxtsmymf670ha"})},
 		"high_total_fine_without_po_for_payables_admin_OnAccount":      {valid: true, field: "total", po: nil, hasPayablesAdminClaim: true, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "OnAccount", "purchase_order": "", "total": NO_PO_EXPENSE_LIMIT + 1000, "vendor": "2zqxtsmymf670ha"})},
@@ -43,6 +45,94 @@ func TestValidateExpense(t *testing.T) {
 		"valid_with_job_no_po_personal_reimbursement":           {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "PersonalReimbursement", "purchase_order": "", "total": NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
 		"valid_with_job_no_po_allowance":                        {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{"Breakfast"}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "Allowance", "purchase_order": "", "total": NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
 		"invalid_no_allowance_types_allowance":                  {valid: false, field: "allowance_types", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "Allowance", "purchase_order": "", "total": NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
+
+		// Tests that an expense against a Cumulative PO is valid when:
+		// 1. The PO has a total of $1000
+		// 2. There are existing expenses totaling $500
+		// 3. The new expense is $400
+		// This should pass because $500 + $400 = $900, which is less than the PO total of $1000
+		"valid_cumulative_po_within_limit": {
+			valid: true,
+			po: buildRecordFromMap(poCollection, map[string]any{
+				"date":  "2024-01-22",
+				"total": 1000.00,
+				"type":  "Cumulative",
+			}),
+			existingExpensesTotal: 500.00,
+			record: buildRecordFromMap(expensesCollection, map[string]any{
+				"allowance_types": []string{},
+				"date":            "2024-01-22",
+				"description":     "Valid description",
+				"job":             "jobId",
+				"payment_type":    "OnAccount",
+				"purchase_order":  "recordId",
+				"total":           400.00,
+				"vendor":          "2zqxtsmymf670ha",
+			}),
+		},
+
+		// Tests that an expense against a Cumulative PO fails with the correct error when:
+		// 1. The PO has a total of $1000
+		// 2. There are existing expenses totaling $800
+		// 3. The new expense is $300
+		// This should fail because $800 + $300 = $1100, which exceeds the PO total
+		// The test verifies that:
+		// - The error is in the "total" field
+		// - The error code is specifically "cumulative_po_overflow"
+		"invalid_cumulative_po_overflow": {
+			valid: false,
+			field: "total",
+			po: buildRecordFromMap(poCollection, map[string]any{
+				"date":  "2024-01-22",
+				"total": 1000.00,
+				"type":  "Cumulative",
+			}),
+			existingExpensesTotal: 800.00,
+			expectedErrorCode:     "cumulative_po_overflow",
+			record: buildRecordFromMap(expensesCollection, map[string]any{
+				"allowance_types": []string{},
+				"date":            "2024-01-22",
+				"description":     "Valid description",
+				"job":             "jobId",
+				"payment_type":    "OnAccount",
+				"purchase_order":  "recordId",
+				"total":           300.00,
+				"vendor":          "2zqxtsmymf670ha",
+			}),
+		},
+
+		// Tests that a single large expense against a Cumulative PO fails appropriately when:
+		// 1. The PO has a total of $1000
+		// 2. There are NO existing expenses ($0 total)
+		// 3. The new expense is $1200
+		// This should fail because the single expense of $1200 exceeds the PO total
+		// This test is important because it verifies the overflow detection works even
+		// when there are no existing expenses. It also tests a different scenario from
+		// the previous test where multiple smaller expenses add up to exceed the total.
+		// The test verifies that:
+		// - The error is in the "total" field
+		// - The error code is specifically "cumulative_po_overflow"
+		"invalid_cumulative_po_single_expense_overflow": {
+			valid: false,
+			field: "total",
+			po: buildRecordFromMap(poCollection, map[string]any{
+				"date":  "2024-01-22",
+				"total": 1000.00,
+				"type":  "Cumulative",
+			}),
+			existingExpensesTotal: 0.00,
+			expectedErrorCode:     "cumulative_po_overflow",
+			record: buildRecordFromMap(expensesCollection, map[string]any{
+				"allowance_types": []string{},
+				"date":            "2024-01-22",
+				"description":     "Valid description",
+				"job":             "jobId",
+				"payment_type":    "OnAccount",
+				"purchase_order":  "recordId",
+				"total":           1200.00,
+				"vendor":          "2zqxtsmymf670ha",
+			}),
+		},
 	}
 
 	// Run tests
@@ -50,19 +140,29 @@ func TestValidateExpense(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// TODO: Add tests where a PO record is provided
 			// TODO: Add tests where an existing expenses total is provided for Cumulative POs
-			got := validateExpense(tt.record, tt.po, 0.0, tt.hasPayablesAdminClaim)
+			got := validateExpense(tt.record, tt.po, tt.existingExpensesTotal, tt.hasPayablesAdminClaim)
 			if got != nil {
 				if tt.valid {
 					t.Errorf("failed validation (%v) but expected valid", got)
 				} else {
 					// Extract the field from the error
-					errMap := got.(validation.Errors)
-					if len(errMap) != 1 {
-						t.Errorf("expected one error, got %d", len(errMap))
-					}
-					for field := range errMap {
-						if field != tt.field {
-							t.Errorf("expected field: %s, got: %s", tt.field, field)
+					if hookErr, ok := got.(*HookError); ok {
+						if codeErr, ok := hookErr.Data[tt.field]; ok {
+							if tt.expectedErrorCode != "" && codeErr.Code != tt.expectedErrorCode {
+								t.Errorf("expected error code: %s, got: %s", tt.expectedErrorCode, codeErr.Code)
+							}
+						} else {
+							t.Errorf("expected error in field: %s, but field not found in error", tt.field)
+						}
+					} else {
+						errMap := got.(validation.Errors)
+						if len(errMap) != 1 {
+							t.Errorf("expected one error, got %d", len(errMap))
+						}
+						for field := range errMap {
+							if field != tt.field {
+								t.Errorf("expected field: %s, got: %s", tt.field, field)
+							}
 						}
 					}
 				}
