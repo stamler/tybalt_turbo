@@ -76,16 +76,12 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 			newTotal := existingExpensesTotal + expenseRecord.GetFloat("total")
 			if newTotal > poTotal {
 				overflowAmount := newTotal - poTotal
-				return &HookError{
-					Code:    http.StatusUnprocessableEntity,
-					Message: fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, overflowAmount),
-					Data: map[string]CodeError{
-						"total": {
-							Code:    "cumulative_po_overflow",
-							Message: fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, overflowAmount),
-						},
-					},
-				}
+				// TODO: This returns a validation.Error per https://pocketbase.io/docs/go-routing/#error-response
+				// However, the po number is not returned in the error data and neither is the poTotal and overflowAmount
+				// properly delimited (it's just combined into a string). How can we return structured error data given
+				// the constraints from the documentation? I've tried using SafeErrorItem but I'm having trouble importing
+				// the router package, possibly related to versioning issues.
+				return validation.Errors{"total": validation.NewError("cumulative_po_overflow", fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, overflowAmount))}.Filter()
 			}
 			totalLimit -= existingExpensesTotal
 		}

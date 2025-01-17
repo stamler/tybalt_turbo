@@ -74,20 +74,12 @@ func AddHooks(app core.App) {
 	// hooks for expenses model
 	app.OnRecordCreateRequest("expenses").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessExpense(app, e); err != nil {
-			// Check if the error is a HookError and return the appropriate JSON response
-			if hookError, ok := err.(*HookError); ok {
-				return e.JSON(hookError.Code, hookError)
-			}
 			return err
 		}
 		return e.Next()
 	})
 	app.OnRecordUpdateRequest("expenses").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessExpense(app, e); err != nil {
-			// Check if the error is a HookError and return the appropriate JSON response
-			if hookError, ok := err.(*HookError); ok {
-				return e.JSON(hookError.Code, hookError)
-			}
 			return err
 		}
 		return e.Next()

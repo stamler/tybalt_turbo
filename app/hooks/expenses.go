@@ -7,6 +7,7 @@ import (
 	"strings"
 	"tybalt/utilities"
 
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -208,16 +209,9 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 
 	// if the purchaseOrder has a status that is not "Active", return an error
 	if poRecord != nil && poRecord.GetString("status") != "Active" {
-		return &HookError{
-			Code:    http.StatusBadRequest,
-			Message: "hook error when processing expense",
-			Data: map[string]CodeError{
-				"purchase_order": {
-					Code:    "not_active",
-					Message: "purchase order must be active",
-				},
-			},
-		}
+		return validation.Errors{
+			"purchase_order": validation.NewError("not_active", "purchase order must be active"),
+		}.Filter()
 	}
 
 	// TODO: throw an error if the caller is not allowed to create an expense
