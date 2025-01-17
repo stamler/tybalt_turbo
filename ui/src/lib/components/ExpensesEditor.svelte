@@ -13,11 +13,13 @@
   import type { CategoriesResponse, ExpensesAllowanceTypesOptions } from "$lib/pocketbase-types";
   import { isExpensesResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
+  import CumulativePOOverflowModal from "./CumulativePOOverflowModal.svelte";
 
   let { data }: { data: ExpensesPageData } = $props();
 
   let errors = $state({} as any);
   let item = $state(data.item);
+  let overflowModal: CumulativePOOverflowModal;
 
   let categories = $state([] as CategoriesResponse[]);
 
@@ -66,14 +68,32 @@
       errors = {};
       goto("/expenses/list");
     } catch (error: any) {
-      errors = error.data.data;
+      // Check if this is a cumulative PO overflow error
+      if (error.data?.data?.total?.code === "cumulative_po_overflow") {
+        // Extract parent PO and overflow amount from the error
+        const errorData = error.data.data.total;
+        overflowModal?.openModal({
+          parent_po: errorData.parent_po,
+          overflow_amount: parseFloat(errorData.message.match(/\$[\d.]+$/)[0].substring(1)),
+        });
+      } else {
+        errors = error.data.data;
+      }
     }
+  }
+
+  function handleCreateChild(event: CustomEvent) {
+    const { parent_po, overflow_amount } = event.detail;
+    // TODO: Navigate to create child PO page with pre-filled data
+    console.log("Create child PO", parent_po, overflow_amount);
   }
 </script>
 
 <svelte:head>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 </svelte:head>
+
+<CumulativePOOverflowModal bind:this={overflowModal} on:createChild={handleCreateChild} />
 
 <form
   class="flex w-full flex-col items-center gap-2 p-2"
