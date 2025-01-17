@@ -4,16 +4,11 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
-	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-func createUnbundleTimesheetHandler(app core.App) echo.HandlerFunc {
+func createUnbundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error {
 	// This function undoes the bundle timesheet operation. It will delete the
 	// time_sheets record with the id specified in the request url and clear the
 	// tsid field in all time entries records that have the same time sheet id.
@@ -21,16 +16,16 @@ func createUnbundleTimesheetHandler(app core.App) echo.HandlerFunc {
 	// there is an error deleting the time sheet or updating the time entries. It
 	// will also error if the submitted, approved, or committed fields are true
 	// on the time sheet record.
-	return func(c echo.Context) error {
+	return func(e *core.RequestEvent) error {
 		// get the auth record from the context
-		authRecord := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		// Start a transaction
-		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+		err := app.RunInTransaction(func(txApp core.App) error {
 
 			// Get the time sheet record
-			timeSheet, err := txDao.FindRecordById("time_sheets", c.PathParam("id"))
+			timeSheet, err := txApp.FindRecordById("time_sheets", e.Request.PathValue("id"))
 			if err != nil {
 				return fmt.Errorf("error fetching time sheet: %v", err)
 			}
@@ -45,8 +40,8 @@ func createUnbundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			}
 
 			// approved time sheets must be rejected before being unbundled
-			if !timeSheet.Get("approved").(types.DateTime).IsZero() {
-				if timeSheet.Get("rejected") == false {
+			if !timeSheet.GetDateTime("approved").IsZero() {
+				if timeSheet.GetBool("rejected") == false {
 					return fmt.Errorf("approved time sheets must be rejected before being unbundled")
 				}
 			}
@@ -57,9 +52,9 @@ func createUnbundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			}
 
 			// Get the time entries
-			timeEntries, err := txDao.FindRecordsByFilter("time_entries", "uid={:userId} && tsid={:timeSheetId}", "", 0, 0, dbx.Params{
+			timeEntries, err := txApp.FindRecordsByFilter("time_entries", "uid={:userId} && tsid={:timeSheetId}", "", 0, 0, dbx.Params{
 				"userId":      userId,
-				"timeSheetId": c.PathParam("id"),
+				"timeSheetId": e.Request.PathValue("id"),
 			})
 			if err != nil {
 				return fmt.Errorf("error fetching time entries: %v", err)
@@ -68,22 +63,22 @@ func createUnbundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			// Clear the tsid field in all time entries
 			for _, entry := range timeEntries {
 				entry.Set("tsid", "")
-				if err := txDao.SaveRecord(entry); err != nil {
+				if err := txApp.Save(entry); err != nil {
 					return fmt.Errorf("error updating time entry: %v", err)
 				}
 			}
 
 			// Delete the time sheet
-			if err := txDao.DeleteRecord(timeSheet); err != nil {
+			if err := txApp.Delete(timeSheet); err != nil {
 				return fmt.Errorf("error deleting time sheet: %v", err)
 			}
 
 			return nil // Return nil if transaction is successful
 		})
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Time sheet unbundled successfully"})
+		return e.JSON(http.StatusOK, map[string]string{"message": "Time sheet unbundled successfully"})
 	}
 }

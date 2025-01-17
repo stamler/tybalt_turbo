@@ -7,11 +7,8 @@ import (
 	"strings"
 	"tybalt/utilities"
 
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/models"
 )
 
 // This feature flag is used to limit the total of expenses that don't have a
@@ -25,10 +22,10 @@ const NO_PO_EXPENSE_LIMIT = 100.0
 // and to ensure that the record is in a valid state before it is created or
 // updated. It is called by ProcessExpense to reduce the number of fields
 // that need to be validated.
-func cleanExpense(app core.App, expenseRecord *models.Record) error {
+func cleanExpense(app core.App, expenseRecord *core.Record) error {
 
 	// get the user's manager and set the approver field
-	profile, err := app.Dao().FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
+	profile, err := app.FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
 		"userId": expenseRecord.GetString("uid"),
 	})
 	if err != nil {
@@ -151,8 +148,8 @@ func cleanExpense(app core.App, expenseRecord *models.Record) error {
 // The processExpense function is used to process the expense record. It is
 // called by the hooks for the expenses collection to ensure that the record
 // is in a valid state before it is created or updated.
-func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Context) error {
-
+func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
+	expenseRecord := e.Record
 	// if the expense record is submitted, return an error
 	if expenseRecord.Get("submitted") == true {
 		return &HookError{
@@ -190,11 +187,11 @@ func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Con
 	expenseRecord.Set("pay_period_ending", payPeriodEnding)
 
 	// if the expense record has a purchase_order, load it
-	var poRecord *models.Record = nil
+	var poRecord *core.Record = nil
 	var err error = nil
 	purchaseOrder := expenseRecord.GetString("purchase_order")
 	if purchaseOrder != "" {
-		poRecord, err = app.Dao().FindRecordById("purchase_orders", purchaseOrder)
+		poRecord, err = app.FindRecordById("purchase_orders", purchaseOrder)
 		if err != nil {
 			return &HookError{
 				Code:    http.StatusInternalServerError,
@@ -248,7 +245,7 @@ func ProcessExpense(app core.App, expenseRecord *models.Record, context echo.Con
 	}
 
 	// Check if user has payables_admin claim
-	hasPayablesAdminClaim, err := utilities.HasClaim(app.Dao(), context.Get(apis.ContextAuthRecordKey).(*models.Record).Id, "payables_admin")
+	hasPayablesAdminClaim, err := utilities.HasClaim(app, e.Auth.Id, "payables_admin")
 	if err != nil {
 		return &HookError{
 			Code:    http.StatusInternalServerError,

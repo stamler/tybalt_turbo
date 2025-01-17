@@ -1,5 +1,6 @@
 app/pb_data
 app/test_pb_data/logs.db
+app/test_pb_data/auxiliary.db
 app/coverage.out
 
 # the built binary

@@ -6,25 +6,20 @@ import (
 
 	"tybalt/utilities"
 
-	"github.com/pocketbase/pocketbase/apis"
-
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 )
 
-func createClosePurchaseOrderHandler(app core.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		id := c.PathParam("id")
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		id := e.Request.PathValue("id")
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		var httpResponseStatusCode int
 
-		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+		err := app.RunInTransaction(func(txApp core.App) error {
 			// Check if user has payables_admin claim
-			hasPayablesAdminClaim, err := utilities.HasClaim(txDao, userId, "payables_admin")
+			hasPayablesAdminClaim, err := utilities.HasClaim(txApp, userId, "payables_admin")
 			if err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
@@ -41,7 +36,7 @@ func createClosePurchaseOrderHandler(app core.App) echo.HandlerFunc {
 			}
 
 			// Fetch existing purchase order
-			po, err := txDao.FindRecordById("purchase_orders", id)
+			po, err := txApp.FindRecordById("purchase_orders", id)
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
@@ -72,7 +67,7 @@ func createClosePurchaseOrderHandler(app core.App) echo.HandlerFunc {
 			po.Set("status", "Closed")
 
 			// Save the updated record
-			if err := txDao.SaveRecord(po); err != nil {
+			if err := txApp.Save(po); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
 					Code:    "error_saving_purchase_order",
@@ -88,14 +83,14 @@ func createClosePurchaseOrderHandler(app core.App) echo.HandlerFunc {
 				// return apis.NewApiError(httpResponseStatusCode, "error closing purchase order", codeError)
 				// TODO: can we have the OnBeforeApiError and OnAfterApiError events fire here by returning an different type of error?
 				// How does this relate to HookError?
-				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+				return e.JSON(httpResponseStatusCode, map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
 				})
 			}
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Purchase order closed successfully"})
+		return e.JSON(http.StatusOK, map[string]string{"message": "Purchase order closed successfully"})
 	}
 }

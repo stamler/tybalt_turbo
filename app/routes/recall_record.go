@@ -4,14 +4,10 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/labstack/echo/v5"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 )
 
-func createRecallRecordHandler(app core.App, collectionName string) echo.HandlerFunc {
+func createRecallRecordHandler(app core.App, collectionName string) func(e *core.RequestEvent) error {
 	// This route handles the recall of a record.
 	// It performs the following actions:
 	// 1. Retrieves the authenticated user's ID
@@ -25,14 +21,14 @@ func createRecallRecordHandler(app core.App, collectionName string) echo.Handler
 	//    f. Save the updated record.
 	// 3. Returns a success message if submitted, or an error message if any checks fail.
 	// This ensures that only the record's owner can submit it.
-	return func(c echo.Context) error {
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+	return func(e *core.RequestEvent) error {
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		var httpResponseStatusCode int
 
-		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-			record, err := txDao.FindRecordById(collectionName, c.PathParam("id"))
+		err := app.RunInTransaction(func(txApp core.App) error {
+			record, err := txApp.FindRecordById(collectionName, e.Request.PathValue("id"))
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
@@ -85,7 +81,7 @@ func createRecallRecordHandler(app core.App, collectionName string) echo.Handler
 			record.Set("submitted", false)
 
 			// Save the updated record
-			if err := txDao.SaveRecord(record); err != nil {
+			if err := txApp.Save(record); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
 					Code:    "error_saving_record",
@@ -97,9 +93,9 @@ func createRecallRecordHandler(app core.App, collectionName string) echo.Handler
 		})
 
 		if err != nil {
-			return c.JSON(httpResponseStatusCode, map[string]string{"error": err.Error()})
+			return e.JSON(httpResponseStatusCode, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Record recalled successfully"})
+		return e.JSON(http.StatusOK, map[string]string{"message": "Record recalled successfully"})
 	}
 }

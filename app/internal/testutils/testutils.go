@@ -5,14 +5,14 @@ import (
 	"tybalt/hooks"
 	"tybalt/routes"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
-	"github.com/pocketbase/pocketbase/tokens"
 )
 
 const testDataDir = "./test_pb_data"
 
 // setup the test ApiScenario app instance
-func SetupTestApp(t *testing.T) *tests.TestApp {
+func SetupTestApp(t testing.TB) *tests.TestApp {
 	testApp, err := tests.NewTestApp(testDataDir)
 	if err != nil {
 		t.Fatal(err)
@@ -36,12 +36,12 @@ func GenerateAdminToken(email string) (string, error) {
 	}
 	defer app.Cleanup()
 
-	admin, err := app.Dao().FindAdminByEmail(email)
+	admin, err := app.FindAuthRecordByEmail(core.CollectionNameSuperusers, email)
 	if err != nil {
 		return "", err
 	}
 
-	return tokens.NewAdminAuthToken(app, admin)
+	return admin.NewAuthToken() // Is this an admin token? I think so because it's a super user
 }
 
 func GenerateRecordToken(collectionNameOrId string, email string) (string, error) {
@@ -51,10 +51,10 @@ func GenerateRecordToken(collectionNameOrId string, email string) (string, error
 	}
 	defer app.Cleanup()
 
-	record, err := app.Dao().FindAuthRecordByEmail(collectionNameOrId, email)
+	record, err := app.FindAuthRecordByEmail(collectionNameOrId, email)
 	if err != nil {
 		return "", err
 	}
 
-	return tokens.NewRecordAuthToken(app, record)
+	return record.NewAuthToken()
 }

@@ -2,18 +2,13 @@ package routes
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 	"tybalt/utilities"
 
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 )
 
 const (
@@ -21,18 +16,18 @@ const (
 	VP_PO_LIMIT      = 2500
 )
 
-func createApprovePurchaseOrderHandler(app core.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		id := c.PathParam("id")
+func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		id := e.Request.PathValue("id")
 
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		var httpResponseStatusCode int
 
-		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+		err := app.RunInTransaction(func(txApp core.App) error {
 			// Fetch existing purchase order
-			po, err := txDao.FindRecordById("purchase_orders", id)
+			po, err := txApp.FindRecordById("purchase_orders", id)
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
@@ -69,7 +64,7 @@ func createApprovePurchaseOrderHandler(app core.App) echo.HandlerFunc {
 
 			// Check if the user is the approver, a qualified approver, or a qualified
 			// second approver
-			callerIsApprover, callerIsQualifiedApprover, callerIsQualifiedSecondApprover, err := isApprover(txDao, userId, po)
+			callerIsApprover, callerIsQualifiedApprover, callerIsQualifiedSecondApprover, err := isApprover(txApp, userId, po)
 			if err != nil {
 				return err
 			}
@@ -122,7 +117,7 @@ func createApprovePurchaseOrderHandler(app core.App) echo.HandlerFunc {
 			// status to Active and generate a PO number
 			if recordIsApproved && (!recordRequiresSecondApproval || recordIsSecondApproved) {
 				po.Set("status", "Active")
-				poNumber, err := generatePONumber(txDao)
+				poNumber, err := generatePONumber(txApp)
 				if err != nil {
 					return &CodeError{
 						Code:    "error_generating_po_number",
@@ -132,7 +127,7 @@ func createApprovePurchaseOrderHandler(app core.App) echo.HandlerFunc {
 				po.Set("po_number", poNumber)
 			}
 
-			if err := txDao.SaveRecord(po); err != nil {
+			if err := txApp.Save(po); err != nil {
 				return &CodeError{
 					Code:    "error_updating_purchase_order",
 					Message: fmt.Sprintf("error updating purchase order: %v", err),
@@ -145,52 +140,52 @@ func createApprovePurchaseOrderHandler(app core.App) echo.HandlerFunc {
 		if err != nil {
 			// Check if the error is a CodeError and return the appropriate JSON response
 			if codeError, ok := err.(*CodeError); ok {
-				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+				return e.JSON(httpResponseStatusCode, map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
 				})
 			}
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
 		// return the updated purchase order from the database
-		updatedPO, err := app.Dao().FindRecordById("purchase_orders", id)
+		updatedPO, err := app.FindRecordById("purchase_orders", id)
 		if err != nil {
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
 		// Expand the new purchase order
-		if errs := app.Dao().ExpandRecord(updatedPO, []string{"uid.profiles_via_uid", "approver.profiles_via_uid", "division", "job"}, nil); len(errs) > 0 {
-			return c.JSON(http.StatusInternalServerError, map[string]interface{}{
+		if errs := app.ExpandRecord(updatedPO, []string{"uid.profiles_via_uid", "approver.profiles_via_uid", "division", "job"}, nil); len(errs) > 0 {
+			return e.JSON(http.StatusInternalServerError, map[string]interface{}{
 				"message": fmt.Sprintf("error expanding record: %v", errs),
 				"code":    "error_expanding_record",
 			})
 		}
 		// return the updated purchase order as a JSON response
-		return c.JSON(http.StatusOK, updatedPO)
+		return e.JSON(http.StatusOK, updatedPO)
 	}
 }
 
-func createRejectPurchaseOrderHandler(app core.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		id := c.PathParam("id")
+func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		id := e.Request.PathValue("id")
 
 		var req RejectionRequest
-		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]interface{}{
+		if err := e.BindBody(&req); err != nil {
+			return e.JSON(http.StatusBadRequest, map[string]interface{}{
 				"message": "you must provide a rejection reason",
 				"code":    "invalid_request_body",
 			})
 		}
 
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		var httpResponseStatusCode int
 
-		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+		err := app.RunInTransaction(func(txApp core.App) error {
 			// Fetch existing purchase order
-			po, err := txDao.FindRecordById("purchase_orders", id)
+			po, err := txApp.FindRecordById("purchase_orders", id)
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
@@ -224,7 +219,7 @@ func createRejectPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 			if !isApprover {
 				secondApproverClaim := po.Get("second_approver_claim")
 				if secondApproverClaim != nil {
-					userClaims, err := txDao.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
+					userClaims, err := txApp.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
 						"userId": userId,
 					})
 					if err != nil {
@@ -256,7 +251,7 @@ func createRejectPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 			po.Set("rejection_reason", req.RejectionReason)
 			po.Set("rejector", userId)
 
-			if err := txDao.SaveRecord(po); err != nil {
+			if err := txApp.Save(po); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
 					Code:    "error_updating_purchase_order",
@@ -269,29 +264,29 @@ func createRejectPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 
 		if err != nil {
 			if codeError, ok := err.(*CodeError); ok {
-				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+				return e.JSON(httpResponseStatusCode, map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
 				})
 			}
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Purchase order rejected successfully"})
+		return e.JSON(http.StatusOK, map[string]string{"message": "Purchase order rejected successfully"})
 	}
 }
 
-func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+func createCancelPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		var httpResponseStatusCode int
-		id := c.PathParam("id")
+		id := e.Request.PathValue("id")
 
-		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+		err := app.RunInTransaction(func(txApp core.App) error {
 			// Fetch existing purchase order
-			po, err := txDao.FindRecordById("purchase_orders", id)
+			po, err := txApp.FindRecordById("purchase_orders", id)
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
@@ -310,7 +305,7 @@ func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 			}
 
 			// Check if the user is authorized to cancel the purchase order
-			hasPayablesAdminClaim, err := utilities.HasClaim(txDao, userId, "payables_admin")
+			hasPayablesAdminClaim, err := utilities.HasClaim(txApp, userId, "payables_admin")
 			if err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
@@ -328,7 +323,7 @@ func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 
 			// Count the number of associated expenses records. If there are any, the
 			// purchase order cannot be cancelled.
-			expenses, err := txDao.FindRecordsByFilter("expenses", "purchase_order = {:poId}", "", 0, 0, dbx.Params{
+			expenses, err := txApp.FindRecordsByFilter("expenses", "purchase_order = {:poId}", "", 0, 0, dbx.Params{
 				"poId": po.Id,
 			})
 			if err != nil {
@@ -351,7 +346,7 @@ func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 			po.Set("cancelled", time.Now())
 			po.Set("canceller", userId)
 
-			if err := txDao.SaveRecord(po); err != nil {
+			if err := txApp.Save(po); err != nil {
 				return &CodeError{
 					Code:    "error_updating_purchase_order",
 					Message: fmt.Sprintf("error updating purchase order: %v", err),
@@ -363,14 +358,14 @@ func createCancelPurchaseOrderHandler(app core.App) echo.HandlerFunc {
 
 		if err != nil {
 			if codeError, ok := err.(*CodeError); ok {
-				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+				return e.JSON(httpResponseStatusCode, map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
 				})
 			}
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
-		return c.NoContent(http.StatusNoContent)
+		return e.NoContent(http.StatusNoContent)
 	}
 }
 
@@ -380,17 +375,17 @@ status=Active type=Normal purchase_orders record to a type=Cumulative
 purchase_orders record. It may only be called by a user with the
 payables_admin claim.
 */
-func createConvertToCumulativePurchaseOrderHandler(app core.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+func createConvertToCumulativePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		var httpResponseStatusCode int
-		id := c.PathParam("id")
+		id := e.Request.PathValue("id")
 
-		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+		err := app.RunInTransaction(func(txApp core.App) error {
 			// Fetch existing purchase order
-			po, err := txDao.FindRecordById("purchase_orders", id)
+			po, err := txApp.FindRecordById("purchase_orders", id)
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
@@ -418,7 +413,7 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) echo.HandlerFun
 			}
 
 			// Check if the user is authorized to cancel the purchase order
-			hasPayablesAdminClaim, err := utilities.HasClaim(txDao, userId, "payables_admin")
+			hasPayablesAdminClaim, err := utilities.HasClaim(txApp, userId, "payables_admin")
 			if err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
@@ -438,7 +433,7 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) echo.HandlerFun
 			po.Set("type", "Cumulative")
 
 			// Save the updated purchase order record
-			if err := txDao.SaveRecord(po); err != nil {
+			if err := txApp.Save(po); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
 					Code:    "error_updating_purchase_order",
@@ -451,24 +446,24 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) echo.HandlerFun
 
 		if err != nil {
 			if codeError, ok := err.(*CodeError); ok {
-				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+				return e.JSON(httpResponseStatusCode, map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
 				})
 			}
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return c.NoContent(http.StatusNoContent)
+		return e.NoContent(http.StatusNoContent)
 	}
 }
 
-func generatePONumber(txDao *daos.Dao) (string, error) {
+func generatePONumber(txApp core.App) (string, error) {
 	currentYear := time.Now().Year()
 	prefix := fmt.Sprintf("%d-", currentYear)
 
 	// Query existing PO numbers for the current year
-	existingPOs, err := txDao.FindRecordsByFilter(
+	existingPOs, err := txApp.FindRecordsByFilter(
 		"purchase_orders",
 		"po_number ~ {:prefix}",
 		"-po_number",
@@ -494,7 +489,7 @@ func generatePONumber(txDao *daos.Dao) (string, error) {
 		newPONumber := fmt.Sprintf("%s%04d", prefix, i)
 
 		// Check if the generated PO number is unique
-		existing, err := txDao.FindFirstRecordByFilter(
+		existing, err := txApp.FindFirstRecordByFilter(
 			"purchase_orders",
 			"po_number = {:poNumber}",
 			dbx.Params{"poNumber": newPONumber},
@@ -512,7 +507,7 @@ func generatePONumber(txDao *daos.Dao) (string, error) {
 }
 
 /*
-	the isApprover function with 3 arguments: the txDao, the userId of the
+	the isApprover function with 3 arguments: the txApp, the userId of the
 	caller, and the purchase_orders record. The function performs the following
 	checks and returns 3 boolean values indicating:
 		1. whether the caller is the approver specified in the record
@@ -522,7 +517,7 @@ func generatePONumber(txDao *daos.Dao) (string, error) {
 	createApprovePurchaseOrderHandler function.
 */
 
-func isApprover(txDao *daos.Dao, userId string, po *models.Record) (bool, bool, bool, error) {
+func isApprover(txApp core.App, userId string, po *core.Record) (bool, bool, bool, error) {
 	// Check if the caller is the approver specified in the record
 	callerIsApprover := po.GetString("approver") == userId
 	callerIsQualifiedApprover := false
@@ -536,7 +531,7 @@ func isApprover(txDao *daos.Dao, userId string, po *models.Record) (bool, bool, 
 		// order)
 		// TODO: implement this (perhaps HasClaim should also return the payload?)
 		callerIsQualifiedApprover = false
-		hasPoApproverClaim, err := utilities.HasClaim(txDao, userId, "po_approver")
+		hasPoApproverClaim, err := utilities.HasClaim(txApp, userId, "po_approver")
 		if err != nil {
 			return false, false, false, &CodeError{
 				Code:    "error_checking_po_approver_claim",
@@ -556,7 +551,7 @@ func isApprover(txDao *daos.Dao, userId string, po *models.Record) (bool, bool, 
 	// Check if the caller is a qualified second approver
 	callerIsQualifiedSecondApprover := false // initialize to false
 	if recordRequiresSecondApproval {
-		userClaims, err := txDao.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
+		userClaims, err := txApp.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
 			"userId": userId,
 		})
 		if err != nil {

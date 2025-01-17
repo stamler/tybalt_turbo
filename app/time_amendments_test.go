@@ -20,7 +20,7 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 		{
 			Name:   "valid time_amendment gets a correct week_ending and bypasses tsid check if skip_tsid_check is true",
 			Method: http.MethodPost,
-			Url:    "/api/collections/time_amendments/records",
+			URL:    "/api/collections/time_amendments/records",
 			Body: strings.NewReader(`{
 				"creator": "f2j5a8vk006baub",
 				"time_type": "sdyfl3q7j7ap849",
@@ -32,24 +32,21 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 				"skip_tsid_check": true,
 				"week_ending": "2006-01-02"
 				}`),
-			RequestHeaders: map[string]string{"Authorization": creatorToken},
+			Headers:        map[string]string{"Authorization": creatorToken},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"committed":""`,
 				`"week_ending":"2024-09-07"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeCreate":         1,
-				"OnModelAfterCreate":          1,
-				"OnRecordBeforeCreateRequest": 1,
-				"OnRecordAfterCreateRequest":  1,
+				"OnRecordCreate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "otherwise valid time_amendment fails creation when a corresponding time_sheets record cannot be found and skip_tsid_check is false",
 			Method: http.MethodPost,
-			Url:    "/api/collections/time_amendments/records",
+			URL:    "/api/collections/time_amendments/records",
 			Body: strings.NewReader(`{
 				"creator": "f2j5a8vk006baub",
 				"time_type": "sdyfl3q7j7ap849",
@@ -61,23 +58,21 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 				"skip_tsid_check": false,
 				"week_ending": "2006-01-02"
 				}`),
-			RequestHeaders: map[string]string{"Authorization": creatorToken},
+			Headers:        map[string]string{"Authorization": creatorToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{"global":{"code":"no_time_sheet"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeCreate":         0,
-				"OnModelAfterCreate":          0,
-				"OnRecordBeforeCreateRequest": 1,
-				"OnRecordAfterCreateRequest":  0,
+				"OnRecordCreateRequest": 1,
+				"OnRecordCreate":        0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "a time_amendment's creator property must match the authenticated user's id",
 			Method: http.MethodPost,
-			Url:    "/api/collections/time_amendments/records",
+			URL:    "/api/collections/time_amendments/records",
 			Body: strings.NewReader(`{
 				"creator": "tqqf7q0f3378rvp",
 				"time_type": "sdyfl3q7j7ap849",
@@ -89,23 +84,21 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 				"skip_tsid_check": true,
 				"week_ending": "2006-01-02"
 				}`),
-			RequestHeaders: map[string]string{"Authorization": creatorToken},
+			Headers:        map[string]string{"Authorization": creatorToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{"creator":{"code":"creator_mismatch"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeCreate":         0,
-				"OnModelAfterCreate":          0,
-				"OnRecordBeforeCreateRequest": 1,
-				"OnRecordAfterCreateRequest":  0,
+				"OnRecordCreateRequest": 1,
+				"OnRecordCreate":        0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "setting the committed property is forbidden",
 			Method: http.MethodPost,
-			Url:    "/api/collections/time_amendments/records",
+			URL:    "/api/collections/time_amendments/records",
 			Body: strings.NewReader(`{
 				"creator": "f2j5a8vk006baub",
 				"committed": "2024-11-01 00:00:00",
@@ -118,10 +111,10 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 				"skip_tsid_check": true,
 				"week_ending": "2006-01-02"
 				}`),
-			RequestHeaders: map[string]string{"Authorization": creatorToken},
+			Headers:        map[string]string{"Authorization": creatorToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"code":400,"message":"Failed to create record."`,
+				`"message":"Failed to create record.","status":400`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelBeforeCreate":         0,
@@ -134,7 +127,7 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 		{
 			Name:   "setting the committer property is forbidden",
 			Method: http.MethodPost,
-			Url:    "/api/collections/time_amendments/records",
+			URL:    "/api/collections/time_amendments/records",
 			Body: strings.NewReader(`{
 				"creator": "f2j5a8vk006baub",
 				"committer": "f2j5a8vk006baub",
@@ -147,10 +140,10 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 				"skip_tsid_check": true,
 				"week_ending": "2006-01-02"
 				}`),
-			RequestHeaders: map[string]string{"Authorization": creatorToken},
+			Headers:        map[string]string{"Authorization": creatorToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"code":400,"message":"Failed to create record."`,
+				`"message":"Failed to create record.","status":400`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelBeforeCreate":         0,
@@ -177,7 +170,7 @@ func TestTimeAmendmentsUpdate(t *testing.T) {
 		{
 			Name:   "a requester can update a time_amendments record they created",
 			Method: http.MethodPatch,
-			Url:    "/api/collections/time_amendments/records/qn4jyrkxp3pfjom",
+			URL:    "/api/collections/time_amendments/records/qn4jyrkxp3pfjom",
 			Body: strings.NewReader(`{
 				"creator": "f2j5a8vk006baub",
 				"time_type": "sdyfl3q7j7ap849",
@@ -190,17 +183,14 @@ func TestTimeAmendmentsUpdate(t *testing.T) {
 				"tsid": "j1lr2oddjongtoj",
 				"week_ending": "2006-01-02"
 				}`),
-			RequestHeaders: map[string]string{"Authorization": creatorToken},
+			Headers:        map[string]string{"Authorization": creatorToken},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"committed":""`,
 				`"week_ending":"2024-09-28"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeUpdate":         1,
-				"OnModelAfterUpdate":          1,
-				"OnRecordBeforeUpdateRequest": 1,
-				"OnRecordAfterUpdateRequest":  1,
+				"OnRecordUpdate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -231,21 +221,20 @@ func TestTimeAmendmentsRoutes(t *testing.T) {
 		{
 			Name:            "caller with the commit claim can commit time_amendments records",
 			Method:          http.MethodPost,
-			Url:             "/api/time_amendments/qn4jyrkxp3pfjom/commit",
-			RequestHeaders:  map[string]string{"Authorization": commitToken},
+			URL:             "/api/time_amendments/qn4jyrkxp3pfjom/commit",
+			Headers:         map[string]string{"Authorization": commitToken},
 			ExpectedStatus:  200,
 			ExpectedContent: []string{`"message":"Record committed successfully"`},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeUpdate": 1,
-				"OnModelAfterUpdate":  1,
+				"OnRecordUpdate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:            "caller without the commit claim cannot commit time_amendments records",
 			Method:          http.MethodPost,
-			Url:             "/api/time_amendments/qn4jyrkxp3pfjom/commit",
-			RequestHeaders:  map[string]string{"Authorization": nonCommitToken},
+			URL:             "/api/time_amendments/qn4jyrkxp3pfjom/commit",
+			Headers:         map[string]string{"Authorization": nonCommitToken},
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"error":"You are not authorized to commit this record."`},
 			ExpectedEvents: map[string]int{

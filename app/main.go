@@ -39,9 +39,9 @@ func main() {
 	indexFallback := true
 
 	// serves static files from the provided public dir (if exists)
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.GET("/*", apis.StaticDirectoryHandler(os.DirFS("./pb_public"), indexFallback))
-		return nil
+	app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+		e.Router.GET("/*", apis.Static(os.DirFS("./pb_public"), indexFallback))
+		return e.Next()
 	})
 
 	// Add the hooks to the app

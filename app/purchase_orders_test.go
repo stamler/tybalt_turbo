@@ -18,7 +18,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		{
 			Name:   "valid purchase order is created",
 			Method: http.MethodPost,
-			Url:    "/api/collections/purchase_orders/records",
+			URL:    "/api/collections/purchase_orders/records",
 			Body: strings.NewReader(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
@@ -31,24 +31,21 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"status": "Unapproved",
 				"type": "Normal"
 			}`),
-			RequestHeaders: map[string]string{"Authorization": recordToken},
+			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
 				`"approver":"etysnrlup2f6bak"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeCreate":         1,
-				"OnModelAfterCreate":          1,
-				"OnRecordBeforeCreateRequest": 1,
-				"OnRecordAfterCreateRequest":  1,
+				"OnRecordCreate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "otherwise valid purchase order with Inactive vendor fails",
 			Method: http.MethodPost,
-			Url:    "/api/collections/purchase_orders/records",
+			URL:    "/api/collections/purchase_orders/records",
 			Body: strings.NewReader(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
@@ -61,10 +58,10 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"status": "Unapproved",
 				"type": "Normal"
 			}`),
-			RequestHeaders: map[string]string{"Authorization": recordToken},
+			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`{"code":400,"message":"Failed to create record."`,
+				`"message":"Failed to create record.","status":400`,
 			},
 			ExpectedEvents: map[string]int{},
 			TestAppFactory: testutils.SetupTestApp,
@@ -87,7 +84,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 		{
 			Name:   "valid purchase order is updated",
 			Method: http.MethodPatch,
-			Url:    "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			URL:    "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
 			Body: strings.NewReader(`{
 				"uid": "f2j5a8vk006baub",
 				"date": "2024-09-01",
@@ -100,24 +97,21 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 				"status": "Unapproved",
 				"type": "Cumulative"
 			}`),
-			RequestHeaders: map[string]string{"Authorization": recordToken},
+			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
 				`"approver":"etysnrlup2f6bak"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeUpdate":         1,
-				"OnModelAfterUpdate":          1,
-				"OnRecordBeforeUpdateRequest": 1,
-				"OnRecordAfterUpdateRequest":  1,
+				"OnRecordUpdate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "otherwise valid purchase order with Inactive vendor fails",
 			Method: http.MethodPatch,
-			Url:    "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			URL:    "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
 			Body: strings.NewReader(`{
 				"uid": "f2j5a8vk006baub",
 				"date": "2024-09-01",
@@ -130,10 +124,10 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 				"status": "Unapproved",
 				"type": "Cumulative"
 			}`),
-			RequestHeaders: map[string]string{"Authorization": recordToken},
+			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 404,
 			ExpectedContent: []string{
-				`"code":404,"message":"The requested resource wasn't found."`,
+				`"message":"The requested resource wasn't found.","status":404`,
 			},
 			ExpectedEvents: map[string]int{},
 			TestAppFactory: testutils.SetupTestApp,
@@ -224,21 +218,20 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:            "caller with the payables_admin claim can convert Active Normal purchase_orders to Cumulative",
 			Method:          http.MethodPost,
-			Url:             "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
-			RequestHeaders:  map[string]string{"Authorization": closeToken},
+			URL:             "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
+			Headers:         map[string]string{"Authorization": closeToken},
 			ExpectedStatus:  204,
 			ExpectedContent: []string{},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeUpdate": 1,
-				"OnModelAfterUpdate":  1,
+				"OnRecordUpdate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "caller with the payables_admin claim cannot convert non-Active Normal purchase_orders to Cumulative",
 			Method:         http.MethodPost,
-			Url:            "/api/purchase_orders/gal6e5la2fa4rpn/make_cumulative",
-			RequestHeaders: map[string]string{"Authorization": closeToken},
+			URL:            "/api/purchase_orders/gal6e5la2fa4rpn/make_cumulative",
+			Headers:        map[string]string{"Authorization": closeToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"code":"po_not_active"`,
@@ -254,8 +247,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:           "caller with the payables_admin claim cannot convert Active non-Normal purchase_orders to Cumulative",
 			Method:         http.MethodPost,
-			Url:            "/api/purchase_orders/ly8xyzpuj79upq1/make_cumulative",
-			RequestHeaders: map[string]string{"Authorization": closeToken},
+			URL:            "/api/purchase_orders/ly8xyzpuj79upq1/make_cumulative",
+			Headers:        map[string]string{"Authorization": closeToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"code":"po_not_normal"`,
@@ -271,8 +264,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:           "caller without the payables_admin claim cannot convert Active Normal purchase_orders to Cumulative",
 			Method:         http.MethodPost,
-			Url:            "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
-			RequestHeaders: map[string]string{"Authorization": nonCloseToken},
+			URL:            "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
+			Headers:        map[string]string{"Authorization": nonCloseToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"code":"unauthorized_conversion"`,
@@ -288,21 +281,20 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:            "caller with the payables_admin claim can cancel Active purchase_orders records with no expenses against them",
 			Method:          http.MethodPost,
-			Url:             "/api/purchase_orders/2plsetqdxht7esg/cancel",
-			RequestHeaders:  map[string]string{"Authorization": closeToken},
+			URL:             "/api/purchase_orders/2plsetqdxht7esg/cancel",
+			Headers:         map[string]string{"Authorization": closeToken},
 			ExpectedStatus:  204,
 			ExpectedContent: []string{},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeUpdate": 1,
-				"OnModelAfterUpdate":  1,
+				"OnRecordUpdate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "caller without the payables_admin claim cannot cancel Active purchase_orders records with no expenses against them",
 			Method:         http.MethodPost,
-			Url:            "/api/purchase_orders/2plsetqdxht7esg/cancel",
-			RequestHeaders: map[string]string{"Authorization": nonCloseToken},
+			URL:            "/api/purchase_orders/2plsetqdxht7esg/cancel",
+			Headers:        map[string]string{"Authorization": nonCloseToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"code":"unauthorized_cancellation"`,
@@ -318,8 +310,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:            "caller without the payables_admin claim cannot close Active Cumulative purchase_orders records",
 			Method:          http.MethodPost,
-			Url:             "/api/purchase_orders/ly8xyzpuj79upq1/close",
-			RequestHeaders:  map[string]string{"Authorization": nonCloseToken},
+			URL:             "/api/purchase_orders/ly8xyzpuj79upq1/close",
+			Headers:         map[string]string{"Authorization": nonCloseToken},
 			ExpectedStatus:  403,
 			ExpectedContent: []string{`"code":"unauthorized_closure","message":"you are not authorized to close purchase orders"`},
 			ExpectedEvents: map[string]int{
@@ -331,8 +323,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:            "caller with the payables_admin claim can close Active Cumulative purchase_orders records",
 			Method:          http.MethodPost,
-			Url:             "/api/purchase_orders/ly8xyzpuj79upq1/close",
-			RequestHeaders:  map[string]string{"Authorization": closeToken},
+			URL:             "/api/purchase_orders/ly8xyzpuj79upq1/close",
+			Headers:         map[string]string{"Authorization": closeToken},
 			ExpectedStatus:  200,
 			ExpectedContent: []string{`"message":"Purchase order closed successfully"`},
 			ExpectedEvents: map[string]int{
@@ -344,8 +336,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:            "Active Non-Cumulative purchase_orders records cannot be closed",
 			Method:          http.MethodPost,
-			Url:             "/api/purchase_orders/2plsetqdxht7esg/close",
-			RequestHeaders:  map[string]string{"Authorization": closeToken},
+			URL:             "/api/purchase_orders/2plsetqdxht7esg/close",
+			Headers:         map[string]string{"Authorization": closeToken},
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"code":"invalid_po_type","message":"only cumulative purchase orders can be closed manually"`},
 			ExpectedEvents: map[string]int{

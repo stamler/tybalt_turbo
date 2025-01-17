@@ -5,16 +5,15 @@ import (
 	"time"
 
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // This function will validate the time entries as a group. If the validation
 // fails, it will return an error. If the validation passes, it will return nil.
-func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollYearEndDateAsTime time.Time, entries []*models.Record) error {
+func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYearEndDateAsTime time.Time, entries []*core.Record) error {
 	// Expand the time_type relations of the entries so we can access the
 	// time_type code stored in the time_types collection.
-	if errs := txDao.ExpandRecords(entries, []string{"time_type"}, nil); len(errs) > 0 {
+	if errs := txApp.ExpandRecords(entries, []string{"time_type"}, nil); len(errs) > 0 {
 		return &CodeError{
 			Code:    "error_expanding_time_type_relations",
 			Message: fmt.Sprintf("error expanding time_type relations: %v", errs),
@@ -307,7 +306,7 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 		TotalHours float64 `db:"total_hours"`
 	}
 	results := []SumResult{}
-	queryError := txDao.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending >= {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
+	queryError := txApp.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending >= {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
 		"uid":          admin_profile.Get("uid"),
 		"openingDate":  openingDate,
 		"weekEnding":   weekEnding,
@@ -328,7 +327,7 @@ func validateTimeEntries(txDao *daos.Dao, admin_profile *models.Record, payrollY
 	// time_type.code is "OP" and week_ending is greater than or equal to
 	// openingDate and less than or equal to weekEnding
 	results = []SumResult{}
-	queryError = txDao.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending >= {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
+	queryError = txApp.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending >= {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
 		"uid":          admin_profile.Get("uid"),
 		"openingDate":  openingDate,
 		"weekEnding":   weekEnding,

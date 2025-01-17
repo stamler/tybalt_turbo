@@ -6,19 +6,15 @@ import (
 	"testing"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/pocketbase/models"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // We need to instantiate a Collection object to be part of the Record object
 // so everything works as expected
-var timeEntriesCollection = &models.Collection{
-	Name:   "time_entries",
-	Type:   "base",
-	System: false,
-}
+var timeEntriesCollection = core.NewBaseCollection("time_entries")
 
-func buildRecordFromMap(collection *models.Collection, m map[string]any) *models.Record {
-	record := models.NewRecord(collection)
+func buildRecordFromMap(collection *core.Collection, m map[string]any) *core.Record {
+	record := core.NewRecord(collection)
 	record.Load(m)
 	return record
 }
@@ -61,7 +57,7 @@ func TestValidateTimeEntry(t *testing.T) {
 		timeTypeCode string
 		valid        bool
 		field        string
-		record       *models.Record
+		record       *core.Record
 	}{
 		// Regular Time (R)
 		// NB: the time_type value is arbitrary and is required but otherwise not

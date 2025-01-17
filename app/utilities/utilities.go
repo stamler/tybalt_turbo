@@ -15,8 +15,6 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
@@ -126,13 +124,13 @@ func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
 // one list element is the divisionId.
 func ApproverHasDivisionPermission(app core.App, approverId string, divisionId string) validation.RuleFunc {
 	return func(value interface{}) error {
-		poApproverClaim, err := app.Dao().FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
+		poApproverClaim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": "po_approver",
 		})
 		if err != nil {
 			return validation.NewError("validation_invalid_claim", "po_approver claim not found")
 		}
-		userClaimsRecord, err := app.Dao().FindFirstRecordByFilter("user_claims", "uid = {:uid} && cid = {:cid}", dbx.Params{
+		userClaimsRecord, err := app.FindFirstRecordByFilter("user_claims", "uid = {:uid} && cid = {:cid}", dbx.Params{
 			"uid": approverId,
 			"cid": poApproverClaim.Id,
 		})
@@ -142,7 +140,7 @@ func ApproverHasDivisionPermission(app core.App, approverId string, divisionId s
 
 		// payload is a JSON list of strings. Load it into a []string slice
 		divisionIds := []string{}
-		divisionIdsJson := userClaimsRecord.Get("payload").(types.JsonRaw)
+		divisionIdsJson := userClaimsRecord.Get("payload").(types.JSONRaw)
 
 		// if divisionIdsJson is null, "{}", or "[]" then all divisions are allowed
 		if divisionIdsJson.String() == "null" || divisionIdsJson.String() == "[]" || divisionIdsJson.String() == "{}" {
@@ -199,7 +197,7 @@ func IsPositiveMultipleOfPointZeroOne() validation.RuleFunc {
 // arguments:
 // expenseRecord: the expense record
 // expenseRateRecord: the expense rate record retrieved from the expense_rates collection
-func CalculateMileageTotal(app core.App, expenseRecord *models.Record, expenseRateRecord *models.Record) (float64, error) {
+func CalculateMileageTotal(app core.App, expenseRecord *core.Record, expenseRateRecord *core.Record) (float64, error) {
 	distance := expenseRecord.GetFloat("distance")
 	// check if the distance is an integer
 	if distance != float64(int(distance)) {
@@ -219,12 +217,12 @@ func CalculateMileageTotal(app core.App, expenseRecord *models.Record, expenseRa
 	var mileageRates map[string]float64
 	mileageRatesRaw := expenseRateRecord.Get("mileage")
 
-	if jsonRawData, ok := mileageRatesRaw.(types.JsonRaw); ok {
+	if jsonRawData, ok := mileageRatesRaw.(types.JSONRaw); ok {
 		if err := json.Unmarshal(jsonRawData, &mileageRates); err != nil {
 			return 0, err
 		}
 	} else {
-		return 0, fmt.Errorf("mileage data is not of type types.JsonRaw")
+		return 0, fmt.Errorf("mileage data is not of type types.JSONRaw")
 	}
 
 	// Mileage rates are stored in a map[string]interface{} with the keys
@@ -269,7 +267,7 @@ func CalculateMileageTotal(app core.App, expenseRecord *models.Record, expenseRa
 		TotalMileage float64 `db:"total_mileage"`
 	}
 	results := []SumResult{}
-	app.Dao().DB().NewQuery("SELECT COALESCE(SUM(distance), 0) AS total_mileage FROM expenses WHERE payment_type = {:paymentType} AND date >= {:startDate} AND date < {:expenseDate}").Bind(dbx.Params{
+	app.DB().NewQuery("SELECT COALESCE(SUM(distance), 0) AS total_mileage FROM expenses WHERE payment_type = {:paymentType} AND date >= {:startDate} AND date < {:expenseDate}").Bind(dbx.Params{
 		"paymentType": "Mileage",
 		"startDate":   startDate,
 		"expenseDate": expenseRecord.GetString("date"),
@@ -405,7 +403,7 @@ func GetAnnualPayrollPeriodStartDate(app core.App, date string) (string, error) 
 	// function. (Since the payroll year end dates are the last day of the
 	// year, we need to use the day after this date for the start of the
 	// current annual period.)
-	payrollYearEndDatesRecord, err := app.Dao().FindRecordsByFilter("payroll_year_end_dates", "date < {:date}", "-date", 1, 0, dbx.Params{
+	payrollYearEndDatesRecord, err := app.FindRecordsByFilter("payroll_year_end_dates", "date < {:date}", "-date", 1, 0, dbx.Params{
 		"date": date,
 	})
 	if err != nil {
@@ -425,8 +423,8 @@ func GetAnnualPayrollPeriodStartDate(app core.App, date string) (string, error) 
 
 // this function returns true if the user with uid has the claim with the
 // specified name and false otherwise
-func HasClaim(dao *daos.Dao, uid string, name string) (bool, error) {
-	userClaims, err := dao.FindRecordsByFilter(
+func HasClaim(app core.App, uid string, name string) (bool, error) {
+	userClaims, err := app.FindRecordsByFilter(
 		"user_claims",
 		"uid={:uid} && cid.name={:name}",
 		"",
@@ -444,7 +442,7 @@ func HasClaim(dao *daos.Dao, uid string, name string) (bool, error) {
 	return len(userClaims) > 0, nil
 }
 
-func GetExpenseRateRecord(app core.App, expenseRecord *models.Record) (*models.Record, error) {
+func GetExpenseRateRecord(app core.App, expenseRecord *core.Record) (*core.Record, error) {
 	// Expense rates are stored in the expense_rates collection in PocketBase.
 	// The records have an effective_date property that designates the date the
 	// rate is effective. We must fetch the appropriate record from the
@@ -456,7 +454,7 @@ func GetExpenseRateRecord(app core.App, expenseRecord *models.Record) (*models.R
 	}
 
 	// fetch the expense rate record from the expense_rates collection
-	expenseRateRecords, findErr := app.Dao().FindRecordsByFilter("expense_rates", "effective_date <= {:expenseDate}", "-effective_date", 1, 0, dbx.Params{
+	expenseRateRecords, findErr := app.FindRecordsByFilter("expense_rates", "effective_date <= {:expenseDate}", "-effective_date", 1, 0, dbx.Params{
 		"expenseDate": expenseDateAsTime.Format("2006-01-02"),
 	})
 	if findErr != nil {
@@ -470,7 +468,7 @@ func GetExpenseRateRecord(app core.App, expenseRecord *models.Record) (*models.R
 	return expenseRateRecords[0], nil
 }
 
-func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord *models.Record) (int, float64, error) {
+func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord *core.Record) (int, float64, error) {
 	startDateString := purchaseOrderRecord.GetString("date")
 	startDate, parseErr := time.Parse(time.DateOnly, startDateString)
 	if parseErr != nil {
@@ -503,12 +501,12 @@ func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord
 }
 
 // return true if the recurring purchase order has been exhausted, false otherwise
-func RecurringPurchaseOrderExhausted(app core.App, purchaseOrderRecord *models.Record) (bool, error) {
+func RecurringPurchaseOrderExhausted(app core.App, purchaseOrderRecord *core.Record) (bool, error) {
 	// TODO: implement issue #13, check if an expense has been committed for each
 	// recurrence of the PO and set the Status to Closed if so, otherwise doing nothing.
 
 	// Count the number of committed expenses for the purchase order
-	query := app.Dao().DB().NewQuery("SELECT COUNT(*) AS count FROM expenses WHERE purchase_order = {:purchaseOrder}")
+	query := app.DB().NewQuery("SELECT COUNT(*) AS count FROM expenses WHERE purchase_order = {:purchaseOrder}")
 	query.Bind(dbx.Params{"purchaseOrder": purchaseOrderRecord.Id})
 	type CountResult struct {
 		Count int `db:"count"`
@@ -534,11 +532,11 @@ func RecurringPurchaseOrderExhausted(app core.App, purchaseOrderRecord *models.R
 // committedOnly is true, return the total of all committed expenses only. This
 // function DOES NOT check if the purchaseOrderRecord is of type Cumulative.
 // TODO: test this thoroughly.
-func CumulativeTotalExpensesForPurchaseOrder(app core.App, purchaseOrderRecord *models.Record, committedOnly bool) (float64, error) {
+func CumulativeTotalExpensesForPurchaseOrder(app core.App, purchaseOrderRecord *core.Record, committedOnly bool) (float64, error) {
 	existingExpensesTotal := 0.0
-	query := app.Dao().DB().NewQuery("SELECT COALESCE(SUM(total), 0) AS total FROM expenses WHERE purchase_order = {:purchaseOrder}")
+	query := app.DB().NewQuery("SELECT COALESCE(SUM(total), 0) AS total FROM expenses WHERE purchase_order = {:purchaseOrder}")
 	if committedOnly {
-		query = app.Dao().DB().NewQuery("SELECT COALESCE(SUM(total), 0) AS total FROM expenses WHERE purchase_order = {:purchaseOrder} AND committed != ''")
+		query = app.DB().NewQuery("SELECT COALESCE(SUM(total), 0) AS total FROM expenses WHERE purchase_order = {:purchaseOrder} AND committed != ''")
 	}
 	query.Bind(dbx.Params{"purchaseOrder": purchaseOrderRecord.Id})
 	type TotalResult struct {

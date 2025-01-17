@@ -7,14 +7,11 @@ import (
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 )
 
-func createCommitRecordHandler(app core.App, collectionName string) echo.HandlerFunc {
+func createCommitRecordHandler(app core.App, collectionName string) func(e *core.RequestEvent) error {
 	// This route handles the committing of a record.
 	// It performs the following actions:
 	// 1. Retrieves the authenticated user's ID
@@ -33,14 +30,14 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 	//    i. Save the updated record.
 	// 3. Returns a success message if committed, or an error message if any checks fail.
 	// This ensures that only the record's owner can submit it.
-	return func(c echo.Context) error {
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+	return func(e *core.RequestEvent) error {
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		var httpResponseStatusCode int
 
-		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-			record, err := txDao.FindRecordById(collectionName, c.PathParam("id"))
+		err := app.RunInTransaction(func(txApp core.App) error {
+			record, err := txApp.FindRecordById(collectionName, e.Request.PathValue("id"))
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
@@ -53,7 +50,7 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 			// collection for a record with uid that matches the caller's ID and cid
 			// who's name in the claims collection is "commit". If the record exists,
 			// the caller has the commit claim.
-			hasCommitClaim, err := utilities.HasClaim(txDao, userId, "commit")
+			hasCommitClaim, err := utilities.HasClaim(txApp, userId, "commit")
 			if err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
@@ -140,7 +137,7 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 				// necessary conditions are met.
 				purchaseOrderId := record.GetString("purchase_order")
 				if purchaseOrderId != "" {
-					purchaseOrderRecord, err := txDao.FindRecordById("purchase_orders", purchaseOrderId)
+					purchaseOrderRecord, err := txApp.FindRecordById("purchase_orders", purchaseOrderId)
 					if err != nil {
 						return err
 					}
@@ -209,7 +206,7 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 					}
 					// Save the purchase order record
 					if dirtyPurchaseOrderRecord {
-						if err := txDao.SaveRecord(purchaseOrderRecord); err != nil {
+						if err := txApp.Save(purchaseOrderRecord); err != nil {
 							httpResponseStatusCode = http.StatusInternalServerError
 							return &CodeError{
 								Code:    "error_saving_purchase_orders_record",
@@ -222,7 +219,7 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 			}
 
 			// Save the updated record
-			if err := txDao.SaveRecord(record); err != nil {
+			if err := txApp.Save(record); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
 					Code:    "error_saving_record",
@@ -234,9 +231,9 @@ func createCommitRecordHandler(app core.App, collectionName string) echo.Handler
 		})
 
 		if err != nil {
-			return c.JSON(httpResponseStatusCode, map[string]string{"error": err.Error()})
+			return e.JSON(httpResponseStatusCode, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Record committed successfully"})
+		return e.JSON(http.StatusOK, map[string]string{"message": "Record committed successfully"})
 	}
 }

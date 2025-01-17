@@ -9,10 +9,8 @@ import (
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/tools/list"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
@@ -23,20 +21,20 @@ import (
 // and to ensure that the record is in a valid state before it is created or
 // updated. It is called by ProcessTimeEntry to reduce the number of fields
 // that need to be validated.
-func cleanTimeEntry(app core.App, timeEntryRecord *models.Record) ([]string, error) {
+func cleanTimeEntry(app core.App, timeEntryRecord *core.Record) ([]string, error) {
 	timeTypeId := timeEntryRecord.GetString("time_type")
 
 	// Load the allowed fields for the time_type from the time_types collection in
 	// PocketBase. They are stored in the allowed_fields property as a JSON array
 	// of strings.
-	timeTypeRecord, findError := app.Dao().FindRecordById("time_types", timeTypeId)
+	timeTypeRecord, findError := app.FindRecordById("time_types", timeTypeId)
 	if findError != nil {
 		return nil, findError
 	}
 
 	// Get the allowed fields from the time_type record with type assertion
 	var allowedFields []string
-	allowedFieldsJson := timeTypeRecord.Get("allowed_fields").(types.JsonRaw)
+	allowedFieldsJson := timeTypeRecord.Get("allowed_fields").(types.JSONRaw)
 
 	// use json.Unmarshal to convert the JSON array to a Go slice of strings
 	if unmarshalErrorAllowed := json.Unmarshal(allowedFieldsJson, &allowedFields); unmarshalErrorAllowed != nil {
@@ -46,7 +44,7 @@ func cleanTimeEntry(app core.App, timeEntryRecord *models.Record) ([]string, err
 
 	// Get the required fields from the time_type record with type assertion
 	var requiredFields []string
-	requiredFieldsJson := timeTypeRecord.Get("required_fields").(types.JsonRaw)
+	requiredFieldsJson := timeTypeRecord.Get("required_fields").(types.JSONRaw)
 
 	// if requiredFieldsJson has a value of null, "{}", or "[]" then all fields
 	// are required so we set the requiredFields to the allowedFields.
@@ -63,7 +61,8 @@ func cleanTimeEntry(app core.App, timeEntryRecord *models.Record) ([]string, err
 
 	// remove any fields from the time_entry record that are not in allowedFields.
 	// I'm not sure if this is the best way to do this but let's try it.
-	for key := range timeEntryRecord.ColumnValueMap() {
+	// FieldsData() is probably a drop in replacement for ColumnValueMap()
+	for _, key := range timeEntryRecord.Collection().Fields.FieldNames() {
 		if !list.ExistInSlice(key, allowedFields) {
 			//log.Println("Removing field: ", key)
 			timeEntryRecord.Set(key, nil)
@@ -79,7 +78,7 @@ func cleanTimeEntry(app core.App, timeEntryRecord *models.Record) ([]string, err
 // the record prior to validation. The requiredFields slice is used to validate
 // the presence of required fields. The function returns an error if the record
 // is invalid, otherwise it returns nil.
-func validateTimeEntry(timeEntryRecord *models.Record, requiredFields []string) error {
+func validateTimeEntry(timeEntryRecord *core.Record, requiredFields []string) error {
 	jobIsPresent := timeEntryRecord.Get("job") != ""
 	totalHours := timeEntryRecord.GetFloat("hours") + timeEntryRecord.GetFloat("meals_hours")
 
@@ -117,9 +116,10 @@ func validateTimeEntry(timeEntryRecord *models.Record, requiredFields []string) 
 // itself so this is for cross-field validation. If the time_entry record is
 // invalid this function throws an error explaining which field(s) are invalid
 // and why.
-func ProcessTimeEntry(app core.App, record *models.Record, context echo.Context) error {
+func ProcessTimeEntry(app core.App, e *core.RecordRequestEvent) error {
+	record := e.Record
 	// get the auth record from the context
-	authRecord := context.Get(apis.ContextAuthRecordKey).(*models.Record)
+	authRecord := e.Auth
 
 	// If the uid property is not equal to the authenticated user's uid, return an
 	// error.

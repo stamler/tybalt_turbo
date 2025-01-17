@@ -10,12 +10,9 @@ import (
 	"tybalt/internal/testutils"
 	"tybalt/routes"
 
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -94,7 +91,7 @@ func TestAbsorbRecords(t *testing.T) {
 				// This will be used later to verify that the count decreased
 				// by exactly the number of absorbed records
 				var result CountResult
-				err := app.Dao().DB().NewQuery(fmt.Sprintf("SELECT COUNT(*) as count FROM %s", tt.collectionName)).One(&result)
+				err := app.DB().NewQuery(fmt.Sprintf("SELECT COUNT(*) as count FROM %s", tt.collectionName)).One(&result)
 				if err != nil {
 					t.Fatalf("failed to get initial count: %v", err)
 				}
@@ -102,7 +99,7 @@ func TestAbsorbRecords(t *testing.T) {
 
 				// Step 2: Verify the target record exists
 				// This is crucial as it's the record that will absorb the others
-				targetRecord, err := app.Dao().FindRecordById(tt.collectionName, tt.targetID)
+				targetRecord, err := app.FindRecordById(tt.collectionName, tt.targetID)
 				if err != nil {
 					t.Fatalf("failed to find target record: %v", err)
 				}
@@ -113,7 +110,7 @@ func TestAbsorbRecords(t *testing.T) {
 				// Step 3: Verify all records to be absorbed exist
 				// We need to ensure they exist before trying to absorb them
 				for _, id := range tt.idsToAbsorb {
-					record, err := app.Dao().FindRecordById(tt.collectionName, id)
+					record, err := app.FindRecordById(tt.collectionName, id)
 					if err != nil {
 						t.Fatalf("failed to find record %s: %v", id, err)
 					}
@@ -139,7 +136,7 @@ func TestAbsorbRecords(t *testing.T) {
 						ref.Column,
 						"'"+strings.Join(append(tt.idsToAbsorb, tt.targetID), "','")+"'",
 					)
-					err = app.Dao().DB().NewQuery(query).One(&result)
+					err = app.DB().NewQuery(query).One(&result)
 					if err != nil {
 						t.Fatalf("failed to get reference count for %s: %v", ref.Table, err)
 					}
@@ -167,7 +164,7 @@ func TestAbsorbRecords(t *testing.T) {
 
 				// Step 6a: Verify the total record count decreased correctly
 				var result CountResult
-				err = app.Dao().DB().NewQuery(fmt.Sprintf("SELECT COUNT(*) as count FROM %s", tt.collectionName)).One(&result)
+				err = app.DB().NewQuery(fmt.Sprintf("SELECT COUNT(*) as count FROM %s", tt.collectionName)).One(&result)
 				if err != nil {
 					t.Fatalf("failed to get final count: %v", err)
 				}
@@ -178,7 +175,7 @@ func TestAbsorbRecords(t *testing.T) {
 
 				// Step 6b: Verify all absorbed records were deleted
 				for _, id := range tt.idsToAbsorb {
-					record, err := app.Dao().FindRecordById(tt.collectionName, id)
+					record, err := app.FindRecordById(tt.collectionName, id)
 					if err == nil {
 						t.Errorf("expected error finding absorbed record %s", id)
 					}
@@ -188,7 +185,7 @@ func TestAbsorbRecords(t *testing.T) {
 				}
 
 				// Step 6c: Verify the target record still exists
-				targetRecord, err := app.Dao().FindRecordById(tt.collectionName, tt.targetID)
+				targetRecord, err := app.FindRecordById(tt.collectionName, tt.targetID)
 				if err != nil {
 					t.Fatalf("failed to find target record: %v", err)
 				}
@@ -211,7 +208,7 @@ func TestAbsorbRecords(t *testing.T) {
 						ref.Column,
 						"'"+strings.Join(tt.idsToAbsorb, "','")+"'",
 					)
-					err = app.Dao().DB().NewQuery(query).One(&result)
+					err = app.DB().NewQuery(query).One(&result)
 					if err != nil {
 						t.Fatalf("failed to check absorbed references: %v", err)
 					}
@@ -228,7 +225,7 @@ func TestAbsorbRecords(t *testing.T) {
 						ref.Column,
 						tt.targetID,
 					)
-					err = app.Dao().DB().NewQuery(query).One(&targetResult)
+					err = app.DB().NewQuery(query).One(&targetResult)
 					if err != nil {
 						t.Fatalf("failed to check target references: %v", err)
 					}
@@ -257,52 +254,38 @@ func TestAbsorbRoutes(t *testing.T) {
 	invalidToken := "invalid_token_format"
 
 	// Create a custom test app factory for testing unsupported collection
-	unsupportedCollectionTestApp := func(t *testing.T) *tests.TestApp {
+	unsupportedCollectionTestApp := func(t testing.TB) *tests.TestApp {
 		app, err := tests.NewTestApp("./test_pb_data")
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Add a route with an unsupported collection
-		app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-			e.Router.AddRoute(echo.Route{
-				Method:  http.MethodPost,
-				Path:    "/api/test_unsupported/:id/absorb",
-				Handler: routes.CreateAbsorbRecordsHandler(app, "unsupported_collection"),
-				Middlewares: []echo.MiddlewareFunc{
-					apis.RequireRecordAuth("users"),
-				},
-			})
-			return nil
+		app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+			e.Router.POST("/api/test_unsupported/:id/absorb", routes.CreateAbsorbRecordsHandler(app, "unsupported_collection")).Bind(apis.RequireAuth("users"))
+			return e.Next()
 		})
 
 		return app
 	}
 
 	// Create a custom test app factory for testing claim check failure
-	claimCheckFailureTestApp := func(t *testing.T) *tests.TestApp {
+	claimCheckFailureTestApp := func(t testing.TB) *tests.TestApp {
 		app, err := tests.NewTestApp("./test_pb_data")
 		if err != nil {
 			t.Fatal(err)
 		}
 
 		// Add routes with the broken claims table
-		app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
+		app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 			// Break the claims table
 			_, err := app.DB().NewQuery("ALTER TABLE claims RENAME TO claims_broken").Execute()
 			if err != nil {
 				t.Fatal(err)
 			}
 
-			e.Router.AddRoute(echo.Route{
-				Method:  http.MethodPost,
-				Path:    "/api/clients/:id/absorb",
-				Handler: routes.CreateAbsorbRecordsHandler(app, "clients"),
-				Middlewares: []echo.MiddlewareFunc{
-					apis.RequireRecordAuth("users"),
-				},
-			})
-			return nil
+			e.Router.POST("/api/clients/:id/absorb", routes.CreateAbsorbRecordsHandler(app, "clients")).Bind(apis.RequireAuth("users"))
+			return e.Next()
 		})
 
 		return app
@@ -312,20 +295,20 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:           "unauthorized request",
 			Method:         http.MethodPost,
-			Url:            "/api/clients/lb0fnenkeyitsny/absorb",
+			URL:            "/api/clients/lb0fnenkeyitsny/absorb",
 			Body:           strings.NewReader(`{"ids_to_absorb": ["eldtxi3i4h00k8r", "pqpd90fqd5ohjcs"]}`),
 			ExpectedStatus: 401,
 			ExpectedContent: []string{
-				`"message":"The request requires valid record authorization token to be set."`,
+				`"message":"The request requires valid record authorization token."`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "invalid request body",
 			Method: http.MethodPost,
-			Url:    "/api/clients/lb0fnenkeyitsny/absorb",
+			URL:    "/api/clients/lb0fnenkeyitsny/absorb",
 			Body:   strings.NewReader(`invalid json`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": userToken,
 			},
 			ExpectedStatus: 400,
@@ -337,9 +320,9 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:   "empty ids list",
 			Method: http.MethodPost,
-			Url:    "/api/clients/lb0fnenkeyitsny/absorb",
+			URL:    "/api/clients/lb0fnenkeyitsny/absorb",
 			Body:   strings.NewReader(`{"ids_to_absorb": []}`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": userToken,
 			},
 			ExpectedStatus: 400,
@@ -351,9 +334,9 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:   "unauthorized user (no absorb claim)",
 			Method: http.MethodPost,
-			Url:    "/api/clients/lb0fnenkeyitsny/absorb",
+			URL:    "/api/clients/lb0fnenkeyitsny/absorb",
 			Body:   strings.NewReader(`{"ids_to_absorb": ["eldtxi3i4h00k8r", "pqpd90fqd5ohjcs"]}`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": userToken,
 			},
 			ExpectedStatus: 403,
@@ -365,9 +348,9 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:   "authorized user (has absorb claim)",
 			Method: http.MethodPost,
-			Url:    "/api/clients/lb0fnenkeyitsny/absorb",
+			URL:    "/api/clients/lb0fnenkeyitsny/absorb",
 			Body:   strings.NewReader(`{"ids_to_absorb": ["eldtxi3i4h00k8r", "pqpd90fqd5ohjcs"]}`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": bookKeeperToken,
 			},
 			ExpectedStatus: 200,
@@ -385,59 +368,57 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:   "invalid auth token format",
 			Method: http.MethodPost,
-			Url:    "/api/clients/lb0fnenkeyitsny/absorb",
+			URL:    "/api/clients/lb0fnenkeyitsny/absorb",
 			Body:   strings.NewReader(`{"ids_to_absorb": ["eldtxi3i4h00k8r", "pqpd90fqd5ohjcs"]}`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": invalidToken,
 			},
 			ExpectedStatus: 401,
 			ExpectedContent: []string{
-				`"message":"The request requires valid record authorization token to be set."`,
+				`"message":"The request requires valid record authorization token."`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "absorb non-existent records",
 			Method: http.MethodPost,
-			Url:    "/api/clients/lb0fnenkeyitsny/absorb",
+			URL:    "/api/clients/lb0fnenkeyitsny/absorb",
 			Body:   strings.NewReader(`{"ids_to_absorb": ["definitely_nonexistent_1", "definitely_nonexistent_2"]}`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": bookKeeperToken,
 			},
 			ExpectedStatus: 404,
 			ExpectedContent: []string{
-				`"code":404,"message":"Failed to find record to absorb."`,
+				`"message":"Failed to find record to absorb.","status":404`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnBeforeApiError": 1,
-				"OnAfterApiError":  1,
+				"*": 0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "absorb into non-existent target",
 			Method: http.MethodPost,
-			Url:    "/api/clients/definitely_nonexistent_target/absorb",
+			URL:    "/api/clients/definitely_nonexistent_target/absorb",
 			Body:   strings.NewReader(`{"ids_to_absorb": ["eldtxi3i4h00k8r", "pqpd90fqd5ohjcs"]}`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": bookKeeperToken,
 			},
 			ExpectedStatus: 404,
 			ExpectedContent: []string{
-				`"code":404,"message":"Failed to find target record."`,
+				`"message":"Failed to find target record.","status":404`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnBeforeApiError": 1,
-				"OnAfterApiError":  1,
+				"*": 0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "unsupported collection",
 			Method: http.MethodPost,
-			Url:    "/api/test_unsupported/test_id/absorb",
+			URL:    "/api/test_unsupported/test_id/absorb",
 			Body:   strings.NewReader(`{"ids_to_absorb": ["test1", "test2"]}`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": bookKeeperToken,
 			},
 			ExpectedStatus: 500,
@@ -453,9 +434,9 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:   "absorb record into itself",
 			Method: http.MethodPost,
-			Url:    "/api/clients/lb0fnenkeyitsny/absorb",
+			URL:    "/api/clients/lb0fnenkeyitsny/absorb",
 			Body:   strings.NewReader(`{"ids_to_absorb": ["lb0fnenkeyitsny"]}`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": bookKeeperToken,
 			},
 			ExpectedStatus: 400,
@@ -467,9 +448,9 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:   "claim check failure",
 			Method: http.MethodPost,
-			Url:    "/api/clients/lb0fnenkeyitsny/absorb",
+			URL:    "/api/clients/lb0fnenkeyitsny/absorb",
 			Body:   strings.NewReader(`{"ids_to_absorb": ["eldtxi3i4h00k8r", "pqpd90fqd5ohjcs"]}`),
-			RequestHeaders: map[string]string{
+			Headers: map[string]string{
 				"Authorization": bookKeeperToken,
 			},
 			ExpectedStatus: 400,
@@ -481,8 +462,8 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:   "undo absorb unauthorized user",
 			Method: http.MethodPost,
-			Url:    "/api/clients/undo_absorb",
-			RequestHeaders: map[string]string{
+			URL:    "/api/clients/undo_absorb",
+			Headers: map[string]string{
 				"Authorization": userToken,
 			},
 			ExpectedStatus: 403,
@@ -494,8 +475,8 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:   "undo absorb no action exists",
 			Method: http.MethodPost,
-			Url:    "/api/clients/undo_absorb",
-			RequestHeaders: map[string]string{
+			URL:    "/api/clients/undo_absorb",
+			Headers: map[string]string{
 				"Authorization": bookKeeperToken,
 			},
 			ExpectedStatus: 404,
@@ -507,8 +488,8 @@ func TestAbsorbRoutes(t *testing.T) {
 		{
 			Name:   "undo absorb successful",
 			Method: http.MethodPost,
-			Url:    "/api/clients/undo_absorb",
-			RequestHeaders: map[string]string{
+			URL:    "/api/clients/undo_absorb",
+			Headers: map[string]string{
 				"Authorization": bookKeeperToken,
 			},
 			ExpectedStatus: 200,
@@ -523,7 +504,7 @@ func TestAbsorbRoutes(t *testing.T) {
 				"OnModelBeforeDelete": 1,
 				"OnModelAfterDelete":  1,
 			},
-			TestAppFactory: func(t *testing.T) *tests.TestApp {
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
 				app := testutils.SetupTestApp(t)
 				// Create an absorb action to undo
 				err := routes.AbsorbRecords(app, "clients", "lb0fnenkeyitsny", []string{"eldtxi3i4h00k8r"})
@@ -537,8 +518,8 @@ func TestAbsorbRoutes(t *testing.T) {
 			{
 				Name:   "undo absorb claim check failure",
 				Method: http.MethodPost,
-				Url:    "/api/clients/undo_absorb",
-				RequestHeaders: map[string]string{
+				URL:    "/api/clients/undo_absorb",
+				Headers: map[string]string{
 					"Authorization": bookKeeperToken,
 				},
 				ExpectedStatus: 400,
@@ -582,13 +563,13 @@ func TestUndoAbsorb(t *testing.T) {
 
 	// Store initial record data
 	for _, id := range append(idsToAbsorb, targetID) {
-		record, err := app.Dao().FindRecordById(collectionName, id)
+		record, err := app.FindRecordById(collectionName, id)
 		if err != nil {
 			t.Fatalf("failed to find record %s: %v", id, err)
 		}
 		recordData := make(map[string]interface{})
-		for _, field := range record.Collection().Schema.Fields() {
-			recordData[field.Name] = record.Get(field.Name)
+		for _, field := range record.Collection().Fields.FieldNames() {
+			recordData[field] = record.Get(field)
 		}
 		initialState[id] = recordData
 	}
@@ -602,7 +583,7 @@ func TestUndoAbsorb(t *testing.T) {
 			ref.Column,
 			"'"+strings.Join(append(idsToAbsorb, targetID), "','")+"'",
 		)
-		err = app.Dao().DB().NewQuery(query).One(&result)
+		err = app.DB().NewQuery(query).One(&result)
 		if err != nil {
 			t.Fatalf("failed to get reference count for %s: %v", ref.Table, err)
 		}
@@ -617,16 +598,16 @@ func TestUndoAbsorb(t *testing.T) {
 
 	// Verify absorption was successful
 	for _, id := range idsToAbsorb {
-		record, err := app.Dao().FindRecordById(collectionName, id)
+		record, err := app.FindRecordById(collectionName, id)
 		if err == nil || record != nil {
 			t.Errorf("absorbed record %s still exists", id)
 		}
 	}
 
 	// Now perform the undo operation
-	err = app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+	err = app.RunInTransaction(func(txApp core.App) error {
 		// Get the absorb action record
-		record, err := txDao.FindFirstRecordByData("absorb_actions", "collection_name", collectionName)
+		record, err := txApp.FindFirstRecordByData("absorb_actions", "collection_name", collectionName)
 		if err != nil {
 			return err
 		}
@@ -645,18 +626,18 @@ func TestUndoAbsorb(t *testing.T) {
 			return err
 		}
 
-		collection, err := txDao.FindCollectionByNameOrId(collectionName)
+		collection, err := txApp.FindCollectionByNameOrId(collectionName)
 		if err != nil {
 			return err
 		}
 
 		// Recreate absorbed records
 		for _, recordData := range absorbedRecords {
-			record := models.NewRecord(collection)
+			record := core.NewRecord(collection)
 			for field, value := range recordData {
 				record.Set(field, value)
 			}
-			if err := txDao.SaveRecord(record); err != nil {
+			if err := txApp.Save(record); err != nil {
 				return err
 			}
 		}
@@ -665,7 +646,7 @@ func TestUndoAbsorb(t *testing.T) {
 		for table, updates := range updatedRefs {
 			for recordID, oldValue := range updates {
 				updateQuery := fmt.Sprintf("UPDATE %s SET %s = {:old_value} WHERE id = {:record_id}", table, refConfigs[0].Column)
-				_, err = txDao.DB().NewQuery(updateQuery).Bind(dbx.Params{
+				_, err = txApp.DB().NewQuery(updateQuery).Bind(dbx.Params{
 					"old_value": oldValue,
 					"record_id": recordID,
 				}).Execute()
@@ -676,7 +657,7 @@ func TestUndoAbsorb(t *testing.T) {
 		}
 
 		// Delete absorb action
-		if err := txDao.DeleteRecord(record); err != nil {
+		if err := txApp.Delete(record); err != nil {
 			return err
 		}
 
@@ -689,7 +670,7 @@ func TestUndoAbsorb(t *testing.T) {
 	// Verify the undo operation restored everything correctly
 	// 1. Check all records exist with original data
 	for id, originalData := range initialState {
-		record, err := app.Dao().FindRecordById(collectionName, id)
+		record, err := app.FindRecordById(collectionName, id)
 		if err != nil {
 			t.Errorf("failed to find restored record %s: %v", id, err)
 			continue
@@ -715,7 +696,7 @@ func TestUndoAbsorb(t *testing.T) {
 			ref.Column,
 			"'"+strings.Join(append(idsToAbsorb, targetID), "','")+"'",
 		)
-		err = app.Dao().DB().NewQuery(query).One(&result)
+		err = app.DB().NewQuery(query).One(&result)
 		if err != nil {
 			t.Errorf("failed to get reference count for %s: %v", ref.Table, err)
 			continue
@@ -726,7 +707,7 @@ func TestUndoAbsorb(t *testing.T) {
 	}
 
 	// 3. Verify absorb action record is deleted
-	record, err := app.Dao().FindFirstRecordByData("absorb_actions", "collection_name", collectionName)
+	record, err := app.FindFirstRecordByData("absorb_actions", "collection_name", collectionName)
 	if err != nil && err.Error() != "sql: no rows in result set" {
 		t.Errorf("error checking absorb action: %v", err)
 	}

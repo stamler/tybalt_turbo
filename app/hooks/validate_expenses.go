@@ -7,13 +7,13 @@ import (
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/pocketbase/models"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // The validateExpense function is used to validate the expense record. It is
 // called by ProcessExpense to ensure that the record is in a valid state before
 // it is created or updated.
-func validateExpense(expenseRecord *models.Record, poRecord *models.Record, existingExpensesTotal float64, byPassTotalLimit bool) error {
+func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existingExpensesTotal float64, byPassTotalLimit bool) error {
 
 	var (
 		poType           string = "Normal"

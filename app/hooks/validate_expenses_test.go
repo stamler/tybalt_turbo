@@ -4,29 +4,21 @@ import (
 	"testing"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/pocketbase/pocketbase/models"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // We need to instantiate a Collection object to be part of the Record object
 // so everything works as expected
-var expensesCollection = &models.Collection{
-	Name:   "expenses",
-	Type:   "base",
-	System: false,
-}
-var poCollection = &models.Collection{
-	Name:   "purchase_orders",
-	Type:   "base",
-	System: false,
-}
+var expensesCollection = core.NewBaseCollection("expenses")
+var poCollection = core.NewBaseCollection("purchase_orders")
 
 func TestValidateExpense(t *testing.T) {
 	// Test cases
 	tests := map[string]struct {
 		valid                 bool
 		field                 string
-		record                *models.Record
-		po                    *models.Record
+		record                *core.Record
+		po                    *core.Record
 		hasPayablesAdminClaim bool
 	}{
 		"total_too_high_without_po":                                    {valid: false, field: "total", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "OnAccount", "purchase_order": "", "total": NO_PO_EXPENSE_LIMIT, "vendor": "2zqxtsmymf670ha"})},

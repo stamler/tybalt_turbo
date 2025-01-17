@@ -5,32 +5,28 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 )
 
-func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
-	return func(c echo.Context) error {
+func createBundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
 		// Validate the date
-		weekEndingTime, err := time.Parse("2006-01-02", c.PathParam("weekEnding"))
+		weekEndingTime, err := time.Parse("2006-01-02", e.Request.PathValue("weekEnding"))
 		if err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid date format. Use YYYY-MM-DD"})
+			return e.JSON(http.StatusBadRequest, map[string]string{"error": "Invalid date format. Use YYYY-MM-DD"})
 		}
 
 		// validate weekEndingTime is a Saturday
 		if weekEndingTime.Weekday() != time.Saturday {
-			return c.JSON(http.StatusBadRequest, map[string]string{"error": "Week ending date must be a Saturday"})
+			return e.JSON(http.StatusBadRequest, map[string]string{"error": "Week ending date must be a Saturday"})
 		}
 
 		// Store the week ending date string
 		weekEnding := weekEndingTime.Format("2006-01-02")
 
 		// get the auth record from the context
-		authRecord := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		/*
@@ -49,12 +45,12 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 		var httpResponseStatusCode int
 
 		// Start a transaction
-		err = app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+		err = app.RunInTransaction(func(txApp core.App) error {
 
 			// Check if a time sheet already exists. This is also prevented by the
 			// unique index on the time_sheets table so may not be necessary, but
 			// it does send a more user-friendly error message.
-			existingTimeSheet, err := txDao.FindFirstRecordByFilter("time_sheets", "uid={:userId} && week_ending={:weekEnding}", dbx.Params{
+			existingTimeSheet, err := txApp.FindFirstRecordByFilter("time_sheets", "uid={:userId} && week_ending={:weekEnding}", dbx.Params{
 				"userId":     userId,
 				"weekEnding": weekEnding,
 			})
@@ -63,7 +59,7 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			}
 
 			// Get the candidate time entries
-			timeEntries, err := txDao.FindRecordsByFilter("time_entries", "uid={:userId} && week_ending={:weekEnding}", "", 0, 0, dbx.Params{
+			timeEntries, err := txApp.FindRecordsByFilter("time_entries", "uid={:userId} && week_ending={:weekEnding}", "", 0, 0, dbx.Params{
 				"userId":     userId,
 				"weekEnding": weekEnding,
 			})
@@ -73,7 +69,7 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 
 			// Load the user's admin_profile record to get values for the new
 			// time_sheets record
-			admin_profile, err := txDao.FindFirstRecordByFilter("admin_profiles", "uid={:userId}", dbx.Params{
+			admin_profile, err := txApp.FindFirstRecordByFilter("admin_profiles", "uid={:userId}", dbx.Params{
 				"userId": userId,
 			})
 			if err != nil {
@@ -99,7 +95,7 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			// equal to the week_ending of the new timesheet. We use
 			// FindFirstRecordByFilter because we want to order the results by date in
 			// descending order and limit the results to 1. limit the results to 1.
-			payrollYearEndDatesRecords, err := txDao.FindRecordsByFilter("payroll_year_end_dates", "date <= {:weekEnding}", "-date", 1, 0, dbx.Params{
+			payrollYearEndDatesRecords, err := txApp.FindRecordsByFilter("payroll_year_end_dates", "date <= {:weekEnding}", "-date", 1, 0, dbx.Params{
 				"weekEnding": weekEnding,
 			})
 			if err != nil {
@@ -120,20 +116,20 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			}
 
 			// Validate the time entries as a group
-			if err := validateTimeEntries(txDao, admin_profile, payrollYearEndDateAsTime, timeEntries); err != nil {
+			if err := validateTimeEntries(txApp, admin_profile, payrollYearEndDateAsTime, timeEntries); err != nil {
 				transactionError = err
 				httpResponseStatusCode = http.StatusUnprocessableEntity
 				return err
 			}
 
 			// Get the collection for time_sheets
-			time_sheets_collection, err := app.Dao().FindCollectionByNameOrId("time_sheets")
+			time_sheets_collection, err := app.FindCollectionByNameOrId("time_sheets")
 			if err != nil {
 				return fmt.Errorf("error fetching time_sheets collection: %v", err)
 			}
 
 			// Get the manager (approver) from the profiles collection
-			profile, err := txDao.FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
+			profile, err := txApp.FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
 				"userId": userId,
 			})
 			if err != nil {
@@ -145,7 +141,7 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			approver := profile.Get("manager")
 
 			// Create new time sheet
-			newTimeSheet := models.NewRecord(time_sheets_collection)
+			newTimeSheet := core.NewRecord(time_sheets_collection)
 			newTimeSheet.Set("uid", userId)
 			newTimeSheet.Set("week_ending", weekEnding)
 			newTimeSheet.Set("approver", approver)
@@ -155,7 +151,7 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			newTimeSheet.Set("work_week_hours", admin_profile.Get("work_week_hours"))
 			newTimeSheet.Set("salary", admin_profile.Get("salary"))
 
-			if err := txDao.SaveRecord(newTimeSheet); err != nil {
+			if err := txApp.Save(newTimeSheet); err != nil {
 				return fmt.Errorf("error creating new time sheet: %v", err)
 			}
 
@@ -163,7 +159,7 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			// then we need to change it to "no" and save the record
 			if admin_profile.Get("skip_min_time_check") == "on_next_bundle" {
 				admin_profile.Set("skip_min_time_check", "no")
-				if err := txDao.SaveRecord(admin_profile); err != nil {
+				if err := txApp.Save(admin_profile); err != nil {
 					return fmt.Errorf("error updating admin profile: %v", err)
 				}
 			}
@@ -171,7 +167,7 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 			// Update time entries with new time sheet ID
 			for _, entry := range timeEntries {
 				entry.Set("tsid", newTimeSheet.Id)
-				if err := txDao.SaveRecord(entry); err != nil {
+				if err := txApp.Save(entry); err != nil {
 					return fmt.Errorf("error updating time entry: %v", err)
 				}
 			}
@@ -182,14 +178,14 @@ func createBundleTimesheetHandler(app core.App) echo.HandlerFunc {
 		if err != nil {
 			// Check if the error is a CodeError and return the appropriate JSON response
 			if codeError, ok := transactionError.(*CodeError); ok {
-				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+				return e.JSON(httpResponseStatusCode, map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
 				})
 			}
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "Time sheet processed successfully"})
+		return e.JSON(http.StatusOK, map[string]string{"message": "Time sheet processed successfully"})
 	}
 }

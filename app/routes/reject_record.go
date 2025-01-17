@@ -1,19 +1,14 @@
 package routes
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
 
-	"github.com/labstack/echo/v5"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 )
 
-func createRejectRecordHandler(app core.App, collectionName string) echo.HandlerFunc {
+func createRejectRecordHandler(app core.App, collectionName string) func(e *core.RequestEvent) error {
 	// This route handles the rejection of a record.
 	// It performs the following actions:
 	// 1. Gets the record ID from the URL.
@@ -27,25 +22,25 @@ func createRejectRecordHandler(app core.App, collectionName string) echo.Handler
 	//    e. Save the updated record.
 	// 5. Returns a success message if rejected, or an error message if any checks fail.
 	// This ensures that only valid, submitted records can be rejected by the correct user.
-	return func(c echo.Context) error {
+	return func(e *core.RequestEvent) error {
 
-		id := c.PathParam("id")
+		id := e.Request.PathValue("id")
 
 		var req RejectionRequest
-		if err := json.NewDecoder(c.Request().Body).Decode(&req); err != nil {
-			return c.JSON(http.StatusBadRequest, map[string]interface{}{
+		if err := e.BindBody(&req); err != nil {
+			return e.JSON(http.StatusBadRequest, map[string]interface{}{
 				"message": "you must provide a rejection reason",
 				"code":    "invalid_request_body",
 			})
 		}
 
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
+		authRecord := e.Auth
 		userId := authRecord.Id
 
 		var httpResponseStatusCode int
 
-		err := app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-			record, err := txDao.FindRecordById(collectionName, id)
+		err := app.RunInTransaction(func(txApp core.App) error {
+			record, err := txApp.FindRecordById(collectionName, id)
 			if err != nil {
 				httpResponseStatusCode = http.StatusNotFound
 				return &CodeError{
@@ -105,7 +100,7 @@ func createRejectRecordHandler(app core.App, collectionName string) echo.Handler
 			record.Set("rejector", userId)
 
 			// Save the updated record
-			if err := txDao.SaveRecord(record); err != nil {
+			if err := txApp.Save(record); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
 					Code:    "record_save_error",
@@ -118,14 +113,14 @@ func createRejectRecordHandler(app core.App, collectionName string) echo.Handler
 
 		if err != nil {
 			if codeError, ok := err.(*CodeError); ok {
-				return c.JSON(httpResponseStatusCode, map[string]interface{}{
+				return e.JSON(httpResponseStatusCode, map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
 				})
 			}
-			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{"message": "record rejected successfully"})
+		return e.JSON(http.StatusOK, map[string]string{"message": "record rejected successfully"})
 	}
 }

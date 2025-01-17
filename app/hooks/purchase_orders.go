@@ -9,11 +9,9 @@ import (
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/models"
 )
 
 const (
@@ -36,7 +34,7 @@ const (
 // to ensure that the record is in a valid state before it is created or
 // updated. It is called by ProcessPurchaseOrder to reduce the number of fields
 // that need to be validated.
-func cleanPurchaseOrder(app core.App, purchaseOrderRecord *models.Record) error {
+func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	typeString := purchaseOrderRecord.GetString("type")
 
 	// Normal and Cumulative Purchase both have empty values for
@@ -61,7 +59,7 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *models.Record) error 
 // function. This ensures that only the fields that are allowed to be set are
 // present in the record prior to validation. The function returns an error if
 // the record is invalid, otherwise it returns nil.
-func validatePurchaseOrder(app core.App, purchaseOrderRecord *models.Record) error {
+func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	isRecurring := purchaseOrderRecord.GetString("type") == "Recurring"
 
 	dateAsTime, parseErr := time.Parse("2006-01-02", purchaseOrderRecord.Get("date").(string))
@@ -103,9 +101,10 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *models.Record) err
 // PocketBase itself so this is for cross-field validation. If the
 // purchase_order record is invalid this function throws an error explaining
 // which field(s) are invalid and why.
-func ProcessPurchaseOrder(app core.App, record *models.Record, context echo.Context) error {
+func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
+	record := e.Record
 	// get the auth record from the context
-	authRecord := context.Get(apis.ContextAuthRecordKey).(*models.Record)
+	authRecord := e.Auth
 
 	// If the uid property is not equal to the authenticated user's uid, return an
 	// error.
@@ -127,7 +126,7 @@ func ProcessPurchaseOrder(app core.App, record *models.Record, context echo.Cont
 	return nil
 }
 
-func getSecondApproverClaim(app core.App, purchaseOrderRecord *models.Record) (string, error) {
+func getSecondApproverClaim(app core.App, purchaseOrderRecord *core.Record) (string, error) {
 	var secondApproverClaim string
 
 	poType := purchaseOrderRecord.GetString("type")
@@ -146,7 +145,7 @@ func getSecondApproverClaim(app core.App, purchaseOrderRecord *models.Record) (s
 
 	if totalValue >= VP_PO_LIMIT {
 		// Set second approver claim to 'smg'
-		claim, err := app.Dao().FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
+		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": "smg",
 		})
 		if err != nil {
@@ -155,7 +154,7 @@ func getSecondApproverClaim(app core.App, purchaseOrderRecord *models.Record) (s
 		secondApproverClaim = claim.Id
 	} else if totalValue >= MANAGER_PO_LIMIT {
 		// Set second approver claim to 'vp'
-		claim, err := app.Dao().FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
+		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": "vp",
 		})
 		if err != nil {

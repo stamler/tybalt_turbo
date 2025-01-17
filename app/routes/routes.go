@@ -1,9 +1,6 @@
 package routes
 
 import (
-	"net/http"
-
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -27,268 +24,46 @@ func (e *CodeError) Error() string {
 func AddRoutes(app core.App) {
 
 	// Add the bundle timesheet route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/time_sheets/:weekEnding/bundle",
-			Handler: createBundleTimesheetHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
+	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
 
-		return nil
+		tsGroup := se.Router.Group("/api/time_sheets")
+		tsGroup.Bind(apis.RequireAuth("users"))
+		tsGroup.POST("/{weekEnding}/bundle", createBundleTimesheetHandler(app))
+		tsGroup.POST("/{id}/unbundle", createUnbundleTimesheetHandler(app))
+		tsGroup.POST("/{id}/approve", createApproveRecordHandler(app, "time_sheets"))
+		tsGroup.POST("/{id}/reject", createRejectRecordHandler(app, "time_sheets"))
+
+		expensesGroup := se.Router.Group("/api/expenses")
+		expensesGroup.Bind(apis.RequireAuth("users"))
+		expensesGroup.POST("/{id}/submit", createSubmitRecordHandler(app, "expenses"))
+		expensesGroup.POST("/{id}/recall", createRecallRecordHandler(app, "expenses"))
+		expensesGroup.POST("/{id}/approve", createApproveRecordHandler(app, "expenses"))
+		expensesGroup.POST("/{id}/reject", createRejectRecordHandler(app, "expenses"))
+		expensesGroup.POST("/{id}/commit", createCommitRecordHandler(app, "expenses"))
+
+		timeAmendmentsGroup := se.Router.Group("/api/time_amendments")
+		timeAmendmentsGroup.Bind(apis.RequireAuth("users"))
+		timeAmendmentsGroup.POST("/{id}/commit", createCommitRecordHandler(app, "time_amendments"))
+
+		poGroup := se.Router.Group("/api/purchase_orders")
+		poGroup.Bind(apis.RequireAuth("users"))
+		poGroup.POST("/{id}/approve", createApprovePurchaseOrderHandler(app))
+		poGroup.POST("/{id}/reject", createRejectPurchaseOrderHandler(app))
+		poGroup.POST("/{id}/cancel", createCancelPurchaseOrderHandler(app))
+		poGroup.POST("/{id}/close", createClosePurchaseOrderHandler(app))
+		poGroup.POST("/{id}/make_cumulative", createConvertToCumulativePurchaseOrderHandler(app))
+
+		clientsGroup := se.Router.Group("/api/clients")
+		clientsGroup.Bind(apis.RequireAuth("users"))
+		clientsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "clients"))
+		clientsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "clients"))
+
+		clientContactsGroup := se.Router.Group("/api/client_contacts")
+		clientContactsGroup.Bind(apis.RequireAuth("users"))
+		clientContactsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "client_contacts"))
+		clientContactsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "client_contacts"))
+
+		return se.Next()
 	})
 
-	// add the unbundle timesheet route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/time_sheets/:id/unbundle",
-			Handler: createUnbundleTimesheetHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the approve timesheet route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/time_sheets/:id/approve",
-			Handler: createApproveRecordHandler(app, "time_sheets"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the commit time_amendment route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/time_amendments/:id/commit",
-			Handler: createCommitRecordHandler(app, "time_amendments"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the reject-timesheet route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/time_sheets/:id/reject",
-			Handler: createRejectRecordHandler(app, "time_sheets"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the approve purchase order route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/purchase_orders/:id/approve",
-			Handler: createApprovePurchaseOrderHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the reject purchase order route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/purchase_orders/:id/reject",
-			Handler: createRejectPurchaseOrderHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the cancel purchase order route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/purchase_orders/:id/cancel",
-			Handler: createCancelPurchaseOrderHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the submit expense route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/expenses/:id/submit",
-			Handler: createSubmitRecordHandler(app, "expenses"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the recall expense route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/expenses/:id/recall",
-			Handler: createRecallRecordHandler(app, "expenses"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the approve expense route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/expenses/:id/approve",
-			Handler: createApproveRecordHandler(app, "expenses"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the reject expense route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/expenses/:id/reject",
-			Handler: createRejectRecordHandler(app, "expenses"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the commit expense route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/expenses/:id/commit",
-			Handler: createCommitRecordHandler(app, "expenses"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the close purchase order route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/purchase_orders/:id/close",
-			Handler: createClosePurchaseOrderHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the convert purchase order route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/purchase_orders/:id/make_cumulative",
-			Handler: createConvertToCumulativePurchaseOrderHandler(app),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the absorb clients route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/clients/:id/absorb",
-			Handler: CreateAbsorbRecordsHandler(app, "clients"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the undo absorb clients route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/clients/undo_absorb",
-			Handler: CreateUndoAbsorbHandler(app, "clients"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the absorb client contacts route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/client_contacts/:id/absorb",
-			Handler: CreateAbsorbRecordsHandler(app, "client_contacts"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
-
-	// Add the undo absorb client contacts route
-	app.OnBeforeServe().Add(func(e *core.ServeEvent) error {
-		e.Router.AddRoute(echo.Route{
-			Method:  http.MethodPost,
-			Path:    "/api/client_contacts/undo_absorb",
-			Handler: CreateUndoAbsorbHandler(app, "client_contacts"),
-			Middlewares: []echo.MiddlewareFunc{
-				apis.RequireRecordAuth("users"),
-			},
-		})
-
-		return nil
-	})
 }

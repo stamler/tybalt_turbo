@@ -9,12 +9,9 @@ import (
 
 	"tybalt/utilities"
 
-	"github.com/labstack/echo/v5"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/daos"
-	"github.com/pocketbase/pocketbase/models"
 )
 
 // AbsorbRequest defines the structure for the absorb request body
@@ -33,15 +30,15 @@ type AbsorbAction struct {
 	Updated           time.Time       `json:"updated"`
 }
 
-func CreateAbsorbRecordsHandler(app core.App, collectionName string) echo.HandlerFunc {
+func CreateAbsorbRecordsHandler(app core.App, collectionName string) func(e *core.RequestEvent) error {
 	// This handler absorbs multiple records into one target record for a given collection.
 	// It performs the following actions:
 	// 1. Validates the request body contains a list of IDs to absorb
 	// 2. Calls the AbsorbRecords function to perform the absorption
-	return func(c echo.Context) error {
-		targetId := c.PathParam("id")
+	return func(e *core.RequestEvent) error {
+		targetId := e.Request.PathValue("id")
 		var request AbsorbRequest
-		if err := c.Bind(&request); err != nil {
+		if err := e.BindBody(&request); err != nil {
 			return apis.NewBadRequestError("Invalid request body", nil)
 		}
 
@@ -57,8 +54,8 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) echo.Handle
 		}
 
 		// Check if user has the absorb claim
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
-		hasAbsorbClaim, err := utilities.HasClaim(app.Dao(), authRecord.Id, "absorb")
+		authRecord := e.Auth
+		hasAbsorbClaim, err := utilities.HasClaim(app, authRecord.Id, "absorb")
 		if err != nil {
 			return apis.NewBadRequestError("Failed to check user claims", err)
 		}
@@ -73,14 +70,14 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) echo.Handle
 		}
 
 		// First verify that the target record exists
-		targetRecord, err := app.Dao().FindRecordById(collectionName, targetId)
+		targetRecord, err := app.FindRecordById(collectionName, targetId)
 		if err != nil {
 			return apis.NewNotFoundError("Failed to find target record", err)
 		}
 
 		// Then verify that all records to absorb exist and satisfy parent constraint
 		for _, id := range request.IdsToAbsorb {
-			record, err := app.Dao().FindRecordById(collectionName, id)
+			record, err := app.FindRecordById(collectionName, id)
 			if err != nil {
 				return apis.NewNotFoundError("Failed to find record to absorb", err)
 			}
@@ -104,7 +101,7 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) echo.Handle
 			return apis.NewApiError(http.StatusInternalServerError, "Failed to absorb records", err)
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{
+		return e.JSON(http.StatusOK, map[string]string{
 			"message": fmt.Sprintf("Successfully absorbed %d records into %s", len(request.IdsToAbsorb), targetId),
 		})
 	}
@@ -121,9 +118,9 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 	refTracker := newReferenceTracker()
 
 	// Absorb the records in a transaction
-	err = app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+	err = app.RunInTransaction(func(txApp core.App) error {
 		// First create the temp table to validate IDs
-		_, err = txDao.DB().NewQuery(`
+		_, err = txApp.DB().NewQuery(`
 			CREATE TEMPORARY TABLE ids_to_absorb (old_id TEXT NOT NULL)
 		`).Execute()
 		if err != nil {
@@ -141,13 +138,13 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			INSERT INTO ids_to_absorb (old_id) VALUES %s
 		`, strings.Join(args, ","))
 
-		_, err = txDao.DB().NewQuery(insertQuery).Execute()
+		_, err = txApp.DB().NewQuery(insertQuery).Execute()
 		if err != nil {
 			return fmt.Errorf("populating temp table: %w", err)
 		}
 
 		// Check for existing absorb action
-		existingAction, err := getAbsorbAction(txDao, collectionName)
+		existingAction, err := getAbsorbAction(txApp, collectionName)
 		if err != nil {
 			return fmt.Errorf("error checking existing absorb action: %w", err)
 		}
@@ -156,7 +153,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 		}
 
 		// Serialize the records to be absorbed
-		absorbedRecords, err := serializeRecords(txDao, collectionName, idsToAbsorb)
+		absorbedRecords, err := serializeRecords(txApp, collectionName, idsToAbsorb)
 		if err != nil {
 			return fmt.Errorf("error serializing records: %w", err)
 		}
@@ -167,7 +164,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			return fmt.Errorf("error serializing reference updates: %w", err)
 		}
 
-		if err := recordAbsorbAction(txDao, collectionName, targetID, absorbedRecords, updatedRefs); err != nil {
+		if err := recordAbsorbAction(txApp, collectionName, targetID, absorbedRecords, updatedRefs); err != nil {
 			return fmt.Errorf("error recording absorb action: %w", err)
 		}
 
@@ -184,7 +181,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 				)
 			`, ref.Table, ref.Column)
 
-			rows, err := txDao.DB().NewQuery(trackQuery).Rows()
+			rows, err := txApp.DB().NewQuery(trackQuery).Rows()
 			if err != nil {
 				return fmt.Errorf("tracking references in %s: %w", ref.Table, err)
 			}
@@ -209,7 +206,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 				)
 			`, ref.Table, ref.Column)
 
-			_, err = txDao.DB().NewQuery(updateQuery).Bind(dbx.Params{
+			_, err = txApp.DB().NewQuery(updateQuery).Bind(dbx.Params{
 				"target_id": targetID,
 			}).Execute()
 			if err != nil {
@@ -223,23 +220,23 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			return fmt.Errorf("error serializing final reference updates: %w", err)
 		}
 
-		action, err := getAbsorbAction(txDao, collectionName)
+		action, err := getAbsorbAction(txApp, collectionName)
 		if err != nil {
 			return fmt.Errorf("error fetching absorb action for update: %w", err)
 		}
 
-		actionRecord, err := txDao.FindRecordById("absorb_actions", action.Id)
+		actionRecord, err := txApp.FindRecordById("absorb_actions", action.Id)
 		if err != nil {
 			return fmt.Errorf("error fetching absorb action record: %w", err)
 		}
 
 		actionRecord.Set("updated_references", string(updatedRefs))
-		if err := txDao.SaveRecord(actionRecord); err != nil {
+		if err := txApp.Save(actionRecord); err != nil {
 			return fmt.Errorf("error updating absorb action: %w", err)
 		}
 
 		// Delete absorbed records
-		_, err = txDao.DB().NewQuery(fmt.Sprintf(`
+		_, err = txApp.DB().NewQuery(fmt.Sprintf(`
 			DELETE FROM %[1]s 
 			WHERE EXISTS (
 				SELECT 1 
@@ -252,7 +249,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 		}
 
 		// Clean up
-		_, err = txDao.DB().NewQuery("DROP TABLE ids_to_absorb").Execute()
+		_, err = txApp.DB().NewQuery("DROP TABLE ids_to_absorb").Execute()
 		if err != nil {
 			return fmt.Errorf("dropping temp table: %w", err)
 		}
@@ -276,13 +273,13 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 //     a. Recreates all previously absorbed records with their original data
 //     b. Restores all references in related tables back to their original values
 //     c. Deletes the absorb action record to allow future absorb operations
-func CreateUndoAbsorbHandler(app core.App, collectionName string) echo.HandlerFunc {
-	return func(c echo.Context) error {
+func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
 		// Step 1: Permission Check
 		// Verify that the user has the 'absorb' claim, which is required for both
 		// absorbing and undoing absorb operations
-		authRecord, _ := c.Get(apis.ContextAuthRecordKey).(*models.Record)
-		hasAbsorbClaim, err := utilities.HasClaim(app.Dao(), authRecord.Id, "absorb")
+		authRecord := e.Auth
+		hasAbsorbClaim, err := utilities.HasClaim(app, authRecord.Id, "absorb")
 		if err != nil {
 			return apis.NewBadRequestError("Failed to check user claims", err)
 		}
@@ -294,7 +291,7 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) echo.HandlerFu
 		// Get the existing absorb action for this collection. There can only be
 		// one absorb action per collection at a time because the collection_name
 		// has a unique constraint.
-		action, err := getAbsorbAction(app.Dao(), collectionName)
+		action, err := getAbsorbAction(app, collectionName)
 		if err != nil {
 			return apis.NewApiError(http.StatusInternalServerError, "Failed to check absorb action", err)
 		}
@@ -319,22 +316,22 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) echo.HandlerFu
 		// Step 4: Execute Undo Operation
 		// Perform all undo operations in a single transaction to ensure data consistency.
 		// If any part fails, the entire undo operation is rolled back.
-		err = app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
+		err = app.RunInTransaction(func(txApp core.App) error {
 			// Step 4a: Recreate Absorbed Records
 			// Reconstruct each absorbed record with its original data, including
 			// system fields like id, created, updated, etc., from the absorbedRecords
 			// array.
-			collection, err := txDao.FindCollectionByNameOrId(collectionName)
+			collection, err := txApp.FindCollectionByNameOrId(collectionName)
 			if err != nil {
 				return fmt.Errorf("error finding collection: %w", err)
 			}
 
 			for _, recordData := range absorbedRecords {
-				record := models.NewRecord(collection)
+				record := core.NewRecord(collection)
 				for field, value := range recordData {
 					record.Set(field, value)
 				}
-				if err := txDao.SaveRecord(record); err != nil {
+				if err := txApp.Save(record); err != nil {
 					return fmt.Errorf("error recreating record: %w", err)
 				}
 			}
@@ -366,7 +363,7 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) echo.HandlerFu
 						WHERE id = {:record_id}
 					`, table, column)
 
-					_, err = txDao.DB().NewQuery(query).Bind(dbx.Params{
+					_, err = txApp.DB().NewQuery(query).Bind(dbx.Params{
 						"old_value": oldValue,
 						"record_id": recordId,
 					}).Execute()
@@ -379,11 +376,11 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) echo.HandlerFu
 			// Step 4c: Clean Up
 			// Delete the absorb action record to allow future absorb operations
 			// on this collection
-			actionRecord, err := txDao.FindRecordById("absorb_actions", action.Id)
+			actionRecord, err := txApp.FindRecordById("absorb_actions", action.Id)
 			if err != nil {
 				return fmt.Errorf("error finding absorb action: %w", err)
 			}
-			if err := txDao.DeleteRecord(actionRecord); err != nil {
+			if err := txApp.Delete(actionRecord); err != nil {
 				return fmt.Errorf("error deleting absorb action: %w", err)
 			}
 
@@ -394,7 +391,7 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) echo.HandlerFu
 			return apis.NewApiError(http.StatusInternalServerError, "Failed to undo absorb", err)
 		}
 
-		return c.JSON(http.StatusOK, map[string]string{
+		return e.JSON(http.StatusOK, map[string]string{
 			"message": "Successfully undid absorb operation",
 		})
 	}
@@ -440,8 +437,8 @@ func GetConfigsAndTable(collectionName string) ([]RefConfig, *ParentConstraint, 
 }
 
 // getAbsorbAction returns the existing absorb action for the collection or nil if none exists
-func getAbsorbAction(dao *daos.Dao, collectionName string) (*AbsorbAction, error) {
-	record, err := dao.FindFirstRecordByData("absorb_actions", "collection_name", collectionName)
+func getAbsorbAction(app core.App, collectionName string) (*AbsorbAction, error) {
+	record, err := app.FindFirstRecordByData("absorb_actions", "collection_name", collectionName)
 	if err != nil {
 		if err.Error() == "sql: no rows in result set" {
 			return nil, nil
@@ -462,19 +459,19 @@ func getAbsorbAction(dao *daos.Dao, collectionName string) (*AbsorbAction, error
 }
 
 // recordAbsorbAction creates a new absorb action record
-func recordAbsorbAction(dao *daos.Dao, collectionName string, targetId string, absorbedRecords []byte, updatedReferences []byte) error {
-	collection, err := dao.FindCollectionByNameOrId("absorb_actions")
+func recordAbsorbAction(app core.App, collectionName string, targetId string, absorbedRecords []byte, updatedReferences []byte) error {
+	collection, err := app.FindCollectionByNameOrId("absorb_actions")
 	if err != nil {
 		return fmt.Errorf("error finding absorb_actions collection: %w", err)
 	}
 
-	record := models.NewRecord(collection)
+	record := core.NewRecord(collection)
 	record.Set("collection_name", collectionName)
 	record.Set("target_id", targetId)
 	record.Set("absorbed_records", string(absorbedRecords))
 	record.Set("updated_references", string(updatedReferences))
 
-	if err := dao.SaveRecord(record); err != nil {
+	if err := app.Save(record); err != nil {
 		return fmt.Errorf("error saving absorb action: %w", err)
 	}
 
@@ -482,16 +479,16 @@ func recordAbsorbAction(dao *daos.Dao, collectionName string, targetId string, a
 }
 
 // serializeRecords fetches and serializes records to be absorbed
-func serializeRecords(dao *daos.Dao, collectionName string, ids []string) ([]byte, error) {
+func serializeRecords(app core.App, collectionName string, ids []string) ([]byte, error) {
 	var records []map[string]interface{}
 
-	collection, err := dao.FindCollectionByNameOrId(collectionName)
+	collection, err := app.FindCollectionByNameOrId(collectionName)
 	if err != nil {
 		return nil, fmt.Errorf("error finding collection: %w", err)
 	}
 
 	for _, id := range ids {
-		record, err := dao.FindRecordById(collectionName, id)
+		record, err := app.FindRecordById(collectionName, id)
 		if err != nil {
 			return nil, fmt.Errorf("error fetching record %s: %w", id, err)
 		}
@@ -499,14 +496,14 @@ func serializeRecords(dao *daos.Dao, collectionName string, ids []string) ([]byt
 		recordData := make(map[string]interface{})
 		// Include base model fields
 		recordData["id"] = record.Id
-		recordData["created"] = record.Created
-		recordData["updated"] = record.Updated
+		recordData["created"] = record.GetDateTime("created").Time()
+		recordData["updated"] = record.GetDateTime("updated").Time()
 		recordData["collectionId"] = record.Collection().Id
 		recordData["collectionName"] = record.Collection().Name
 
 		// Then include all schema fields
-		for _, field := range collection.Schema.Fields() {
-			recordData[field.Name] = record.Get(field.Name)
+		for _, field := range collection.Fields {
+			recordData[field.GetName()] = record.Get(field.GetName())
 		}
 		records = append(records, recordData)
 	}

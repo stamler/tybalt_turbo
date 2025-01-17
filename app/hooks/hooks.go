@@ -33,63 +33,63 @@ func (e *CodeError) Error() string {
 
 func AddHooks(app core.App) {
 	// hooks for time_entries model
-	app.OnRecordBeforeCreateRequest("time_entries").Add(func(e *core.RecordCreateEvent) error {
-		if err := ProcessTimeEntry(app, e.Record, e.HttpContext); err != nil {
+	app.OnRecordCreateRequest("time_entries").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessTimeEntry(app, e); err != nil {
 			return err
 		}
-		return nil
+		return e.Next()
 	})
-	app.OnRecordBeforeUpdateRequest("time_entries").Add(func(e *core.RecordUpdateEvent) error {
-		if err := ProcessTimeEntry(app, e.Record, e.HttpContext); err != nil {
+	app.OnRecordUpdateRequest("time_entries").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessTimeEntry(app, e); err != nil {
 			return err
 		}
-		return nil
+		return e.Next()
 	})
 	// hooks for time_amendments model
-	app.OnRecordBeforeCreateRequest("time_amendments").Add(func(e *core.RecordCreateEvent) error {
-		if err := ProcessTimeAmendment(app, e.Record, e.HttpContext); err != nil {
+	app.OnRecordCreateRequest("time_amendments").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessTimeAmendment(app, e); err != nil {
 			return err
 		}
-		return nil
+		return e.Next()
 	})
-	app.OnRecordBeforeUpdateRequest("time_amendments").Add(func(e *core.RecordUpdateEvent) error {
-		if err := ProcessTimeAmendment(app, e.Record, e.HttpContext); err != nil {
+	app.OnRecordUpdateRequest("time_amendments").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessTimeAmendment(app, e); err != nil {
 			return err
 		}
-		return nil
+		return e.Next()
 	})
 	// hooks for purchase_orders model
-	app.OnRecordBeforeCreateRequest("purchase_orders").Add(func(e *core.RecordCreateEvent) error {
-		if err := ProcessPurchaseOrder(app, e.Record, e.HttpContext); err != nil {
+	app.OnRecordCreateRequest("purchase_orders").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessPurchaseOrder(app, e); err != nil {
 			return err
 		}
-		return nil
+		return e.Next()
 	})
-	app.OnRecordBeforeUpdateRequest("purchase_orders").Add(func(e *core.RecordUpdateEvent) error {
-		if err := ProcessPurchaseOrder(app, e.Record, e.HttpContext); err != nil {
+	app.OnRecordUpdateRequest("purchase_orders").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessPurchaseOrder(app, e); err != nil {
 			return err
 		}
-		return nil
+		return e.Next()
 	})
 	// hooks for expenses model
-	app.OnRecordBeforeCreateRequest("expenses").Add(func(e *core.RecordCreateEvent) error {
-		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
+	app.OnRecordCreateRequest("expenses").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessExpense(app, e); err != nil {
 			// Check if the error is a HookError and return the appropriate JSON response
 			if hookError, ok := err.(*HookError); ok {
-				return e.HttpContext.JSON(hookError.Code, hookError)
+				return e.JSON(hookError.Code, hookError)
 			}
 			return err
 		}
-		return nil
+		return e.Next()
 	})
-	app.OnRecordBeforeUpdateRequest("expenses").Add(func(e *core.RecordUpdateEvent) error {
-		if err := ProcessExpense(app, e.Record, e.HttpContext); err != nil {
+	app.OnRecordUpdateRequest("expenses").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessExpense(app, e); err != nil {
 			// Check if the error is a HookError and return the appropriate JSON response
 			if hookError, ok := err.(*HookError); ok {
-				return e.HttpContext.JSON(hookError.Code, hookError)
+				return e.JSON(hookError.Code, hookError)
 			}
 			return err
 		}
-		return nil
+		return e.Next()
 	})
 }
