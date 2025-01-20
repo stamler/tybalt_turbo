@@ -423,7 +423,11 @@ func GetAnnualPayrollPeriodStartDate(app core.App, date string) (string, error) 
 
 // this function returns true if the user with uid has the claim with the
 // specified name and false otherwise
-func HasClaim(app core.App, uid string, name string) (bool, error) {
+func HasClaim(app core.App, auth *core.Record, name string) (bool, error) {
+	// fast fail if the auth record is nil
+	if auth == nil {
+		return false, nil
+	}
 	userClaims, err := app.FindRecordsByFilter(
 		"user_claims",
 		"uid={:uid} && cid.name={:name}",
@@ -431,7 +435,7 @@ func HasClaim(app core.App, uid string, name string) (bool, error) {
 		1,
 		0,
 		dbx.Params{
-			"uid":  uid,
+			"uid":  auth.Id,
 			"name": name,
 		},
 	)

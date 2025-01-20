@@ -55,7 +55,7 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) func(e *cor
 
 		// Check if user has the absorb claim
 		authRecord := e.Auth
-		hasAbsorbClaim, err := utilities.HasClaim(app, authRecord.Id, "absorb")
+		hasAbsorbClaim, err := utilities.HasClaim(app, authRecord, "absorb")
 		if err != nil {
 			return apis.NewBadRequestError("Failed to check user claims", err)
 		}
@@ -279,7 +279,7 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 		// Verify that the user has the 'absorb' claim, which is required for both
 		// absorbing and undoing absorb operations
 		authRecord := e.Auth
-		hasAbsorbClaim, err := utilities.HasClaim(app, authRecord.Id, "absorb")
+		hasAbsorbClaim, err := utilities.HasClaim(app, authRecord, "absorb")
 		if err != nil {
 			return apis.NewBadRequestError("Failed to check user claims", err)
 		}

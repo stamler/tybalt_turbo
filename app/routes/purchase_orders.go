@@ -83,7 +83,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 
 			// Check if the user is the approver, a qualified approver, or a qualified
 			// second approver
-			callerIsApprover, callerIsQualifiedApprover, callerIsQualifiedSecondApprover, err := isApprover(txApp, userId, po)
+			callerIsApprover, callerIsQualifiedApprover, callerIsQualifiedSecondApprover, err := isApprover(txApp, authRecord, po)
 			if err != nil {
 				return err
 			}
@@ -324,7 +324,7 @@ func createCancelPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 			}
 
 			// Check if the user is authorized to cancel the purchase order
-			hasPayablesAdminClaim, err := utilities.HasClaim(txApp, userId, "payables_admin")
+			hasPayablesAdminClaim, err := utilities.HasClaim(txApp, authRecord, "payables_admin")
 			if err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
@@ -397,7 +397,6 @@ payables_admin claim.
 func createConvertToCumulativePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		authRecord := e.Auth
-		userId := authRecord.Id
 
 		var httpResponseStatusCode int
 		id := e.Request.PathValue("id")
@@ -432,7 +431,7 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) func(e *core.Re
 			}
 
 			// Check if the user is authorized to cancel the purchase order
-			hasPayablesAdminClaim, err := utilities.HasClaim(txApp, userId, "payables_admin")
+			hasPayablesAdminClaim, err := utilities.HasClaim(txApp, authRecord, "payables_admin")
 			if err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
@@ -613,9 +612,9 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 	createApprovePurchaseOrderHandler function.
 */
 
-func isApprover(txApp core.App, userId string, po *core.Record) (bool, bool, bool, error) {
+func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool, bool, error) {
 	// Check if the caller is the approver specified in the record
-	callerIsApprover := po.GetString("approver") == userId
+	callerIsApprover := po.GetString("approver") == auth.Id
 	callerIsQualifiedApprover := false
 
 	// if the caller is not the approver, perform additional checks to see if
@@ -627,7 +626,7 @@ func isApprover(txApp core.App, userId string, po *core.Record) (bool, bool, boo
 		// order)
 		// TODO: implement this (perhaps HasClaim should also return the payload?)
 		callerIsQualifiedApprover = false
-		hasPoApproverClaim, err := utilities.HasClaim(txApp, userId, "po_approver")
+		hasPoApproverClaim, err := utilities.HasClaim(txApp, auth, "po_approver")
 		if err != nil {
 			return false, false, false, &CodeError{
 				Code:    "error_checking_po_approver_claim",
@@ -648,7 +647,7 @@ func isApprover(txApp core.App, userId string, po *core.Record) (bool, bool, boo
 	callerIsQualifiedSecondApprover := false // initialize to false
 	if recordRequiresSecondApproval {
 		userClaims, err := txApp.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
-			"userId": userId,
+			"userId": auth.Id,
 		})
 		if err != nil {
 			return false, false, false, &CodeError{

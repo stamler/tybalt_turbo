@@ -13,13 +13,12 @@ func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) er
 	return func(e *core.RequestEvent) error {
 		id := e.Request.PathValue("id")
 		authRecord := e.Auth
-		userId := authRecord.Id
 
 		var httpResponseStatusCode int
 
 		err := app.RunInTransaction(func(txApp core.App) error {
 			// Check if user has payables_admin claim
-			hasPayablesAdminClaim, err := utilities.HasClaim(txApp, userId, "payables_admin")
+			hasPayablesAdminClaim, err := utilities.HasClaim(txApp, authRecord, "payables_admin")
 			if err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{

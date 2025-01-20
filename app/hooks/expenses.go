@@ -239,7 +239,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	}
 
 	// Check if user has payables_admin claim
-	hasPayablesAdminClaim, err := utilities.HasClaim(app, e.Auth.Id, "payables_admin")
+	hasPayablesAdminClaim, err := utilities.HasClaim(app, e.Auth, "payables_admin")
 	if err != nil {
 		return &HookError{
 			Code:    http.StatusInternalServerError,

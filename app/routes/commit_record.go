@@ -50,7 +50,7 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 			// collection for a record with uid that matches the caller's ID and cid
 			// who's name in the claims collection is "commit". If the record exists,
 			// the caller has the commit claim.
-			hasCommitClaim, err := utilities.HasClaim(txApp, userId, "commit")
+			hasCommitClaim, err := utilities.HasClaim(txApp, authRecord, "commit")
 			if err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
