@@ -262,7 +262,7 @@ func TestAbsorbRoutes(t *testing.T) {
 
 		// Add a route with an unsupported collection
 		app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-			e.Router.POST("/api/test_unsupported/:id/absorb", routes.CreateAbsorbRecordsHandler(app, "unsupported_collection")).Bind(apis.RequireAuth("users"))
+			e.Router.POST("/api/test_unsupported/{id}/absorb", routes.CreateAbsorbRecordsHandler(app, "unsupported_collection")).Bind(apis.RequireAuth("users"))
 			return e.Next()
 		})
 
@@ -284,7 +284,7 @@ func TestAbsorbRoutes(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			e.Router.POST("/api/clients/:id/absorb", routes.CreateAbsorbRecordsHandler(app, "clients")).Bind(apis.RequireAuth("users"))
+			e.Router.POST("/api/clients/{id}/absorb", routes.CreateAbsorbRecordsHandler(app, "clients")).Bind(apis.RequireAuth("users"))
 			return e.Next()
 		})
 
@@ -358,10 +358,15 @@ func TestAbsorbRoutes(t *testing.T) {
 				`"message":"Successfully absorbed 2 records into lb0fnenkeyitsny"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeCreate": 1,
-				"OnModelAfterCreate":  1,
-				"OnModelBeforeUpdate": 1,
-				"OnModelAfterUpdate":  1,
+				"OnRecordCreate":             1,
+				"OnRecordCreateExecute":      1,
+				"OnRecordValidate":           1,
+				"OnRecordAfterCreateSuccess": 1,
+				"OnModelCreate":              1,
+				"OnModelCreateExecute":       1,
+				"OnModelValidate":            1,
+				"OnModelAfterCreateSuccess":  1,
+				"*":                          0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -423,11 +428,10 @@ func TestAbsorbRoutes(t *testing.T) {
 			},
 			ExpectedStatus: 500,
 			ExpectedContent: []string{
-				`"code":500,"message":"Failed to absorb records."`,
+				`"message":"Failed to absorb records.","status":500`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnBeforeApiError": 1,
-				"OnAfterApiError":  1,
+				"*": 0,
 			},
 			TestAppFactory: unsupportedCollectionTestApp,
 		},
@@ -497,12 +501,21 @@ func TestAbsorbRoutes(t *testing.T) {
 				`"message":"Successfully undid absorb operation"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeCreate": 2,
-				"OnModelAfterCreate":  2,
-				"OnModelBeforeUpdate": 1,
-				"OnModelAfterUpdate":  1,
-				"OnModelBeforeDelete": 1,
-				"OnModelAfterDelete":  1,
+				"OnRecordDelete":             1,
+				"OnRecordDeleteExecute":      1,
+				"OnRecordValidate":           1,
+				"OnRecordCreate":             1,
+				"OnRecordCreateExecute":      1,
+				"OnRecordAfterCreateSuccess": 1,
+				"OnModelDelete":              1,
+				"OnModelDeleteExecute":       1,
+				"OnRecordAfterDeleteSuccess": 1,
+				"OnModelValidate":            1,
+				"OnModelCreate":              1,
+				"OnModelCreateExecute":       1,
+				"OnModelAfterCreateSuccess":  1,
+				"OnModelAfterDeleteSuccess":  1,
+				"*":                          0,
 			},
 			TestAppFactory: func(t testing.TB) *tests.TestApp {
 				app := testutils.SetupTestApp(t)

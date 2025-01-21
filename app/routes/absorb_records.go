@@ -158,16 +158,6 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			return fmt.Errorf("error serializing records: %w", err)
 		}
 
-		// Record the absorb action
-		updatedRefs, err := refTracker.serialize()
-		if err != nil {
-			return fmt.Errorf("error serializing reference updates: %w", err)
-		}
-
-		if err := recordAbsorbAction(txApp, collectionName, targetID, absorbedRecords, updatedRefs); err != nil {
-			return fmt.Errorf("error recording absorb action: %w", err)
-		}
-
 		// Update all references using EXISTS
 		for _, ref := range refConfigs {
 			// First get the current values for tracking
@@ -214,25 +204,14 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			}
 		}
 
-		// Update the absorb action with the final reference updates
-		updatedRefs, err = refTracker.serialize()
+		// Update the absorb action with the reference updates
+		updatedRefs, err := refTracker.serialize()
 		if err != nil {
-			return fmt.Errorf("error serializing final reference updates: %w", err)
+			return fmt.Errorf("error serializing reference updates: %w", err)
 		}
 
-		action, err := getAbsorbAction(txApp, collectionName)
-		if err != nil {
-			return fmt.Errorf("error fetching absorb action for update: %w", err)
-		}
-
-		actionRecord, err := txApp.FindRecordById("absorb_actions", action.Id)
-		if err != nil {
-			return fmt.Errorf("error fetching absorb action record: %w", err)
-		}
-
-		actionRecord.Set("updated_references", string(updatedRefs))
-		if err := txApp.Save(actionRecord); err != nil {
-			return fmt.Errorf("error updating absorb action: %w", err)
+		if err := recordAbsorbAction(txApp, collectionName, targetID, absorbedRecords, updatedRefs); err != nil {
+			return fmt.Errorf("error recording absorb action: %w", err)
 		}
 
 		// Delete absorbed records
