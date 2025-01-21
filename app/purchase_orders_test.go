@@ -405,6 +405,16 @@ func TestGeneratePONumber(t *testing.T) {
 			record: func() *core.Record {
 				r := core.NewRecord(poCollection)
 				r.Set("parent_po", "2plsetqdxht7esg")
+				r.Set("uid", "f2j5a8vk006baub")
+				r.Set("type", "Normal")
+				r.Set("date", "2024-01-01")
+				r.Set("division", "ngpjzurmkrfl8fo")
+				r.Set("description", "Test description")
+				r.Set("total", 100.0)
+				r.Set("payment_type", "OnAccount")
+				r.Set("vendor", "2zqxtsmymf670ha")
+				r.Set("approver", "wegviunlyr2jjjv")
+				r.Set("status", "Unapproved")
 				return r
 			}(),
 			setup: func(t *testing.T, app *tests.TestApp) {
@@ -412,6 +422,16 @@ func TestGeneratePONumber(t *testing.T) {
 				firstChild := core.NewRecord(poCollection)
 				firstChild.Set("parent_po", "2plsetqdxht7esg")
 				firstChild.Set("po_number", "2024-0008-01")
+				firstChild.Set("uid", "f2j5a8vk006baub")
+				firstChild.Set("type", "Normal")
+				firstChild.Set("date", "2024-01-01")
+				firstChild.Set("division", "ngpjzurmkrfl8fo")
+				firstChild.Set("description", "Test description")
+				firstChild.Set("total", 100.0)
+				firstChild.Set("payment_type", "OnAccount")
+				firstChild.Set("vendor", "2zqxtsmymf670ha")
+				firstChild.Set("approver", "wegviunlyr2jjjv")
+				firstChild.Set("status", "Unapproved")
 				if err := app.Save(firstChild); err != nil {
 					t.Fatalf("failed to save first child PO: %v", err)
 				}
@@ -480,6 +500,16 @@ func TestGeneratePONumber(t *testing.T) {
 			record: func() *core.Record {
 				r := core.NewRecord(poCollection)
 				r.Set("parent_po", "2plsetqdxht7esg")
+				r.Set("uid", "f2j5a8vk006baub")
+				r.Set("type", "Normal")
+				r.Set("date", "2024-01-01")
+				r.Set("division", "ngpjzurmkrfl8fo")
+				r.Set("description", "Test description")
+				r.Set("total", 100.0)
+				r.Set("payment_type", "OnAccount")
+				r.Set("vendor", "2zqxtsmymf670ha")
+				r.Set("approver", "wegviunlyr2jjjv")
+				r.Set("status", "Unapproved")
 				return r
 			}(),
 			setup: func(t *testing.T, app *tests.TestApp) {
@@ -488,6 +518,16 @@ func TestGeneratePONumber(t *testing.T) {
 					child := core.NewRecord(poCollection)
 					child.Set("parent_po", "2plsetqdxht7esg")
 					child.Set("po_number", fmt.Sprintf("2024-0008-%02d", i))
+					child.Set("uid", "f2j5a8vk006baub")
+					child.Set("type", "Normal")
+					child.Set("date", "2024-01-01")
+					child.Set("division", "ngpjzurmkrfl8fo")
+					child.Set("description", "Test description")
+					child.Set("total", 100.0)
+					child.Set("payment_type", "OnAccount")
+					child.Set("vendor", "2zqxtsmymf670ha")
+					child.Set("approver", "wegviunlyr2jjjv")
+					child.Set("status", "Unapproved")
 					if err := app.Save(child); err != nil {
 						t.Fatalf("failed to save child PO %d: %v", i, err)
 					}
