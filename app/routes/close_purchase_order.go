@@ -82,6 +82,7 @@ func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) er
 				// return apis.NewApiError(httpResponseStatusCode, "error closing purchase order", codeError)
 				// TODO: can we have the OnBeforeApiError and OnAfterApiError events fire here by returning an different type of error?
 				// How does this relate to HookError?
+				// TODO: This is broken. Because an error isn't actually being returned.
 				return e.JSON(httpResponseStatusCode, map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
