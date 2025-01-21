@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
-	"time"
 
 	"tybalt/utilities"
 
@@ -26,8 +25,6 @@ type AbsorbAction struct {
 	TargetId          string          `json:"target_id"`
 	AbsorbedRecords   json.RawMessage `json:"absorbed_records"`
 	UpdatedReferences json.RawMessage `json:"updated_references"`
-	Created           time.Time       `json:"created"`
-	Updated           time.Time       `json:"updated"`
 }
 
 func CreateAbsorbRecordsHandler(app core.App, collectionName string) func(e *core.RequestEvent) error {
@@ -297,8 +294,8 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 		// If any part fails, the entire undo operation is rolled back.
 		err = app.RunInTransaction(func(txApp core.App) error {
 			// Step 4a: Recreate Absorbed Records
-			// Reconstruct each absorbed record with its original data, including
-			// system fields like id, created, updated, etc., from the absorbedRecords
+			// Reconstruct each absorbed record with its original data, excluding
+			// system fields like created, updated, etc., from the absorbedRecords
 			// array.
 			collection, err := txApp.FindCollectionByNameOrId(collectionName)
 			if err != nil {
@@ -431,8 +428,6 @@ func getAbsorbAction(app core.App, collectionName string) (*AbsorbAction, error)
 	action.TargetId = record.GetString("target_id")
 	action.AbsorbedRecords = []byte(record.GetString("absorbed_records"))
 	action.UpdatedReferences = []byte(record.GetString("updated_references"))
-	action.Created = record.GetDateTime("created").Time()
-	action.Updated = record.GetDateTime("updated").Time()
 
 	return &action, nil
 }
@@ -473,12 +468,8 @@ func serializeRecords(app core.App, collectionName string, ids []string) ([]byte
 		}
 
 		recordData := make(map[string]interface{})
-		// Include base model fields
+		// Include original record id
 		recordData["id"] = record.Id
-		recordData["created"] = record.GetDateTime("created").Time()
-		recordData["updated"] = record.GetDateTime("updated").Time()
-		recordData["collectionId"] = record.Collection().Id
-		recordData["collectionName"] = record.Collection().Name
 
 		// Then include all schema fields
 		for _, field := range collection.Fields {

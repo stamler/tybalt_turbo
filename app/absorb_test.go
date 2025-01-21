@@ -693,6 +693,11 @@ func TestUndoAbsorb(t *testing.T) {
 			continue
 		}
 		for field, originalValue := range originalData {
+			// skip the created and updated fields because these system fields are not
+			// backed up in an absorb action
+			if field == "created" || field == "updated" {
+				continue
+			}
 			currentValue := record.Get(field)
 			if !reflect.DeepEqual(currentValue, originalValue) {
 				t.Errorf("field %s of record %s has value %v, want %v", field, id, currentValue, originalValue)
