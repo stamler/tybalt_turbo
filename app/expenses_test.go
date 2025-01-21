@@ -196,13 +196,11 @@ func TestExpensesCreate(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"message":"Failed to create record."`,
+				`"data":{"uid":{"code":"not_provided"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnModelBeforeCreate":         0,
-				"OnModelAfterCreate":          0,
-				"OnRecordBeforeCreateRequest": 0,
-				"OnRecordAfterCreateRequest":  0,
+				"*":                     0,
+				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

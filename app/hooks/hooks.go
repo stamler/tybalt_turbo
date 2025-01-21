@@ -1,6 +1,8 @@
 package hooks
 
 import (
+	"errors"
+
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -12,6 +14,14 @@ type HookError struct {
 
 func (e *HookError) Error() string {
 	return e.Message
+}
+
+func AnnotateHookError(app core.App, e *core.RecordRequestEvent, err error) error {
+	var hookErr *HookError
+	if errors.As(err, &hookErr) {
+		e.JSON(hookErr.Code, hookErr)
+	}
+	return err
 }
 
 // CodeError is a custom error type that includes a code
@@ -74,13 +84,13 @@ func AddHooks(app core.App) {
 	// hooks for expenses model
 	app.OnRecordCreateRequest("expenses").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessExpense(app, e); err != nil {
-			return err
+			return AnnotateHookError(app, e, err)
 		}
 		return e.Next()
 	})
 	app.OnRecordUpdateRequest("expenses").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessExpense(app, e); err != nil {
-			return err
+			return AnnotateHookError(app, e, err)
 		}
 		return e.Next()
 	})

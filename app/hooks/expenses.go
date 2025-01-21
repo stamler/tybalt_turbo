@@ -24,19 +24,43 @@ const NO_PO_EXPENSE_LIMIT = 100.0
 // updated. It is called by ProcessExpense to reduce the number of fields
 // that need to be validated.
 func cleanExpense(app core.App, expenseRecord *core.Record) error {
+	if expenseRecord.GetString("uid") == "" {
+		return &HookError{
+			Code:    http.StatusBadRequest,
+			Message: "hook error when cleaning expense",
+			Data: map[string]CodeError{
+				"uid": {
+					Code:    "not_provided",
+					Message: "no uid provided in for expense record",
+				},
+			},
+		}
+	}
 
 	// get the user's manager and set the approver field
 	profile, err := app.FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
 		"userId": expenseRecord.GetString("uid"),
 	})
+	if profile == nil {
+		return &HookError{
+			Code:    http.StatusBadRequest,
+			Message: "hook error when cleaning expense",
+			Data: map[string]CodeError{
+				"uid": {
+					Code:    "no_profile_found_for_uid",
+					Message: "no profile found for uid",
+				},
+			},
+		}
+	}
 	if err != nil {
 		return &HookError{
 			Code:    http.StatusInternalServerError,
 			Message: "hook error when cleaning expense",
 			Data: map[string]CodeError{
 				"uid": {
-					Code:    "error_finding_profile",
-					Message: "error finding profile for user",
+					Code:    "error_during_profile_lookup",
+					Message: "error during profile lookup",
 				},
 			},
 		}
