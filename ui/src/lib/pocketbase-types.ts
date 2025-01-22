@@ -229,6 +229,7 @@ export type PurchaseOrdersRecord = {
   end_date: string;
   frequency: PurchaseOrdersFrequencyOptions;
   job: RecordIdString;
+  parent_po: RecordIdString;
   payment_type: PurchaseOrdersPaymentTypeOptions;
   po_number: string;
   rejected: IsoDateString;

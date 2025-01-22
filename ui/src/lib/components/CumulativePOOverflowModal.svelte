@@ -1,10 +1,11 @@
 <script lang="ts">
   import DsActionButton from "./DSActionButton.svelte";
   import { fade } from "svelte/transition";
+  import { goto } from "$app/navigation";
 
   let show = $state(false);
   let overflowData = $state<{
-    parent_po: any;
+    parent_po: string;
     parent_po_number: string;
     overflow_amount: number;
     po_total: number;
@@ -16,7 +17,7 @@
   }
 
   export function openModal(data: {
-    parent_po: any;
+    parent_po: string;
     parent_po_number: string;
     overflow_amount: number;
     po_total: number;
@@ -26,7 +27,10 @@
   }
 
   function handleCreateChild() {
+    if (!overflowData) return;
     closeModal();
+    console.log("overflowData", overflowData);
+    goto(`/pos/${overflowData.parent_po}/add-child`);
   }
 </script>
 

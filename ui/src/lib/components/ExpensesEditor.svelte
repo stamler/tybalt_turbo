@@ -83,19 +83,13 @@
       }
     }
   }
-
-  function handleCreateChild(event: CustomEvent) {
-    const { parent_po, overflow_amount } = event.detail;
-    // TODO: Navigate to create child PO page with pre-filled data
-    console.log("Create child PO", parent_po, overflow_amount);
-  }
 </script>
 
 <svelte:head>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 </svelte:head>
 
-<CumulativePOOverflowModal bind:this={overflowModal} on:createChild={handleCreateChild} />
+<CumulativePOOverflowModal bind:this={overflowModal} />
 
 <form
   class="flex w-full flex-col items-center gap-2 p-2"
