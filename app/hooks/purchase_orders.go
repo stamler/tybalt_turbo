@@ -48,12 +48,12 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	secondApproverClaim, err := getSecondApproverClaim(app, purchaseOrderRecord)
 	if err != nil {
 		return &HookError{
-			Code:    http.StatusInternalServerError,
+			Status:  http.StatusInternalServerError,
 			Message: "hook error when getting second approver claim",
 			Data: map[string]CodeError{
 				"second_approver_claim": {
 					Code:    "internal_server_error",
-					Message: "error getting second approver claim",
+					Message: err.Error(),
 				},
 			},
 		}
@@ -77,7 +77,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		parentPO, err := app.FindRecordById("purchase_orders", purchaseOrderRecord.GetString("parent_po"))
 		if err != nil {
 			return &HookError{
-				Code:    http.StatusBadRequest,
+				Status:  http.StatusBadRequest,
 				Message: "hook error when fetching parent PO",
 				Data: map[string]CodeError{
 					"parent_po": {
@@ -90,7 +90,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 
 		if parentPO.GetString("status") != "Active" {
 			return &HookError{
-				Code:    http.StatusBadRequest,
+				Status:  http.StatusBadRequest,
 				Message: "hook error when validating parent PO",
 				Data: map[string]CodeError{
 					"parent_po": {
@@ -103,7 +103,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 
 		if parentPO.GetString("type") != "Cumulative" {
 			return &HookError{
-				Code:    http.StatusBadRequest,
+				Status:  http.StatusBadRequest,
 				Message: "hook error when validating parent PO",
 				Data: map[string]CodeError{
 					"parent_po": {
@@ -121,7 +121,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		})
 		if err != nil {
 			return &HookError{
-				Code:    http.StatusInternalServerError,
+				Status:  http.StatusInternalServerError,
 				Message: "hook error when fetching other child POs",
 				Data: map[string]CodeError{
 					"parent_po": {
@@ -134,7 +134,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 
 		if len(otherChildPOs) > 0 {
 			return &HookError{
-				Code:    http.StatusBadRequest,
+				Status:  http.StatusBadRequest,
 				Message: "hook error when validating parent PO",
 				Data: map[string]CodeError{
 					"parent_po": {
@@ -150,7 +150,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		for _, field := range fieldsToMatch {
 			if purchaseOrderRecord.GetString(field) != parentPO.GetString(field) {
 				return &HookError{
-					Code:    http.StatusBadRequest,
+					Status:  http.StatusBadRequest,
 					Message: "hook error when validating parent PO",
 					Data: map[string]CodeError{
 						field: {
@@ -166,7 +166,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 	dateAsTime, parseErr := time.Parse("2006-01-02", purchaseOrderRecord.Get("date").(string))
 	if parseErr != nil {
 		return &HookError{
-			Code:    http.StatusBadRequest,
+			Status:  http.StatusBadRequest,
 			Message: "hook error when validating date",
 			Data: map[string]CodeError{
 				"date": {
@@ -220,7 +220,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	// error.
 	if record.GetString("uid") != authRecord.Id {
 		return &HookError{
-			Code:    http.StatusBadRequest,
+			Status:  http.StatusBadRequest,
 			Message: "hook error when validating uid",
 			Data: map[string]CodeError{
 				"uid": {

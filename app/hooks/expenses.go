@@ -26,7 +26,7 @@ const NO_PO_EXPENSE_LIMIT = 100.0
 func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	if expenseRecord.GetString("uid") == "" {
 		return &HookError{
-			Code:    http.StatusBadRequest,
+			Status:  http.StatusBadRequest,
 			Message: "hook error when cleaning expense",
 			Data: map[string]CodeError{
 				"uid": {
@@ -43,7 +43,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	})
 	if profile == nil {
 		return &HookError{
-			Code:    http.StatusBadRequest,
+			Status:  http.StatusBadRequest,
 			Message: "hook error when cleaning expense",
 			Data: map[string]CodeError{
 				"uid": {
@@ -55,7 +55,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	}
 	if err != nil {
 		return &HookError{
-			Code:    http.StatusInternalServerError,
+			Status:  http.StatusInternalServerError,
 			Message: "hook error when cleaning expense",
 			Data: map[string]CodeError{
 				"uid": {
@@ -78,7 +78,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {
 			return &HookError{
-				Code:    http.StatusInternalServerError,
+				Status:  http.StatusInternalServerError,
 				Message: "hook error when cleaning expense",
 				Data: map[string]CodeError{
 					"global": {
@@ -95,7 +95,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		// check if the distance is an integer
 		if distance != float64(int(distance)) {
 			return &HookError{
-				Code:    http.StatusBadRequest,
+				Status:  http.StatusBadRequest,
 				Message: "hook error when cleaning expense",
 				Data: map[string]CodeError{
 					"distance": {
@@ -109,7 +109,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		totalMileageExpense, mileageErr := utilities.CalculateMileageTotal(app, expenseRecord, expenseRateRecord)
 		if mileageErr != nil {
 			return &HookError{
-				Code:    http.StatusInternalServerError,
+				Status:  http.StatusInternalServerError,
 				Message: "hook error when cleaning expense",
 				Data: map[string]CodeError{
 					"total": {
@@ -133,7 +133,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {
 			return &HookError{
-				Code:    http.StatusInternalServerError,
+				Status:  http.StatusInternalServerError,
 				Message: "hook error when cleaning expense",
 				Data: map[string]CodeError{
 					"global": {
@@ -178,7 +178,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	// if the expense record is submitted, return an error
 	if expenseRecord.Get("submitted") == true {
 		return &HookError{
-			Code:    http.StatusBadRequest,
+			Status:  http.StatusBadRequest,
 			Message: "hook error when processing expense",
 			Data: map[string]CodeError{
 				"submitted": {
@@ -199,7 +199,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	payPeriodEnding, ppEndErr := utilities.GeneratePayPeriodEnding(expenseRecord.GetString("date"))
 	if ppEndErr != nil {
 		return &HookError{
-			Code:    http.StatusInternalServerError,
+			Status:  http.StatusInternalServerError,
 			Message: "hook error when processing expense",
 			Data: map[string]CodeError{
 				"pay_period_ending": {
@@ -219,7 +219,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		poRecord, err = app.FindRecordById("purchase_orders", purchaseOrder)
 		if err != nil {
 			return &HookError{
-				Code:    http.StatusInternalServerError,
+				Status:  http.StatusInternalServerError,
 				Message: "hook error when processing expense",
 				Data: map[string]CodeError{
 					"purchase_order": {
@@ -250,7 +250,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		existingExpensesTotal, err = utilities.CumulativeTotalExpensesForPurchaseOrder(app, poRecord, false)
 		if err != nil {
 			return &HookError{
-				Code:    http.StatusInternalServerError,
+				Status:  http.StatusInternalServerError,
 				Message: "hook error when processing expense",
 				Data: map[string]CodeError{
 					"purchase_order": {
@@ -266,7 +266,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	hasPayablesAdminClaim, err := utilities.HasClaim(app, e.Auth, "payables_admin")
 	if err != nil {
 		return &HookError{
-			Code:    http.StatusInternalServerError,
+			Status:  http.StatusInternalServerError,
 			Message: "error checking claim",
 			Data: map[string]CodeError{
 				"global": {

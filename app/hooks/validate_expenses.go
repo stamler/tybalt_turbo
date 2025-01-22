@@ -32,7 +32,7 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 		poDate, parseErr = time.Parse(time.DateOnly, poRecord.GetString("date"))
 		if parseErr != nil {
 			return &HookError{
-				Code:    http.StatusInternalServerError,
+				Status:  http.StatusInternalServerError,
 				Message: "error parsing purchase order date",
 				Data: map[string]CodeError{
 					"purchase_order": {
@@ -46,11 +46,11 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 			poEndDate, parseErr = time.Parse(time.DateOnly, poRecord.GetString("end_date"))
 			if parseErr != nil {
 				return &HookError{
-					Code:    http.StatusInternalServerError,
+					Status:  http.StatusBadRequest,
 					Message: "error parsing purchase order end date",
 					Data: map[string]CodeError{
 						"purchase_order": {
-							Code:    "error_parsing_date",
+							Code:    "error_parsing_end_date",
 							Message: "error parsing purchase order end date",
 						},
 					},
@@ -82,7 +82,7 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 				// the constraints from the documentation? I've tried using SafeErrorItem but I'm having trouble importing
 				// the router package, possibly related to versioning issues.
 				return &HookError{
-					Code:    http.StatusBadRequest,
+					Status:  http.StatusBadRequest,
 					Message: "cumulative expenses exceed purchase order total",
 					Data: map[string]CodeError{
 						"total": {
@@ -114,7 +114,7 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 	// Throw an error if hasPurchaseOrder is true but poRecordProvided is false
 	if hasPurchaseOrder && !poRecordProvided {
 		return &HookError{
-			Code:    http.StatusInternalServerError,
+			Status:  http.StatusInternalServerError,
 			Message: "an expense against a purchase_orders record cannot be validated without a corresponding purchase order record",
 			Data: map[string]CodeError{
 				"purchase_order": {
