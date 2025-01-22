@@ -81,7 +81,22 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 				// properly delimited (it's just combined into a string). How can we return structured error data given
 				// the constraints from the documentation? I've tried using SafeErrorItem but I'm having trouble importing
 				// the router package, possibly related to versioning issues.
-				return validation.Errors{"total": validation.NewError("cumulative_po_overflow", fmt.Sprintf("cumulative expenses exceed purchase order total of $%0.2f by $%0.2f", poTotal, overflowAmount))}.Filter()
+				return &HookError{
+					Code:    http.StatusBadRequest,
+					Message: "cumulative expenses exceed purchase order total",
+					Data: map[string]CodeError{
+						"total": {
+							Code:    "cumulative_po_overflow",
+							Message: "cumulative expenses exceed purchase order total",
+							Data: map[string]any{
+								"purchase_order":  poRecord.Id,
+								"po_number":       poRecord.GetString("po_number"),
+								"po_total":        poTotal,
+								"overflow_amount": overflowAmount,
+							},
+						},
+					},
+				}
 			}
 			totalLimit -= existingExpensesTotal
 		}

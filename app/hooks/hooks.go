@@ -7,7 +7,7 @@ import (
 )
 
 type HookError struct {
-	Code    int                  `json:"code"`
+	Code    int                  `json:"code"` // TODO: rename this to Status, representing the HTTP status code
 	Message string               `json:"message"`
 	Data    map[string]CodeError `json:"data"`
 }
@@ -28,6 +28,7 @@ func AnnotateHookError(app core.App, e *core.RecordRequestEvent, err error) erro
 type CodeError struct {
 	Code    string `json:"code"`
 	Message string `json:"message"`
+	Data    any    `json:"data"`
 }
 
 func (e *CodeError) Error() string {

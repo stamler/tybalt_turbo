@@ -70,11 +70,13 @@
     } catch (error: any) {
       // Check if this is a cumulative PO overflow error
       if (error.data?.data?.total?.code === "cumulative_po_overflow") {
-        // Extract parent PO and overflow amount from the error
-        const errorData = error.data.data.total;
+        // Show the child PO creation modal populated with relevant data
+        const errorData = error.data.data.total.data;
         overflowModal?.openModal({
-          parent_po: errorData.parent_po,
-          overflow_amount: parseFloat(errorData.message.match(/\$[\d.]+$/)[0].substring(1)),
+          parent_po: errorData.purchase_order,
+          parent_po_number: errorData.po_number,
+          po_total: errorData.po_total,
+          overflow_amount: parseFloat(errorData.overflow_amount),
         });
       } else {
         errors = error.data.data;
