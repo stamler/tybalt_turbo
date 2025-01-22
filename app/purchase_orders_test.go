@@ -47,6 +47,95 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "valid child purchase order is created",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(`{
+				"parent_po": "ly8xyzpuj79upq1",
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "this one is cumulative",
+				"payment_type": "OnAccount",
+				"total": 1234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal",
+				"job": "cjf0kt0defhq480",
+				"category": "t5nmdl188gtlhz0"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"approver":"etysnrlup2f6bak"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "fails when parent_po is not cumulative",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(`{
+				"parent_po": "2plsetqdxht7esg",
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "this one is cumulative",
+				"payment_type": "OnAccount",
+				"total": 1234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal",
+				"job": "cjf0kt0defhq480",
+				"category": "t5nmdl188gtlhz0"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"parent_po":{"code":"invalid_type"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "fails when job of child purchase order does not match job of parent purchase order",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(`{
+				"parent_po": "ly8xyzpuj79upq1",
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "this one is cumulative",
+				"payment_type": "OnAccount",
+				"total": 1234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal",
+				"job": "non-matching-job",
+				"category": "t5nmdl188gtlhz0"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"job":{"code":"value_mismatch"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		{
 			Name:   "otherwise valid purchase order with Inactive vendor fails",
 			Method: http.MethodPost,
 			URL:    "/api/collections/purchase_orders/records",
@@ -421,9 +510,9 @@ func TestGeneratePONumber(t *testing.T) {
 				// Create and save the first child PO
 				firstChild := core.NewRecord(poCollection)
 				firstChild.Set("parent_po", "2plsetqdxht7esg")
-				firstChild.Set("po_number", "2024-0008-01")
 				firstChild.Set("uid", "f2j5a8vk006baub")
 				firstChild.Set("type", "Normal")
+				firstChild.Set("po_number", "2024-0008-01")
 				firstChild.Set("date", "2024-01-01")
 				firstChild.Set("division", "ngpjzurmkrfl8fo")
 				firstChild.Set("description", "Test description")

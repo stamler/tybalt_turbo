@@ -5,12 +5,12 @@ package hooks
 
 import (
 	"fmt"
+	"net/http"
 	"time"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -47,7 +47,16 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	// set the second_approver_claim field
 	secondApproverClaim, err := getSecondApproverClaim(app, purchaseOrderRecord)
 	if err != nil {
-		return err
+		return &HookError{
+			Code:    http.StatusInternalServerError,
+			Message: "hook error when getting second approver claim",
+			Data: map[string]CodeError{
+				"second_approver_claim": {
+					Code:    "internal_server_error",
+					Message: "error getting second approver claim",
+				},
+			},
+		}
 	}
 	purchaseOrderRecord.Set("second_approver_claim", secondApproverClaim)
 
@@ -61,10 +70,111 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 // the record is invalid, otherwise it returns nil.
 func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	isRecurring := purchaseOrderRecord.GetString("type") == "Recurring"
+	isChild := purchaseOrderRecord.GetString("parent_po") != ""
+
+	if isChild {
+		// Validate parent PO is active and cumulative
+		parentPO, err := app.FindRecordById("purchase_orders", purchaseOrderRecord.GetString("parent_po"))
+		if err != nil {
+			return &HookError{
+				Code:    http.StatusBadRequest,
+				Message: "hook error when fetching parent PO",
+				Data: map[string]CodeError{
+					"parent_po": {
+						Code:    "not_found",
+						Message: "parent PO not found",
+					},
+				},
+			}
+		}
+
+		if parentPO.GetString("status") != "Active" {
+			return &HookError{
+				Code:    http.StatusBadRequest,
+				Message: "hook error when validating parent PO",
+				Data: map[string]CodeError{
+					"parent_po": {
+						Code:    "invalid_status",
+						Message: "parent PO must be active",
+					},
+				},
+			}
+		}
+
+		if parentPO.GetString("type") != "Cumulative" {
+			return &HookError{
+				Code:    http.StatusBadRequest,
+				Message: "hook error when validating parent PO",
+				Data: map[string]CodeError{
+					"parent_po": {
+						Code:    "invalid_type",
+						Message: "parent PO must be cumulative",
+					},
+				},
+			}
+		}
+
+		// Validate that other child POs with status "Unapproved" do not exist
+		otherChildPOs, err := app.FindRecordsByFilter("purchase_orders", "parent_po = {:parentId} && status = {:status}", "", 0, 0, dbx.Params{
+			"parentId": parentPO.Id,
+			"status":   "Unapproved",
+		})
+		if err != nil {
+			return &HookError{
+				Code:    http.StatusInternalServerError,
+				Message: "hook error when fetching other child POs",
+				Data: map[string]CodeError{
+					"parent_po": {
+						Code:    "internal_server_error",
+						Message: "error searching for other child POs",
+					},
+				},
+			}
+		}
+
+		if len(otherChildPOs) > 0 {
+			return &HookError{
+				Code:    http.StatusBadRequest,
+				Message: "hook error when validating parent PO",
+				Data: map[string]CodeError{
+					"parent_po": {
+						Code:    "invalid_status",
+						Message: "other child POs with status 'Unapproved' already exist",
+					},
+				},
+			}
+		}
+
+		// Validate fields match parent PO
+		fieldsToMatch := []string{"job", "payment_type", "category", "description", "vendor"}
+		for _, field := range fieldsToMatch {
+			if purchaseOrderRecord.GetString(field) != parentPO.GetString(field) {
+				return &HookError{
+					Code:    http.StatusBadRequest,
+					Message: "hook error when validating parent PO",
+					Data: map[string]CodeError{
+						field: {
+							Code:    "value_mismatch",
+							Message: fmt.Sprintf("field %s must match parent PO's %s", field, field),
+						},
+					},
+				}
+			}
+		}
+	}
 
 	dateAsTime, parseErr := time.Parse("2006-01-02", purchaseOrderRecord.Get("date").(string))
 	if parseErr != nil {
-		return parseErr
+		return &HookError{
+			Code:    http.StatusBadRequest,
+			Message: "hook error when validating date",
+			Data: map[string]CodeError{
+				"date": {
+					Code:    "invalid_date",
+					Message: "date must be a valid date",
+				},
+			},
+		}
 	}
 
 	validationsErrors := validation.Errors{
@@ -109,20 +219,28 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	// If the uid property is not equal to the authenticated user's uid, return an
 	// error.
 	if record.GetString("uid") != authRecord.Id {
-		return apis.NewApiError(400, "uid property must be equal to the authenticated user's id", map[string]validation.Error{})
+		return &HookError{
+			Code:    http.StatusBadRequest,
+			Message: "hook error when validating uid",
+			Data: map[string]CodeError{
+				"uid": {
+					Code:    "value_mismatch",
+					Message: "uid must be equal to the authenticated user's id",
+				},
+			},
+		}
 	}
 
 	// set properties to nil if they are not allowed to be set based on the type
 	cleanErr := cleanPurchaseOrder(app, record)
 	if cleanErr != nil {
-		return apis.NewBadRequestError("Error cleaning purchase_order record", cleanErr)
+		return cleanErr
 	}
 
 	// validate the purchase_order record
 	if validationErr := validatePurchaseOrder(app, record); validationErr != nil {
-		return apis.NewBadRequestError("Validation error", validationErr)
+		return validationErr
 	}
-
 	return nil
 }
 

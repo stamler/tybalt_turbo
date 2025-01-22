@@ -71,13 +71,13 @@ func AddHooks(app core.App) {
 	// hooks for purchase_orders model
 	app.OnRecordCreateRequest("purchase_orders").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessPurchaseOrder(app, e); err != nil {
-			return err
+			return AnnotateHookError(app, e, err)
 		}
 		return e.Next()
 	})
 	app.OnRecordUpdateRequest("purchase_orders").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessPurchaseOrder(app, e); err != nil {
-			return err
+			return AnnotateHookError(app, e, err)
 		}
 		return e.Next()
 	})
