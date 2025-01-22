@@ -115,9 +115,8 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		}
 
 		// Validate that other child POs with status "Unapproved" do not exist
-		otherChildPOs, err := app.FindRecordsByFilter("purchase_orders", "parent_po = {:parentId} && status = {:status}", "", 0, 0, dbx.Params{
+		otherChildPOs, err := app.FindRecordsByFilter("purchase_orders", "parent_po = {:parentId} && status != 'Closed' && status != 'Cancelled'", "", 0, 0, dbx.Params{
 			"parentId": parentPO.Id,
-			"status":   "Unapproved",
 		})
 		if err != nil {
 			return &HookError{
@@ -138,8 +137,8 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				Message: "hook error when validating parent PO",
 				Data: map[string]CodeError{
 					"parent_po": {
-						Code:    "invalid_status",
-						Message: "other child POs with status 'Unapproved' already exist",
+						Code:    "existing_children_with_blocking_status",
+						Message: "other child POs that are not 'Closed' or 'Cancelled' already exist",
 					},
 				},
 			}

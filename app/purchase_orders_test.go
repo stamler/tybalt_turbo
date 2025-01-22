@@ -77,6 +77,36 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "fails when other child POs with status 'Unapproved' exist",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(`{
+				"parent_po": "y660i6a14ql2355",
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "this one is cumulative",
+				"payment_type": "OnAccount",
+				"total": 1234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal",
+				"job": "cjf0kt0defhq480",
+				"category": "t5nmdl188gtlhz0"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"parent_po":{"code":"existing_children_with_blocking_status"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*":                     0,
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "fails when parent_po is not cumulative",
 			Method: http.MethodPost,
 			URL:    "/api/collections/purchase_orders/records",
