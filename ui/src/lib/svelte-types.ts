@@ -24,7 +24,7 @@ export type TimeEntriesPageData = PageData<TimeEntriesRecord>;
 export type TimeAmendmentsPageData = PageData<TimeAmendmentsRecord>;
 export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord | PurchaseOrdersResponse> & {
   approvers: PoApproversResponse[];
-  parentPo?: PurchaseOrdersResponse;
+  parent_po_number?: string;
 };
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse>;
 export type JobsPageData = PageData<JobsRecord> & { categories: CategoriesResponse[] };

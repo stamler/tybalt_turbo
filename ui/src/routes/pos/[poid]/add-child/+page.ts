@@ -50,6 +50,6 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     editing: false,
     id: null,
     approvers: allApprovers,
-    parentPo,
+    parent_po_number: parentPo.po_number,
   };
 }; 

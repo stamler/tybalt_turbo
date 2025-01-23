@@ -70,9 +70,9 @@
   enctype="multipart/form-data"
   onsubmit={save}
 >
-  {#if isChildPO && data.parentPo?.po_number}
+  {#if isChildPO && data.parent_po_number}
     <span class="flex w-full gap-2">
-      <DsLabel color="cyan">Child PO of {data.parentPo.po_number}</DsLabel>
+      <DsLabel color="cyan">Child PO of {data.parent_po_number}</DsLabel>
     </span>
   {/if}
 
