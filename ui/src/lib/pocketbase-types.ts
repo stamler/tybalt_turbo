@@ -6,6 +6,11 @@ import type PocketBase from "pocketbase";
 import type { RecordService } from "pocketbase";
 
 export enum Collections {
+  Authorigins = "_authOrigins",
+  Externalauths = "_externalAuths",
+  Mfas = "_mfas",
+  Otps = "_otps",
+  Superusers = "_superusers",
   AbsorbActions = "absorb_actions",
   AdminProfiles = "admin_profiles",
   Categories = "categories",
@@ -40,11 +45,11 @@ export type HTMLString = string;
 // System fields
 export type BaseSystemFields<T = never> = {
   id: RecordIdString;
-  created: IsoDateString;
-  updated: IsoDateString;
   collectionId: string;
   collectionName: Collections;
   expand: T;
+  created: IsoDateString;
+  updated: IsoDateString;
 };
 
 export type AuthSystemFields<T = never> = {
@@ -56,10 +61,62 @@ export type AuthSystemFields<T = never> = {
 
 // Record types for each collection
 
+export type AuthoriginsRecord = {
+  collectionRef: string;
+  created: IsoDateString;
+  fingerprint: string;
+  id: string;
+  recordRef: string;
+  updated: IsoDateString;
+};
+
+export type ExternalauthsRecord = {
+  collectionRef: string;
+  created: IsoDateString;
+  id: string;
+  provider: string;
+  providerId: string;
+  recordRef: string;
+  updated: IsoDateString;
+};
+
+export type MfasRecord = {
+  collectionRef: string;
+  created: IsoDateString;
+  id: string;
+  method: string;
+  recordRef: string;
+  updated: IsoDateString;
+};
+
+export type OtpsRecord = {
+  collectionRef: string;
+  created: IsoDateString;
+  id: string;
+  password: string;
+  recordRef: string;
+  sentTo: string;
+  updated: IsoDateString;
+};
+
+export type SuperusersRecord = {
+  created: IsoDateString;
+  email: string;
+  emailVisibility: boolean;
+  id: string;
+  password: string;
+  tokenKey: string;
+  updated: IsoDateString;
+  verified: boolean;
+};
+
 export type AbsorbActionsRecord<Tabsorbed_records = unknown, Tupdated_references = unknown> = {
   absorbed_records: null | Tabsorbed_records;
   collection_name: string;
+  created: IsoDateString;
+  id: string;
   target_id: string;
+  updated: IsoDateString;
   updated_references: null | Tupdated_references;
 };
 
@@ -69,7 +126,9 @@ export enum AdminProfilesSkipMinTimeCheckOptions {
   "yes" = "yes",
 }
 export type AdminProfilesRecord = {
+  created: IsoDateString;
   default_charge_out_rate: number;
+  id: string;
   off_rotation_permitted: boolean;
   opening_date: string;
   opening_op: number;
@@ -78,42 +137,61 @@ export type AdminProfilesRecord = {
   salary: boolean;
   skip_min_time_check: AdminProfilesSkipMinTimeCheckOptions;
   uid: RecordIdString;
+  updated: IsoDateString;
   work_week_hours: number;
 };
 
 export type CategoriesRecord = {
+  created: IsoDateString;
+  id: string;
   job: RecordIdString;
   name: string;
+  updated: IsoDateString;
 };
 
 export type ClaimsRecord = {
+  created: IsoDateString;
   description: string;
+  id: string;
   name: string;
-};
-
-export type ClientsRecord = {
-  name: string;
+  updated: IsoDateString;
 };
 
 export type ClientContactsRecord = {
   client: RecordIdString;
+  created: IsoDateString;
   email: string;
   given_name: string;
+  id: string;
   surname: string;
+  updated: IsoDateString;
+};
+
+export type ClientsRecord = {
+  created: IsoDateString;
+  id: string;
+  name: string;
+  updated: IsoDateString;
 };
 
 export type DivisionsRecord = {
   code: string;
+  created: IsoDateString;
+  id: string;
   name: string;
+  updated: IsoDateString;
 };
 
 export type ExpenseRatesRecord<Tmileage = unknown> = {
   breakfast: number;
+  created: IsoDateString;
   dinner: number;
   effective_date: string;
+  id: string;
   lodging: number;
   lunch: number;
   mileage: null | Tmileage;
+  updated: IsoDateString;
 };
 
 export enum ExpensesPaymentTypeOptions {
@@ -142,10 +220,12 @@ export type ExpensesRecord = {
   committed: IsoDateString;
   committed_week_ending: string;
   committer: RecordIdString;
+  created: IsoDateString;
   date: string;
   description: string;
   distance: number;
   division: RecordIdString;
+  id: string;
   job: RecordIdString;
   pay_period_ending: string;
   payment_type: ExpensesPaymentTypeOptions;
@@ -156,40 +236,51 @@ export type ExpensesRecord = {
   submitted: boolean;
   total: number;
   uid: RecordIdString;
+  updated: IsoDateString;
   vendor: RecordIdString;
-  vendor_name: string;
 };
 
 export type JobsRecord = {
   client: RecordIdString;
   contact: RecordIdString;
+  created: IsoDateString;
   description: string;
+  id: string;
   manager: RecordIdString;
   number: string;
+  updated: IsoDateString;
 };
 
 export type ManagersRecord = {
   given_name: string;
+  id: string;
   surname: string;
 };
 
 export type PayrollYearEndDatesRecord = {
+  created: IsoDateString;
   date: string;
+  id: string;
+  updated: IsoDateString;
 };
 
 export type PoApproversRecord = {
   divisions: null | string[];
   given_name: string;
+  id: string;
   surname: string;
 };
 
 export type ProfilesRecord = {
   alternate_manager: RecordIdString;
+  created: IsoDateString;
   default_division: RecordIdString;
   given_name: string;
+  id: string;
   manager: RecordIdString;
   surname: string;
   uid: RecordIdString;
+  updated: IsoDateString;
 };
 
 export enum PurchaseOrdersStatusOptions {
@@ -223,11 +314,13 @@ export type PurchaseOrdersRecord = {
   cancelled: IsoDateString;
   canceller: RecordIdString;
   category: RecordIdString;
+  created: IsoDateString;
   date: string;
   description: string;
   division: RecordIdString;
   end_date: string;
   frequency: PurchaseOrdersFrequencyOptions;
+  id: string;
   job: RecordIdString;
   parent_po: RecordIdString;
   payment_type: PurchaseOrdersPaymentTypeOptions;
@@ -242,6 +335,7 @@ export type PurchaseOrdersRecord = {
   total: number;
   type: PurchaseOrdersTypeOptions;
   uid: RecordIdString;
+  updated: IsoDateString;
   vendor: RecordIdString;
   vendor_name: string;
 };
@@ -251,11 +345,13 @@ export type TimeAmendmentsRecord = {
   committed: IsoDateString;
   committed_week_ending: string;
   committer: RecordIdString;
+  created: IsoDateString;
   creator: RecordIdString;
   date: string;
   description: string;
   division: RecordIdString;
   hours: number;
+  id: string;
   job: RecordIdString;
   meals_hours: number;
   payout_request_amount: number;
@@ -263,27 +359,32 @@ export type TimeAmendmentsRecord = {
   time_type: RecordIdString;
   tsid: RecordIdString;
   uid: RecordIdString;
+  updated: IsoDateString;
   week_ending: string;
   work_record: string;
 };
 
 export type TimeEntriesRecord = {
   category: RecordIdString;
+  created: IsoDateString;
   date: string;
   description: string;
   division: RecordIdString;
   hours: number;
+  id: string;
   job: RecordIdString;
   meals_hours: number;
   payout_request_amount: number;
   time_type: RecordIdString;
   tsid: RecordIdString;
   uid: RecordIdString;
+  updated: IsoDateString;
   week_ending: string;
   work_record: string;
 };
 
 export type TimeOffRecord = {
+  id: string;
   last_op: string;
   last_ov: string;
   manager: string;
@@ -299,9 +400,12 @@ export type TimeOffRecord = {
 };
 
 export type TimeSheetReviewersRecord = {
+  created: IsoDateString;
+  id: string;
   reviewed: IsoDateString;
   reviewer: RecordIdString;
   time_sheet: RecordIdString;
+  updated: IsoDateString;
 };
 
 export type TimeSheetsRecord = {
@@ -309,12 +413,15 @@ export type TimeSheetsRecord = {
   approver: RecordIdString;
   committed: IsoDateString;
   committer: RecordIdString;
+  created: IsoDateString;
+  id: string;
   rejected: IsoDateString;
   rejection_reason: string;
   rejector: RecordIdString;
   salary: boolean;
   submitted: boolean;
   uid: RecordIdString;
+  updated: IsoDateString;
   week_ending: string;
   work_week_hours: number;
 };
@@ -322,19 +429,34 @@ export type TimeSheetsRecord = {
 export type TimeTypesRecord = {
   allowed_fields: null | string[];
   code: string;
+  created: IsoDateString;
   description: string;
+  id: string;
   name: string;
   required_fields: null | string[];
+  updated: IsoDateString;
 };
 
 export type UserClaimsRecord<Tpayload = unknown> = {
   cid: RecordIdString;
+  created: IsoDateString;
+  id: string;
   payload: null | Tpayload;
   uid: RecordIdString;
+  updated: IsoDateString;
 };
 
 export type UsersRecord = {
+  created: IsoDateString;
+  email: string;
+  emailVisibility: boolean;
+  id: string;
   name: string;
+  password: string;
+  tokenKey: string;
+  updated: IsoDateString;
+  username: string;
+  verified: boolean;
 };
 
 export enum VendorsStatusOptions {
@@ -343,8 +465,11 @@ export enum VendorsStatusOptions {
 }
 export type VendorsRecord = {
   alias: string;
+  created: IsoDateString;
+  id: string;
   name: string;
   status: VendorsStatusOptions;
+  updated: IsoDateString;
 };
 
 type TimeEntriesRecordExpands = {
@@ -407,6 +532,14 @@ type ClientsRecordExpands = {
 };
 
 // Response types include system fields and match responses from the PocketBase API
+export type AuthoriginsResponse<Texpand = unknown> = Required<AuthoriginsRecord> &
+  BaseSystemFields<Texpand>;
+export type ExternalauthsResponse<Texpand = unknown> = Required<ExternalauthsRecord> &
+  BaseSystemFields<Texpand>;
+export type MfasResponse<Texpand = unknown> = Required<MfasRecord> & BaseSystemFields<Texpand>;
+export type OtpsResponse<Texpand = unknown> = Required<OtpsRecord> & BaseSystemFields<Texpand>;
+export type SuperusersResponse<Texpand = unknown> = Required<SuperusersRecord> &
+  AuthSystemFields<Texpand>;
 export type AbsorbActionsResponse<
   Tabsorbed_records = unknown,
   Tupdated_references = unknown,
@@ -464,12 +597,17 @@ export type VendorsResponse<Texpand = unknown> = Required<VendorsRecord> &
 // Types containing all Records and Responses, useful for creating typing helper functions
 
 export type CollectionRecords = {
+  _authOrigins: AuthoriginsRecord;
+  _externalAuths: ExternalauthsRecord;
+  _mfas: MfasRecord;
+  _otps: OtpsRecord;
+  _superusers: SuperusersRecord;
   absorb_actions: AbsorbActionsRecord;
   admin_profiles: AdminProfilesRecord;
   categories: CategoriesRecord;
   claims: ClaimsRecord;
-  clients: ClientsRecord;
   client_contacts: ClientContactsRecord;
+  clients: ClientsRecord;
   divisions: DivisionsRecord;
   expense_rates: ExpenseRatesRecord;
   expenses: ExpensesRecord;
@@ -491,12 +629,17 @@ export type CollectionRecords = {
 };
 
 export type CollectionResponses = {
+  _authOrigins: AuthoriginsResponse;
+  _externalAuths: ExternalauthsResponse;
+  _mfas: MfasResponse;
+  _otps: OtpsResponse;
+  _superusers: SuperusersResponse;
   absorb_actions: AbsorbActionsResponse;
   admin_profiles: AdminProfilesResponse;
   categories: CategoriesResponse;
   claims: ClaimsResponse;
-  clients: ClientsResponse;
   client_contacts: ClientContactsResponse;
+  clients: ClientsResponse;
   divisions: DivisionsResponse;
   expense_rates: ExpenseRatesResponse;
   expenses: ExpensesResponse;
@@ -521,12 +664,17 @@ export type CollectionResponses = {
 // https://github.com/pocketbase/js-sdk#specify-typescript-definitions
 
 export type TypedPocketBase = PocketBase & {
+  collection(idOrName: "_authOrigins"): RecordService<AuthoriginsResponse>;
+  collection(idOrName: "_externalAuths"): RecordService<ExternalauthsResponse>;
+  collection(idOrName: "_mfas"): RecordService<MfasResponse>;
+  collection(idOrName: "_otps"): RecordService<OtpsResponse>;
+  collection(idOrName: "_superusers"): RecordService<SuperusersResponse>;
   collection(idOrName: "absorb_actions"): RecordService<AbsorbActionsResponse>;
   collection(idOrName: "admin_profiles"): RecordService<AdminProfilesResponse>;
   collection(idOrName: "categories"): RecordService<CategoriesResponse>;
   collection(idOrName: "claims"): RecordService<ClaimsResponse>;
-  collection(idOrName: "clients"): RecordService<ClientsResponse>;
   collection(idOrName: "client_contacts"): RecordService<ClientContactsResponse>;
+  collection(idOrName: "clients"): RecordService<ClientsResponse>;
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
   collection(idOrName: "expense_rates"): RecordService<ExpenseRatesResponse>;
   collection(idOrName: "expenses"): RecordService<ExpensesResponse>;
