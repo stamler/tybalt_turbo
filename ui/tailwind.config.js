@@ -4,15 +4,15 @@ export default {
   safelist: [
     {
       // DsLabel border colors
-      pattern: /border-(cyan|teal|red|green|orange)-300/,
+      pattern: /border-(cyan|teal|red|green|orange|blue)-300/,
     },
     {
       // DsLabel background colors
-      pattern: /bg-(cyan|teal|red|green|orange)-100/,
+      pattern: /bg-(cyan|teal|red|green|orange|blue)-100/,
     },
     {
       // DsLabel text colors
-      pattern: /text-(cyan|teal|red|green|orange)-500/,
+      pattern: /text-(cyan|teal|red|green|orange|blue)-500/,
     },
     {
       // DsHoverIcon colors

@@ -15,7 +15,7 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
   }
 
   // Create a new PO with fields that must match the parent
-  const defaultItem: PurchaseOrdersRecord = {
+  const defaultItem = {
     po_number: "",
     status: PurchaseOrdersStatusOptions.Unapproved,
     uid: "",
@@ -31,22 +31,16 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     vendor: parentPo.vendor,
     job: parentPo.job,
     category: parentPo.category,
-    approved: "",
     approver: "",
     attachment: "",
-    cancelled: "",
-    canceller: "",
-    rejected: "",
-    rejection_reason: "",
-    rejector: "",
-    second_approval: "",
-    second_approver: "",
-    second_approver_claim: "",
-    vendor_name: "",
   };
 
   return {
-    item: defaultItem,
+    // we cast here rather than using defaultItem directly because some fields
+    // from PurchaseOrdersRecord are not present in the defaultItem and if they
+    // were we would get an error on the backend due to isset field restrictions
+    // on create.
+    item: { ...defaultItem } as PurchaseOrdersRecord,
     editing: false,
     id: null,
     approvers: allApprovers,

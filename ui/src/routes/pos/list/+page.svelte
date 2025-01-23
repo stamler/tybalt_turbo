@@ -126,7 +126,7 @@
   </span>
 {/snippet}
 
-{#snippet headline({ total, payment_type, expand }: PurchaseOrdersResponse)}
+{#snippet headline({ total, payment_type, parent_po, expand }: PurchaseOrdersResponse)}
   <span class="flex items-center gap-2">
     ${total}
     {payment_type}
@@ -134,6 +134,11 @@
       <Icon icon="mdi:store" width="24px" class="inline-block" />
       {expand?.vendor.name} ({expand?.vendor.alias})
     </span>
+    {#if parent_po !== ""}
+      <DsLabel color="blue">
+        child of {expand?.parent_po?.po_number}
+      </DsLabel>
+    {/if}
   </span>
 {/snippet}
 
