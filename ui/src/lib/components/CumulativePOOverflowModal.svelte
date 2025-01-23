@@ -28,8 +28,6 @@
 
   function handleCreateChild() {
     if (!overflowData) return;
-    closeModal();
-    console.log("overflowData", overflowData);
     goto(`/pos/${overflowData.parent_po}/add-child`);
   }
 </script>
