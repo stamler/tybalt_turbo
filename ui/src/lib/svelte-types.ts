@@ -1,6 +1,7 @@
 import type {
   TimeEntriesRecord,
   PurchaseOrdersRecord,
+  PurchaseOrdersResponse,
   ExpensesRecord,
   ExpensesResponse,
   JobsRecord,
@@ -21,8 +22,9 @@ export interface PageData<T> {
 
 export type TimeEntriesPageData = PageData<TimeEntriesRecord>;
 export type TimeAmendmentsPageData = PageData<TimeAmendmentsRecord>;
-export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord> & {
+export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord | PurchaseOrdersResponse> & {
   approvers: PoApproversResponse[];
+  parentPo?: PurchaseOrdersResponse;
 };
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse>;
 export type JobsPageData = PageData<JobsRecord> & { categories: CategoriesResponse[] };

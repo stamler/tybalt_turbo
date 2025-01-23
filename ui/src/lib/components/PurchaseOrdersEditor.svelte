@@ -11,6 +11,7 @@
   import type { PurchaseOrdersPageData } from "$lib/svelte-types";
   import type { CategoriesResponse, PoApproversResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
+  import DsLabel from "./DsLabel.svelte";
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
 
@@ -18,6 +19,7 @@
   let item = $state(data.item);
 
   const isRecurring = $derived(item.type === "Recurring");
+  const isChildPO = $derived(item.parent_po !== "" && item.parent_po !== undefined);
 
   let categories = $state([] as CategoriesResponse[]);
 
@@ -68,6 +70,12 @@
   enctype="multipart/form-data"
   onsubmit={save}
 >
+  {#if isChildPO && data.parentPo?.po_number}
+    <span class="flex w-full gap-2">
+      <DsLabel color="cyan">Child PO of {data.parentPo.po_number}</DsLabel>
+    </span>
+  {/if}
+
   <DsSelector
     bind:value={item.type as string}
     items={[
@@ -78,6 +86,7 @@
     {errors}
     fieldName="type"
     uiName="Purchase Order Type"
+    disabled={isChildPO}
   >
     {#snippet optionTemplate(item)}
       {item.name}
@@ -166,6 +175,7 @@
     {errors}
     fieldName="payment_type"
     uiName="Payment Type"
+    disabled={isChildPO}
   >
     {#snippet optionTemplate(item)}
       {item.name}
@@ -179,6 +189,7 @@
       {errors}
       fieldName="job"
       uiName="Job"
+      disabled={isChildPO}
     >
       {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
     </DsAutoComplete>
@@ -192,6 +203,7 @@
       fieldName="category"
       uiName="Category"
       clear={true}
+      disabled={isChildPO}
     >
       {#snippet optionTemplate(item: CategoriesResponse)}
         {item.name}
@@ -204,6 +216,7 @@
     {errors}
     fieldName="description"
     uiName="Description"
+    disabled={isChildPO}
   />
 
   <DsTextInput
@@ -223,6 +236,7 @@
       {errors}
       fieldName="vendor"
       uiName="Vendor"
+      disabled={isChildPO}
     >
       {#snippet resultTemplate(item)}{item.name} ({item.alias}){/snippet}
     </DsAutoComplete>
