@@ -624,8 +624,6 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 		// Check if the caller is a qualified approver (has the po_approver claim
 		// and that claim has a payload that includes the division of the purchase
 		// order)
-		// TODO: implement this (perhaps HasClaim should also return the payload?)
-		callerIsQualifiedApprover = false
 		hasPoApproverClaim, err := utilities.HasClaim(txApp, auth, "po_approver")
 		if err != nil {
 			return false, false, false, &CodeError{
@@ -634,8 +632,12 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 			}
 		}
 		if hasPoApproverClaim {
-			// TODO: check if the payload includes the division of the purchase order
-			callerIsQualifiedApprover = true
+			// ApproverHasDivisionPermission returns a validation function that checks if the
+			// provided approver ID has permission to approve purchase orders for the specified
+			// division. We pass the auth.Id as the value to validate.
+			if err := utilities.ApproverHasDivisionPermission(txApp, po.GetString("division"))(auth.Id); err == nil {
+				callerIsQualifiedApprover = true
+			}
 		}
 	}
 

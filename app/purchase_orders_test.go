@@ -2,9 +2,12 @@ package main
 
 import (
 	"fmt"
+	"math/rand"
 	"net/http"
 	"strings"
 	"testing"
+	"time"
+	"tybalt/hooks"
 	"tybalt/internal/testutils"
 	"tybalt/routes"
 
@@ -18,6 +21,36 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	// Generate token for user with po_approver claim
+	poApproverToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate token for user with division-specific po_approver claim
+	divisionApproverToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate token for user with smg claim
+	smgApproverToken, err := testutils.GenerateRecordToken("users", "hal@2005.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate token for user with vp claim
+	vpApproverToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Get current year for PO number validation
+	currentYear := time.Now().Format("2006")
+	// Get current date for approval timestamp validation
+	currentDate := time.Now().Format("2006-01-02")
+
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "valid purchase order is created",
@@ -164,7 +197,6 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-
 		{
 			Name:   "otherwise valid purchase order with Inactive vendor fails",
 			Method: http.MethodPost,
@@ -187,6 +219,231 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"message":"Failed to create record.","status":400`,
 			},
 			ExpectedEvents: map[string]int{},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		/*
+		   This test verifies the basic auto-approval flow for purchase orders.
+		   When a user with the po_approver claim (empty payload = all divisions) creates a PO:
+		   1. The PO should be auto-approved immediately:
+		      - approved timestamp should be set to current date/time
+		      - approver should be set to the creator's ID
+		   2. Status should become "Active" (since no second approval needed for low value)
+		   3. PO number should be generated (format: YYYY-NNNN)
+
+		   Test setup:
+		   - Uses user wegviunlyr2jjjv (fakemanager@fakesite.xyz) who has po_approver claim
+		   - Sets PO total to random value below MANAGER_PO_LIMIT to avoid triggering second approval
+		   - Uses correct auth token matching the creator's ID
+
+		   Verification points:
+		   - approved: Checks timestamp starts with current date
+		   - status: Must be "Active"
+		   - po_number: Must start with current year
+		   - approver: Must be creator's ID (wegviunlyr2jjjv)
+		*/
+		{
+			Name:   "purchase order is auto-approved when creator has po_approver claim",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(fmt.Sprintf(`{
+				"uid": "wegviunlyr2jjjv",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": %.2f,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal"
+			}`, rand.Float64()*(hooks.MANAGER_PO_LIMIT-1.0)+1.0)),
+			Headers:        map[string]string{"Authorization": poApproverToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
+				`"status":"Active"`,
+				fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number starting with current year
+				`"approver":"wegviunlyr2jjjv"`,               // Creator becomes approver
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		/*
+		   These tests verify division-specific auto-approval for purchase orders.
+		   User fatt@mac.com (id: etysnrlup2f6bak) has po_approver claim with payload:
+		   ["hcd86z57zjty6jo", "fy4i9poneukvq9u", "vccd5fo56ctbigh"]
+
+		   Test 1 (Success case):
+		   - Creates PO with division "vccd5fo56ctbigh" (in user's po_approver claim payload)
+		   - Should auto-approve since user has permission for this division
+		   - Verifies: approval timestamp, Active status, PO number generation
+		   - Creator becomes approver
+
+		   Test 2 (Failure case):
+		   - Creates PO with division "ngpjzurmkrfl8fo" (not in user's po_approver claim payload)
+		   - Uses wegviunlyr2jjjv as approver (has empty po_approver claim payload = all divisions)
+		   - Should succeed (200) but not auto-approve
+		   - Verifies: no approval, Unapproved status, original approver remains
+
+		   Both tests:
+		   - Use random total below MANAGER_PO_LIMIT (500) to avoid second approval
+		   - Use correct auth token for fatt@mac.com
+		   - Match uid to authenticated user's ID
+		*/
+		{
+			Name:   "purchase order is auto-approved when creator has po_approver claim for matching division",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(fmt.Sprintf(`{
+				"uid": "etysnrlup2f6bak",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": %.2f,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal"
+			}`, rand.Float64()*(hooks.MANAGER_PO_LIMIT-1.0)+1.0)),
+			Headers:        map[string]string{"Authorization": divisionApproverToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
+				`"status":"Active"`,
+				fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number starting with current year
+				`"approver":"etysnrlup2f6bak"`,               // Creator becomes approver
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "purchase order is not auto-approved when creator has po_approver claim but non-matching division",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(fmt.Sprintf(`{
+				"uid": "etysnrlup2f6bak",
+				"date": "2024-09-01",
+				"division": "ngpjzurmkrfl8fo",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": %.2f,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "wegviunlyr2jjjv",
+				"status": "Unapproved",
+				"type": "Normal"
+			}`, rand.Float64()*(hooks.MANAGER_PO_LIMIT-1.0)+1.0)),
+			Headers:        map[string]string{"Authorization": divisionApproverToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approved":""`,                // Should not be approved
+				`"status":"Unapproved"`,        // Status should remain Unapproved
+				`"approver":"wegviunlyr2jjjv"`, // Original approver should remain
+				`"po_number":""`,               // No PO number should be generated
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		/*
+		   This test verifies auto-approval of high-value purchase orders by users with elevated claims.
+		   User hal@2005.com (id: 66ct66w380ob6w8) has:
+		   - po_approver claim with empty payload (can approve for any division)
+		   - smg claim (can provide second approval for high-value POs)
+
+		   Test verifies that when this user creates a high-value PO:
+		   1. First approval is automatic (due to po_approver claim)
+		   2. Second approval is also automatic (due to smg claim)
+		   3. Status becomes Active and PO number is generated
+		   4. Creator is set as both approver and second_approver
+
+		   The test:
+		   - Uses total above VP_PO_LIMIT (2500) to trigger second approval requirement
+		   - Uses random division (since user has empty po_approver payload)
+		   - Verifies all approval fields and timestamps
+		*/
+		{
+			Name:   "purchase order is fully auto-approved when creator has po_approver and smg claims",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(fmt.Sprintf(`{
+				"uid": "66ct66w380ob6w8",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": %.2f,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal"
+			}`, rand.Float64()*(1000.0)+hooks.VP_PO_LIMIT)), // Random value > VP_PO_LIMIT
+			Headers:        map[string]string{"Authorization": smgApproverToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate),
+				fmt.Sprintf(`"second_approval":"%s`, currentDate),
+				`"status":"Active"`,
+				fmt.Sprintf(`"po_number":"%s-`, currentYear),
+				`"approver":"66ct66w380ob6w8"`,
+				`"second_approver":"66ct66w380ob6w8"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		/*
+		   This test verifies auto-approval of mid-range value purchase orders by users with VP claim.
+		   User author@soup.com (id: f2j5a8vk006baub) has:
+		   - po_approver claim with empty payload (can approve for any division)
+		   - vp claim (can provide second approval for POs between MANAGER_PO_LIMIT and VP_PO_LIMIT)
+
+		   Test verifies that when this user creates a mid-range value PO:
+		   1. First approval is automatic (due to po_approver claim)
+		   2. Second approval is also automatic (due to vp claim)
+		   3. Status becomes Active and PO number is generated
+		   4. Creator is set as both approver and second_approver
+
+		   The test:
+		   - Uses total between MANAGER_PO_LIMIT (500) and VP_PO_LIMIT (2500)
+		   - Uses random division (since user has empty po_approver payload)
+		   - Verifies all approval fields and timestamps
+		*/
+		{
+			Name:   "purchase order is fully auto-approved when creator has po_approver and vp claims",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(fmt.Sprintf(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": %.2f,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal"
+			}`, rand.Float64()*(hooks.VP_PO_LIMIT-hooks.MANAGER_PO_LIMIT)+hooks.MANAGER_PO_LIMIT)), // Random value between MANAGER_PO_LIMIT and VP_PO_LIMIT
+			Headers:        map[string]string{"Authorization": vpApproverToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate),        // Should have an approval timestamp
+				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have a second approval timestamp
+				`"status":"Active"`,
+				fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number
+				`"approver":"f2j5a8vk006baub"`,               // Creator becomes approver
+				`"second_approver":"f2j5a8vk006baub"`,        // Creator also becomes second approver
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 1,
+			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 	}

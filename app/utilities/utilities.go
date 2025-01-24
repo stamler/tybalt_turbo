@@ -114,16 +114,14 @@ func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
 	}
 }
 
-// approverHasDivisionPermission returns true if the payload of the user_claims
-// collection record corresponding to the approverId is null or is a JSON list
-// of strings where one list element is the divisionId. Returns false otherwise.
-// To accomplish this, it must first get the id of the claim that has a name of
-// 'po_approver' and then use that id to load the user_claims record
-// corresponding to the approverId and the po_approver claim id. This record is
-// then checked to see if its payload is null or a JSON list of strings where
-// one list element is the divisionId.
-func ApproverHasDivisionPermission(app core.App, approverId string, divisionId string) validation.RuleFunc {
+// ApproverHasDivisionPermission returns a validation function that checks if the
+// provided approver ID (as the value parameter) has permission to approve
+// purchase orders for the specified division. Permission is granted if either:
+// 1. The approver's po_approver claim payload is empty (null, [], or {})
+// 2. The approver's po_approver claim payload contains the specified divisionId
+func ApproverHasDivisionPermission(app core.App, divisionId string) validation.RuleFunc {
 	return func(value interface{}) error {
+		approverId, _ := value.(string)
 		poApproverClaim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": "po_approver",
 		})
