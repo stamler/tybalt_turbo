@@ -111,18 +111,28 @@
 </script>
 
 {#snippet anchor(item: PurchaseOrdersResponse)}
-  <span class="flex flex-col items-center">
-    {#if item.status === "Unapproved"}
+  <span class="flex flex-col items-center gap-2">
+    {#if item.status === "Active"}
+      <DsLabel style="inverted" color="green">
+        {item.po_number}
+      </DsLabel>
+    {:else if item.status === "Unapproved"}
       {item.date}
     {:else}
       {item.po_number}
     {/if}
-    <DsActionButton
+    <!-- <DsActionButton
       action={() => navigator.clipboard.writeText(JSON.stringify(item))}
       icon="mdi:clipboard-outline"
       title="Copy"
       color="blue"
-    />
+    /> -->
+    {#if item.type === "Cumulative"}
+      <DsLabel color="teal">
+        <!-- <Icon icon="mdi:chart-bell-curve-cumulative" width="24px" class="inline-block" /> -->
+        <Icon icon="mdi:sigma" width="24px" class="inline-block" />
+      </DsLabel>
+    {/if}
   </span>
 {/snippet}
 
@@ -158,10 +168,6 @@
         <Icon icon="mdi:cancel" width="24px" class="inline-block" />
         {expand?.rejector.expand?.profiles_via_uid.given_name}
         {expand?.rejector.expand?.profiles_via_uid.surname}
-      </DsLabel>
-    {:else if status === "Active"}
-      <DsLabel color="green">
-        <Icon icon="mdi:check" width="24px" class="inline-block" />
       </DsLabel>
     {:else if status === "Cancelled"}
       <DsLabel color="orange" title={`Cancelled ${shortDate(cancelled)}`}>
@@ -202,11 +208,6 @@
         <!-- Perhaps use Japanese character for monthly payment-->
         <Icon icon="mdi:recurring-payment" width="24px" class="inline-block" />
         {item.frequency} until {shortDate(item.end_date, true)}
-      </DsLabel>
-    {:else if item.type === "Cumulative"}
-      <DsLabel color="teal">
-        <!-- <Icon icon="mdi:chart-bell-curve-cumulative" width="24px" class="inline-block" /> -->
-        <Icon icon="mdi:sigma" width="24px" class="inline-block" />
       </DsLabel>
     {/if}
     {#if item.approved !== ""}

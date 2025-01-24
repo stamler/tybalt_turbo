@@ -507,9 +507,10 @@ type ExpensesRecordExpands = {
 
 type PurchaseOrdersRecordExpands = {
   approver: UsersResponse;
-  category: CategoriesRecord;
-  division: DivisionsRecord;
+  category: CategoriesResponse;
+  division: DivisionsResponse;
   job: JobsResponse;
+  parent_po: PurchaseOrdersResponse;
   rejector: UsersResponse;
   second_approver: UsersResponse;
   second_approver_claim: ClaimsResponse;
