@@ -242,6 +242,15 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 		return validationErr
 	}
 
+	// *************************************************************************
+	// The following code was disabled by the boolean flag autoApprove due to the
+	// fact that auto-approval would eliminate the ability to double-check and
+	// edit a PO after it was created by users with the po_approver claim or a
+	// second approver claim since the PO would already be status:Active and thus
+	// not editable. Associated tests were also removed.
+	// *************************************************************************
+	var autoApprove = false
+
 	// Auto-approval behavior:
 	// 1. The UI allows users to select an approver, which is validated to ensure they have
 	//    permission for the division.
@@ -258,109 +267,111 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	//    - Set status to Active
 	//    - Generate and set the PO number
 
-	// Check if the creator has po_approver claim and division permission
-	hasPoApproverClaim, err := utilities.HasClaim(app, authRecord, "po_approver")
-	if err != nil {
-		return &HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when checking po_approver claim",
-			Data: map[string]CodeError{
-				"global": {
-					Code:    "error_checking_claim",
-					Message: fmt.Sprintf("error checking po_approver claim: %v", err),
-				},
-			},
-		}
-	}
-	var hasPoDivisionPermission bool
-	if hasPoApproverClaim {
-		appDivErr := utilities.ApproverHasDivisionPermission(app, record.GetString("division"))(authRecord.Id)
-		if appDivErr == nil {
-			hasPoDivisionPermission = true
-		}
-	}
-
-	// Check if the caller has vp or smg claim
-	hasVPClaim, err := utilities.HasClaim(app, authRecord, "vp")
-	if err != nil {
-		return &HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when checking vp claim",
-			Data: map[string]CodeError{
-				"global": {
-					Code:    "error_checking_claim",
-					Message: fmt.Sprintf("error checking vp claim: %v", err),
-				},
-			},
-		}
-	}
-	hasSMGClaim, err := utilities.HasClaim(app, authRecord, "smg")
-	if err != nil {
-		return &HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when checking smg claim",
-			Data: map[string]CodeError{
-				"global": {
-					Code:    "error_checking_claim",
-					Message: fmt.Sprintf("error checking smg claim: %v", err),
-				},
-			},
-		}
-	}
-	now := time.Now()
-
-	// If caller has po_approver claim and division permission, or vp or smg claim, auto-approve
-	if (hasPoApproverClaim && hasPoDivisionPermission) || hasVPClaim || hasSMGClaim {
-		// Auto-approve if they have permission
-		record.Set("approved", now)
-		record.Set("approver", authRecord.Id)
-
-		// Check if they also qualify for second approval
-		secondApproverClaim := record.GetString("second_approver_claim")
-		if secondApproverClaim != "" {
-			userClaims, err := app.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
-				"userId": authRecord.Id,
-			})
-			if err != nil {
-				return &HookError{
-					Status:  http.StatusInternalServerError,
-					Message: "hook error when checking second approver claims",
-					Data: map[string]CodeError{
-						"global": {
-							Code:    "error_checking_claims",
-							Message: fmt.Sprintf("error checking second approver claims: %v", err),
-						},
+	if autoApprove {
+		// Check if the creator has po_approver claim and division permission
+		hasPoApproverClaim, err := utilities.HasClaim(app, authRecord, "po_approver")
+		if err != nil {
+			return &HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "hook error when checking po_approver claim",
+				Data: map[string]CodeError{
+					"global": {
+						Code:    "error_checking_claim",
+						Message: fmt.Sprintf("error checking po_approver claim: %v", err),
 					},
-				}
-			}
-
-			// Check if user has the required second approver claim
-			for _, claim := range userClaims {
-				if claim.GetString("cid") == secondApproverClaim {
-					record.Set("second_approval", now)
-					record.Set("second_approver", authRecord.Id)
-					break
-				}
+				},
 			}
 		}
 
-		// If both approvals are set (or second approval wasn't needed), set status to Active and generate PO number
-		if !record.GetDateTime("approved").IsZero() && (record.GetString("second_approver_claim") == "" || !record.GetDateTime("second_approval").IsZero()) {
-			record.Set("status", "Active")
-			poNumber, err := routes.GeneratePONumber(app, record)
-			if err != nil {
-				return &HookError{
-					Status:  http.StatusInternalServerError,
-					Message: "hook error when generating PO number",
-					Data: map[string]CodeError{
-						"global": {
-							Code:    "error_generating_po_number",
-							Message: fmt.Sprintf("error generating PO number: %v", err),
-						},
+		var hasPoDivisionPermission bool
+		if hasPoApproverClaim {
+			appDivErr := utilities.ApproverHasDivisionPermission(app, record.GetString("division"))(authRecord.Id)
+			if appDivErr == nil {
+				hasPoDivisionPermission = true
+			}
+		}
+
+		// Check if the caller has vp or smg claim
+		hasVPClaim, err := utilities.HasClaim(app, authRecord, "vp")
+		if err != nil {
+			return &HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "hook error when checking vp claim",
+				Data: map[string]CodeError{
+					"global": {
+						Code:    "error_checking_claim",
+						Message: fmt.Sprintf("error checking vp claim: %v", err),
 					},
+				},
+			}
+		}
+		hasSMGClaim, err := utilities.HasClaim(app, authRecord, "smg")
+		if err != nil {
+			return &HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "hook error when checking smg claim",
+				Data: map[string]CodeError{
+					"global": {
+						Code:    "error_checking_claim",
+						Message: fmt.Sprintf("error checking smg claim: %v", err),
+					},
+				},
+			}
+		}
+		now := time.Now()
+		// If caller has po_approver claim and division permission, or vp or smg claim, auto-approve
+		if (hasPoApproverClaim && hasPoDivisionPermission) || hasVPClaim || hasSMGClaim {
+			// Auto-approve if they have permission
+			record.Set("approved", now)
+			record.Set("approver", authRecord.Id)
+
+			// Check if they also qualify for second approval
+			secondApproverClaim := record.GetString("second_approver_claim")
+			if secondApproverClaim != "" {
+				userClaims, err := app.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
+					"userId": authRecord.Id,
+				})
+				if err != nil {
+					return &HookError{
+						Status:  http.StatusInternalServerError,
+						Message: "hook error when checking second approver claims",
+						Data: map[string]CodeError{
+							"global": {
+								Code:    "error_checking_claims",
+								Message: fmt.Sprintf("error checking second approver claims: %v", err),
+							},
+						},
+					}
+				}
+
+				// Check if user has the required second approver claim
+				for _, claim := range userClaims {
+					if claim.GetString("cid") == secondApproverClaim {
+						record.Set("second_approval", now)
+						record.Set("second_approver", authRecord.Id)
+						break
+					}
 				}
 			}
-			record.Set("po_number", poNumber)
+
+			// If both approvals are set (or second approval wasn't needed), set status to Active and generate PO number
+			if !record.GetDateTime("approved").IsZero() && (record.GetString("second_approver_claim") == "" || !record.GetDateTime("second_approval").IsZero()) {
+				record.Set("status", "Active")
+				poNumber, err := routes.GeneratePONumber(app, record)
+				if err != nil {
+					return &HookError{
+						Status:  http.StatusInternalServerError,
+						Message: "hook error when generating PO number",
+						Data: map[string]CodeError{
+							"global": {
+								Code:    "error_generating_po_number",
+								Message: fmt.Sprintf("error generating PO number: %v", err),
+							},
+						},
+					}
+				}
+				record.Set("po_number", poNumber)
+			}
 		}
 	}
 

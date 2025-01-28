@@ -76,14 +76,15 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			/*
 				The caller may not be the approver but still be qualified to approve
 				the purchase order if they have a po_approver claim and the payload
-				specifies a division that matches the record's division. In this case,
-				callerIsQualifiedApprover is set to true and then during the update we
-				will set approver to the caller's uid.
+				specifies a division that matches the record's division. In either case,
+				callerIsApprover is set to true as during the update we will set approver
+				to the caller's uid.
 			*/
 
-			// Check if the user is the approver, a qualified approver, or a qualified
-			// second approver
-			callerIsApprover, callerIsQualifiedApprover, callerIsQualifiedSecondApprover, err := isApprover(txApp, authRecord, po)
+			// Check if the user is an approver and/or a qualified second approver.
+			// Because a caller may be a second approver without being an approver on
+			// the record, we check for both.
+			callerIsApprover, callerIsQualifiedSecondApprover, err := isApprover(txApp, authRecord, po)
 			if err != nil {
 				return err
 			}
@@ -95,45 +96,26 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			// approval status changes
 			now := time.Now()
 
-			if recordIsApproved && callerIsApprover && recordRequiresSecondApproval && !recordIsSecondApproved && !callerIsQualifiedSecondApprover {
-				// if the caller is the approver and approved is already set and the
-				// record requires second approval but the caller is not qualified to
-				// approve it, return an error indicating that the purchase order has
-				// already been approved by a manager but requires elevated approval.
-				httpResponseStatusCode = http.StatusBadRequest
-				return &CodeError{
-					Code:    "po_missing_second_approval",
-					Message: "this purchase order has already been approved by a manager but requires second approval",
-				}
-			} else if recordIsApproved && callerIsQualifiedSecondApprover && recordRequiresSecondApproval && !recordIsSecondApproved {
-				// Second-Approve the purchase order
+			// If the purchase order is not approved and the caller is an approver
+			// or a qualified second approver, approve the purchase order.
+			if !recordIsApproved && (callerIsApprover || callerIsQualifiedSecondApprover) {
+				// Approve the purchase order
+				po.Set("approved", now)
+				po.Set("approver", userId)
+				recordIsApproved = true
+			}
+
+			// If the purchase order is approved but requires second approval and
+			// the caller is a qualified second approver, second-approve the purchase
+			// order.
+			if recordIsApproved && recordRequiresSecondApproval && callerIsQualifiedSecondApprover && !recordIsSecondApproved {
 				po.Set("second_approval", now)
 				po.Set("second_approver", userId)
 				recordIsSecondApproved = true
-			} else if !recordIsApproved {
-				if callerIsApprover {
-					// Approve the purchase order as is
-					po.Set("approved", now)
-					recordIsApproved = true
-				} else if callerIsQualifiedApprover {
-					// Approve the purchase order, updating the approver to the caller's
-					// uid since the caller is not the approver specified in the record
-					po.Set("approved", now)
-					po.Set("approver", userId)
-					recordIsApproved = true
-				}
-			} else {
-				// the user is not the approver or a qualified second approver
-				httpResponseStatusCode = http.StatusForbidden
-				return &CodeError{
-					Code:    "unauthorized_approval",
-					Message: "you are not authorized to approve this purchase order",
-				}
 			}
 
-			// If approved is set and either second_approver_claim is not set or
-			// second_approval is set, the purchase order is fully approved. Set the
-			// status to Active and generate a PO number
+			// If both approvals are complete (or second approval wasn't needed),
+			// set status and PO number
 			if recordIsApproved && (!recordRequiresSecondApproval || recordIsSecondApproved) {
 				po.Set("status", "Active")
 				poNumber, err := GeneratePONumber(txApp, po)
@@ -604,21 +586,19 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 /*
 	the isApprover function with 3 arguments: the txApp, the userId of the
 	caller, and the purchase_orders record. The function performs the following
-	checks and returns 3 boolean values indicating:
-		1. whether the caller is the approver specified in the record
-		2. whether the caller is a qualified approver for another reason as outlined above
-		3. whether the caller is a qualified second approver
+	checks and returns 2 boolean values indicating:
+		1. whether the caller is permitted to approve the purchase order
+		2. whether the caller is permitted to second-approve the purchase order
 	We will incorporate this function into the approval logic above within the
 	createApprovePurchaseOrderHandler function.
 */
 
-func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool, bool, error) {
+func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool, error) {
 	// Check if the caller is the approver specified in the record
 	callerIsApprover := po.GetString("approver") == auth.Id
-	callerIsQualifiedApprover := false
 
-	// if the caller is not the approver, perform additional checks to see if
-	// caller is a qualified approver
+	// if the caller is not the approver on the record, perform additional checks
+	// to see if the caller is nontheless permitted to approve the purchase order
 	if !callerIsApprover {
 
 		// Check if the caller is a qualified approver (has the po_approver claim
@@ -626,7 +606,7 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 		// order)
 		hasPoApproverClaim, err := utilities.HasClaim(txApp, auth, "po_approver")
 		if err != nil {
-			return false, false, false, &CodeError{
+			return false, false, &CodeError{
 				Code:    "error_checking_po_approver_claim",
 				Message: fmt.Sprintf("error checking po_approver claim: %v", err),
 			}
@@ -636,7 +616,7 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 			// provided approver ID has permission to approve purchase orders for the specified
 			// division. We pass the auth.Id as the value to validate.
 			if err := utilities.ApproverHasDivisionPermission(txApp, po.GetString("division"))(auth.Id); err == nil {
-				callerIsQualifiedApprover = true
+				callerIsApprover = true
 			}
 		}
 	}
@@ -645,14 +625,18 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 	secondApproverClaim := po.GetString("second_approver_claim")
 	recordRequiresSecondApproval := secondApproverClaim != ""
 
-	// Check if the caller is a qualified second approver
+	// Check if the caller is a qualified second approver. This means the caller
+	// has a user_claim with a claim_id that matches the second_approver_claim
+	// on the record. Note that this is a different claim than the po_approver
+	// claim and that the caller may be a second approver regardless of whether
+	// they are an approver on the record.
 	callerIsQualifiedSecondApprover := false // initialize to false
 	if recordRequiresSecondApproval {
 		userClaims, err := txApp.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
 			"userId": auth.Id,
 		})
 		if err != nil {
-			return false, false, false, &CodeError{
+			return false, false, &CodeError{
 				Code:    "error_fetching_user_claims",
 				Message: fmt.Sprintf("error fetching user claims: %v", err),
 			}
@@ -665,5 +649,5 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 		}
 	}
 
-	return callerIsApprover, callerIsQualifiedApprover, callerIsQualifiedSecondApprover, nil
+	return callerIsApprover, callerIsQualifiedSecondApprover, nil
 }
