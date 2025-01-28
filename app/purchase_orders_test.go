@@ -259,12 +259,23 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			}`, rand.Float64()*(hooks.MANAGER_PO_LIMIT-1.0)+1.0)),
 			Headers:        map[string]string{"Authorization": poApproverToken},
 			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
-				`"status":"Active"`,
-				fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number starting with current year
-				`"approver":"wegviunlyr2jjjv"`,               // Creator becomes approver
-			},
+			ExpectedContent: func() []string {
+				if hooks.POAutoApprove {
+					return []string{
+						fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
+						`"status":"Active"`,
+						fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number starting with current year
+						`"approver":"wegviunlyr2jjjv"`,               // Creator becomes approver
+					}
+				} else {
+					return []string{
+						`"approved":""`,
+						`"status":"Unapproved"`,
+						`"po_number":""`,
+						`"approver":"etysnrlup2f6bak"`, // Original approver remains
+					}
+				}
+			}(),
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 1,
 			},
@@ -310,12 +321,23 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			}`, rand.Float64()*(hooks.MANAGER_PO_LIMIT-1.0)+1.0)),
 			Headers:        map[string]string{"Authorization": divisionApproverToken},
 			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
-				`"status":"Active"`,
-				fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number starting with current year
-				`"approver":"etysnrlup2f6bak"`,               // Creator becomes approver
-			},
+			ExpectedContent: func() []string {
+				if hooks.POAutoApprove {
+					return []string{
+						fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
+						`"status":"Active"`,
+						fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number starting with current year
+						`"approver":"etysnrlup2f6bak"`,               // Creator becomes approver
+					}
+				} else {
+					return []string{
+						`"approved":""`,
+						`"status":"Unapproved"`,
+						`"po_number":""`,
+						`"approver":"etysnrlup2f6bak"`, // Original approver remains
+					}
+				}
+			}(),
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 1,
 			},
@@ -385,14 +407,26 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			}`, rand.Float64()*(1000.0)+hooks.VP_PO_LIMIT)), // Random value > VP_PO_LIMIT
 			Headers:        map[string]string{"Authorization": smgApproverToken},
 			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				fmt.Sprintf(`"approved":"%s`, currentDate),
-				fmt.Sprintf(`"second_approval":"%s`, currentDate),
-				`"status":"Active"`,
-				fmt.Sprintf(`"po_number":"%s-`, currentYear),
-				`"approver":"66ct66w380ob6w8"`,
-				`"second_approver":"66ct66w380ob6w8"`,
-			},
+			ExpectedContent: func() []string {
+				if hooks.POAutoApprove {
+					return []string{
+						fmt.Sprintf(`"approved":"%s`, currentDate),
+						fmt.Sprintf(`"second_approval":"%s`, currentDate),
+						`"status":"Active"`,
+						fmt.Sprintf(`"po_number":"%s-`, currentYear),
+						`"approver":"66ct66w380ob6w8"`,
+						`"second_approver":"66ct66w380ob6w8"`,
+					}
+				} else {
+					return []string{
+						`"approved":""`,
+						`"second_approval":""`,
+						`"status":"Unapproved"`,
+						`"po_number":""`,
+						`"approver":"etysnrlup2f6bak"`,
+					}
+				}
+			}(),
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 1,
 			},
@@ -433,14 +467,26 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			}`, rand.Float64()*(hooks.VP_PO_LIMIT-hooks.MANAGER_PO_LIMIT)+hooks.MANAGER_PO_LIMIT)), // Random value between MANAGER_PO_LIMIT and VP_PO_LIMIT
 			Headers:        map[string]string{"Authorization": vpApproverToken},
 			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				fmt.Sprintf(`"approved":"%s`, currentDate),        // Should have an approval timestamp
-				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have a second approval timestamp
-				`"status":"Active"`,
-				fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number
-				`"approver":"f2j5a8vk006baub"`,               // Creator becomes approver
-				`"second_approver":"f2j5a8vk006baub"`,        // Creator also becomes second approver
-			},
+			ExpectedContent: func() []string {
+				if hooks.POAutoApprove {
+					return []string{
+						fmt.Sprintf(`"approved":"%s`, currentDate),        // Should have an approval timestamp
+						fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have a second approval timestamp
+						`"status":"Active"`,
+						fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number
+						`"approver":"f2j5a8vk006baub"`,               // Creator becomes approver
+						`"second_approver":"f2j5a8vk006baub"`,        // Creator also becomes second approver
+					}
+				} else {
+					return []string{
+						`"approved":""`,
+						`"second_approval":""`,
+						`"status":"Unapproved"`,
+						`"po_number":""`,
+						`"approver":"etysnrlup2f6bak"`, // Original approver remains
+					}
+				}
+			}(),
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 1,
 			},

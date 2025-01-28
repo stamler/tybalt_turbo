@@ -16,6 +16,14 @@ import (
 )
 
 const (
+	// When true, POs will be auto-approved by the creator if they have the
+	// po_approver claim and division permission, or vp or smg claim. This
+	// behavior is disabled by default since it would eliminate the ability to
+	// double-check and edit a PO after it was created by users with the
+	// po_approver claim or a second approver claim since the PO would already be
+	// status:Active and thus not editable.
+	POAutoApprove = false
+
 	// The amount of money below which a purchase order does not require a second
 	// approval.
 	MANAGER_PO_LIMIT = 500
@@ -243,13 +251,12 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	}
 
 	// *************************************************************************
-	// The following code was disabled by the boolean flag autoApprove due to the
-	// fact that auto-approval would eliminate the ability to double-check and
-	// edit a PO after it was created by users with the po_approver claim or a
-	// second approver claim since the PO would already be status:Active and thus
-	// not editable. Associated tests were also removed.
+	// The following code was disabled by the boolean flag hooks.POAutoApprove
+	// since auto-approval would eliminate the ability to double-check and edit a
+	// PO after it was created by users with the po_approver claim or a second
+	// approver claim since the PO would already be status:Active and thus not
+	// editable. Associated tests are also modified by this flag.
 	// *************************************************************************
-	var autoApprove = false
 
 	// Auto-approval behavior:
 	// 1. The UI allows users to select an approver, which is validated to ensure they have
@@ -267,7 +274,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	//    - Set status to Active
 	//    - Generate and set the PO number
 
-	if autoApprove {
+	if POAutoApprove {
 		// Check if the creator has po_approver claim and division permission
 		hasPoApproverClaim, err := utilities.HasClaim(app, authRecord, "po_approver")
 		if err != nil {
