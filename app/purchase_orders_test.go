@@ -762,6 +762,24 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "po_approver cannot approve PO in unauthorized division",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/j6nn3v7s2s6d6u8/approve", // PO in division 2rrfy6m2c8hazjy
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": poApproverToken, // fatt@mac.com who can't approve purchase orders in this division
+			},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized_approval"`,
+				`"message":"you are not authorized to approve this purchase order"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:            "caller with the payables_admin claim can convert Active Normal purchase_orders to Cumulative",
 			Method:          http.MethodPost,
 			URL:             "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
