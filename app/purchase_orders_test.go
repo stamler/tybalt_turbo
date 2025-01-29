@@ -630,6 +630,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Token for VP who can do second approvals
+	vpToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	currentDate := time.Now().Format("2006-01-02")
 	currentYear := time.Now().Format("2006")
 
@@ -660,6 +666,56 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should start with current year
 				`"status":"Active"`,                          // Status should be Active
 				`"approver":"etysnrlup2f6bak"`,               // Should be set to the approver's ID
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "first approval of high-value PO leaves status as Unapproved",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/46efdq319b22480/approve", // Using existing Unapproved PO with total 862.12
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": poApproverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate), // Should have today's date
+				`"status":"Unapproved"`,                    // Status should remain Unapproved
+				`"po_number":""`,                           // No PO number yet
+				`"approver":"etysnrlup2f6bak"`,             // Approver changes to match caller (fatt@mac.com)
+				`"second_approver":""`,                     // No second approver yet
+				`"second_approval":""`,                     // No second approval timestamp yet
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "second approval of high-value PO completes approval process",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/2blv18f40i2q373/approve", // Using PO with first approval and total 1022.69
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": vpToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"approved":"2025-01-29 14:22:29.563Z"`,           // Should keep original first approval
+				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have today's date
+				`"status":"Active"`,                               // Status should become Active
+				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
+				`"approver":"wegviunlyr2jjjv"`,                    // Should keep original approver
+				`"second_approver":"f2j5a8vk006baub"`,             // Should be set to VP's ID
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,
