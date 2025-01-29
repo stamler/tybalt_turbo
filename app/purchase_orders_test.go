@@ -1267,6 +1267,58 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "rejection with empty reason fails",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/reject",
+			Body: strings.NewReader(`{
+				"rejection_reason": ""
+			}`),
+			Headers:        map[string]string{"Authorization": poApproverToken},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"invalid_rejection_reason"`,
+				`"message":"rejection reason must be at least 5 characters"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "rejection with too short reason fails",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/reject",
+			Body: strings.NewReader(`{
+				"rejection_reason": "no"
+			}`),
+			Headers:        map[string]string{"Authorization": poApproverToken},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"invalid_rejection_reason"`,
+				`"message":"rejection reason must be at least 5 characters"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "rejection with blank body fails",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/gal6e5la2fa4rpn/reject",
+			Body:           strings.NewReader(`{}`),
+			Headers:        map[string]string{"Authorization": poApproverToken},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"invalid_request_body"`,
+				`"message":"you must provide a rejection reason"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {

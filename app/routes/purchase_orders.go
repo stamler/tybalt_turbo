@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	"tybalt/utilities"
 
@@ -192,11 +193,48 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 	return func(e *core.RequestEvent) error {
 		id := e.Request.PathValue("id")
 
+		/*
+		   We use two separate request bindings to properly distinguish between different error cases:
+		   1. First bind to a raw map to check if the rejection_reason field exists at all
+		      - If the field is missing (e.g., {}), return "invalid_request_body"
+		   2. Then bind to our typed struct for actual validation
+		      - If the field exists but is empty/too short, return "invalid_rejection_reason"
+
+		   This two-step process is necessary because binding directly to the struct
+		   would give us an empty string for both cases, making it impossible to
+		   distinguish between a missing field and an empty value.
+		*/
+		// First bind to a map to check if the field exists
+		var rawReq map[string]interface{}
+		if err := e.BindBody(&rawReq); err != nil {
+			return e.JSON(http.StatusBadRequest, map[string]interface{}{
+				"message": "you must provide a rejection reason",
+				"code":    "invalid_request_body",
+			})
+		}
+
+		if _, exists := rawReq["rejection_reason"]; !exists {
+			return e.JSON(http.StatusBadRequest, map[string]interface{}{
+				"message": "you must provide a rejection reason",
+				"code":    "invalid_request_body",
+			})
+		}
+
+		// Now bind to our typed struct
 		var req RejectionRequest
 		if err := e.BindBody(&req); err != nil {
 			return e.JSON(http.StatusBadRequest, map[string]interface{}{
 				"message": "you must provide a rejection reason",
 				"code":    "invalid_request_body",
+			})
+		}
+
+		// Validate rejection reason length
+		trimmedReason := strings.TrimSpace(req.RejectionReason)
+		if trimmedReason == "" || len(trimmedReason) < 5 {
+			return e.JSON(http.StatusBadRequest, map[string]interface{}{
+				"message": "rejection reason must be at least 5 characters",
+				"code":    "invalid_rejection_reason",
 			})
 		}
 
