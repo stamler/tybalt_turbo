@@ -625,6 +625,14 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	poApproverToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	currentDate := time.Now().Format("2006-01-02")
+	currentYear := time.Now().Format("2006")
+
 	/*
 		creatorToken, err := testutils.GenerateRecordToken("users", "time@test.com")
 		if err != nil {
@@ -638,6 +646,29 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 	*/
 
 	scenarios := []tests.ApiScenario{
+		{
+			Name:   "authorized approver successfully approves PO below MANAGER_PO_LIMIT",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/approve", // Using existing Unapproved PO with total 329.01
+			Body:   strings.NewReader(`{}`),                        // No body needed for approval
+			Headers: map[string]string{
+				"Authorization": poApproverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate),   // Should have today's date
+				fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should start with current year
+				`"status":"Active"`,                          // Status should be Active
+				`"approver":"etysnrlup2f6bak"`,               // Should be set to the approver's ID
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 		// TODO: Add test scenarios for custom routes:
 		// - /api/purchase_orders/{id}/approve
 		// - /api/purchase_orders/{id}/reject
