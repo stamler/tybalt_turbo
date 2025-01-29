@@ -1085,12 +1085,15 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/reject",
 			Body: strings.NewReader(`{
-				"reason": "Budget constraints"
+				"rejection_reason": "Budget constraints"
 			}`),
 			Headers:        map[string]string{"Authorization": poApproverToken},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"message":"Purchase order rejected successfully"`,
+				`"status":"Unapproved"`,
+				fmt.Sprintf(`"rejected":"%s`, currentDate),
+				`"rejection_reason":"Budget constraints"`,
+				`"rejector":"etysnrlup2f6bak"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,
