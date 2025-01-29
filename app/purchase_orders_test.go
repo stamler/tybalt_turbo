@@ -1139,6 +1139,80 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "qualified second approver can reject an unapproved purchase order",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/reject",
+			Body: strings.NewReader(`{
+				"rejection_reason": "Budget constraints"
+			}`),
+			Headers:        map[string]string{"Authorization": smgToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"status":"Unapproved"`,
+				fmt.Sprintf(`"rejected":"%s`, currentDate),
+				`"rejection_reason":"Budget constraints"`,
+				`"rejector":"66ct66w380ob6w8"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		/*
+		   This test verifies an important aspect of the rejection authorization model:
+		   that rejection permissions are intentionally simpler than approval permissions.
+
+		   Specifically, it verifies that any user with basic approval rights (po_approver)
+		   can reject a PO that's awaiting second approval, even if they aren't qualified
+		   to perform that second approval themselves.
+
+		   Test setup:
+		   - Uses PO 2blv18f40i2q373 which:
+		     * Has total of 1022.69 (above MANAGER_PO_LIMIT, requiring second approval)
+		     * Already has first approval (from wegviunlyr2jjjv)
+		     * Is awaiting second approval
+		   - Uses poApproverToken (fatt@mac.com) who:
+		     * Has po_approver claim but NOT smg/vp claims
+		     * Cannot perform second approvals
+		     * Can still reject because PO is in Unapproved state
+
+		   This is by design - the rejection model is simpler because:
+		   1. The PO isn't Active yet, so no downstream processes are affected
+		   2. Any qualified approver should be able to reject if they spot issues
+		   3. The approval state (first approval, pending second) doesn't matter
+		      as long as the PO is still in an Unapproved state
+		*/
+		{
+			Name:   "regular approver can reject PO awaiting second approval",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/2blv18f40i2q373/reject", // PO with first approval but awaiting second approval
+			Body: strings.NewReader(`{
+				"rejection_reason": "Budget constraints"
+			}`),
+			Headers:        map[string]string{"Authorization": poApproverToken}, // Using regular approver, not a second approver
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"status":"Unapproved"`,
+				fmt.Sprintf(`"rejected":"%s`, currentDate),
+				`"rejection_reason":"Budget constraints"`,
+				`"rejector":"etysnrlup2f6bak"`,
+				`"approved":"2025-01-29 14:22:29.563Z"`, // Should preserve existing first approval
+				`"approver":"wegviunlyr2jjjv"`,          // Should preserve existing approver
+				`"second_approval":""`,                  // Should still have no second approval
+				`"second_approver":""`,                  // Should still have no second approver
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
