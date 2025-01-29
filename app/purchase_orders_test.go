@@ -1080,6 +1080,26 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "authorized approver can reject an unapproved purchase order",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/reject",
+			Body: strings.NewReader(`{
+				"reason": "Budget constraints"
+			}`),
+			Headers:        map[string]string{"Authorization": poApproverToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"message":"Purchase order rejected successfully"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
