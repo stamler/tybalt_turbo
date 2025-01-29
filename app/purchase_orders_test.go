@@ -641,6 +641,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Token for user with smg claim
+	smgToken, err := testutils.GenerateRecordToken("users", "hal@2005.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	currentDate := time.Now().Format("2006-01-02")
 	currentYear := time.Now().Format("2006")
 
@@ -956,6 +962,49 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			ExpectedEvents: map[string]int{
 				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "VP cannot second-approve PO with value above VP_PO_LIMIT (SMG claim required)",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/q79eyq0uqrk6x2q/approve", // PO with total 3251.12
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": vpToken, // author@soup.com who has VP claim but not SMG
+			},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized_approval"`,
+				`"message":"you are not authorized to perform second approval on this purchase order"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "SMG can second-approve PO with value above VP_PO_LIMIT",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/q79eyq0uqrk6x2q/approve", // PO with total 3251.12
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": smgToken, // hal@2005.com who has SMG claim
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate),        // Should have today's date
+				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have same timestamp
+				`"status":"Active"`,                               // Status should become Active
+				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
+				`"approver":"f2j5a8vk006baub"`,                    // approver does not change
+				`"second_approver":"66ct66w380ob6w8"`,             // smg holder becomes second approver
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
