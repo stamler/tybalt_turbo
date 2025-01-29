@@ -701,6 +701,31 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "VP completes both approvals of high-value PO in single call",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/46efdq319b22480/approve", // Using existing Unapproved PO with total 862.12
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": vpToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate),        // Should have today's date
+				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have same timestamp
+				`"status":"Active"`,                               // Status should become Active
+				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
+				`"approver":"f2j5a8vk006baub"`,                    // VP becomes first approver
+				`"second_approver":"f2j5a8vk006baub"`,             // VP also becomes second approver
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "second approval of high-value PO completes approval process",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/2blv18f40i2q373/approve", // Using PO with first approval and total 1022.69
