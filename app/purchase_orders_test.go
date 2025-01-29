@@ -1008,6 +1008,24 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "approval attempt on already approved PO fails",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/2plsetqdxht7esg/approve", // Already approved PO (2024-0008)
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": poApproverToken, // Using a valid approver token to isolate the already-approved check
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"po_not_unapproved"`,
+				`"message":"only unapproved purchase orders can be approved"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
