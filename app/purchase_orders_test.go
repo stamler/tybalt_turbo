@@ -1103,6 +1103,24 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "unauthorized user cannot reject purchase order",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/reject",
+			Body: strings.NewReader(`{
+				"rejection_reason": "Budget constraints"
+			}`),
+			Headers:        map[string]string{"Authorization": unauthorizedToken},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized_rejection"`,
+				`"message":"you are not authorized to reject this purchase order"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
