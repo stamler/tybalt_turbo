@@ -1044,6 +1044,24 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "approval attempt on cancelled PO fails",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/338568325487lo2/approve", // Cancelled PO (2025-0002)
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": poApproverToken, // Using a valid approver token to isolate the cancelled status check
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"po_not_unapproved"`,
+				`"message":"only unapproved purchase orders can be approved"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
