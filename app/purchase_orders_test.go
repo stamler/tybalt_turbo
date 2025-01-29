@@ -1213,6 +1213,24 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "rejection attempt on already rejected PO fails",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/l9w1z13mm3srtoo/reject",
+			Body: strings.NewReader(`{
+				"rejection_reason": "New rejection reason"
+			}`),
+			Headers:        map[string]string{"Authorization": poApproverToken},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"po_rejected"`,
+				`"message":"rejected purchase orders cannot be rejected again"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
