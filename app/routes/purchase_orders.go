@@ -88,6 +88,17 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			if err != nil {
 				return err
 			}
+
+			// If the caller is not an approver or a qualified second approver,
+			// return a 403 Forbidden status.
+			if !callerIsApprover && !callerIsQualifiedSecondApprover {
+				httpResponseStatusCode = http.StatusForbidden
+				return &CodeError{
+					Code:    "unauthorized_approval",
+					Message: "you are not authorized to approve this purchase order",
+				}
+			}
+
 			recordIsApproved := !po.GetDateTime("approved").IsZero()
 			recordRequiresSecondApproval := po.GetString("second_approver_claim") != ""
 			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()

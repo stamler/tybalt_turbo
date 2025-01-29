@@ -615,6 +615,11 @@ func TestPurchaseOrdersRead(t *testing.T) {
 }
 
 func TestPurchaseOrdersRoutes(t *testing.T) {
+	unauthorizedToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	nonCloseToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
 	if err != nil {
 		t.Fatal(err)
@@ -638,18 +643,6 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 
 	currentDate := time.Now().Format("2006-01-02")
 	currentYear := time.Now().Format("2006")
-
-	/*
-		creatorToken, err := testutils.GenerateRecordToken("users", "time@test.com")
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		approverToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
-		if err != nil {
-			t.Fatal(err)
-		}
-	*/
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -750,9 +743,24 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-		// TODO: Add test scenarios for custom routes:
-		// - /api/purchase_orders/{id}/approve
-		// - /api/purchase_orders/{id}/reject
+		{
+			Name:   "unauthorized user cannot approve purchase order",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/approve",
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": unauthorizedToken,
+			},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized_approval"`,
+				`"message":"you are not authorized to approve this purchase order"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 		{
 			Name:            "caller with the payables_admin claim can convert Active Normal purchase_orders to Cumulative",
 			Method:          http.MethodPost,
