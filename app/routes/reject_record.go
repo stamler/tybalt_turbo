@@ -50,6 +50,7 @@ func createRejectRecordHandler(app core.App, collectionName string) func(e *core
 			}
 
 			// Check if the user is the approver
+			// TODO: others should be able to reject besides the approver
 			if record.GetString("approver") != userId {
 				httpResponseStatusCode = http.StatusUnauthorized
 				return &CodeError{
