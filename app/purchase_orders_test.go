@@ -1062,6 +1062,24 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "approval attempt on non-existent PO fails",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/nonexistent123/approve",
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": poApproverToken, // Using a valid approver token to isolate the not-found check
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"code":"po_not_found"`,
+				`"message":"error fetching purchase order: sql: no rows in result set"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
