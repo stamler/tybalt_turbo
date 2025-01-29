@@ -911,6 +911,54 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		// TODO: Non-Active Cumulative purchase_orders records cannot be closed
+
+		/*
+		   This test verifies that a user cannot perform second approval without the required claims (SMG/VP),
+		   even if they have other valid permissions. Specifically, it tests that:
+
+		   Test Data:
+		   1. Purchase Order (2blv18f40i2q373):
+		      - Division: vccd5fo56ctbigh
+		      - Total: 1022.69 (above MANAGER_PO_LIMIT, requiring second approval)
+		      - Current Status: Unapproved
+		      - Has first approval: Yes (timestamp: 2025-01-29 14:22:29.563Z)
+		      - First approver: wegviunlyr2jjjv
+
+		   2. User Attempting Second Approval (fatt@mac.com using poApproverToken):
+		      - Has po_approver claim: Yes
+		      - Authorized divisions: ["hcd86z57zjty6jo", "fy4i9poneukvq9u", "vccd5fo56ctbigh"]
+		      - Has division permission: Yes (PO's division matches user's authorized divisions)
+		      - Has SMG claim: No
+		      - Has VP claim: No
+
+		   Expected Behavior:
+		   - Request should fail with 403 Forbidden
+		   - Error should indicate lack of required claim (not division permission)
+		   - No changes should be made to the PO
+		   - No events should be triggered
+
+		   This test isolates the claim requirement by using a user who has all other necessary permissions
+		   (division authorization, po_approver claim) but lacks the specific claims required for second approval.
+		   This ensures the failure is specifically due to missing SMG/VP claims, not other permission issues.
+		*/
+		{
+			Name:   "user with po_approver claim but without SMG/VP claims cannot perform second approval",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/2blv18f40i2q373/approve",
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": poApproverToken, // fatt@mac.com who has division permission but no SMG/VP claims
+			},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized_approval"`,
+				`"message":"you are not authorized to perform second approval on this purchase order"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {

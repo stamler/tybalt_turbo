@@ -107,6 +107,16 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			// approval status changes
 			now := time.Now()
 
+			// If the PO is already approved and requires second approval, caller must
+			// be a qualified second approver
+			if recordIsApproved && recordRequiresSecondApproval && !callerIsQualifiedSecondApprover {
+				httpResponseStatusCode = http.StatusForbidden
+				return &CodeError{
+					Code:    "unauthorized_approval",
+					Message: "you are not authorized to perform second approval on this purchase order",
+				}
+			}
+
 			// If the purchase order is not approved and the caller is an approver
 			// or a qualified second approver, approve the purchase order.
 			if !recordIsApproved && (callerIsApprover || callerIsQualifiedSecondApprover) {
