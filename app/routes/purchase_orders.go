@@ -68,8 +68,8 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			if !po.GetDateTime("rejected").IsZero() {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "po_already_rejected",
-					Message: "this purchase order has been rejected and cannot be approved",
+					Code:    "po_rejected",
+					Message: "rejected purchase orders cannot be approved",
 				}
 			}
 
@@ -220,8 +220,8 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 			if !po.GetDateTime("rejected").IsZero() {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "po_already_rejected",
-					Message: "this purchase order has been rejected and cannot be rejected again",
+					Code:    "po_rejected",
+					Message: "rejected purchase orders cannot be rejected again",
 				}
 			}
 

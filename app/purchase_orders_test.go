@@ -1026,6 +1026,24 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "approval attempt on rejected PO fails",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/l9w1z13mm3srtoo/approve", // Rejected PO with rejection reason
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": poApproverToken, // Using a valid approver token to isolate the rejection check
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"po_rejected"`,
+				`"message":"rejected purchase orders cannot be approved"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
