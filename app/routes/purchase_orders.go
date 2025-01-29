@@ -234,33 +234,18 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 				}
 			}
 
-			// Check if the user is the approver or a qualified second approver
-			isApprover := po.Get("approver") == userId
-			isSecondApprover := false
-
-			if !isApprover {
-				secondApproverClaim := po.Get("second_approver_claim")
-				if secondApproverClaim != nil {
-					userClaims, err := txApp.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
-						"userId": userId,
-					})
-					if err != nil {
-						httpResponseStatusCode = http.StatusInternalServerError
-						return &CodeError{
-							Code:    "error_fetching_user_claims",
-							Message: fmt.Sprintf("error fetching user claims: %v", err),
-						}
-					}
-					for _, claim := range userClaims {
-						if claim.Get("claim") == secondApproverClaim {
-							isSecondApprover = true
-							break
-						}
-					}
-				}
+			// Check if the user is an approver and/or a qualified second approver
+			callerIsApprover, callerIsQualifiedSecondApprover, err := isApprover(txApp, authRecord, po)
+			if err != nil {
+				return err
 			}
 
-			if !isApprover && !isSecondApprover {
+			// If the caller is not an approver or a qualified second approver,
+			// return a 403 Forbidden status. NOTE: This means that even if a
+			// purchase_orders record requiring second approval is already approved,
+			// it can still be rejected by any approver or a qualified second
+			// approver since it isn't yet Active.
+			if !(callerIsApprover || callerIsQualifiedSecondApprover) {
 				httpResponseStatusCode = http.StatusForbidden
 				return &CodeError{
 					Code:    "unauthorized_rejection",
@@ -281,6 +266,10 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 				}
 			}
 
+			// TODO: send notification (email) to the creator (uid), and approver
+			// that the purchase order has been rejected, at what time, and by whom
+			// This will be implemented through the notification service that hasn't
+			// been built yet.
 			return nil
 		})
 
