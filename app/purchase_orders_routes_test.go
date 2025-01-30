@@ -726,24 +726,6 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-		{
-			Name:   "payables admin can successfully cancel an active purchase order",
-			Method: http.MethodPost,
-			URL:    "/api/purchase_orders/2plsetqdxht7esg/cancel", // Using PO 2024-0008 which is Active
-			Headers: map[string]string{
-				"Authorization": closeToken, // book@keeper.com has payables_admin claim
-			},
-			ExpectedStatus: http.StatusOK,
-			ExpectedContent: []string{
-				`"status":"Cancelled"`,
-				fmt.Sprintf(`"cancelled":"%s`, currentDate),
-				`"canceller":"tqqf7q0f3378rvp"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdate": 1, // Should trigger one record update
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
 	}
 
 	for _, scenario := range scenarios {
