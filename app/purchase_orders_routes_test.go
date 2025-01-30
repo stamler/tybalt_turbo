@@ -800,6 +800,44 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				return app
 			},
 		},
+		{
+			Name:           "caller with the payables_admin claim can cancel Active Cumulative purchase_orders records with no expenses",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/y660i6a14ql2355/cancel", // Active Cumulative PO (2025-0001)
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"status":"Cancelled"`,
+				fmt.Sprintf(`"cancelled":"%s`, currentDate),
+				`"canceller":"tqqf7q0f3378rvp"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "caller with the payables_admin claim can cancel Active Recurring purchase_orders records with no expenses",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/rec5e5la2fa4rpn/cancel", // Active Recurring PO (2025-0003)
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"status":"Cancelled"`,
+				fmt.Sprintf(`"cancelled":"%s`, currentDate),
+				`"canceller":"tqqf7q0f3378rvp"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelAfterUpdateSuccess": 1,
+				"OnModelUpdate":             1,
+				"OnRecordUpdate":            1,
+				"OnRecordValidate":          1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
