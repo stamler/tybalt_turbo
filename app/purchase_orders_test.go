@@ -47,10 +47,9 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	}
 
 	// Get current year for PO number validation
-	currentYear := time.Now().Format("2006")
-	// Get current date for approval timestamp validation
-	currentDate := time.Now().Format("2006-01-02")
-
+	currentYear := time.Now().UTC().Format("2006")
+	// Get current date in UTC for approval timestamp validation
+	currentDate := time.Now().UTC().Format("2006-01-02")
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "valid purchase order is created",
@@ -647,8 +646,9 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	currentDate := time.Now().Format("2006-01-02")
-	currentYear := time.Now().Format("2006")
+	// Get current date in UTC for approval timestamp validation
+	currentDate := time.Now().UTC().Format("2006-01-02")
+	currentYear := time.Now().UTC().Format("2006")
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -849,12 +849,16 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:            "caller with the payables_admin claim can cancel Active purchase_orders records with no expenses against them",
-			Method:          http.MethodPost,
-			URL:             "/api/purchase_orders/2plsetqdxht7esg/cancel",
-			Headers:         map[string]string{"Authorization": closeToken},
-			ExpectedStatus:  204,
-			ExpectedContent: []string{},
+			Name:           "caller with the payables_admin claim can cancel Active purchase_orders records with no expenses against them",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/2plsetqdxht7esg/cancel",
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"status":"Cancelled"`,
+				fmt.Sprintf(`"cancelled":"%s`, currentDate),
+				`"canceller":"tqqf7q0f3378rvp"`,
+			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdate": 1,
 			},
@@ -865,7 +869,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			Method:         http.MethodPost,
 			URL:            "/api/purchase_orders/2plsetqdxht7esg/cancel",
 			Headers:        map[string]string{"Authorization": nonCloseToken},
-			ExpectedStatus: 403,
+			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{
 				`"code":"unauthorized_cancellation"`,
 			},
@@ -882,7 +886,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			Method:          http.MethodPost,
 			URL:             "/api/purchase_orders/ly8xyzpuj79upq1/close",
 			Headers:         map[string]string{"Authorization": nonCloseToken},
-			ExpectedStatus:  403,
+			ExpectedStatus:  http.StatusForbidden,
 			ExpectedContent: []string{`"code":"unauthorized_closure","message":"you are not authorized to close purchase orders"`},
 			ExpectedEvents: map[string]int{
 				"OnBeforeApiError": 0,
@@ -891,12 +895,17 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:            "caller with the payables_admin claim can close Active Cumulative purchase_orders records",
-			Method:          http.MethodPost,
-			URL:             "/api/purchase_orders/ly8xyzpuj79upq1/close",
-			Headers:         map[string]string{"Authorization": closeToken},
-			ExpectedStatus:  200,
-			ExpectedContent: []string{`"message":"Purchase order closed successfully"`},
+			Name:           "caller with the payables_admin claim can close Active Cumulative purchase_orders records",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/ly8xyzpuj79upq1/close",
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"status":"Closed"`,
+				fmt.Sprintf(`"closed":"%s`, currentDate),
+				`"closer":"tqqf7q0f3378rvp"`,
+				`"closed_by_system":false`,
+			},
 			ExpectedEvents: map[string]int{
 				"OnBeforeApiError": 0,
 				"OnAfterApiError":  0,
@@ -993,7 +1002,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				fmt.Sprintf(`"approved":"%s`, currentDate),        // Should have today's date
+				`"approved":"2025-01-29 17:00:02.493Z"`,           // already approved, should not change
 				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have same timestamp
 				`"status":"Active"`,                               // Status should become Active
 				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
@@ -1316,6 +1325,24 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			ExpectedEvents: map[string]int{
 				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "payables admin can successfully cancel an active purchase order",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/2plsetqdxht7esg/cancel", // Using PO 2024-0008 which is Active
+			Headers: map[string]string{
+				"Authorization": closeToken, // book@keeper.com has payables_admin claim
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"status":"Cancelled"`,
+				fmt.Sprintf(`"cancelled":"%s`, currentDate),
+				`"canceller":"tqqf7q0f3378rvp"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdate": 1, // Should trigger one record update
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

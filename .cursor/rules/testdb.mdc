@@ -1,0 +1,20 @@
+---
+description: These rules are general rules to always follow when creating or updating code
+globs: *.go
+---
+
+# Rules to follow during our code-writing conversations
+
+## General rules
+
+- When applying code changes, the apply model has a tendency to delete comments. I DO NOT want this. Only modify comments if the code they reference is changing, otherwise leave them alone. This applies to both comment blocks and end-of-line comments.
+- Periodically I'll ask you to review or get an update of where we are (like situational awareness). In those instances if we're following a markdown file in descriptions, outline what we've done already, what remains to be done, and whether we've missed anything.
+
+## Rules for writing tests
+
+- Only ever write one test at a time unless I explicitly tell you to do more than one. In this way I will review all your work.
+- You have access to the sqlite3 command to look into the test database
+- The test database is in the test_pb_data folder and is called data.db
+- Use `pwd` on the command line to figure out where you are if you don't know what working directory you're in or you run a command and it looks like you're on the wrong path. This of course applies to data.db
+- There are often *.md files in the descriptions directory that can guide your progress. We make these files together usually. I will often reference them so you can look at them for guidance.
+

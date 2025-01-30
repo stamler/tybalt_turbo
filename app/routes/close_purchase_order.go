@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	"tybalt/utilities"
 
@@ -63,6 +64,8 @@ func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) er
 			}
 
 			// Update the purchase order status to Closed
+			po.Set("closed", time.Now())
+			po.Set("closer", authRecord.Id)
 			po.Set("status", "Closed")
 
 			// Save the updated record
@@ -91,6 +94,11 @@ func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) er
 			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return e.JSON(http.StatusOK, map[string]string{"message": "Purchase order closed successfully"})
+		// return the updated purchase order from the database
+		closedPO, err := app.FindRecordById("purchase_orders", id)
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+		return e.JSON(http.StatusOK, closedPO)
 	}
 }
