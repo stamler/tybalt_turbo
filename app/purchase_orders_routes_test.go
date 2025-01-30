@@ -726,6 +726,51 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:           "caller with the payables_admin claim cannot cancel non-Active purchase_orders records",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/338568325487lo2/cancel", // Already Cancelled PO (2025-0002)
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"po_not_active"`,
+				`"message":"only active purchase orders can be cancelled"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "cancellation of non-existent purchase order returns 404",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/nonexistent123/cancel",
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"code":"po_not_found"`,
+				`"message":"error fetching purchase order: sql: no rows in result set"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "purchase orders with associated expenses cannot be cancelled",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/ly8xyzpuj79upq1/cancel", // PO 2024-0009 with 4 expenses
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"po_has_expenses"`,
+				`"message":"this purchase order has associated expenses and cannot be cancelled"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
