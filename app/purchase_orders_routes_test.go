@@ -185,12 +185,14 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:            "caller with the payables_admin claim can convert Active Normal purchase_orders to Cumulative",
-			Method:          http.MethodPost,
-			URL:             "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
-			Headers:         map[string]string{"Authorization": closeToken},
-			ExpectedStatus:  204,
-			ExpectedContent: []string{},
+			Name:           "caller with the payables_admin claim can convert Active Normal purchase_orders to Cumulative",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"type":"Cumulative"`,
+			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdate": 1,
 			},
@@ -201,7 +203,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			Method:         http.MethodPost,
 			URL:            "/api/purchase_orders/gal6e5la2fa4rpn/make_cumulative",
 			Headers:        map[string]string{"Authorization": closeToken},
-			ExpectedStatus: 400,
+			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
 				`"code":"po_not_active"`,
 			},
@@ -218,7 +220,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			Method:         http.MethodPost,
 			URL:            "/api/purchase_orders/ly8xyzpuj79upq1/make_cumulative",
 			Headers:        map[string]string{"Authorization": closeToken},
-			ExpectedStatus: 400,
+			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
 				`"code":"po_not_normal"`,
 			},
@@ -235,7 +237,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			Method:         http.MethodPost,
 			URL:            "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
 			Headers:        map[string]string{"Authorization": nonCloseToken},
-			ExpectedStatus: 403,
+			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{
 				`"code":"unauthorized_conversion"`,
 			},

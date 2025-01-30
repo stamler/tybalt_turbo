@@ -515,7 +515,13 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) func(e *core.Re
 			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		return e.NoContent(http.StatusNoContent)
+		// return the updated purchase order from the database
+		updatedPO, err := app.FindRecordById("purchase_orders", id)
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+
+		return e.JSON(http.StatusOK, updatedPO)
 	}
 }
 
