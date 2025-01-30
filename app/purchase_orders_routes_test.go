@@ -8,6 +8,7 @@ import (
 	"time"
 	"tybalt/internal/testutils"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -770,6 +771,34 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				"*": 0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "cancellation fails when expense query fails",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/2plsetqdxht7esg/cancel", // Using a known Active PO
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusInternalServerError,
+			ExpectedContent: []string{
+				`"code":"error_fetching_expenses"`,
+				`"message":"error fetching expenses: SQL logic error: no such table: expenses (1); failed query: SELECT`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(t)
+
+				// Break the expenses table after routes are registered
+				app.OnServe().BindFunc(func(e *core.ServeEvent) error {
+					_, err := app.DB().NewQuery("ALTER TABLE expenses RENAME TO expenses_broken").Execute()
+					if err != nil {
+						t.Fatal(err)
+					}
+					return e.Next()
+				})
+
+				return app
+			},
 		},
 	}
 
