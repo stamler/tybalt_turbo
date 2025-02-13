@@ -6,6 +6,9 @@ app/coverage.out
 # the built binary
 app/tybalt
 
+# the built ui
+app/pb_public/
+
 # import data
 import_data/*.parquet
 import_data/*.duckdb
