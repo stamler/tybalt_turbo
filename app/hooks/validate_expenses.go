@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"tybalt/constants"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -22,7 +23,7 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 		poDate           time.Time
 		poEndDate        time.Time
 		totalLimit       float64
-		excessErrorText  string = fmt.Sprintf("%0.2f%%", utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT*100)
+		excessErrorText  string = fmt.Sprintf("%0.2f%%", constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT*100)
 		parseErr         error
 	)
 	if poRecord != nil {
@@ -60,10 +61,10 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 
 		// The maximum allowed total for all purchase_orders records is the lesser
 		// of the value and percent limits.
-		totalLimit = poTotal * (1.0 + utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
-		if utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT {
-			totalLimit = poTotal + utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
-			excessErrorText = fmt.Sprintf("$%0.2f", utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE)
+		totalLimit = poTotal * (1.0 + constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
+		if constants.MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT {
+			totalLimit = poTotal + constants.MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
+			excessErrorText = fmt.Sprintf("$%0.2f", constants.MAX_PURCHASE_ORDER_EXCESS_VALUE)
 		}
 
 		// For Cumulative POs, we check for overflow before other validations.
@@ -166,8 +167,8 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 			expenseRecord.GetFloat("total"),
 			validation.Required.Error("must be greater than 0"),
 			validation.Min(0.01).Error("must be greater than 0"),
-			validation.When(!(byPassTotalLimit && paymentType == "OnAccount") && limitNonPoAmounts && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
-				validation.Max(NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", NO_PO_EXPENSE_LIMIT)),
+			validation.When(!(byPassTotalLimit && paymentType == "OnAccount") && constants.LIMIT_NON_PO_AMOUNTS && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
+				validation.Max(constants.NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", constants.NO_PO_EXPENSE_LIMIT)),
 			),
 			validation.When(hasPurchaseOrder && (poType == "Normal" || poType == "Recurring"),
 				validation.Max(totalLimit).Error(fmt.Sprintf("expense exceeds purchase order total of $%0.2f by more than %s", poTotal, excessErrorText)),

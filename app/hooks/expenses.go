@@ -12,11 +12,6 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// This feature flag is used to limit the total of expenses that don't have a
-// corresponding purchase order.
-const limitNonPoAmounts = true
-const NO_PO_EXPENSE_LIMIT = 100.0
-
 // The cleanExpense function is used to remove properties from the expense
 // record that are not allowed to be set based on the value of the record's
 // expense_type property. This is intended to reduce round trips to the database

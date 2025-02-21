@@ -12,11 +12,6 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-const (
-	MANAGER_PO_LIMIT = 500
-	VP_PO_LIMIT      = 2500
-)
-
 // recordFinder defines the minimal interface needed for PO number generation operations.
 //
 // This interface exists for two main reasons:

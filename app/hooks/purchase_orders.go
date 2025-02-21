@@ -7,32 +7,13 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"tybalt/constants"
 	"tybalt/routes"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
-)
-
-const (
-	// When true, POs will be auto-approved by the creator if they have the
-	// po_approver claim and division permission, or vp or smg claim. This
-	// behavior is disabled by default since it would eliminate the ability to
-	// double-check and edit a PO after it was created by users with the
-	// po_approver claim or a second approver claim since the PO would already be
-	// status:Active and thus not editable.
-	POAutoApprove = false
-
-	// The amount of money below which a purchase order does not require a second
-	// approval.
-	MANAGER_PO_LIMIT = 500
-	// The amount of money below which a purchase order does not require SMG
-	// approval but can be second approved by a VP if necessary.
-	VP_PO_LIMIT = 2500
-	// The maximum number of days between the start and end dates for a recurring
-	// purchase order.
-	RECURRING_MAX_DAYS = 400
 )
 
 // The cleanPurchaseOrder function is used to remove properties from the
@@ -195,7 +176,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 			purchaseOrderRecord.Get("end_date"),
 			validation.When(isRecurring,
 				validation.Required.Error("end_date is required for recurring purchase orders"),
-				validation.Date("2006-01-02").Error("must be a valid date").Min(dateAsTime).RangeError("end date must be after start date").Max(dateAsTime.AddDate(0, 0, RECURRING_MAX_DAYS)).RangeError(fmt.Sprintf("end date must be within %v days of the start date", RECURRING_MAX_DAYS)),
+				validation.Date("2006-01-02").Error("must be a valid date").Min(dateAsTime).RangeError("end date must be after start date").Max(dateAsTime.AddDate(0, 0, constants.RECURRING_MAX_DAYS)).RangeError(fmt.Sprintf("end date must be within %v days of the start date", constants.RECURRING_MAX_DAYS)),
 			).Else(
 				validation.In("").Error("end_date is not permitted for non-recurring purchase orders"),
 			),
@@ -274,7 +255,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	//    - Set status to Active
 	//    - Generate and set the PO number
 
-	if POAutoApprove {
+	if constants.POAutoApprove {
 		// Check if the creator has po_approver claim and division permission
 		hasPoApproverClaim, err := utilities.HasClaim(app, authRecord, "po_approver")
 		if err != nil {
@@ -402,7 +383,7 @@ func getSecondApproverClaim(app core.App, purchaseOrderRecord *core.Record) (str
 		}
 	}
 
-	if totalValue >= VP_PO_LIMIT {
+	if totalValue >= constants.TIER_2_PO_LIMIT {
 		// Set second approver claim to 'smg'
 		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": "smg",
@@ -411,7 +392,7 @@ func getSecondApproverClaim(app core.App, purchaseOrderRecord *core.Record) (str
 			return "", fmt.Errorf("error fetching SMG claim: %v", err)
 		}
 		secondApproverClaim = claim.Id
-	} else if totalValue >= MANAGER_PO_LIMIT {
+	} else if totalValue >= constants.TIER_1_PO_LIMIT {
 		// Set second approver claim to 'vp'
 		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": "vp",

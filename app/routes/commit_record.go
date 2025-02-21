@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"tybalt/constants"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -185,9 +186,9 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 						}
 						pendingExpenseTotal := record.GetFloat("total")
 
-						totalLimit := purchaseOrderRecord.GetFloat("total") * (1.0 + utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
-						if utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE < purchaseOrderRecord.GetFloat("total")*utilities.MAX_PURCHASE_ORDER_EXCESS_PERCENT {
-							totalLimit = purchaseOrderRecord.GetFloat("total") + utilities.MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
+						totalLimit := purchaseOrderRecord.GetFloat("total") * (1.0 + constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
+						if constants.MAX_PURCHASE_ORDER_EXCESS_VALUE < purchaseOrderRecord.GetFloat("total")*constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT {
+							totalLimit = purchaseOrderRecord.GetFloat("total") + constants.MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
 						}
 
 						if existingExpensesTotal+pendingExpenseTotal > totalLimit {

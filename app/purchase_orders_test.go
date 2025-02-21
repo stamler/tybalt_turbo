@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 	"time"
-	"tybalt/hooks"
+	"tybalt/constants"
 	"tybalt/internal/testutils"
 	"tybalt/routes"
 
@@ -231,7 +231,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 
 		   Test setup:
 		   - Uses user wegviunlyr2jjjv (fakemanager@fakesite.xyz) who has po_approver claim
-		   - Sets PO total to random value below MANAGER_PO_LIMIT to avoid triggering second approval
+		   - Sets PO total to random value below TIER_1_PO_LIMIT to avoid triggering second approval
 		   - Uses correct auth token matching the creator's ID
 
 		   Verification points:
@@ -255,11 +255,11 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(hooks.MANAGER_PO_LIMIT-1.0)+1.0)),
+			}`, rand.Float64()*(constants.TIER_1_PO_LIMIT-1.0)+1.0)),
 			Headers:        map[string]string{"Authorization": poApproverToken},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
-				if hooks.POAutoApprove {
+				if constants.POAutoApprove {
 					return []string{
 						fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
 						`"status":"Active"`,
@@ -298,7 +298,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   - Verifies: no approval, Unapproved status, original approver remains
 
 		   Both tests:
-		   - Use random total below MANAGER_PO_LIMIT (500) to avoid second approval
+		   - Use random total below TIER_1_PO_LIMIT (500) to avoid second approval
 		   - Use correct auth token for fatt@mac.com
 		   - Match uid to authenticated user's ID
 		*/
@@ -317,11 +317,11 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(hooks.MANAGER_PO_LIMIT-1.0)+1.0)),
+			}`, rand.Float64()*(constants.TIER_1_PO_LIMIT-1.0)+1.0)),
 			Headers:        map[string]string{"Authorization": divisionApproverToken},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
-				if hooks.POAutoApprove {
+				if constants.POAutoApprove {
 					return []string{
 						fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
 						`"status":"Active"`,
@@ -357,7 +357,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "wegviunlyr2jjjv",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(hooks.MANAGER_PO_LIMIT-1.0)+1.0)),
+			}`, rand.Float64()*(constants.TIER_1_PO_LIMIT-1.0)+1.0)),
 			Headers:        map[string]string{"Authorization": divisionApproverToken},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
@@ -384,7 +384,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   4. Creator is set as both approver and second_approver
 
 		   The test:
-		   - Uses total above VP_PO_LIMIT (2500) to trigger second approval requirement
+		   - Uses total above TIER_2_PO_LIMIT (2500) to trigger second approval requirement
 		   - Uses random division (since user has empty po_approver payload)
 		   - Verifies all approval fields and timestamps
 		*/
@@ -403,11 +403,11 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(1000.0)+hooks.VP_PO_LIMIT)), // Random value > VP_PO_LIMIT
+			}`, rand.Float64()*(1000.0)+constants.TIER_2_PO_LIMIT)), // Random value > TIER_2_PO_LIMIT
 			Headers:        map[string]string{"Authorization": smgApproverToken},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
-				if hooks.POAutoApprove {
+				if constants.POAutoApprove {
 					return []string{
 						fmt.Sprintf(`"approved":"%s`, currentDate),
 						fmt.Sprintf(`"second_approval":"%s`, currentDate),
@@ -435,7 +435,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   This test verifies auto-approval of mid-range value purchase orders by users with VP claim.
 		   User author@soup.com (id: f2j5a8vk006baub) has:
 		   - po_approver claim with empty payload (can approve for any division)
-		   - vp claim (can provide second approval for POs between MANAGER_PO_LIMIT and VP_PO_LIMIT)
+		   - vp claim (can provide second approval for POs between TIER_1_PO_LIMIT and TIER_2_PO_LIMIT)
 
 		   Test verifies that when this user creates a mid-range value PO:
 		   1. First approval is automatic (due to po_approver claim)
@@ -444,7 +444,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   4. Creator is set as both approver and second_approver
 
 		   The test:
-		   - Uses total between MANAGER_PO_LIMIT (500) and VP_PO_LIMIT (2500)
+		   - Uses total between TIER_1_PO_LIMIT (500) and TIER_2_PO_LIMIT (2500)
 		   - Uses random division (since user has empty po_approver payload)
 		   - Verifies all approval fields and timestamps
 		*/
@@ -463,11 +463,11 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(hooks.VP_PO_LIMIT-hooks.MANAGER_PO_LIMIT)+hooks.MANAGER_PO_LIMIT)), // Random value between MANAGER_PO_LIMIT and VP_PO_LIMIT
+			}`, rand.Float64()*(constants.TIER_2_PO_LIMIT-constants.TIER_1_PO_LIMIT)+constants.TIER_1_PO_LIMIT)), // Random value between TIER_1_PO_LIMIT and TIER_2_PO_LIMIT
 			Headers:        map[string]string{"Authorization": vpApproverToken},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
-				if hooks.POAutoApprove {
+				if constants.POAutoApprove {
 					return []string{
 						fmt.Sprintf(`"approved":"%s`, currentDate),        // Should have an approval timestamp
 						fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have a second approval timestamp
