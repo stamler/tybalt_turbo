@@ -327,7 +327,37 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		// TODO: Non-Active Cumulative purchase_orders records cannot be closed
-
+		{
+			Name:           "caller with the payables_admin claim can close Active Recurring purchase_orders records that have committed expenses",
+			Method:         http.MethodPost,
+			URL:            "/api/purchase_orders/d8463q483f3da28/close", // PO 2025-0004 (Recurring with committed expense)
+			Headers:        map[string]string{"Authorization": closeToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"status":"Closed"`,
+				fmt.Sprintf(`"closed":"%s`, currentDate),
+				`"closer":"tqqf7q0f3378rvp"`,
+				`"closed_by_system":false`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnBeforeApiError": 0,
+				"OnAfterApiError":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:            "Active Recurring purchase_orders records without committed expenses cannot be closed manually",
+			Method:          http.MethodPost,
+			URL:             "/api/purchase_orders/rec5e5la2fa4rpn/close", // PO 2025-0003 (Recurring with no committed expenses)
+			Headers:         map[string]string{"Authorization": closeToken},
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"code":"no_expenses","message":"only cumulative or recurring purchase orders with at least one associated expense may be closed manually. Cancel the purchase order instead."`},
+			ExpectedEvents: map[string]int{
+				"OnBeforeApiError": 0,
+				"OnAfterApiError":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 		/*
 		   This test verifies that a user cannot perform second approval without the required claims (SMG/VP),
 		   even if they have other valid permissions. Specifically, it tests that:

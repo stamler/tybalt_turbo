@@ -56,8 +56,8 @@ func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) er
 				}
 			}
 
-			// For Recurring and Cumulative POs, ensure that there is at least one associated expense
-			expenses, err := txApp.FindRecordsByFilter("expenses", "purchase_order = {:poId}", "", 0, 0, dbx.Params{
+			// For Recurring and Cumulative POs, ensure that there is at least one associated expense that is committed (the committed property has a length greater than 0)
+			expenses, err := txApp.FindRecordsByFilter("expenses", "purchase_order = {:poId} && committed != '' && committed != NULL", "", 0, 0, dbx.Params{
 				"poId": po.Id,
 			})
 			if err != nil {
