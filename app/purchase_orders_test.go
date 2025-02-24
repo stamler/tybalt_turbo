@@ -34,14 +34,14 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Generate token for user with smg claim
-	smgApproverToken, err := testutils.GenerateRecordToken("users", "hal@2005.com")
+	// Generate token for user with po_approver_tier3 claim
+	po_approver_tier3Token, err := testutils.GenerateRecordToken("users", "hal@2005.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Generate token for user with vp claim
-	vpApproverToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	// Generate token for user with po_approver_tier2 claim
+	po_approver_tier2Token, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -375,11 +375,11 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   This test verifies auto-approval of high-value purchase orders by users with elevated claims.
 		   User hal@2005.com (id: 66ct66w380ob6w8) has:
 		   - po_approver claim with empty payload (can approve for any division)
-		   - smg claim (can provide second approval for high-value POs)
+		   - po_approver_tier3 claim (can provide second approval for high-value POs)
 
 		   Test verifies that when this user creates a high-value PO:
 		   1. First approval is automatic (due to po_approver claim)
-		   2. Second approval is also automatic (due to smg claim)
+		   2. Second approval is also automatic (due to po_approver_tier3 claim)
 		   3. Status becomes Active and PO number is generated
 		   4. Creator is set as both approver and second_approver
 
@@ -389,7 +389,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   - Verifies all approval fields and timestamps
 		*/
 		{
-			Name:   "purchase order is fully auto-approved when creator has po_approver and smg claims",
+			Name:   "purchase order is fully auto-approved when creator has po_approver and po_approver_tier3 claims",
 			Method: http.MethodPost,
 			URL:    "/api/collections/purchase_orders/records",
 			Body: strings.NewReader(fmt.Sprintf(`{
@@ -404,7 +404,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"status": "Unapproved",
 				"type": "Normal"
 			}`, rand.Float64()*(1000.0)+constants.TIER_2_PO_LIMIT)), // Random value > TIER_2_PO_LIMIT
-			Headers:        map[string]string{"Authorization": smgApproverToken},
+			Headers:        map[string]string{"Authorization": po_approver_tier3Token},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
 				if constants.POAutoApprove {
@@ -432,14 +432,14 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		/*
-		   This test verifies auto-approval of mid-range value purchase orders by users with VP claim.
+		   This test verifies auto-approval of mid-range value purchase orders by users with po_approver_tier2 claim.
 		   User author@soup.com (id: f2j5a8vk006baub) has:
 		   - po_approver claim with empty payload (can approve for any division)
-		   - vp claim (can provide second approval for POs between TIER_1_PO_LIMIT and TIER_2_PO_LIMIT)
+		   - po_approver_tier2 claim (can provide second approval for POs between TIER_1_PO_LIMIT and TIER_2_PO_LIMIT)
 
 		   Test verifies that when this user creates a mid-range value PO:
 		   1. First approval is automatic (due to po_approver claim)
-		   2. Second approval is also automatic (due to vp claim)
+		   2. Second approval is also automatic (due to po_approver_tier2 claim)
 		   3. Status becomes Active and PO number is generated
 		   4. Creator is set as both approver and second_approver
 
@@ -449,7 +449,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   - Verifies all approval fields and timestamps
 		*/
 		{
-			Name:   "purchase order is fully auto-approved when creator has po_approver and vp claims",
+			Name:   "purchase order is fully auto-approved when creator has po_approver and po_approver_tier2 claims",
 			Method: http.MethodPost,
 			URL:    "/api/collections/purchase_orders/records",
 			Body: strings.NewReader(fmt.Sprintf(`{
@@ -464,7 +464,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"status": "Unapproved",
 				"type": "Normal"
 			}`, rand.Float64()*(constants.TIER_2_PO_LIMIT-constants.TIER_1_PO_LIMIT)+constants.TIER_1_PO_LIMIT)), // Random value between TIER_1_PO_LIMIT and TIER_2_PO_LIMIT
-			Headers:        map[string]string{"Authorization": vpApproverToken},
+			Headers:        map[string]string{"Authorization": po_approver_tier2Token},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
 				if constants.POAutoApprove {

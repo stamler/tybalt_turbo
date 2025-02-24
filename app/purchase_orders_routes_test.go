@@ -33,14 +33,14 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Token for VP who can do second approvals
-	vpToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	// Token for po_approver_tier2 user
+	tier2Token, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Token for user with smg claim
-	smgToken, err := testutils.GenerateRecordToken("users", "hal@2005.com")
+	// Token for user with po_approver_tier3 claim
+	po_approver_tier3Token, err := testutils.GenerateRecordToken("users", "hal@2005.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,12 +99,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "VP completes both approvals of high-value PO in single call",
+			Name:   "po_approver_tier2 claim holder completes both approvals of high-value PO in single call",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/46efdq319b22480/approve", // Using existing Unapproved PO with total 862.12
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
-				"Authorization": vpToken,
+				"Authorization": tier2Token,
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
@@ -112,8 +112,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have same timestamp
 				`"status":"Active"`,                               // Status should become Active
 				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
-				`"approver":"f2j5a8vk006baub"`,                    // VP becomes first approver
-				`"second_approver":"f2j5a8vk006baub"`,             // VP also becomes second approver
+				`"approver":"f2j5a8vk006baub"`,                    // caller becomes first approver
+				`"second_approver":"f2j5a8vk006baub"`,             // caller also becomes second approver
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,
@@ -129,7 +129,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			URL:    "/api/purchase_orders/2blv18f40i2q373/approve", // Using PO with first approval and total 1022.69
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
-				"Authorization": vpToken,
+				"Authorization": tier2Token,
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
@@ -138,7 +138,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				`"status":"Active"`,                               // Status should become Active
 				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
 				`"approver":"wegviunlyr2jjjv"`,                    // Should keep original approver
-				`"second_approver":"f2j5a8vk006baub"`,             // Should be set to VP's ID
+				`"second_approver":"f2j5a8vk006baub"`,             // Should be set to caller's ID
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,
@@ -359,7 +359,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		/*
-		   This test verifies that a user cannot perform second approval without the required claims (SMG/VP),
+		   This test verifies that a user cannot perform second approval without the required claims (po_approver_tier2/po_approver_tier3),
 		   even if they have other valid permissions. Specifically, it tests that:
 
 		   Test Data:
@@ -374,8 +374,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		      - Has po_approver claim: Yes
 		      - Authorized divisions: ["hcd86z57zjty6jo", "fy4i9poneukvq9u", "vccd5fo56ctbigh"]
 		      - Has division permission: Yes (PO's division matches user's authorized divisions)
-		      - Has SMG claim: No
-		      - Has VP claim: No
+		      - Has po_approver_tier3 claim: No
+		      - Has po_approver_tier2 claim: No
 
 		   Expected Behavior:
 		   - Request should fail with 403 Forbidden
@@ -385,15 +385,15 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 
 		   This test isolates the claim requirement by using a user who has all other necessary permissions
 		   (division authorization, po_approver claim) but lacks the specific claims required for second approval.
-		   This ensures the failure is specifically due to missing SMG/VP claims, not other permission issues.
+		   This ensures the failure is specifically due to missing po_approver_tier3/po_approver_tier2 claims, not other permission issues.
 		*/
 		{
-			Name:   "user with po_approver claim but without SMG/VP claims cannot perform second approval",
+			Name:   "user with po_approver claim but without po_approver_tier3/po_approver_tier2 claims cannot perform second approval",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/2blv18f40i2q373/approve",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
-				"Authorization": poApproverToken, // fatt@mac.com who has division permission but no SMG/VP claims
+				"Authorization": poApproverToken, // fatt@mac.com who has division permission but no po_approver_tier2/po_approver_tier3 claims
 			},
 			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{
@@ -406,12 +406,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "VP cannot second-approve PO with value above TIER_2_PO_LIMIT (SMG claim required)",
+			Name:   "po_approver_tier2 cannot second-approve PO with value above TIER_2_PO_LIMIT (po_approver_tier3 claim required)",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/q79eyq0uqrk6x2q/approve", // PO with total 3251.12
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
-				"Authorization": vpToken, // author@soup.com who has VP claim but not SMG
+				"Authorization": tier2Token, // author@soup.com who has po_approver_tier2 claim but not po_approver_tier3
 			},
 			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{
@@ -424,12 +424,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "SMG can second-approve PO with value above TIER_2_PO_LIMIT",
+			Name:   "po_approver_tier3 claim holder can second-approve PO with value above TIER_2_PO_LIMIT",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/q79eyq0uqrk6x2q/approve", // PO with total 3251.12
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
-				"Authorization": smgToken, // hal@2005.com who has SMG claim
+				"Authorization": po_approver_tier3Token, // hal@2005.com who has po_approver_tier3 claim
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
@@ -438,7 +438,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				`"status":"Active"`,                               // Status should become Active
 				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
 				`"approver":"f2j5a8vk006baub"`,                    // approver does not change
-				`"second_approver":"66ct66w380ob6w8"`,             // smg holder becomes second approver
+				`"second_approver":"66ct66w380ob6w8"`,             // po_approver_tier3 holder becomes second approver
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,
@@ -586,7 +586,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			Body: strings.NewReader(`{
 				"rejection_reason": "Budget constraints"
 			}`),
-			Headers:        map[string]string{"Authorization": smgToken},
+			Headers:        map[string]string{"Authorization": po_approver_tier3Token},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"status":"Unapproved"`,
@@ -616,7 +616,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		     * Already has first approval (from wegviunlyr2jjjv)
 		     * Is awaiting second approval
 		   - Uses poApproverToken (fatt@mac.com) who:
-		     * Has po_approver claim but NOT smg/vp claims
+		     * Has po_approver claim but NOT po_approver_tier3/po_approver_tier2 claims
 		     * Cannot perform second approvals
 		     * Can still reject because PO is in Unapproved state
 

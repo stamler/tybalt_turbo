@@ -247,7 +247,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	//    - They become the approver themselves
 	//    - The PO is approved immediately
 	//    - This makes sense because they could approve it anyway
-	// 3. Additionally, if they have the necessary elevated claims (smg/vp) for second
+	// 3. Additionally, if they have the necessary elevated claims (po_approver_tier3/po_approver_tier2) for second
 	//    approval, we also:
 	//    - Make them the second approver
 	//    - Set the second approval immediately
@@ -279,36 +279,36 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 			}
 		}
 
-		// Check if the caller has vp or smg claim
-		hasVPClaim, err := utilities.HasClaim(app, authRecord, "vp")
+		// Check if the caller has po_approver_tier2 or po_approver_tier3 claim
+		hasPo_approver_tier2Claim, err := utilities.HasClaim(app, authRecord, "po_approver_tier2")
 		if err != nil {
 			return &HookError{
 				Status:  http.StatusInternalServerError,
-				Message: "hook error when checking vp claim",
+				Message: "hook error when checking po_approver_tier2 claim",
 				Data: map[string]CodeError{
 					"global": {
 						Code:    "error_checking_claim",
-						Message: fmt.Sprintf("error checking vp claim: %v", err),
+						Message: fmt.Sprintf("error checking po_approver_tier2 claim: %v", err),
 					},
 				},
 			}
 		}
-		hasSMGClaim, err := utilities.HasClaim(app, authRecord, "smg")
+		hasPo_approver_tier3Claim, err := utilities.HasClaim(app, authRecord, "po_approver_tier3")
 		if err != nil {
 			return &HookError{
 				Status:  http.StatusInternalServerError,
-				Message: "hook error when checking smg claim",
+				Message: "hook error when checking po_approver_tier3 claim",
 				Data: map[string]CodeError{
 					"global": {
 						Code:    "error_checking_claim",
-						Message: fmt.Sprintf("error checking smg claim: %v", err),
+						Message: fmt.Sprintf("error checking po_approver_tier3 claim: %v", err),
 					},
 				},
 			}
 		}
 		now := time.Now()
-		// If caller has po_approver claim and division permission, or vp or smg claim, auto-approve
-		if (hasPoApproverClaim && hasPoDivisionPermission) || hasVPClaim || hasSMGClaim {
+		// If caller has po_approver claim and division permission, or po_approver_tier2 or po_approver_tier3 claim, auto-approve
+		if (hasPoApproverClaim && hasPoDivisionPermission) || hasPo_approver_tier2Claim || hasPo_approver_tier3Claim {
 			// Auto-approve if they have permission
 			record.Set("approved", now)
 			record.Set("approver", authRecord.Id)
@@ -384,21 +384,21 @@ func getSecondApproverClaim(app core.App, purchaseOrderRecord *core.Record) (str
 	}
 
 	if totalValue >= constants.TIER_2_PO_LIMIT {
-		// Set second approver claim to 'smg'
+		// Set second approver claim to 'po_approver_tier3'
 		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
-			"claimName": "smg",
+			"claimName": "po_approver_tier3",
 		})
 		if err != nil {
-			return "", fmt.Errorf("error fetching SMG claim: %v", err)
+			return "", fmt.Errorf("error fetching po_approver_tier3 claim: %v", err)
 		}
 		secondApproverClaim = claim.Id
 	} else if totalValue >= constants.TIER_1_PO_LIMIT {
-		// Set second approver claim to 'vp'
+		// Set second approver claim to 'po_approver_tier2'
 		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
-			"claimName": "vp",
+			"claimName": "po_approver_tier2",
 		})
 		if err != nil {
-			return "", fmt.Errorf("error fetching VP claim: %v", err)
+			return "", fmt.Errorf("error fetching po_approver_tier2 claim: %v", err)
 		}
 		secondApproverClaim = claim.Id
 	}

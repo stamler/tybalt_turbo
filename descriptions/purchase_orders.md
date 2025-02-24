@@ -36,9 +36,9 @@ purchase order's status remains unapproved. The user with uid, approver or
 second approver (if applicable) can cancel the purchase_order. Some purchase
 orders require the approval of a second user. If the purchase order is recurring
 or its total is greater than or equal to the TIER_2_PO_LIMIT, the second approver
-must be a member of the SMG group and the second_approver_claim will be set
+must hold the po_approver_tier3 claim and the second_approver_claim will be set
 accordingly. Otherwise if the purchase order's total is greater than or equal to
-the TIER_1_PO_LIMIT, the second approver must be a member of the VP group and
+the TIER_1_PO_LIMIT, the second approver must hold the po_approver_tier2 claim and
 the second_approver_claim will be set accordingly. If neither of these
 conditions are met, there is no need for a second approver so it will be left
 blank. If the purchase_order is cancelled, the cancelling user's id is recorded
@@ -55,9 +55,9 @@ order's status is set to Unapproved.
 1. A purchase order is created by a user.
 2. The purchase order is submitted for approval to the user's manager.
 3. The purchase order is approved by the manager.
-4. If conditions are met, the purchase order is submitted for approval to a VP
-   or SMG member.
-5. The purchase order is approved by the VP or SMG member (as applicable) and
+4. If conditions are met, the purchase order is submitted for approval to a po_approver_tier2
+   or po_approver_tier3 claim holder.
+5. The purchase order is approved by the po_approver_tier2 or po_approver_tier3 claim holder (as applicable) and
    status set to Active.
 
 At step 2 the purchase order can be deleted by the user.
@@ -82,9 +82,9 @@ These endpoints should be implemented in app/routes/purchase_orders.go and calle
   the purchase_orders collection with a blank value for the po_number field. If
   the purchase order is recurring or if the total is greater than or equal to
   TIER_2_PO_LIMIT, the second approver claim is set to the id of the record in the
-  claims collection with the name 'smg'. Otherwise, if the total is greater than
+  claims collection with the name 'po_approver_tier3'. Otherwise, if the total is greater than
   or equal to TIER_1_PO_LIMIT, the second approver claim is set to the id of
-  the record in the claims collection with the name 'vp'. If neither condition
+  the record in the claims collection with the name 'po_approver_tier2'. If neither condition
   is met, the second approver claim is left blank. The endpoint returns the
   created purchase order record upon successful creation.
 
@@ -99,10 +99,10 @@ These endpoints should be implemented in app/routes/purchase_orders.go and calle
   be processed as a file upload. The status is set to Unapproved. There is no PO
   number at this stage. If the purchase order is recurring or if the total is
   greater than or equal to TIER_2_PO_LIMIT, the second approver claim is set to the
-  id of the record in the claims collection with the name 'smg'. Otherwise, if
+  id of the record in the claims collection with the name 'po_approver_tier3'. Otherwise, if
   the total is greater than or equal to TIER_1_PO_LIMIT, the second approver
   claim is set to the id of the record in the claims collection with the name
-  'vp'. Otherwise, the second approver claim is left blank.
+  'po_approver_tier2'. Otherwise, the second approver claim is left blank.
 
 - DELETE /api/po/:id # delete the purchase order with :id if it's unapproved, caller's id must be the creator's uid
 

@@ -12,7 +12,7 @@ package constants
 
 const (
 	// When true, POs will be auto-approved by the creator if they have the
-	// po_approver claim and division permission, or vp or smg claim. This
+	// po_approver claim and division permission, or po_approver_tier2 or po_approver_tier3 claim. This
 	// behavior is disabled by default since it would eliminate the ability to
 	// double-check and edit a PO after it was created by users with the
 	// po_approver claim or a second approver claim since the PO would already be
@@ -22,8 +22,8 @@ const (
 	// The amount of money below which a purchase order does not require a second
 	// approval.
 	TIER_1_PO_LIMIT = 500
-	// The amount of money below which a purchase order does not require SMG
-	// approval but can be second approved by a VP if necessary.
+	// The amount of money below which a purchase order does not require po_approver_tier3
+	// approval but can be second approved by a po_approver_tier2 claim holder if necessary.
 	TIER_2_PO_LIMIT = 2500
 	// The maximum number of days between the start and end dates for a recurring
 	// purchase order.
