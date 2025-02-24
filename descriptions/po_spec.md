@@ -15,7 +15,7 @@
 |------|-----------------------------------------------|
 | 1    | PO amount < TIER_1_PO_LIMIT                   |
 | 2    | TIER_1_PO_LIMIT ≤ PO amount < TIER_2_PO_LIMIT |
-| 3    | PO amount ≥ TIER_1_PO_LIMIT                   |
+| 3    | PO amount ≥ TIER_2_PO_LIMIT                   |
 
 *tiers are adjustable through a software update via constants rather
 than stored in the database and currently have values of 500 and 2500*
