@@ -7,6 +7,7 @@ import (
 
 	"tybalt/utilities"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -45,12 +46,32 @@ func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) er
 				}
 			}
 
-			// Check if purchase order is of type Cumulative
-			if po.GetString("type") != "Cumulative" {
+			// Check if purchase order is allowed to be closed manually per spec:
+			// Normal purchase orders cannot be closed manually.
+			if po.GetString("type") == "Normal" {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
 					Code:    "invalid_po_type",
-					Message: "only cumulative purchase orders can be closed manually",
+					Message: "Normal -type purchase orders may be cancelled but not manually closed",
+				}
+			}
+
+			// For Recurring and Cumulative POs, ensure that there is at least one associated expense
+			expenses, err := txApp.FindRecordsByFilter("expenses", "purchase_order = {:poId}", "", 0, 0, dbx.Params{
+				"poId": po.Id,
+			})
+			if err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_fetching_expenses",
+					Message: fmt.Sprintf("error fetching expenses: %v", err),
+				}
+			}
+			if len(expenses) == 0 {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "no_expenses",
+					Message: "only cumulative or recurring purchase orders with at least one associated expense may be closed manually. Cancel the purchase order instead.",
 				}
 			}
 
