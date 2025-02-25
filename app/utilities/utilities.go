@@ -85,7 +85,7 @@ func GeneratePayPeriodEnding(date string) (string, error) {
 	return weekEndingTime.AddDate(0, 0, 7).Format(time.DateOnly), nil
 }
 
-// DateStringMin returns a validation.RuleFunc that validates that the value is
+// DateStringLimit returns a validation.RuleFunc that validates that the value is
 // a date string that is on or after the date string passed to the function or,
 // if max is true, on or before the date string passed to the function.
 func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
@@ -108,17 +108,12 @@ func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
 	}
 }
 
-// ApproverHasDivisionPermission returns a validation function that checks if the
-// provided approver ID (as the value parameter) has permission to approve
-// purchase orders for the specified division. Permission is granted if either:
-// 1. The approver's po_approver claim payload is empty (null, [], or {})
-// 2. The approver's po_approver claim payload contains the specified divisionId
-func ApproverHasDivisionPermission(app core.App, divisionId string) validation.RuleFunc {
-	return ClaimHasDivisionPermission(app, "po_approver", divisionId)
-}
-
-// ClaimHasDivisionPermission is a more generic version of ApproverHasDivisionPermission
-// that can check any claim type for division permissions
+// ClaimHasDivisionPermission returns a validation function that checks if the
+// provided user ID (as the value parameter) has permission to approve purchase
+// orders for the specified division with the given claim. Permission is granted if
+// either:
+// 1. The user's claim payload is empty (null, [], or {})
+// 2. The user's claim payload contains the specified divisionId
 func ClaimHasDivisionPermission(app core.App, claimName string, divisionId string) validation.RuleFunc {
 	return func(value interface{}) error {
 		userId, _ := value.(string)
@@ -551,4 +546,35 @@ func CumulativeTotalExpensesForPurchaseOrder(app core.App, purchaseOrderRecord *
 	}
 	existingExpensesTotal = result.Total
 	return existingExpensesTotal, nil
+}
+
+// FindTierForAmount takes a purchase order amount and returns the claim ID that should
+// be used for approval based on the po_approval_tiers table.
+// Returns an empty string if no second approval is needed.
+func FindTierForAmount(app core.App, amount float64) (string, error) {
+	// Find all tiers with max_amount >= amount, ordered by max_amount ascending
+	// This will give us the smallest tier that can handle this amount
+	tiers, err := app.FindRecordsByFilter(
+		"po_approval_tiers",
+		"max_amount >= {:amount}",
+		"max_amount",
+		1, // limit to 1 result (the lowest tier that qualifies)
+		0,
+		dbx.Params{
+			"amount": amount,
+		},
+	)
+
+	if err != nil {
+		return "", fmt.Errorf("error finding approval tier: %v", err)
+	}
+
+	// If no tier is found, no second approval is needed
+	if len(tiers) == 0 {
+		return "", nil
+	}
+
+	// Return the claim ID for the appropriate tier
+	claim := tiers[0].GetString("claim")
+	return claim, nil
 }

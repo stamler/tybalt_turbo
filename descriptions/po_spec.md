@@ -11,11 +11,10 @@
 
 ## Approval Tiers
 
-| Tier | Description                                   |
-|------|-----------------------------------------------|
-| 1    | PO amount < TIER_1_PO_LIMIT                   |
-| 2    | TIER_1_PO_LIMIT ≤ PO amount < TIER_2_PO_LIMIT |
-| 3    | PO amount ≥ TIER_2_PO_LIMIT                   |
+| Tier | Description                                       | Associated Claim        |
+|------|---------------------------------------------------|-------------------------|
+| 1    | PO amount < tier 1 limit                          | po_approver             |
+| 2    | tier 1 limit ≤ PO amount < tier 2 limit           | po_approver_tier2       |
+| 3    | PO amount ≥ tier 2 limit                          | po_approver_tier3       |
 
-*tiers are adjustable through a software update via constants rather
-than stored in the database and currently have values of 500 and 2500*
+*Approval tiers are now stored in the database in the `po_approval_tiers` table, with each tier having an associated claim and maximum amount. This allows for dynamic adjustment of tier amounts without requiring code changes.*

@@ -2,8 +2,7 @@
 
 ## Constants
 
-TIER_1_PO_LIMIT = 500
-TIER_2_PO_LIMIT = 2500
+Tier information is stored in the po_approval_tiers table in the database
 
 ## Description of the Purchase Orders System
 

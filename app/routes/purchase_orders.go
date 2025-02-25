@@ -674,10 +674,10 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 			}
 		}
 		if hasPoApproverClaim {
-			// ApproverHasDivisionPermission returns a validation function that checks if the
-			// provided approver ID has permission to approve purchase orders for the specified
-			// division. We pass the auth.Id as the value to validate.
-			if err := utilities.ApproverHasDivisionPermission(txApp, po.GetString("division"))(auth.Id); err == nil {
+			// ClaimHasDivisionPermission returns a validation function that checks if the
+			// provided user ID has permission for the specified division with the given claim.
+			// We pass the auth.Id as the value to validate.
+			if err := utilities.ClaimHasDivisionPermission(txApp, "po_approver", po.GetString("division"))(auth.Id); err == nil {
 				callerIsApprover = true
 			}
 		}

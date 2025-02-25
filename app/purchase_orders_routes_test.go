@@ -49,9 +49,13 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 	currentDate := time.Now().UTC().Format("2006-01-02")
 	currentYear := time.Now().UTC().Format("2006")
 
+	// Get approval tier values from the database
+	app := testutils.SetupTestApp(t)
+	tier1, tier2, _ := testutils.GetApprovalTiers(app)
+
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "authorized approver successfully approves PO below TIER_1_PO_LIMIT",
+			Name:   fmt.Sprintf("authorized approver successfully approves PO below tier 1 limit (%.0f)", tier1),
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/approve", // Using existing Unapproved PO with total 329.01
 			Body:   strings.NewReader(`{}`),                        // No body needed for approval
@@ -365,7 +369,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		   Test Data:
 		   1. Purchase Order (2blv18f40i2q373):
 		      - Division: vccd5fo56ctbigh
-		      - Total: 1022.69 (above TIER_1_PO_LIMIT, requiring second approval)
+		      - Total: 1022.69 (above tier 1 limit, requiring second approval)
 		      - Current Status: Unapproved
 		      - Has first approval: Yes (timestamp: 2025-01-29 14:22:29.563Z)
 		      - First approver: wegviunlyr2jjjv
@@ -406,7 +410,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "po_approver_tier2 cannot second-approve PO with value above TIER_2_PO_LIMIT (po_approver_tier3 claim required)",
+			Name:   fmt.Sprintf("po_approver_tier2 cannot second-approve PO with value above tier 2 limit (%.0f) (po_approver_tier3 claim required)", tier2),
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/q79eyq0uqrk6x2q/approve", // PO with total 3251.12
 			Body:   strings.NewReader(`{}`),
@@ -424,7 +428,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "po_approver_tier3 claim holder can second-approve PO with value above TIER_2_PO_LIMIT",
+			Name:   fmt.Sprintf("po_approver_tier3 claim holder can second-approve PO with value above tier 2 limit (%.0f)", tier2),
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/q79eyq0uqrk6x2q/approve", // PO with total 3251.12
 			Body:   strings.NewReader(`{}`),
@@ -612,7 +616,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 
 		   Test setup:
 		   - Uses PO 2blv18f40i2q373 which:
-		     * Has total of 1022.69 (above TIER_1_PO_LIMIT, requiring second approval)
+		     * Has total of 1022.69 (above tier 1 limit, requiring second approval)
 		     * Already has first approval (from wegviunlyr2jjjv)
 		     * Is awaiting second approval
 		   - Uses poApproverToken (fatt@mac.com) who:

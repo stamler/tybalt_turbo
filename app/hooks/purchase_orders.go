@@ -188,7 +188,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 			).Else(
 				validation.In("").Error("frequency is not permitted for non-recurring purchase orders"))),
 		"description": validation.Validate(purchaseOrderRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
-		"approver":    validation.Validate(purchaseOrderRecord.GetString("approver"), validation.By(utilities.ApproverHasDivisionPermission(app, purchaseOrderRecord.GetString("division")))),
+		"approver":    validation.Validate(purchaseOrderRecord.GetString("approver"), validation.By(utilities.ClaimHasDivisionPermission(app, "po_approver", purchaseOrderRecord.GetString("division")))),
 		// "global":                validation.Validate(totalHours, validation.Max(18.0).Error("Total hours must not exceed 18")),
 	}.Filter()
 
@@ -273,7 +273,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 
 		var hasPoDivisionPermission bool
 		if hasPoApproverClaim {
-			appDivErr := utilities.ApproverHasDivisionPermission(app, record.GetString("division"))(authRecord.Id)
+			appDivErr := utilities.ClaimHasDivisionPermission(app, "po_approver", record.GetString("division"))(authRecord.Id)
 			if appDivErr == nil {
 				hasPoDivisionPermission = true
 			}
@@ -367,8 +367,6 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 }
 
 func getSecondApproverClaim(app core.App, purchaseOrderRecord *core.Record) (string, error) {
-	var secondApproverClaim string
-
 	poType := purchaseOrderRecord.GetString("type")
 	total := purchaseOrderRecord.GetFloat("total")
 
@@ -383,26 +381,11 @@ func getSecondApproverClaim(app core.App, purchaseOrderRecord *core.Record) (str
 		}
 	}
 
-	if totalValue >= constants.TIER_2_PO_LIMIT {
-		// Set second approver claim to 'po_approver_tier3'
-		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
-			"claimName": "po_approver_tier3",
-		})
-		if err != nil {
-			return "", fmt.Errorf("error fetching po_approver_tier3 claim: %v", err)
-		}
-		secondApproverClaim = claim.Id
-	} else if totalValue >= constants.TIER_1_PO_LIMIT {
-		// Set second approver claim to 'po_approver_tier2'
-		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
-			"claimName": "po_approver_tier2",
-		})
-		if err != nil {
-			return "", fmt.Errorf("error fetching po_approver_tier2 claim: %v", err)
-		}
-		secondApproverClaim = claim.Id
+	// Find the appropriate tier for this amount
+	secondApproverClaim, err := utilities.FindTierForAmount(app, totalValue)
+	if err != nil {
+		return "", fmt.Errorf("error determining approval tier: %v", err)
 	}
 
-	// If neither condition is met, secondApproverClaim remains an empty string
 	return secondApproverClaim, nil
 }

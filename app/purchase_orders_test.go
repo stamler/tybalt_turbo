@@ -50,6 +50,11 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	currentYear := time.Now().UTC().Format("2006")
 	// Get current date in UTC for approval timestamp validation
 	currentDate := time.Now().UTC().Format("2006-01-02")
+
+	// Get approval tier values once and reuse them throughout the tests
+	app := testutils.SetupTestApp(t)
+	tier1, tier2, _ := testutils.GetApprovalTiers(app)
+
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "valid purchase order is created",
@@ -231,7 +236,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 
 		   Test setup:
 		   - Uses user wegviunlyr2jjjv (fakemanager@fakesite.xyz) who has po_approver claim
-		   - Sets PO total to random value below TIER_1_PO_LIMIT to avoid triggering second approval
+		   - Sets PO total to random value below tier1 to avoid triggering second approval
 		   - Uses correct auth token matching the creator's ID
 
 		   Verification points:
@@ -255,7 +260,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(constants.TIER_1_PO_LIMIT-1.0)+1.0)),
+			}`, rand.Float64()*(tier1-1.0)+1.0)), // Random value between 1 and tier1
 			Headers:        map[string]string{"Authorization": poApproverToken},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
@@ -298,7 +303,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   - Verifies: no approval, Unapproved status, original approver remains
 
 		   Both tests:
-		   - Use random total below TIER_1_PO_LIMIT (500) to avoid second approval
+		   - Use random total below tier1 to avoid second approval
 		   - Use correct auth token for fatt@mac.com
 		   - Match uid to authenticated user's ID
 		*/
@@ -317,7 +322,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(constants.TIER_1_PO_LIMIT-1.0)+1.0)),
+			}`, rand.Float64()*(tier1-1.0)+1.0)), // Random value between 1 and tier1
 			Headers:        map[string]string{"Authorization": divisionApproverToken},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
@@ -357,7 +362,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "wegviunlyr2jjjv",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(constants.TIER_1_PO_LIMIT-1.0)+1.0)),
+			}`, rand.Float64()*(tier1-1.0)+1.0)), // Random value between 1 and tier1
 			Headers:        map[string]string{"Authorization": divisionApproverToken},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
@@ -384,7 +389,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   4. Creator is set as both approver and second_approver
 
 		   The test:
-		   - Uses total above TIER_2_PO_LIMIT (2500) to trigger second approval requirement
+		   - Uses total above tier2 to trigger second approval requirement
 		   - Uses random division (since user has empty po_approver payload)
 		   - Verifies all approval fields and timestamps
 		*/
@@ -403,7 +408,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(1000.0)+constants.TIER_2_PO_LIMIT)), // Random value > TIER_2_PO_LIMIT
+			}`, rand.Float64()*(1000.0)+tier2)), // Random value > tier2
 			Headers:        map[string]string{"Authorization": po_approver_tier3Token},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
@@ -435,7 +440,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   This test verifies auto-approval of mid-range value purchase orders by users with po_approver_tier2 claim.
 		   User author@soup.com (id: f2j5a8vk006baub) has:
 		   - po_approver claim with empty payload (can approve for any division)
-		   - po_approver_tier2 claim (can provide second approval for POs between TIER_1_PO_LIMIT and TIER_2_PO_LIMIT)
+		   - po_approver_tier2 claim (can provide second approval for POs between tier1 and tier2)
 
 		   Test verifies that when this user creates a mid-range value PO:
 		   1. First approval is automatic (due to po_approver claim)
@@ -444,7 +449,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   4. Creator is set as both approver and second_approver
 
 		   The test:
-		   - Uses total between TIER_1_PO_LIMIT (500) and TIER_2_PO_LIMIT (2500)
+		   - Uses total between tier1 and tier2
 		   - Uses random division (since user has empty po_approver payload)
 		   - Verifies all approval fields and timestamps
 		*/
@@ -463,7 +468,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
 				"type": "Normal"
-			}`, rand.Float64()*(constants.TIER_2_PO_LIMIT-constants.TIER_1_PO_LIMIT)+constants.TIER_1_PO_LIMIT)), // Random value between TIER_1_PO_LIMIT and TIER_2_PO_LIMIT
+			}`, rand.Float64()*(tier2-tier1)+tier1)), // Random value between tier1 and tier2
 			Headers:        map[string]string{"Authorization": po_approver_tier2Token},
 			ExpectedStatus: 200,
 			ExpectedContent: func() []string {
