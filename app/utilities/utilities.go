@@ -114,20 +114,26 @@ func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
 // 1. The approver's po_approver claim payload is empty (null, [], or {})
 // 2. The approver's po_approver claim payload contains the specified divisionId
 func ApproverHasDivisionPermission(app core.App, divisionId string) validation.RuleFunc {
+	return ClaimHasDivisionPermission(app, "po_approver", divisionId)
+}
+
+// ClaimHasDivisionPermission is a more generic version of ApproverHasDivisionPermission
+// that can check any claim type for division permissions
+func ClaimHasDivisionPermission(app core.App, claimName string, divisionId string) validation.RuleFunc {
 	return func(value interface{}) error {
-		approverId, _ := value.(string)
-		poApproverClaim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
-			"claimName": "po_approver",
+		userId, _ := value.(string)
+		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
+			"claimName": claimName,
 		})
 		if err != nil {
-			return validation.NewError("validation_invalid_claim", "po_approver claim not found")
+			return validation.NewError("validation_invalid_claim", fmt.Sprintf("%s claim not found", claimName))
 		}
 		userClaimsRecord, err := app.FindFirstRecordByFilter("user_claims", "uid = {:uid} && cid = {:cid}", dbx.Params{
-			"uid": approverId,
-			"cid": poApproverClaim.Id,
+			"uid": userId,
+			"cid": claim.Id,
 		})
 		if err != nil {
-			return validation.NewError("validation_invalid_approver", "approver does not have a po_approver claim")
+			return validation.NewError("validation_invalid_claim", fmt.Sprintf("user does not have a %s claim", claimName))
 		}
 
 		// payload is a JSON list of strings. Load it into a []string slice
@@ -146,7 +152,8 @@ func ApproverHasDivisionPermission(app core.App, divisionId string) validation.R
 		}
 
 		if !slices.Contains(divisionIds, divisionId) {
-			return validation.NewError("validation_invalid_division", "approver does not have permission for the specified division")
+			return validation.NewError("validation_invalid_division",
+				fmt.Sprintf("user does not have %s permission for the specified division", claimName))
 		}
 		return nil
 	}
