@@ -1,7 +1,6 @@
 // Package constants centralizes application-wide configuration values and thresholds.
 // It contains:
 // - Feature flags controlling system behavior (POAutoApprove, LIMIT_NON_PO_AMOUNTS)
-// - Financial thresholds for purchase order approvals (TIER_1_PO_LIMIT, TIER_2_PO_LIMIT)
 // - Validation parameters for business rules (MAX_PURCHASE_ORDER_EXCESS_PERCENT/VALUE)
 // - Operational limits (RECURRING_MAX_DAYS, NO_PO_EXPENSE_LIMIT)
 //
@@ -19,12 +18,6 @@ const (
 	// status:Active and thus not editable.
 	POAutoApprove = false
 
-	// The amount of money below which a purchase order does not require a second
-	// approval.
-	TIER_1_PO_LIMIT = 500
-	// The amount of money below which a purchase order does not require po_approver_tier3
-	// approval but can be second approved by a po_approver_tier2 claim holder if necessary.
-	TIER_2_PO_LIMIT = 2500
 	// The maximum number of days between the start and end dates for a recurring
 	// purchase order.
 	RECURRING_MAX_DAYS = 400

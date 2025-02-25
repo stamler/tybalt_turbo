@@ -2,7 +2,12 @@
 
 ## Constants
 
-Tier information is stored in the po_approval_tiers table in the database
+Approval tiers are stored in the po_approval_tiers table in the database. Each tier has a:
+
+- claim field that references a claim in the claims collection (po_approver, po_approver_tier2, po_approver_tier3)
+- max_amount field that specifies the maximum purchase order amount for that tier
+
+These database-driven tiers replace the previous hardcoded constants (TIER_1_PO_LIMIT, TIER_2_PO_LIMIT).
 
 ## Description of the Purchase Orders System
 
@@ -34,10 +39,10 @@ by the rejecting user. The rejected is set to the current date and time. The
 purchase order's status remains unapproved. The user with uid, approver or
 second approver (if applicable) can cancel the purchase_order. Some purchase
 orders require the approval of a second user. If the purchase order is recurring
-or its total is greater than or equal to the TIER_2_PO_LIMIT, the second approver
-must hold the po_approver_tier3 claim and the second_approver_claim will be set
+or its total is greater than or equal to the Tier 2 threshold (as defined in the po_approval_tiers table),
+the second approver must hold the po_approver_tier3 claim and the second_approver_claim will be set
 accordingly. Otherwise if the purchase order's total is greater than or equal to
-the TIER_1_PO_LIMIT, the second approver must hold the po_approver_tier2 claim and
+the Tier 1 threshold, the second approver must hold the po_approver_tier2 claim and
 the second_approver_claim will be set accordingly. If neither of these
 conditions are met, there is no need for a second approver so it will be left
 blank. If the purchase_order is cancelled, the cancelling user's id is recorded
@@ -80,9 +85,9 @@ These endpoints should be implemented in app/routes/purchase_orders.go and calle
   should be no PO number at this stage and the purchase order should be added to
   the purchase_orders collection with a blank value for the po_number field. If
   the purchase order is recurring or if the total is greater than or equal to
-  TIER_2_PO_LIMIT, the second approver claim is set to the id of the record in the
+  the Tier 2 threshold (from po_approval_tiers), the second approver claim is set to the id of the record in the
   claims collection with the name 'po_approver_tier3'. Otherwise, if the total is greater than
-  or equal to TIER_1_PO_LIMIT, the second approver claim is set to the id of
+  or equal to the Tier 1 threshold, the second approver claim is set to the id of
   the record in the claims collection with the name 'po_approver_tier2'. If neither condition
   is met, the second approver claim is left blank. The endpoint returns the
   created purchase order record upon successful creation.
@@ -97,9 +102,9 @@ These endpoints should be implemented in app/routes/purchase_orders.go and calle
   payment type, vendor name, and attachment. The attachment is optional and can
   be processed as a file upload. The status is set to Unapproved. There is no PO
   number at this stage. If the purchase order is recurring or if the total is
-  greater than or equal to TIER_2_PO_LIMIT, the second approver claim is set to the
+  greater than or equal to the Tier 2 threshold (from po_approval_tiers), the second approver claim is set to the
   id of the record in the claims collection with the name 'po_approver_tier3'. Otherwise, if
-  the total is greater than or equal to TIER_1_PO_LIMIT, the second approver
+  the total is greater than or equal to the Tier 1 threshold, the second approver
   claim is set to the id of the record in the claims collection with the name
   'po_approver_tier2'. Otherwise, the second approver claim is left blank.
 
