@@ -759,19 +759,20 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 			})
 		}
 
-		// Build query to get all users with po_approver claim
-		query := app.DB().Select("p.uid AS id, p.given_name, p.surname").
-			From("profiles p").
-			InnerJoin("user_claims u", dbx.NewExp("p.uid = u.uid")).
-			Where(dbx.NewExp("u.cid = {:claimId}", dbx.Params{
-				"claimId": approverClaim.Id,
-			}))
+		// Build query to get all users with po_approver claim using NewQuery
+		sql := `
+		SELECT p.uid AS id, p.given_name, p.surname
+		FROM profiles p
+		INNER JOIN user_claims u ON p.uid = u.uid
+		WHERE u.cid = {:claimId} 
+		AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
+		`
 
-		// Apply division filtering
-		// Include users with empty payload (all divisions) or payload containing this division
-		query = query.AndWhere(dbx.NewExp("(u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})", dbx.Params{
+		query := app.DB().NewQuery(sql)
+		query.Bind(dbx.Params{
+			"claimId":         approverClaim.Id,
 			"divisionPattern": "%\"" + division + "\"%",
-		}))
+		})
 
 		// Execute the query
 		var results []map[string]string
@@ -844,19 +845,20 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 			return e.JSON(http.StatusOK, []map[string]string{})
 		}
 
-		// Build query to get all users with the required claim
-		query := app.DB().Select("p.uid AS id, p.given_name, p.surname").
-			From("profiles p").
-			InnerJoin("user_claims u", dbx.NewExp("p.uid = u.uid")).
-			Where(dbx.NewExp("u.cid = {:claimId}", dbx.Params{
-				"claimId": secondApproverClaimId,
-			}))
+		// Build query to get all users with the required claim using NewQuery
+		sql := `
+		SELECT p.uid AS id, p.given_name, p.surname
+		FROM profiles p
+		INNER JOIN user_claims u ON p.uid = u.uid
+		WHERE u.cid = {:claimId} 
+		AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
+		`
 
-		// Apply division filtering
-		// Include users with empty payload (all divisions) or payload containing this division
-		query = query.AndWhere(dbx.NewExp("(u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})", dbx.Params{
+		query := app.DB().NewQuery(sql)
+		query.Bind(dbx.Params{
+			"claimId":         secondApproverClaimId,
 			"divisionPattern": "%\"" + division + "\"%",
-		}))
+		})
 
 		// Execute the query
 		var results []map[string]string
