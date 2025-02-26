@@ -767,12 +767,13 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 		}
 
 		// Build query to get all users with po_approver claim using NewQuery
+		// Note the check for text "null" as well as other empty payload states
 		sql := `
 		SELECT p.uid AS id, p.given_name, p.surname
 		FROM profiles p
 		INNER JOIN user_claims u ON p.uid = u.uid
 		WHERE u.cid = {:claimId} 
-		AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
+		AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR u.payload = '' OR u.payload = 'null' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
 		`
 
 		query := app.DB().NewQuery(sql)
@@ -853,12 +854,13 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 		}
 
 		// Build query to get all users with the required claim using NewQuery
+		// Note the check for text "null" as well as other empty payload states
 		sql := `
 		SELECT p.uid AS id, p.given_name, p.surname
 		FROM profiles p
 		INNER JOIN user_claims u ON p.uid = u.uid
 		WHERE u.cid = {:claimId} 
-		AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
+		AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR u.payload = '' OR u.payload = 'null' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
 		`
 
 		query := app.DB().NewQuery(sql)
