@@ -715,6 +715,13 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 	return callerIsApprover, callerIsQualifiedSecondApprover, nil
 }
 
+// Approver represents a user who can approve purchase orders
+type Approver struct {
+	ID        string `db:"id" json:"id"`
+	GivenName string `db:"given_name" json:"given_name"`
+	Surname   string `db:"surname" json:"surname"`
+}
+
 // GetApprovers returns a list of users who can approve a purchase order of the given amount and division.
 // If the current user has approver claims, an empty list is returned (UI will auto-set to self).
 // Results are filtered to approvers with permission for the specified division
@@ -745,7 +752,7 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 
 		// If user has approver claim, return empty list (UI will auto-set to self)
 		if hasApproverClaim {
-			return e.JSON(http.StatusOK, []map[string]string{})
+			return e.JSON(http.StatusOK, []Approver{})
 		}
 
 		// Find the po_approver claim ID
@@ -774,8 +781,8 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 			"divisionPattern": "%\"" + division + "\"%",
 		})
 
-		// Execute the query
-		var results []map[string]string
+		// Execute the query using our custom Approver struct
+		var results []Approver
 		err = query.All(&results)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
@@ -819,7 +826,7 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 
 		// If no second approval is needed (amount below tier 1), return empty list
 		if secondApproverClaimId == "" {
-			return e.JSON(http.StatusOK, []map[string]string{})
+			return e.JSON(http.StatusOK, []Approver{})
 		}
 
 		// Get the claim details to check if the current user has this claim
@@ -842,7 +849,7 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 
 		// If user has the required claim, return empty list (UI will auto-set to self)
 		if hasRequiredClaim {
-			return e.JSON(http.StatusOK, []map[string]string{})
+			return e.JSON(http.StatusOK, []Approver{})
 		}
 
 		// Build query to get all users with the required claim using NewQuery
@@ -860,8 +867,8 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 			"divisionPattern": "%\"" + division + "\"%",
 		})
 
-		// Execute the query
-		var results []map[string]string
+		// Execute the query using our custom Approver struct
+		var results []Approver
 		err = query.All(&results)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
