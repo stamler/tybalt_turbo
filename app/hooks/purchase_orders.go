@@ -35,7 +35,7 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	}
 
 	// set the second_approver_claim field
-	secondApproverClaim, err := getSecondApproverClaim(app, purchaseOrderRecord)
+	secondApproverClaimId, err := getSecondApproverClaimId(app, purchaseOrderRecord)
 	if err != nil {
 		return &HookError{
 			Status:  http.StatusInternalServerError,
@@ -48,7 +48,7 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 			},
 		}
 	}
-	purchaseOrderRecord.Set("second_approver_claim", secondApproverClaim)
+	purchaseOrderRecord.Set("second_approver_claim", secondApproverClaimId)
 
 	return nil
 }
@@ -366,7 +366,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	return nil
 }
 
-func getSecondApproverClaim(app core.App, purchaseOrderRecord *core.Record) (string, error) {
+func getSecondApproverClaimId(app core.App, purchaseOrderRecord *core.Record) (string, error) {
 	poType := purchaseOrderRecord.GetString("type")
 	total := purchaseOrderRecord.GetFloat("total")
 
@@ -382,10 +382,26 @@ func getSecondApproverClaim(app core.App, purchaseOrderRecord *core.Record) (str
 	}
 
 	// Find the appropriate tier for this amount
-	secondApproverClaim, err := utilities.FindTierForAmount(app, totalValue)
+	secondApproverClaimId, err := utilities.FindRequiredApproverClaimIdForPOAmount(app, totalValue)
 	if err != nil {
 		return "", fmt.Errorf("error determining approval tier: %v", err)
 	}
 
-	return secondApproverClaim, nil
+	// get the claim id from the lowest max_amount tier record
+	lowestMaxAmountTierClaimId, _, err := utilities.FindLowestTierClaimIdAndMaxAmount(app)
+	if err != nil {
+		return "", fmt.Errorf("error determining lowest approval tier: %v", err)
+	}
+
+	// if the secondApproverClaim matches the approver claim, return an empty
+	// string because second approval is not needed
+	if secondApproverClaimId == lowestMaxAmountTierClaimId {
+		return "", nil
+	}
+
+	// otherwise, return the second approver claim. This may be empty if the
+	// approver amount of the purchase order exceeds the max_amount of the
+	// highest tier. In this case, the hook will return an error to the user
+	// preventing the PO from being created or updated.
+	return secondApproverClaimId, nil
 }

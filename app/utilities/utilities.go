@@ -548,10 +548,11 @@ func CumulativeTotalExpensesForPurchaseOrder(app core.App, purchaseOrderRecord *
 	return existingExpensesTotal, nil
 }
 
-// FindTierForAmount takes a purchase order amount and returns the claim ID that should
-// be used for approval based on the po_approval_tiers table.
-// Returns an empty string if no second approval is needed.
-func FindTierForAmount(app core.App, amount float64) (string, error) {
+// FindRequiredApproverClaimIdForPOAmount takes a purchase order amount and
+// returns the claim ID that should be used for full approval based on the
+// po_approval_tiers table. A claim ID is always returned unless the amount
+// exceeds the maximum tier's limit or the po_approval_tiers table is empty.
+func FindRequiredApproverClaimIdForPOAmount(app core.App, amount float64) (string, error) {
 	// Find all tiers with max_amount >= amount, ordered by max_amount ascending
 	// This will give us the smallest tier that can handle this amount
 	tiers, err := app.FindRecordsByFilter(
@@ -569,7 +570,7 @@ func FindTierForAmount(app core.App, amount float64) (string, error) {
 		return "", fmt.Errorf("error finding approval tier: %v", err)
 	}
 
-	// If no tier is found, no second approval is needed
+	// If no tier is found, return an empty string
 	if len(tiers) == 0 {
 		return "", nil
 	}
@@ -577,4 +578,26 @@ func FindTierForAmount(app core.App, amount float64) (string, error) {
 	// Return the claim ID for the appropriate tier
 	claim := tiers[0].GetString("claim")
 	return claim, nil
+}
+
+// FindLowestTierClaimIdAndMaxAmount returns the claim ID and max_amount of the
+// tier with the lowest max_amount in the po_approval_tiers table.
+func FindLowestTierClaimIdAndMaxAmount(app core.App) (string, float64, error) {
+	tiers, err := app.FindRecordsByFilter(
+		"po_approval_tiers",
+		"",
+		"max_amount",
+		1,
+		0,
+	)
+
+	if err != nil {
+		return "", 0, fmt.Errorf("error finding lowest approval tier: %v", err)
+	}
+
+	if len(tiers) == 0 {
+		return "", 0, fmt.Errorf("no approval tiers found")
+	}
+
+	return tiers[0].GetString("claim"), tiers[0].GetFloat("max_amount"), nil
 }

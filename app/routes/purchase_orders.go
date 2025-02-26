@@ -816,8 +816,23 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 			})
 		}
 
-		// Find the appropriate claim for this amount
-		secondApproverClaimId, err := utilities.FindTierForAmount(app, amount)
+		// Get the max amount for the lowest tier
+		_, lowestTierMaxAmount, err := utilities.FindLowestTierClaimIdAndMaxAmount(app)
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_lowest_tier_claim",
+				"message": fmt.Sprintf("Error fetching lowest tier claim: %v", err),
+			})
+		}
+
+		// Return an empty list if the amount is below the lowest tier max amount
+		// because no second approval is needed
+		if amount < lowestTierMaxAmount {
+			return e.JSON(http.StatusOK, []Approver{})
+		}
+
+		// Determine the claim ID for the required tier
+		secondApproverClaimId, err := utilities.FindRequiredApproverClaimIdForPOAmount(app, amount)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_determining_tier",
@@ -825,31 +840,26 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 			})
 		}
 
-		// If no second approval is needed (amount below tier 1), return empty list
-		if secondApproverClaimId == "" {
-			return e.JSON(http.StatusOK, []Approver{})
+		// Return empty list (UI will auto-set to self) if the current user has the required claim
+		type ClaimResult struct {
+			HasClaim bool `db:"has_claim"`
 		}
-
-		// Get the claim details to check if the current user has this claim
-		secondApproverClaim, err := app.FindRecordById("claims", secondApproverClaimId)
-		if err != nil {
-			return e.JSON(http.StatusInternalServerError, map[string]string{
-				"code":    "error_fetching_claim",
-				"message": fmt.Sprintf("Error fetching claim details: %v", err),
-			})
-		}
-
-		// Check if the current user has the required claim
-		hasRequiredClaim, err := utilities.HasClaim(app, auth, secondApproverClaim.GetString("name"))
+		var result ClaimResult
+		err = app.DB().NewQuery(`
+			SELECT COUNT(*) > 0 AS has_claim
+			FROM user_claims
+			WHERE uid = {:userId} AND cid = {:claimId}
+		`).Bind(dbx.Params{
+			"userId":  auth.Id,
+			"claimId": secondApproverClaimId,
+		}).One(&result)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_checking_claims",
 				"message": fmt.Sprintf("Error checking user claims: %v", err),
 			})
 		}
-
-		// If user has the required claim, return empty list (UI will auto-set to self)
-		if hasRequiredClaim {
+		if result.HasClaim {
 			return e.JSON(http.StatusOK, []Approver{})
 		}
 
