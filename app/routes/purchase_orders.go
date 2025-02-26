@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"tybalt/utilities"
@@ -712,4 +713,161 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 	}
 
 	return callerIsApprover, callerIsQualifiedSecondApprover, nil
+}
+
+// GetApprovers returns a list of users who can approve a purchase order of the given amount and division.
+// If the current user has approver claims, an empty list is returned (UI will auto-set to self).
+// Results are filtered to approvers with permission for the specified division
+// (empty payload means all divisions, otherwise division must be in payload).
+func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+
+		// Get the division and amount parameters
+		division := e.Request.PathValue("division")
+		amountStr := e.Request.PathValue("amount")
+		_, err := strconv.ParseFloat(amountStr, 64)
+		if err != nil {
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "invalid_amount",
+				"message": "Amount must be a valid number",
+			})
+		}
+
+		// Check if the current user has po_approver claim
+		hasApproverClaim, err := utilities.HasClaim(app, auth, "po_approver")
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_checking_claims",
+				"message": fmt.Sprintf("Error checking user claims: %v", err),
+			})
+		}
+
+		// If user has approver claim, return empty list (UI will auto-set to self)
+		if hasApproverClaim {
+			return e.JSON(http.StatusOK, []map[string]string{})
+		}
+
+		// Find the po_approver claim ID
+		approverClaim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
+			"claimName": "po_approver",
+		})
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_claim",
+				"message": fmt.Sprintf("Error fetching po_approver claim: %v", err),
+			})
+		}
+
+		// Build query to get all users with po_approver claim
+		query := app.DB().Select("p.uid AS id, p.given_name, p.surname").
+			From("profiles p").
+			InnerJoin("user_claims u", dbx.NewExp("p.uid = u.uid")).
+			Where(dbx.NewExp("u.cid = {:claimId}", dbx.Params{
+				"claimId": approverClaim.Id,
+			}))
+
+		// Apply division filtering
+		// Include users with empty payload (all divisions) or payload containing this division
+		query = query.AndWhere(dbx.NewExp("(u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})", dbx.Params{
+			"divisionPattern": "%\"" + division + "\"%",
+		}))
+
+		// Execute the query
+		var results []map[string]string
+		err = query.All(&results)
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_approvers",
+				"message": fmt.Sprintf("Error fetching approvers: %v", err),
+			})
+		}
+
+		return e.JSON(http.StatusOK, results)
+	}
+}
+
+// GetSecondApprovers returns a list of users who can provide second approval for a purchase order
+// of the given amount and division. If the amount is below tier 1 or the current user has the appropriate claim
+// for the required tier, an empty list is returned (no second approval needed or UI will auto-set to self).
+// Results are filtered to approvers with permission for the specified division
+// (empty payload means all divisions, otherwise division must be in payload).
+func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+
+		// Get the division and amount parameters
+		division := e.Request.PathValue("division")
+		amountStr := e.Request.PathValue("amount")
+		amount, err := strconv.ParseFloat(amountStr, 64)
+		if err != nil {
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "invalid_amount",
+				"message": "Amount must be a valid number",
+			})
+		}
+
+		// Find the appropriate claim for this amount
+		secondApproverClaimId, err := utilities.FindTierForAmount(app, amount)
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_determining_tier",
+				"message": fmt.Sprintf("Error determining approval tier: %v", err),
+			})
+		}
+
+		// If no second approval is needed (amount below tier 1), return empty list
+		if secondApproverClaimId == "" {
+			return e.JSON(http.StatusOK, []map[string]string{})
+		}
+
+		// Get the claim details to check if the current user has this claim
+		secondApproverClaim, err := app.FindRecordById("claims", secondApproverClaimId)
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_claim",
+				"message": fmt.Sprintf("Error fetching claim details: %v", err),
+			})
+		}
+
+		// Check if the current user has the required claim
+		hasRequiredClaim, err := utilities.HasClaim(app, auth, secondApproverClaim.GetString("name"))
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_checking_claims",
+				"message": fmt.Sprintf("Error checking user claims: %v", err),
+			})
+		}
+
+		// If user has the required claim, return empty list (UI will auto-set to self)
+		if hasRequiredClaim {
+			return e.JSON(http.StatusOK, []map[string]string{})
+		}
+
+		// Build query to get all users with the required claim
+		query := app.DB().Select("p.uid AS id, p.given_name, p.surname").
+			From("profiles p").
+			InnerJoin("user_claims u", dbx.NewExp("p.uid = u.uid")).
+			Where(dbx.NewExp("u.cid = {:claimId}", dbx.Params{
+				"claimId": secondApproverClaimId,
+			}))
+
+		// Apply division filtering
+		// Include users with empty payload (all divisions) or payload containing this division
+		query = query.AndWhere(dbx.NewExp("(u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})", dbx.Params{
+			"divisionPattern": "%\"" + division + "\"%",
+		}))
+
+		// Execute the query
+		var results []map[string]string
+		err = query.All(&results)
+		if err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_approvers",
+				"message": fmt.Sprintf("Error fetching approvers: %v", err),
+			})
+		}
+
+		return e.JSON(http.StatusOK, results)
+	}
 }

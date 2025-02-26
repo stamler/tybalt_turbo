@@ -38,23 +38,15 @@ The priority_second_approver field addresses this by:
 
 We will implement two new endpoints:
 
-### 1. GET /api/purchase_orders/approvers/{amount}
+### 1. GET /api/purchase_orders/approvers/{division}/{amount}
 
-Returns a list of users who can serve as first approvers for a purchase order with the specified amount.
+Returns a list of users who can serve as first approvers for a purchase order with the specified amount and division.
 
 **Behavior:**
 
 - If user has no approver claims: Return all users with po_approver claim
 - If user has po_approver claim or higher: Return empty list (will auto-set to self in UI)
-- If a division ID is provided in the request body, filter the results to only include approvers who have permission for that division. Permissions are determined by a claim payload. No payload means full permission, divisions in the payload restrict permissions to those divisions.
-
-**Request Format (Optional):**
-
-```json
-{
-  "division": "division123"
-}
-```
+- Results are filtered to only include approvers who have permission for the specified division. Permissions are determined by a claim payload. No payload means full permission, divisions in the payload restrict permissions to those divisions.
 
 **Response Format:**
 
@@ -65,9 +57,9 @@ Returns a list of users who can serve as first approvers for a purchase order wi
 ]
 ```
 
-### 2. GET /api/purchase_orders/second_approvers/{amount}
+### 2. GET /api/purchase_orders/second_approvers/{division}/{amount}
 
-Returns a list of users who can serve as second approvers for a purchase order with the specified amount.
+Returns a list of users who can serve as second approvers for a purchase order with the specified amount and division.
 
 **Behavior:**
 
@@ -79,15 +71,7 @@ Returns a list of users who can serve as second approvers for a purchase order w
   - If user has po_approver_tier3 claim: Return empty list (will auto-set to self in UI)
   - Otherwise: Return all users with po_approver_tier3 claim
 - The code should intelligently adjust to even greater numbers of tiers beyond tier3 if they exist in the database by simply sorting them by max_amount
-- If a division ID is provided in the request body, filter the results to only include approvers who have permission for that division, with the same behaviour as in the approvers endpoint.
-
-**Request Format (Optional):**
-
-```json
-{
-  "division": "division123"
-}
-```
+- Results are filtered to only include approvers who have permission for the specified division, with the same behaviour as in the approvers endpoint.
 
 **Response Format:**
 
@@ -106,34 +90,18 @@ Returns a list of users who can serve as second approvers for a purchase order w
    - Add the two new route handlers in `app/routes/purchase_orders.go`
 
    ```go
-   // GetApprovers returns a list of users who can approve a purchase order of the given amount
-   // If a division ID is provided in the request body, results are filtered to that division
+   // GetApprovers returns a list of users who can approve a purchase order of the given amount and division
    func GetApprovers(c echo.Context) error {
+       division := c.Param("division")
        amount := c.Param("amount")
-       
-       // Parse request body for optional division ID
-       var req struct {
-           Division string `json:"division"`
-       }
-       if err := c.Bind(&req); err != nil {
-           // Handle error or just ignore and proceed without division filtering
-       }
        
        // Implementation details...
    }
 
-   // GetSecondApprovers returns a list of users who can provide second approval for a purchase order of the given amount
-   // If a division ID is provided in the request body, results are filtered to that division
+   // GetSecondApprovers returns a list of users who can provide second approval for a purchase order of the given amount and division
    func GetSecondApprovers(c echo.Context) error {
+       division := c.Param("division")
        amount := c.Param("amount")
-       
-       // Parse request body for optional division ID
-       var req struct {
-           Division string `json:"division"`
-       }
-       if err := c.Bind(&req); err != nil {
-           // Handle error or just ignore and proceed without division filtering
-       }
        
        // Implementation details...
    }
@@ -146,8 +114,8 @@ Returns a list of users who can serve as second approvers for a purchase order w
 
    ```go
    // Add these routes inside RegisterPurchaseOrderRoutes
-   g.GET("/purchase_orders/approvers/:amount", purchase_orders.GetApprovers)
-   g.GET("/purchase_orders/second_approvers/:amount", purchase_orders.GetSecondApprovers)
+   g.GET("/purchase_orders/approvers/:division/:amount", purchase_orders.GetApprovers)
+   g.GET("/purchase_orders/second_approvers/:division/:amount", purchase_orders.GetSecondApprovers)
    ```
 
 3. **Purchase Order Validation**:

@@ -52,6 +52,8 @@ func AddRoutes(app core.App) {
 		poGroup.POST("/{id}/cancel", createCancelPurchaseOrderHandler(app))
 		poGroup.POST("/{id}/close", createClosePurchaseOrderHandler(app))
 		poGroup.POST("/{id}/make_cumulative", createConvertToCumulativePurchaseOrderHandler(app))
+		poGroup.GET("/approvers/{division}/{amount}", createGetApproversHandler(app))
+		poGroup.GET("/second_approvers/{division}/{amount}", createGetSecondApproversHandler(app))
 
 		clientsGroup := se.Router.Group("/api/clients")
 		clientsGroup.Bind(apis.RequireAuth("users"))
