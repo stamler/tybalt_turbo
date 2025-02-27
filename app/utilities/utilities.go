@@ -18,7 +18,7 @@ import (
 	"github.com/pocketbase/pocketbase/tools/types"
 )
 
-func IsValidDate(value interface{}) error {
+func IsValidDate(value any) error {
 	s, _ := value.(string)
 	if _, err := time.Parse(time.DateOnly, s); err != nil {
 		return validation.NewError("validation_invalid_date", s+" is not a valid date")
@@ -89,7 +89,7 @@ func GeneratePayPeriodEnding(date string) (string, error) {
 // a date string that is on or after the date string passed to the function or,
 // if max is true, on or before the date string passed to the function.
 func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
-	return func(value interface{}) error {
+	return func(value any) error {
 		date, _ := value.(string)
 		dateAsTime, err := time.Parse(time.DateOnly, date)
 		if err != nil {
@@ -115,7 +115,7 @@ func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
 // 1. The user's claim payload is empty (null, [], or {})
 // 2. The user's claim payload contains the specified divisionId
 func ClaimHasDivisionPermission(app core.App, claimName string, divisionId string) validation.RuleFunc {
-	return func(value interface{}) error {
+	return func(value any) error {
 		userId, _ := value.(string)
 		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
 			"claimName": claimName,
@@ -155,7 +155,7 @@ func ClaimHasDivisionPermission(app core.App, claimName string, divisionId strin
 }
 
 func IsPositiveMultipleOfPointFive() validation.RuleFunc {
-	return func(value interface{}) error {
+	return func(value any) error {
 		s, _ := value.(float64)
 		if s == 0 {
 			return nil
@@ -172,7 +172,7 @@ func IsPositiveMultipleOfPointFive() validation.RuleFunc {
 }
 
 func IsPositiveMultipleOfPointZeroOne() validation.RuleFunc {
-	return func(value interface{}) error {
+	return func(value any) error {
 		s, _ := value.(float64)
 		if s == 0 {
 			return nil
@@ -606,4 +606,35 @@ func GetBoundClaimIdAndMaxAmount(app core.App, highest bool) (string, float64, e
 	}
 
 	return tiers[0].GetString("claim"), tiers[0].GetFloat("max_amount"), nil
+}
+
+// PurchaseOrderAmountDoesNotExceedMaxTier returns nil if a purchase order's
+// amount is less than or equal to the maximum amount defined in the highest
+// approval tier. Otherwise, it returns an error. It handles both normal and
+// recurring purchase orders.
+func PurchaseOrderAmountDoesNotExceedMaxTier(app core.App, purchaseOrderRecord *core.Record) error {
+	// Get the highest tier max amount
+	_, highestTierMaxAmount, err := GetBoundClaimIdAndMaxAmount(app, true)
+	if err != nil {
+		return fmt.Errorf("error determining highest approval tier: %v", err)
+	}
+
+	// Determine the total value based on PO type
+	poType := purchaseOrderRecord.GetString("type")
+	total := purchaseOrderRecord.GetFloat("total")
+	totalValue := total
+
+	if poType == "Recurring" {
+		_, totalValue, err = CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
+		if err != nil {
+			return fmt.Errorf("error calculating recurring PO total value: %v", err)
+		}
+	}
+
+	// Check if total exceeds highest tier max amount
+	if totalValue > highestTierMaxAmount {
+		return errors.New("purchase order amount exceeds the max_amount of the highest approval tier")
+	}
+
+	return nil
 }

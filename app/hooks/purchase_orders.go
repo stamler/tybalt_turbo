@@ -194,7 +194,13 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				validation.In("").Error("frequency is not permitted for non-recurring purchase orders"))),
 		"description": validation.Validate(purchaseOrderRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
 		"approver":    validation.Validate(purchaseOrderRecord.GetString("approver"), validation.By(utilities.ClaimHasDivisionPermission(app, "po_approver", purchaseOrderRecord.GetString("division")))),
-		// "global":                validation.Validate(totalHours, validation.Max(18.0).Error("Total hours must not exceed 18")),
+		"total": validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.By(func(value any) error {
+			err := utilities.PurchaseOrderAmountDoesNotExceedMaxTier(app, purchaseOrderRecord)
+			if err != nil {
+				return validation.NewError("amount_exceeds_max_tier", "Purchase order amount exceeds maximum approval threshold")
+			}
+			return nil
+		})),
 	}.Filter()
 
 	return validationsErrors
