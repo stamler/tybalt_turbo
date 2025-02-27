@@ -50,6 +50,11 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	}
 	purchaseOrderRecord.Set("second_approver_claim", secondApproverClaimId)
 
+	// Clear priority_second_approver if no second approval is needed
+	if secondApproverClaimId == "" {
+		purchaseOrderRecord.Set("priority_second_approver", "")
+	}
+
 	return nil
 }
 

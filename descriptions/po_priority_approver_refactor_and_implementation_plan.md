@@ -16,6 +16,32 @@ Both functions follow a similar pattern:
 - Filter results by division permissions
 - Return formatted results
 
+## Implementation Progress
+
+### Completed
+
+- The `cleanPurchaseOrder` function has already been updated to clear the `priority_second_approver` field when second approval is not needed:
+
+  ```go
+  // In cleanPurchaseOrder
+  secondApproverClaimId, err := getSecondApproverClaimId(app, record)
+  if err != nil {
+      return err
+  }
+  
+  // Set second_approver_claim on the record
+  record.Set("second_approver_claim", secondApproverClaimId)
+  
+  // Clear priority_second_approver if no second approval is needed
+  if secondApproverClaimId == "" {
+      record.Set("priority_second_approver", "")
+  }
+  ```
+
+### Remaining Work
+
+The following aspects still need to be implemented:
+
 ## Refactoring Strategy
 
 ### 1. Create a Core Utility Function
@@ -26,7 +52,7 @@ Create a utility function that handles the common logic of finding approvers wit
 // GetApproversByTier fetches a list of users who can approve a purchase order based on parameters
 // Parameters:
 // - app: the application context
-// - auth: the authenticated user record
+// - auth: the authenticated user record. This is optional (nil is a valid parameter) as nil enables using the function for validation where no authenticated user is available.
 // - division: the division ID for which approval is needed
 // - amount: the purchase order amount
 // - forSecondApproval: whether we're looking for second approvers (true) or first approvers (false)
@@ -67,64 +93,106 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 }
 ```
 
-### 3. Hook Validation Implementation
+### 3. Update ProcessPurchaseOrder for Priority Second Approver
 
-Create a validation function in the purchase orders hooks to validate the priority_second_approver field:
+The existing `ProcessPurchaseOrder()` function in `app/hooks/purchase_orders.go` follows a clean/validate pattern:
 
 ```go
-// ValidatePrioritySecondApprover checks if the provided priority_second_approver ID
-// is valid for the given purchase order amount and division
-func ValidatePrioritySecondApprover(app core.App, record *core.Record) error {
-    // Get necessary values from the record
-    prioritySecondApprover := record.GetString("priority_second_approver")
-    
-    // If empty, validation passes (field is optional)
-    if prioritySecondApprover == "" {
-        return nil
-    }
-    
-    // Get purchase order amount and division
-    division := record.GetString("division")
-    amount := CalculateTotalPOValue(record)
-    
-    // Use the utility function to get eligible second approvers
-    approvers, _, err := GetApproversByTier(app, nil, division, amount, true)
-    if err != nil {
+func ProcessPurchaseOrder(app core.App, record *core.Record, authRecord *core.Record, processType string) error {
+    // Stage 1: Clean up data
+    if err := cleanPurchaseOrder(app, record, authRecord, processType); err != nil {
         return err
     }
-    
-    // Check if prioritySecondApprover is in the list of eligible approvers
-    valid := false
-    for _, approver := range approvers {
-        if approver.ID == prioritySecondApprover {
-            valid = true
-            break
-        }
+
+    // Stage 2: Validate the purchase order
+    if err := validatePurchaseOrder(app, record, authRecord, processType); err != nil {
+        return err
     }
-    
-    if !valid {
-        return &HookError{
-            Status: http.StatusBadRequest,
-            Message: "Invalid priority second approver",
-            Data: map[string]CodeError{
-                "priority_second_approver": {
-                    Code:    "invalid_priority_second_approver",
-                    Message: "The selected priority second approver is not authorized to approve this purchase order",
+
+    // Additional stages...
+
+    return nil
+}
+```
+
+#### 3.1 Update `cleanPurchaseOrder` [COMPLETED]
+
+The `cleanPurchaseOrder` function has already been updated to clear the priority_second_approver field if second approval is not needed.
+
+#### 3.2 Update `validatePurchaseOrder` [PENDING]
+
+We still need to update the `validatePurchaseOrder` function to validate the priority_second_approver field if set:
+
+```go
+func validatePurchaseOrder(app core.App, record *core.Record, authRecord *core.Record, processType string) error {
+    // Existing validation logic...
+
+    // Validate priority_second_approver if set
+    prioritySecondApprover := record.GetString("priority_second_approver")
+    if prioritySecondApprover != "" {
+        // Get purchase order details
+        division := record.GetString("division")
+        
+        // Calculate total value for the PO (same calculation as in cleanPurchaseOrder)
+        poType := record.GetString("type")
+        total := record.GetFloat("total")
+        totalValue := total
+        
+        if poType == "Recurring" {
+            _, totalValue, err = utilities.CalculateRecurringPurchaseOrderTotalValue(app, record)
+            if err != nil {
+                return err
+            }
+        }
+        
+        // Get list of eligible second approvers
+        approvers, _, err := utilities.GetApproversByTier(app, nil, division, totalValue, true)
+        if err != nil {
+            return &HookError{
+                Status:  http.StatusInternalServerError,
+                Message: "hook error when checking eligible second approvers",
+                Data: map[string]CodeError{
+                    "global": {
+                        Code:    "error_checking_approvers",
+                        Message: fmt.Sprintf("error checking eligible second approvers: %v", err),
+                    },
                 },
-            },
+            }
+        }
+        
+        // Check if prioritySecondApprover is in the list of eligible approvers
+        valid := false
+        for _, approver := range approvers {
+            if approver.ID == prioritySecondApprover {
+                valid = true
+                break
+            }
+        }
+        
+        if !valid {
+            return &HookError{
+                Status:  http.StatusBadRequest,
+                Message: "hook error when validating priority second approver",
+                Data: map[string]CodeError{
+                    "priority_second_approver": {
+                        Code:    "invalid_priority_second_approver",
+                        Message: "The selected priority second approver is not authorized to approve this purchase order",
+                    },
+                },
+            }
         }
     }
-    
+
     return nil
 }
 ```
 
 ## Implementation Steps
 
-1. Create the `GetApproversByTier` utility function in `app/utilities/approvers.go`
+1. Create the `GetApproversByTier` utility function in `app/utilities/po_approvers.go`
 2. Update the existing handler functions to use this utility function
-3. Add validation for the priority_second_approver field in the purchase orders hook
-4. Add tests for the validation logic
+3. Update `validatePurchaseOrder()` to validate the priority_second_approver field if set (cleanPurchaseOrder is already updated)
+4. Add tests for the utility function and the updated hooks
 
 ## Detailed Implementation Plan
 
@@ -164,16 +232,16 @@ func GetApproversByTier(
 
 Update both `createGetApproversHandler` and `createGetSecondApproversHandler` to use the new utility function.
 
-### Step 3: Add Validation Logic
+### Step 3: Update validatePurchaseOrder
 
-Update the BeforeCreateRequest and BeforeUpdateRequest hooks in `app/hooks/purchase_orders.go` to validate the priority_second_approver field.
+Update the `validatePurchaseOrder` function in `app/hooks/purchase_orders.go` to validate the priority_second_approver field.
 
 ### Step 4: Write Tests
 
 Create tests for:
 
 - The utility function
-- The validation logic
+- The updated hooks
 
 ## Benefits of This Approach
 
@@ -181,6 +249,10 @@ Create tests for:
 2. **Improves Maintainability**: Changes to approval logic only need to be made in one place
 3. **Enables Reuse**: The same function can be used for API responses and internal validation
 4. **Enforces Business Rules**: Ensures that only eligible second approvers can be assigned to a PO
+5. **Follows Existing Patterns**: Uses the established clean/validate pattern in ProcessPurchaseOrder
+6. **Proper Separation of Concerns**:
+   - The clean phase ensures data consistency (clearing priority_second_approver when not needed) [COMPLETED]
+   - The validate phase ensures business rule compliance (validating against eligible approvers) [PENDING]
 
 ## Considerations
 
