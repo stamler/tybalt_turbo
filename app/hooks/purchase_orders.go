@@ -393,7 +393,7 @@ func getSecondApproverClaimId(app core.App, purchaseOrderRecord *core.Record) (s
 	}
 
 	// get the claim id from the lowest max_amount tier record
-	lowestMaxAmountTierClaimId, _, err := utilities.FindLowestTierClaimIdAndMaxAmount(app)
+	lowestMaxAmountTierClaimId, _, err := utilities.GetBoundClaimIdAndMaxAmount(app, false)
 	if err != nil {
 		return "", fmt.Errorf("error determining lowest approval tier: %v", err)
 	}

@@ -817,7 +817,7 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 		}
 
 		// Get the max amount for the lowest tier
-		_, lowestTierMaxAmount, err := utilities.FindLowestTierClaimIdAndMaxAmount(app)
+		_, lowestTierMaxAmount, err := utilities.GetBoundClaimIdAndMaxAmount(app, false)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_lowest_tier_claim",

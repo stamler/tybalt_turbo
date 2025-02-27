@@ -580,19 +580,25 @@ func FindRequiredApproverClaimIdForPOAmount(app core.App, amount float64) (strin
 	return claim, nil
 }
 
-// FindLowestTierClaimIdAndMaxAmount returns the claim ID and max_amount of the
-// tier with the lowest max_amount in the po_approval_tiers table.
-func FindLowestTierClaimIdAndMaxAmount(app core.App) (string, float64, error) {
+// GetBoundClaimIdAndMaxAmount returns the claim ID and max_amount of the
+// tier with the lowest or highest max_amount in the po_approval_tiers table.
+// If highest is true, the tier with the highest max_amount is returned,
+// otherwise the tier with the lowest max_amount is returned.
+func GetBoundClaimIdAndMaxAmount(app core.App, highest bool) (string, float64, error) {
+	order := "max_amount"
+	if highest {
+		order = "-max_amount"
+	}
 	tiers, err := app.FindRecordsByFilter(
 		"po_approval_tiers",
 		"",
-		"max_amount",
+		order,
 		1,
 		0,
 	)
 
 	if err != nil {
-		return "", 0, fmt.Errorf("error finding lowest approval tier: %v", err)
+		return "", 0, fmt.Errorf("error finding approval tier: %v", err)
 	}
 
 	if len(tiers) == 0 {
