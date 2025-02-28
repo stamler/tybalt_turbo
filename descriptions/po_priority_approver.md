@@ -194,6 +194,45 @@ WHERE
   )
 ```
 
+It's important to note that all status = 'Active' purchase orders can be viewed
+by anybody who is authenticated. It's the ones with a different status that need
+special filtering. So the above query will actually be implemented as pocketbase
+listRule and viewRule strings.
+
+```rules
+// Active purchase_orders can be viewed by any authenticated user
+(status = "Active" && @request.auth.id != "") ||
+
+// Cancelled and Closed purchase_orders can be viewed by uid, approver, second_approver, and 'report' claim holder
+(
+  (status = "Cancelled" || status = "Closed") &&
+  (
+    @request.auth.id = uid || 
+    @request.auth.id = approver || 
+    @request.auth.id = second_approver || 
+    @request.auth.user_claims_via_uid.cid.name ?= 'report'
+  )
+) ||
+
+// TODO: We may also later allow Closed purchase_orders to be viewed by uid, approver, and committer of corresponding expenses, if any, in a rule here
+(
+  true = true
+) ||
+
+// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of second_approver_claim
+(
+  status = "Unapproved" &&
+  (
+    @request.auth.id = uid || 
+    @request.auth.id = approver || 
+    @request.auth.id = priority_second_approver || 
+    (
+      // TODO: if updated more than 24 hours ago, @request.auth.id holds second_approver_claim
+    )
+  )
+)
+```
+
 ### Auto-Approval Logic
 
 Existing auto-approval logic is set to FALSE by constant. Maintain the existing auto-approval logic, but ensure that it is updated to reflect the new code:
