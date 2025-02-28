@@ -496,6 +496,34 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		// Add a new test case for priority_second_approver validation
+		{
+			Name:   "fails when priority_second_approver is not authorized for the PO amount",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": 1234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal",
+				"priority_second_approver": "regularUser"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"priority_second_approver":{"code":"invalid_priority_second_approver","message":"The selected priority second approver is not authorized to approve this purchase order"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {

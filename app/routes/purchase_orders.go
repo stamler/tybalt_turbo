@@ -734,6 +734,18 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 			})
 		}
 
+		// Check for recurring purchase order query parameters and calculate the total value if necessary
+		poType := e.Request.URL.Query().Get("type")
+		if poType == "Recurring" {
+			amount, err = calculateRecurringPurchaseOrderTotalValue(app, amount, e.Request.URL.Query().Get("start_date"), e.Request.URL.Query().Get("end_date"), e.Request.URL.Query().Get("frequency"))
+			if err != nil {
+				return e.JSON(http.StatusBadRequest, map[string]string{
+					"code":    "invalid_parameters",
+					"message": fmt.Sprintf("Error calculating recurring PO total: %v", err),
+				})
+			}
+		}
+
 		// Use the GetApproversByTier utility function with forSecondApproval=false
 		approvers, _, err := utilities.GetApproversByTier(app, auth, division, amount, false)
 		if err != nil {
@@ -767,6 +779,18 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 			})
 		}
 
+		// Check for recurring purchase order query parameters and calculate the total value if necessary
+		poType := e.Request.URL.Query().Get("type")
+		if poType == "Recurring" {
+			amount, err = calculateRecurringPurchaseOrderTotalValue(app, amount, e.Request.URL.Query().Get("start_date"), e.Request.URL.Query().Get("end_date"), e.Request.URL.Query().Get("frequency"))
+			if err != nil {
+				return e.JSON(http.StatusBadRequest, map[string]string{
+					"code":    "invalid_parameters",
+					"message": fmt.Sprintf("Error calculating recurring PO total: %v", err),
+				})
+			}
+		}
+
 		// Use the GetApproversByTier utility function with forSecondApproval=true
 		approvers, _, err := utilities.GetApproversByTier(app, auth, division, amount, true)
 		if err != nil {
@@ -778,4 +802,32 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 
 		return e.JSON(http.StatusOK, approvers)
 	}
+}
+
+// calculate the total value of a recurring purchase order this is used to
+// determine the approvers for the purchase order it is used in the getApprovers
+// and getSecondApprovers handlers it is also used in the createPurchaseOrder
+// handler to validate the total value of the purchase order. It is a wrapper
+// around CalculateRecurringPurchaseOrderTotalValue function that assembles
+// query parameters into a temporary purchase_orders record.
+func calculateRecurringPurchaseOrderTotalValue(app core.App, amount float64, startDate string, endDate string, frequency string) (float64, error) {
+	// Validate required parameters
+	if startDate == "" || endDate == "" || frequency == "" {
+		return 0, fmt.Errorf("start_date, end_date, and frequency are required for recurring purchase orders")
+	}
+
+	// Create a temporary record for calculation
+	tempPO := core.NewRecord(core.NewCollection("purchase_orders", "purchase_orders"))
+	tempPO.Set("date", startDate)
+	tempPO.Set("end_date", endDate)
+	tempPO.Set("frequency", frequency)
+	tempPO.Set("total", amount)
+
+	// Calculate the actual total for recurring PO
+	_, calculatedTotal, err := utilities.CalculateRecurringPurchaseOrderTotalValue(app, tempPO)
+	if err != nil {
+		return 0, fmt.Errorf("Error calculating recurring PO total: %v", err)
+	}
+
+	return calculatedTotal, nil
 }

@@ -171,6 +171,71 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		}
 	}
 
+	// Validate priority_second_approver if set
+	prioritySecondApprover := purchaseOrderRecord.GetString("priority_second_approver")
+	if prioritySecondApprover != "" {
+		division := purchaseOrderRecord.GetString("division")
+
+		// Calculate total value for the PO
+		poType := purchaseOrderRecord.GetString("type")
+		total := purchaseOrderRecord.GetFloat("total")
+		totalValue := total
+
+		if poType == "Recurring" {
+			_, calculatedTotal, err := utilities.CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
+			if err != nil {
+				return &HookError{
+					Status:  http.StatusInternalServerError,
+					Message: "hook error when calculating recurring PO total value",
+					Data: map[string]CodeError{
+						"global": {
+							Code:    "error_calculating_total_value",
+							Message: fmt.Sprintf("error calculating recurring PO total value: %v", err),
+						},
+					},
+				}
+			}
+			totalValue = calculatedTotal
+		}
+
+		// Get list of eligible second approvers
+		approvers, _, err := utilities.GetApproversByTier(app, nil, division, totalValue, true)
+		if err != nil {
+			return &HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "hook error when checking eligible second approvers",
+				Data: map[string]CodeError{
+					"global": {
+						Code:    "error_checking_approvers",
+						Message: fmt.Sprintf("error checking eligible second approvers: %v", err),
+					},
+				},
+			}
+		}
+
+		// Check if prioritySecondApprover is in the list of eligible approvers
+		valid := false
+		for _, approver := range approvers {
+			if approver.ID == prioritySecondApprover {
+				valid = true
+				break
+			}
+		}
+
+		if !valid {
+			return &HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating priority second approver",
+				Data: map[string]CodeError{
+					"priority_second_approver": {
+						Code:    "invalid_priority_second_approver",
+						Message: "The selected priority second approver is not authorized to approve this purchase order",
+					},
+				},
+			}
+		}
+	}
+
 	validationsErrors := validation.Errors{
 		"date": validation.Validate(
 			purchaseOrderRecord.Get("date"),
