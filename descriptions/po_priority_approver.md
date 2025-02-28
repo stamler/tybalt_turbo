@@ -227,7 +227,9 @@ listRule and viewRule strings.
     @request.auth.id = approver || 
     @request.auth.id = priority_second_approver || 
     (
-      // TODO: if updated more than 24 hours ago, @request.auth.id holds second_approver_claim
+      // if updated more than 24 hours ago, @request.auth.id holds second_approver_claim
+      updated < @yesterday && @request.auth.user_claims_via_uid.cid ?= second_approver_claim
+      // TODO: validate this rule ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
     )
   )
 )
