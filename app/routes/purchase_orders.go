@@ -715,13 +715,6 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 	return callerIsApprover, callerIsQualifiedSecondApprover, nil
 }
 
-// Approver represents a user who can approve purchase orders
-type Approver struct {
-	ID        string `db:"id" json:"id"`
-	GivenName string `db:"given_name" json:"given_name"`
-	Surname   string `db:"surname" json:"surname"`
-}
-
 // GetApprovers returns a list of users who can approve a purchase order of the given amount and division.
 // If the current user has approver claims, an empty list is returned (UI will auto-set to self).
 // Results are filtered to approvers with permission for the specified division
@@ -733,7 +726,7 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 		// Get the division and amount parameters
 		division := e.Request.PathValue("division")
 		amountStr := e.Request.PathValue("amount")
-		_, err := strconv.ParseFloat(amountStr, 64)
+		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
 			return e.JSON(http.StatusBadRequest, map[string]string{
 				"code":    "invalid_amount",
@@ -741,50 +734,8 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 			})
 		}
 
-		// Check if the current user has po_approver claim
-		hasApproverClaim, err := utilities.HasClaim(app, auth, "po_approver")
-		if err != nil {
-			return e.JSON(http.StatusInternalServerError, map[string]string{
-				"code":    "error_checking_claims",
-				"message": fmt.Sprintf("Error checking user claims: %v", err),
-			})
-		}
-
-		// If user has approver claim, return empty list (UI will auto-set to self)
-		if hasApproverClaim {
-			return e.JSON(http.StatusOK, []Approver{})
-		}
-
-		// Find the po_approver claim ID
-		approverClaim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
-			"claimName": "po_approver",
-		})
-		if err != nil {
-			return e.JSON(http.StatusInternalServerError, map[string]string{
-				"code":    "error_fetching_claim",
-				"message": fmt.Sprintf("Error fetching po_approver claim: %v", err),
-			})
-		}
-
-		// Build query to get all users with po_approver claim using NewQuery
-		// Note the check for text "null" as well as other empty payload states
-		sql := `
-		SELECT p.uid AS id, p.given_name, p.surname
-		FROM profiles p
-		INNER JOIN user_claims u ON p.uid = u.uid
-		WHERE u.cid = {:claimId} 
-		AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR u.payload = '' OR u.payload = 'null' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
-		`
-
-		query := app.DB().NewQuery(sql)
-		query.Bind(dbx.Params{
-			"claimId":         approverClaim.Id,
-			"divisionPattern": "%\"" + division + "\"%",
-		})
-
-		// Execute the query using our custom Approver struct
-		var results []Approver
-		err = query.All(&results)
+		// Use the GetApproversByTier utility function with forSecondApproval=false
+		approvers, _, err := utilities.GetApproversByTier(app, auth, division, amount, false)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_approvers",
@@ -792,7 +743,7 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 			})
 		}
 
-		return e.JSON(http.StatusOK, results)
+		return e.JSON(http.StatusOK, approvers)
 	}
 }
 
@@ -816,72 +767,8 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 			})
 		}
 
-		// Get the max amount for the lowest tier
-		_, lowestTierMaxAmount, err := utilities.GetBoundClaimIdAndMaxAmount(app, false)
-		if err != nil {
-			return e.JSON(http.StatusInternalServerError, map[string]string{
-				"code":    "error_fetching_lowest_tier_claim",
-				"message": fmt.Sprintf("Error fetching lowest tier claim: %v", err),
-			})
-		}
-
-		// Return an empty list if the amount is below the lowest tier max amount
-		// because no second approval is needed
-		if amount < lowestTierMaxAmount {
-			return e.JSON(http.StatusOK, []Approver{})
-		}
-
-		// Determine the claim ID for the required tier
-		secondApproverClaimId, err := utilities.FindRequiredApproverClaimIdForPOAmount(app, amount)
-		if err != nil {
-			return e.JSON(http.StatusInternalServerError, map[string]string{
-				"code":    "error_determining_tier",
-				"message": fmt.Sprintf("Error determining approval tier: %v", err),
-			})
-		}
-
-		// Return empty list (UI will auto-set to self) if the current user has the required claim
-		type ClaimResult struct {
-			HasClaim bool `db:"has_claim"`
-		}
-		var result ClaimResult
-		err = app.DB().NewQuery(`
-			SELECT COUNT(*) > 0 AS has_claim
-			FROM user_claims
-			WHERE uid = {:userId} AND cid = {:claimId}
-		`).Bind(dbx.Params{
-			"userId":  auth.Id,
-			"claimId": secondApproverClaimId,
-		}).One(&result)
-		if err != nil {
-			return e.JSON(http.StatusInternalServerError, map[string]string{
-				"code":    "error_checking_claims",
-				"message": fmt.Sprintf("Error checking user claims: %v", err),
-			})
-		}
-		if result.HasClaim {
-			return e.JSON(http.StatusOK, []Approver{})
-		}
-
-		// Build query to get all users with the required claim using NewQuery
-		// Note the check for text "null" as well as other empty payload states
-		sql := `
-		SELECT p.uid AS id, p.given_name, p.surname
-		FROM profiles p
-		INNER JOIN user_claims u ON p.uid = u.uid
-		WHERE u.cid = {:claimId} 
-		AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR u.payload = '' OR u.payload = 'null' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
-		`
-
-		query := app.DB().NewQuery(sql)
-		query.Bind(dbx.Params{
-			"claimId":         secondApproverClaimId,
-			"divisionPattern": "%\"" + division + "\"%",
-		})
-
-		// Execute the query using our custom Approver struct
-		var results []Approver
-		err = query.All(&results)
+		// Use the GetApproversByTier utility function with forSecondApproval=true
+		approvers, _, err := utilities.GetApproversByTier(app, auth, division, amount, true)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_approvers",
@@ -889,6 +776,6 @@ func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) er
 			})
 		}
 
-		return e.JSON(http.StatusOK, results)
+		return e.JSON(http.StatusOK, approvers)
 	}
 }
