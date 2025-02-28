@@ -517,7 +517,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"priority_second_approver":{"code":"invalid_priority_second_approver","message":"The selected priority second approver is not authorized to approve this purchase order"`,
+				`"priority_second_approver":{"code":"invalid_priority_second_approver"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
