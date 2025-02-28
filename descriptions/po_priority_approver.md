@@ -167,10 +167,32 @@ When the optional division parameter is provided to the API endpoints:
 
 When a purchase order is created or updated with a priority_second_approver:
 
-1. Record the timestamp of the assignment. This may already exist somehow so verify if some existing data is useable.
-2. For 24 hours, only show this PO to the designated approver for second approval
+1. Record the timestamp of the assignment. For the first version of the implementation we'll just use PocketBase's built in 'updated' field of the purchase_orders record. This has the effect of resetting the 24-hour countdown every time the purchase_orders record is updated, but that's fine.
+2. For 24 hours, only show this PO to the priority_second_approver for second approval
 3. After 24 hours, if not approved, make it visible to all users with the appropriate claim
-4. This can probably be implemented by just having the scheduled emailer (not implemented) check the timestamp mentioned in 1 and compare it to the current time.
+4. This can probably be implemented by just having the scheduled emailer (not implemented) and the query for the UI, check the timestamp mentioned in 1 and compare it to the current time.
+
+Here's a possible implementation that needs to be verified:
+
+```sql
+SELECT * FROM purchase_orders 
+WHERE 
+  status = 'Unapproved' AND
+  LENGTH(approved) > 0 AND -- The record already has first-level approval
+  (
+    priority_second_approver = {:userId} OR -- caller is the priority second approver
+    priority_second_approver = "" OR -- no specified priority second approver
+    priority_second_approver IS NULL OR
+    (
+      -- There is a priority second approver and it's not the caller, but the 24
+      -- window for exclusivity has closed
+      priority_second_approver IS NOT NULL AND
+      priority_second_approver != "" AND
+      priority_second_approver != {:userId} AND
+      updated < datetime('now', '-24 hours') -- SQLite Syntax
+    )
+  )
+```
 
 ### Auto-Approval Logic
 
