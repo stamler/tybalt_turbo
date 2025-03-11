@@ -230,6 +230,7 @@ listRule and viewRule strings.
       // if updated more than 24 hours ago, @request.auth.id holds second_approver_claim
       updated < @yesterday && @request.auth.user_claims_via_uid.cid ?= second_approver_claim
       // TODO: validate this rule ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ 
+      // TODO: @yesterday macro requires PocketBase v0.24 or later
     )
   )
 )
