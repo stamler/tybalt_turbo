@@ -49,6 +49,12 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Generate token for a user with no claims (creator of cancelled PO 1cqrvp4mna33k2b)
+	noclaimsToken, err := testutils.GenerateRecordToken("users", "noclaims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	scenarios := []tests.ApiScenario{
 		// Any authenticated user without special permissions can see all Active purchase_orders records
 		{
@@ -187,6 +193,89 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 
 				return app
 			},
+		},
+
+		// Creator can see their own Cancelled PO
+		{
+			Name:   "creator can see their own Cancelled PO",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/1cqrvp4mna33k2b", // Cancelled PO created by noclaims@example.com
+			Headers: map[string]string{
+				"Authorization": noclaimsToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"1cqrvp4mna33k2b"`,
+				`"status":"Cancelled"`,
+				`"uid":"4ssj9f1yg250o9y"`, // noclaims@example.com's ID
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// Approver can see a Cancelled PO they approved
+		{
+			Name:   "approver can see a Cancelled PO they approved",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/1cqrvp4mna33k2b", // Cancelled PO with orphan@poapprover.com as approver
+			Headers: map[string]string{
+				"Authorization": approverTokenNoPOs, // orphan@poapprover.com
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"1cqrvp4mna33k2b"`,
+				`"status":"Cancelled"`,
+				`"approver":"4r70mfovf22m9uh"`, // orphan@poapprover.com's ID
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// Second approver can see a Cancelled PO they second-approved
+		{
+			Name:   "second approver can see a Cancelled PO they second-approved",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/1cqrvp4mna33k2b", // Cancelled PO with tier2@poapprover.com as second_approver
+			Headers: map[string]string{
+				"Authorization": prioritySecondApproverToken, // tier2@poapprover.com
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"1cqrvp4mna33k2b"`,
+				`"status":"Cancelled"`,
+				`"second_approver":"6bq4j0eb26631dy"`, // tier2@poapprover.com's ID
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// User without special claims cannot see a cancelled PO they didn't create (for 1cqrvp4mna33k2b)
+		{
+			Name:   "user without special claims cannot see a cancelled PO they didn't create (new PO)",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/1cqrvp4mna33k2b", // Cancelled PO created by noclaims@example.com
+			Headers: map[string]string{
+				"Authorization": regularUserToken, // Tester Time has no special claims
+			},
+			ExpectedStatus: http.StatusNotFound, // Should get 404 as they don't have permission
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+				`"status":404`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// Approver cannot see a Cancelled PO they didn't approve
+		{
+			Name:   "approver cannot see a Cancelled PO they didn't approve",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/1cqrvp4mna33k2b", // Cancelled PO with orphan@poapprover.com as approver
+			Headers: map[string]string{
+				"Authorization": approverToken, // Fakesy Manjor is not the approver of this PO
+			},
+			ExpectedStatus: http.StatusNotFound, // Should get 404 as they don't have permission
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+				`"status":404`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 	}
 
