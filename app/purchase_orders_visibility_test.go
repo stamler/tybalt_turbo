@@ -277,6 +277,56 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+
+		// Creator can see their own Closed PO
+		{
+			Name:   "creator can see their own Closed PO",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/0pia83nnprdlzf8", // Closed PO created by noclaims@example.com
+			Headers: map[string]string{
+				"Authorization": noclaimsToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"0pia83nnprdlzf8"`,
+				`"status":"Closed"`,
+				`"uid":"4ssj9f1yg250o9y"`, // noclaims@example.com's ID
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// Approver can see a Closed PO they approved
+		{
+			Name:   "approver can see a Closed PO they approved",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/0pia83nnprdlzf8", // Closed PO with orphan@poapprover.com as approver
+			Headers: map[string]string{
+				"Authorization": approverTokenNoPOs, // orphan@poapprover.com
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"0pia83nnprdlzf8"`,
+				`"status":"Closed"`,
+				`"approver":"4r70mfovf22m9uh"`, // orphan@poapprover.com's ID
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// User without special claims cannot see a Closed PO they didn't create
+		{
+			Name:   "user without special claims cannot see a Closed PO they didn't create",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/0pia83nnprdlzf8", // Closed PO created by noclaims@example.com
+			Headers: map[string]string{
+				"Authorization": regularUserToken, // Tester Time has no special claims
+			},
+			ExpectedStatus: http.StatusNotFound, // Should get 404 as they don't have permission
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+				`"status":404`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 	}
 
 	for _, scenario := range scenarios {
