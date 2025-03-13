@@ -37,6 +37,18 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Generate token for Tier Two (priority_second_approver of n9ev1x7a00c1iy6)
+	prioritySecondApproverToken, err := testutils.GenerateRecordToken("users", "tier2@poapprover.com") // Tier Two
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate token for Tier TwoB (has only po_approver_tier2 claim, not priority_second_approver)
+	tier2bToken, err := testutils.GenerateRecordToken("users", "tier2b@poapprover.com") // Tier TwoB
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	scenarios := []tests.ApiScenario{
 		// Any authenticated user without special permissions can see all Active purchase_orders records
 		{
@@ -115,6 +127,66 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 				`"uid":"f2j5a8vk006baub"`, // Horace Silver's ID
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// Priority second approver can see an Unapproved PO they're assigned to
+		{
+			Name:   "priority second approver can see an Unapproved PO they're assigned to",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/n9ev1x7a00c1iy6", // Unapproved PO with Tier Two as priority_second_approver
+			Headers: map[string]string{
+				"Authorization": prioritySecondApproverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"n9ev1x7a00c1iy6"`,
+				`"status":"Unapproved"`,
+				`"priority_second_approver":"6bq4j0eb26631dy"`, // Tier Two's ID
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// User with second_approver_claim CAN see an Unapproved PO with a different priority_second_approver after 24h
+		{
+			Name:   "user with second_approver_claim CAN see an Unapproved PO with different priority_second_approver AFTER 24 hours",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/n9ev1x7a00c1iy6", // Unapproved PO with Tier Two as priority_second_approver
+			Headers: map[string]string{
+				"Authorization": tier2bToken, // Tier TwoB has only po_approver_tier2 claim but is not the priority_second_approver
+			},
+			ExpectedStatus: http.StatusOK, // Should be able to see it after 24 hours
+			ExpectedContent: []string{
+				`"id":"n9ev1x7a00c1iy6"`,
+				`"status":"Unapproved"`,
+				`"priority_second_approver":"6bq4j0eb26631dy"`, // Tier Two's ID
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
+		// User with second_approver_claim CANNOT see an Unapproved PO with a different priority_second_approver within 24h
+		{
+			Name:   "user with second_approver_claim CANNOT see an Unapproved PO with different priority_second_approver WITHIN 24 hours",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/n9ev1x7a00c1iy6", // Unapproved PO with Tier Two as priority_second_approver
+			Headers: map[string]string{
+				"Authorization": tier2bToken, // Tier TwoB has only po_approver_tier2 claim but is not the priority_second_approver
+			},
+			ExpectedStatus: http.StatusNotFound, // Should NOT be able to see it within 24 hours
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+				`"status":404`,
+			},
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(t)
+
+				// Update the PO's timestamp to be within the past 24 hours (2 hours ago)
+				_, err := app.DB().NewQuery("UPDATE purchase_orders SET updated = datetime('now', '-2 hours') WHERE id = 'n9ev1x7a00c1iy6'").Execute()
+				if err != nil {
+					t.Fatalf("Failed to update timestamp: %v", err)
+				}
+
+				return app
+			},
 		},
 	}
 
