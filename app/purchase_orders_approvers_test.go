@@ -52,6 +52,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"id":"wegviunlyr2jjjv"`, // Fakesy Manjor (has null payload)
 				`"id":"66ct66w380ob6w8"`, // Shallow Hal (has null payload)
+				`"id":"4r70mfovf22m9uh"`, // Orphaned POApprover (has null payload)
 				`"given_name"`,
 				`"surname"`,
 			},
@@ -86,7 +87,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		},
 		// Tests for GET /api/purchase_orders/second_approvers/{division}/{amount}
 		{
-			Name:   "amount_below_tier_1_returns_empty_list",
+			Name:   "amount below tier1 returns empty list for second approvers call",
 			Method: http.MethodGet,
 			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier1)-1),
 			Headers: map[string]string{
@@ -99,7 +100,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "tier1_amount_returns_tier2_approvers",
+			Name:   "tier1 amount returns tier2 approvers for second approvers call",
 			Method: http.MethodGet,
 			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier1)+1),
 			Headers: map[string]string{
@@ -114,7 +115,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "tier2_amount_returns_tier3_approvers",
+			Name:   "tier2 amount returns tier3 approvers for second approvers call",
 			Method: http.MethodGet,
 			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier2)+1),
 			Headers: map[string]string{
@@ -129,7 +130,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "user_with_tier2_claim_receives_empty_list_for_tier1_amount",
+			Name:   "user with tier2 claim receives empty list for tier1 amount for second approvers call",
 			Method: http.MethodGet,
 			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier1)+1),
 			Headers: map[string]string{
@@ -142,7 +143,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "user_with_tier3_claim_receives_empty_list_for_tier2_amount",
+			Name:   "user with tier3 claim receives empty list for tier2 amount for second approvers call",
 			Method: http.MethodGet,
 			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier2)+1),
 			Headers: map[string]string{
@@ -155,7 +156,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "super_high_amount_returns_empty_list",
+			Name:   "super high amount returns empty list for second approvers call",
 			Method: http.MethodGet,
 			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier3)+10000),
 			Headers: map[string]string{
@@ -168,7 +169,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "invalid_amount_returns_error",
+			Name:   "invalid amount returns error for second approvers call",
 			Method: http.MethodGet,
 			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/invalid", municipalDivision),
 			Headers: map[string]string{
