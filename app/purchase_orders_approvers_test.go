@@ -37,6 +37,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 
 	// Municipal division ID for testing
 	municipalDivision := "2rrfy6m2c8hazjy"
+	drillingServicesDivision := "fy4i9poneukvq9u"
 
 	scenarios := []tests.ApiScenario{
 		// Tests for GET /api/purchase_orders/approvers/{division}/{amount}
@@ -57,9 +58,9 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "po_approver receives empty list of approvers (will auto-set to self in UI)",
+			Name:   "po_approver receives empty list of approvers (will auto-set to self in UI) if they have no division restriction",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/approvers/%s/500", municipalDivision),
+			URL:    fmt.Sprintf("/api/purchase_orders/approvers/%s/500", drillingServicesDivision),
 			Headers: map[string]string{
 				"Authorization": poApproverToken,
 			},

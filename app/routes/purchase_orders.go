@@ -719,7 +719,13 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 // If the current user has approver claims, an empty list is returned (UI will auto-set to self).
 // Results are filtered to approvers with permission for the specified division
 // (empty payload means all divisions, otherwise division must be in payload).
-func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
+// If forSecondApproval is true, the function returns a list of users who can
+// second-approve a purchase order of the given amount and division unless the
+// amount is below tier 1 or the current user has the appropriate claim for the
+// required tier. In this case, an empty list is returned. Results are filtered
+// to approvers with permission for the specified division (empty payload means
+// all divisions, otherwise division must be in payload).
+func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
 
@@ -747,52 +753,7 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 		}
 
 		// Use the GetApproversByTier utility function with forSecondApproval=false
-		approvers, _, err := utilities.GetApproversByTier(app, auth, division, amount, false)
-		if err != nil {
-			return e.JSON(http.StatusInternalServerError, map[string]string{
-				"code":    "error_fetching_approvers",
-				"message": fmt.Sprintf("Error fetching approvers: %v", err),
-			})
-		}
-
-		return e.JSON(http.StatusOK, approvers)
-	}
-}
-
-// GetSecondApprovers returns a list of users who can provide second approval for a purchase order
-// of the given amount and division. If the amount is below tier 1 or the current user has the appropriate claim
-// for the required tier, an empty list is returned (no second approval needed or UI will auto-set to self).
-// Results are filtered to approvers with permission for the specified division
-// (empty payload means all divisions, otherwise division must be in payload).
-func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		auth := e.Auth
-
-		// Get the division and amount parameters
-		division := e.Request.PathValue("division")
-		amountStr := e.Request.PathValue("amount")
-		amount, err := strconv.ParseFloat(amountStr, 64)
-		if err != nil {
-			return e.JSON(http.StatusBadRequest, map[string]string{
-				"code":    "invalid_amount",
-				"message": "Amount must be a valid number",
-			})
-		}
-
-		// Check for recurring purchase order query parameters and calculate the total value if necessary
-		poType := e.Request.URL.Query().Get("type")
-		if poType == "Recurring" {
-			amount, err = calculateRecurringPurchaseOrderTotalValue(app, amount, e.Request.URL.Query().Get("start_date"), e.Request.URL.Query().Get("end_date"), e.Request.URL.Query().Get("frequency"))
-			if err != nil {
-				return e.JSON(http.StatusBadRequest, map[string]string{
-					"code":    "invalid_parameters",
-					"message": fmt.Sprintf("Error calculating recurring PO total: %v", err),
-				})
-			}
-		}
-
-		// Use the GetApproversByTier utility function with forSecondApproval=true
-		approvers, _, err := utilities.GetApproversByTier(app, auth, division, amount, true)
+		approvers, _, err := utilities.GetApproversByTier(app, auth, division, amount, forSecondApproval)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_approvers",
