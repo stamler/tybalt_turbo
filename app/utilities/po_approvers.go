@@ -75,8 +75,9 @@ func GetApproversByTier(
 		targetClaimId = requiredClaimId
 	}
 
-	// Early check if the authenticated user has the target claim
-	// If they do, return empty list (UI will auto-set to self)
+	// Early check if the authenticated user has the target claim (and not
+	// restricted by division). If they do, return empty list (UI will auto-set
+	// to self)
 	if auth != nil {
 		// Check if the auth user has the required claim
 		type ClaimResult struct {
@@ -85,11 +86,13 @@ func GetApproversByTier(
 		var result ClaimResult
 		err = app.DB().NewQuery(`
 			SELECT COUNT(*) > 0 AS has_claim
-			FROM user_claims
-			WHERE uid = {:userId} AND cid = {:claimId}
+			FROM user_claims u
+			WHERE u.uid = {:userId} AND u.cid = {:claimId}
+			AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR u.payload = '' OR u.payload = 'null' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
 		`).Bind(dbx.Params{
-			"userId":  auth.Id,
-			"claimId": targetClaimId,
+			"userId":          auth.Id,
+			"claimId":         targetClaimId,
+			"divisionPattern": "%\"" + division + "\"%",
 		}).One(&result)
 
 		if err != nil {
