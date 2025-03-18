@@ -10,16 +10,27 @@ import { pb } from "$lib/pocketbase";
 import { error } from "@sveltejs/kit";
 
 export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
-  const allApprovers = await pb.collection("po_approvers").getFullList();
-
   // Get the parent PO
   const parentPo = await pb.collection("purchase_orders").getOne(params.poid);
   if (!parentPo) {
     throw error(404, "Parent PO not found");
   }
 
+  // Fetch approvers using the new API endpoints
+  const approvers = await pb.send(`/api/purchase_orders/approvers/${parentPo.division}/0`, {
+    method: "GET",
+  });
+
+  // Fetch second approvers
+  const secondApprovers = await pb.send(
+    `/api/purchase_orders/second_approvers/${parentPo.division}/0`,
+    {
+      method: "GET",
+    },
+  );
+
   // Create a new PO with fields that must match the parent
-  const defaultItem = {
+  const defaultItem: Partial<PurchaseOrdersRecord> = {
     po_number: "",
     status: PurchaseOrdersStatusOptions.Unapproved,
     uid: "",
@@ -44,10 +55,11 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     // from PurchaseOrdersRecord are not present in the defaultItem and if they
     // were we would get an error on the backend due to isset field restrictions
     // on create.
-    item: { ...defaultItem } as PurchaseOrdersRecord,
+    item: defaultItem as PurchaseOrdersRecord,
     editing: false,
     id: null,
-    approvers: allApprovers,
+    approvers: approvers,
+    second_approvers: secondApprovers,
     parent_po_number: parentPo.po_number,
   };
 };

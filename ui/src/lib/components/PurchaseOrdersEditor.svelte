@@ -22,13 +22,10 @@
   const isChildPO = $derived(item.parent_po !== "" && item.parent_po !== undefined);
 
   let categories = $state([] as CategoriesResponse[]);
-
-  const approvers = $derived(
-    data.approvers.filter(
-      (approver: PoApproversResponse) =>
-        approver.divisions?.includes(item.division) || approver.divisions === null,
-    ),
-  );
+  let approvers = $state([] as PoApproversResponse[]);
+  let secondApprovers = $state([] as PoApproversResponse[]);
+  let showApproverField = $state(false);
+  let showSecondApproverField = $state(false);
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
@@ -36,6 +33,50 @@
       fetchCategories(item.job).then((c) => (categories = c));
     }
   });
+
+  // Watch for changes to division, amount, or type to fetch approvers
+  $effect(() => {
+    if (item.division && item.total) {
+      fetchApprovers();
+    }
+  });
+
+  async function fetchApprovers() {
+    try {
+      // Build query parameters
+      const queryParams = new URLSearchParams();
+      if (isRecurring) {
+        queryParams.append("type", "Recurring");
+        queryParams.append("start_date", item.date || "");
+        queryParams.append("end_date", item.end_date || "");
+        queryParams.append("frequency", item.frequency || "");
+      }
+
+      // Fetch first approvers
+      approvers = await pb.send(
+        `/api/purchase_orders/approvers/${item.division}/${item.total}?${queryParams.toString()}`,
+        {
+          method: "GET",
+        },
+      );
+
+      // Fetch second approvers
+      secondApprovers = await pb.send(
+        `/api/purchase_orders/second_approvers/${item.division}/${item.total}?${queryParams.toString()}`,
+        {
+          method: "GET",
+        },
+      );
+
+      // Show approvers field if there are approvers available
+      showApproverField = approvers.length > 0;
+
+      // Show second approver field if there are second approvers available
+      showSecondApproverField = secondApprovers.length > 0;
+    } catch (error) {
+      console.error("Error fetching approvers:", error);
+    }
+  }
 
   async function save(event: Event) {
     event.preventDefault();
@@ -93,17 +134,34 @@
     {/snippet}
   </DsSelector>
 
-  <DsSelector
-    bind:value={item.approver as string}
-    items={approvers}
-    {errors}
-    fieldName="approver"
-    uiName="Approver"
-  >
-    {#snippet optionTemplate(item)}
-      {item.given_name} {item.surname}
-    {/snippet}
-  </DsSelector>
+  {#if showApproverField}
+    <DsSelector
+      bind:value={item.approver as string}
+      items={approvers}
+      {errors}
+      fieldName="approver"
+      uiName="Approver"
+    >
+      {#snippet optionTemplate(item)}
+        {item.given_name} {item.surname}
+      {/snippet}
+    </DsSelector>
+  {/if}
+
+  {#if showSecondApproverField}
+    <DsSelector
+      bind:value={item.priority_second_approver as string}
+      items={secondApprovers}
+      {errors}
+      fieldName="priority_second_approver"
+      uiName="Priority Second Approver"
+      clear={true}
+    >
+      {#snippet optionTemplate(item)}
+        {item.given_name} {item.surname}
+      {/snippet}
+    </DsSelector>
+  {/if}
 
   {#if isRecurring}
     <span class="flex w-full gap-2 {errors.end_date !== undefined ? 'bg-red-200' : ''}">

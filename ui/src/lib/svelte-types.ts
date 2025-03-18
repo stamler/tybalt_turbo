@@ -8,7 +8,6 @@ import type {
   CategoriesResponse,
   ClientsRecord,
   ClientContactsResponse,
-  PoApproversResponse,
   VendorsRecord,
   VendorsResponse,
   TimeAmendmentsRecord,
@@ -23,7 +22,6 @@ export interface PageData<T> {
 export type TimeEntriesPageData = PageData<TimeEntriesRecord>;
 export type TimeAmendmentsPageData = PageData<TimeAmendmentsRecord>;
 export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord | PurchaseOrdersResponse> & {
-  approvers: PoApproversResponse[];
   parent_po_number?: string;
 };
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse>;

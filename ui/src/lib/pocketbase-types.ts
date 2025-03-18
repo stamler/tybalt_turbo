@@ -325,6 +325,7 @@ export type PurchaseOrdersRecord = {
   parent_po: RecordIdString;
   payment_type: PurchaseOrdersPaymentTypeOptions;
   po_number: string;
+  priority_second_approver: RecordIdString;
   rejected: IsoDateString;
   rejection_reason: string;
   rejector: RecordIdString;
@@ -517,6 +518,7 @@ type PurchaseOrdersRecordExpands = {
   type: PurchaseOrdersTypeOptions;
   uid: UsersResponse;
   vendor: VendorsResponse;
+  priority_second_approver: UsersResponse;
 };
 
 type UsersRecordExpands = {
