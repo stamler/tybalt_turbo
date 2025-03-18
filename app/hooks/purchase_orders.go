@@ -255,7 +255,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 			).Else(
 				validation.In("").Error("frequency is not permitted for non-recurring purchase orders"))),
 		"description": validation.Validate(purchaseOrderRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
-		"approver":    validation.Validate(purchaseOrderRecord.GetString("approver"), validation.By(utilities.ClaimHasDivisionPermission(app, "po_approver", purchaseOrderRecord.GetString("division")))),
+		"approver":    validation.Validate(purchaseOrderRecord.GetString("approver"), validation.By(utilities.PurchaseOrderClaimHasDivisionPermission(app, "po_approver", purchaseOrderRecord.GetString("division")))),
 		"total": validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.By(func(value any) error {
 			err := utilities.PurchaseOrderAmountDoesNotExceedMaxTier(app, purchaseOrderRecord)
 			if err != nil {
@@ -346,7 +346,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 
 		var hasPoDivisionPermission bool
 		if hasPoApproverClaim {
-			appDivErr := utilities.ClaimHasDivisionPermission(app, "po_approver", record.GetString("division"))(authRecord.Id)
+			appDivErr := utilities.PurchaseOrderClaimHasDivisionPermission(app, "po_approver", record.GetString("division"))(authRecord.Id)
 			if appDivErr == nil {
 				hasPoDivisionPermission = true
 			}

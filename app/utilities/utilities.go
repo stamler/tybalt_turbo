@@ -108,13 +108,20 @@ func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
 	}
 }
 
-// ClaimHasDivisionPermission returns a validation function that checks if the
+// PurchaseOrderClaimHasDivisionPermission returns a validation function that checks if the
 // provided user ID (as the value parameter) has permission to approve purchase
 // orders for the specified division with the given claim. Permission is granted if
 // either:
 // 1. The user's claim payload is empty (null, [], or {})
 // 2. The user's claim payload contains the specified divisionId
-func ClaimHasDivisionPermission(app core.App, claimName string, divisionId string) validation.RuleFunc {
+
+// TODO: This function should also check if the user has claims in a higher
+// tier(s) than the specified claim and if so, include the divisions in the
+// higher tier(s) to determine if the user has permission. We can do this with a
+// single SQL query by joining the claims table (for name), the
+// po_approval_tiers table (to restrict to just relevant claims), and the
+// user_claims table (to get the payloads).
+func PurchaseOrderClaimHasDivisionPermission(app core.App, claimName string, divisionId string) validation.RuleFunc {
 	return func(value any) error {
 		userId, _ := value.(string)
 		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
