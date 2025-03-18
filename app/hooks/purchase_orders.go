@@ -18,13 +18,15 @@ import (
 
 // The cleanPurchaseOrder function is used to remove properties from the
 // purchase_order record that are not allowed to be set based on the value of
-// the record's type property. It is also used to set the approver and, if
-// applicable, the second_approver_claim fields based on the value of the total
-// and type fields. This is intended to reduce round trips to the database and
-// to ensure that the record is in a valid state before it is created or
-// updated. It is called by ProcessPurchaseOrder to reduce the number of fields
-// that need to be validated.
+// the record's type property. It is also used to set the approval_total field,
+// which matches the total field unless the type is Recurring. It is called by
+// ProcessPurchaseOrder to reduce the number of fields that need to be
+// validated.
 func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
+	// initialize approval_total to total. This will be changed if the PO is
+	// recurring.
+	purchaseOrderRecord.Set("approval_total", purchaseOrderRecord.GetFloat("total"))
+
 	typeString := purchaseOrderRecord.GetString("type")
 
 	// Normal and Cumulative Purchase both have empty values for
@@ -34,24 +36,25 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 		purchaseOrderRecord.Set("frequency", "")
 	}
 
-	// set the second_approver_claim field
-	secondApproverClaimId, err := getSecondApproverClaimId(app, purchaseOrderRecord)
-	if err != nil {
-		return &HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when getting second approver claim",
-			Data: map[string]CodeError{
-				"second_approver_claim": {
-					Code:    "internal_server_error",
-					Message: err.Error(),
+	if typeString == "Recurring" {
+		_, calculatedTotal, err := utilities.CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
+		if err != nil {
+			return &HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "hook error when calculating recurring PO total value",
+				Data: map[string]CodeError{
+					"global": {
+						Code:    "error_calculating_total_value",
+						Message: fmt.Sprintf("error calculating recurring PO total value: %v", err),
+					},
 				},
-			},
+			}
 		}
+		purchaseOrderRecord.Set("approval_total", calculatedTotal)
 	}
-	purchaseOrderRecord.Set("second_approver_claim", secondApproverClaimId)
 
-	// Clear priority_second_approver if no second approval is needed
-	if secondApproverClaimId == "" {
+	// Clear priority_second_approver if approval_total <= constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD
+	if purchaseOrderRecord.GetFloat("approval_total") <= constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD {
 		purchaseOrderRecord.Set("priority_second_approver", "")
 	}
 
@@ -174,34 +177,12 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 	// Validate priority_second_approver if set
 	prioritySecondApproverIsAuthorized := func(app core.App, purchaseOrderRecord *core.Record) validation.RuleFunc {
 		return func(value any) error {
-			prioritySecondApprover := purchaseOrderRecord.GetString("priority_second_approver")
-			if prioritySecondApprover != "" {
+			prioritySecondApproverId := purchaseOrderRecord.GetString("priority_second_approver")
+			if prioritySecondApproverId != "" {
 				division := purchaseOrderRecord.GetString("division")
 
-				// Calculate total value for the PO
-				poType := purchaseOrderRecord.GetString("type")
-				total := purchaseOrderRecord.GetFloat("total")
-				totalValue := total
-
-				if poType == "Recurring" {
-					_, calculatedTotal, err := utilities.CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
-					if err != nil {
-						return &HookError{
-							Status:  http.StatusInternalServerError,
-							Message: "hook error when calculating recurring PO total value",
-							Data: map[string]CodeError{
-								"global": {
-									Code:    "error_calculating_total_value",
-									Message: fmt.Sprintf("error calculating recurring PO total value: %v", err),
-								},
-							},
-						}
-					}
-					totalValue = calculatedTotal
-				}
-
 				// Get list of eligible second approvers
-				approvers, _, err := utilities.GetApproversByTier(app, nil, division, totalValue, true)
+				approvers, _, err := utilities.GetApproversByTier(app, nil, division, purchaseOrderRecord.GetFloat("approval_total"), true)
 				if err != nil {
 					return &HookError{
 						Status:  http.StatusInternalServerError,
@@ -218,7 +199,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				// Check if prioritySecondApprover is in the list of eligible approvers
 				valid := false
 				for _, approver := range approvers {
-					if approver.ID == prioritySecondApprover {
+					if approver.ID == prioritySecondApproverId {
 						valid = true
 						break
 					}
@@ -437,44 +418,4 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	}
 
 	return nil
-}
-
-func getSecondApproverClaimId(app core.App, purchaseOrderRecord *core.Record) (string, error) {
-	poType := purchaseOrderRecord.GetString("type")
-	total := purchaseOrderRecord.GetFloat("total")
-
-	// Calculate the total value for recurring purchase orders
-	totalValue := total
-	var err error
-	if poType == "Recurring" {
-		// ignore the number of occurrences, we just want the total value
-		_, totalValue, err = utilities.CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
-		if err != nil {
-			return "", err
-		}
-	}
-
-	// Find the appropriate tier for this amount
-	secondApproverClaimId, err := utilities.FindRequiredApproverClaimIdForPOAmount(app, totalValue)
-	if err != nil {
-		return "", fmt.Errorf("error determining approval tier: %v", err)
-	}
-
-	// get the claim id from the lowest max_amount tier record
-	lowestMaxAmountTierClaimId, _, err := utilities.GetBoundClaimIdAndMaxAmount(app, false)
-	if err != nil {
-		return "", fmt.Errorf("error determining lowest approval tier: %v", err)
-	}
-
-	// if the secondApproverClaim matches the approver claim, return an empty
-	// string because second approval is not needed
-	if secondApproverClaimId == lowestMaxAmountTierClaimId {
-		return "", nil
-	}
-
-	// otherwise, return the second approver claim. This may be empty if the
-	// approver amount of the purchase order exceeds the max_amount of the
-	// highest tier. In this case, the hook will return an error to the user
-	// preventing the PO from being created or updated.
-	return secondApproverClaimId, nil
 }

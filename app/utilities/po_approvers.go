@@ -2,6 +2,7 @@ package utilities
 
 import (
 	"fmt"
+	"tybalt/constants"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -14,18 +15,27 @@ type Approver struct {
 	Surname   string `db:"surname" json:"surname"`
 }
 
-// GetApproversByTier fetches a list of users who can approve a purchase order based on specified parameters.
+// GetApproversByTier fetches a list of users who can approve a purchase order
+// based on specified parameters.
 //
-// This function encapsulates the logic for finding both first-level approvers and second-level approvers
-// for purchase orders, based on approval tiers and division permissions.
+// This function encapsulates the logic for finding both first-level approvers
+// and second-level approvers for purchase orders, based on the payload of a
+// user's po_approver claim and provided division.
 //
 // How it works:
-//  1. It first identifies the required claim for the given purchase order amount by checking the po_approval_tiers collection
-//  2. It then finds users who have this claim and have permission for the specified division
-//  3. Division permission is determined by the claim's payload - if the payload is empty (null, [], {}, or "),
-//     the user has permission for all divisions; otherwise, the division must be in the payload
-//  4. For second approvers, it only returns users with the appropriate tier claim that is higher than the minimum tier
-//  5. It also identifies if the authenticated user (if provided) is among the eligible approvers
+// If forSecondApproval is true, it returns users who have the po_approver
+// claim with a payload that has a max_amount greater than or equal to the
+// purchase_orders records' approval_total AND the claim payload's division
+// property is missing, or is a list that contains the provided division.
+//
+// If forSecondApproval is false, it returns users who have the po_approver
+// claim with a payload that has a max_amount less than or equal to the
+// constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD AND the claim payload's
+// division property is missing, or is a list that contains the provided
+// division.
+//
+// The difference between the two is what value is compared to the claim
+// payload's max_amount property.
 //
 // Parameters:
 // - app: the application context used to access the database and other core services
@@ -49,51 +59,49 @@ func GetApproversByTier(
 		return nil, false, fmt.Errorf("division is required")
 	}
 
-	// Determine the required claim based on amount
-	// This is the same logic used in getSecondApproverClaimId
-	requiredClaimId, err := FindRequiredApproverClaimIdForPOAmount(app, amount)
-	if err != nil {
-		return nil, false, fmt.Errorf("error determining approval tier: %v", err)
-	}
-
-	// Get the lowest tier claim ID and max amount (needed for both first and second approvers)
-	// By default, set the target claim to the lowest tier (used for first approvers)
-	targetClaimId, lowestTierMaxAmount, err := GetBoundClaimIdAndMaxAmount(app, false)
-	if err != nil {
-		return nil, false, fmt.Errorf("error determining lowest approval tier: %v", err)
-	}
-
-	// Special handling for second approvers
-	if forSecondApproval {
-		// If the amount is below the lowest tier max amount, return empty list
-		// because no second approval is needed
-		if amount <= lowestTierMaxAmount {
-			return []Approver{}, false, nil
-		}
-
-		// For second approvers, override the target claim with the required claim
-		targetClaimId = requiredClaimId
-	}
-
-	// Early check if the authenticated user has the target claim (and not
-	// restricted by division). If they do, return empty list (UI will auto-set
-	// to self)
+	// Check if the authenticated user has approval permission. If they do, return
+	// empty list (UI will auto-set to self)
 	if auth != nil {
 		// Check if the auth user has the required claim
 		type ClaimResult struct {
 			HasClaim bool `db:"has_claim"`
 		}
 		var result ClaimResult
-		err = app.DB().NewQuery(`
+		var err error
+
+		hasClaimQueryString := `
 			SELECT COUNT(*) > 0 AS has_claim
 			FROM user_claims u
 			WHERE u.uid = {:userId} AND u.cid = {:claimId}
-			AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR u.payload = '' OR u.payload = 'null' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
+			AND (
+				JSON_EXTRACT(u.payload, '$.divisions') IS NULL
+				OR EXISTS (
+					SELECT 1
+					FROM JSON_EACH(JSON_EXTRACT(u.payload, '$.divisions'))
+					WHERE value = {:division}
+				)
+			)
+		`
+
+		if forSecondApproval {
+			err = app.DB().NewQuery(hasClaimQueryString + `
+				AND JSON_EXTRACT(u.payload, '$.max_amount') > {:amount}
+			`).Bind(dbx.Params{
+				"userId":   auth.Id,
+				"claimId":  "po_approver",
+				"division": division,
+				"amount":   amount,
+			}).One(&result)
+		} else {
+			err = app.DB().NewQuery(hasClaimQueryString + `
+			AND JSON_EXTRACT(u.payload, '$.max_amount') <= {:amount}
 		`).Bind(dbx.Params{
-			"userId":          auth.Id,
-			"claimId":         targetClaimId,
-			"divisionPattern": "%\"" + division + "\"%",
-		}).One(&result)
+				"userId":   auth.Id,
+				"claimId":  "po_approver",
+				"division": division,
+				"amount":   constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD,
+			}).One(&result)
+		}
 
 		if err != nil {
 			return nil, false, fmt.Errorf("error checking user claims: %v", err)
@@ -105,40 +113,51 @@ func GetApproversByTier(
 		}
 	}
 
-	// Find users who have the required claim
-	var approvers []Approver
-	authIsApprover := false
+	// The authenticated user is not an approver, or the function is being called
+	// without an authenticated user (e.g. from the UI when the user is not logged
+	// in). In this case, we need to find the approvers based on the amount and
+	// the claim payload's max_amount property.
 
-	// Build the query to find users with the target claim and division permission
-	// Note: Division permission is determined by checking if the payload is empty (null, [], {}, or '')
-	// or if it contains the specified division
-	query := app.DB().NewQuery(`
+	var approvers []Approver
+	var err error
+	// SQL query to find approvers
+	approversQueryString := `
 		SELECT p.uid AS id, p.given_name, p.surname
 		FROM profiles p
 		INNER JOIN user_claims u ON p.uid = u.uid
-		WHERE u.cid = {:claimId} 
-		AND (u.payload IS NULL OR u.payload = '[]' OR u.payload = '{}' OR u.payload = '' OR u.payload = 'null' OR JSON_EXTRACT(u.payload, '$') LIKE {:divisionPattern})
-		ORDER BY p.surname, p.given_name
-	`)
+		WHERE u.cid = {:claimId}
+		AND (
+			JSON_EXTRACT(u.payload, '$.divisions') IS NULL
+			OR EXISTS (
+				SELECT 1
+				FROM JSON_EACH(JSON_EXTRACT(u.payload, '$.divisions'))
+				WHERE value = {:division}
+			)
+		)`
 
-	// Execute the query with the appropriate parameters
-	if err := query.Bind(dbx.Params{
-		"claimId":         targetClaimId,
-		"divisionPattern": "%\"" + division + "\"%",
-	}).All(&approvers); err != nil {
+	if forSecondApproval {
+		err = app.DB().NewQuery(approversQueryString + `
+			AND JSON_EXTRACT(u.payload, '$.max_amount') > {:amount}
+		ORDER BY p.surname, p.given_name
+		`).Bind(dbx.Params{
+			"claimId":  "po_approver",
+			"division": division,
+			"amount":   amount,
+		}).All(&approvers)
+	} else {
+		err = app.DB().NewQuery(approversQueryString + `
+			AND JSON_EXTRACT(u.payload, '$.max_amount') <= {:amount}
+		ORDER BY p.surname, p.given_name
+		`).Bind(dbx.Params{
+			"claimId":  "po_approver",
+			"division": division,
+			"amount":   constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD,
+		}).All(&approvers)
+	}
+
+	if err != nil {
 		return nil, false, fmt.Errorf("error finding approvers: %v", err)
 	}
 
-	// Check if auth user is among the approvers
-	if auth != nil {
-		authUserId := auth.Id
-		for _, approver := range approvers {
-			if approver.ID == authUserId {
-				authIsApprover = true
-				break
-			}
-		}
-	}
-
-	return approvers, authIsApprover, nil
+	return approvers, false, nil
 }

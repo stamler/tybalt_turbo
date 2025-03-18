@@ -32,4 +32,8 @@ const (
 	// corresponding purchase order.
 	LIMIT_NON_PO_AMOUNTS = true
 	NO_PO_EXPENSE_LIMIT  = 100.0
+
+	// The threshold for approval_total for a purchase_orders record above which
+	// the requirement for a second approver is triggered.
+	PO_SECOND_APPROVER_TOTAL_THRESHOLD = 500.0
 )
