@@ -88,7 +88,7 @@ func GetApproversByTier(
 				AND JSON_EXTRACT(u.payload, '$.max_amount') > {:amount}
 			`).Bind(dbx.Params{
 				"userId":   auth.Id,
-				"claimId":  "po_approver",
+				"claimId":  constants.PO_APPROVER_CLAIM_ID,
 				"division": division,
 				"amount":   amount,
 			}).One(&result)
@@ -97,7 +97,7 @@ func GetApproversByTier(
 			AND JSON_EXTRACT(u.payload, '$.max_amount') <= {:amount}
 		`).Bind(dbx.Params{
 				"userId":   auth.Id,
-				"claimId":  "po_approver",
+				"claimId":  constants.PO_APPROVER_CLAIM_ID,
 				"division": division,
 				"amount":   constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD,
 			}).One(&result)
@@ -140,7 +140,7 @@ func GetApproversByTier(
 			AND JSON_EXTRACT(u.payload, '$.max_amount') > {:amount}
 		ORDER BY p.surname, p.given_name
 		`).Bind(dbx.Params{
-			"claimId":  "po_approver",
+			"claimId":  constants.PO_APPROVER_CLAIM_ID,
 			"division": division,
 			"amount":   amount,
 		}).All(&approvers)
@@ -149,7 +149,7 @@ func GetApproversByTier(
 			AND JSON_EXTRACT(u.payload, '$.max_amount') <= {:amount}
 		ORDER BY p.surname, p.given_name
 		`).Bind(dbx.Params{
-			"claimId":  "po_approver",
+			"claimId":  constants.PO_APPROVER_CLAIM_ID,
 			"division": division,
 			"amount":   constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD,
 		}).All(&approvers)

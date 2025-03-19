@@ -36,4 +36,7 @@ const (
 	// The threshold for approval_total for a purchase_orders record above which
 	// the requirement for a second approver is triggered.
 	PO_SECOND_APPROVER_TOTAL_THRESHOLD = 500.0
+
+	// The claim ID for the po_approver claim
+	PO_APPROVER_CLAIM_ID = "5vh881k048bboim"
 )
