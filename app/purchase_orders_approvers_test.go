@@ -21,19 +21,19 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	tier2Token, err := testutils.GenerateRecordToken("users", "author@soup.com") // Horace Silver has po_approver_tier2 claim
+	authorSoupToken, err := testutils.GenerateRecordToken("users", "author@soup.com") // Horace Silver has {"divisions":["hcd86z57zjty6jo","fy4i9poneukvq9u"],"max_amount":2500}
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	tier3Token, err := testutils.GenerateRecordToken("users", "hal@2005.com") // Shallow Hal has po_approver_tier3 claim
+	tier3Token, err := testutils.GenerateRecordToken("users", "hal@2005.com") // Shallow Hal has {"max_amount":1000000}
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Get approval tier amounts from the database for test validation
 	app := testutils.SetupTestApp(t)
-	tier1, tier2, tier3 := testutils.GetApprovalTiers(app)
+	tier1, tier2 := testutils.GetApprovalTiers(app)
 
 	// Municipal division ID for testing
 	municipalDivision := "2rrfy6m2c8hazjy"
@@ -51,7 +51,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				`"id":"wegviunlyr2jjjv"`, // Fakesy Manjor (has null payload)
-				`"id":"66ct66w380ob6w8"`, // Shallow Hal (has null payload)
+				//`"id":"66ct66w380ob6w8"`, // Shallow Hal (has null payload), removed since the max_amount is too high
 				`"id":"4r70mfovf22m9uh"`, // Orphaned POApprover (has null payload)
 				`"given_name"`,
 				`"surname"`,
@@ -100,7 +100,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "tier1 amount returns tier2 approvers for second approvers call",
+			Name:   "amount exceeding first threshold returns only approvers with max_amount less than or equal to second threshold for second approvers call",
 			Method: http.MethodGet,
 			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier1)+1),
 			Headers: map[string]string{
@@ -108,9 +108,12 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"id":"f2j5a8vk006baub"`, // Horace Silver has tier2 claim
-				`"given_name":"Horace"`,
-				`"surname":"Silver"`,
+				`"id":"6bq4j0eb26631dy"`, // Tier Two has max_amount of 2500 with no restrictions
+				`"given_name":"Tier"`,
+				`"surname":"Two"`,
+				`"id":"t4g84hfvkt1v9j3"`, // Tier TwoB has max_amount of 2500 with no restrictions
+				`"given_name":"Tier"`,
+				`"surname":"TwoB"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -130,11 +133,11 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "user with tier2 claim receives empty list for tier1 amount for second approvers call",
+			Name:   "user with max_amount between first and second thresholds receives empty list for amount in within their max_amount and division restrictions for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier1)+1),
+			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", drillingServicesDivision, int(tier1)+1),
 			Headers: map[string]string{
-				"Authorization": tier2Token,
+				"Authorization": authorSoupToken,
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
@@ -142,6 +145,21 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "user with max_amount between first and second thresholds receives non-empty list for amount in within their max_amount but outside of their division restrictions for second approvers call",
+			Method: http.MethodGet,
+			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier1)+1),
+			Headers: map[string]string{
+				"Authorization": authorSoupToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"6bq4j0eb26631dy"`, // Tier Two has max_amount of 2500 with no restrictions
+				`"id":"t4g84hfvkt1v9j3"`, // Tier TwoB has max_amount of 2500 with no restrictions
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
 		{
 			Name:   "user with tier3 claim receives empty list for tier2 amount for second approvers call",
 			Method: http.MethodGet,
@@ -158,7 +176,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "super high amount returns empty list for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier3)+10000),
+			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier2)+1000000),
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},

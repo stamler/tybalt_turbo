@@ -53,7 +53,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 
 	// Get approval tier values once and reuse them throughout the tests
 	app := testutils.SetupTestApp(t)
-	tier1, tier2, _ := testutils.GetApprovalTiers(app)
+	tier1, tier2 := testutils.GetApprovalTiers(app)
 
 	scenarios := []tests.ApiScenario{
 		{

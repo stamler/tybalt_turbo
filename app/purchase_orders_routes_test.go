@@ -51,7 +51,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 
 	// Get approval tier values from the database
 	app := testutils.SetupTestApp(t)
-	tier1, tier2, _ := testutils.GetApprovalTiers(app)
+	tier1, tier2 := testutils.GetApprovalTiers(app)
 
 	scenarios := []tests.ApiScenario{
 		{
