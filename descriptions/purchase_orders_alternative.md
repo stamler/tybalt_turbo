@@ -18,13 +18,17 @@
       user can approve `purchase_orders` records whose `approval_total` is less
       than or equal to their `max_amount` for all divisions.
 4. The `po_approval_tiers` table is deleted
-5. The `purchase_order_tiers` table is created. It just has one column,
-   `max_amount`, plus a unique `id`. Normally it would have just one row, which
-   is the lowest amount (floor) of the `max_amount` property of the payload on
-   `po_approver` claims. If it has more than one row, the lowest value is used
-   in determining this floor and other behaviours are undefined. Due to this,
-   perhaps this should be implemented elsewhere in a settings table rather than
-   its own table.
+5. The `po_approval_thresholds` table is created. It just has two columns,
+   `threshold`, and `description`, plus a unique `id`. Normally it would have
+   just one row, where the threshold value is the amount above which second
+   approval is required. If it has more than one row, the lowest value is used
+   in determining this threshold for second approval requirements and subsequent
+   higher thresholds are used only to restrict visibility of purchase_orders
+   requiring second approval in order to reduce noise for users with higher
+   levels of approval authority. Concretely, users with a max_amount in their
+   claim payload will only be shown unapproved purchase_orders records whose
+   approval_total falls between the same two thresholds as their po_approver
+   claim's max_amount payload value.
 6. All `purchase_orders` records with values above the the lowest `max_amount`
    of the `purchase_orders_tiers` table require two approvers
 7. The first approver of a `purchase_orders` record is selected by the creator

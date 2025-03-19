@@ -32,16 +32,18 @@ type Approver struct {
 //
 // If forSecondApproval is true, it returns users who have the
 // constants.PO_APPROVER_CLAIM_ID with a payload that has a max_amount greater
-// than or equal to the purchase_orders records' approval_total AND the claim
-// payload's division property is missing, or is a list that contains the
-// provided division. If the amount is less than or equal to the
-// constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD, it returns an empty list.
+// than or equal to the purchase_orders records' approval_total AND less than or
+// equal to the ceiling, AND the claim payload's division property is missing,
+// or is a list that contains the provided division. If the amount is less than
+// or equal to the lowest threshold returned by GetPOApprovalThresholds, it
+// returns an empty list.
 //
 // If forSecondApproval is false, it returns users who have the
 // constants.PO_APPROVER_CLAIM_ID claim with a payload that is either missing
-// max_amount property or has a max_amount less than or equal to the
-// constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD AND the claim payload's division
-// property is missing, or is a list that contains the provided division.
+// max_amount property or has a max_amount less than or equal to the lowest
+// threshold returned by GetPOApprovalThresholds AND the claim payload's
+// division property is missing, or is a list that contains the provided
+// division.
 //
 // Parameters:
 //   - app: the application context used to access the database and
@@ -70,6 +72,22 @@ func GetPOApprovers(
 		return nil, false, fmt.Errorf("division is required")
 	}
 
+	thresholds, err := GetPOApprovalThresholds(app)
+	if err != nil {
+		return nil, false, fmt.Errorf("error fetching po approval thresholds: %v", err)
+	}
+
+	// Find the value of the lowest threshold that is greater than or equal to
+	// the amount and store it in the ceiling variable. If no such threshold
+	// exists, set the ceiling to constants.MAX_APPROVAL_TOTAL.
+	ceiling := constants.MAX_APPROVAL_TOTAL
+	for _, threshold := range thresholds {
+		if threshold >= amount {
+			ceiling = threshold
+			break
+		}
+	}
+
 	// Check if the authenticated user has approval permission. If they do, return
 	// empty list (UI will auto-set to self)
 	if auth != nil {
@@ -78,7 +96,6 @@ func GetPOApprovers(
 			HasClaim bool `db:"has_claim"`
 		}
 		var result ClaimResult
-		var err error
 
 		hasClaimQueryString := `
 			SELECT COUNT(*) > 0 AS has_claim
@@ -108,7 +125,7 @@ func GetPOApprovers(
 				"userId":   auth.Id,
 				"claimId":  constants.PO_APPROVER_CLAIM_ID,
 				"division": division,
-				"amount":   constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD,
+				"amount":   thresholds[0],
 			}).One(&result)
 		}
 
@@ -128,7 +145,6 @@ func GetPOApprovers(
 	// the claim payload's max_amount property.
 
 	var approvers []Approver
-	var err error
 	// SQL query to find approvers
 	approversQueryString := `
 		SELECT p.uid AS id, p.given_name, p.surname
@@ -145,19 +161,21 @@ func GetPOApprovers(
 		)`
 
 	if forSecondApproval {
-		// return an empty list if the amount is less than or equal to
-		// PO_SECOND_APPROVER_TOTAL_THRESHOLD.
-		if amount <= constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD {
+		// return an empty list if the amount is less than or equal to the lowest
+		// threshold returned by GetPOApprovalThresholds.
+		if amount <= thresholds[0] {
 			return []Approver{}, false, nil
 		}
 
 		err = app.DB().NewQuery(approversQueryString + `
-			AND JSON_EXTRACT(u.payload, '$.max_amount') >= {:amount} 
+			AND JSON_EXTRACT(u.payload, '$.max_amount') >= {:amount}
+			AND JSON_EXTRACT(u.payload, '$.max_amount') <= {:ceiling}
 			ORDER BY p.surname, p.given_name
 		`).Bind(dbx.Params{
 			"claimId":  constants.PO_APPROVER_CLAIM_ID,
 			"division": division,
 			"amount":   amount,
+			"ceiling":  ceiling,
 		}).All(&approvers)
 	} else {
 		err = app.DB().NewQuery(approversQueryString + `
@@ -169,7 +187,8 @@ func GetPOApprovers(
 		`).Bind(dbx.Params{
 			"claimId":  constants.PO_APPROVER_CLAIM_ID,
 			"division": division,
-			"amount":   constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD,
+			"amount":   thresholds[0],
+			"ceiling":  ceiling,
 		}).All(&approvers)
 	}
 
@@ -178,4 +197,21 @@ func GetPOApprovers(
 	}
 
 	return approvers, false, nil
+}
+
+// GetPOApprovalThresholds fetches an ordered (ascending) slice of all
+// thresholds from the po_approval_thresholds table.
+func GetPOApprovalThresholds(app core.App) ([]float64, error) {
+	thresholds := []struct {
+		Threshold float64 `db:"threshold"`
+	}{}
+	err := app.DB().NewQuery("SELECT threshold FROM po_approval_thresholds ORDER BY threshold ASC").All(&thresholds)
+	if err != nil {
+		return nil, fmt.Errorf("error fetching po_approval_thresholds: %v", err)
+	}
+	threshold_floats := make([]float64, len(thresholds))
+	for i, threshold := range thresholds {
+		threshold_floats[i] = threshold.Threshold
+	}
+	return threshold_floats, nil
 }

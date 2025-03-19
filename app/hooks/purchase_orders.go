@@ -53,8 +53,15 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 		purchaseOrderRecord.Set("approval_total", calculatedTotal)
 	}
 
-	// Clear priority_second_approver if approval_total <= constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD
-	if purchaseOrderRecord.GetFloat("approval_total") <= constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD {
+	// Clear priority_second_approver if approval_total <= the lowest threshold
+	thresholds, err := utilities.GetPOApprovalThresholds(app)
+	if err != nil {
+		return &HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "hook error when fetching po approval thresholds",
+		}
+	}
+	if purchaseOrderRecord.GetFloat("approval_total") <= thresholds[0] {
 		purchaseOrderRecord.Set("priority_second_approver", "")
 	}
 
