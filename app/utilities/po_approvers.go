@@ -15,40 +15,51 @@ type Approver struct {
 	Surname   string `db:"surname" json:"surname"`
 }
 
-// GetApproversByTier fetches a list of users who can approve a purchase order
-// based on specified parameters.
+// GetPOApprovers fetches a list of users who can approve a purchase order based
+// on specified parameters.
 //
 // This function encapsulates the logic for finding both first-level approvers
 // and second-level approvers for purchase orders, based on the payload of a
 // user's po_approver claim and provided division.
 //
 // How it works:
-// If forSecondApproval is true, it returns users who have the po_approver
-// claim with a payload that has a max_amount greater than or equal to the
-// purchase_orders records' approval_total AND the claim payload's division
+// First the function checks if the authenticated user has the right to approve
+// the purchase order based on the claim payload's max_amount property at the
+// requested approval level (first or second). If the authenticated user has the
+// right to approve, the function returns an empty list, indicating that the
+// user is an approver. It also returns true in the second return value to
+// indicate that the user is an approver.
+//
+// If forSecondApproval is true, it returns users who have the
+// constants.PO_APPROVER_CLAIM_ID with a payload that has a max_amount greater
+// than or equal to the purchase_orders records' approval_total AND the claim
+// payload's division property is missing, or is a list that contains the
+// provided division. If the amount is less than or equal to the
+// constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD, it returns an empty list.
+//
+// If forSecondApproval is false, it returns users who have the
+// constants.PO_APPROVER_CLAIM_ID claim with a payload that is either missing
+// max_amount property or has a max_amount less than or equal to the
+// constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD AND the claim payload's division
 // property is missing, or is a list that contains the provided division.
 //
-// If forSecondApproval is false, it returns users who have the po_approver
-// claim with a payload that has a max_amount less than or equal to the
-// constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD AND the claim payload's
-// division property is missing, or is a list that contains the provided
-// division.
-//
-// The difference between the two is what value is compared to the claim
-// payload's max_amount property.
-//
 // Parameters:
-// - app: the application context used to access the database and other core services
-// - auth: the authenticated user record (optional, nil is valid) - when provided, checks if this user is among eligible approvers
-// - division: the division ID for which approval is needed
-// - amount: the purchase order amount used to determine the required approval tier
-// - forSecondApproval: boolean flag indicating whether we're looking for second approvers (true) or first approvers (false)
+//   - app: the application context used to access the database and
+//     other core services
+//   - auth: the authenticated user record (optional, nil is
+//     valid) - when provided, checks if this user is among eligible approvers
+//   - division: the division ID for which approval is needed
+//   - amount: the purchase order amount used to determine the required approval tier
+//   - forSecondApproval: boolean flag indicating whether we're looking for second
+//     approvers (true) or first approvers (false)
 //
 // Returns:
-// - []Approver: list of eligible approvers with their basic information
-// - bool: whether the current user (auth) is among the eligible approvers (always false if auth is nil)
-// - error: any error that occurred during the operation
-func GetApproversByTier(
+//   - []Approver: list of eligible approvers with their basic
+//     information
+//   - bool: whether the current user (auth) is among the eligible
+//     approvers (always false if auth is nil)
+//   - error: any error that occurred during the operation
+func GetPOApprovers(
 	app core.App,
 	auth *core.Record,
 	division string,
@@ -85,7 +96,7 @@ func GetApproversByTier(
 
 		if forSecondApproval {
 			err = app.DB().NewQuery(hasClaimQueryString + `
-				AND JSON_EXTRACT(u.payload, '$.max_amount') > {:amount}
+				AND JSON_EXTRACT(u.payload, '$.max_amount') >= {:amount}
 			`).Bind(dbx.Params{
 				"userId":   auth.Id,
 				"claimId":  constants.PO_APPROVER_CLAIM_ID,
@@ -93,9 +104,7 @@ func GetApproversByTier(
 				"amount":   amount,
 			}).One(&result)
 		} else {
-			err = app.DB().NewQuery(hasClaimQueryString + `
-			AND JSON_EXTRACT(u.payload, '$.max_amount') <= {:amount}
-		`).Bind(dbx.Params{
+			err = app.DB().NewQuery(hasClaimQueryString).Bind(dbx.Params{
 				"userId":   auth.Id,
 				"claimId":  constants.PO_APPROVER_CLAIM_ID,
 				"division": division,
@@ -136,9 +145,15 @@ func GetApproversByTier(
 		)`
 
 	if forSecondApproval {
+		// return an empty list if the amount is less than or equal to
+		// PO_SECOND_APPROVER_TOTAL_THRESHOLD.
+		if amount <= constants.PO_SECOND_APPROVER_TOTAL_THRESHOLD {
+			return []Approver{}, false, nil
+		}
+
 		err = app.DB().NewQuery(approversQueryString + `
-			AND JSON_EXTRACT(u.payload, '$.max_amount') > {:amount}
-		ORDER BY p.surname, p.given_name
+			AND JSON_EXTRACT(u.payload, '$.max_amount') >= {:amount} 
+			ORDER BY p.surname, p.given_name
 		`).Bind(dbx.Params{
 			"claimId":  constants.PO_APPROVER_CLAIM_ID,
 			"division": division,
@@ -146,8 +161,11 @@ func GetApproversByTier(
 		}).All(&approvers)
 	} else {
 		err = app.DB().NewQuery(approversQueryString + `
-			AND JSON_EXTRACT(u.payload, '$.max_amount') <= {:amount}
-		ORDER BY p.surname, p.given_name
+			AND (
+				JSON_EXTRACT(u.payload, '$.max_amount') <= {:amount}
+				OR JSON_EXTRACT(u.payload, '$.max_amount') IS NULL
+			)
+			ORDER BY p.surname, p.given_name
 		`).Bind(dbx.Params{
 			"claimId":  constants.PO_APPROVER_CLAIM_ID,
 			"division": division,

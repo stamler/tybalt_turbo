@@ -49,7 +49,7 @@ The following aspects still need to be implemented:
 Create a utility function that handles the common logic of finding approvers with parameters to control behavior:
 
 ```go
-// GetApproversByTier fetches a list of users who can approve a purchase order based on parameters
+// GetPOApprovers fetches a list of users who can approve a purchase order based on parameters
 // Parameters:
 // - app: the application context
 // - auth: the authenticated user record. This is optional (nil is a valid parameter) as nil enables using the function for validation where no authenticated user is available.
@@ -60,7 +60,7 @@ Create a utility function that handles the common logic of finding approvers wit
 // - []Approver: list of eligible approvers
 // - bool: whether the current user is among the eligible approvers
 // - error: any error that occurred
-func GetApproversByTier(
+func GetPOApprovers(
     app core.App, 
     auth *core.Record, 
     division string, 
@@ -79,7 +79,7 @@ Refactor both handler functions to use the new utility function:
 func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
     return func(e *core.RequestEvent) error {
         // Parse parameters
-        // Call GetApproversByTier with forSecondApproval=false
+        // Call GetPOApprovers with forSecondApproval=false
         // Return results
     }
 }
@@ -87,7 +87,7 @@ func createGetApproversHandler(app core.App) func(e *core.RequestEvent) error {
 func createGetSecondApproversHandler(app core.App) func(e *core.RequestEvent) error {
     return func(e *core.RequestEvent) error {
         // Parse parameters
-        // Call GetApproversByTier with forSecondApproval=true
+        // Call GetPOApprovers with forSecondApproval=true
         // Return results
     }
 }
@@ -146,7 +146,7 @@ func validatePurchaseOrder(app core.App, record *core.Record, authRecord *core.R
         }
         
         // Get list of eligible second approvers
-        approvers, _, err := utilities.GetApproversByTier(app, nil, division, totalValue, true)
+        approvers, _, err := utilities.GetPOApprovers(app, nil, division, totalValue, true)
         if err != nil {
             return &HookError{
                 Status:  http.StatusInternalServerError,
@@ -189,7 +189,7 @@ func validatePurchaseOrder(app core.App, record *core.Record, authRecord *core.R
 
 ## Implementation Steps
 
-1. Create the `GetApproversByTier` utility function in `app/utilities/po_approvers.go`
+1. Create the `GetPOApprovers` utility function in `app/utilities/po_approvers.go`
 2. Update the existing handler functions to use this utility function
 3. Update `validatePurchaseOrder()` to validate the priority_second_approver field if set (cleanPurchaseOrder is already updated)
 4. Add tests for the utility function and the updated hooks
@@ -216,8 +216,8 @@ type Approver struct {
     Surname   string `db:"surname" json:"surname"`
 }
 
-// GetApproversByTier fetches a list of users who can approve a purchase order based on parameters
-func GetApproversByTier(
+// GetPOApprovers fetches a list of users who can approve a purchase order based on parameters
+func GetPOApprovers(
     app core.App, 
     auth *core.Record, 
     division string, 

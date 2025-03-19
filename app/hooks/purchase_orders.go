@@ -182,7 +182,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				division := purchaseOrderRecord.GetString("division")
 
 				// Get list of eligible second approvers
-				approvers, _, err := utilities.GetApproversByTier(app, nil, division, purchaseOrderRecord.GetFloat("approval_total"), true)
+				approvers, _, err := utilities.GetPOApprovers(app, nil, division, purchaseOrderRecord.GetFloat("approval_total"), true)
 				if err != nil {
 					return &HookError{
 						Status:  http.StatusInternalServerError,

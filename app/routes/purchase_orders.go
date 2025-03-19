@@ -752,8 +752,7 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 			}
 		}
 
-		// Use the GetApproversByTier utility function with forSecondApproval=false
-		approvers, _, err := utilities.GetApproversByTier(app, auth, division, amount, forSecondApproval)
+		approvers, _, err := utilities.GetPOApprovers(app, auth, division, amount, forSecondApproval)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_approvers",
