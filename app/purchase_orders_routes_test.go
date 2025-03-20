@@ -34,7 +34,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 	}
 
 	// Token for po_approver_tier2 user
-	tier2Token, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	tier2Token, err := testutils.GenerateRecordToken("users", "tier2@poapprover.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,7 +55,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   fmt.Sprintf("authorized approver successfully approves PO below tier 1 limit (%.0f)", tier1),
+			Name:   fmt.Sprintf("authorized approver successfully approves PO below lowest threshold (%.0f)", tier1),
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/approve", // Using existing Unapproved PO with total 329.01
 			Body:   strings.NewReader(`{}`),                        // No body needed for approval
@@ -116,8 +116,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have same timestamp
 				`"status":"Active"`,                               // Status should become Active
 				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
-				`"approver":"f2j5a8vk006baub"`,                    // caller becomes first approver
-				`"second_approver":"f2j5a8vk006baub"`,             // caller also becomes second approver
+				`"approver":"6bq4j0eb26631dy"`,                    // caller becomes first approver
+				`"second_approver":"6bq4j0eb26631dy"`,             // caller also becomes second approver
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,
@@ -142,7 +142,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				`"status":"Active"`,                               // Status should become Active
 				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
 				`"approver":"wegviunlyr2jjjv"`,                    // Should keep original approver
-				`"second_approver":"f2j5a8vk006baub"`,             // Should be set to caller's ID
+				`"second_approver":"6bq4j0eb26631dy"`,             // Should be set to caller's ID
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,
@@ -410,12 +410,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   fmt.Sprintf("po_approver_tier2 cannot second-approve PO with value above tier 2 limit (%.0f) (po_approver_tier3 claim required)", tier2),
+			Name:   "user cannot second-approve PO with approval_total above their max_amount",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/q79eyq0uqrk6x2q/approve", // PO with total 3251.12
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
-				"Authorization": tier2Token, // author@soup.com who has po_approver_tier2 claim but not po_approver_tier3
+				"Authorization": tier2Token,
 			},
 			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{
@@ -433,7 +433,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			URL:    "/api/purchase_orders/q79eyq0uqrk6x2q/approve", // PO with total 3251.12
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
-				"Authorization": po_approver_tier3Token, // hal@2005.com who has po_approver_tier3 claim
+				"Authorization": po_approver_tier3Token, // hal@2005.com has max_amount of 1000000
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
@@ -584,19 +584,37 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "qualified second approver can reject an unapproved purchase order",
+			Name:   "qualified second approver cannot reject an unapproved purchase order if it doesn't require second approval",
 			Method: http.MethodPost,
-			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/reject",
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/reject", // doesn't require second approval
 			Body: strings.NewReader(`{
 				"rejection_reason": "Budget constraints"
 			}`),
-			Headers:        map[string]string{"Authorization": po_approver_tier3Token},
+			Headers:        map[string]string{"Authorization": tier2Token},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized_rejection"`,
+				`"message":"you are not authorized to reject this purchase order"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "qualified second approver can reject an unapproved purchase order if it requires second approval",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/46efdq319b22480/reject",
+			Body: strings.NewReader(`{
+				"rejection_reason": "Budget constraints"
+			}`),
+			Headers:        map[string]string{"Authorization": tier2Token},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"status":"Unapproved"`,
 				fmt.Sprintf(`"rejected":"%s`, currentDate),
 				`"rejection_reason":"Budget constraints"`,
-				`"rejector":"66ct66w380ob6w8"`,
+				`"rejector":"6bq4j0eb26631dy"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,

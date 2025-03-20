@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log"
-	"slices"
 	"sort"
 	"strconv"
 	"time"
@@ -108,54 +106,28 @@ func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
 	}
 }
 
-// PurchaseOrderClaimHasDivisionPermission returns a validation function that checks if the
+// POClaimPayloadHasDivisionPermission returns a validation function that checks if the
 // provided user ID (as the value parameter) has permission to approve purchase
 // orders for the specified division with the given claim. Permission is granted if
 // either:
-// 1. The user's claim payload is empty (null, [], or {})
-// 2. The user's claim payload contains the specified divisionId
-
-// TODO: This function should also check if the user has claims in a higher
-// tier(s) than the specified claim and if so, include the divisions in the
-// higher tier(s) to determine if the user has permission. We can do this with a
-// single SQL query by joining the claims table (for name), the
-// po_approval_tiers table (to restrict to just relevant claims), and the
-// user_claims table (to get the payloads).
-func PurchaseOrderClaimHasDivisionPermission(app core.App, claimName string, divisionId string) validation.RuleFunc {
+// 1. The payload's divisions property is missing or
+// 2. The payload's divisions property contains the specified divisionId
+// This is implemented entirely in SQL to avoid the overhead of loading the
+// user_claims record and unmarshalling the payload.
+func POClaimPayloadHasDivisionPermission(app core.App, claimId string, divisionId string) validation.RuleFunc {
 	return func(value any) error {
 		userId, _ := value.(string)
-		claim, err := app.FindFirstRecordByFilter("claims", "name = {:claimName}", dbx.Params{
-			"claimName": claimName,
-		})
-		if err != nil {
-			return validation.NewError("validation_invalid_claim", fmt.Sprintf("%s claim not found", claimName))
+		type ClaimResult struct {
+			HasClaim bool `db:"has_claim"`
 		}
-		userClaimsRecord, err := app.FindFirstRecordByFilter("user_claims", "uid = {:uid} && cid = {:cid}", dbx.Params{
-			"uid": userId,
-			"cid": claim.Id,
-		})
-		if err != nil {
-			return validation.NewError("validation_invalid_claim", fmt.Sprintf("user does not have a %s claim", claimName))
-		}
-
-		// payload is a JSON list of strings. Load it into a []string slice
-		divisionIds := []string{}
-		divisionIdsJson := userClaimsRecord.Get("payload").(types.JSONRaw)
-
-		// if divisionIdsJson is null, "{}", or "[]" then all divisions are allowed
-		if divisionIdsJson.String() == "null" || divisionIdsJson.String() == "[]" || divisionIdsJson.String() == "{}" {
-			log.Printf("divisionIdsJson is null, [], or {}, so all divisions are allowed")
-			return nil
-		}
-
-		jsonErr := json.Unmarshal(divisionIdsJson, &divisionIds)
-		if jsonErr != nil {
-			return validation.NewError("validation_invalid_division_payload", "division payload is not a valid JSON list of strings")
-		}
-
-		if !slices.Contains(divisionIds, divisionId) {
-			return validation.NewError("validation_invalid_division",
-				fmt.Sprintf("user does not have %s permission for the specified division", claimName))
+		var result ClaimResult
+		app.DB().NewQuery("SELECT COUNT(*) > 0 AS has_claim FROM user_claims WHERE uid = {:userId} AND cid = {:claimId} AND (JSON_EXTRACT(payload, '$.divisions') IS NULL OR EXISTS (SELECT 1 FROM JSON_EACH(JSON_EXTRACT(payload, '$.divisions')) WHERE value = {:divisionId}))").Bind(dbx.Params{
+			"userId":     userId,
+			"claimId":    claimId,
+			"divisionId": divisionId,
+		}).One(&result)
+		if !result.HasClaim {
+			return validation.NewError("validation_no_claim", "user does not have the required claim")
 		}
 		return nil
 	}
@@ -613,35 +585,4 @@ func GetBoundClaimIdAndMaxAmount(app core.App, highest bool) (string, float64, e
 	}
 
 	return tiers[0].GetString("claim"), tiers[0].GetFloat("max_amount"), nil
-}
-
-// PurchaseOrderAmountDoesNotExceedMaxTier returns nil if a purchase order's
-// amount is less than or equal to the maximum amount defined in the highest
-// approval tier. Otherwise, it returns an error. It handles both normal and
-// recurring purchase orders.
-func PurchaseOrderAmountDoesNotExceedMaxTier(app core.App, purchaseOrderRecord *core.Record) error {
-	// Get the highest tier max amount
-	_, highestTierMaxAmount, err := GetBoundClaimIdAndMaxAmount(app, true)
-	if err != nil {
-		return fmt.Errorf("error determining highest approval tier: %v", err)
-	}
-
-	// Determine the total value based on PO type
-	poType := purchaseOrderRecord.GetString("type")
-	total := purchaseOrderRecord.GetFloat("total")
-	totalValue := total
-
-	if poType == "Recurring" {
-		_, totalValue, err = CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
-		if err != nil {
-			return fmt.Errorf("error calculating recurring PO total value: %v", err)
-		}
-	}
-
-	// Check if total exceeds highest tier max amount
-	if totalValue > highestTierMaxAmount {
-		return errors.New("purchase order amount exceeds the max_amount of the highest approval tier")
-	}
-
-	return nil
 }

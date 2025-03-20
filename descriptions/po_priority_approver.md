@@ -234,6 +234,15 @@ listRule and viewRule strings.
 )
 ```
 
+#### The alternative PO implementation with no tiers
+
+In the alternative PO implementation, there is no second_approver_claim field. Instead, we will need to find a different way to validate whether a user can view/list the PO before the 24 hour window (they're the priority_second_approver, so that doesn't change) or whether the user can view/list the PO after the 24 hour window has expired. In this second case, we can't check that the user has the second_approver_claim. Instead we need to test several things:
+
+1. The user must have the po_approver claim
+2. Their po_approver claim's payload.max_amount >= the amount of the purchase_order
+3. Their po_approver claim's payload.max_amount <= the value of lowest po_approval_threshold value that is greater or equal to the approval_amount of the purchase_order
+4. Their po_approver claim's payload.divisions is missing or includes the division id of the purchase_order
+
 ### Auto-Approval Logic
 
 Existing auto-approval logic is set to FALSE by constant. Maintain the existing auto-approval logic, but ensure that it is updated to reflect the new code:

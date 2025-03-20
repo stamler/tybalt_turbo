@@ -71,11 +71,12 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			}
 
 			/*
-				The caller may not be the approver but still be qualified to approve
-				the purchase order if they have a po_approver claim and the payload
-				specifies a division that matches the record's division. In either case,
-				callerIsApprover is set to true as during the update we will set approver
-				to the caller's uid.
+				The caller may not be the approver but still be qualified to approve the
+				purchase order if they have a po_approver claim and the payload
+				specifies a division that matches the record's division or is missing,
+				and the amount is within the caller's max_amount as specified in their
+				claim payload. In both cases, callerIsApprover is set to true as during
+				the update we will set approver to the caller's uid.
 			*/
 
 			// Check if the user is an approver and/or a qualified second approver.
@@ -86,19 +87,26 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				return err
 			}
 
-			// If the caller is not an approver or a qualified second approver,
-			// return a 403 Forbidden status.
-			if !callerIsApprover && !callerIsQualifiedSecondApprover {
+			thresholds, err := utilities.GetPOApprovalThresholds(txApp)
+			if err != nil {
+				return &CodeError{
+					Code:    "error_fetching_approval_thresholds",
+					Message: fmt.Sprintf("error fetching approval thresholds: %v", err),
+				}
+			}
+			recordIsApproved := !po.GetDateTime("approved").IsZero()
+			recordRequiresSecondApproval := po.GetFloat("approval_total") > thresholds[0]
+			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()
+
+			// If the caller is not an approver or a qualified second approver, and
+			// the PO is not already approved, return a 403 Forbidden status.
+			if !recordIsApproved && !callerIsApprover && !callerIsQualifiedSecondApprover {
 				httpResponseStatusCode = http.StatusForbidden
 				return &CodeError{
 					Code:    "unauthorized_approval",
 					Message: "you are not authorized to approve this purchase order",
 				}
 			}
-
-			recordIsApproved := !po.GetDateTime("approved").IsZero()
-			recordRequiresSecondApproval := po.GetString("second_approver_claim") != ""
-			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()
 
 			// This time will be written to the record if the approval or second
 			// approval status changes
@@ -273,6 +281,11 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 			if err != nil {
 				return err
 			}
+
+			// Because isApprover uses GetPOApprovers, the second approvers list is
+			// just users below the next threshold. This means that users above the
+			// next threshold cannot reject a PO with an approval_total that exceeds
+			// the threshold immediately below their max_amount.
 
 			// If the caller is not an approver or a qualified second approver,
 			// return a 403 Forbidden status. NOTE: This means that even if a
@@ -657,58 +670,36 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 */
 
 func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool, error) {
-	// Check if the caller is the approver specified in the record
-	callerIsApprover := po.GetString("approver") == auth.Id
-
-	// if the caller is not the approver on the record, perform additional checks
-	// to see if the caller is nontheless permitted to approve the purchase order
-	if !callerIsApprover {
-
-		// Check if the caller is a qualified approver (has the po_approver claim
-		// and that claim has a payload that includes the division of the purchase
-		// order)
-		hasPoApproverClaim, err := utilities.HasClaim(txApp, auth, "po_approver")
-		if err != nil {
-			return false, false, &CodeError{
-				Code:    "error_checking_po_approver_claim",
-				Message: fmt.Sprintf("error checking po_approver claim: %v", err),
-			}
-		}
-		if hasPoApproverClaim {
-			// PurchaseOrderClaimHasDivisionPermission returns a validation function that checks if the
-			// provided user ID has permission for the specified division with the given claim.
-			// We pass the auth.Id as the value to validate.
-			if err := utilities.PurchaseOrderClaimHasDivisionPermission(txApp, "po_approver", po.GetString("division"))(auth.Id); err == nil {
-				callerIsApprover = true
-			}
+	approvers, _, err := utilities.GetPOApprovers(txApp, nil, po.GetString("division"), po.GetFloat("approval_total"), false)
+	if err != nil {
+		return false, false, &CodeError{
+			Code:    "error_fetching_approvers",
+			Message: fmt.Sprintf("error fetching approvers: %v", err),
 		}
 	}
 
-	// Check if the record requires second approval
-	secondApproverClaim := po.GetString("second_approver_claim")
-	recordRequiresSecondApproval := secondApproverClaim != ""
-
-	// Check if the caller is a qualified second approver. This means the caller
-	// has a user_claim with a claim_id that matches the second_approver_claim
-	// on the record. Note that this is a different claim than the po_approver
-	// claim and that the caller may be a second approver regardless of whether
-	// they are an approver on the record.
-	callerIsQualifiedSecondApprover := false // initialize to false
-	if recordRequiresSecondApproval {
-		userClaims, err := txApp.FindRecordsByFilter("user_claims", "uid = {:userId}", "", 0, 0, dbx.Params{
-			"userId": auth.Id,
-		})
-		if err != nil {
-			return false, false, &CodeError{
-				Code:    "error_fetching_user_claims",
-				Message: fmt.Sprintf("error fetching user claims: %v", err),
-			}
+	secondApprovers, _, err := utilities.GetPOApprovers(txApp, nil, po.GetString("division"), po.GetFloat("approval_total"), true)
+	if err != nil {
+		return false, false, &CodeError{
+			Code:    "error_fetching_approvers",
+			Message: fmt.Sprintf("error fetching approvers: %v", err),
 		}
-		for _, userClaim := range userClaims {
-			if userClaim.GetString("cid") == secondApproverClaim {
-				callerIsQualifiedSecondApprover = true
-				break
-			}
+	}
+
+	callerIsApprover := false
+	callerIsQualifiedSecondApprover := false
+
+	for _, approver := range approvers {
+		if approver.ID == auth.Id {
+			callerIsApprover = true
+			break
+		}
+	}
+
+	for _, secondApprover := range secondApprovers {
+		if secondApprover.ID == auth.Id {
+			callerIsQualifiedSecondApprover = true
+			break
 		}
 	}
 
