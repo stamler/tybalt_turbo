@@ -19,31 +19,32 @@ type Approver struct {
 // on specified parameters.
 //
 // This function encapsulates the logic for finding both first-level approvers
-// and second-level approvers for purchase orders, based on the payload of a
-// user's po_approver claim and provided division.
+// and second-level approvers for purchase orders, based on the
+// po_approver_props record's divisions property and the max_amount property.
 //
 // How it works:
 // First the function checks if the authenticated user has the right to approve
-// the purchase order based on the claim payload's max_amount property at the
-// requested approval level (first or second). If the authenticated user has the
+// the purchase order based on the po_approver_props record's divisions property
+// and the max_amount property at the requested approval level (first or second).
+// If the authenticated user has the right to approve, the function returns an
 // right to approve, the function returns an empty list, indicating that the
 // user is an approver. It also returns true in the second return value to
 // indicate that the user is an approver.
 //
 // If forSecondApproval is true, it returns users who have the
-// constants.PO_APPROVER_CLAIM_ID with a payload that has a max_amount greater
-// than or equal to the purchase_orders records' approval_total AND less than or
-// equal to the ceiling, AND the claim payload's division property is missing,
-// or is a list that contains the provided division. If the amount is less than
-// or equal to the lowest threshold returned by GetPOApprovalThresholds, it
-// returns an empty list.
+// constants.PO_APPROVER_CLAIM_ID claim with a po_approver_props record that has
+// a max_amount greater than or equal to the purchase_orders records'
+// approval_total AND less than or equal to the ceiling, AND the
+// po_approver_props record's divisions property is missing, or is a list that
+// contains the provided division. If the amount is less than or equal to the
+// lowest threshold returned by or equal to the lowest threshold returned by
+// GetPOApprovalThresholds, it returns an empty list.
 //
 // If forSecondApproval is false, it returns users who have the
-// constants.PO_APPROVER_CLAIM_ID claim with a payload that is either missing
-// max_amount property or has a max_amount less than or equal to the lowest
-// threshold returned by GetPOApprovalThresholds AND the claim payload's
-// division property is missing, or is a list that contains the provided
-// division.
+// constants.PO_APPROVER_CLAIM_ID claim with a po_approver_props record that has
+// a max_amount less than or equal to the purchase_orders records'
+// approval_total AND the po_approver_props record's divisions property is
+// missing, or is a list that contains the provided division.
 //
 // Parameters:
 //   - app: the application context used to access the database and
@@ -100,12 +101,13 @@ func GetPOApprovers(
 		hasClaimQueryString := `
 			SELECT COUNT(*) > 0 AS has_claim
 			FROM user_claims u
+			INNER JOIN po_approver_props p ON p.user_claim = u.id
 			WHERE u.uid = {:userId} AND u.cid = {:claimId}
 			AND (
-				JSON_EXTRACT(u.payload, '$.divisions') IS NULL
+				JSON_ARRAY_LENGTH(p.divisions) = 0
 				OR EXISTS (
 					SELECT 1
-					FROM JSON_EACH(JSON_EXTRACT(u.payload, '$.divisions'))
+					FROM JSON_EACH(p.divisions)
 					WHERE value = {:division}
 				)
 			)
@@ -113,7 +115,7 @@ func GetPOApprovers(
 
 		if forSecondApproval {
 			err = app.DB().NewQuery(hasClaimQueryString + `
-				AND JSON_EXTRACT(u.payload, '$.max_amount') >= {:amount}
+				AND p.max_amount >= {:amount}
 			`).Bind(dbx.Params{
 				"userId":   auth.Id,
 				"claimId":  constants.PO_APPROVER_CLAIM_ID,
@@ -142,7 +144,7 @@ func GetPOApprovers(
 	// The authenticated user is not an approver, or the function is being called
 	// without an authenticated user (e.g. from the UI when the user is not logged
 	// in). In this case, we need to find the approvers based on the amount and
-	// the claim payload's max_amount property.
+	// the po_approver_props record's max_amount property.
 
 	var approvers []Approver
 	// SQL query to find approvers
@@ -150,12 +152,13 @@ func GetPOApprovers(
 		SELECT p.uid AS id, p.given_name, p.surname
 		FROM profiles p
 		INNER JOIN user_claims u ON p.uid = u.uid
+		INNER JOIN po_approver_props p ON p.user_claim = u.id
 		WHERE u.cid = {:claimId}
 		AND (
-			JSON_EXTRACT(u.payload, '$.divisions') IS NULL
+			JSON_ARRAY_LENGTH(p.divisions) = 0
 			OR EXISTS (
 				SELECT 1
-				FROM JSON_EACH(JSON_EXTRACT(u.payload, '$.divisions'))
+				FROM JSON_EACH(p.divisions)
 				WHERE value = {:division}
 			)
 		)`
@@ -168,8 +171,8 @@ func GetPOApprovers(
 		}
 
 		err = app.DB().NewQuery(approversQueryString + `
-			AND JSON_EXTRACT(u.payload, '$.max_amount') >= {:amount}
-			AND JSON_EXTRACT(u.payload, '$.max_amount') <= {:ceiling}
+			AND p.max_amount >= {:amount}
+			AND p.max_amount <= {:ceiling}
 			ORDER BY p.surname, p.given_name
 		`).Bind(dbx.Params{
 			"claimId":  constants.PO_APPROVER_CLAIM_ID,
@@ -180,8 +183,8 @@ func GetPOApprovers(
 	} else {
 		err = app.DB().NewQuery(approversQueryString + `
 			AND (
-				JSON_EXTRACT(u.payload, '$.max_amount') <= {:amount}
-				OR JSON_EXTRACT(u.payload, '$.max_amount') IS NULL
+				p.max_amount <= {:amount}
+				OR p.max_amount IS NULL
 			)
 			ORDER BY p.surname, p.given_name
 		`).Bind(dbx.Params{

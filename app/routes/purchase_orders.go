@@ -72,11 +72,12 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 
 			/*
 				The caller may not be the approver but still be qualified to approve the
-				purchase order if they have a po_approver claim and the payload
-				specifies a division that matches the record's division or is missing,
-				and the amount is within the caller's max_amount as specified in their
-				claim payload. In both cases, callerIsApprover is set to true as during
-				the update we will set approver to the caller's uid.
+				purchase order if they have a po_approver claim and the
+				po_approver_props record's divisions property specifies a division that
+				matches the record's division or is missing, and the amount is within
+				the caller's max_amount as specified in their max_amount property on the
+				po_approver_props record. In both cases, callerIsApprover is set to true
+				as during the update we will set approver to the caller's uid.
 			*/
 
 			// Check if the user is an approver and/or a qualified second approver.
@@ -706,16 +707,19 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 	return callerIsApprover, callerIsQualifiedSecondApprover, nil
 }
 
-// GetApprovers returns a list of users who can approve a purchase order of the given amount and division.
-// If the current user has approver claims, an empty list is returned (UI will auto-set to self).
-// Results are filtered to approvers with permission for the specified division
-// (empty payload means all divisions, otherwise division must be in payload).
-// If forSecondApproval is true, the function returns a list of users who can
-// second-approve a purchase order of the given amount and division unless the
-// amount is below tier 1 or the current user has the appropriate claim for the
-// required tier. In this case, an empty list is returned. Results are filtered
-// to approvers with permission for the specified division (empty payload means
-// all divisions, otherwise division must be in payload).
+// GetApprovers returns a list of users who can approve a purchase order of the
+// given amount and division. If the current user has approver claims, an empty
+// list is returned (UI will auto-set to self). Results are filtered to
+// approvers with permission for the specified division (empty divisions
+// property on the po_approver_props record means all divisions, otherwise
+// division must be in divisions property). If forSecondApproval is true, the
+// function returns a list of users who can second-approve a purchase order of
+// the given amount and division unless the amount is below tier 1 or the
+// current user has the appropriate claim for the required tier. In this case,
+// an empty list is returned. Results are filtered to approvers with permission
+// for the specified division (empty divisions property on the po_approver_props
+// record means all divisions, otherwise division must be in divisions
+// property).
 func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth

@@ -227,7 +227,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		},
 		/*
 		   This test verifies the basic auto-approval flow for purchase orders.
-		   When a user with the po_approver claim (empty payload = all divisions) creates a PO:
+		   When a user with the po_approver claim (empty divsions property of po_approver_props = all divisions) creates a PO:
 		   1. The PO should be auto-approved immediately:
 		      - approved timestamp should be set to current date/time
 		      - approver should be set to the creator's ID
@@ -287,18 +287,18 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		},
 		/*
 		   These tests verify division-specific auto-approval for purchase orders.
-		   User fatt@mac.com (id: etysnrlup2f6bak) has po_approver claim with payload:
-		   ["hcd86z57zjty6jo", "fy4i9poneukvq9u", "vccd5fo56ctbigh"]
+		   User fatt@mac.com (id: etysnrlup2f6bak) has po_approver claim with divisions property:
+		   ["hcd86z57zjty6jo", "fy4i9poneukvq9u", "vccd5fo56ctbigh"] on the po_approver_props record
 
 		   Test 1 (Success case):
-		   - Creates PO with division "vccd5fo56ctbigh" (in user's po_approver claim payload)
+		   - Creates PO with division "vccd5fo56ctbigh" (in user's po_approver_props divisions property)
 		   - Should auto-approve since user has permission for this division
 		   - Verifies: approval timestamp, Active status, PO number generation
 		   - Creator becomes approver
 
 		   Test 2 (Failure case):
-		   - Creates PO with division "ngpjzurmkrfl8fo" (not in user's po_approver claim payload)
-		   - Uses wegviunlyr2jjjv as approver (has empty po_approver claim payload = all divisions)
+		   - Creates PO with division "ngpjzurmkrfl8fo" (not in user's po_approver_props divisions property)
+		   - Uses wegviunlyr2jjjv as approver (has empty po_approver_props divisions property = all divisions)
 		   - Should succeed (200) but not auto-approve
 		   - Verifies: no approval, Unapproved status, original approver remains
 
@@ -379,7 +379,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		/*
 		   This test verifies auto-approval of high-value purchase orders by users with elevated claims.
 		   User hal@2005.com (id: 66ct66w380ob6w8) has:
-		   - po_approver claim with empty payload (can approve for any division)
+		   - po_approver claim with empty divisions property on the po_approver_props record (can approve for any division)
 		   - po_approver_tier3 claim (can provide second approval for high-value POs)
 
 		   Test verifies that when this user creates a high-value PO:
@@ -390,7 +390,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 
 		   The test:
 		   - Uses total above tier2 to trigger second approval requirement
-		   - Uses random division (since user has empty po_approver payload)
+		   - Uses random division (since user has empty po_approver_props divisions property)
 		   - Verifies all approval fields and timestamps
 		*/
 		{
@@ -439,7 +439,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		/*
 		   This test verifies auto-approval of mid-range value purchase orders by users with po_approver_tier2 claim.
 		   User author@soup.com (id: f2j5a8vk006baub) has:
-		   - po_approver claim with empty payload (can approve for any division)
+		   - po_approver claim with empty divisions property on the po_approver_props record (can approve for any division)
 		   - po_approver_tier2 claim (can provide second approval for POs between tier1 and tier2)
 
 		   Test verifies that when this user creates a mid-range value PO:
@@ -450,7 +450,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 
 		   The test:
 		   - Uses total between tier1 and tier2
-		   - Uses random division (since user has empty po_approver payload)
+		   - Uses random division (since user has empty po_approver_props divisions property)
 		   - Verifies all approval fields and timestamps
 		*/
 		{

@@ -50,9 +50,9 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"id":"wegviunlyr2jjjv"`, // Fakesy Manjor (has null payload)
-				//`"id":"66ct66w380ob6w8"`, // Shallow Hal (has null payload), removed since the max_amount is too high
-				`"id":"4r70mfovf22m9uh"`, // Orphaned POApprover (has null payload)
+				`"id":"wegviunlyr2jjjv"`, // Fakesy Manjor
+				//`"id":"66ct66w380ob6w8"`, // Shallow Hal, removed since the max_amount is too high
+				`"id":"4r70mfovf22m9uh"`, // Orphaned POApprover
 				`"given_name"`,
 				`"surname"`,
 			},

@@ -239,9 +239,44 @@ listRule and viewRule strings.
 In the alternative PO implementation, there is no second_approver_claim field. Instead, we will need to find a different way to validate whether a user can view/list the PO before the 24 hour window (they're the priority_second_approver, so that doesn't change) or whether the user can view/list the PO after the 24 hour window has expired. In this second case, we can't check that the user has the second_approver_claim. Instead we need to test several things:
 
 1. The user must have the po_approver claim
-2. Their po_approver claim's payload.max_amount >= the amount of the purchase_order
+2. @request.auth.user_claims_props_po_approver.max_amount >= the approval_total of the purchase_order
 3. Their po_approver claim's payload.max_amount <= the value of lowest po_approval_threshold value that is greater or equal to the approval_amount of the purchase_order
 4. Their po_approver claim's payload.divisions is missing or includes the division id of the purchase_order
+
+```rules
+...exiting rules
+// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of second_approver_claim
+(
+  status = "Unapproved" &&
+  (
+    @request.auth.id = uid || 
+    @request.auth.id = approver || 
+    @request.auth.id = priority_second_approver 
+  ) || 
+  (
+    // updated more than 24 hours ago
+    updated < @yesterday && 
+    
+    // caller has the po_approver claim
+    @request.auth.user_claims_via_uid.cid.name ?= 'po_approver' &&
+
+    // caller's max_amount for the po_approver claim >= approval_total
+    @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&
+
+    // caller's user_claims.payload.max_amount <= the lowest po_approval_threshold value that is >= approval_total
+    (
+      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount <= @collections.po_approval_thresholds.threshold &&
+      @collections.po_approval_thresholds.threshold >= approval_total
+    ) &&
+
+    // caller's user_claims.payload.divisions = null OR includes division
+    (
+      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:length = 0 ||
+      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:each ?= division
+    )
+  )
+)
+```
 
 ### Auto-Approval Logic
 

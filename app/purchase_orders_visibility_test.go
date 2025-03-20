@@ -16,16 +16,16 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 	}
 
 	// Generate token for Fakesy Manjor (approver of several Unapproved POs) This
-	// user only has the po_approver claim with no payload, and has no second tier
-	// claims
+	// user only has the po_approver claim empty divisions property on the
+	// po_approver_props record, and has no second tier claims
 	approverToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz") // Fakesy Manjor
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	// Generate token for Horace Silver (creator of several Unapproved POs) This
-	// user has the po_approver claim with a payload that includes restrictions
-	// and also the po_approver_tier2 claim with no payload.
+	// user has the po_approver claim with a divisions property on the
+	// po_approver_props record that includes restrictions.
 	creatorToken, err := testutils.GenerateRecordToken("users", "author@soup.com") // Horace Silver
 	if err != nil {
 		t.Fatal(err)

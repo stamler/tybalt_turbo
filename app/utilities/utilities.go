@@ -106,22 +106,27 @@ func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
 	}
 }
 
-// POClaimPayloadHasDivisionPermission returns a validation function that checks if the
+// PoApproverPropsHasDivisionPermission returns a validation function that checks if the
 // provided user ID (as the value parameter) has permission to approve purchase
 // orders for the specified division with the given claim. Permission is granted if
 // either:
-// 1. The payload's divisions property is missing or
-// 2. The payload's divisions property contains the specified divisionId
-// This is implemented entirely in SQL to avoid the overhead of loading the
-// user_claims record and unmarshalling the payload.
-func POClaimPayloadHasDivisionPermission(app core.App, claimId string, divisionId string) validation.RuleFunc {
+// 1. The po_approver_props record's divisions property is missing or
+// 2. The po_approver_props record's divisions property contains the specified divisionId
+func PoApproverPropsHasDivisionPermission(app core.App, claimId string, divisionId string) validation.RuleFunc {
 	return func(value any) error {
 		userId, _ := value.(string)
 		type ClaimResult struct {
 			HasClaim bool `db:"has_claim"`
 		}
 		var result ClaimResult
-		app.DB().NewQuery("SELECT COUNT(*) > 0 AS has_claim FROM user_claims WHERE uid = {:userId} AND cid = {:claimId} AND (JSON_EXTRACT(payload, '$.divisions') IS NULL OR EXISTS (SELECT 1 FROM JSON_EACH(JSON_EXTRACT(payload, '$.divisions')) WHERE value = {:divisionId}))").Bind(dbx.Params{
+		app.DB().NewQuery(`
+		  SELECT COUNT(*) > 0 AS has_claim 
+			FROM user_claims u
+			INNER JOIN po_approver_props p ON p.user_claim = u.id
+			WHERE u.uid = {:userId} 
+			AND u.cid = {:claimId}
+			AND (JSON_ARRAY_LENGTH(p.divisions) = 0 OR EXISTS (SELECT 1 FROM JSON_EACH(p.divisions) WHERE value = {:divisionId}))
+		`).Bind(dbx.Params{
 			"userId":     userId,
 			"claimId":    claimId,
 			"divisionId": divisionId,
