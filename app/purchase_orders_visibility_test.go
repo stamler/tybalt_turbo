@@ -154,7 +154,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 
 		// User with second_approver_claim CAN see an Unapproved PO with a different priority_second_approver after 24h
 		{
-			Name:   "user with second_approver_claim CAN see an Unapproved PO with different priority_second_approver AFTER 24 hours",
+			Name:   "user with second_approver_claim CAN see an Unapproved PO with different priority_second_approver AFTER 24 hours if the PO is in the same tier as the user",
 			Method: http.MethodGet,
 			URL:    "/api/collections/purchase_orders/records/n9ev1x7a00c1iy6", // Unapproved PO with Tier Two as priority_second_approver
 			Headers: map[string]string{
@@ -165,6 +165,21 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 				`"id":"n9ev1x7a00c1iy6"`,
 				`"status":"Unapproved"`,
 				`"priority_second_approver":"6bq4j0eb26631dy"`, // Tier Two's ID
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		// User with second_approver_claim CANNOT see an Unapproved PO with a different priority_second_approver after 24h if the PO is in a lower tier
+		{
+			Name:   "user with second_approver_claim CANNOT see an Unapproved PO with different priority_second_approver AFTER 24 hours if the PO is in a lower tier than the user",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/l9w1z13mm3srtoo", // Unapproved PO with approval_total less than 500
+			Headers: map[string]string{
+				"Authorization": tier2bToken, // Tier TwoB has is not the priority_second_approver
+			},
+			ExpectedStatus: http.StatusNotFound, // Should NOT be able to see it even after 24 hours because it's in a lower tier
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+				`"status":404`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
