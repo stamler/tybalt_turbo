@@ -239,13 +239,29 @@ listRule and viewRule strings.
 In the alternative PO implementation, there is no second_approver_claim field. Instead, we will need to find a different way to validate whether a user can view/list the PO before the 24 hour window (they're the priority_second_approver, so that doesn't change) or whether the user can view/list the PO after the 24 hour window has expired. In this second case, we can't check that the user has the second_approver_claim. Instead we need to test several things:
 
 1. The user must have the po_approver claim
-2. @request.auth.user_claims_props_po_approver.max_amount >= the approval_total of the purchase_order
-3. Their po_approver claim's payload.max_amount <= the value of lowest po_approval_threshold value that is greater or equal to the approval_amount of the purchase_order
+2. @request.auth.user_claims_props_po_approver.max_amount >= the approval_total of the purchase_order. This ensures that the caller has the permission to actually approve/reject the po in question based on amount.
+3. Their po_approver claim's payload.max_amount <= the value of lowest po_approval_threshold value that is greater or equal to the approval_amount of the purchase_order. We do this by joining a view collection `purchase_order_thresholds` which has the lower and upper thresholds included as columns for each po and testing whether the user's max_amount is less than the upper_threshold. In doing this we indirectly filter out POs that, even though the max_amount is greater than the approval_total, can be approved by a lower qualified user in a lower tier.
 4. Their po_approver claim's payload.divisions is missing or includes the division id of the purchase_order
+
+##### purchase_order_thresholds view
+
+```sql
+SELECT 
+    po.id, po.approval_total,
+    COALESCE((SELECT MAX(threshold) 
+     FROM po_approval_thresholds 
+     WHERE threshold < po.approval_total), 0) AS lower_threshold,
+    COALESCE((SELECT MIN(threshold) 
+     FROM po_approval_thresholds 
+     WHERE threshold >= po.approval_total),1000000) AS upper_threshold
+FROM purchase_orders AS po;
+```
+
+##### additional listRule and viewRule fragments
 
 ```rules
 ...exiting rules
-// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of second_approver_claim
+// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of the po_approver claim whose po_approver_props.max_amount >= approval_amount and <= the upper_threshold of the tier.
 (
   status = "Unapproved" &&
   (
@@ -258,21 +274,20 @@ In the alternative PO implementation, there is no second_approver_claim field. I
     updated < @yesterday && 
     
     // caller has the po_approver claim
-    @request.auth.user_claims_via_uid.cid.name ?= 'po_approver' &&
+    @request.auth.user_claims_via_uid.cid.name ?= "po_approver" &&
 
-    // caller's max_amount for the po_approver claim >= approval_total
+    // caller max_amount for the po_approver claim >= approval_total
     @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&
 
-    // caller's user_claims.payload.max_amount <= the lowest po_approval_threshold value that is >= approval_total
-    (
-      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount <= @collections.po_approval_thresholds.threshold &&
-      @collections.po_approval_thresholds.threshold >= approval_total
-    ) &&
-
-    // caller's user_claims.payload.divisions = null OR includes division
+    // caller user_claims.payload.divisions = null OR includes division
     (
       @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:length = 0 ||
       @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:each ?= division
+    ) &&
+    (
+      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&
+      @collection.purchase_order_thresholds.id ?= id &&
+      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount ?<= @collection.purchase_order_thresholds.upper_threshold
     )
   )
 )

@@ -43,7 +43,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Generate token for Tier TwoB (has only po_approver_tier2 claim, not priority_second_approver)
+	// Generate token for Tier TwoB (has max_amount 2500, unrestricted divisions)
 	tier2bToken, err := testutils.GenerateRecordToken("users", "tier2b@poapprover.com") // Tier TwoB
 	if err != nil {
 		t.Fatal(err)
@@ -158,7 +158,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			Method: http.MethodGet,
 			URL:    "/api/collections/purchase_orders/records/n9ev1x7a00c1iy6", // Unapproved PO with Tier Two as priority_second_approver
 			Headers: map[string]string{
-				"Authorization": tier2bToken, // Tier TwoB has only po_approver_tier2 claim but is not the priority_second_approver
+				"Authorization": tier2bToken, // Tier TwoB has is not the priority_second_approver
 			},
 			ExpectedStatus: http.StatusOK, // Should be able to see it after 24 hours
 			ExpectedContent: []string{
@@ -175,7 +175,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			Method: http.MethodGet,
 			URL:    "/api/collections/purchase_orders/records/n9ev1x7a00c1iy6", // Unapproved PO with Tier Two as priority_second_approver
 			Headers: map[string]string{
-				"Authorization": tier2bToken, // Tier TwoB has only po_approver_tier2 claim but is not the priority_second_approver
+				"Authorization": tier2bToken, // Tier TwoB  is not the priority_second_approver
 			},
 			ExpectedStatus: http.StatusNotFound, // Should NOT be able to see it within 24 hours
 			ExpectedContent: []string{
