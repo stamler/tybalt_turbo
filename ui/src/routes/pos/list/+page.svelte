@@ -226,9 +226,7 @@
         <Icon icon="material-symbols:order-approve-outline" width="24px" class="inline-block" />
         {item.expand.second_approver.expand?.profiles_via_uid.given_name}
         {item.expand.second_approver.expand?.profiles_via_uid.surname}
-        as {item.expand.second_approver_claim.name.toUpperCase()} ({shortDate(
-          item.second_approval,
-        )})
+        ({shortDate(item.second_approval)})
       </span>
     {/if}
     {#if item.attachment}

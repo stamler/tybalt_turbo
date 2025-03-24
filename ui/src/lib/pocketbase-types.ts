@@ -15,16 +15,18 @@ export enum Collections {
   AdminProfiles = "admin_profiles",
   Categories = "categories",
   Claims = "claims",
-  Clients = "clients",
   ClientContacts = "client_contacts",
+  Clients = "clients",
   Divisions = "divisions",
   ExpenseRates = "expense_rates",
   Expenses = "expenses",
   Jobs = "jobs",
   Managers = "managers",
   PayrollYearEndDates = "payroll_year_end_dates",
-  PoApprovers = "po_approvers",
+  PoApprovalThresholds = "po_approval_thresholds",
+  PoApproverProps = "po_approver_props",
   Profiles = "profiles",
+  PurchaseOrderThresholds = "purchase_order_thresholds",
   PurchaseOrders = "purchase_orders",
   TimeAmendments = "time_amendments",
   TimeEntries = "time_entries",
@@ -48,8 +50,6 @@ export type BaseSystemFields<T = never> = {
   collectionId: string;
   collectionName: Collections;
   expand: T;
-  created: IsoDateString;
-  updated: IsoDateString;
 };
 
 export type AuthSystemFields<T = never> = {
@@ -264,11 +264,21 @@ export type PayrollYearEndDatesRecord = {
   updated: IsoDateString;
 };
 
-export type PoApproversRecord = {
-  divisions: null | string[];
-  given_name: string;
+export type PoApprovalThresholdsRecord = {
+  created: IsoDateString;
+  description: string;
   id: string;
-  surname: string;
+  threshold: number;
+  updated: IsoDateString;
+};
+
+export type PoApproverPropsRecord = {
+  created: IsoDateString;
+  divisions: RecordIdString[];
+  id: string;
+  max_amount: number;
+  updated: IsoDateString;
+  user_claim: RecordIdString;
 };
 
 export type ProfilesRecord = {
@@ -281,6 +291,13 @@ export type ProfilesRecord = {
   surname: string;
   uid: RecordIdString;
   updated: IsoDateString;
+};
+
+export type PurchaseOrderThresholdsRecord = {
+  approval_total: number;
+  id: string;
+  lower_threshold: number;
+  upper_threshold: number;
 };
 
 export enum PurchaseOrdersStatusOptions {
@@ -308,12 +325,16 @@ export enum PurchaseOrdersPaymentTypeOptions {
   "CorporateCreditCard" = "CorporateCreditCard",
 }
 export type PurchaseOrdersRecord = {
+  approval_total: number;
   approved: IsoDateString;
   approver: RecordIdString;
   attachment: string;
   cancelled: IsoDateString;
   canceller: RecordIdString;
   category: RecordIdString;
+  closed: IsoDateString;
+  closed_by_system: boolean;
+  closer: RecordIdString;
   created: IsoDateString;
   date: string;
   description: string;
@@ -338,7 +359,6 @@ export type PurchaseOrdersRecord = {
   uid: RecordIdString;
   updated: IsoDateString;
   vendor: RecordIdString;
-  vendor_name: string;
 };
 
 export type TimeAmendmentsRecord = {
@@ -438,11 +458,10 @@ export type TimeTypesRecord = {
   updated: IsoDateString;
 };
 
-export type UserClaimsRecord<Tpayload = unknown> = {
+export type UserClaimsRecord = {
   cid: RecordIdString;
   created: IsoDateString;
   id: string;
-  payload: null | Tpayload;
   uid: RecordIdString;
   updated: IsoDateString;
 };
@@ -554,9 +573,9 @@ export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRec
 export type CategoriesResponse<Texpand = unknown> = Required<CategoriesRecord> &
   BaseSystemFields<Texpand>;
 export type ClaimsResponse<Texpand = unknown> = Required<ClaimsRecord> & BaseSystemFields<Texpand>;
-export type ClientsResponse<Texpand = ClientsRecordExpands> = Required<ClientsRecord> &
-  BaseSystemFields<Texpand>;
 export type ClientContactsResponse<Texpand = unknown> = Required<ClientContactsRecord> &
+  BaseSystemFields<Texpand>;
+export type ClientsResponse<Texpand = ClientsRecordExpands> = Required<ClientsRecord> &
   BaseSystemFields<Texpand>;
 export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
   BaseSystemFields<Texpand>;
@@ -572,10 +591,14 @@ export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
   BaseSystemFields<Texpand>;
 export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYearEndDatesRecord> &
   BaseSystemFields<Texpand>;
-export type PoApproversResponse<Texpand = unknown> = Required<PoApproversRecord> &
+export type PoApprovalThresholdsResponse<Texpand = unknown> = Required<PoApprovalThresholdsRecord> &
+  BaseSystemFields<Texpand>;
+export type PoApproverPropsResponse<Texpand = unknown> = Required<PoApproverPropsRecord> &
   BaseSystemFields<Texpand>;
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
+export type PurchaseOrderThresholdsResponse<Texpand = unknown> =
+  Required<PurchaseOrderThresholdsRecord> & BaseSystemFields<Texpand>;
 export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> =
   Required<PurchaseOrdersRecord> & BaseSystemFields<Texpand>;
 export type TimeAmendmentsResponse<Texpand = TimeAmendmentsRecordExpands> =
@@ -617,8 +640,10 @@ export type CollectionRecords = {
   jobs: JobsRecord;
   managers: ManagersRecord;
   payroll_year_end_dates: PayrollYearEndDatesRecord;
-  po_approvers: PoApproversRecord;
+  po_approval_thresholds: PoApprovalThresholdsRecord;
+  po_approver_props: PoApproverPropsRecord;
   profiles: ProfilesRecord;
+  purchase_order_thresholds: PurchaseOrderThresholdsRecord;
   purchase_orders: PurchaseOrdersRecord;
   time_amendments: TimeAmendmentsRecord;
   time_entries: TimeEntriesRecord;
@@ -649,8 +674,10 @@ export type CollectionResponses = {
   jobs: JobsResponse;
   managers: ManagersResponse;
   payroll_year_end_dates: PayrollYearEndDatesResponse;
-  po_approvers: PoApproversResponse;
+  po_approval_thresholds: PoApprovalThresholdsResponse;
+  po_approver_props: PoApproverPropsResponse;
   profiles: ProfilesResponse;
+  purchase_order_thresholds: PurchaseOrderThresholdsResponse;
   purchase_orders: PurchaseOrdersResponse;
   time_amendments: TimeAmendmentsResponse;
   time_entries: TimeEntriesResponse;
@@ -684,8 +711,10 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "jobs"): RecordService<JobsResponse>;
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
   collection(idOrName: "payroll_year_end_dates"): RecordService<PayrollYearEndDatesResponse>;
-  collection(idOrName: "po_approvers"): RecordService<PoApproversResponse>;
+  collection(idOrName: "po_approval_thresholds"): RecordService<PoApprovalThresholdsResponse>;
+  collection(idOrName: "po_approver_props"): RecordService<PoApproverPropsResponse>;
   collection(idOrName: "profiles"): RecordService<ProfilesResponse>;
+  collection(idOrName: "purchase_order_thresholds"): RecordService<PurchaseOrderThresholdsResponse>;
   collection(idOrName: "purchase_orders"): RecordService<PurchaseOrdersResponse>;
   collection(idOrName: "time_amendments"): RecordService<TimeAmendmentsResponse>;
   collection(idOrName: "time_entries"): RecordService<TimeEntriesResponse>;
