@@ -5,24 +5,54 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
+  import { type UnsubscribeFunc } from "pocketbase";
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
   import type { PurchaseOrdersResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
-  import { invalidate } from "$app/navigation";
+  import { onMount, onDestroy } from "svelte";
   // import { toastStore, type ToastSettings } from "@skeletonlabs/skeleton";
 
   let rejectModal: RejectModal;
 
+  // Load the initial data
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
+  let unsubscribeFunc: UnsubscribeFunc;
 
-  async function refresh() {
-    await invalidate("app:purchaseOrders");
-    items = data.items;
-  }
+  onMount(async () => {
+    // Subscribe to the purchase_orders collection and act on the changes
+    unsubscribeFunc = await pb.collection("purchase_orders").subscribe<PurchaseOrdersResponse>(
+      "*",
+      (e) => {
+        // return immediately if items is not an array
+        if (!Array.isArray(items)) return;
+        switch (e.action) {
+          case "create":
+            // Insert the new item at the top of the list
+            items = [e.record, ...items];
+            break;
+          case "update":
+            items = items.map((item) => (item.id === e.record.id ? e.record : item));
+            break;
+          case "delete":
+            items = items.filter((item) => item.id !== e.record.id);
+            break;
+        }
+      },
+      {
+        expand:
+          "uid.profiles_via_uid,approver.profiles_via_uid,division,vendor,job,job.client,rejector.profiles_via_uid,category,second_approver.profiles_via_uid,second_approver_claim,parent_po",
+        sort: "-date",
+      },
+    );
+  });
+
+  onDestroy(async () => {
+    unsubscribeFunc();
+  });
 
   async function del(id: string): Promise<void> {
     // return immediately if items is not an array
@@ -30,29 +60,16 @@
 
     try {
       await pb.collection("purchase_orders").delete(id);
-
-      // remove the deleted item from the list
-      items = items.filter((item) => item.id !== id);
     } catch (error: any) {
-      alert(error.data.message);
+      globalStore.addError(error?.response?.message);
     }
   }
 
   async function approve(id: string): Promise<void> {
     try {
-      const response = await pb.send(`/api/purchase_orders/${id}/approve`, {
+      await pb.send(`/api/purchase_orders/${id}/approve`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      // replace the item in the list with the updated item
-      items = items?.map((item) => {
-        if (item.id === id) {
-          return response as PurchaseOrdersResponse;
-        }
-        return item;
+        headers: { "Content-Type": "application/json" },
       });
     } catch (error: any) {
       globalStore.addError(error?.response?.message);
@@ -63,13 +80,8 @@
     try {
       await pb.send(`/api/purchase_orders/${id}/cancel`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
       });
-
-      // refresh the list
-      await refresh();
     } catch (error: any) {
       globalStore.addError(error?.response?.message);
     }
@@ -81,9 +93,7 @@
 
   async function closePurchaseOrder(id: string) {
     try {
-      await pb.send(`/api/purchase_orders/${id}/close`, {
-        method: "POST",
-      });
+      await pb.send(`/api/purchase_orders/${id}/close`, { method: "POST" });
 
       // Show success toast
       /*
@@ -93,10 +103,8 @@
       };
       toastStore.trigger(t);
       */
-      // Refresh the data
-      await invalidate("app:pos");
-    } catch (error) {
-      console.error("Error closing purchase order:", error);
+    } catch (error: any) {
+      globalStore.addError(error?.response?.message);
 
       // Show error toast
       /*  
@@ -271,7 +279,7 @@
   {/if}
 {/snippet}
 
-<RejectModal on:refresh={refresh} collectionName="purchase_orders" bind:this={rejectModal} />
+<RejectModal collectionName="purchase_orders" bind:this={rejectModal} />
 <DsList
   items={items as PurchaseOrdersResponse[]}
   search={true}
