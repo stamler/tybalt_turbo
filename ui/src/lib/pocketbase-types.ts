@@ -544,6 +544,10 @@ type UsersRecordExpands = {
   profiles_via_uid: ProfilesResponse;
 };
 
+type UserClaimsRecordExpands = {
+  cid: ClaimsResponse;
+};
+
 type JobsRecordExpands = {
   categories_via_job: CategoriesResponse[];
   client: ClientsResponse;
@@ -613,7 +617,7 @@ export type TimeSheetsResponse<Texpand = unknown> = Required<TimeSheetsRecord> &
   BaseSystemFields<Texpand>;
 export type TimeTypesResponse<Texpand = unknown> = Required<TimeTypesRecord> &
   BaseSystemFields<Texpand>;
-export type UserClaimsResponse<Texpand = unknown> = Required<UserClaimsRecord> &
+export type UserClaimsResponse<Texpand = UserClaimsRecordExpands> = Required<UserClaimsRecord> &
   BaseSystemFields<Texpand>;
 export type UsersResponse<Texpand = UsersRecordExpands> = Required<UsersRecord> &
   AuthSystemFields<Texpand>;
