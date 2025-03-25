@@ -748,3 +748,10 @@ export function isExpensesRecord(item: unknown): item is ExpensesRecord {
 export function isExpensesResponse(item: unknown): item is ExpensesResponse {
   return isBaseSystemFields(item) && isExpensesRecord(item);
 }
+
+// This is defined in the app/utilities/po_approvers.go file
+export type POApproversResponse = {
+  id: string;
+  given_name: string;
+  surname: string;
+};
