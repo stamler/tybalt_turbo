@@ -240,10 +240,10 @@ In the alternative PO implementation, there is no second_approver_claim field. I
 
 1. The user must have the po_approver claim
 2. @request.auth.user_claims_props_po_approver.max_amount >= the approval_total of the purchase_order. This ensures that the caller has the permission to actually approve/reject the po in question based on amount.
-3. Their po_approver claim's payload.max_amount <= the value of lowest po_approval_threshold value that is greater or equal to the approval_amount of the purchase_order. We do this by joining a view collection `purchase_order_thresholds` which has the lower and upper thresholds included as columns for each po and testing whether the user's max_amount is less than the upper_threshold. In doing this we indirectly filter out POs that, even though the max_amount is greater than the approval_total, can be approved by a lower qualified user in a lower tier.
+3. Their po_approver claim's payload.max_amount <= the value of lowest po_approval_threshold value that is greater or equal to the approval_amount of the purchase_order. We do this by joining a view collection `purchase_orders_augmented` which has the lower and upper thresholds included as columns for each po and testing whether the user's max_amount is less than the upper_threshold. In doing this we indirectly filter out POs that, even though the max_amount is greater than the approval_total, can be approved by a lower qualified user in a lower tier.
 4. Their po_approver claim's payload.divisions is missing or includes the division id of the purchase_order
 
-##### purchase_order_thresholds view
+##### purchase_orders_augmented view
 
 ```sql
 SELECT 
@@ -253,7 +253,10 @@ SELECT
      WHERE threshold < po.approval_total), 0) AS lower_threshold,
     COALESCE((SELECT MIN(threshold) 
      FROM po_approval_thresholds 
-     WHERE threshold >= po.approval_total),1000000) AS upper_threshold
+     WHERE threshold >= po.approval_total),1000000) AS upper_threshold,
+    (SELECT COUNT(*) 
+     FROM expenses 
+     WHERE expenses.purchase_order = po.id AND expenses.committed != "") AS committed_expenses_count
 FROM purchase_orders AS po;
 ```
 
@@ -286,8 +289,8 @@ FROM purchase_orders AS po;
     ) &&
     (
       @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&
-      @collection.purchase_order_thresholds.id ?= id &&
-      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount ?<= @collection.purchase_order_thresholds.upper_threshold
+      @collection.purchase_orders_augmented.id ?= id &&
+      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount ?<= @collection.purchase_orders_augmented.upper_threshold
     )
   )
 )

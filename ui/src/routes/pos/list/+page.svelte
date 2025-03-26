@@ -8,7 +8,10 @@
   import { type UnsubscribeFunc } from "pocketbase";
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
-  import type { PurchaseOrdersResponse } from "$lib/pocketbase-types";
+  import type {
+    PurchaseOrdersResponse,
+    PurchaseOrdersAugmentedResponse,
+  } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
@@ -21,6 +24,74 @@
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
   let unsubscribeFunc: UnsubscribeFunc;
+
+  // create a map of purchase order id to augmented data
+  let augmentedMap = $state(new Map(data.augmentedItems?.map((item) => [item.id, item]) ?? []));
+
+  // Set to true to show all buttons regardless of user permissions or PO
+  // status. This is used for testing purposes.
+  const deactivateButtonHiding = $state(false);
+
+  function poMayBeApprovedOrRejectedByUser(po: PurchaseOrdersResponse): boolean {
+    if (deactivateButtonHiding) return true;
+    if (po.status === "Unapproved") {
+      // po is unapproved
+      if (po.rejected === "") {
+        // po is not rejected
+        if ($globalStore.user_po_permission_data.claims.includes("po_approver")) {
+          // user has po_approver claim
+          if (po.approval_total <= $globalStore.user_po_permission_data.max_amount) {
+            // po is below the user's max amount
+            if (
+              $globalStore.user_po_permission_data.divisions.includes(po.division) ||
+              $globalStore.user_po_permission_data.divisions.length === 0
+            ) {
+              // po is in the user's division or the user has no divisions
+              if (po.approval_total >= $globalStore.user_po_permission_data.lower_threshold) {
+                // po is above the user's lower threshold (in the same tier as the user's max amount)
+                // user can approve
+                return true;
+              }
+            }
+          }
+        }
+      }
+    }
+    return false;
+  }
+
+  function poMayBeCancelledByUser(po: PurchaseOrdersResponse): boolean {
+    if (deactivateButtonHiding) return true;
+    if (po.status === "Active") {
+      if ($globalStore.user_po_permission_data.claims.includes("payables_admin")) {
+        // user has payables_admin claim
+        const augmented = augmentedMap.get(po.id);
+        if (augmented !== undefined) {
+          // return true if there are no expenses associated with the PO
+          return augmented.committed_expenses_count === 0;
+        }
+      }
+    }
+    return false;
+  }
+
+  function poMayBeClosedByUser(po: PurchaseOrdersResponse): boolean {
+    if (deactivateButtonHiding) return true;
+    if (po.status === "Active") {
+      if (po.type !== "Normal") {
+        // only normal POs can be closed manually
+        if ($globalStore.user_po_permission_data.claims.includes("payables_admin")) {
+          // user has payables_admin claim
+          const augmented = augmentedMap.get(po.id);
+          if (augmented !== undefined) {
+            // return true if there is at least one committed expense associated with the PO
+            return augmented.committed_expenses_count > 0;
+          }
+        }
+      }
+    }
+    return false;
+  }
 
   onMount(async () => {
     // Subscribe to the purchase_orders collection and act on the changes
@@ -248,34 +319,53 @@
   </span>
 {/snippet}
 
-{#snippet actions({ id, status, type }: PurchaseOrdersResponse)}
-  {#if status === "Active"}
+{#snippet actions(item: PurchaseOrdersResponse)}
+  {#if item.status === "Active"}
     <DsActionButton
-      action={`/expenses/add/${id}`}
+      action={`/expenses/add/${item.id}`}
       icon="mdi:add-bold"
       title="Create Expense"
       color="green"
     />
-    <DsActionButton action={() => cancel(id)} icon="mdi:cancel" title="Cancel" color="orange" />
-    {#if type === "Cumulative"}
+    {#if poMayBeCancelledByUser(item)}
       <DsActionButton
-        action={() => closePurchaseOrder(id)}
+        action={() => cancel(item.id)}
+        icon="mdi:cancel"
+        title="Cancel"
+        color="orange"
+      />
+    {/if}
+    {#if poMayBeClosedByUser(item)}
+      <DsActionButton
+        action={() => closePurchaseOrder(item.id)}
         icon="mdi:curtains-closed"
         title="Close Purchase Order"
         color="orange"
       />
     {/if}
   {/if}
-  {#if status === "Unapproved"}
-    <DsActionButton action={`/pos/${id}/edit`} icon="mdi:edit-outline" title="Edit" color="blue" />
-    <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+  {#if item.status === "Unapproved"}
     <DsActionButton
-      action={() => openRejectModal(id)}
-      icon="mdi:cancel"
-      title="Reject"
-      color="orange"
+      action={`/pos/${item.id}/edit`}
+      icon="mdi:edit-outline"
+      title="Edit"
+      color="blue"
     />
-    <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
+    {#if poMayBeApprovedOrRejectedByUser(item)}
+      <DsActionButton
+        action={() => approve(item.id)}
+        icon="mdi:approve"
+        title="Approve"
+        color="green"
+      />
+      <DsActionButton
+        action={() => openRejectModal(item.id)}
+        icon="mdi:cancel"
+        title="Reject"
+        color="orange"
+      />
+    {/if}
+    <DsActionButton action={() => del(item.id)} icon="mdi:delete" title="Delete" color="red" />
   {/if}
 {/snippet}
 

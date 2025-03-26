@@ -26,7 +26,7 @@ export enum Collections {
   PoApprovalThresholds = "po_approval_thresholds",
   PoApproverProps = "po_approver_props",
   Profiles = "profiles",
-  PurchaseOrderThresholds = "purchase_order_thresholds",
+  PurchaseOrdersAugmented = "purchase_orders_augmented",
   PurchaseOrders = "purchase_orders",
   TimeAmendments = "time_amendments",
   TimeEntries = "time_entries",
@@ -35,6 +35,7 @@ export enum Collections {
   TimeSheets = "time_sheets",
   TimeTypes = "time_types",
   UserClaims = "user_claims",
+  UserPoPermissionData = "user_po_permission_data",
   Users = "users",
   Vendors = "vendors",
 }
@@ -293,11 +294,12 @@ export type ProfilesRecord = {
   updated: IsoDateString;
 };
 
-export type PurchaseOrderThresholdsRecord = {
+export type PurchaseOrdersAugmentedRecord = {
   approval_total: number;
   id: string;
   lower_threshold: number;
   upper_threshold: number;
+  committed_expenses_count: number;
 };
 
 export enum PurchaseOrdersStatusOptions {
@@ -466,6 +468,15 @@ export type UserClaimsRecord = {
   updated: IsoDateString;
 };
 
+export type UserPoPermissionDataRecord = {
+  claims: string[];
+  divisions: string[];
+  id: string;
+  lower_threshold: number;
+  max_amount: number;
+  upper_threshold: number;
+};
+
 export type UsersRecord = {
   created: IsoDateString;
   email: string;
@@ -601,8 +612,8 @@ export type PoApproverPropsResponse<Texpand = unknown> = Required<PoApproverProp
   BaseSystemFields<Texpand>;
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
-export type PurchaseOrderThresholdsResponse<Texpand = unknown> =
-  Required<PurchaseOrderThresholdsRecord> & BaseSystemFields<Texpand>;
+export type PurchaseOrdersAugmentedResponse<Texpand = unknown> =
+  Required<PurchaseOrdersAugmentedRecord> & BaseSystemFields<Texpand>;
 export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> =
   Required<PurchaseOrdersRecord> & BaseSystemFields<Texpand>;
 export type TimeAmendmentsResponse<Texpand = TimeAmendmentsRecordExpands> =
@@ -618,6 +629,8 @@ export type TimeSheetsResponse<Texpand = unknown> = Required<TimeSheetsRecord> &
 export type TimeTypesResponse<Texpand = unknown> = Required<TimeTypesRecord> &
   BaseSystemFields<Texpand>;
 export type UserClaimsResponse<Texpand = UserClaimsRecordExpands> = Required<UserClaimsRecord> &
+  BaseSystemFields<Texpand>;
+export type UserPoPermissionDataResponse<Texpand = unknown> = Required<UserPoPermissionDataRecord> &
   BaseSystemFields<Texpand>;
 export type UsersResponse<Texpand = UsersRecordExpands> = Required<UsersRecord> &
   AuthSystemFields<Texpand>;
@@ -647,7 +660,7 @@ export type CollectionRecords = {
   po_approval_thresholds: PoApprovalThresholdsRecord;
   po_approver_props: PoApproverPropsRecord;
   profiles: ProfilesRecord;
-  purchase_order_thresholds: PurchaseOrderThresholdsRecord;
+  purchase_orders_augmented: PurchaseOrdersAugmentedRecord;
   purchase_orders: PurchaseOrdersRecord;
   time_amendments: TimeAmendmentsRecord;
   time_entries: TimeEntriesRecord;
@@ -656,6 +669,7 @@ export type CollectionRecords = {
   time_sheets: TimeSheetsRecord;
   time_types: TimeTypesRecord;
   user_claims: UserClaimsRecord;
+  user_po_permission_data: UserPoPermissionDataRecord;
   users: UsersRecord;
   vendors: VendorsRecord;
 };
@@ -681,7 +695,7 @@ export type CollectionResponses = {
   po_approval_thresholds: PoApprovalThresholdsResponse;
   po_approver_props: PoApproverPropsResponse;
   profiles: ProfilesResponse;
-  purchase_order_thresholds: PurchaseOrderThresholdsResponse;
+  purchase_orders_augmented: PurchaseOrdersAugmentedResponse;
   purchase_orders: PurchaseOrdersResponse;
   time_amendments: TimeAmendmentsResponse;
   time_entries: TimeEntriesResponse;
@@ -690,6 +704,7 @@ export type CollectionResponses = {
   time_sheets: TimeSheetsResponse;
   time_types: TimeTypesResponse;
   user_claims: UserClaimsResponse;
+  user_po_permission_data: UserPoPermissionDataResponse;
   users: UsersResponse;
   vendors: VendorsResponse;
 };
@@ -718,7 +733,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "po_approval_thresholds"): RecordService<PoApprovalThresholdsResponse>;
   collection(idOrName: "po_approver_props"): RecordService<PoApproverPropsResponse>;
   collection(idOrName: "profiles"): RecordService<ProfilesResponse>;
-  collection(idOrName: "purchase_order_thresholds"): RecordService<PurchaseOrderThresholdsResponse>;
+  collection(idOrName: "purchase_orders_augmented"): RecordService<PurchaseOrdersAugmentedResponse>;
   collection(idOrName: "purchase_orders"): RecordService<PurchaseOrdersResponse>;
   collection(idOrName: "time_amendments"): RecordService<TimeAmendmentsResponse>;
   collection(idOrName: "time_entries"): RecordService<TimeEntriesResponse>;
@@ -727,6 +742,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "time_sheets"): RecordService<TimeSheetsResponse>;
   collection(idOrName: "time_types"): RecordService<TimeTypesResponse>;
   collection(idOrName: "user_claims"): RecordService<UserClaimsResponse>;
+  collection(idOrName: "user_po_permission_data"): RecordService<UserPoPermissionDataResponse>;
   collection(idOrName: "users"): RecordService<UsersResponse>;
   collection(idOrName: "vendors"): RecordService<VendorsResponse>;
 };

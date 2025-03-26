@@ -11,6 +11,7 @@
     ProfilesResponse,
     DivisionsResponse,
   } from "$lib/pocketbase-types";
+  import DsLabel from "$lib/components/DsLabel.svelte";
 
   let { data }: { data: PageData } = $props();
   let errors = $state({} as any);
@@ -102,4 +103,14 @@
       <li>{age.key}: {age.age}s</li>
     {/each}
   </ul>
+
+  <p>Claims:</p>
+  <ul class="flex flex-row gap-2">
+    {#each $globalStore.claims as claim}
+      <DsLabel color="cyan">{claim}</DsLabel>
+    {/each}
+  </ul>
+
+  <p>User PO Permission Data:</p>
+  <p>{JSON.stringify($globalStore.user_po_permission_data)}</p>
 </form>

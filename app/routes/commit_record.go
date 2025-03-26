@@ -140,7 +140,10 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 				if purchaseOrderId != "" {
 					purchaseOrderRecord, err := txApp.FindRecordById("purchase_orders", purchaseOrderId)
 					if err != nil {
-						return err
+						// TODO: Verify this error is thrown if the PO is not found. This is
+						// necessary to ensure that we're not committing an expense with a
+						// purchase order that doesn't exist.
+						return fmt.Errorf("purchase order referenced by expense not found: %v", err)
 					}
 					if purchaseOrderRecord.GetString("status") != "Active" {
 						httpResponseStatusCode = http.StatusBadRequest

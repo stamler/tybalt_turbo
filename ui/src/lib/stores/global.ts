@@ -11,6 +11,7 @@ import type {
   ManagersResponse,
   TimeSheetsResponse,
   VendorsResponse,
+  UserPoPermissionDataResponse,
 } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
@@ -61,6 +62,16 @@ interface StoreState {
   clientsIndex: MiniSearch<ClientsResponse> | null;
   vendorsIndex: MiniSearch<VendorsResponse> | null;
   isLoading: boolean;
+  user_po_permission_data: {
+    id: string;
+    max_amount: number;
+    lower_threshold: number;
+    upper_threshold: number;
+    divisions: string[];
+    claims: string[];
+    maxAge: number;
+    lastRefresh: Date;
+  };
   error: ClientResponseError | null;
   errorMessages: ErrorMessage[];
 }
@@ -73,6 +84,15 @@ type WrappedStoreValue = {
     errorMessages: ErrorMessage[];
     addError: (message: string) => void;
     dismissError: (id: string) => void;
+    claims: string[];
+    user_po_permission_data: {
+      id: string;
+      max_amount: number;
+      lower_threshold: number;
+      upper_threshold: number;
+      divisions: string[];
+      claims: string[];
+    };
   };
 
 const createStore = () => {
@@ -94,9 +114,41 @@ const createStore = () => {
     clientsIndex: null,
     vendorsIndex: null,
     isLoading: false,
+    user_po_permission_data: {
+      id: "",
+      max_amount: 0,
+      lower_threshold: 0,
+      upper_threshold: 0,
+      divisions: [],
+      claims: [],
+      maxAge: 3600 * 1000,
+      lastRefresh: new Date(0),
+    },
     error: null,
     errorMessages: [],
   });
+
+  const loadUserPoPermissionData = async () => {
+    try {
+      const userId = get(authStore)?.model?.id || "";
+      const userPoPermissionData = await pb
+        .collection("user_po_permission_data")
+        .getFullList<UserPoPermissionDataResponse>({
+          filter: pb.filter("id={:userId}", { userId }),
+        });
+      update((state) => ({
+        ...state,
+        user_po_permission_data: {
+          ...userPoPermissionData[0],
+          lastRefresh: new Date(),
+          maxAge: state.user_po_permission_data.maxAge,
+        },
+      }));
+    } catch (error: unknown) {
+      const typedErr = error as ClientResponseError;
+      console.error("Error loading user po permission data:", typedErr);
+    }
+  };
 
   const loadData = async <K extends CollectionName>(key: K) => {
     update((state) => ({ ...state, isLoading: true, error: null }));
@@ -222,6 +274,13 @@ const createStore = () => {
       const now = new Date();
       const newState = { ...state };
 
+      if (
+        now.getTime() - state.user_po_permission_data.lastRefresh.getTime() >=
+        state.user_po_permission_data.maxAge
+      ) {
+        loadUserPoPermissionData();
+      }
+
       if (key !== null) {
         // refresh immediately when the key is specified
         loadData(key);
@@ -267,7 +326,9 @@ const createStore = () => {
       // the item from the list and keep the rest of the collection state around
       // to avoid reloading the entire collection, but this will involve a
       // different function to handle the fact that some collections also have
-      // MiniSearch indexes.
+      // MiniSearch indexes. We should probably attempt to use the realtime
+      // events to update the collection state instead of reloading the entire
+      // collection for the collections that change frequently (such as jobs).
       refresh(collectionName);
     } catch (error) {
       addError(`error deleting item: ${error}`);
@@ -288,6 +349,9 @@ const _globalStore = createStore();
 // Proxy handler to allow access like $globalStore.time_types
 const proxyHandler: ProxyHandler<StoreState> = {
   get(target, prop: string | symbol) {
+    if (prop === "claims") {
+      return target.user_po_permission_data.claims;
+    }
     if (prop in target.collections) {
       const items = target.collections[prop as CollectionName].items;
       return items || []; // Return an empty array if items is undefined
