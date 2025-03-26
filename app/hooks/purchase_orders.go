@@ -65,6 +65,16 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 		purchaseOrderRecord.Set("priority_second_approver", "")
 	}
 
+	// Clear all rejection fields here. ProcessPurchaseOrder, which calls
+	// cleanPurchaseOrder, is only ever called when a user is creating or
+	// updating a PO. POs cannot be rejected upon creation, so clearing rejection
+	// fields is idempotent. Upon update, rejection fields should be cleared if
+	// any changes are made to the record, on the assumption that the user is
+	// preparing to resubmit the PO after making changes.
+	purchaseOrderRecord.Set("rejected", "")
+	purchaseOrderRecord.Set("rejection_reason", "")
+	purchaseOrderRecord.Set("rejector", "")
+
 	return nil
 }
 
