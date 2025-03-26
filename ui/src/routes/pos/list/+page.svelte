@@ -8,10 +8,8 @@
   import { type UnsubscribeFunc } from "pocketbase";
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
-  import type {
-    PurchaseOrdersResponse,
-    PurchaseOrdersAugmentedResponse,
-  } from "$lib/pocketbase-types";
+  import type { PurchaseOrdersResponse } from "$lib/pocketbase-types";
+  import { authStore } from "$lib/stores/auth";
   import { globalStore } from "$lib/stores/global";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
@@ -40,8 +38,12 @@
         // po is not rejected
         if ($globalStore.user_po_permission_data.claims.includes("po_approver")) {
           // user has po_approver claim
-          if (po.approval_total <= $globalStore.user_po_permission_data.max_amount) {
-            // po is below the user's max amount
+          if (
+            po.approval_total <= $globalStore.user_po_permission_data.max_amount ||
+            (po.approved === "" && po.approver === $authStore?.model?.id)
+          ) {
+            // po is below the user's max amount or the user is the specified
+            // approver and the PO has not yet been approved
             if (
               $globalStore.user_po_permission_data.divisions.includes(po.division) ||
               $globalStore.user_po_permission_data.divisions.length === 0
@@ -115,7 +117,7 @@
       },
       {
         expand:
-          "uid.profiles_via_uid,approver.profiles_via_uid,division,vendor,job,job.client,rejector.profiles_via_uid,category,second_approver.profiles_via_uid,second_approver_claim,parent_po",
+          "uid.profiles_via_uid,approver.profiles_via_uid,division,vendor,job,job.client,rejector.profiles_via_uid,category,second_approver.profiles_via_uid,second_approver_claim,parent_po,priority_second_approver.profiles_via_uid",
         sort: "-date",
       },
     );
@@ -300,12 +302,22 @@
       {item.expand.approver.expand?.profiles_via_uid.surname}
     {/if}
     {#if item.second_approver !== "" && item.second_approval !== ""}
+      <!-- Item has second approval -->
       <span class="flex items-center gap-1">
         /
         <Icon icon="material-symbols:order-approve-outline" width="24px" class="inline-block" />
         {item.expand.second_approver.expand?.profiles_via_uid.given_name}
         {item.expand.second_approver.expand?.profiles_via_uid.surname}
         ({shortDate(item.second_approval)})
+      </span>
+    {/if}
+    {#if item.status === "Unapproved" && item.second_approval === "" && item.approved !== ""}
+      <!-- Approved, but second approval is required -->
+      <span class="flex items-center gap-1">
+        /
+        <Icon icon="mdi:timer-sand" width="24px" class="inline-block" />
+        {item.expand.priority_second_approver?.expand.profiles_via_uid.given_name}
+        {item.expand.priority_second_approver?.expand.profiles_via_uid.surname}
       </span>
     {/if}
     {#if item.attachment}

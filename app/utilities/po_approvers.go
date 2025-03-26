@@ -41,10 +41,9 @@ type Approver struct {
 // GetPOApprovalThresholds, it returns an empty list.
 //
 // If forSecondApproval is false, it returns users who have the
-// constants.PO_APPROVER_CLAIM_ID claim with a po_approver_props record that has
-// a max_amount less than or equal to the purchase_orders records'
-// approval_total AND the po_approver_props record's divisions property is
-// missing, or is a list that contains the provided division.
+// constants.PO_APPROVER_CLAIM_ID claim with a po_approver_props record whose
+// divisions property is missing, or is a list that contains the provided
+// division.
 //
 // Parameters:
 //   - app: the application context used to access the database and
@@ -182,10 +181,12 @@ func GetPOApprovers(
 		}).All(&approvers)
 	} else {
 		err = app.DB().NewQuery(approversQueryString + `
-			AND (
-				p.max_amount <= {:amount}
-				OR p.max_amount IS NULL
-			)
+			-- TODO: Remove this once we've confirmed that the max_amount
+			-- property is no longer used for first-level approvers.
+			-- AND (
+			-- 	p.max_amount <= {:amount}
+			-- 	OR p.max_amount IS NULL
+			-- )
 			ORDER BY p.surname, p.given_name
 		`).Bind(dbx.Params{
 			"claimId":  constants.PO_APPROVER_CLAIM_ID,

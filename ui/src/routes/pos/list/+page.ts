@@ -31,7 +31,7 @@ export const load: PageLoad = async () => {
       // the user's claims and knowledge of the thresholds below and above their
       // max_amount
       expand:
-        "uid.profiles_via_uid,approver.profiles_via_uid,division,vendor,job,job.client,rejector.profiles_via_uid,category,second_approver.profiles_via_uid,second_approver_claim,parent_po",
+        "uid.profiles_via_uid,approver.profiles_via_uid,division,vendor,job,job.client,rejector.profiles_via_uid,category,second_approver.profiles_via_uid,second_approver_claim,parent_po,priority_second_approver.profiles_via_uid",
       sort: "-date",
     });
     return {
