@@ -87,6 +87,18 @@
       item.category = "";
     }
 
+    // set approver to self if the approver field is hidden
+    if (!showApproverField) {
+      item.approver = item.uid;
+    }
+
+    // set priority_second_approver to self if the second approver field is
+    // hidden. This will be cleared in the backend (cleanPurchaseOrder) if the
+    // total is less than the lowest threshold.
+    if (!showSecondApproverField) {
+      item.priority_second_approver = item.uid;
+    }
+
     try {
       if (data.editing && data.id !== null) {
         await pb.collection("purchase_orders").update(data.id, item);

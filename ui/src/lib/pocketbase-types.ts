@@ -770,7 +770,7 @@ export function isExpensesResponse(item: unknown): item is ExpensesResponse {
 }
 
 // This is defined in the app/utilities/po_approvers.go file
-export type POApproversResponse = {
+export type PoApproversResponse = {
   id: string;
   given_name: string;
   surname: string;
