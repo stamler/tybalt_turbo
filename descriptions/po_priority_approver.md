@@ -14,26 +14,6 @@ The priority_second_approver field addresses this by:
 2. Creating a 24-hour window of exclusive review for the designated approver
 3. Falling back to the standard all-users approach only if the designated approver doesn't act within the window
 
-## Database Components
-
-### Existing Components
-
-- The `purchase_orders` table already includes the `priority_second_approver` field
-- The `po_approval_tiers` table exists with the proper structure of claim/max_amount pairs
-- The database-driven tier system is implemented, replacing hardcoded constants
-
-### Redundant Components
-
-- The `po_approvers` view will be redundant. This view currently:
-  - Provides a static list of users with the po_approver claim
-  - Is used in the UI for populating approver dropdown lists:
-    - In `ui/src/routes/pos/add/+page.ts`
-    - In `ui/src/routes/pos/[poid]/edit/+page.ts`
-    - In `ui/src/routes/pos/[poid]/add-child/+page.ts`
-  - Doesn't consider the current user's permission level
-  - Doesn't account for auto-approval scenarios
-  - Will be replaced by the new dynamic `/api/purchase_orders/approvers/{amount}` endpoint
-
 ## API Endpoints
 
 We will implement two new endpoints:
@@ -81,71 +61,6 @@ Returns a list of users who can serve as second approvers for a purchase order w
   { "id": "user456", "given_name": "Jane", "surname": "Smith" }
 ]
 ```
-
-## Implementation Locations
-
-### Backend Changes
-
-1. **New Route Handlers**:
-   - Add the two new route handlers in `app/routes/purchase_orders.go`
-
-   ```go
-   // GetApprovers returns a list of users who can approve a purchase order of the given amount and division
-   func GetApprovers(c echo.Context) error {
-       division := c.Param("division")
-       amount := c.Param("amount")
-       
-       // Implementation details...
-   }
-
-   // GetSecondApprovers returns a list of users who can provide second approval for a purchase order of the given amount and division
-   func GetSecondApprovers(c echo.Context) error {
-       division := c.Param("division")
-       amount := c.Param("amount")
-       
-       // Implementation details...
-   }
-   ```
-
-   - Alternatively these could be implemented a single function GetApprovers with an argument specifying the behaviour mode outlined above.
-
-2. **Route Registration**:
-   - Register the new routes in `app/routes/routes.go`
-
-   ```go
-   // Add these routes inside RegisterPurchaseOrderRoutes
-   g.GET("/purchase_orders/approvers/:division/:amount", purchase_orders.GetApprovers)
-   g.GET("/purchase_orders/second_approvers/:division/:amount", purchase_orders.GetSecondApprovers)
-   ```
-
-3. **Purchase Order Validation**:
-   - Update validation logic in `app/hooks/purchase_orders.go` to enforce rules about the priority_second_approver field
-
-4. **Approval Process Update**:
-   - Modify the approval logic in `app/routes/purchase_orders.go` to consider the priority_second_approver field and the 24-hour window
-
-### Frontend Changes
-
-1. **PurchaseOrdersEditor Component**:
-   - Update `ui/src/lib/components/PurchaseOrdersEditor.svelte` to:
-     - Fetch approver options based on PO amount. For recurring POs this will be the product of the number of recurrences and the total. Code exists for this in the back end (go app) but may not exist in the front end. We should verify if it exists or not and if it doesn't create it for the front end to mirror the behaviour of the back end.
-     - Dynamically show/hide fields based on user permissions
-     - Handle auto-selection logic
-
-2. **Purchase Order Pages**:
-   - Update the following files to use the new API endpoints instead of the po_approvers view:
-     - `ui/src/routes/pos/add/+page.ts`
-     - `ui/src/routes/pos/[poid]/edit/+page.ts`
-     - `ui/src/routes/pos/[poid]/add-child/+page.ts`
-
-3. **API Client Types**:
-   - Update types in `ui/src/lib/pocketbase-types.ts` to remove references to the redundant views
-
-## Migration Considerations
-
-1. The `po_approvers` view will be redundant and can be removed via a migration
-
-2. Create a migration to update the documentation of the `priority_second_approver` field in the purchase_orders collection. (This was written, but why? Think this part through)
 
 ## Business Logic Details
 
@@ -236,10 +151,3 @@ FROM purchase_orders AS po;
   )
 )
 ```
-
-### Auto-Approval Logic
-
-Existing auto-approval logic is set to FALSE by constant. Maintain the existing auto-approval logic, but ensure that it is updated to reflect the new code:
-
-1. If the creator has sufficient claims, the PO is auto-approved
-2. Add logic to use the priority_second_approver for auto-setting the second_approver when appropriate
