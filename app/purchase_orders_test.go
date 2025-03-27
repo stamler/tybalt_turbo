@@ -84,6 +84,32 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "otherwise valid purchase order fails when approver is set to blank string or missing",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": 1234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "",
+				"status": "Unapproved",
+				"type": "Normal"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"approver":{"code":"value_required"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "valid child purchase order is created",
 			Method: http.MethodPost,
 			URL:    "/api/collections/purchase_orders/records",

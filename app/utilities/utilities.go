@@ -114,6 +114,14 @@ func DateStringLimit(limit time.Time, max bool) validation.RuleFunc {
 // 2. The po_approver_props record's divisions property contains the specified divisionId
 func PoApproverPropsHasDivisionPermission(app core.App, claimId string, divisionId string) validation.RuleFunc {
 	return func(value any) error {
+		// fast fail if the value is nil
+		if value == nil {
+			return validation.NewError("value_required", "value is required")
+		}
+		// fast fail if the value is an empty string
+		if value == "" {
+			return validation.NewError("value_required", "value is required")
+		}
 		userId, _ := value.(string)
 		type ClaimResult struct {
 			HasClaim bool `db:"has_claim"`
