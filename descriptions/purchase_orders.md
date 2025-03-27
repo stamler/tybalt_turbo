@@ -18,12 +18,57 @@ approval_total values into tiers. The lower threshold is always less than the
 approval_total while the upper threshold is greater than or equal to the
 approval_total. approval_totals greater than the lowest threshold in the
 po_approval_thresholds table will always require a second approval. This is
-determined in the GetPOApprovals() function (for assigning a priority second
+determined in the GetPOApprovers() function (for assigning a priority second
 approver) and in the createApprovePurchaseOrderHandler() function (for not
 marking a record as 'Active' if the first user to approve it doesn't have a
 max_amount that is creater than or equal to the approval_total). Note that the
 one user can be both the approver and the second_approver if they pass the
 requirements for both.
+
+### Division-Specific Approver Logic
+
+Some approvers have division restrictions in their po_approval_props:
+
+1. Approvers with an empty payload can approve POs for any division
+2. Approvers with a non-empty payload can only approve POs for divisions listed in their payload
+
+The division parameter provided to the API endpoints only return users where the divisions list:
+
+- Is empty (indicating they can approve for any division), or
+- Contains the specified division ID
+
+Ensuring that callers will only see approvers who are authorized for the division of the PO they're creating/editing
+
+### priority_second_approver
+
+When a purchase order requires second approval based on its value, any user with a max_amount greater than the approval_total and no divisions restrictions may perform the second approval. This would result in all users with necessary permissions seeing many purchase orders in their approval queue, creating noise and potential confusion over responsibility.
+
+The priority_second_approver field addresses this by:
+
+1. Allowing the creator/editor to specifically designate a second approver
+2. Creating a 24-hour window of exclusive review for the designated approver
+3. Falling back to the standard all-users approach only if the designated approver doesn't act within the window
+
+### 24-Hour Window Implementation
+
+When a purchase order is created or updated with a priority_second_approver:
+
+1. Record the timestamp of the assignment. For the first version of the implementation we'll just use PocketBase's built in 'updated' field of the purchase_orders record. This has the effect of resetting the 24-hour countdown every time the purchase_orders record is updated, but that's fine.
+2. For 24 hours, only show this PO to the priority_second_approver for second approval
+3. After 24 hours, if not approved, make it visible to all users with the appropriate permissions
+4. This can probably be implemented by just having the scheduled emailer (not implemented) and the query for the UI, check the timestamp mentioned in 1 and compare it to the current time.
+
+It's important to note that all status = 'Active' purchase orders can be viewed
+by anybody who is authenticated. It's the ones with a different status that need
+special filtering. So the above query will actually be implemented as pocketbase
+listRule and viewRule strings.
+
+We need to find a way to validate whether the user can view/list the PO after the 24 hour window has expired. To accomplish this, we need to test several things:
+
+1. The user must have the po_approver claim
+2. @request.auth.user_claims_props_po_approver.max_amount >= the approval_total of the purchase_order. This ensures that the caller has the permission to actually approve/reject the po in question based on amount.
+3. Their po_approver claim's payload.max_amount <= the value of lowest po_approval_threshold value that is greater or equal to the approval_amount of the purchase_order. We do this by joining a view collection `purchase_orders_augmented` which has the lower and upper thresholds included as columns for each po and testing whether the user's max_amount is less than the upper_threshold. In doing this we indirectly filter out POs that, even though the max_amount is greater than the approval_total, can be approved by a lower qualified user in a lower tier.
+4. Their po_approver claim's payload.divisions is missing or includes the division id of the purchase_order
 
 ## Description of the Purchase Orders System
 
