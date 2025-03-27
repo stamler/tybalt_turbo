@@ -1,142 +1,98 @@
 # The Purchase Orders System
 
-## Constants
+## Approvals
 
-Approval tiers are stored in the po_approval_tiers table in the database. Each tier has a:
-
-- claim field that references a claim in the claims collection (po_approver, po_approver_tier2, po_approver_tier3)
-- max_amount field that specifies the maximum purchase order amount for that tier
-
-These database-driven tiers replace the previous hardcoded constants (TIER_1_PO_LIMIT, TIER_2_PO_LIMIT).
+All purchase orders will have a status of `Unapproved` when they are created.
+Approval thresholds are stored in the po_approval_thresholds table in the
+database. The thresholds are used to group together purchase_orders record's
+approval_total values into tiers. The lower threshold is always less than the
+approval_total while the upper threshold is greater than or equal to the
+approval_total. approval_totals greater than the lowest threshold in the
+po_approval_thresholds table will always require a second approval. This is
+determined in the GetPOApprovals() function (for assigning a priority second
+approver) and in the createApprovePurchaseOrderHandler() function (for not
+marking a record as 'Active' if the first user to approve it doesn't have a
+max_amount that is creater than or equal to the approval_total). Note that the
+one user can be both the approver and the second_approver if they pass the
+requirements for both.
 
 ## Description of the Purchase Orders System
 
 Any user can create a purchase_order, and their uid is in the uid column of the
-purchase order record. A purchase order can be of type normal, cumulative, or
-recurring. A normal purchase order is valid for one expense and then is no
-longer valid. A cumulative purchase order is valid for a number of expenses
+purchase order record. A purchase order can be of type `Normal`, `Cumulative`,
+or `Recurring`. A `Normal` purchase order is valid for one expense and then is
+no longer valid. A `Cumulative` purchase order is valid for a number of expenses
 until the total amount of the expenses reaches the total of the purchase order.
-Once that total is reached, the purchase order is no longer valid. A recurring
-purchase order is valid for multiple expenses at a specified frequency until a
-specified end date, and once that date is reached, the purchase order is no
-longer valid. A purchase order has a payment_type that specifies how the
-associated expense(s) is/are to be paid. A purchase order may have an
-attachment, which is a file. How this will be handled in the by the API endpoint
-is an open problem that we will need to address. The purchase order record is
-not directly created by the user, but rather is created by an API endpoint that
-receives the purchase order data from the user. Upon creation the approver field
-is set to the user's manager. Approval is handled by an api endpoint that is
-invoked by a user. The payload of the request will contain the id of the
-purchase order and the endpoint will determine whether to set the approved
-timestamp, second_approval timestamp, or both based on the id of the user making
-the request and the user_claims stored in the database. If the purchase_order is
-approved by the approver and, if applicable, the second approver, a po_number is
-generated assigned by the system and written into the po_number column of the
-purchase order record. The approver or second approver (if applicable) can
-reject the purchase_order. If the purchase_order is rejected, the rejecting
-user's id is recorded in the rejector property. The rejection_reason is provided
-by the rejecting user. The rejected is set to the current date and time. The
-purchase order's status remains unapproved. The user with uid, approver or
-second approver (if applicable) can cancel the purchase_order. Some purchase
-orders require the approval of a second user. If the purchase order is recurring
-or its total is greater than or equal to the Tier 2 threshold (as defined in the po_approval_tiers table),
-the second approver must hold the po_approver_tier3 claim and the second_approver_claim will be set
-accordingly. Otherwise if the purchase order's total is greater than or equal to
-the Tier 1 threshold, the second approver must hold the po_approver_tier2 claim and
-the second_approver_claim will be set accordingly. If neither of these
-conditions are met, there is no need for a second approver so it will be left
-blank. If the purchase_order is cancelled, the cancelling user's id is recorded
-in the canceller property. The cancelled property of the purchase order is set
-to the current date and time. The purchase order's status is set to Cancelled.
-Depending on their contents, some purchase_orders will require additional
-approval by users with other claims. These purchase orders will be submitted to
-the next approver claim in the purchase_order record. A purchase order must be
-fully approved prior having its status set to Active. Initially a purchase
-order's status is set to Unapproved.
+Once that total is reached, the purchase order is automatically closed during
+commit. A `Recurring` purchase order is valid for multiple expenses at a
+specified frequency until a specified end date, and once that date is reached,
+the purchase order is automatically closed during commit. A purchase order has a
+`payment_type` that specifies how the associated expense(s) is/are to be paid. A
+purchase order may have an attachment, which is a file. How this will be handled
+in the by the API endpoint is an open problem that we will need to addressed. A
+purchase order creator specifies the approver from a list which is determined by
+the backend. Approval is handled by an api endpoint that is invoked by a user.
+The payload of the request will contain the id of the purchase order and the
+endpoint will determine whether to set the approved timestamp, second_approval
+timestamp, or both based on the id of the user making the request and the
+user_claims and `po_approver_props` stored in the database. If the
+purchase_order is approved by the approver and, if applicable, the second
+approver, a po_number is generated assigned by the system and written into the
+po_number column of the purchase order record. The approver or second approver
+(if applicable) can reject the purchase_order. If the purchase_order is
+rejected, the rejecting user's id is recorded in the rejector property. The
+rejection_reason is provided by the rejecting user. The rejected field is set to
+the current date and time. The purchase order's status remains `Unapproved`.
+
+If a purchase order's approval_total is greater than the lowest threshold in the
+database, second approval is required. The second approver must hold a
+max_amount that is greater than or equal to the purchase order's approval_total.
+Additionally the second approver must either be allowed to approve purchase
+orders in any division, or their divisions whitelist must contain the division
+of the purchase order pending approval. A purchase order must be fully approved
+prior having its status set to Active.
 
 ## Lifecycle of a Purchase Order
 
 1. A purchase order is created by a user.
-2. The purchase order is submitted for approval to the user's manager.
-3. The purchase order is approved by the manager.
-4. If conditions are met, the purchase order is submitted for approval to a po_approver_tier2
-   or po_approver_tier3 claim holder.
-5. The purchase order is approved by the po_approver_tier2 or po_approver_tier3 claim holder (as applicable) and
-   status set to Active.
+2. The creator may delete a purchase order as long as it is not `Active`.
+3. The purchase order is either approved or rejected by the approver the user has specified
+4. If the purchase order requires second approval, it is either approved or rejected by the second approver
+5. The purchase order is `Active`
 
-At step 2 the purchase order can be deleted by the user.
+## Cancellation
 
-At step 3 or 4 the purchase order can be rejected by the approver or second
-approver (as applicable).
+The user with uid, approver or second approver (if applicable) can cancel the
+purchase_order if it has no expenses against it. When a purchase_order is
+cancelled, the cancelling user's id is recorded in the canceller property. The
+cancelled property of the purchase order is set to the current date and time.
+The purchase order's status is set to Cancelled.
 
 ## API Endpoints
 
 These endpoints should be implemented in app/routes/purchase_orders.go and called from app/routes/routes.go
 
-- POST /api/po # create a new purchase order, JSON body + optional attachment
-
-  This endpoint handles the creation of a new purchase order. All database
-  operations are performed within a single transaction. The JSON body should
-  include the necessary details including type, date, end date, frequency,
-  division, description, total, payment type, vendor name, and attachment. The
-  uid is populated from the context of the caller. The approver is set to the
-  caller's manager from the profiles collection. The attachment is optional and
-  can be processed as a file upload. The status is set to Unapproved. There
-  should be no PO number at this stage and the purchase order should be added to
-  the purchase_orders collection with a blank value for the po_number field. If
-  the purchase order is recurring or if the total is greater than or equal to
-  the Tier 2 threshold (from po_approval_tiers), the second approver claim is set to the id of the record in the
-  claims collection with the name 'po_approver_tier3'. Otherwise, if the total is greater than
-  or equal to the Tier 1 threshold, the second approver claim is set to the id of
-  the record in the claims collection with the name 'po_approver_tier2'. If neither condition
-  is met, the second approver claim is left blank. The endpoint returns the
-  created purchase order record upon successful creation.
-
-- PUT /api/po/:id # update the purchase order with :id, JSON body + optional new attachment file
-
-  This endpoint handles the update of an existing purchase order. All database
-  operations are performed within a single transaction. If the status is not
-  Unapproved, the call fails. The caller's id must match the uid in the
-  purchase order record. The JSON body should include the necessary details
-  including type, date, end date, frequency, division, description, total,
-  payment type, vendor name, and attachment. The attachment is optional and can
-  be processed as a file upload. The status is set to Unapproved. There is no PO
-  number at this stage. If the purchase order is recurring or if the total is
-  greater than or equal to the Tier 2 threshold (from po_approval_tiers), the second approver claim is set to the
-  id of the record in the claims collection with the name 'po_approver_tier3'. Otherwise, if
-  the total is greater than or equal to the Tier 1 threshold, the second approver
-  claim is set to the id of the record in the claims collection with the name
-  'po_approver_tier2'. Otherwise, the second approver claim is left blank.
-
-- DELETE /api/po/:id # delete the purchase order with :id if it's unapproved, caller's id must be the creator's uid
-
-  This endpoint handles the deletion of an unapproved purchase order. All
-  database operations are performed within a single transaction. Only purchase
-  orders with a status of Unapproved can be deleted. The caller's id must be the
-  uid in the purchase order record. The record is simply removed from the
-  purchase_orders collection and the transaction is committed. The endpoint
-  returns a success message if the purchase order is deleted, otherwise it
-  returns an error.
-
-- PATCH /api/po/:id/approve # approve po with :id, based on caller's id and claims
+- POST /api/purchase_orders/:id/approve # approve po with :id, based on caller's id and claims
 
   This endpoint handles the approval of a purchase order. All database
   operations are performed within a single transaction. If the record doesn't
   have a status of Unapproved, the call fails. If the record's rejected property
   is not blank, the purchase order was already rejected and the call fails. The
-  approver claim is used to determine whether this is the approver or second
-  approver. If the caller's id matches the approver property of the purchase
-  order record, then this is the (first, primary) approver. In this case, the
-  approved property is updated with the current timestamp, and the status is set
-  to Active. Otherwise, we check if the caller is a qualified second approver by
-  loading the caller's claims from the user_claims collection. The caller is a
-  qualified second approver if the purchase order's second_approver_claim
-  property references one of the claims returned by the query to the user_claims
-  collection. If so, we update the second_approval property with the current
-  timestamp, and the status is set to Active. If the caller is not a qualified
-  second approver, the call fails with a permission denied error.
+  endpoint completes both first and second approvals in one call if the caller
+  is so qualified. If the caller's id matches the approver property of the
+  purchase order record, then this is the (first, primary) approver. In this
+  case, the approved property is updated with the current timestamp, and the
+  status is set to Active. Otherwise, we check if the caller is a qualified
+  second approver by checking whether their max_amount is greater or equal to
+  the approval_total of the purchase order and whether the caller has any
+  divisional restrictions. If the caller is qualified, a po_number is generated
+  in the format YYYY-NNNN where NNNN is a sequential zero-padded 4 digit number
+  beginning at 0001 and less than 5000. We query the existing PO numbers in the
+  purchase_orders collection to ensure the generated PO number is unique. If the
+  caller is not a qualified second approver, the call fails with a permission
+  denied error.
 
-- PATCH /api/po/:id/reject # reject po with :id based on caller's id, JSON body contains rejection reason
+- POST /api/purchase_orders/:id/reject # reject po with :id based on caller's id, JSON body contains rejection reason
 
   This endpoint handles the rejection of a purchase order. All database
   operations are performed within a single transaction. If no rejection_reason
@@ -148,25 +104,27 @@ These endpoints should be implemented in app/routes/purchase_orders.go and calle
   to the current date and time. The status remains Unapproved, and the api call
   returns with success. Otherwise, we must check if the caller is a qualified
   second approver. To do this we first query the user_claims collection for the
-  caller's claims. The caller is a qualified second approver if the purchase
-  order's second_approver_claim property references one of the claims returned
-  by the query to the user_claims collection for the caller's claims. If this is
-  so, the second_approver is set to the caller's id, the second_approval
-  property is set to the current timestamp, and the status is set to Active.
-  Finally a po_number is generated in the format YYYY-NNNN where NNNN is a
-  sequential zero-padded 4 digit number beginning at 0001 and less than 5000. We
-  query the existing PO numbers in the purchase_orders collection to ensure the
-  generated PO number is unique.
+  caller's claims. The caller is a qualified second approver if their max_amount
+  is greater or equal to the approval_total of the purchase order and they have
+  no divisional restrictions.
 
-- PATCH /api/po/:id/cancel # cancel po with :id based on caller's id
+- POST /api/purchase_orders/:id/cancel # cancel po with :id based on caller's id
 
   This endpoint handles the cancellation of a purchase order. All database
   operations are performed within a single transaction. If the status of the
-  purchase order is Unapproved, the call fails. If the caller's id matches the
-  uid in the purchase order record, the canceller is set to the caller's id
-  and the cancelled property is set to the current timestamp. The status is set
-  to Cancelled. The endpoint returns a success code if the purchase order is
+  purchase order is not `Active`, the call fails. The purchase_order may not
+  have any associated expenses. If the caller's id matches the uid in the
+  purchase order record, the canceller is set to the caller's id and the
+  cancelled property is set to the current timestamp. The status is set to
+  Cancelled. The endpoint returns a success code if the purchase order is
   cancelled, otherwise it returns an error.
+
+- POST /api/purchase_orders/:id/close # close po with :id based on caller's id
+
+  This endpoint handles the closure of a purchase order. Only `Recurring` and
+  `Cumulative` purchase orders may be manually closed. A purchase order must
+  have at least one associated expense to be closed, otherwise it may be
+  cancelled instead.
 
 ## Pocketbase Collection Schema (purchase_orders)
 
@@ -193,7 +151,6 @@ This schema should be implemented in a go migrations file in app/migrations/
 - rejection_reason (string, minimum 5 characters)
 - approver (references users collection, required)
 - approved (datetime)
-- second_approver_claim (references claims collection)
 - second_approver (references users collection)
 - second_approval (datetime, interpret as date the purchase order is created)
 - canceller (references users collection)
