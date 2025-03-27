@@ -10,7 +10,6 @@
 | type                  | \*              |          |
 | end_date              | \*              |          |
 | frequency             | \*              |          |
-| second_approver_claim | \*              |          |
 | second_approver       | \*              |          |
 | second_approval       | \*              |          |
 | canceller             | \*              |          |

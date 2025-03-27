@@ -10,14 +10,6 @@
 package constants
 
 const (
-	// When true, POs will be auto-approved by the creator if they have the
-	// po_approver claim and division permission, or po_approver_tier2 or po_approver_tier3 claim. This
-	// behavior is disabled by default since it would eliminate the ability to
-	// double-check and edit a PO after it was created by users with the
-	// po_approver claim or a second approver claim since the PO would already be
-	// status:Active and thus not editable.
-	POAutoApprove = false
-
 	// The maximum number of days between the start and end dates for a recurring
 	// purchase order.
 	RECURRING_MAX_DAYS = 400

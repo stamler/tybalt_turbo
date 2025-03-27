@@ -6,7 +6,7 @@ This document outlines the implementation of the priority second approver featur
 
 ## Purpose
 
-When a purchase order requires second approval based on its value, the current system assigns the second_approver_claim but does not designate a specific user to handle that approval. This results in all users with the matching claim seeing the purchase order in their approval queue, creating unnecessary noise and potential confusion over responsibility.
+When a purchase order requires second approval based on its value, the current system does not designate a specific user to handle that approval. This results in all users with required permissions seeing the purchase order in their approval queue, creating unnecessary noise and potential confusion over responsibility.
 
 The priority_second_approver field addresses this by:
 
@@ -169,81 +169,22 @@ When a purchase order is created or updated with a priority_second_approver:
 
 1. Record the timestamp of the assignment. For the first version of the implementation we'll just use PocketBase's built in 'updated' field of the purchase_orders record. This has the effect of resetting the 24-hour countdown every time the purchase_orders record is updated, but that's fine.
 2. For 24 hours, only show this PO to the priority_second_approver for second approval
-3. After 24 hours, if not approved, make it visible to all users with the appropriate claim
+3. After 24 hours, if not approved, make it visible to all users with the appropriate permissions
 4. This can probably be implemented by just having the scheduled emailer (not implemented) and the query for the UI, check the timestamp mentioned in 1 and compare it to the current time.
-
-Here's a possible implementation that needs to be verified:
-
-```sql
-SELECT * FROM purchase_orders 
-WHERE 
-  status = 'Unapproved' AND
-  LENGTH(approved) > 0 AND -- The record already has first-level approval
-  (
-    priority_second_approver = {:userId} OR -- caller is the priority second approver
-    priority_second_approver = "" OR -- no specified priority second approver
-    priority_second_approver IS NULL OR
-    (
-      -- There is a priority second approver and it's not the caller, but the 24
-      -- window for exclusivity has closed
-      priority_second_approver IS NOT NULL AND
-      priority_second_approver != "" AND
-      priority_second_approver != {:userId} AND
-      updated < datetime('now', '-24 hours') -- SQLite Syntax
-    )
-  )
-```
 
 It's important to note that all status = 'Active' purchase orders can be viewed
 by anybody who is authenticated. It's the ones with a different status that need
 special filtering. So the above query will actually be implemented as pocketbase
 listRule and viewRule strings.
 
-```rules
-// Active purchase_orders can be viewed by any authenticated user
-(status = "Active" && @request.auth.id != "") ||
-
-// Cancelled and Closed purchase_orders can be viewed by uid, approver, second_approver, and 'report' claim holder
-(
-  (status = "Cancelled" || status = "Closed") &&
-  (
-    @request.auth.id = uid || 
-    @request.auth.id = approver || 
-    @request.auth.id = second_approver || 
-    @request.auth.user_claims_via_uid.cid.name ?= 'report'
-  )
-) ||
-
-// TODO: We may also later allow Closed purchase_orders to be viewed by uid, approver, and committer of corresponding expenses, if any, in a rule here
-(
-  true = true
-) ||
-
-// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of second_approver_claim
-(
-  status = "Unapproved" &&
-  (
-    @request.auth.id = uid || 
-    @request.auth.id = approver || 
-    @request.auth.id = priority_second_approver || 
-    (
-      // updated more than 24 hours ago and @request.auth.id holds second_approver_claim
-      updated < @yesterday && @request.auth.user_claims_via_uid.cid ?= second_approver_claim
-    )
-  )
-)
-```
-
-#### The alternative PO implementation with no tiers
-
-In the alternative PO implementation, there is no second_approver_claim field. Instead, we will need to find a different way to validate whether a user can view/list the PO before the 24 hour window (they're the priority_second_approver, so that doesn't change) or whether the user can view/list the PO after the 24 hour window has expired. In this second case, we can't check that the user has the second_approver_claim. Instead we need to test several things:
+We need to find a way to validate whether the user can view/list the PO after the 24 hour window has expired. To accomplish this, we need to test several things:
 
 1. The user must have the po_approver claim
 2. @request.auth.user_claims_props_po_approver.max_amount >= the approval_total of the purchase_order. This ensures that the caller has the permission to actually approve/reject the po in question based on amount.
 3. Their po_approver claim's payload.max_amount <= the value of lowest po_approval_threshold value that is greater or equal to the approval_amount of the purchase_order. We do this by joining a view collection `purchase_orders_augmented` which has the lower and upper thresholds included as columns for each po and testing whether the user's max_amount is less than the upper_threshold. In doing this we indirectly filter out POs that, even though the max_amount is greater than the approval_total, can be approved by a lower qualified user in a lower tier.
 4. Their po_approver claim's payload.divisions is missing or includes the division id of the purchase_order
 
-##### purchase_orders_augmented view
+#### purchase_orders_augmented view
 
 ```sql
 SELECT 
@@ -260,7 +201,7 @@ SELECT
 FROM purchase_orders AS po;
 ```
 
-##### additional listRule and viewRule fragments
+#### additional listRule and viewRule fragments
 
 ```rules
 ...exiting rules

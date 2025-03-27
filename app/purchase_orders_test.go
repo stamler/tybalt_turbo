@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
-	"tybalt/constants"
 	"tybalt/internal/testutils"
 	"tybalt/routes"
 
@@ -45,11 +43,6 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	// Get current year for PO number validation
-	currentYear := time.Now().UTC().Format("2006")
-	// Get current date in UTC for approval timestamp validation
-	currentDate := time.Now().UTC().Format("2006-01-02")
 
 	// Get approval tier values once and reuse them throughout the tests
 	app := testutils.SetupTestApp(t)
@@ -298,7 +291,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   - approver: Must be creator's ID (wegviunlyr2jjjv)
 		*/
 		{
-			Name:   "purchase order is auto-approved when creator has po_approver claim",
+			Name:   "purchase order is not automatically approved when creator has po_approver claim",
 			Method: http.MethodPost,
 			URL:    "/api/collections/purchase_orders/records",
 			Body: strings.NewReader(fmt.Sprintf(`{
@@ -315,23 +308,12 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			}`, rand.Float64()*(tier1-1.0)+1.0)), // Random value between 1 and tier1
 			Headers:        map[string]string{"Authorization": poApproverToken},
 			ExpectedStatus: 200,
-			ExpectedContent: func() []string {
-				if constants.POAutoApprove {
-					return []string{
-						fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
-						`"status":"Active"`,
-						fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number starting with current year
-						`"approver":"wegviunlyr2jjjv"`,               // Creator becomes approver
-					}
-				} else {
-					return []string{
-						`"approved":""`,
-						`"status":"Unapproved"`,
-						`"po_number":""`,
-						`"approver":"etysnrlup2f6bak"`, // Original approver remains
-					}
-				}
-			}(),
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"status":"Unapproved"`,
+				`"po_number":""`,
+				`"approver":"etysnrlup2f6bak"`, // Original approver remains
+			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 1,
 			},
@@ -360,7 +342,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   - Match uid to authenticated user's ID
 		*/
 		{
-			Name:   "purchase order is auto-approved when creator has po_approver claim for matching division",
+			Name:   "purchase order is not automatically approved when creator has po_approver claim for non-matching division",
 			Method: http.MethodPost,
 			URL:    "/api/collections/purchase_orders/records",
 			Body: strings.NewReader(fmt.Sprintf(`{
@@ -377,23 +359,12 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			}`, rand.Float64()*(tier1-1.0)+1.0)), // Random value between 1 and tier1
 			Headers:        map[string]string{"Authorization": divisionApproverToken},
 			ExpectedStatus: 200,
-			ExpectedContent: func() []string {
-				if constants.POAutoApprove {
-					return []string{
-						fmt.Sprintf(`"approved":"%s`, currentDate), // Should have an approval timestamp starting with today's date
-						`"status":"Active"`,
-						fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number starting with current year
-						`"approver":"etysnrlup2f6bak"`,               // Creator becomes approver
-					}
-				} else {
-					return []string{
-						`"approved":""`,
-						`"status":"Unapproved"`,
-						`"po_number":""`,
-						`"approver":"etysnrlup2f6bak"`, // Original approver remains
-					}
-				}
-			}(),
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"status":"Unapproved"`,
+				`"po_number":""`,
+				`"approver":"etysnrlup2f6bak"`, // Original approver remains
+			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 1,
 			},
@@ -446,7 +417,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   - Verifies all approval fields and timestamps
 		*/
 		{
-			Name:   "purchase order is fully auto-approved when creator has po_approver and po_approver_tier3 claims",
+			Name:   "purchase order is not automatically approved when creator has po_approver and po_approver_tier3 claims",
 			Method: http.MethodPost,
 			URL:    "/api/collections/purchase_orders/records",
 			Body: strings.NewReader(fmt.Sprintf(`{
@@ -463,26 +434,13 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			}`, rand.Float64()*(1000.0)+tier2)), // Random value > tier2
 			Headers:        map[string]string{"Authorization": po_approver_tier3Token},
 			ExpectedStatus: 200,
-			ExpectedContent: func() []string {
-				if constants.POAutoApprove {
-					return []string{
-						fmt.Sprintf(`"approved":"%s`, currentDate),
-						fmt.Sprintf(`"second_approval":"%s`, currentDate),
-						`"status":"Active"`,
-						fmt.Sprintf(`"po_number":"%s-`, currentYear),
-						`"approver":"66ct66w380ob6w8"`,
-						`"second_approver":"66ct66w380ob6w8"`,
-					}
-				} else {
-					return []string{
-						`"approved":""`,
-						`"second_approval":""`,
-						`"status":"Unapproved"`,
-						`"po_number":""`,
-						`"approver":"etysnrlup2f6bak"`,
-					}
-				}
-			}(),
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"second_approval":""`,
+				`"status":"Unapproved"`,
+				`"po_number":""`,
+				`"approver":"etysnrlup2f6bak"`,
+			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 1,
 			},
@@ -506,7 +464,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		   - Verifies all approval fields and timestamps
 		*/
 		{
-			Name:   "purchase order is fully auto-approved when creator has po_approver and po_approver_tier2 claims",
+			Name:   "purchase order is not automatically approved when creator has po_approver and po_approver_tier2 claims",
 			Method: http.MethodPost,
 			URL:    "/api/collections/purchase_orders/records",
 			Body: strings.NewReader(fmt.Sprintf(`{
@@ -523,26 +481,13 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			}`, rand.Float64()*(tier2-tier1)+tier1)), // Random value between tier1 and tier2
 			Headers:        map[string]string{"Authorization": po_approver_tier2Token},
 			ExpectedStatus: 200,
-			ExpectedContent: func() []string {
-				if constants.POAutoApprove {
-					return []string{
-						fmt.Sprintf(`"approved":"%s`, currentDate),        // Should have an approval timestamp
-						fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have a second approval timestamp
-						`"status":"Active"`,
-						fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should have a PO number
-						`"approver":"f2j5a8vk006baub"`,               // Creator becomes approver
-						`"second_approver":"f2j5a8vk006baub"`,        // Creator also becomes second approver
-					}
-				} else {
-					return []string{
-						`"approved":""`,
-						`"second_approval":""`,
-						`"status":"Unapproved"`,
-						`"po_number":""`,
-						`"approver":"etysnrlup2f6bak"`, // Original approver remains
-					}
-				}
-			}(),
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"second_approval":""`,
+				`"status":"Unapproved"`,
+				`"po_number":""`,
+				`"approver":"etysnrlup2f6bak"`, // Original approver remains
+			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 1,
 			},

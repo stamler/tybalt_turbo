@@ -294,14 +294,6 @@ export type ProfilesRecord = {
   updated: IsoDateString;
 };
 
-export type PurchaseOrdersAugmentedRecord = {
-  approval_total: number;
-  id: string;
-  lower_threshold: number;
-  upper_threshold: number;
-  committed_expenses_count: number;
-};
-
 export enum PurchaseOrdersStatusOptions {
   "Unapproved" = "Unapproved",
   "Active" = "Active",
@@ -354,13 +346,20 @@ export type PurchaseOrdersRecord = {
   rejector: RecordIdString;
   second_approval: IsoDateString;
   second_approver: RecordIdString;
-  second_approver_claim: RecordIdString;
   status: PurchaseOrdersStatusOptions;
   total: number;
   type: PurchaseOrdersTypeOptions;
   uid: RecordIdString;
   updated: IsoDateString;
   vendor: RecordIdString;
+};
+
+export type PurchaseOrdersAugmentedRecord = {
+  approval_total: number;
+  committed_expenses_count: number;
+  id: string;
+  lower_threshold: number;
+  upper_threshold: number;
 };
 
 export type TimeAmendmentsRecord = {
@@ -544,7 +543,6 @@ type PurchaseOrdersRecordExpands = {
   parent_po: PurchaseOrdersResponse;
   rejector: UsersResponse;
   second_approver: UsersResponse;
-  second_approver_claim: ClaimsResponse;
   type: PurchaseOrdersTypeOptions;
   uid: UsersResponse;
   vendor: VendorsResponse;

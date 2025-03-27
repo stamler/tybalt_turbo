@@ -1,4 +1,7 @@
-import type { PurchaseOrdersAugmentedResponse, PurchaseOrdersResponse } from "$lib/pocketbase-types";
+import type {
+  PurchaseOrdersAugmentedResponse,
+  PurchaseOrdersResponse,
+} from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 
@@ -9,7 +12,9 @@ export const load: PageLoad = async () => {
   try {
     // load augmented data, which contains extra calculated columns about each
     // purchase order
-    augmentedItems = await pb.collection("purchase_orders_augmented").getFullList<PurchaseOrdersAugmentedResponse>();
+    augmentedItems = await pb
+      .collection("purchase_orders_augmented")
+      .getFullList<PurchaseOrdersAugmentedResponse>();
 
     // load required data
     items = await pb.collection("purchase_orders").getFullList<PurchaseOrdersResponse>({
@@ -31,7 +36,7 @@ export const load: PageLoad = async () => {
       // the user's claims and knowledge of the thresholds below and above their
       // max_amount
       expand:
-        "uid.profiles_via_uid,approver.profiles_via_uid,division,vendor,job,job.client,rejector.profiles_via_uid,category,second_approver.profiles_via_uid,second_approver_claim,parent_po,priority_second_approver.profiles_via_uid",
+        "uid.profiles_via_uid,approver.profiles_via_uid,division,vendor,job,job.client,rejector.profiles_via_uid,category,second_approver.profiles_via_uid,parent_po,priority_second_approver.profiles_via_uid",
       sort: "-date",
     });
     return {
