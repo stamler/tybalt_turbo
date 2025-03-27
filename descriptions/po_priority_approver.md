@@ -1,12 +1,8 @@
 # Purchase Order Priority Second Approver Feature
 
-## Overview
-
-This document outlines the implementation of the priority second approver feature for purchase orders. This feature allows users to specify which holder of the appropriate approval tier claim should be responsible for providing the second approval on a purchase order.
-
 ## Purpose
 
-When a purchase order requires second approval based on its value, the current system does not designate a specific user to handle that approval. This results in all users with required permissions seeing the purchase order in their approval queue, creating unnecessary noise and potential confusion over responsibility.
+When a purchase order requires second approval based on its value, any user with a max_amount greater than the approval_total and no divisions restrictions may perform the second approval. This would result in all users with necessary permissions seeing many purchase orders in their approval queue, creating noise and potential confusion over responsibility.
 
 The priority_second_approver field addresses this by:
 
@@ -16,17 +12,17 @@ The priority_second_approver field addresses this by:
 
 ## API Endpoints
 
-We will implement two new endpoints:
+The UI loads approvers and second approvers from two endpoints.
 
 ### 1. GET /api/purchase_orders/approvers/{division}/{amount}
 
 Returns a list of users who can serve as first approvers for a purchase order with the specified amount and division.
 
-**Behavior:**
+**Behaviour:**
 
-- If user has no approver claims: Return all users with po_approver claim
-- If user has po_approver claim or higher: Return empty list (will auto-set to self in UI)
-- Results are filtered to only include approvers who have permission for the specified division. Permissions are determined by a claim payload. No payload means full permission, divisions in the payload restrict permissions to those divisions.
+- If user has no approver claims: Return all users with po_approver claim and permission based on the submitted division.
+- If user has po_approver claim or higher and not restricted by division: Return empty list (will auto-set to self in UI)
+- Results are filtered to only include approvers who have permission for the specified division. Permissions are determined by the `po_approver_props` table. An empty divisions array means full permission, divisions is a whitelist.
 
 **Response Format:**
 
@@ -43,14 +39,8 @@ Returns a list of users who can serve as second approvers for a purchase order w
 
 **Behavior:**
 
-- If amount < tier1: Return empty list (no second approval needed)
-- If tier1 ≤ amount < tier2:
-  - If user has po_approver_tier2 claim or higher: Return empty list (will auto-set to self in UI)
-  - Otherwise: Return all users with po_approver_tier2 claim
-- If amount ≥ tier2:
-  - If user has po_approver_tier3 claim: Return empty list (will auto-set to self in UI)
-  - Otherwise: Return all users with po_approver_tier3 claim
-- The code should intelligently adjust to even greater numbers of tiers beyond tier3 if they exist in the database by simply sorting them by max_amount
+- If amount < lowest threshold in `po_approval_thresholds` table, return empty list (no second approval needed)
+- Otherwise return users with max_amount >= approval_total but less than or equal to the next biggest threshold
 - Results are filtered to only include approvers who have permission for the specified division, with the same behaviour as in the approvers endpoint.
 
 **Response Format:**
@@ -66,17 +56,17 @@ Returns a list of users who can serve as second approvers for a purchase order w
 
 ### Division-Specific Approver Logic
 
-Some approvers have division restrictions in their claim payloads:
+Some approvers have division restrictions in their po_approval_props:
 
 1. Approvers with an empty payload can approve POs for any division
 2. Approvers with a non-empty payload can only approve POs for divisions listed in their payload
 
-When the optional division parameter is provided to the API endpoints:
+The division parameter provided to the API endpoints only return users where the divisions list:
 
-- Only return users whose po_approver claim payload either:
-  - Is empty (indicating they can approve for any division), or
-  - Contains the specified division ID
-- This ensures that users will only see approvers who are authorized for the division of the PO they're creating/editing
+- Is empty (indicating they can approve for any division), or
+- Contains the specified division ID
+
+Ensuring that callers will only see approvers who are authorized for the division of the PO they're creating/editing
 
 ### 24-Hour Window Implementation
 
