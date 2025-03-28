@@ -22,34 +22,9 @@ expenses while maintaining proper tracking and relationships.
 #### A. Purchase Order Hook Enhancement
 
 1. Modify `cleanPurchaseOrder` function in `app/hooks/purchase_orders.go`:
-   - Add child PO cleaning logic similar to Normal/Cumulative handling:
-     - Clear end_date and frequency for child POs
-     - Set type to Normal for child POs
      - Handle second_approver_claim based on total value
 
-2. Modify `validatePurchaseOrder` function:
-   - Add parent-child validation rules:
-
-     ```go
-     "parent_po": validation.Validate(
-         purchaseOrderRecord.Get("parent_po"),
-         validation.When(isChild,
-             validation.Required.Error("parent_po is required for child POs"),
-             validation.By(parentMustBeCumulative),
-             validation.By(parentMustBeActive),
-         ).Else(
-             validation.Empty.Error("parent_po must be empty for non-child POs"),
-         ),
-     ),
-     "type": validation.Validate(
-         purchaseOrderRecord.Get("type"),
-         validation.When(isChild,
-             validation.In("Normal").Error("child POs must be Normal type"),
-         ),
-     ),
-     ```
-
-3. Modify `ProcessPurchaseOrder` function:
+2. Modify `ProcessPurchaseOrder` function:
    - Add transaction-wrapped validation for parent-child relationships
    - Add checks for parent PO status changes
    - Add validation for concurrent child PO creation
@@ -94,52 +69,7 @@ expenses while maintaining proper tracking and relationships.
      }
      ```
 
-#### C. New API Endpoint
-
-1. Create `/api/purchase_orders/:id/create_child` endpoint:
-   - Input: Original expense details that caused overflow
-   - Functionality:
-     - Creates new PO with inherited properties
-     - Sets required `parent_po` reference
-     - Pre-fills remaining fields from parent
-     - Calculates appropriate total based on overflow amount
-     - Leaves `po_number` blank (will be assigned upon approval)
-
-2. Use the following as psuedo code for the logic. It may look like it's not complete but it's just a starting point.
-
-   ```go
-   func createChildPurchaseOrderHandler(app core.App) echo.HandlerFunc {
-       return func(c echo.Context) error {
-           return app.Dao().RunInTransaction(func(txDao *daos.Dao) error {
-               // Validate parent PO
-               parentId := c.PathParam("id")
-               parentPO, err := txDao.FindRecordById("purchase_orders", parentId)
-               if err != nil {
-                   return err
-               }
-               
-               // Validation checks
-               if parentPO.GetString("type") != "Cumulative" {
-                   return &CodeError{
-                       Code: "invalid_parent_type",
-                       Message: "parent must be Cumulative type",
-                   }
-               }
-               // ... more validation ...
-               
-               // Create child PO
-               childPO := models.NewRecord("purchase_orders")
-               childPO.Set("parent_po", parentId)
-               childPO.Set("type", "Normal")
-               // ... inherit other properties ...
-               
-               return txDao.SaveRecord(childPO)
-           })
-       }
-   }
-   ```
-
-#### D. PO Number Generation Enhancement
+#### C. PO Number Generation Enhancement
 
 1. Modify `generatePONumber()` function:
    - Check for presence of `parent_po` field
@@ -152,50 +82,6 @@ expenses while maintaining proper tracking and relationships.
      - Where XX is zero-padded sequential number (01, 02, etc.)
 
 2. Update unique index constraints to handle new format
-
-3. Use the following as psuedo code for the logic. It may look like it's not complete but it's just a starting point.
-
-   ```go
-   func generatePONumber(txDao *daos.Dao, record *models.Record) (string, error) {
-       currentYear := time.Now().Year()
-       prefix := fmt.Sprintf("%d-", currentYear)
-       
-       // If this is a child PO, handle differently
-       if record.Get("parent_po") != "" {
-           parent, err := txDao.FindRecordById("purchase_orders", record.Get("parent_po").(string))
-           if err != nil {
-               return "", err
-           }
-           parentNumber := parent.GetString("po_number")
-           
-           // Find highest child suffix
-           children, err := txDao.FindRecordsByFilter(
-               "purchase_orders",
-               "po_number ~ {:pattern}",
-               "-po_number",
-               1,
-               0,
-               dbx.Params{"pattern": fmt.Sprintf("^%s-\\d{2}$", parentNumber)},
-           )
-           
-           var nextSuffix int = 1
-           if len(children) > 0 {
-               lastChild := children[0].GetString("po_number")
-               fmt.Sscanf(lastChild[len(lastChild)-2:], "%d", &nextSuffix)
-               nextSuffix++
-           }
-           
-           if nextSuffix > 99 {
-               return "", fmt.Errorf("maximum number of child POs reached")
-           }
-           
-           return fmt.Sprintf("%s-%02d", parentNumber, nextSuffix), nil
-       }
-       
-       // Original logic for parent POs
-       // ... existing code for YYYY-NNNN format ...
-   }
-   ```
 
 #### E. Utilities
 
@@ -222,15 +108,7 @@ expenses while maintaining proper tracking and relationships.
 
 #### A. UI Components
 
-1. Enhance error handling in `ExpensesEditor.svelte`:
-   - Add handling for new `cumulative_po_overflow` error type
-   - Show modal/dialog when overflow detected
-   - Provide options:
-     - Create child PO
-     - Modify expense amount
-     - Cancel
-
-2. Create new component `ChildPoCreationDialog.svelte`:
+1. Create new component `ChildPoCreationDialog.svelte`:
    - Display parent PO details
    - Show overflow amount
    - Allow adjustment of new PO total
@@ -248,37 +126,7 @@ expenses while maintaining proper tracking and relationships.
    - Verify proper linking of parent-child relationships
    - Verify `parent_po` field requirements
 
-2. Perhaps this pseudo code could be helpful for the unit tests:
-
-   ```go
-   func TestGeneratePONumber(t *testing.T) {
-       tests := []struct {
-           name     string
-           record   *models.Record
-           want     string
-           wantErr  bool
-       }{
-           {
-               name: "normal parent PO",
-               record: &models.Record{...},
-               want: "2024-0001",
-               wantErr: false,
-           },
-           {
-               name: "first child PO",
-               record: &models.Record{
-                   // parent with number 2024-0001
-               },
-               want: "2024-0001-01",
-               wantErr: false,
-           },
-           // ... more test cases ...
-       }
-       // ... test implementation ...
-   }
-   ```
-
-3. Integration Tests:
+2. Integration Tests:
    - Test complete workflow from expense submission to child PO creation
    - Test approval process for child POs
    - Test PO number generation timing
@@ -288,20 +136,7 @@ expenses while maintaining proper tracking and relationships.
    - Test multiple overflow scenarios
    - Test concurrent child PO creation attempts
 
-### 5. Migration Strategy
-
-1. Database Migration will be done manually since it uses PocketBase migrations:
-   - Add `parent_po` field with appropriate constraints. Specifically, it will be a relation to the `purchase_orders` collection and is not required for non-child POs.
-   - Update indexes to handle new PO number format. This will be done by dropping the existing index and creating a new one with the new pattern.
-   - Add validation for parent-child relationships. Specifically, it will be a validation rule that ensures that child POs can only be of type `Normal` and that they cannot have their own children.
-
-2. Deployment Steps:
-   - Deploy database changes first
-   - Deploy backend changes with feature flag
-   - Deploy frontend changes
-   - Enable feature flag in production
-
-### 6. Documentation Updates
+### 5. Documentation Updates
 
 1. Update API documentation:
    - Document new endpoint
@@ -338,10 +173,8 @@ expenses while maintaining proper tracking and relationships.
 
 ## Limitations and Considerations
 
-1. Child POs will require same approval process as normal POs based on their value. They can only be of type `Normal`, not `Recurring` or `Cumulative`.
-2. Need to consider reporting implications for linked POs
-3. Consider limits on number of child POs per parent (max 99 with XX format)
-4. Handle edge cases like:
+1. Consider limits on number of child POs per parent (max 99 with XX format)
+2. Handle edge cases like:
    - Cancellation of parent PO (we should prevent cancellation of parent PO if it has child POs)
    - Multiple simultaneous overflow attempts. We should prevent multiple overflow attempts from the same expense by denying the request if the parent PO already has a child PO.
    - Approval order dependencies
