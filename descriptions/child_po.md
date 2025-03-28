@@ -2,20 +2,10 @@
 
 ## Overview
 
-When a Cumulative PO's total is exceeded by an expense, instead of just returning an error, we'll provide functionality to create a child PO that inherits properties from the parent PO. This will streamline the process of handling overflow expenses while maintaining proper tracking and relationships.
-
-## Current System Analysis
-
-1. The system currently:
-   - Validates expenses against PO totals with a maximum excess limit
-   - Has specific handling for Cumulative POs in expense validation
-   - Generates PO numbers only after full approval using format `YYYY-NNNN`
-   - Uses the backend `generatePONumber()` function with SQL pattern matching
-   - Validates PO types (Normal, Cumulative, Recurring) with specific rules for each
-   - Prevents changes to POs after approval
-   - Uses a two-phase validation approach (clean then validate)
-   - Handles all operations within transactions
-   - Has a sophisticated approval process with multiple checks
+When a Cumulative PO's total is exceeded by an expense, rather than simply
+returning an error, a provision exists to create a child PO that inherits
+properties from the parent PO. This streamlines the process of handling overflow
+expenses while maintaining proper tracking and relationships.
 
 ## Implementation Plan
 
@@ -23,7 +13,7 @@ When a Cumulative PO's total is exceeded by an expense, instead of just returnin
 
 1. Add new fields to `purchase_orders` collection:
    - `parent_po` (relation) - References the parent purchase_orders record (required for child POs)
-   - Add validation rule to ensure child POs can only be of type `Normal` (this should already done by the validation rule that ensures child POs can only be of type `Normal`)
+   - fail if a child PO is created with a type other than `Normal`
    - Add validation rule to prevent child POs from having their own children (this should already done by the validation rule that ensures child POs can only be of type `Normal`)
    - Update SQL pattern matching index for new PO number format
 

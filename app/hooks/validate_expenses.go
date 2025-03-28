@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 	"tybalt/constants"
+	"tybalt/errs"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -32,10 +33,10 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 		poType = poRecord.GetString("type")
 		poDate, parseErr = time.Parse(time.DateOnly, poRecord.GetString("date"))
 		if parseErr != nil {
-			return &HookError{
+			return &errs.HookError{
 				Status:  http.StatusInternalServerError,
 				Message: "error parsing purchase order date",
-				Data: map[string]CodeError{
+				Data: map[string]errs.CodeError{
 					"purchase_order": {
 						Code:    "error_parsing_date",
 						Message: "error parsing purchase order date",
@@ -46,10 +47,10 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 		if poType == "Recurring" {
 			poEndDate, parseErr = time.Parse(time.DateOnly, poRecord.GetString("end_date"))
 			if parseErr != nil {
-				return &HookError{
+				return &errs.HookError{
 					Status:  http.StatusBadRequest,
 					Message: "error parsing purchase order end date",
-					Data: map[string]CodeError{
+					Data: map[string]errs.CodeError{
 						"purchase_order": {
 							Code:    "error_parsing_end_date",
 							Message: "error parsing purchase order end date",
@@ -82,10 +83,10 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 				// properly delimited (it's just combined into a string). How can we return structured error data given
 				// the constraints from the documentation? I've tried using SafeErrorItem but I'm having trouble importing
 				// the router package, possibly related to versioning issues.
-				return &HookError{
+				return &errs.HookError{
 					Status:  http.StatusBadRequest,
 					Message: "cumulative expenses exceed purchase order total",
-					Data: map[string]CodeError{
+					Data: map[string]errs.CodeError{
 						"total": {
 							Code:    "cumulative_po_overflow",
 							Message: "cumulative expenses exceed purchase order total",
@@ -114,10 +115,10 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 
 	// Throw an error if hasPurchaseOrder is true but poRecordProvided is false
 	if hasPurchaseOrder && !poRecordProvided {
-		return &HookError{
+		return &errs.HookError{
 			Status:  http.StatusInternalServerError,
 			Message: "an expense against a purchase_orders record cannot be validated without a corresponding purchase order record",
-			Data: map[string]CodeError{
+			Data: map[string]errs.CodeError{
 				"purchase_order": {
 					Code:    "missing_purchase_order",
 					Message: "an expense against a purchase_orders record cannot be validated without a corresponding purchase order record",

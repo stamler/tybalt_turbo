@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"sort"
 	"strconv"
 	"time"
+	"tybalt/errs"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
@@ -459,6 +461,31 @@ func GetExpenseRateRecord(app core.App, expenseRecord *core.Record) (*core.Recor
 }
 
 func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord *core.Record) (int, float64, error) {
+	if purchaseOrderRecord.GetDateTime("end_date").IsZero() {
+		return 0, 0, &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "end_date is required for recurring purchase orders",
+			Data: map[string]errs.CodeError{
+				"end_date": {
+					Code:    "value_required",
+					Message: "end_date is required for recurring purchase orders",
+				},
+			},
+		}
+	}
+	if purchaseOrderRecord.GetString("frequency") == "" || purchaseOrderRecord.Get("frequency") == nil {
+		return 0, 0, &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "frequency is required for recurring purchase orders",
+			Data: map[string]errs.CodeError{
+				"frequency": {
+					Code:    "value_required",
+					Message: "frequency is required for recurring purchase orders",
+				},
+			},
+		}
+	}
+
 	startDateString := purchaseOrderRecord.GetString("date")
 	startDate, parseErr := time.Parse(time.DateOnly, startDateString)
 	if parseErr != nil {
@@ -472,6 +499,18 @@ func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord
 	}
 	frequency := purchaseOrderRecord.GetString("frequency")
 	daysDiff := endDate.Sub(startDate).Hours() / 24
+
+	// error if daysDiff is negative or zero
+	if daysDiff <= 0 {
+		return 0, 0, &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "end_date is before start_date",
+			Data: map[string]errs.CodeError{
+				"end_date": {Code: "end_date_not_after_start_date", Message: "end_date must be after start_date"},
+			},
+		}
+	}
+
 	var occurrences float64
 
 	switch frequency {
@@ -482,7 +521,24 @@ func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord
 	case "Monthly":
 		occurrences = daysDiff / 30 // Approximation
 	default:
-		return 0, 0, fmt.Errorf("invalid frequency: %s", frequency)
+		return 0, 0, &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "invalid frequency",
+			Data: map[string]errs.CodeError{
+				"frequency": {Code: "invalid_frequency", Message: "invalid frequency value"},
+			},
+		}
+	}
+
+	// error if occurrences is less than 2
+	if occurrences < 2 {
+		return 0, 0, &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "recurring purchase order must occur at least twice",
+			Data: map[string]errs.CodeError{
+				"global": {Code: "fewer_than_two_occurrences", Message: "recurring purchase order must occur at least twice, adjust either the end_date or the frequency"},
+			},
+		}
 	}
 
 	// calculate totalValue using the integer value of occurrences

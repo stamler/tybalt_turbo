@@ -3,6 +3,7 @@ package hooks
 import (
 	"testing"
 	"tybalt/constants"
+	"tybalt/errs"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase/core"
@@ -147,7 +148,7 @@ func TestValidateExpense(t *testing.T) {
 					t.Errorf("failed validation (%v) but expected valid", got)
 				} else {
 					// Extract the field from the error
-					if hookErr, ok := got.(*HookError); ok {
+					if hookErr, ok := got.(*errs.HookError); ok {
 						if codeErr, ok := hookErr.Data[tt.field]; ok {
 							if tt.expectedErrorCode != "" && codeErr.Code != tt.expectedErrorCode {
 								t.Errorf("expected error code: %s, got: %s", tt.expectedErrorCode, codeErr.Code)

@@ -5,6 +5,7 @@ package hooks
 import (
 	"net/http"
 	"strings"
+	"tybalt/errs"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -20,10 +21,10 @@ import (
 // that need to be validated.
 func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	if expenseRecord.GetString("uid") == "" {
-		return &HookError{
+		return &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "hook error when cleaning expense",
-			Data: map[string]CodeError{
+			Data: map[string]errs.CodeError{
 				"uid": {
 					Code:    "not_provided",
 					Message: "no uid provided in for expense record",
@@ -37,10 +38,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		"userId": expenseRecord.GetString("uid"),
 	})
 	if profile == nil {
-		return &HookError{
+		return &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "hook error when cleaning expense",
-			Data: map[string]CodeError{
+			Data: map[string]errs.CodeError{
 				"uid": {
 					Code:    "no_profile_found_for_uid",
 					Message: "no profile found for uid",
@@ -49,10 +50,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		}
 	}
 	if err != nil {
-		return &HookError{
+		return &errs.HookError{
 			Status:  http.StatusInternalServerError,
 			Message: "hook error when cleaning expense",
-			Data: map[string]CodeError{
+			Data: map[string]errs.CodeError{
 				"uid": {
 					Code:    "error_during_profile_lookup",
 					Message: "error during profile lookup",
@@ -72,10 +73,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	case "Mileage":
 		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {
-			return &HookError{
+			return &errs.HookError{
 				Status:  http.StatusInternalServerError,
 				Message: "hook error when cleaning expense",
-				Data: map[string]CodeError{
+				Data: map[string]errs.CodeError{
 					"global": {
 						Code:    "error_loading_expense_rate_record",
 						Message: "error loading expense rate record",
@@ -89,10 +90,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		distance := expenseRecord.GetFloat("distance")
 		// check if the distance is an integer
 		if distance != float64(int(distance)) {
-			return &HookError{
+			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "hook error when cleaning expense",
-				Data: map[string]CodeError{
+				Data: map[string]errs.CodeError{
 					"distance": {
 						Code:    "not_an_integer",
 						Message: "distance must be an integer for mileage expenses",
@@ -103,10 +104,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 
 		totalMileageExpense, mileageErr := utilities.CalculateMileageTotal(app, expenseRecord, expenseRateRecord)
 		if mileageErr != nil {
-			return &HookError{
+			return &errs.HookError{
 				Status:  http.StatusInternalServerError,
 				Message: "hook error when cleaning expense",
-				Data: map[string]CodeError{
+				Data: map[string]errs.CodeError{
 					"total": {
 						Code:    "error_calculating_mileage_total",
 						Message: "error calculating mileage total",
@@ -127,10 +128,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	case "Allowance":
 		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {
-			return &HookError{
+			return &errs.HookError{
 				Status:  http.StatusInternalServerError,
 				Message: "hook error when cleaning expense",
-				Data: map[string]CodeError{
+				Data: map[string]errs.CodeError{
 					"global": {
 						Code:    "error_loading_expense_rate_record",
 						Message: "error loading expense rate record",
@@ -172,10 +173,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	expenseRecord := e.Record
 	// if the expense record is submitted, return an error
 	if expenseRecord.Get("submitted") == true {
-		return &HookError{
+		return &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "hook error when processing expense",
-			Data: map[string]CodeError{
+			Data: map[string]errs.CodeError{
 				"submitted": {
 					Code:    "is_submitted",
 					Message: "cannot edit submitted expense",
@@ -193,10 +194,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	// exclusively from the date property.
 	payPeriodEnding, ppEndErr := utilities.GeneratePayPeriodEnding(expenseRecord.GetString("date"))
 	if ppEndErr != nil {
-		return &HookError{
+		return &errs.HookError{
 			Status:  http.StatusInternalServerError,
 			Message: "hook error when processing expense",
-			Data: map[string]CodeError{
+			Data: map[string]errs.CodeError{
 				"pay_period_ending": {
 					Code:    "error_generating",
 					Message: "error generating pay period ending",
@@ -213,10 +214,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	if purchaseOrder != "" {
 		poRecord, err = app.FindRecordById("purchase_orders", purchaseOrder)
 		if err != nil {
-			return &HookError{
+			return &errs.HookError{
 				Status:  http.StatusInternalServerError,
 				Message: "hook error when processing expense",
-				Data: map[string]CodeError{
+				Data: map[string]errs.CodeError{
 					"purchase_order": {
 						Code:    "not_found",
 						Message: "purchase order not found",
@@ -244,10 +245,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	if poRecord != nil && poRecord.GetString("type") == "Cumulative" {
 		existingExpensesTotal, err = utilities.CumulativeTotalExpensesForPurchaseOrder(app, poRecord, false)
 		if err != nil {
-			return &HookError{
+			return &errs.HookError{
 				Status:  http.StatusInternalServerError,
 				Message: "hook error when processing expense",
-				Data: map[string]CodeError{
+				Data: map[string]errs.CodeError{
 					"purchase_order": {
 						Code:    "error_calculating",
 						Message: "error calculating cumulative total",
@@ -260,10 +261,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	// Check if user has payables_admin claim
 	hasPayablesAdminClaim, err := utilities.HasClaim(app, e.Auth, "payables_admin")
 	if err != nil {
-		return &HookError{
+		return &errs.HookError{
 			Status:  http.StatusInternalServerError,
 			Message: "error checking claim",
-			Data: map[string]CodeError{
+			Data: map[string]errs.CodeError{
 				"global": {
 					Code:    "error_checking_claim",
 					Message: "error checking payables_admin claim",

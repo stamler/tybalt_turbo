@@ -2,37 +2,17 @@ package hooks
 
 import (
 	"errors"
+	"tybalt/errs"
 
 	"github.com/pocketbase/pocketbase/core"
 )
 
-type HookError struct {
-	Status  int                  `json:"status"` // Represents the HTTP status code
-	Message string               `json:"message"`
-	Data    map[string]CodeError `json:"data"`
-}
-
-func (e *HookError) Error() string {
-	return e.Message
-}
-
 func AnnotateHookError(app core.App, e *core.RecordRequestEvent, err error) error {
-	var hookErr *HookError
+	var hookErr *errs.HookError
 	if errors.As(err, &hookErr) {
 		e.JSON(hookErr.Status, hookErr)
 	}
 	return err
-}
-
-// CodeError is a custom error type that includes a code
-type CodeError struct {
-	Code    string `json:"code"`
-	Message string `json:"message"`
-	Data    any    `json:"data"`
-}
-
-func (e *CodeError) Error() string {
-	return e.Message
 }
 
 // This file exports the hooks that are available to the PocketBase application.
