@@ -49,9 +49,14 @@
               $globalStore.user_po_permission_data.divisions.length === 0
             ) {
               // po is in the user's division or the user has no divisions
-              if (po.approval_total >= $globalStore.user_po_permission_data.lower_threshold) {
-                // po is above the user's lower threshold (in the same tier as the user's max amount)
-                // user can approve
+              if (
+                po.approval_total >= $globalStore.user_po_permission_data.lower_threshold ||
+                po.uid === $authStore?.model?.id
+              ) {
+                // po is above the user's lower threshold (in the same tier as
+                // the user's max amount) or the user created the PO (it's
+                // annoying to have to go through the approval process if you
+                // created it and you're qualified to approve it)
                 return true;
               }
             }
