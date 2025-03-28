@@ -564,9 +564,13 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 		// Find highest child suffix for this parent. Do this by filtering on
 		// parentId and sorting by po_number descending then taking the first
 		// record.
-		children, err := txApp.FindRecordsByFilter(
+
+		// NOTE: This result will include the child PO itself (which should not yet
+		// have a PO number), so we need to filter out any purchase_orders records
+		// that have a po_number that is an empty string as well.
+		childrenWithPONumbers, err := txApp.FindRecordsByFilter(
 			"purchase_orders",
-			"parent_po = {:parentId}",
+			"parent_po = {:parentId} && po_number != ''",
 			"-po_number",
 			1,
 			0,
@@ -576,12 +580,12 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 			return "", fmt.Errorf("error querying child PO numbers: %v", err)
 		}
 
-		// If there are no children, the next suffix is 1. If there are children,
-		// find the highest suffix and increment it.
+		// If there are no children with a PO number, the next suffix is 1. If
+		// there are children, find the highest suffix and increment it.
 
 		nextSuffix := 1
-		if len(children) > 0 {
-			lastChild := children[0].GetString("po_number")
+		if len(childrenWithPONumbers) > 0 {
+			lastChild := childrenWithPONumbers[0].GetString("po_number")
 			suffix := lastChild[len(lastChild)-2:]
 
 			// Convert the suffix to an integer and increment it

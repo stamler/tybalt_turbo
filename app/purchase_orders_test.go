@@ -354,6 +354,36 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		// We need a test child PO that is status Active
+		{
+			Name:   "a child purchase order cannot itself be a parent",
+			Method: http.MethodPost,
+			URL:    "/api/collections/purchase_orders/records",
+			Body: strings.NewReader(`{
+				"parent_po": "25046ft47x49cc2",
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "this one is cumulative",
+				"payment_type": "OnAccount",
+				"total": 1234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Normal",
+				"job": "cjf0kt0defhq480",
+				"category": "t5nmdl188gtlhz0"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"parent_po":{"code":"child_po_cannot_be_parent"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 		{
 			Name:   "child purchase order may not be of type Cumulative",
 			Method: http.MethodPost,

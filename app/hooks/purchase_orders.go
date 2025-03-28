@@ -109,6 +109,20 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 			}
 		}
 
+		// Validate parent PO is not itself a child
+		if parentPO.GetString("parent_po") != "" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating parent PO",
+				Data: map[string]errs.CodeError{
+					"parent_po": {
+						Code:    "child_po_cannot_be_parent",
+						Message: "parent PO cannot be itself a child",
+					},
+				},
+			}
+		}
+
 		if parentPO.GetString("status") != "Active" {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,

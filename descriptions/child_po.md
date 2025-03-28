@@ -1,4 +1,4 @@
-# Child Purchase Order Feature Implementation Plan
+# Child Purchase Order System
 
 ## Overview
 
@@ -13,8 +13,8 @@ expenses while maintaining proper tracking and relationships.
 
 1. Add new fields to `purchase_orders` collection:
    - `parent_po` (relation) - References the parent purchase_orders record (required for child POs)
-   - fail if a child PO is created with a type other than `Normal`
-   - Add validation rule to prevent child POs from having their own children (this should already done by the validation rule that ensures child POs can only be of type `Normal`)
+   - fail when creating a child PO with a type other than `Normal`
+   - fail when creating a child PO of an existing child PO (child POs cannot be parents)
    - Update SQL pattern matching index for new PO number format
 
 ### 2. Backend Changes
