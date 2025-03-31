@@ -124,8 +124,11 @@
   onsubmit={save}
 >
   {#if isChildPO && data.parent_po_number}
-    <span class="flex w-full gap-2">
+    <span class="flex w-full gap-2 {errors.parent_po !== undefined ? 'bg-red-200' : ''}">
       <DsLabel color="cyan">Child PO of {data.parent_po_number}</DsLabel>
+      {#if errors.parent_po !== undefined}
+        <span class="text-red-600">{errors.parent_po.message}</span>
+      {/if}
     </span>
   {/if}
 
