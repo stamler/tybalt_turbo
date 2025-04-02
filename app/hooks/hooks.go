@@ -75,4 +75,18 @@ func AddHooks(app core.App) {
 		}
 		return e.Next()
 	})
+
+	// hooks for notifications model
+	app.OnRecordCreateRequest("notifications").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessNotification(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	app.OnRecordUpdateRequest("notifications").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessNotification(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
 }
