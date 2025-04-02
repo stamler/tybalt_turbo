@@ -41,6 +41,14 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 
 		var httpResponseStatusCode int
 
+		// This variable is used to track whether the original unmodified purchase
+		// order has been approved. It is initialized to false and set to true if
+		// the purchase order has a non-zero approved date during the transaction
+		// prior to any updates. We declare the variable here so that it can be
+		// used after the transaction has completed outside of the transaction
+		// function.
+		recordIsApproved := false
+
 		err := app.RunInTransaction(func(txApp core.App) error {
 			// Fetch existing purchase order
 			po, err := txApp.FindRecordById("purchase_orders", id)
@@ -95,7 +103,8 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 					Message: fmt.Sprintf("error fetching approval thresholds: %v", err),
 				}
 			}
-			recordIsApproved := !po.GetDateTime("approved").IsZero()
+			recordIsApproved = !po.GetDateTime("approved").IsZero()
+			updatedRecordIsApproved := recordIsApproved
 			recordRequiresSecondApproval := po.GetFloat("approval_total") > thresholds[0]
 			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()
 
@@ -129,13 +138,13 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				// Approve the purchase order
 				po.Set("approved", now)
 				po.Set("approver", userId)
-				recordIsApproved = true
+				updatedRecordIsApproved = true
 			}
 
 			// If the purchase order is approved but requires second approval and
 			// the caller is a qualified second approver, second-approve the purchase
 			// order.
-			if recordIsApproved && recordRequiresSecondApproval && callerIsQualifiedSecondApprover && !recordIsSecondApproved {
+			if updatedRecordIsApproved && recordRequiresSecondApproval && callerIsQualifiedSecondApprover && !recordIsSecondApproved {
 				po.Set("second_approval", now)
 				po.Set("second_approver", userId)
 				recordIsSecondApproved = true
@@ -143,7 +152,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 
 			// If both approvals are complete (or second approval wasn't needed),
 			// set status and PO number
-			if recordIsApproved && (!recordRequiresSecondApproval || recordIsSecondApproved) {
+			if updatedRecordIsApproved && (!recordRequiresSecondApproval || recordIsSecondApproved) {
 				po.Set("status", "Active")
 				poNumber, err := GeneratePONumber(txApp, po)
 				if err != nil {
@@ -189,6 +198,59 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				"code":    "error_expanding_record",
 			})
 		}
+
+		notificationCollection, err := app.FindCollectionByNameOrId("notifications")
+		if err != nil {
+			return err
+		}
+		var notificationRecord *core.Record = nil
+
+		if recordIsApproved && updatedPO.GetString("priority_second_approver") != "" && updatedPO.GetString("status") != "Active" {
+			// The PO is now approved but not second-approved, and the
+			// priority_second_approver is set. Create a message to the
+			// priority_second_approver alerting them that they need to approve the PO
+			// and have a 24 hour window to do so before it is available for approval
+			// by all qualified approvers.
+			notificationRecord = core.NewRecord(notificationCollection)
+
+			notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+				"code": "po_priority_second_approval_required",
+			})
+			if err != nil {
+				return err
+			}
+			notificationRecord.Set("recipient", updatedPO.GetString("priority_second_approver"))
+			notificationRecord.Set("template", notificationTemplate.Id)
+			notificationRecord.Set("status", "pending")
+			notificationRecord.Set("user", userId)
+		}
+
+		if !recordIsApproved && updatedPO.GetString("status") == "Active" {
+			// The PO was just approved and is active. Send a message to the creator
+			// (uid) alerting them that the PO has been approved and is available for
+			// use.
+			notificationRecord = core.NewRecord(notificationCollection)
+
+			notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+				"code": "po_active",
+			})
+			if err != nil {
+				return err
+			}
+
+			notificationRecord.Set("recipient", updatedPO.GetString("uid"))
+			notificationRecord.Set("template", notificationTemplate.Id)
+			notificationRecord.Set("status", "pending")
+			notificationRecord.Set("user", userId)
+		}
+
+		// If there is a notification record to save, save it
+		if notificationRecord != nil {
+			if err := app.Save(notificationRecord); err != nil {
+				return err
+			}
+		}
+
 		// return the updated purchase order as a JSON response
 		return e.JSON(http.StatusOK, updatedPO)
 	}
