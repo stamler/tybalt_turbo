@@ -3,6 +3,7 @@ package hooks
 import (
 	"errors"
 	"tybalt/errs"
+	"tybalt/notifications"
 
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -80,13 +81,13 @@ func AddHooks(app core.App) {
 	// RecordRequestEvent because the notifications model is not exposed to the
 	// API.
 	app.OnRecordCreate("notifications").BindFunc(func(e *core.RecordEvent) error {
-		if err := ProcessNotification(app, e); err != nil {
+		if err := notifications.WriteStatusUpdated(app, e); err != nil {
 			return err
 		}
 		return e.Next()
 	})
 	app.OnRecordUpdate("notifications").BindFunc(func(e *core.RecordEvent) error {
-		if err := ProcessNotification(app, e); err != nil {
+		if err := notifications.WriteStatusUpdated(app, e); err != nil {
 			return err
 		}
 		return e.Next()
