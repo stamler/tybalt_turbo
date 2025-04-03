@@ -9,8 +9,12 @@ import (
 
 type Notification struct {
 	Id                 string    `db:"id"`
-	Recipient          string    `db:"recipient"`
-	Template           string    `db:"template"`
+	RecipientEmail     string    `db:"recipient_email"`
+	RecipientName      string    `db:"recipient_name"`
+	NotificationType   string    `db:"notification_type"`
+	UserName           string    `db:"user_name"`
+	Subject            string    `db:"subject"`
+	Template           string    `db:"text_email"`
 	Status             string    `db:"status"`
 	StatusUpdated      time.Time `db:"status_updated"`
 	Error              string    `db:"error"`
@@ -46,14 +50,17 @@ func SendNotifications(app core.App, e *core.RecordEvent) error {
 		notifications := []Notification{}
 		err := txApp.DB().NewQuery(`SELECT 
     n.*,
-    (r_profile.given_name || ' ' || r_profile.surname) AS RecipientName,
-    (u_profile.given_name || ' ' || u_profile.surname) AS UserName,
+    (r_profile.given_name || ' ' || r_profile.surname) AS recipient_name,
+		u.email,
+		r_profile.notification_type,
+    (u_profile.given_name || ' ' || u_profile.surname) AS user_name,
     nt.subject,
     nt.text_email
 FROM notifications n
 LEFT JOIN profiles r_profile ON n.recipient = r_profile.uid
 LEFT JOIN profiles u_profile ON n.user = u_profile.uid
 LEFT JOIN notification_templates nt ON n.template = nt.id
+LEFT JOIN users u ON n.recipient = u.id
 WHERE n.status = 'pending'`).All(&notifications)
 		if err != nil {
 			return err
@@ -61,7 +68,7 @@ WHERE n.status = 'pending'`).All(&notifications)
 
 		// for each notification, send a notification to the recipient
 		for _, notification := range notifications {
-			log.Println("sending notification to", notification.Recipient)
+			log.Println("sending notification to", notification.RecipientEmail)
 		}
 
 		return nil
