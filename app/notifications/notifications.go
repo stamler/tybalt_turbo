@@ -1,10 +1,13 @@
 package notifications
 
 import (
-	"log"
+	"database/sql"
+	"fmt"
+	"net/mail"
 	"time"
 
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/mailer"
 )
 
 type Notification struct {
@@ -32,47 +35,78 @@ func WriteStatusUpdated(app core.App, e *core.RecordEvent) error {
 	return nil
 }
 
-// Send all pending notifications from the notifications collection in a
-// transaction. First we'll get all entries from the notifications collection
-// that are pending. Then for each one we'll send a notification to the
-// recipient. We will aggregate the results and any errors then update the
-// status of the notification to either sent or failed, along with any
-// corresponding error message. A notification will be sent to each destination
-// specified in the notification_types property on the user's profile. the
-// notification_types property is an array of strings that refer to columns in
-// the notification_templates collection. For now, options will be "email_text"
-// and "email_html". Since a user will only want to receive one email at a time,
-// if both email_text and email_html are specified, only send the email_text.
-func SendNotifications(app core.App, e *core.RecordEvent) error {
+// SendNextPendingNotification will send the next pending notification from the
+// notifications collection in a transaction. For now, the notification_type
+// will be always be "email_text" so we'll just use the text_email field of the
+// notification_templates collection as the body template of the email.
+func SendNextPendingNotification(app core.App, e *core.RecordEvent) error {
+	// fast return if there are no pending notifications
+	type CountResult struct {
+		Count int64 `db:"count"`
+	}
+	var result CountResult
+	err := app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&result)
+	if err != nil {
+		return err
+	}
+	if result.Count == 0 {
+		return nil
+	}
 
-	err := app.RunInTransaction(func(txApp core.App) error {
+	notification := Notification{}
+	err = app.RunInTransaction(func(txApp core.App) error {
 		// get all notifications that are pending
-		notifications := []Notification{}
 		err := txApp.DB().NewQuery(`SELECT 
-    n.*,
-    (r_profile.given_name || ' ' || r_profile.surname) AS recipient_name,
-		u.email,
-		r_profile.notification_type,
-    (u_profile.given_name || ' ' || u_profile.surname) AS user_name,
-    nt.subject,
-    nt.text_email
-FROM notifications n
-LEFT JOIN profiles r_profile ON n.recipient = r_profile.uid
-LEFT JOIN profiles u_profile ON n.user = u_profile.uid
-LEFT JOIN notification_templates nt ON n.template = nt.id
-LEFT JOIN users u ON n.recipient = u.id
-WHERE n.status = 'pending'`).All(&notifications)
+				n.*,
+				(r_profile.given_name || ' ' || r_profile.surname) AS recipient_name,
+				u.email,
+				r_profile.notification_type,
+				(u_profile.given_name || ' ' || u_profile.surname) AS user_name,
+				nt.subject,
+				nt.text_email
+			FROM notifications n
+			LEFT JOIN profiles r_profile ON n.recipient = r_profile.uid
+			LEFT JOIN profiles u_profile ON n.user = u_profile.uid
+			LEFT JOIN notification_templates nt ON n.template = nt.id
+			LEFT JOIN users u ON n.recipient = u.id
+			WHERE n.status = 'pending'
+			LIMIT 1`).One(&notification)
 		if err != nil {
+			// if the error is that there are no more pending notifications, return nil
+			if err == sql.ErrNoRows {
+				return nil
+			}
 			return err
 		}
 
-		// for each notification, send a notification to the recipient
-		for _, notification := range notifications {
-			log.Println("sending notification to", notification.RecipientEmail)
-		}
+		// update the notification status to inflight
+		txApp.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'inflight' WHERE id = %s", notification.Id)).Execute()
 
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	// create the message
+	message := &mailer.Message{
+		From:    mail.Address{Name: e.App.Settings().Meta.SenderName, Address: e.App.Settings().Meta.SenderAddress},
+		To:      []mail.Address{{Name: notification.RecipientName, Address: notification.RecipientEmail}},
+		Subject: notification.Subject,
+		Text:    notification.Template, // TODO: populate the template
+	}
+
+	// send the notification
+	err = app.NewMailClient().Send(message)
+	if err != nil {
+		// update the notification status to error and set the error message
+		app.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'error', error = '%s' WHERE id = %s", err.Error(), notification.Id)).Execute()
+		return err
+	}
+
+	// update the notification status to sent
+	_, err = app.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'sent' WHERE id = %s", notification.Id)).Execute()
 
 	if err != nil {
 		return err
