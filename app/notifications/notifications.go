@@ -11,18 +11,18 @@ import (
 )
 
 type Notification struct {
-	Id                 string    `db:"id"`
-	RecipientEmail     string    `db:"recipient_email"`
-	RecipientName      string    `db:"recipient_name"`
-	NotificationType   string    `db:"notification_type"`
-	UserName           string    `db:"user_name"`
-	Subject            string    `db:"subject"`
-	Template           string    `db:"text_email"`
-	Status             string    `db:"status"`
-	StatusUpdated      time.Time `db:"status_updated"`
-	Error              string    `db:"error"`
-	UserId             string    `db:"user"`
-	SystemNotification bool      `db:"system_notification"`
+	Id                 string `db:"id"`
+	RecipientEmail     string `db:"email"`
+	RecipientName      string `db:"recipient_name"`
+	NotificationType   string `db:"notification_type"`
+	UserName           string `db:"user_name"`
+	Subject            string `db:"subject"`
+	Template           string `db:"text_email"`
+	Status             string `db:"status"`
+	StatusUpdated      string `db:"status_updated"`
+	Error              string `db:"error"`
+	UserId             string `db:"user"`
+	SystemNotification bool   `db:"system_notification"`
 }
 
 // WriteStatusUpdatedOnNotification is a hook that writes the current time to the status_updated field
@@ -39,18 +39,18 @@ func WriteStatusUpdated(app core.App, e *core.RecordEvent) error {
 // notifications collection in a transaction. For now, the notification_type
 // will be always be "email_text" so we'll just use the text_email field of the
 // notification_templates collection as the body template of the email.
-func SendNextPendingNotification(app core.App, e *core.RecordEvent) error {
+func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 	// fast return if there are no pending notifications
 	type CountResult struct {
 		Count int64 `db:"count"`
 	}
-	var result CountResult
-	err := app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&result)
+	var countResult CountResult
+	err = app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&countResult)
 	if err != nil {
-		return err
+		return 0, err
 	}
-	if result.Count == 0 {
-		return nil
+	if countResult.Count == 0 {
+		return 0, nil
 	}
 
 	notification := Notification{}
@@ -80,18 +80,18 @@ func SendNextPendingNotification(app core.App, e *core.RecordEvent) error {
 		}
 
 		// update the notification status to inflight
-		txApp.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'inflight' WHERE id = %s", notification.Id)).Execute()
+		txApp.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'inflight' WHERE id = '%s'", notification.Id)).Execute()
 
 		return nil
 	})
 
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	// create the message
 	message := &mailer.Message{
-		From:    mail.Address{Name: e.App.Settings().Meta.SenderName, Address: e.App.Settings().Meta.SenderAddress},
+		From:    mail.Address{Name: app.Settings().Meta.SenderName, Address: app.Settings().Meta.SenderAddress},
 		To:      []mail.Address{{Name: notification.RecipientName, Address: notification.RecipientEmail}},
 		Subject: notification.Subject,
 		Text:    notification.Template, // TODO: populate the template
@@ -101,16 +101,16 @@ func SendNextPendingNotification(app core.App, e *core.RecordEvent) error {
 	err = app.NewMailClient().Send(message)
 	if err != nil {
 		// update the notification status to error and set the error message
-		app.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'error', error = '%s' WHERE id = %s", err.Error(), notification.Id)).Execute()
-		return err
+		app.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'error', error = '%s' WHERE id = '%s'", err.Error(), notification.Id)).Execute()
+		return countResult.Count - 1, fmt.Errorf("error sending notification %s: %s", notification.Id, err)
 	}
 
 	// update the notification status to sent
-	_, err = app.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'sent' WHERE id = %s", notification.Id)).Execute()
+	_, err = app.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'sent' WHERE id = '%s'", notification.Id)).Execute()
 
 	if err != nil {
-		return err
+		return countResult.Count - 1, fmt.Errorf("error setting status to sent for notification %s: %s", notification.Id, err)
 	}
 
-	return nil
+	return countResult.Count - 1, nil
 }

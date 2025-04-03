@@ -1,6 +1,9 @@
 package routes
 
 import (
+	"net/http"
+	"tybalt/notifications"
+
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -25,6 +28,19 @@ func AddRoutes(app core.App) {
 
 	// Add the bundle timesheet route
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+
+		// TODO: This is a temporary route to send a single notification for testing
+		// purposes remove this before going to production
+		notificationsGroup := se.Router.Group("/api/notifications")
+		notificationsGroup.POST("/send_one", func(e *core.RequestEvent) error {
+			remaining, err := notifications.SendNextPendingNotification(app)
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, err.Error(), nil)
+			}
+			return e.JSON(200, map[string]any{
+				"remaining": remaining,
+			})
+		})
 
 		tsGroup := se.Router.Group("/api/time_sheets")
 		tsGroup.Bind(apis.RequireAuth("users"))
