@@ -41,6 +41,15 @@ func AddRoutes(app core.App) {
 				"remaining": remaining,
 			})
 		})
+		// TODO: this is a temporary route to send all notifications for testing
+		// purposes remove this before going to production
+		notificationsGroup.POST("/send_all", func(e *core.RequestEvent) error {
+			sentCount, err := notifications.SendNotifications(app)
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, err.Error(), nil)
+			}
+			return e.JSON(http.StatusOK, map[string]any{"notificationsSent": sentCount})
+		})
 
 		tsGroup := se.Router.Group("/api/time_sheets")
 		tsGroup.Bind(apis.RequireAuth("users"))

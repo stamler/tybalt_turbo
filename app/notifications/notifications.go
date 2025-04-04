@@ -160,3 +160,24 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 	// return immediately with the decremented count since we've taken one notification
 	return countResult.Count - 1, nil
 }
+
+// SendNotifications will send all notifications that are pending. It will call
+// SendNextPendingNotification in a loop until there are no more pending
+// notifications.
+func SendNotifications(app core.App) (int64, error) {
+	sentCount := int64(0)
+	remaining := int64(1) // initialize greater than 0 to enter the loop
+	var err error
+
+	for remaining > 0 {
+		remaining, err = SendNextPendingNotification(app)
+		if err != nil {
+			// if there was an error, return the remaining count and the error because
+			// if remaining is greater than 0 and the next call continues to fail,
+			// we'll never get out of this loop
+			return sentCount, err
+		}
+		sentCount++
+	}
+	return sentCount, nil
+}
