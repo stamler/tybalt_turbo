@@ -56,6 +56,7 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 	}
 
 	notification := Notification{}
+	message := &mailer.Message{}
 	err = app.RunInTransaction(func(txApp core.App) error {
 		// get all notifications that are pending
 		err := txApp.DB().NewQuery(`SELECT 
@@ -81,49 +82,47 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 			return err
 		}
 
+		// populate the text template
+		textTemplate, err := template.New("text_email").Parse(notification.Template)
+		if err != nil {
+			return fmt.Errorf("error parsing text template for notification %s: %s", notification.Id, err)
+		}
+
+		// execute the text template
+		var text bytes.Buffer
+		err = textTemplate.Execute(&text, notification)
+		if err != nil {
+			return fmt.Errorf("error executing text template for notification %s: %s", notification.Id, err)
+		}
+
+		// create the message
+		message = &mailer.Message{
+			From:    mail.Address{Name: app.Settings().Meta.SenderName, Address: app.Settings().Meta.SenderAddress},
+			To:      []mail.Address{{Name: notification.RecipientName, Address: notification.RecipientEmail}},
+			Subject: notification.Subject,
+			Text:    text.String(),
+		}
+
 		// update the notification status to inflight
-		txApp.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'inflight' WHERE id = '%s'", notification.Id)).Execute()
+		_, err = txApp.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'inflight' WHERE id = '%s'", notification.Id)).Execute()
+		if err != nil {
+			return err
+		}
 
 		return nil
 	})
 
-	// TODO: This next segment of code until the actual sending of the email could
-	// potentially be moved into the transaction above so that any errors from the
-	// block prevent the status from being updated to inflight. Actually it would
-	// be even better to have everything in the transaction but we can't do that
-	// because sending the email is a blocking operation. For this reason we will
-	// execute the transaction and then send the email in a second step. In fact
-	// later we will move the sending of the email to a background job so that we
-	// can return immediately from this function.
-
 	if err != nil {
-		// we do not decrement the count here because we want to return the total
-		// number of pending notifications, and any error from the transaction will
-		// result in the status change to 'inflight' being rolled back
-		// TODO: confirm this
+		// return the total number of pending notifications, which won't change due
+		// to the error since any error from the transaction will result in the
+		// status change to 'inflight' being rolled back
 		return countResult.Count, err
 	}
 
-	// populate the text template
-	textTemplate, err := template.New("text_email").Parse(notification.Template)
-	if err != nil {
-		return countResult.Count - 1, fmt.Errorf("error parsing text template for notification %s: %s", notification.Id, err)
-	}
-
-	// execute the text template
-	var text bytes.Buffer
-	err = textTemplate.Execute(&text, notification)
-	if err != nil {
-		return countResult.Count - 1, fmt.Errorf("error executing text template for notification %s: %s", notification.Id, err)
-	}
-
-	// create the message
-	message := &mailer.Message{
-		From:    mail.Address{Name: app.Settings().Meta.SenderName, Address: app.Settings().Meta.SenderAddress},
-		To:      []mail.Address{{Name: notification.RecipientName, Address: notification.RecipientEmail}},
-		Subject: notification.Subject,
-		Text:    text.String(),
-	}
+	// sending the email is a blocking operation. For this reason we will execute
+	// the transaction and then send the email in a second step. In fact later we
+	// will move the sending of the email to a background job so that we can
+	// return immediately from this function.
 
 	// send the notification
 	err = app.NewMailClient().Send(message)
