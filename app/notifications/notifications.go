@@ -37,6 +37,30 @@ func WriteStatusUpdated(app core.App, e *core.RecordEvent) error {
 	return nil
 }
 
+// updateNotificationStatus handles updating the notification status after sending
+func updateNotificationStatus(app core.App, notification Notification, sendErr error) {
+	var query string
+	if sendErr != nil {
+		// update the notification status to error and set the error message
+		query = fmt.Sprintf("UPDATE notifications SET status = 'error', error = '%s' WHERE id = '%s'",
+			sendErr.Error(), notification.Id)
+	} else {
+		// update the notification status to sent
+		query = fmt.Sprintf("UPDATE notifications SET status = 'sent' WHERE id = '%s'",
+			notification.Id)
+	}
+
+	_, err := app.DB().NewQuery(query).Execute()
+	if err != nil {
+		app.Logger().Error(
+			"Failed to update notification status",
+			"notification_id", notification.Id,
+			"intended_status", map[bool]string{true: "error", false: "sent"}[sendErr != nil],
+			"error", err,
+		)
+	}
+}
+
 // SendNextPendingNotification will send the next pending notification from the
 // notifications collection in a transaction. For now, the notification_type
 // will be always be "email_text" so we'll just use the text_email field of the
@@ -119,25 +143,20 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 		return countResult.Count, err
 	}
 
-	// sending the email is a blocking operation. For this reason we will execute
-	// the transaction and then send the email in a second step. In fact later we
-	// will move the sending of the email to a background job so that we can
-	// return immediately from this function.
+	// sending the email is now non-blocking. We launch it in a goroutine and
+	// update the status once it completes
+	go func(app core.App, message *mailer.Message, notification Notification) {
+		err := app.NewMailClient().Send(message)
+		if err != nil {
+			app.Logger().Error(
+				"Failed to send notification email",
+				"notification_id", notification.Id,
+				"error", err,
+			)
+		}
+		updateNotificationStatus(app, notification, err)
+	}(app, message, notification)
 
-	// send the notification
-	err = app.NewMailClient().Send(message)
-	if err != nil {
-		// update the notification status to error and set the error message
-		app.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'error', error = '%s' WHERE id = '%s'", err.Error(), notification.Id)).Execute()
-		return countResult.Count - 1, fmt.Errorf("error sending notification %s: %s", notification.Id, err)
-	}
-
-	// update the notification status to sent
-	_, err = app.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'sent' WHERE id = '%s'", notification.Id)).Execute()
-
-	if err != nil {
-		return countResult.Count - 1, fmt.Errorf("error setting status to sent for notification %s: %s", notification.Id, err)
-	}
-
+	// return immediately with the decremented count since we've taken one notification
 	return countResult.Count - 1, nil
 }
