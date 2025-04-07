@@ -126,8 +126,44 @@ func TestSendNextPendingNotification_ErrorOnCountQuery(t *testing.T) {
 	}
 }
 
-// 4. the pending count and an error are returned if fetching one notification
-//    fails for a reason other than there being no pending notifications
+//  4. the pending count and an error are returned if fetching one notification
+//     fails for a reason other than there being no pending notifications
+func TestSendNextPendingNotification_ErrorOnFetch(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Break the notification_templates table to force a JOIN error
+	_, err := app.DB().NewQuery("ALTER TABLE notification_templates RENAME TO notification_templates_broken").Execute()
+	if err != nil {
+		t.Fatalf("Failed to rename notification_templates table: %v", err)
+	}
+
+	// Get initial count of pending notifications
+	var countResult struct {
+		Count int64 `db:"count"`
+	}
+	err = app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&countResult)
+	if err != nil {
+		t.Fatalf("Failed to get initial count: %v", err)
+	}
+	initialCount := countResult.Count
+
+	// Attempt to send notification with broken join
+	remaining, err := notifications.SendNextPendingNotification(app)
+
+	// Verify we got an error
+	if err == nil {
+		t.Error("Expected an error when notification_templates table is missing, got nil")
+	} else if !strings.Contains(err.Error(), "error fetching pending notification") {
+		t.Errorf("Expected an error containing 'error fetching pending notification', got %v", err)
+	}
+
+	// Verify remaining count matches initial count since the operation failed
+	if remaining != initialCount {
+		t.Errorf("Expected remaining count to be %d when fetch fails, got %d", initialCount, remaining)
+	}
+}
 
 // 5. the pending count and an error are returned if the text template cannot be
 //    parsed

@@ -119,7 +119,7 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 			if err == sql.ErrNoRows {
 				return nil
 			}
-			return err
+			return fmt.Errorf("error fetching pending notification: %v", err)
 		}
 
 		// populate the text template
