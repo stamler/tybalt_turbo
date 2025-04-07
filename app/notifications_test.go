@@ -48,9 +48,53 @@ func TestSendNextPendingNotification_SendsOneEmail(t *testing.T) {
 	}
 }
 
-// 2. no emails are sent when there are no pending notifications. The pending
-//    count is returned as 0 and a nil error is returned. There are no emails
-//    in the TestMailer.Messages() inbox.
+//  2. no emails are sent when there are no pending notifications. The pending
+//     count is returned as 0 and a nil error is returned. There are no emails
+//     in the TestMailer.Messages() inbox.
+func TestSendNextPendingNotification_NoEmailsWhenNoPendingNotifications(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// First, clear all pending notifications
+	_, err := notifications.SendNotifications(app)
+	if err != nil {
+		t.Fatalf("Failed to clear pending notifications: %v", err)
+	}
+
+	// Now try to send another notification when there are none pending
+	remaining, err := notifications.SendNextPendingNotification(app)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	// Verify remaining count is 0 since there are no pending notifications
+	if remaining != 0 {
+		t.Errorf("Expected remaining count to be 0, got %d", remaining)
+	}
+
+	// Sleep briefly to allow any potential async operations to complete
+	time.Sleep(20 * time.Millisecond)
+
+	// Get the initial message count
+	initialMessageCount := len(app.TestMailer.Messages())
+
+	// Try to send another notification
+	_, err = notifications.SendNextPendingNotification(app)
+	if err != nil {
+		t.Fatalf("Expected no error on second attempt, got %v", err)
+	}
+
+	// Sleep briefly to allow any potential async operations to complete
+	time.Sleep(20 * time.Millisecond)
+
+	// Verify no new messages were added to the TestMailer
+	finalMessageCount := len(app.TestMailer.Messages())
+	if finalMessageCount != initialMessageCount {
+		t.Errorf("Expected no new messages to be sent, but message count changed from %d to %d",
+			initialMessageCount, finalMessageCount)
+	}
+}
 
 // 3. pending count of 0 and an error are returned if the CountResult query
 //    fails
