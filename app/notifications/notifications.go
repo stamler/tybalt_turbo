@@ -88,7 +88,8 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 	var countResult CountResult
 	err = app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&countResult)
 	if err != nil {
-		return 0, err
+		// report error while counting pending notifications
+		return 0, fmt.Errorf("error counting pending notifications: %v", err)
 	}
 	if countResult.Count == 0 {
 		return 0, nil

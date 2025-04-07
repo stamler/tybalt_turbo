@@ -3,6 +3,7 @@
 package main
 
 import (
+	"strings"
 	"testing"
 	"time"
 	"tybalt/internal/testutils"
@@ -96,8 +97,34 @@ func TestSendNextPendingNotification_NoEmailsWhenNoPendingNotifications(t *testi
 	}
 }
 
-// 3. pending count of 0 and an error are returned if the CountResult query
-//    fails
+//  3. pending count of 0 and an error are returned if the CountResult query
+//     fails
+func TestSendNextPendingNotification_ErrorOnCountQuery(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Break the notifications table to force query errors
+	_, err := app.DB().NewQuery("ALTER TABLE notifications RENAME TO notifications_broken").Execute()
+	if err != nil {
+		t.Fatalf("Failed to rename notifications table: %v", err)
+	}
+
+	// Attempt to send notification with broken table
+	remaining, err := notifications.SendNextPendingNotification(app)
+
+	// Verify we got an error that contains the string "error counting pending notifications"
+	if err == nil {
+		t.Error("Expected an error when notifications table is missing, got nil")
+	} else if !strings.Contains(err.Error(), "error counting pending notifications") {
+		t.Errorf("Expected an error containing 'error counting pending notifications', got %v", err)
+	}
+
+	// Verify remaining count is 0
+	if remaining != 0 {
+		t.Errorf("Expected remaining count to be 0 when query fails, got %d", remaining)
+	}
+}
 
 // 4. the pending count and an error are returned if fetching one notification
 //    fails for a reason other than there being no pending notifications
