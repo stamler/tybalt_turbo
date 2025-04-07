@@ -165,8 +165,44 @@ func TestSendNextPendingNotification_ErrorOnFetch(t *testing.T) {
 	}
 }
 
-// 5. the pending count and an error are returned if the text template cannot be
-//    parsed
+//  5. the pending count and an error are returned if the text template cannot
+//     be parsed
+func TestSendNextPendingNotification_ErrorOnInvalidTemplate(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Get initial count of pending notifications
+	var countResult struct {
+		Count int64 `db:"count"`
+	}
+	err := app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&countResult)
+	if err != nil {
+		t.Fatalf("Failed to get initial count: %v", err)
+	}
+	initialCount := countResult.Count
+
+	// Update a notification template to have invalid template syntax
+	_, err = app.DB().NewQuery("UPDATE notification_templates SET text_email = '{{.InvalidSyntax}'").Execute()
+	if err != nil {
+		t.Fatalf("Failed to update template: %v", err)
+	}
+
+	// Attempt to send notification with invalid template
+	remaining, err := notifications.SendNextPendingNotification(app)
+
+	// Verify we got an error
+	if err == nil {
+		t.Error("Expected an error when template is invalid, got nil")
+	} else if !strings.Contains(err.Error(), "error parsing text template for notification") {
+		t.Errorf("Expected an error containing 'error parsing text template for notification', got %v", err)
+	}
+
+	// Verify remaining count matches initial count since the operation failed
+	if remaining != initialCount {
+		t.Errorf("Expected remaining count to be %d when template parsing fails, got %d", initialCount, remaining)
+	}
+}
 
 // 6. the pending count and an error are returned if the text template cannot be
 //    executed
