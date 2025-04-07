@@ -9,17 +9,14 @@ import (
 	"tybalt/notifications"
 )
 
-// This will be the test file for the notifications package. We're using mailpit
-// for testing so we'll use the mailpit API to check for messages as expected in
-// the test cases below. The mailbox should be emptied prior to each test so
-// that each test is independent. The mailpit API is expected to be running
-// at http://localhost:8025
+// This is the test file for the notifications package.
 
 // SendNextPendingNotification()
 
 //  1. one email is sent when there are one or more pending notifications
 //     notifications. The pending count is returned as 1 less than the original
-//     count, no error is returned, and there is one email in the mailpit inbox.
+//     count, no error is returned, and there is one email in the
+//     TestMailer.Messages() inbox.
 func TestSendNextPendingNotification_SendsOneEmail(t *testing.T) {
 	// Set up test app
 	app := testutils.SetupTestApp(t)
@@ -40,9 +37,9 @@ func TestSendNextPendingNotification_SendsOneEmail(t *testing.T) {
 	// Sleep for 100ms to allow the goroutine called by
 	// SendNextPendingNotification to complete. This is a bit of a hack, but it's
 	// necessary since the email sending is async and we need to wait for it to
-	// complete before checking the mailpit inbox. TODO: Find a better way to do
-	// this, perhaps by using a channel to communicate the completion of the email
-	// sending.
+	// complete before checking the TestMailer.Messages() inbox. TODO: Find a
+	// better way to do this, perhaps by using a channel to communicate the
+	// completion of the email sending.
 	time.Sleep(100 * time.Millisecond)
 
 	messageCount := len(app.TestMailer.Messages())
@@ -53,7 +50,7 @@ func TestSendNextPendingNotification_SendsOneEmail(t *testing.T) {
 
 // 2. no emails are sent when there are no pending notifications. The pending
 //    count is returned as 0 and a nil error is returned. There are no emails
-//    in the mailpit inbox.
+//    in the TestMailer.Messages() inbox.
 
 // 3. pending count of 0 and an error are returned if the CountResult query
 //    fails

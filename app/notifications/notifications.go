@@ -43,7 +43,9 @@ func updateNotificationStatus(app core.App, notification Notification, sendErr e
 	// directly in an SQL statement because we depend on PocketBase's writer to
 	// handle locking and busy-waiting. A previous version used update and was
 	// causing race conditions (database was locked for writing during another
-	// update).
+	// update). This could probably also be solved with a mutex for notification
+	// status updates, but I think PocketBase's writer is somehow more
+	// efficient/easier.
 	record, err := app.FindRecordById("notifications", notification.Id)
 	if err != nil {
 		app.Logger().Error(
