@@ -39,19 +39,32 @@ func WriteStatusUpdated(app core.App, e *core.RecordEvent) error {
 
 // updateNotificationStatus handles updating the notification status after sending
 func updateNotificationStatus(app core.App, notification Notification, sendErr error) {
-	var query string
-	if sendErr != nil {
-		// update the notification status to error and set the error message
-		query = fmt.Sprintf("UPDATE notifications SET status = 'error', error = '%s' WHERE id = '%s'",
-			sendErr.Error(), notification.Id)
-	} else {
-		// update the notification status to sent
-		query = fmt.Sprintf("UPDATE notifications SET status = 'sent' WHERE id = '%s'",
-			notification.Id)
+	// Get the notification record. We must do this rather than running UPDATE
+	// directly in an SQL statement because we depend on PocketBase's writer to
+	// handle locking and busy-waiting. A previous version used update and was
+	// causing race conditions (database was locked for writing during another
+	// update).
+	record, err := app.FindRecordById("notifications", notification.Id)
+	if err != nil {
+		app.Logger().Error(
+			"Failed to find notification record",
+			"notification_id", notification.Id,
+			"error", err,
+		)
+		return
 	}
 
-	_, err := app.DB().NewQuery(query).Execute()
-	if err != nil {
+	// Update the status and error fields
+	if sendErr != nil {
+		record.Set("status", "error")
+		record.Set("error", sendErr.Error())
+	} else {
+		record.Set("status", "sent")
+		record.Set("error", "")
+	}
+
+	// Save the record back to the database
+	if err := app.Save(record); err != nil {
 		app.Logger().Error(
 			"Failed to update notification status",
 			"notification_id", notification.Id,

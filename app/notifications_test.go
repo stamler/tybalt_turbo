@@ -77,7 +77,32 @@ func TestSendNextPendingNotification_SendsOneEmail(t *testing.T) {
 
 // SendNotifications()
 
-// 1. on success, sentCount matches the number of emails in the mailpit inbox.
+//  1. on success, sentCount matches the number of emails in the TestMailer
+//     messages parameter.
+func TestSendNotifications_SendsAllPendingNotifications(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
 
-// 2. on failure, sentCount matches the number of emails in the mailpit inbox
-//    but an error is returned
+	// Call SendNotifications
+	sentCount, err := notifications.SendNotifications(app)
+	if err != nil {
+		t.Fatalf("Expected no error, got %v", err)
+	}
+
+	time.Sleep(20 * time.Millisecond)
+	// Verify sentCount matches the number of emails in the TestMailer messages
+	// parameter
+	if sentCount != int64(len(app.TestMailer.Messages())) {
+		t.Errorf("Expected sentCount to be %d, got %d", len(app.TestMailer.Messages()), sentCount)
+	}
+
+	// Verify that there are 4 messages in the TestMailer, matching the 4 pending
+	// notifications in the test data.
+	if len(app.TestMailer.Messages()) != 4 {
+		t.Errorf("Expected 4 messages in the TestMailer, got %d", len(app.TestMailer.Messages()))
+	}
+}
+
+// 2. on failure, sentCount matches the number of emails in the TestMailer
+//    messages parameter but an error is returned
