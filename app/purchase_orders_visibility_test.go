@@ -201,7 +201,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 				app := testutils.SetupTestApp(t)
 
 				// Update the PO's timestamp to be within the past 24 hours (2 hours ago)
-				_, err := app.DB().NewQuery("UPDATE purchase_orders SET updated = datetime('now', '-2 hours') WHERE id = 'n9ev1x7a00c1iy6'").Execute()
+				_, err := app.NonconcurrentDB().NewQuery("UPDATE purchase_orders SET updated = datetime('now', '-2 hours') WHERE id = 'n9ev1x7a00c1iy6'").Execute()
 				if err != nil {
 					t.Fatalf("Failed to update timestamp: %v", err)
 				}

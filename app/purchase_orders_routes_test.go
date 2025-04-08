@@ -875,7 +875,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 
 				// Break the expenses table after routes are registered
 				app.OnServe().BindFunc(func(e *core.ServeEvent) error {
-					_, err := app.DB().NewQuery("ALTER TABLE expenses RENAME TO expenses_broken").Execute()
+					_, err := app.NonconcurrentDB().NewQuery("ALTER TABLE expenses RENAME TO expenses_broken").Execute()
 					if err != nil {
 						t.Fatal(err)
 					}

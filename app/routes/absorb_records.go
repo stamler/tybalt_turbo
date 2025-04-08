@@ -135,7 +135,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			INSERT INTO ids_to_absorb (old_id) VALUES %s
 		`, strings.Join(args, ","))
 
-		_, err = txApp.DB().NewQuery(insertQuery).Execute()
+		_, err = txApp.NonconcurrentDB().NewQuery(insertQuery).Execute()
 		if err != nil {
 			return fmt.Errorf("populating temp table: %w", err)
 		}
@@ -193,7 +193,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 				)
 			`, ref.Table, ref.Column)
 
-			_, err = txApp.DB().NewQuery(updateQuery).Bind(dbx.Params{
+			_, err = txApp.NonconcurrentDB().NewQuery(updateQuery).Bind(dbx.Params{
 				"target_id": targetID,
 			}).Execute()
 			if err != nil {
@@ -212,7 +212,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 		}
 
 		// Delete absorbed records
-		_, err = txApp.DB().NewQuery(fmt.Sprintf(`
+		_, err = txApp.NonconcurrentDB().NewQuery(fmt.Sprintf(`
 			DELETE FROM %[1]s 
 			WHERE EXISTS (
 				SELECT 1 
@@ -225,7 +225,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 		}
 
 		// Clean up
-		_, err = txApp.DB().NewQuery("DROP TABLE ids_to_absorb").Execute()
+		_, err = txApp.NonconcurrentDB().NewQuery("DROP TABLE ids_to_absorb").Execute()
 		if err != nil {
 			return fmt.Errorf("dropping temp table: %w", err)
 		}
@@ -339,7 +339,7 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 						WHERE id = {:record_id}
 					`, table, column)
 
-					_, err = txApp.DB().NewQuery(query).Bind(dbx.Params{
+					_, err = txApp.NonconcurrentDB().NewQuery(query).Bind(dbx.Params{
 						"old_value": oldValue,
 						"record_id": recordId,
 					}).Execute()

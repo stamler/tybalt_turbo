@@ -105,7 +105,7 @@ func TestSendNextPendingNotification_ErrorOnCountQuery(t *testing.T) {
 	defer app.Cleanup()
 
 	// Break the notifications table to force query errors
-	_, err := app.DB().NewQuery("ALTER TABLE notifications RENAME TO notifications_broken").Execute()
+	_, err := app.NonconcurrentDB().NewQuery("ALTER TABLE notifications RENAME TO notifications_broken").Execute()
 	if err != nil {
 		t.Fatalf("Failed to rename notifications table: %v", err)
 	}
@@ -134,7 +134,7 @@ func TestSendNextPendingNotification_ErrorOnFetch(t *testing.T) {
 	defer app.Cleanup()
 
 	// Break the notification_templates table to force a JOIN error
-	_, err := app.DB().NewQuery("ALTER TABLE notification_templates RENAME TO notification_templates_broken").Execute()
+	_, err := app.NonconcurrentDB().NewQuery("ALTER TABLE notification_templates RENAME TO notification_templates_broken").Execute()
 	if err != nil {
 		t.Fatalf("Failed to rename notification_templates table: %v", err)
 	}
@@ -183,7 +183,7 @@ func TestSendNextPendingNotification_ErrorOnInvalidTemplate(t *testing.T) {
 	initialCount := countResult.Count
 
 	// Update a notification template to have invalid template syntax
-	_, err = app.DB().NewQuery("UPDATE notification_templates SET text_email = '{{.InvalidSyntax}'").Execute()
+	_, err = app.NonconcurrentDB().NewQuery("UPDATE notification_templates SET text_email = '{{.InvalidSyntax}'").Execute()
 	if err != nil {
 		t.Fatalf("Failed to update template: %v", err)
 	}

@@ -279,7 +279,7 @@ func TestAbsorbRoutes(t *testing.T) {
 		// Add routes with the broken claims table
 		app.OnServe().BindFunc(func(e *core.ServeEvent) error {
 			// Break the claims table
-			_, err := app.DB().NewQuery("ALTER TABLE claims RENAME TO claims_broken").Execute()
+			_, err := app.NonconcurrentDB().NewQuery("ALTER TABLE claims RENAME TO claims_broken").Execute()
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -659,7 +659,7 @@ func TestUndoAbsorb(t *testing.T) {
 		for table, updates := range updatedRefs {
 			for recordID, oldValue := range updates {
 				updateQuery := fmt.Sprintf("UPDATE %s SET %s = {:old_value} WHERE id = {:record_id}", table, refConfigs[0].Column)
-				_, err = txApp.DB().NewQuery(updateQuery).Bind(dbx.Params{
+				_, err = txApp.NonconcurrentDB().NewQuery(updateQuery).Bind(dbx.Params{
 					"old_value": oldValue,
 					"record_id": recordID,
 				}).Execute()

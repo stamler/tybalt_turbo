@@ -44,8 +44,8 @@ func updateNotificationStatus(app core.App, notification Notification, sendErr e
 	// handle locking and busy-waiting. A previous version used update and was
 	// causing race conditions (database was locked for writing during another
 	// update). This could probably also be solved with a mutex for notification
-	// status updates, but I think PocketBase's writer is somehow more
-	// efficient/easier.
+	// status updates, or by using the UPDATEs but leveraging the
+	// NonconcurrentDB() rather than DB() to avoid the writer lock.
 	record, err := app.FindRecordById("notifications", notification.Id)
 	if err != nil {
 		app.Logger().Error(
@@ -147,7 +147,7 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 		}
 
 		// update the notification status to inflight
-		_, err = txApp.DB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'inflight' WHERE id = '%s'", notification.Id)).Execute()
+		_, err = txApp.NonconcurrentDB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'inflight' WHERE id = '%s'", notification.Id)).Execute()
 		if err != nil {
 			return err
 		}
