@@ -204,14 +204,6 @@ func TestSendNextPendingNotification_ErrorOnInvalidTemplate(t *testing.T) {
 	}
 }
 
-// 6. the pending count and an error are returned if updating the notification
-//    status to inflight fails
-
-// 7. the pending count and an error are returned if the email cannot be sent
-
-// 8. the pending count and an error are returned if updating the notification
-//    status to sent fails
-
 // SendNotifications()
 
 //  1. on success, sentCount matches the number of emails in the TestMailer
@@ -241,5 +233,33 @@ func TestSendNotifications_SendsAllPendingNotifications(t *testing.T) {
 	}
 }
 
-// 2. on failure, sentCount matches the number of emails in the TestMailer
-//    messages parameter but an error is returned
+//  2. on failure, sentCount matches the number of emails in the TestMailer
+//     messages parameter but an error is returned
+func TestSendNotifications_ErrorHandling(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Break the notifications table to force query errors
+	_, err := app.NonconcurrentDB().NewQuery("ALTER TABLE notifications RENAME TO notifications_broken").Execute()
+	if err != nil {
+		t.Fatalf("Failed to rename notifications table: %v", err)
+	}
+
+	// Call SendNotifications
+	sentCount, err := notifications.SendNotifications(app)
+
+	// Sleep briefly to allow any async operations to complete
+	time.Sleep(20 * time.Millisecond)
+
+	// Verify we got an error
+	if err == nil {
+		t.Error("Expected an error when email sending fails, got nil")
+	}
+
+	// Verify sentCount matches the number of emails in the TestMailer messages
+	messageCount := len(app.TestMailer.Messages())
+	if sentCount != int64(messageCount) {
+		t.Errorf("Expected sentCount to be %d, got %d", messageCount, sentCount)
+	}
+}
