@@ -541,7 +541,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				"OnModelAfterUpdateSuccess": 1,
 				"OnModelUpdate":             1,
 				"OnRecordUpdate":            1,
-				"OnRecordValidate":          1,
+				"OnRecordValidate":          2, // 1 for validate, 1 for notification
+				"OnRecordCreate":            1, // notification created
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -628,7 +629,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				"OnModelAfterUpdateSuccess": 1,
 				"OnModelUpdate":             1,
 				"OnRecordUpdate":            1,
-				"OnRecordValidate":          1,
+				"OnRecordValidate":          2, // 1 for validate, 1 for notification
+				"OnRecordCreate":            1, // notification created
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -651,7 +653,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				"OnModelAfterUpdateSuccess": 1,
 				"OnModelUpdate":             1,
 				"OnRecordUpdate":            1,
-				"OnRecordValidate":          1,
+				"OnRecordValidate":          2, // 1 for validate, 1 for notification
+				"OnRecordCreate":            1, // notification created
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -702,7 +705,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				"OnModelAfterUpdateSuccess": 1,
 				"OnModelUpdate":             1,
 				"OnRecordUpdate":            1,
-				"OnRecordValidate":          1,
+				"OnRecordValidate":          2, // 1 for validate, 1 for notification
+				"OnRecordCreate":            1, // notification created
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

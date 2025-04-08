@@ -377,10 +377,6 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 				}
 			}
 
-			// TODO: send notification (email) to the creator (uid), and approver
-			// that the purchase order has been rejected, at what time, and by whom
-			// This will be implemented through the notification service that hasn't
-			// been built yet.
 			return nil
 		})
 
@@ -398,6 +394,31 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 		updatedPO, err := app.FindRecordById("purchase_orders", id)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+
+		// Send notification to the creator (uid)
+		notificationCollection, err := app.FindCollectionByNameOrId("notifications")
+		if err != nil {
+			// Log the error but don't fail the request, as the PO was already rejected
+			app.Logger().Error("notification not sent: error finding notifications collection", "error", err)
+		} else {
+			notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+				"code": "po_rejected",
+			})
+			if err != nil {
+				// Log the error but don't fail the request
+				app.Logger().Error("notification not sent: error finding po_rejected notification template", "error", err)
+			} else {
+				notificationRecord := core.NewRecord(notificationCollection)
+				notificationRecord.Set("recipient", updatedPO.GetString("uid"))
+				notificationRecord.Set("template", notificationTemplate.Id)
+				notificationRecord.Set("status", "pending")
+				notificationRecord.Set("user", userId)
+				if err := app.Save(notificationRecord); err != nil {
+					// Log the error but don't fail the request
+					app.Logger().Error("notification not sent: error saving rejection notification", "error", err)
+				}
+			}
 		}
 
 		return e.JSON(http.StatusOK, updatedPO)
