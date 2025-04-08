@@ -317,5 +317,30 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 		return validationErr
 	}
 
+	// If this is a new record, send a notification to the approver
+	if record.IsNew() {
+		notificationCollection, err := app.FindCollectionByNameOrId("notifications")
+		if err != nil {
+			return err
+		}
+
+		notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+			"code": "po_approval_required",
+		})
+		if err != nil {
+			return err
+		}
+
+		notificationRecord := core.NewRecord(notificationCollection)
+		notificationRecord.Set("recipient", record.GetString("approver"))
+		notificationRecord.Set("template", notificationTemplate.Id)
+		notificationRecord.Set("status", "pending")
+		notificationRecord.Set("user", authRecord.Id)
+
+		if err := app.Save(notificationRecord); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }

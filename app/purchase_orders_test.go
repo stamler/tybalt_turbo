@@ -72,7 +72,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"approver":"etysnrlup2f6bak"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -101,7 +101,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"approver":"etysnrlup2f6bak"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -240,7 +240,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"approver":"etysnrlup2f6bak"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -350,7 +350,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"approver":"etysnrlup2f6bak"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -601,7 +601,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"approver":"etysnrlup2f6bak"`, // Original approver remains
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -652,7 +652,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"approver":"etysnrlup2f6bak"`, // Original approver remains
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -681,7 +681,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"po_number":""`,               // No PO number should be generated
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -728,7 +728,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"approver":"etysnrlup2f6bak"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -775,7 +775,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				`"approver":"etysnrlup2f6bak"`, // Original approver remains
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
