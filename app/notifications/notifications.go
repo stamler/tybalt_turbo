@@ -149,7 +149,7 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 		// update the notification status to inflight
 		_, err = txApp.NonconcurrentDB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'inflight' WHERE id = '%s'", notification.Id)).Execute()
 		if err != nil {
-			return err
+			return fmt.Errorf("error updating notification status to inflight: %v", err)
 		}
 
 		return nil
