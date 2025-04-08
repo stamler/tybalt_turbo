@@ -132,6 +132,9 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 		var text bytes.Buffer
 		err = textTemplate.Execute(&text, notification)
 		if err != nil {
+			// NOTE: In testing, it was impossible to reliably cause this error since
+			// template execution fails gracefully under most circumstances. As a
+			// result, we are not testing this code path.
 			return fmt.Errorf("error executing text template for notification %s: %s", notification.Id, err)
 		}
 

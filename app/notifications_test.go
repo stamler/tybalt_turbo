@@ -204,15 +204,12 @@ func TestSendNextPendingNotification_ErrorOnInvalidTemplate(t *testing.T) {
 	}
 }
 
-// 6. the pending count and an error are returned if the text template cannot be
-//    executed
-
-// 7. the pending count and an error are returned if updating the notification
+// 6. the pending count and an error are returned if updating the notification
 //    status to inflight fails
 
-// 8. the pending count and an error are returned if the email cannot be sent
+// 7. the pending count and an error are returned if the email cannot be sent
 
-// 9. the pending count and an error are returned if updating the notification
+// 8. the pending count and an error are returned if updating the notification
 //    status to sent fails
 
 // SendNotifications()
