@@ -193,7 +193,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 
 		// Expand the new purchase order
 		if errs := app.ExpandRecord(updatedPO, []string{"uid.profiles_via_uid", "approver.profiles_via_uid", "division", "job"}, nil); len(errs) > 0 {
-			return e.JSON(http.StatusInternalServerError, map[string]interface{}{
+			return e.JSON(http.StatusInternalServerError, map[string]any{
 				"message": fmt.Sprintf("error expanding record: %v", errs),
 				"code":    "error_expanding_record",
 			})
@@ -223,6 +223,10 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			notificationRecord.Set("template", notificationTemplate.Id)
 			notificationRecord.Set("status", "pending")
 			notificationRecord.Set("user", userId)
+			notificationRecord.Set("data", map[string]any{
+				"POId":          updatedPO.Id,
+				"POCreatorName": updatedPO.ExpandedOne("uid").GetString("given_name") + " " + updatedPO.ExpandedOne("uid").GetString("surname"),
+			})
 		}
 
 		if !recordIsApproved && updatedPO.GetString("status") == "Active" && updatedPO.GetString("uid") != userId {
@@ -243,6 +247,12 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			notificationRecord.Set("template", notificationTemplate.Id)
 			notificationRecord.Set("status", "pending")
 			notificationRecord.Set("user", userId)
+			notificationRecord.Set("data", map[string]any{
+				"POId":           updatedPO.Id,
+				"PONumber":       updatedPO.GetString("po_number"),
+				"POCreatorName":  updatedPO.ExpandedOne("uid").GetString("given_name") + " " + updatedPO.ExpandedOne("uid").GetString("surname"),
+				"POApproverName": updatedPO.ExpandedOne("approver").GetString("given_name") + " " + updatedPO.ExpandedOne("approver").GetString("surname"),
+			})
 		}
 
 		// If there is a notification record to save, save it
@@ -396,6 +406,14 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
+		// Expand the new purchase order
+		if errs := app.ExpandRecord(updatedPO, []string{"uid.profiles_via_uid", "approver.profiles_via_uid", "division", "job"}, nil); len(errs) > 0 {
+			return e.JSON(http.StatusInternalServerError, map[string]any{
+				"message": fmt.Sprintf("error expanding record: %v", errs),
+				"code":    "error_expanding_record",
+			})
+		}
+
 		// Send notification to the creator (uid)
 		notificationCollection, err := app.FindCollectionByNameOrId("notifications")
 		if err != nil {
@@ -414,6 +432,9 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 				notificationRecord.Set("template", notificationTemplate.Id)
 				notificationRecord.Set("status", "pending")
 				notificationRecord.Set("user", userId)
+				notificationRecord.Set("data", map[string]any{
+					"POId": updatedPO.Id,
+				})
 				if err := app.Save(notificationRecord); err != nil {
 					// Log the error but don't fail the request
 					app.Logger().Error("notification not sent: error saving rejection notification", "error", err)

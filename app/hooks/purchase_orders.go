@@ -319,6 +319,13 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 
 	// If this is a new record, send a notification to the approver
 	if record.IsNew() {
+
+		// Generate a new id for the record here so that the notification can
+		// reference it
+		// https://github.com/pocketbase/pocketbase/discussions/6170
+		// https://pocketbase.io/docs/collections/#textfield
+		record.Set("id:autogenerate", "")
+
 		notificationCollection, err := app.FindCollectionByNameOrId("notifications")
 		if err != nil {
 			return err
@@ -336,6 +343,9 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 		notificationRecord.Set("template", notificationTemplate.Id)
 		notificationRecord.Set("status", "pending")
 		notificationRecord.Set("user", authRecord.Id)
+		notificationRecord.Set("data", map[string]any{
+			"POId": record.Id,
+		})
 
 		if err := app.Save(notificationRecord); err != nil {
 			return err
