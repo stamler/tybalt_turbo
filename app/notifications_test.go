@@ -31,8 +31,8 @@ func TestSendNextPendingNotification_SendsOneEmail(t *testing.T) {
 
 	// Verify remaining count is one less than original 4 pending notifications
 	// in the test data.
-	if remaining != 3 {
-		t.Errorf("Expected remaining count to be 3, got %d", remaining)
+	if remaining != 4 {
+		t.Errorf("Expected remaining count to be 4, got %d", remaining)
 	}
 
 	// Sleep for 100ms to allow the goroutine called by
@@ -226,10 +226,10 @@ func TestSendNotifications_SendsAllPendingNotifications(t *testing.T) {
 		t.Errorf("Expected sentCount to be %d, got %d", len(app.TestMailer.Messages()), sentCount)
 	}
 
-	// Verify that there are 4 messages in the TestMailer, matching the 4 pending
+	// Verify that there are 5 messages in the TestMailer, matching the 5 pending
 	// notifications in the test data.
-	if len(app.TestMailer.Messages()) != 4 {
-		t.Errorf("Expected 4 messages in the TestMailer, got %d", len(app.TestMailer.Messages()))
+	if len(app.TestMailer.Messages()) != 5 {
+		t.Errorf("Expected 5 messages in the TestMailer, got %d", len(app.TestMailer.Messages()))
 	}
 }
 

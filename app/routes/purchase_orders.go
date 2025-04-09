@@ -199,6 +199,9 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			})
 		}
 
+		creatorProfile := updatedPO.ExpandedOne("uid").ExpandedOne("profiles_via_uid")
+		approverProfile := updatedPO.ExpandedOne("approver").ExpandedOne("profiles_via_uid")
+
 		notificationCollection, err := app.FindCollectionByNameOrId("notifications")
 		if err != nil {
 			return err
@@ -225,7 +228,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			notificationRecord.Set("user", userId)
 			notificationRecord.Set("data", map[string]any{
 				"POId":          updatedPO.Id,
-				"POCreatorName": updatedPO.ExpandedOne("uid").GetString("given_name") + " " + updatedPO.ExpandedOne("uid").GetString("surname"),
+				"POCreatorName": creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
 			})
 		}
 
@@ -250,8 +253,8 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			notificationRecord.Set("data", map[string]any{
 				"POId":           updatedPO.Id,
 				"PONumber":       updatedPO.GetString("po_number"),
-				"POCreatorName":  updatedPO.ExpandedOne("uid").GetString("given_name") + " " + updatedPO.ExpandedOne("uid").GetString("surname"),
-				"POApproverName": updatedPO.ExpandedOne("approver").GetString("given_name") + " " + updatedPO.ExpandedOne("approver").GetString("surname"),
+				"POCreatorName":  creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
+				"POApproverName": approverProfile.GetString("given_name") + " " + approverProfile.GetString("surname"),
 			})
 		}
 
