@@ -48,6 +48,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 		// used after the transaction has completed outside of the transaction
 		// function.
 		recordIsApproved := false
+		updatedRecordIsApproved := false
 
 		err := app.RunInTransaction(func(txApp core.App) error {
 			// Fetch existing purchase order
@@ -104,7 +105,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				}
 			}
 			recordIsApproved = !po.GetDateTime("approved").IsZero()
-			updatedRecordIsApproved := recordIsApproved
+			updatedRecordIsApproved = recordIsApproved
 			recordRequiresSecondApproval := po.GetFloat("approval_total") > thresholds[0]
 			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()
 
@@ -208,7 +209,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 		}
 		var notificationRecord *core.Record = nil
 
-		if recordIsApproved && updatedPO.GetString("priority_second_approver") != "" && updatedPO.GetString("status") != "Active" {
+		if updatedRecordIsApproved && updatedPO.GetString("priority_second_approver") != "" && updatedPO.GetString("status") != "Active" {
 			// The PO is now approved but not second-approved, and the
 			// priority_second_approver is set. Create a message to the
 			// priority_second_approver alerting them that they need to approve the PO
