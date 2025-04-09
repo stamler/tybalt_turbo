@@ -3,7 +3,9 @@ package notifications
 import (
 	"bytes"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	"maps"
 	"net/mail"
 	"text/template"
 	"time"
@@ -25,6 +27,8 @@ type Notification struct {
 	Error              string `db:"error"`
 	UserId             string `db:"user"`
 	SystemNotification bool   `db:"system_notification"`
+	Data               []byte `db:"data"`
+	parsedData         map[string]any
 }
 
 // WriteStatusUpdatedOnNotification is a hook that writes the current time to the status_updated field
@@ -106,7 +110,8 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 				r_profile.notification_type,
 				(u_profile.given_name || ' ' || u_profile.surname) AS user_name,
 				nt.subject,
-				nt.text_email
+				nt.text_email,
+				n.data
 			FROM notifications n
 			LEFT JOIN profiles r_profile ON n.recipient = r_profile.uid
 			LEFT JOIN profiles u_profile ON n.user = u_profile.uid
@@ -122,15 +127,52 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 			return fmt.Errorf("error fetching pending notification: %v", err)
 		}
 
+		// unmarshal the json data if it exists
+		if len(notification.Data) > 0 {
+			err = json.Unmarshal(notification.Data, &notification.parsedData)
+			if err != nil {
+				// NOTE: Decide how to handle invalid JSON. Log and continue? Error out?
+				// Here, we'll log and error out the transaction.
+				app.Logger().Error(
+					"Failed to unmarshal notification data",
+					"notification_id", notification.Id,
+					"error", err,
+					"raw_data", string(notification.Data),
+				)
+				return fmt.Errorf("error unmarshalling notification data for %s: %w", notification.Id, err)
+			}
+		}
+
 		// populate the text template
 		textTemplate, err := template.New("text_email").Parse(notification.Template)
 		if err != nil {
 			return fmt.Errorf("error parsing text template for notification %s: %s", notification.Id, err)
 		}
 
+		// Create a map to hold all template data
+		templateData := map[string]any{
+			"Id":                 notification.Id,
+			"RecipientEmail":     notification.RecipientEmail,
+			"RecipientName":      notification.RecipientName,
+			"NotificationType":   notification.NotificationType,
+			"UserName":           notification.UserName,
+			"Subject":            notification.Subject,
+			"Template":           notification.Template, // Include template itself if needed
+			"Status":             notification.Status,
+			"StatusUpdated":      notification.StatusUpdated,
+			"Error":              notification.Error,
+			"UserId":             notification.UserId,
+			"SystemNotification": notification.SystemNotification,
+		}
+
+		// Merge the custom data from the 'Data' field using maps.Copy
+		if notification.parsedData != nil {
+			maps.Copy(templateData, notification.parsedData)
+		}
+
 		// execute the text template
 		var text bytes.Buffer
-		err = textTemplate.Execute(&text, notification)
+		err = textTemplate.Execute(&text, templateData) // Use the combined map
 		if err != nil {
 			// NOTE: In testing, it was impossible to reliably cause this error since
 			// template execution fails gracefully under most circumstances. As a
