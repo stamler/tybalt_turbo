@@ -75,3 +75,71 @@ This section details the logic for the daily scheduled job that generates `po_se
 - POs with a `priority_second_approver` are currently *included* in this daily job based on this spec (needs confirmation if this is desired).
 - If multiple users share the exact same *minimum* qualifying `max_amount` for a specific PO, they will *all* receive a notification.
 - If no user is qualified to approve a pending PO (based on amount or division), no notification is generated for that PO by this job.
+
+## The View
+
+### pending_items_for_qualified_po_second_approvers
+
+```sql
+-- This view identifies users qualified to perform second approvals on purchase orders
+-- that have been awaiting second approval for more than 24 hours (based on 'updated' timestamp)
+-- and counts how many such POs each user is qualified for.
+-- It implements the logic described in the "The View" section of po_second_approver_notifications.md
+
+-- Note: This view considers a user qualified for a PO if:
+-- 1. They have the 'po_approver' claim.
+-- 2. The PO needs second approval (approved, status='Unapproved', second_approval='', updated > 24h ago).
+-- 3. The user's max_amount >= PO's approval_total.
+-- 4. The user has permission for the PO's division (user.divisions is empty OR contains po.division).
+-- 5. The user's max_amount <= PO's upper_threshold (ensuring users aren't counted for POs below their effective tier).
+
+WITH QualifiedUsers AS (
+    -- Select users with the 'po_approver' claim and their properties
+    SELECT
+        u.id AS user_id,
+        pap.max_amount,
+        pap.divisions
+    FROM users u
+    -- Join user claims to get claim IDs
+    JOIN user_claims uc ON u.id = uc.uid
+    -- Join claims to filter by claim name
+    JOIN claims c ON uc.cid = c.id
+    -- Join PO approver properties using the user_claims ID
+    JOIN po_approver_props pap ON uc.id = pap.user_claim
+    WHERE c.name = 'po_approver'
+),
+POsNeedingSecondApproval AS (
+    -- Select Purchase Orders that require second approval and are past the 24h priority window
+    SELECT
+        po.id AS po_id,
+        po.approval_total,
+        po.division,
+        poa.upper_threshold
+    FROM purchase_orders po
+    -- Join with the augmented view to get threshold information
+    JOIN purchase_orders_augmented poa ON po.id = poa.id
+    WHERE
+        po.approved != ''           -- Must be first-approved
+        AND po.status = 'Unapproved'  -- Must still be Unapproved (awaiting second approval)
+        AND po.second_approval = '' -- Must not be second-approved yet
+        -- Check if the PO was last updated more than 24 hours ago
+        AND po.updated < strftime('%Y-%m-%d %H:%M:%fZ', 'now', '-24 hours')
+)
+-- Final selection: Group by user and count the POs they are qualified to second-approve
+SELECT
+    qu.user_id AS id,
+    COUNT(pnsa.po_id) AS num_pos_qualified
+FROM QualifiedUsers qu
+-- Left join ensures all qualified users appear, even if they have 0 POs to approve currently
+LEFT JOIN POsNeedingSecondApproval pnsa
+    -- Join condition: Check if the user (qu) is qualified for the PO (pnsa)
+    ON qu.max_amount >= pnsa.approval_total  -- 1. Check amount threshold
+    AND (
+        json_valid(qu.divisions) AND json_array_length(qu.divisions) = 0 -- 2a. User can approve any division (divisions is '[]')
+        OR (
+           json_valid(qu.divisions) AND EXISTS (SELECT 1 FROM json_each(qu.divisions) WHERE value = pnsa.division) -- 2b. User's divisions list contains the PO's division
+        )
+    )
+    AND qu.max_amount <= pnsa.upper_threshold -- 3. Tier check: User's max_amount is within the PO's threshold band
+GROUP BY qu.user_id; -- Group results per user
+```
