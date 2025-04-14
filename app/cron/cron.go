@@ -12,6 +12,9 @@ func AddCronJobs(app core.App) {
 	// awaiting second approval but the priority_second_approver has not yet
 	// approved the PO after 24 hours.
 	app.Cron().MustAdd("po_second_approval_notifications", "0 21 * * *", func() {
+		// The true flag will send the notifications immediately. In the future we
+		// may use false and then schedule a job to send all pending notifications
+		// at regular intervals.
 		notifications.QueuePoSecondApproverNotifications(app, true)
 	})
 }
