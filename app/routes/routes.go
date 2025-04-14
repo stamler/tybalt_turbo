@@ -50,6 +50,13 @@ func AddRoutes(app core.App) {
 			}
 			return e.JSON(http.StatusOK, map[string]any{"notificationsSent": sentCount})
 		})
+		// TODO: This is a temporary route to send the po_second_approval_required
+		// notifications for testing purposes. Remove this before going to
+		// production.
+		notificationsGroup.POST("/send_po_second_approval_notifications", func(e *core.RequestEvent) error {
+			err := notifications.QueuePoSecondApproverNotifications(app, true)
+			return e.JSON(http.StatusOK, map[string]any{"error": err})
+		})
 
 		tsGroup := se.Router.Group("/api/time_sheets")
 		tsGroup.Bind(apis.RequireAuth("users"))

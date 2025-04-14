@@ -92,6 +92,7 @@ This section details the logic for the daily scheduled job that generates `po_se
 -- 3. The user's max_amount >= PO's approval_total.
 -- 4. The user has permission for the PO's division (user.divisions is empty OR contains po.division).
 -- 5. The user's max_amount <= PO's upper_threshold (ensuring users aren't counted for POs below their effective tier).
+-- TODO: Does `num_pos_qualified` inadvertently include rejected purchase orders?
 
 WITH QualifiedUsers AS (
     -- Select users with the 'po_approver' claim and their properties

@@ -10,6 +10,7 @@ import (
 	"text/template"
 	"time"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/mailer"
 )
@@ -108,7 +109,7 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 				(r_profile.given_name || ' ' || r_profile.surname) AS recipient_name,
 				u.email,
 				r_profile.notification_type,
-				(u_profile.given_name || ' ' || u_profile.surname) AS user_name,
+				COALESCE(u_profile.given_name || ' ' || u_profile.surname, '') AS user_name,
 				nt.subject,
 				nt.text_email,
 				n.data
@@ -241,4 +242,78 @@ func SendNotifications(app core.App) (int64, error) {
 		sentCount++
 	}
 	return sentCount, nil
+}
+
+// QueueSecondApproverNotifications will create a notification for each user (id
+// column) in `pending_items_for_qualified_po_second_approvers` who has a
+// `num_pos_qualified` > 0.
+func QueuePoSecondApproverNotifications(app core.App, send bool) error {
+	// query the `pending_items_for_qualified_po_second_approvers` view
+	records, err := app.FindRecordsByFilter(
+		"pending_items_for_qualified_po_second_approvers",
+		"num_pos_qualified > 0",
+		"",
+		0,
+		0,
+	)
+	if err != nil {
+		app.Logger().Error(
+			"error querying pending_items_for_qualified_po_second_approvers",
+			"error", err,
+		)
+		return fmt.Errorf("error querying pending_items_for_qualified_po_second_approvers: %v", err)
+	}
+
+	notificationCollection, err := app.FindCollectionByNameOrId("notifications")
+	if err != nil {
+		app.Logger().Error(
+			"error finding notifications collection",
+			"error", err,
+		)
+		return fmt.Errorf("error finding notifications collection: %v", err)
+	}
+
+	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+		"code": "po_second_approval_required",
+	})
+	if err != nil {
+		app.Logger().Error(
+			"error finding notification template",
+			"error", err,
+		)
+		return fmt.Errorf("error finding notification template: %v", err)
+	}
+
+	// create a notification for each user
+	for _, record := range records {
+		notificationRecord := core.NewRecord(notificationCollection)
+		notificationRecord.Set("recipient", record.Get("id"))
+		notificationRecord.Set("template", notificationTemplate.Get("id"))
+		notificationRecord.Set("subject", notificationTemplate.Get("subject"))
+		notificationRecord.Set("text_email", notificationTemplate.Get("text_email"))
+		notificationRecord.Set("status", "pending")
+		notificationRecord.Set("system_notification", true)
+		err = app.Save(notificationRecord)
+		if err != nil {
+			app.Logger().Error(
+				"error saving second approval notification",
+				"error", err,
+				"recipient_id", record.Get("id"),
+			)
+			return fmt.Errorf("error saving second approval notification: %v", err)
+		}
+	}
+
+	// Send the notifications if the send flag is true
+	if send {
+		sentCount, err := SendNotifications(app)
+		if err != nil {
+			return fmt.Errorf("error sending notifications: %v", err)
+		}
+		app.Logger().Info(
+			"sent all notifications",
+			"sent_count", sentCount,
+		)
+	}
+	return nil
 }

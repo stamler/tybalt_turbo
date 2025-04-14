@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"tybalt/cron"
 	"tybalt/hooks"
 	_ "tybalt/migrations"
 	"tybalt/routes"
@@ -60,6 +61,9 @@ func main() {
 
 	// Add the routes to the app
 	routes.AddRoutes(app)
+
+	// Add the cron jobs to the app
+	cron.AddCronJobs(app)
 
 	if err := app.Start(); err != nil {
 		log.Fatal(err)
