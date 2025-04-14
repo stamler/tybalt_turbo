@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 	"tybalt/notifications"
+	"tybalt/reports"
 
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -97,6 +98,11 @@ func AddRoutes(app core.App) {
 		clientContactsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "client_contacts"))
 		clientContactsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "client_contacts"))
 
+		reportsGroup := se.Router.Group("/api/reports")
+		reportsGroup.Bind(apis.RequireAuth("users"))
+		reportsGroup.GET("/payroll_time/{payrollEnding}/{week}", reports.CreatePayrollTimeReportHandler(app))
+		reportsGroup.GET("/payroll_expense/{payrollEnding}", reports.CreatePayrollExpenseReportHandler(app))
+		reportsGroup.GET("/payroll_receipts/{payrollEnding}", reports.CreatePayrollReceiptsReportHandler(app))
 		return se.Next()
 	})
 
