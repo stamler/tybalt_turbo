@@ -145,8 +145,9 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,
 				"OnModelUpdate":             1,
-				"OnRecordUpdate":            1,
-				"OnRecordValidate":          1,
+				"OnRecordUpdate":            1, // purchase order record is updated
+				"OnRecordCreate":            1, // notification record is created
+				"OnRecordValidate":          2, // both records are validated
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -445,8 +446,9 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnModelAfterUpdateSuccess": 1,
 				"OnModelUpdate":             1,
-				"OnRecordUpdate":            1,
-				"OnRecordValidate":          1,
+				"OnRecordUpdate":            1, // purchase order record is updated
+				"OnRecordValidate":          2, // both records are validated
+				"OnRecordCreate":            1, // notification record is created
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

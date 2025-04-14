@@ -49,6 +49,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 		// function.
 		recordIsApproved := false
 		updatedRecordIsApproved := false
+		recordRequiresSecondApproval := false
 
 		err := app.RunInTransaction(func(txApp core.App) error {
 			// Fetch existing purchase order
@@ -106,7 +107,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			}
 			recordIsApproved = !po.GetDateTime("approved").IsZero()
 			updatedRecordIsApproved = recordIsApproved
-			recordRequiresSecondApproval := po.GetFloat("approval_total") > thresholds[0]
+			recordRequiresSecondApproval = po.GetFloat("approval_total") > thresholds[0]
 			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()
 
 			// If the caller is not an approver or a qualified second approver, and
@@ -233,7 +234,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			})
 		}
 
-		if !recordIsApproved && updatedPO.GetString("status") == "Active" && updatedPO.GetString("uid") != userId {
+		if (!recordIsApproved || (recordIsApproved && recordRequiresSecondApproval)) && updatedPO.GetString("status") == "Active" && updatedPO.GetString("uid") != userId {
 			// The PO was just approved and is active. Unless the caller is the
 			// creator of the PO (and thus would already know that it has been
 			// approved), send a message to the creator alerting them that the PO has
