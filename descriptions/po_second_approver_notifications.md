@@ -88,11 +88,10 @@ This section details the logic for the daily scheduled job that generates `po_se
 
 -- Note: This view considers a user qualified for a PO if:
 -- 1. They have the 'po_approver' claim.
--- 2. The PO needs second approval (approved, status='Unapproved', second_approval='', updated > 24h ago).
+-- 2. The PO needs second approval (approved, not rejected, status='Unapproved', second_approval='', updated > 24h ago).
 -- 3. The user's max_amount >= PO's approval_total.
 -- 4. The user has permission for the PO's division (user.divisions is empty OR contains po.division).
 -- 5. The user's max_amount <= PO's upper_threshold (ensuring users aren't counted for POs below their effective tier).
--- TODO: Does `num_pos_qualified` inadvertently include rejected purchase orders?
 
 WITH QualifiedUsers AS (
     -- Select users with the 'po_approver' claim and their properties
@@ -121,6 +120,7 @@ POsNeedingSecondApproval AS (
     JOIN purchase_orders_augmented poa ON po.id = poa.id
     WHERE
         po.approved != ''           -- Must be first-approved
+        AND po.rejected == ''           -- Must not be rejected
         AND po.status = 'Unapproved'  -- Must still be Unapproved (awaiting second approval)
         AND po.second_approval = '' -- Must not be second-approved yet
         -- Check if the PO was last updated more than 24 hours ago
