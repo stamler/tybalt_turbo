@@ -235,10 +235,11 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 		}
 
 		if (!recordIsApproved || (recordIsApproved && recordRequiresSecondApproval)) && updatedPO.GetString("status") == "Active" && updatedPO.GetString("uid") != userId {
-			// The PO was just approved and is active. Unless the caller is the
-			// creator of the PO (and thus would already know that it has been
-			// approved), send a message to the creator alerting them that the PO has
-			// been approved and is available for use.
+			// The PO was just approved (or just second approved) and is active.
+			// Unless the caller is the creator of the PO (and thus would already
+			// know that it has been approved), send a message to the creator
+			// alerting them that the PO has been approved and is available for
+			// use.
 			notificationRecord = core.NewRecord(notificationCollection)
 
 			notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
