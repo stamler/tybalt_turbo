@@ -1,11 +1,16 @@
 package reports
 
 import (
+	_ "embed" // Needed for //go:embed
 	"net/http"
 	"time"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
+
+//go:embed payroll_time_component.sql
+var payrollTimeComponentQuery string
 
 // CreatePayrollTimeReportHandler returns a function that creates a payroll time report for a given week
 func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) error {
@@ -22,9 +27,22 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 			return err
 		}
 
-		// TODO: Implement the logic to create the payroll time report
+		// Load the query from the descriptions/payroll_time_component.sql file
+		// query, err := os.ReadFile("descriptions/payroll_time_component.sql")
+		// if err != nil {
+		// 	return e.Error(http.StatusInternalServerError, "failed to read query file", nil)
+		// }
 
-		return e.JSON(http.StatusOK, map[string]any{"message": "Payroll time report for " + payrollEndingDate.Format("2006-01-02") + " week " + week})
+		// Execute the query
+		var report []map[string]any
+		err = app.DB().NewQuery(payrollTimeComponentQuery).Bind(dbx.Params{
+			"weekEnding": payrollEndingDate.Format("2006-01-02"),
+		}).All(&report)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query", nil)
+		}
+
+		return e.JSON(http.StatusOK, report)
 	}
 }
 

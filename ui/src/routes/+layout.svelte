@@ -181,6 +181,12 @@
               />
             </div>
           </div>
+          <div class="mt-4 space-y-1">
+            <p class="px-2 text-xs font-semibold uppercase text-neutral-400">Reports</p>
+            <div class="flex items-center justify-between rounded px-2 py-1 hover:bg-neutral-600">
+              <a href="/reports/payroll">Payroll</a>
+            </div>
+          </div>
 
           <div class="mt-4 space-y-1">
             <p class="px-2 text-xs font-semibold uppercase text-neutral-400">Settings</p>
