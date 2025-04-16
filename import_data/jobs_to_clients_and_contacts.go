@@ -8,15 +8,25 @@ import (
 )
 
 // The function uses DuckDB to normalize the Jobs.parquet data by:
-// 1. Creating a separate Clients.parquet file with unique client records and UUIDs
-// 2. Creating a separate Contacts.parquet file with unique contact records, UUIDs, and corresponding client relationships
-// 3. Updating Jobs.parquet to reference clients and contacts via UUID foreign keys instead of names
+// 1. Creating a separate Clients.parquet file with unique client records and PocketBase formatted ids
+// 2. Creating a separate Contacts.parquet file with unique contact records, PocketBase formatted ids, and corresponding client relationships
+// 3. Updating Jobs.parquet to reference clients and contacts via PocketBase formatted ids instead of names
 func jobsToClientsAndContacts() {
 
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
+
+	// Create random_string() UDF in DuckDB
+	_, err = db.Exec(`
+CREATE OR REPLACE MACRO make_pocketbase_id(length)
+AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, length), '');
+`)
+	if err != nil {
+		log.Fatalf("Failed to create random_string() UDF: %v", err)
+	}
+
 	defer db.Close()
 
 	splitQuery := `
@@ -26,14 +36,14 @@ func jobsToClientsAndContacts() {
 
 		-- Create the clients table, removing duplicate names
 		CREATE TABLE clients AS
-		SELECT uuid() AS id, t_client AS name
+		SELECT make_pocketbase_id(15) AS id, t_client AS name
 		FROM (SELECT DISTINCT t_client FROM jobs);
 
 		COPY clients TO 'parquet/Clients.parquet' (FORMAT PARQUET);
 
 		-- Create the contacts table where name is trimmed
 		CREATE TABLE contacts AS
-		SELECT uuid() AS id, clientContact AS name, c.id AS client_id
+		SELECT make_pocketbase_id(15) AS id, clientContact AS name, c.id AS client_id
 		FROM (
 				SELECT DISTINCT t_clientContact AS clientContact, t_client AS client
 				FROM jobs
@@ -45,8 +55,8 @@ func jobsToClientsAndContacts() {
 		COPY contacts TO 'parquet/Contacts.parquet' (FORMAT PARQUET);
 		
 		-- Update the jobs table to use the new client and contact ids instead of the old client and clientContact columns
-		ALTER TABLE jobs ADD COLUMN client_id uuid;
-		ALTER TABLE jobs ADD COLUMN contact_id uuid;
+		ALTER TABLE jobs ADD COLUMN client_id string;
+		ALTER TABLE jobs ADD COLUMN contact_id string;
 
 		UPDATE jobs SET client_id = clients.id FROM clients WHERE jobs.t_client = clients.name;
 		UPDATE jobs SET contact_id = contacts.id FROM contacts WHERE jobs.t_clientContact = contacts.name;
