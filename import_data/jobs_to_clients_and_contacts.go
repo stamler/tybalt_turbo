@@ -32,7 +32,7 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 	splitQuery := `
 		-- Load Jobs.parquet into a table called jobs
 		CREATE TABLE jobs AS
-		SELECT *, make_pocketbase_id(15) AS pocketbase_id, TRIM(client) AS t_client, TRIM(clientContact) AS t_clientContact FROM read_parquet('parquet/Jobs.parquet');
+		SELECT *, TRIM(client) AS t_client, TRIM(clientContact) AS t_clientContact FROM read_parquet('parquet/Jobs.parquet');
 
 		-- Create the clients table, removing duplicate names
 		CREATE TABLE clients AS

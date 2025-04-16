@@ -108,7 +108,7 @@ func main() {
 		// Read from MySQL and export to Parquet
 		query := fmt.Sprintf(`
     COPY (
-      SELECT * FROM mysql_db.%s
+      SELECT *, array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id FROM mysql_db.%s
 		) TO 'parquet/%s.parquet' (FORMAT PARQUET)`,
 			table, table)
 
