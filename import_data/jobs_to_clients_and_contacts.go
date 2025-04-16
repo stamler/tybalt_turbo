@@ -22,14 +22,14 @@ func jobsToClientsAndContacts() {
 	splitQuery := `
 		-- Load Jobs.parquet into a table called jobs
 		CREATE TABLE jobs AS
-		SELECT *, TRIM(client) AS t_client, TRIM(clientContact) AS t_clientContact FROM read_parquet('Jobs.parquet');
+		SELECT *, TRIM(client) AS t_client, TRIM(clientContact) AS t_clientContact FROM read_parquet('parquet/Jobs.parquet');
 
 		-- Create the clients table, removing duplicate names
 		CREATE TABLE clients AS
 		SELECT uuid() AS id, t_client AS name
 		FROM (SELECT DISTINCT t_client FROM jobs);
 
-		COPY clients TO 'Clients.parquet' (FORMAT PARQUET);
+		COPY clients TO 'parquet/Clients.parquet' (FORMAT PARQUET);
 
 		-- Create the contacts table where name is trimmed
 		CREATE TABLE contacts AS
@@ -42,7 +42,7 @@ func jobsToClientsAndContacts() {
 		) unique_contacts
 		JOIN clients c ON unique_contacts.client = c.name;
 
-		COPY contacts TO 'Contacts.parquet' (FORMAT PARQUET);
+		COPY contacts TO 'parquet/Contacts.parquet' (FORMAT PARQUET);
 		
 		-- Update the jobs table to use the new client and contact ids instead of the old client and clientContact columns
 		ALTER TABLE jobs ADD COLUMN client_id uuid;
@@ -58,7 +58,7 @@ func jobsToClientsAndContacts() {
 		LEFT JOIN clients ON jobs.client_id = clients.id
 		LEFT JOIN contacts ON jobs.contact_id = contacts.id;
 
-		COPY jobs_audit TO 'Jobs_audit.parquet' (FORMAT PARQUET);
+		COPY jobs_audit TO 'parquet/Jobs_audit.parquet' (FORMAT PARQUET);
 
 		-- ALTER TABLE jobs DROP client;
 		-- ALTER TABLE jobs DROP clientContact;
@@ -67,7 +67,7 @@ func jobsToClientsAndContacts() {
 		-- ALTER TABLE jobs RENAME client_id TO client;
 		-- ALTER TABLE jobs RENAME contact_id TO clientContact;
 
-		COPY jobs TO 'Jobs.parquet' (FORMAT PARQUET);`
+		COPY jobs TO 'parquet/Jobs.parquet' (FORMAT PARQUET);`
 
 	_, err = db.Exec(splitQuery)
 	if err != nil {

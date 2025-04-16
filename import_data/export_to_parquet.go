@@ -23,6 +23,15 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
+	// Create the parquet directory if it doesn't exist
+	parquetDir := "parquet"
+	if _, err := os.Stat(parquetDir); os.IsNotExist(err) {
+		err = os.Mkdir(parquetDir, 0755)
+		if err != nil {
+			log.Fatal("Failed to create parquet directory:", err)
+		}
+	}
+
 	// SSH configuration
 	sshConfig := &ssh.ClientConfig{
 		User: os.Getenv("SSH_USER"),
@@ -100,8 +109,8 @@ func main() {
 		query := fmt.Sprintf(`
     COPY (
       SELECT * FROM mysql_db.%s
-		) TO '%s' (FORMAT PARQUET)`,
-			table, table+".parquet")
+		) TO 'parquet/%s.parquet' (FORMAT PARQUET)`,
+			table, table)
 
 		_, err = db.Exec(query)
 		if err != nil {

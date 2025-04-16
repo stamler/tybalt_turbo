@@ -12,5 +12,5 @@ app/pb_public/
 # import data
 import_data/*.parquet
 import_data/*.duckdb
-
+import_data/parquet
 .env
