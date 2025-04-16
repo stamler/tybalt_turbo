@@ -12,10 +12,10 @@ Users authenticate via OAuth2.0 with Microsoft. We would ideally like to migrate
 
     - collectionRef: '_pb_users_auth_'
     - created: <timestamp_now>
-    - id: <new_pocketbase_id> (perhaps create this on the Profiles.parquet file in advance)
+    - id: <new_pocketbase_id>
     - provider: 'microsoft'
     - providerId: Profiles.parquet.azureId
-    - recordRef: Profiles.parquet.pocketbase_id
+    - recordRef: Profiles.parquet.pocketbase_uid
     - update: <timestamp_now> (see created)
 
 3. We will populate the `users` table as follows:
@@ -23,7 +23,7 @@ Users authenticate via OAuth2.0 with Microsoft. We would ideally like to migrate
     - created: <timestamp_now>
     - email: Profiles.parquet.email
     - emailVisibility: 0
-    - id: <new_pocketbase_id> (perhaps create this on the Profiles.parquet file in advance)
+    - id: Profiles.parquet.pocketbase_uid
     - name: join Profiles.parquet.givenName and Profiles.parquet.surname with a space
     - password: ??
     - tokenKey: ??
@@ -35,11 +35,11 @@ Users authenticate via OAuth2.0 with Microsoft. We would ideally like to migrate
 
     - created: <timestamp_now>
     - given_name: Profiles.parquet.givenName
-    - id: <new_pocketbase_id> (perhaps create this on the Profiles.parquet file in advance, see _externalAuths)
+    - id: Profiles.parquet.pocketbase_id
     - surname: Profiles.parquet.surname
     - updated: <timestamp_now> (see created)
     - manager: Profiles.parquet.pocketbase_managerUid **TO BE CREATED**
     - alternate_manager: Profiles.parquet.pocketbase_alternateManager **TO BE CREATED**
     - default_division: Profiles.parquet.pocketbase_defaultDivision **TO BE CREATED**
-    - uid: Profiles.parquet.pocketbase_id
+    - uid: Profiles.parquet.pocketbase_uid
     - notification_type: 'to be determined, see test database'

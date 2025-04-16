@@ -106,10 +106,24 @@ func main() {
 
 	for _, table := range tablesToDump {
 		// Read from MySQL and export to Parquet
+
+		// if the table is Profiles, make a pocketbase_uid column in the parquet
+		// file and populate it with a different unique 15 character string. Note
+		// random comparison value doesn't match the one in the regular SELECT
+		// statement because if it does DuckDB will optimize the query by caching
+		// the output of the first value.
+		specialCol := ""
+		if table == "Profiles" {
+			specialCol = `, array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.71 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_uid`
+		}
+
 		query := fmt.Sprintf(`
     COPY (
-      SELECT *, array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id FROM mysql_db.%s
-		) TO 'parquet/%s.parquet' (FORMAT PARQUET)`,
+      SELECT *, 
+				array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id 
+				%s
+				FROM mysql_db.%s
+		) TO 'parquet/%s.parquet' (FORMAT PARQUET)`, specialCol,
 			table, table)
 
 		_, err = db.Exec(query)
