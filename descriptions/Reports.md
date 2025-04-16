@@ -139,26 +139,33 @@ FROM (
              ability to have DISTINCT inside it */
             SELECT *
             FROM (
-                SELECT payrollId,
-                  workWeekHours,
-                  committedWeekEnding weekEnding,
-                  surname,
-                  givenName,
-                  commitName manager,
-                  mealsHours meals,
-                  payoutRequestAmount,
-                  committedWeekEnding,
-                  salary,
+                SELECT payrollId, -- MUST JOIN TO admin_profiles on uid = id to get payroll_id
+                  workWeekHours,  -- MUST JOIN TO admin_profiles on uid = id to get work_week_hours
+                  committedWeekEnding weekEnding, -- committed_week_ending on time_amendments
+                  surname, -- MUST JOIN TO profiles on uid = uid to get surname
+                  givenName, -- MUST JOIN TO profiles on uid = uid to get given_name
+                  commitName manager, -- MUST JOIN TO profiles via users on the commiter field to create commit_name
+                  mealsHours meals, -- meals_hours
+                  payoutRequestAmount, -- payout_request_amount
+                  committedWeekEnding, -- committed_week_ending
+                  salary, -- MUST JOIN TO admin_profiles on uid = id to get salary bool
                   uid primaryUid,
-                  timetype,
-                  hours,
-                  jobHours
+                  timetype, -- MUST JOIN TO time_types on time_type = id to get code
+                  hours, -- 0 if job is present
+                  jobHours -- hours if job is present
                 FROM TimeAmendments
                 WHERE committedWeekEnding = ?
               ) X
               LEFT OUTER JOIN (
+                -- The purpose of the Y table is to return a JSON list of dates 
+                -- (week endings) for which a time_amendments record has been
+                -- folded into the final output row for a given uid. In other
+                -- words, the column hasAmendmentsForWeeksEnding will be empty
+                -- unless for this week, the user has amendments included in 
+                -- their totals. In such a case this would be a list of one or
+                -- more date strings representing week endings.
                 SELECT uid,
-                  JSON_ARRAYAGG(weekEnding) hasAmendmentsForWeeksEnding
+                  JSON_ARRAYAGG(weekEnding) hasAmendmentsForWeeksEnding -- MUST BE json_group_array() in SQLite
                 FROM (
                     SELECT DISTINCT uid,
                       weekEnding
