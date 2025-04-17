@@ -3,8 +3,10 @@ package load
 import (
 	"fmt"
 
+	"github.com/pocketbase/dbx"
 	"github.com/xitongsys/parquet-go-source/local"
 	"github.com/xitongsys/parquet-go/reader"
+	_ "modernc.org/sqlite" // Import modernc SQLite driver for side-effect registration
 )
 
 // TODO: shape the data into the target form then ATTACH the sqlite database
@@ -59,11 +61,23 @@ func FromParquet(parquetFilePath string, sqliteDBPath string, sqliteTableName st
 		items = append(items, rows...)
 	}
 
+	// connect to the sqlite database with the dbx package
+	db, err := dbx.Open("sqlite", sqliteDBPath)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
 	for _, item := range items {
 		// TODO: write data into the corresponding collection in pocketbase, either
 		// using the pocketbase client with a super admin token or building this
 		// into the app itself as an endpoint that accepts a parquet file and a
 		// target collection name.
+
+		db.NewQuery("INSERT INTO clients (id, name) VALUES ({:id}, {:name})").Bind(dbx.Params{
+			"id":   item.Id,
+			"name": item.Name,
+		}).Execute()
 		fmt.Printf("Client: %s, %s\n", item.Id, item.Name)
 	}
 }
