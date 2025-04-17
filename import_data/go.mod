@@ -5,12 +5,17 @@ go 1.23.3
 require (
 	github.com/joho/godotenv v1.5.1
 	github.com/marcboeker/go-duckdb v1.8.3
+	github.com/xitongsys/parquet-go v1.6.2
+	github.com/xitongsys/parquet-go-source v0.0.0-20241021075129-b732d2ac9c9b
 	golang.org/x/crypto v0.29.0
 )
 
 require (
 	github.com/apache/arrow-go/v18 v18.0.0 // indirect
+	github.com/apache/arrow/go/arrow v0.0.0-20200730104253-651201b0f516 // indirect
+	github.com/apache/thrift v0.21.0 // indirect
 	github.com/goccy/go-json v0.10.3 // indirect
+	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/flatbuffers v24.3.25+incompatible // indirect
 	github.com/klauspost/compress v1.17.11 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.8 // indirect

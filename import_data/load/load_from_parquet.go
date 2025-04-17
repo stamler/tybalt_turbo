@@ -1,11 +1,10 @@
 package load
 
 import (
-	"database/sql"
 	"fmt"
-	"log"
 
-	_ "github.com/marcboeker/go-duckdb" // Import DuckDB driver
+	"github.com/xitongsys/parquet-go-source/local"
+	"github.com/xitongsys/parquet-go/reader"
 )
 
 // TODO: shape the data into the target form then ATTACH the sqlite database
@@ -26,41 +25,52 @@ import (
 	8. Upload Expenses.parquet to the sqlite database (these reference jobs, profiles, and purchase orders) We may not do this because there aren't many purchase orders and we can archive the attachments.
 */
 
+type Client struct {
+	Id   string `db:"id" parquet:"name=id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Name string `db:"name" parquet:"name=name, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+}
+
 func FromParquet(parquetFilePath string, sqliteDBPath string, sqliteTableName string, columnNameMap map[string]string) {
-	db, err := sql.Open("duckdb", "")
+	// Open the Parquet file
+	fr, err := local.NewLocalFileReader(parquetFilePath)
 	if err != nil {
-		log.Fatal(err)
+		panic(err)
 	}
-	defer db.Close()
+	defer fr.Close()
 
-	// Install and Load the SQLite extension in DuckDB
-	db.Exec(`
-	INSTALL sqlite;
-	LOAD sqlite;
-	`)
+	// Create a Parquet reader
+	pr, err := reader.NewParquetReader(fr, new(Client), 4)
+	if err != nil {
+		panic(err)
+	}
+	defer pr.ReadStop()
 
-	// Attach the SQLite database
-	db.Exec(fmt.Sprintf(`
-	ATTACH '%s' AS sqlite_db (TYPE sqlite);
-	`, sqliteDBPath))
+	// Count the number of rows in the parquet file
+	numRows := int(pr.GetNumRows())
+	fmt.Printf("%s has %d rows\n", parquetFilePath, numRows)
 
-	// Now we copy each parquet file's data into the corresponding table in
-	// sqlite_db, transforming the data and renaming columns as necessary.
+	// Read all rows into a slice of structs
+	items := make([]Client, 0, numRows)
 
-	// ColumnNameMap is a map of the column names in the parquet file to the
-	// column names in the sqlite table. So we need to create a string that uses
-	// the 'AS' keyword to rename the columns in the parquet file to the column
-	// names in the sqlite table.
-	columnNameString := ""
-	for parquetColumnName, sqliteColumnName := range columnNameMap {
-		columnNameString += fmt.Sprintf("%s AS %s, ", parquetColumnName, sqliteColumnName)
+	const batchSize = 10
+	for i := 0; i < numRows; i += batchSize {
+		toRead := batchSize
+		if numRows-i < batchSize {
+			toRead = numRows - i
+		}
+
+		rows := make([]Client, toRead)
+		if err = pr.Read(&rows); err != nil {
+			panic(err)
+		}
+		items = append(items, rows...)
 	}
 
-	insertStatement := fmt.Sprintf(`
-	INSERT INTO sqlite_db.%s SELECT %s FROM read_parquet('%s');
-	`, sqliteTableName, columnNameString, parquetFilePath)
-	fmt.Println(insertStatement)
-	db.Exec(insertStatement)
-
-	// Now we need to create the foreign key constraints.
+	for _, item := range items {
+		// TODO: write data into the corresponding collection in pocketbase, either
+		// using the pocketbase client with a super admin token or building this
+		// into the app itself as an endpoint that accepts a parquet file and a
+		// target collection name.
+		fmt.Printf("Client: %s, %s\n", item.Id, item.Name)
+	}
 }
