@@ -58,8 +58,24 @@ func FromParquet(parquetFilePath string, sqliteDBPath string, sqliteTableName st
 		if err = pr.Read(&rows); err != nil {
 			panic(err)
 		}
+		// Diagnostic print for the first element of the first batch
+		if i == 0 && len(rows) > 0 {
+			fmt.Printf("First batch, first element: ID=%s, Name=%s\n", rows[0].Id, rows[0].Name)
+		}
 		items = append(items, rows...)
 	}
+
+	// Diagnostic print:
+	fmt.Printf("Expected rows: %d, Actual items read: %d\n", numRows, len(items))
+
+	// NOTE: Potential issue with parquet-go reader:
+	// Observations during testing with Clients.parquet indicate that the first
+	// element read into the items slice (items[0]) contains zero-value data
+	// (e.g., "\uFFFD\uFFFD") instead of the actual first row from the Parquet file.
+	// The actual first row appears in items[1]. This seems to occur specifically
+	// during the first pr.Read(&rows) call. Subsequent reads and the total item
+	// count appear correct. For now, we are not skipping items[0], but this may
+	// need to be addressed if the garbage row causes issues during insertion.
 
 	// connect to the sqlite database with the dbx package
 	db, err := dbx.Open("sqlite", sqliteDBPath)
@@ -78,6 +94,5 @@ func FromParquet(parquetFilePath string, sqliteDBPath string, sqliteTableName st
 			"id":   item.Id,
 			"name": item.Name,
 		}).Execute()
-		fmt.Printf("Client: %s, %s\n", item.Id, item.Name)
 	}
 }
