@@ -45,13 +45,11 @@ func FromParquet(parquetFilePath string, sqliteDBPath string, sqliteTableName st
 	}
 	defer pr.ReadStop()
 
-	// Count the number of rows in the parquet file
+	// Setup the destination slice
 	numRows := int(pr.GetNumRows())
-	fmt.Printf("%s has %d rows\n", parquetFilePath, numRows)
-
-	// Read all rows into a slice of structs
 	items := make([]Client, 0, numRows)
 
+	// Read the data in batches
 	const batchSize = 10
 	for i := 0; i < numRows; i += batchSize {
 		rows := make([]Client, min(batchSize, numRows-i))
