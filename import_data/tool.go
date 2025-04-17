@@ -38,7 +38,7 @@ func main() {
 		}
 
 		// Call the generic function, specifying the type and providing SQL + binder
-		load.FromParquet( // Specify the type parameter [load.Client]
+		load.FromParquet(
 			"./parquet/Clients.parquet",
 			"../app/test_pb_data/data.db",
 			"clients",       // Table name (for logging)
