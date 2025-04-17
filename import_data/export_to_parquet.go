@@ -155,6 +155,10 @@ func main() {
 	// contacts via UUID foreign keys.
 	jobsToClientsAndContacts()
 
+	// Dump the pre-populated tables from the sqlite test database.
+	sqliteTableDumps("../app/test_pb_data/data.db", "divisions")
+	sqliteTableDumps("../app/test_pb_data/data.db", "time_types")
+
 	// We will need a merge clients function to merge duplicate clients and then
 	// update all the jobs that reference the old client to reference the newly
 	// merged client.

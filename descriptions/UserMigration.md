@@ -38,8 +38,8 @@ Users authenticate via OAuth2.0 with Microsoft. We would ideally like to migrate
     - id: Profiles.parquet.pocketbase_id
     - surname: Profiles.parquet.surname
     - updated: <timestamp_now> (see created)
-    - manager: Profiles.parquet.pocketbase_managerUid **TO BE CREATED**
-    - alternate_manager: Profiles.parquet.pocketbase_alternateManager **TO BE CREATED**
-    - default_division: Profiles.parquet.pocketbase_defaultDivision **TO BE CREATED**
+    - manager: Profiles.parquet.pocketbase_managerUid **TO BE CREATED by joining Profiles to itself on pocketbase_uid?**
+    - alternate_manager: Profiles.parquet.pocketbase_alternateManager **TO BE CREATED by joining Profiles to itself on pocketbase_uid**
+    - default_division: Profiles.parquet.pocketbase_defaultDivision **TO BE CREATED by dumping divisions (and timetypes from test db)**
     - uid: Profiles.parquet.pocketbase_uid
     - notification_type: 'to be determined, see test database'
