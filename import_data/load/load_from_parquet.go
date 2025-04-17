@@ -54,12 +54,7 @@ func FromParquet(parquetFilePath string, sqliteDBPath string, sqliteTableName st
 
 	const batchSize = 10
 	for i := 0; i < numRows; i += batchSize {
-		toRead := batchSize
-		if numRows-i < batchSize {
-			toRead = numRows - i
-		}
-
-		rows := make([]Client, toRead)
+		rows := make([]Client, min(batchSize, numRows-i))
 		if err = pr.Read(&rows); err != nil {
 			panic(err)
 		}
