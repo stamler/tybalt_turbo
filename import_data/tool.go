@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"imports/extract"
 	"imports/load"
+
+	"github.com/pocketbase/dbx"
 )
 
 // This file is used to run either an export or an import.
@@ -22,14 +24,26 @@ func main() {
 
 	if *importFlag {
 		fmt.Println("Importing data from Parquet files...")
-		load.FromParquet(
+
+		// --- Load Clients ---
+		// Define the specific SQL for the clients table
+		clientInsertSQL := "INSERT INTO clients (id, name) VALUES ({:id}, {:name})"
+
+		// Define the binder function for the Client type
+		clientBinder := func(item load.Client) dbx.Params {
+			return dbx.Params{
+				"id":   item.Id,
+				"name": item.Name,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet( // Specify the type parameter [load.Client]
 			"./parquet/Clients.parquet",
 			"../app/test_pb_data/data.db",
-			"clients",
-			map[string]string{
-				"id":   "id",
-				"name": "name",
-			},
+			"clients",       // Table name (for logging)
+			clientInsertSQL, // The specific INSERT SQL
+			clientBinder,    // The specific binder function
 		)
 	}
 }
