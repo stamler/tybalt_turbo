@@ -45,6 +45,15 @@ type ClientContact struct {
 	Client string `db:"client" parquet:"name=client_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
 }
 
+type Job struct {
+	Id          string `db:"id" parquet:"name=pocketbase_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Number      string `db:"number" parquet:"name=id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Description string `db:"description" parquet:"name=description, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Client      string `db:"client" parquet:"name=client_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Contact     string `db:"contact" parquet:"name=contact_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Manager     string `db:"manager" parquet:"name=manager_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+}
+
 // TODO: Add struct definitions for other tables (Contacts, Jobs, etc.) here or elsewhere.
 
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
