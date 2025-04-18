@@ -45,5 +45,29 @@ func main() {
 			clientInsertSQL, // The specific INSERT SQL
 			clientBinder,    // The specific binder function
 		)
+
+		// --- Load Contacts ---
+		// Define the specific SQL for the contacts table
+		contactInsertSQL := "INSERT INTO client_contacts (id, surname, given_name, client) VALUES ({:id}, {:surname}, {:given_name}, {:client})"
+
+		// Define the binder function for the Contact type
+		contactBinder := func(item load.ClientContact) dbx.Params {
+			return dbx.Params{
+				"id":         item.Id,
+				"surname":    item.Surname,
+				"given_name": item.GivenName,
+				"client":     item.Client,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/Contacts.parquet",
+			"../app/test_pb_data/data.db",
+			"client_contacts", // Table name (for logging)
+			contactInsertSQL,  // The specific INSERT SQL
+			contactBinder,     // The specific binder function
+		)
+
 	}
 }

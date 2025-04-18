@@ -52,7 +52,31 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 		) unique_contacts
 		JOIN clients c ON unique_contacts.client = c.name;
 
-		COPY contacts TO 'parquet/Contacts.parquet' (FORMAT PARQUET);
+		-- Augment the contacts table with surname and givenName
+		CREATE TABLE contacts_augmented AS
+		WITH NameParts AS (
+		SELECT
+			*,
+			-- Trim whitespace and split the name into a list of words
+			string_split(trim(name), ' ') AS parts
+		FROM
+			contacts
+		)
+	SELECT
+		id, name, client_id, '' as email,
+		CASE
+			WHEN len(parts) = 0 THEN ''
+			ELSE parts[len(parts)]     -- 1-indexed
+		END AS surname,
+		CASE
+			WHEN len(parts) <= 1 THEN ''
+			-- Use list_slice explicitly: start=1, end=length-1 (inclusive)
+			ELSE array_to_string(list_slice(parts, 1, len(parts) - 1), ' ')
+		END AS givenName
+		FROM
+			NameParts;
+
+		COPY contacts_augmented TO 'parquet/Contacts.parquet' (FORMAT PARQUET);
 		
 		-- Update the jobs table to use the new client and contact ids instead of the old client and clientContact columns
 		ALTER TABLE jobs ADD COLUMN client_id string;

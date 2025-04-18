@@ -38,12 +38,10 @@ type Client struct {
 }
 
 type ClientContact struct {
-	Id string `db:"id" parquet:"name=id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	// Surname and given name don't exist in the parquet file, must be derived from the name field
+	Id        string `db:"id" parquet:"name=id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
 	Surname   string `db:"surname" parquet:"name=surname, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	GivenName string `db:"given_name" parquet:"name=given_name, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	// Email doesn't exist in the parquet file
-	Email  string `db:"email" parquet:"name=email, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	GivenName string `db:"given_name" parquet:"name=givenName, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+
 	Client string `db:"client" parquet:"name=client_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
 }
 
