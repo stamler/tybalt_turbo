@@ -54,6 +54,15 @@ type Job struct {
 	Manager     string `db:"manager" parquet:"name=manager_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
 }
 
+type Profile struct {
+	PocketbaseId     string `parquet:"name=pocketbase_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	PocketbaseUserId string `parquet:"name=pocketbase_uid, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Username         string `parquet:"name=username, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Email            string `parquet:"name=email, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Surname          string `parquet:"name=surname, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	GivenName        string `parquet:"name=givenName, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+}
+
 // TODO: Add struct definitions for other tables (Contacts, Jobs, etc.) here or elsewhere.
 
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.

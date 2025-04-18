@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"imports/extract"
 	"imports/load"
+	"strings"
 
 	"github.com/pocketbase/dbx"
 )
@@ -67,6 +68,29 @@ func main() {
 			"client_contacts", // Table name (for logging)
 			contactInsertSQL,  // The specific INSERT SQL
 			contactBinder,     // The specific binder function
+		)
+
+		// --- Load Users ---
+		// Define the specific SQL for the users table
+		userInsertSQL := "INSERT INTO users (id, email, username, name, emailVisibility, verified) VALUES ({:id}, {:email}, {:username}, {:name}, 0, 1)"
+
+		// Define the binder function for the User type
+		userBinder := func(item load.Profile) dbx.Params {
+			return dbx.Params{
+				"id":       item.PocketbaseUserId,
+				"email":    item.Email,
+				"username": strings.Split(item.Email, "@")[0],
+				"name":     item.Surname + " " + item.GivenName,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/Profiles.parquet",
+			"../app/test_pb_data/data.db",
+			"users",       // Table name (for logging)
+			userInsertSQL, // The specific INSERT SQL
+			userBinder,    // The specific binder function
 		)
 
 		// --- Load Jobs ---
