@@ -144,6 +144,8 @@ func ToParquet() {
 	// Augment the Profiles.parquet data by adding the pocketbase_uid column.
 	augmentProfiles()
 
+	// Augment the Jobs.parquet data by adding the manager_id column.
+	augmentJobs()
 	// We will need a merge clients function to merge duplicate clients and then
 	// update all the jobs that reference the old client to reference the newly
 	// merged client.
