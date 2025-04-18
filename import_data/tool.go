@@ -7,6 +7,7 @@ import (
 	"imports/load"
 	"strings"
 
+	"github.com/google/uuid"
 	"github.com/pocketbase/dbx"
 )
 
@@ -72,7 +73,7 @@ func main() {
 
 		// --- Load Users ---
 		// Define the specific SQL for the users table
-		userInsertSQL := "INSERT INTO users (id, email, username, name, emailVisibility, verified) VALUES ({:id}, {:email}, {:username}, {:name}, 0, 1)"
+		userInsertSQL := "INSERT INTO users (id, email, username, name, emailVisibility, verified, password, tokenKey) VALUES ({:id}, {:email}, {:username}, {:name}, 0, 1, {:password}, {:tokenKey})"
 
 		// Define the binder function for the User type
 		userBinder := func(item load.Profile) dbx.Params {
@@ -80,7 +81,9 @@ func main() {
 				"id":       item.PocketbaseUserId,
 				"email":    item.Email,
 				"username": strings.Split(item.Email, "@")[0],
-				"name":     item.Surname + " " + item.GivenName,
+				"name":     item.GivenName + " " + item.Surname,
+				"password": "",                            // ************ TODO: What should this be?
+				"tokenKey": fmt.Sprintf("%x", uuid.New()), // ************ TODO: What should this be?
 			}
 		}
 
@@ -93,30 +96,30 @@ func main() {
 			userBinder,    // The specific binder function
 		)
 
-		// --- Load Jobs ---
-		// Define the specific SQL for the jobs table
-		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager})"
+		// 	// --- Load Jobs ---
+		// 	// Define the specific SQL for the jobs table
+		// 	jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager})"
 
-		// Define the binder function for the Job type
-		jobBinder := func(item load.Job) dbx.Params {
-			return dbx.Params{
-				"id":          item.Id,
-				"number":      item.Number,
-				"description": item.Description,
-				"client":      item.Client,
-				"contact":     item.Contact,
-				"manager":     item.Manager,
-			}
-		}
+		// 	// Define the binder function for the Job type
+		// 	jobBinder := func(item load.Job) dbx.Params {
+		// 		return dbx.Params{
+		// 			"id":          item.Id,
+		// 			"number":      item.Number,
+		// 			"description": item.Description,
+		// 			"client":      item.Client,
+		// 			"contact":     item.Contact,
+		// 			"manager":     item.Manager,
+		// 		}
+		// 	}
 
-		// Call the generic function, specifying the type and providing SQL + binder
-		load.FromParquet(
-			"./parquet/Jobs.parquet",
-			"../app/test_pb_data/data.db",
-			"jobs",       // Table name (for logging)
-			jobInsertSQL, // The specific INSERT SQL
-			jobBinder,    // The specific binder function
-		)
+		// 	// Call the generic function, specifying the type and providing SQL + binder
+		// 	load.FromParquet(
+		// 		"./parquet/Jobs.parquet",
+		// 		"../app/test_pb_data/data.db",
+		// 		"jobs",       // Table name (for logging)
+		// 		jobInsertSQL, // The specific INSERT SQL
+		// 		jobBinder,    // The specific binder function
+		// 	)
 
 	}
 }

@@ -57,7 +57,6 @@ type Job struct {
 type Profile struct {
 	PocketbaseId     string `parquet:"name=pocketbase_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
 	PocketbaseUserId string `parquet:"name=pocketbase_uid, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Username         string `parquet:"name=username, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
 	Email            string `parquet:"name=email, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
 	Surname          string `parquet:"name=surname, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
 	GivenName        string `parquet:"name=givenName, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
