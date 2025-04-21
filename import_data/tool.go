@@ -96,30 +96,30 @@ func main() {
 			userBinder,    // The specific binder function
 		)
 
-		// 	// --- Load Jobs ---
-		// 	// Define the specific SQL for the jobs table
-		// 	jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager})"
+		// --- Load Jobs ---
+		// Define the specific SQL for the jobs table
+		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager})"
 
-		// 	// Define the binder function for the Job type
-		// 	jobBinder := func(item load.Job) dbx.Params {
-		// 		return dbx.Params{
-		// 			"id":          item.Id,
-		// 			"number":      item.Number,
-		// 			"description": item.Description,
-		// 			"client":      item.Client,
-		// 			"contact":     item.Contact,
-		// 			"manager":     item.Manager,
-		// 		}
-		// 	}
+		// Define the binder function for the Job type
+		jobBinder := func(item load.Job) dbx.Params {
+			return dbx.Params{
+				"id":          item.Id,
+				"number":      item.Number,
+				"description": item.Description,
+				"client":      item.Client,
+				"contact":     item.Contact,
+				"manager":     item.Manager,
+			}
+		}
 
-		// 	// Call the generic function, specifying the type and providing SQL + binder
-		// 	load.FromParquet(
-		// 		"./parquet/Jobs.parquet",
-		// 		"../app/test_pb_data/data.db",
-		// 		"jobs",       // Table name (for logging)
-		// 		jobInsertSQL, // The specific INSERT SQL
-		// 		jobBinder,    // The specific binder function
-		// 	)
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/Jobs.parquet",
+			"../app/test_pb_data/data.db",
+			"jobs",       // Table name (for logging)
+			jobInsertSQL, // The specific INSERT SQL
+			jobBinder,    // The specific binder function
+		)
 
 	}
 }

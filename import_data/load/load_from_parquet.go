@@ -46,12 +46,33 @@ type ClientContact struct {
 }
 
 type Job struct {
-	Id          string `db:"id" parquet:"name=pocketbase_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Number      string `db:"number" parquet:"name=id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Description string `db:"description" parquet:"name=description, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Client      string `db:"client" parquet:"name=client_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Contact     string `db:"contact" parquet:"name=contact_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Manager     string `db:"manager" parquet:"name=manager_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Number                      string `parquet:"name=id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	AlternateManagerDisplayName string `parquet:"name=alternateManagerDisplayName, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	AlternateManagerUid         string `parquet:"name=alternateManagerUid, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Categories                  string `parquet:"name=categories, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	ClientName                  string `parquet:"name=client, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	ClientContact               string `parquet:"name=clientContact, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Description                 string `parquet:"name=description, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Divisions                   string `parquet:"name=divisions, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	FnAgreement                 bool   `parquet:"name=fnAgreement, type=BOOLEAN"`
+	HasTimeEntries              bool   `parquet:"name=hasTimeEntries, type=BOOLEAN"`
+	JobOwner                    string `parquet:"name=jobOwner, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	LastTimeEntryDate           string `parquet:"name=lastTimeEntryDate, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	ManagerName                 string `parquet:"name=manager, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	ManagerDisplayName          string `parquet:"name=managerDisplayName, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	ManagerUid                  string `parquet:"name=managerUid, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	ProjectAwardDate            string `parquet:"name=projectAwardDate, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Proposal                    string `parquet:"name=proposal, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	ProposalOpeningDate         string `parquet:"name=proposalOpeningDate, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	ProposalSubmissionDueDate   string `parquet:"name=proposalSubmissionDueDate, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Status                      string `parquet:"name=status, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Timestamp                   string `parquet:"name=timestamp, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Id                          string `parquet:"name=pocketbase_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	TClient                     string `parquet:"name=t_client, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	TClientContact              string `parquet:"name=t_clientContact, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Client                      string `parquet:"name=client_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Contact                     string `parquet:"name=contact_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Manager                     string `parquet:"name=manager_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
 }
 
 type Profile struct {
@@ -90,12 +111,14 @@ func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTable
 	// Setup the destination slice
 	numRows := int(pr.GetNumRows())
 	items := make([]T, 0, numRows)
-
+	fmt.Printf("numRows: %d\n", numRows)
 	// Read the data in batches
 	const batchSize = 10
 	for i := 0; i < numRows; i += batchSize {
 		rows := make([]T, min(batchSize, numRows-i))
+		fmt.Printf("rows: %v\n", rows)
 		if err = pr.Read(&rows); err != nil {
+			fmt.Printf("Error reading batch starting at row %d: %v\n", i, err)
 			panic(err)
 		}
 		items = append(items, rows...)
