@@ -4,9 +4,8 @@ import (
 	"fmt"
 	"log"
 
+	"github.com/parquet-go/parquet-go"
 	"github.com/pocketbase/dbx"
-	"github.com/xitongsys/parquet-go-source/local"
-	"github.com/xitongsys/parquet-go/reader"
 	_ "modernc.org/sqlite" // Import modernc SQLite driver for side-effect registration
 )
 
@@ -33,54 +32,53 @@ import (
 
 // Client represents the schema for the Clients.parquet file.
 type Client struct {
-	Id   string `db:"id" parquet:"name=id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Name string `db:"name" parquet:"name=name, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Id   string `parquet:"id"`
+	Name string `parquet:"name"`
 }
 
 type ClientContact struct {
-	Id        string `db:"id" parquet:"name=id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Surname   string `db:"surname" parquet:"name=surname, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	GivenName string `db:"given_name" parquet:"name=givenName, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-
-	Client string `db:"client" parquet:"name=client_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Id        string `parquet:"id"`
+	Surname   string `parquet:"surname"`
+	GivenName string `parquet:"givenName"`
+	Client    string `parquet:"client_id"`
 }
 
 type Job struct {
-	Number                      string `parquet:"name=id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	AlternateManagerDisplayName string `parquet:"name=alternateManagerDisplayName, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	AlternateManagerUid         string `parquet:"name=alternateManagerUid, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Categories                  string `parquet:"name=categories, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	ClientName                  string `parquet:"name=client, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	ClientContact               string `parquet:"name=clientContact, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Description                 string `parquet:"name=description, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Divisions                   string `parquet:"name=divisions, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	FnAgreement                 bool   `parquet:"name=fnAgreement, type=BOOLEAN"`
-	HasTimeEntries              bool   `parquet:"name=hasTimeEntries, type=BOOLEAN"`
-	JobOwner                    string `parquet:"name=jobOwner, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	LastTimeEntryDate           string `parquet:"name=lastTimeEntryDate, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	ManagerName                 string `parquet:"name=manager, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	ManagerDisplayName          string `parquet:"name=managerDisplayName, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	ManagerUid                  string `parquet:"name=managerUid, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	ProjectAwardDate            string `parquet:"name=projectAwardDate, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Proposal                    string `parquet:"name=proposal, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	ProposalOpeningDate         string `parquet:"name=proposalOpeningDate, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	ProposalSubmissionDueDate   string `parquet:"name=proposalSubmissionDueDate, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Status                      string `parquet:"name=status, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Timestamp                   string `parquet:"name=timestamp, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Id                          string `parquet:"name=pocketbase_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	TClient                     string `parquet:"name=t_client, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	TClientContact              string `parquet:"name=t_clientContact, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Client                      string `parquet:"name=client_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Contact                     string `parquet:"name=contact_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Manager                     string `parquet:"name=manager_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	Number                      string `parquet:"id"`
+	AlternateManagerDisplayName string `parquet:"alternateManagerDisplayName"`
+	AlternateManagerUid         string `parquet:"alternateManagerUid"`
+	Categories                  string `parquet:"categories"`
+	ClientName                  string `parquet:"client"`
+	ClientContact               string `parquet:"clientContact"`
+	Description                 string `parquet:"description"`
+	Divisions                   string `parquet:"divisions"`
+	FnAgreement                 bool   `parquet:"fnAgreement"`
+	HasTimeEntries              bool   `parquet:"hasTimeEntries"`
+	JobOwner                    string `parquet:"jobOwner"`
+	LastTimeEntryDate           string `parquet:"lastTimeEntryDate"`
+	ManagerName                 string `parquet:"manager"`
+	ManagerDisplayName          string `parquet:"managerDisplayName"`
+	ManagerUid                  string `parquet:"managerUid"`
+	ProjectAwardDate            string `parquet:"projectAwardDate"`
+	Proposal                    string `parquet:"proposal"`
+	ProposalOpeningDate         string `parquet:"proposalOpeningDate"`
+	ProposalSubmissionDueDate   string `parquet:"proposalSubmissionDueDate"`
+	Status                      string `parquet:"status"`
+	Timestamp                   string `parquet:"timestamp"`
+	Id                          string `parquet:"pocketbase_id"`
+	TClient                     string `parquet:"t_client"`
+	TClientContact              string `parquet:"t_clientContact"`
+	Client                      string `parquet:"client_id"`
+	Contact                     string `parquet:"contact_id"`
+	Manager                     string `parquet:"manager_id"`
 }
 
 type Profile struct {
-	PocketbaseId     string `parquet:"name=pocketbase_id, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	PocketbaseUserId string `parquet:"name=pocketbase_uid, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Email            string `parquet:"name=email, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	Surname          string `parquet:"name=surname, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
-	GivenName        string `parquet:"name=givenName, type=BYTE_ARRAY, encoding=PLAIN_DICTIONARY"`
+	PocketbaseId     string `parquet:"pocketbase_id"`
+	PocketbaseUserId string `parquet:"pocketbase_uid"`
+	Email            string `parquet:"email"`
+	Surname          string `parquet:"surname"`
+	GivenName        string `parquet:"givenName"`
 }
 
 // TODO: Add struct definitions for other tables (Contacts, Jobs, etc.) here or elsewhere.
@@ -94,47 +92,10 @@ type Profile struct {
 // binder: A function that takes an item of type T and returns a dbx.Params map suitable for binding to insertSQL.
 func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTableName string, insertSQL string, binder func(item T) dbx.Params) {
 	// --- Parquet Reading (Generic) ---
-	// Open the Parquet file
-	fr, err := local.NewLocalFileReader(parquetFilePath)
+	items, err := parquet.ReadFile[T](parquetFilePath)
 	if err != nil {
 		panic(err)
 	}
-	defer fr.Close()
-
-	// Create a Parquet reader
-	pr, err := reader.NewParquetReader(fr, new(T), 4)
-	if err != nil {
-		panic(err)
-	}
-	defer pr.ReadStop()
-
-	// Setup the destination slice
-	numRows := int(pr.GetNumRows())
-	items := make([]T, 0, numRows)
-	fmt.Printf("numRows: %d\n", numRows)
-	// Read the data in batches
-	const batchSize = 10
-	for i := 0; i < numRows; i += batchSize {
-		rows := make([]T, min(batchSize, numRows-i))
-		fmt.Printf("rows: %v\n", rows)
-		if err = pr.Read(&rows); err != nil {
-			fmt.Printf("Error reading batch starting at row %d: %v\n", i, err)
-			panic(err)
-		}
-		items = append(items, rows...)
-	}
-
-	// Diagnostic print:
-	fmt.Printf("Expected rows: %d, Actual items read: %d\n", numRows, len(items))
-
-	// NOTE: Potential issue with parquet-go reader:
-	// Observations during testing with Clients.parquet indicate that the first
-	// element read into the items slice (items[0]) contains zero-value data
-	// (e.g., "\uFFFD\uFFFD") instead of the actual first row from the Parquet file.
-	// The actual first row appears in items[1]. This seems to occur specifically
-	// during the first pr.Read(&rows) call. Subsequent reads and the total item
-	// count appear correct. For now, we are not skipping items[0], but this may
-	// need to be addressed if the garbage row causes issues during insertion.
 
 	// connect to the sqlite database with the dbx package
 	db, err := dbx.Open("sqlite", sqliteDBPath)
