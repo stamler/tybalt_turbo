@@ -85,6 +85,12 @@ type Profile struct {
 	GivenName        string `parquet:"givenName"`
 }
 
+type Category struct {
+	Id   string `parquet:"id"`
+	Name string `parquet:"name"`
+	Job  string `parquet:"job"`
+}
+
 // TODO: Add struct definitions for other tables (Contacts, Jobs, etc.) here or elsewhere.
 
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.

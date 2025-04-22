@@ -131,5 +131,26 @@ func main() {
 			jobBinder,    // The specific binder function
 		)
 
+		// --- Load Categories ---
+		// Define the specific SQL for the categories table
+		categoryInsertSQL := "INSERT INTO categories (id, name, job) VALUES ({:id}, {:name}, {:job})"
+
+		// Define the binder function for the Category type
+		categoryBinder := func(item load.Category) dbx.Params {
+			return dbx.Params{
+				"id":   item.Id,
+				"name": item.Name,
+				"job":  item.Job,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/Categories.parquet",
+			"../app/test_pb_data/data.db",
+			"categories",      // Table name (for logging)
+			categoryInsertSQL, // The specific INSERT SQL
+			categoryBinder,    // The specific binder function
+		)
 	}
 }

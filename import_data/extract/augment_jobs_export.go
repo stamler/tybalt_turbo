@@ -12,6 +12,15 @@ func augmentJobs() {
 	}
 	defer db.Close()
 
+	// Define PocketBase-like ID generation macro
+	_, err = db.Exec(`
+CREATE OR REPLACE MACRO make_pocketbase_id(length)
+AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, length), '');
+`)
+	if err != nil {
+		log.Fatalf("Failed to create make_pocketbase_id macro: %v", err)
+	}
+
 	// Load base tables from Parquet
 	_, err = db.Exec("CREATE TABLE jobs_raw AS SELECT * FROM read_parquet('parquet/Jobs.parquet')")
 	if err != nil {
@@ -73,46 +82,16 @@ func augmentJobs() {
 		log.Fatalf("Failed to create division_id_lists: %v", err)
 	}
 
-	// Unnest category strings
-	_, err = db.Exec(`
-	CREATE TEMP TABLE categories_unnested AS
-	SELECT
-	    jobsC.id as job_id,
-	    trim(unnested_category) as category_string
-	FROM jobsC, unnest(str_split(jobsC.categories, ',')) AS t(unnested_category)
-	WHERE jobsC.categories IS NOT NULL AND jobsC.categories != '';
-	`)
-	if err != nil {
-		log.Fatalf("Failed to create categories_unnested: %v", err)
-	}
-
-	// Aggregate category strings per job
-	_, err = db.Exec(`
-	CREATE TEMP TABLE category_lists AS
-	SELECT
-	    unnested.job_id,
-	    list(unnested.category_string) AS category_list
-	FROM
-	    categories_unnested unnested
-	GROUP BY unnested.job_id;
-	`)
-	if err != nil {
-		log.Fatalf("Failed to create category_lists: %v", err)
-	}
-
-	// Join aggregated division IDs and categories back and convert to JSON
+	// Join aggregated division IDs back and convert to JSON, exclude original divisions field
 	_, err = db.Exec(`
 	CREATE TABLE jobsD AS
 	SELECT
-	    jobsC.* EXCLUDE (divisions, categories), -- Exclude original comma-separated fields
-	    COALESCE(to_json(div_agg.division_id_list), '[]') AS divisions_ids,
-	    COALESCE(to_json(cat_agg.category_list), '[]') AS categories -- Add categories as JSON list
+	    jobsC.* EXCLUDE (divisions), -- Exclude original comma-separated divisions
+	    COALESCE(to_json(div_agg.division_id_list), '[]') AS divisions_ids
 	FROM
 	    jobsC
 	LEFT JOIN division_id_lists div_agg
-	    ON jobsC.id = div_agg.job_id
-	LEFT JOIN category_lists cat_agg
-	    ON jobsC.id = cat_agg.job_id;
+	    ON jobsC.id = div_agg.job_id;
 	`)
 	if err != nil {
 		log.Fatalf("Failed to create jobsD: %v", err)
@@ -122,5 +101,39 @@ func augmentJobs() {
 	_, err = db.Exec("COPY jobsD TO 'parquet/Jobs.parquet' (FORMAT PARQUET)") // Output to Jobs.parquet
 	if err != nil {
 		log.Fatalf("Failed to copy jobsD to Parquet: %v", err)
+	}
+
+	// --- Create Categories Parquet ---
+
+	// Unnest category strings separately
+	_, err = db.Exec(`
+	CREATE TEMP TABLE categories_extracted AS
+	SELECT
+	    jobsC.pocketbase_id as job_id, -- Use pocketbase_id instead of id
+	    trim(unnested_category) as category_name
+	FROM jobsC, unnest(str_split(jobsC.categories, ',')) AS t(unnested_category)
+	WHERE jobsC.categories IS NOT NULL AND jobsC.categories != '';
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create categories_extracted: %v", err)
+	}
+
+	// Create the final categories table with new IDs
+	_, err = db.Exec(`
+	CREATE TABLE categories_export AS
+	SELECT
+	    make_pocketbase_id(15) AS id, -- Use the macro here
+	    category_name AS name,
+	    job_id AS job
+	FROM categories_extracted;
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create categories_export: %v", err)
+	}
+
+	// Export categories to Parquet
+	_, err = db.Exec("COPY categories_export TO 'parquet/Categories.parquet' (FORMAT PARQUET)")
+	if err != nil {
+		log.Fatalf("Failed to copy categories_export to Parquet: %v", err)
 	}
 }
