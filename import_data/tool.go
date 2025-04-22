@@ -98,7 +98,7 @@ func main() {
 
 		// --- Load Jobs ---
 		// Define the specific SQL for the jobs table
-		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date})"
+		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal})"
 
 		// Define the binder function for the Job type
 		jobBinder := func(item load.Job) dbx.Params {
@@ -115,6 +115,7 @@ func main() {
 				"project_award_date":           item.ProjectAwardDate,
 				"proposal_opening_date":        item.ProposalOpeningDate,
 				"proposal_submission_due_date": item.ProposalSubmissionDueDate,
+				"proposal":                     item.ProposalId,
 			}
 		}
 

@@ -61,6 +61,7 @@ type Job struct {
 	ManagerUid                  string `parquet:"managerUid"`
 	ProjectAwardDate            string `parquet:"projectAwardDate"`
 	Proposal                    string `parquet:"proposal"`
+	ProposalId                  string `parquet:"proposal_id"`
 	ProposalOpeningDate         string `parquet:"proposalOpeningDate"`
 	ProposalSubmissionDueDate   string `parquet:"proposalSubmissionDueDate"`
 	Status                      string `parquet:"status"`
