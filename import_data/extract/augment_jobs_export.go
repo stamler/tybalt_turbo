@@ -15,9 +15,12 @@ func augmentJobs() {
 	db.Exec("CREATE TABLE jobs AS SELECT * FROM read_parquet('parquet/Jobs.parquet')")
 	db.Exec("CREATE TABLE profiles AS SELECT * FROM read_parquet('parquet/Profiles.parquet')")
 
-	db.Exec("CREATE TABLE jobs_with_profiles AS SELECT jobs.*, profiles.pocketbase_uid AS manager_id FROM jobs JOIN profiles ON jobs.managerUid = profiles.id")
+	db.Exec("CREATE TABLE jobs_with_profiles AS SELECT jobs.*, profiles.pocketbase_uid AS manager_id FROM jobs LEFT JOIN profiles ON jobs.managerUid = profiles.id")
+
+	// fold in alternate_manager_id
+	db.Exec("CREATE TABLE jobs_with_profilesB AS SELECT jobs_with_profiles.*, profiles.pocketbase_uid AS alternate_manager_id FROM jobs_with_profiles LEFT JOIN profiles ON jobs_with_profiles.alternateManagerUid = profiles.id")
 
 	// overwrite the jobs table with the jobs_with_profiles table
-	db.Exec("COPY jobs_with_profiles TO 'parquet/Jobs.parquet' (FORMAT PARQUET)")
+	db.Exec("COPY jobs_with_profilesB TO 'parquet/Jobs.parquet' (FORMAT PARQUET)")
 
 }

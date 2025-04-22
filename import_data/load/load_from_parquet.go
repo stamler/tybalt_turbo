@@ -71,6 +71,7 @@ type Job struct {
 	Client                      string `parquet:"client_id"`
 	Contact                     string `parquet:"contact_id"`
 	Manager                     string `parquet:"manager_id"`
+	AlternateManagerId          string `parquet:"alternate_manager_id"`
 }
 
 type Profile struct {
