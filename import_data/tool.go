@@ -98,6 +98,7 @@ func main() {
 
 		// --- Load Jobs ---
 		// Define the specific SQL for the jobs table
+		// TODO: jobOwner, divisions, categories
 		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal})"
 
 		// Define the binder function for the Job type
