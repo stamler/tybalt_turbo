@@ -52,6 +52,7 @@ type Job struct {
 	ClientContact               string `parquet:"clientContact"`
 	Description                 string `parquet:"description"`
 	Divisions                   string `parquet:"divisions"`
+	DivisionsIds                string `parquet:"divisions_ids"`
 	FnAgreement                 bool   `parquet:"fnAgreement"`
 	HasTimeEntries              bool   `parquet:"hasTimeEntries"`
 	JobOwner                    string `parquet:"jobOwner"`
