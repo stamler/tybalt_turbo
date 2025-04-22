@@ -32,12 +32,16 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 	splitQuery := `
 		-- Load Jobs.parquet into a table called jobs
 		CREATE TABLE jobs AS
-		SELECT *, TRIM(client) AS t_client, TRIM(clientContact) AS t_clientContact FROM read_parquet('parquet/Jobs.parquet');
+		SELECT *, TRIM(client) AS t_client, TRIM(clientContact) AS t_clientContact, TRIM(jobOwner) AS t_jobOwner FROM read_parquet('parquet/Jobs.parquet');
 
-		-- Create the clients table, removing duplicate names
+		-- Create the clients table, removing duplicate names and including job owners
 		CREATE TABLE clients AS
-		SELECT make_pocketbase_id(15) AS id, t_client AS name
-		FROM (SELECT DISTINCT t_client FROM jobs);
+		SELECT make_pocketbase_id(15) AS id, name
+		FROM (
+		    SELECT DISTINCT t_client AS name FROM jobs WHERE t_client IS NOT NULL AND t_client != ''
+		    UNION
+		    SELECT DISTINCT t_jobOwner AS name FROM jobs WHERE t_jobOwner IS NOT NULL AND t_jobOwner != ''
+		);
 
 		COPY clients TO 'parquet/Clients.parquet' (FORMAT PARQUET);
 
@@ -80,16 +84,20 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 		
 		-- Update the jobs table to use the new client and contact ids instead of the old client and clientContact columns
 		ALTER TABLE jobs ADD COLUMN client_id string;
+		ALTER TABLE jobs ADD COLUMN job_owner_id string;
 		ALTER TABLE jobs ADD COLUMN contact_id string;
 
 		UPDATE jobs SET client_id = clients.id FROM clients WHERE jobs.t_client = clients.name;
+		UPDATE jobs SET job_owner_id = clients.id FROM clients WHERE jobs.t_jobOwner = clients.name;
 		UPDATE jobs SET contact_id = contacts.id FROM contacts WHERE jobs.t_clientContact = contacts.name;
+
 		
 		-- Audit jobs by joining with clients and contacts
 		CREATE TABLE jobs_audit AS
 		SELECT jobs.*, clients.name AS client_match, contacts.name AS contact_match
 		FROM jobs
 		LEFT JOIN clients ON jobs.client_id = clients.id
+		LEFT JOIN clients AS job_owners ON jobs.job_owner_id = clients.id
 		LEFT JOIN contacts ON jobs.contact_id = contacts.id;
 
 		COPY jobs_audit TO 'parquet/Jobs_audit.parquet' (FORMAT PARQUET);
