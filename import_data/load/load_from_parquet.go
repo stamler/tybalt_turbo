@@ -56,6 +56,7 @@ type Job struct {
 	FnAgreement                 bool   `parquet:"fnAgreement"`
 	HasTimeEntries              bool   `parquet:"hasTimeEntries"`
 	JobOwner                    string `parquet:"jobOwner"`
+	JobOwnerId                  string `parquet:"job_owner_id"`
 	LastTimeEntryDate           string `parquet:"lastTimeEntryDate"`
 	ManagerName                 string `parquet:"manager"`
 	ManagerDisplayName          string `parquet:"managerDisplayName"`
