@@ -98,18 +98,23 @@ func main() {
 
 		// --- Load Jobs ---
 		// Define the specific SQL for the jobs table
-		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager})"
+		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date})"
 
 		// Define the binder function for the Job type
 		jobBinder := func(item load.Job) dbx.Params {
 			return dbx.Params{
-				"id":                item.Id,
-				"number":            item.Number,
-				"description":       item.Description,
-				"client":            item.Client,
-				"contact":           item.Contact,
-				"manager":           item.Manager,
-				"alternate_manager": item.AlternateManagerId,
+				"id":                           item.Id,
+				"number":                       item.Number,
+				"description":                  item.Description,
+				"client":                       item.Client,
+				"contact":                      item.Contact,
+				"manager":                      item.Manager,
+				"alternate_manager":            item.AlternateManagerId,
+				"fn_agreement":                 item.FnAgreement,
+				"status":                       item.Status,
+				"project_award_date":           item.ProjectAwardDate,
+				"proposal_opening_date":        item.ProposalOpeningDate,
+				"proposal_submission_due_date": item.ProposalSubmissionDueDate,
 			}
 		}
 
