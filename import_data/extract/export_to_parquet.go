@@ -106,29 +106,49 @@ func ToParquet() {
 
 	for _, table := range tablesToDump {
 		// Read from MySQL and export to Parquet
+		var query string
 
-		// if the table is Profiles, make a pocketbase_uid column in the parquet
-		// file and populate it with a different unique 15 character string. Note
-		// random comparison value doesn't match the one in the regular SELECT
-		// statement because if it does DuckDB will optimize the query by caching
-		// the output of the first value.
-		specialCol := ""
-		if table == "Profiles" {
-			specialCol = `, array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.71 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_uid`
+		if table == "Jobs" {
+			// Specific query for Jobs table to format dates as strings (YYYY-MM-DD or empty)
+			// and add pocketbase_id. Use %% for literal % in fmt.Sprintf.
+			query = fmt.Sprintf(`
+				COPY (
+					SELECT * EXCLUDE (projectAwardDate, proposalOpeningDate, proposalSubmissionDueDate),
+						strftime(projectAwardDate, '%%Y-%%m-%%d') AS projectAwardDate,
+						strftime(proposalOpeningDate, '%%Y-%%m-%%d') AS proposalOpeningDate,
+						strftime(proposalSubmissionDueDate, '%%Y-%%m-%%d') AS proposalSubmissionDueDate,
+						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id
+					FROM mysql_db.Jobs
+				) TO 'parquet/Jobs.parquet' (FORMAT PARQUET)
+		 `)
+
+		} else if table == "Profiles" {
+			// Specific query for Profiles to add both pocketbase_id and pocketbase_uid
+			// Use different random seeds to avoid potential caching issues if needed.
+			query = `
+				COPY (
+					SELECT *,
+						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id,
+						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.71 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_uid
+					FROM mysql_db.Profiles
+				) TO 'parquet/Profiles.parquet' (FORMAT PARQUET)
+			`
+
+		} else {
+			// Generic query for other tables, just adding pocketbase_id
+			query = fmt.Sprintf(`
+				COPY (
+					SELECT *,
+						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id
+					FROM mysql_db.%s
+				) TO 'parquet/%s.parquet' (FORMAT PARQUET)
+			`, table, table)
 		}
-
-		query := fmt.Sprintf(`
-    COPY (
-      SELECT *, 
-				array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id 
-				%s
-				FROM mysql_db.%s
-		) TO 'parquet/%s.parquet' (FORMAT PARQUET)`, specialCol,
-			table, table)
 
 		_, err = db.Exec(query)
 		if err != nil {
-			log.Fatalf("Failed to export to Parquet: %v", err)
+			// Provide more context in the error message
+			log.Fatalf("Failed to export table %s to Parquet: %v", table, err)
 		}
 	}
 
