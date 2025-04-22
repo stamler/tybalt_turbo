@@ -12,42 +12,85 @@ func augmentJobs() {
 	}
 	defer db.Close()
 
-	db.Exec("CREATE TABLE jobs_raw AS SELECT * FROM read_parquet('parquet/Jobs.parquet')")
-	db.Exec("CREATE TABLE profiles AS SELECT * FROM read_parquet('parquet/Profiles.parquet')")
-	db.Exec("CREATE TABLE divisions AS SELECT * FROM read_parquet('parquet/divisions.parquet')")
+	// Load base tables from Parquet
+	_, err = db.Exec("CREATE TABLE jobs_raw AS SELECT * FROM read_parquet('parquet/Jobs.parquet')")
+	if err != nil {
+		log.Fatalf("Failed to load Jobs.parquet: %v", err)
+	}
+	_, err = db.Exec("CREATE TABLE profiles AS SELECT * FROM read_parquet('parquet/Profiles.parquet')")
+	if err != nil {
+		log.Fatalf("Failed to load Profiles.parquet: %v", err)
+	}
+	_, err = db.Exec("CREATE TABLE divisions AS SELECT * FROM read_parquet('parquet/divisions.parquet')") // Load divisions
+	if err != nil {
+		log.Fatalf("Failed to load divisions.parquet: %v", err)
+	}
 
 	// fold in manager_id
-	db.Exec("CREATE TABLE jobsA AS SELECT jobs_raw.*, profiles.pocketbase_uid AS manager_id FROM jobs_raw LEFT JOIN profiles ON jobs_raw.managerUid = profiles.id")
+	_, err = db.Exec("CREATE TABLE jobsA AS SELECT jobs_raw.*, profiles.pocketbase_uid AS manager_id FROM jobs_raw LEFT JOIN profiles ON jobs_raw.managerUid = profiles.id")
+	if err != nil {
+		log.Fatalf("Failed to create jobsA: %v", err)
+	}
 
 	// fold in alternate_manager_id
-	db.Exec("CREATE TABLE jobsB AS SELECT jobsA.*, profiles.pocketbase_uid AS alternate_manager_id FROM jobsA LEFT JOIN profiles ON jobsA.alternateManagerUid = profiles.id")
+	_, err = db.Exec("CREATE TABLE jobsB AS SELECT jobsA.*, profiles.pocketbase_uid AS alternate_manager_id FROM jobsA LEFT JOIN profiles ON jobsA.alternateManagerUid = profiles.id")
+	if err != nil {
+		log.Fatalf("Failed to create jobsB: %v", err)
+	}
 
 	// fold in the proposal_id
-	db.Exec("CREATE TABLE jobsC AS SELECT jobsB.*, proposals.pocketbase_id AS proposal_id FROM jobsB LEFT JOIN jobsB proposals ON jobsB.proposal = proposals.id")
+	_, err = db.Exec("CREATE TABLE jobsC AS SELECT jobsB.*, proposals.pocketbase_id AS proposal_id FROM jobsB LEFT JOIN jobsB proposals ON jobsB.proposal = proposals.id")
+	if err != nil {
+		log.Fatalf("Failed to create jobsC: %v", err)
+	}
 
-	// fold in the divisions_ids
+	// Unnest division codes into a temporary table
+	_, err = db.Exec(`
+	CREATE TEMP TABLE jobsC_unnested AS
+	SELECT
+	    jobsC.id as job_id, -- Assuming 'id' is the unique job identifier from jobs_raw
+	    trim(unnested_code) as division_code
+	FROM jobsC, unnest(str_split(jobsC.divisions, ',')) AS t(unnested_code)
+	WHERE jobsC.divisions IS NOT NULL AND jobsC.divisions != '';
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create jobsC_unnested: %v", err)
+	}
+
+	// Aggregate division IDs per job into a temporary table
+	_, err = db.Exec(`
+	CREATE TEMP TABLE division_id_lists AS
+	SELECT
+	    unnested.job_id,
+	    list_filter(list(div.id), x -> x IS NOT NULL) AS division_id_list -- Use 'id' from divisions table
+	FROM
+	    jobsC_unnested unnested
+	JOIN divisions div
+	    ON unnested.division_code = div.code
+	GROUP BY unnested.job_id;
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create division_id_lists: %v", err)
+	}
+
+	// Join aggregated division IDs back and convert to JSON
 	_, err = db.Exec(`
 	CREATE TABLE jobsD AS
 	SELECT
 	    jobsC.*,
-	    to_json(
-	        CASE
-	            WHEN jobsC.divisions IS NULL OR jobsC.divisions = '' THEN list_value() -- Handle empty/NULL divisions string
-	            ELSE
-	                list_filter( -- Remove NULLs resulting from codes not found
-	                    list_transform(
-	                        str_split(jobsC.divisions, ','), -- Split codes string into a list
-	                        code -> (SELECT id FROM divisions WHERE divisions.code = trim(code)) -- Find ID for each code
-	                    ),
-	                    id -> id IS NOT NULL
-	                )
-	        END
-	    ) AS divisions_ids
-	FROM jobsC
+	    COALESCE(to_json(agg.division_id_list), '[]') AS divisions_ids
+	FROM
+	    jobsC
+	LEFT JOIN division_id_lists agg
+	    ON jobsC.id = agg.job_id; -- Join on the job identifier
 	`)
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to create jobsD: %v", err)
 	}
 
-	db.Exec("COPY jobsD TO 'parquet/JobsD.parquet' (FORMAT PARQUET)")
+	// overwrite the jobs table with the final augmented table
+	_, err = db.Exec("COPY jobsD TO 'parquet/Jobs.parquet' (FORMAT PARQUET)") // Output to Jobs.parquet
+	if err != nil {
+		log.Fatalf("Failed to copy jobsD to Parquet: %v", err)
+	}
 }
