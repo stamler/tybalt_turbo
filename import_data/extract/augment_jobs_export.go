@@ -73,16 +73,46 @@ func augmentJobs() {
 		log.Fatalf("Failed to create division_id_lists: %v", err)
 	}
 
-	// Join aggregated division IDs back and convert to JSON
+	// Unnest category strings
+	_, err = db.Exec(`
+	CREATE TEMP TABLE categories_unnested AS
+	SELECT
+	    jobsC.id as job_id,
+	    trim(unnested_category) as category_string
+	FROM jobsC, unnest(str_split(jobsC.categories, ',')) AS t(unnested_category)
+	WHERE jobsC.categories IS NOT NULL AND jobsC.categories != '';
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create categories_unnested: %v", err)
+	}
+
+	// Aggregate category strings per job
+	_, err = db.Exec(`
+	CREATE TEMP TABLE category_lists AS
+	SELECT
+	    unnested.job_id,
+	    list(unnested.category_string) AS category_list
+	FROM
+	    categories_unnested unnested
+	GROUP BY unnested.job_id;
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create category_lists: %v", err)
+	}
+
+	// Join aggregated division IDs and categories back and convert to JSON
 	_, err = db.Exec(`
 	CREATE TABLE jobsD AS
 	SELECT
-	    jobsC.*,
-	    COALESCE(to_json(agg.division_id_list), '[]') AS divisions_ids
+	    jobsC.* EXCLUDE (divisions, categories), -- Exclude original comma-separated fields
+	    COALESCE(to_json(div_agg.division_id_list), '[]') AS divisions_ids,
+	    COALESCE(to_json(cat_agg.category_list), '[]') AS categories -- Add categories as JSON list
 	FROM
 	    jobsC
-	LEFT JOIN division_id_lists agg
-	    ON jobsC.id = agg.job_id; -- Join on the job identifier
+	LEFT JOIN division_id_lists div_agg
+	    ON jobsC.id = div_agg.job_id
+	LEFT JOIN category_lists cat_agg
+	    ON jobsC.id = cat_agg.job_id;
 	`)
 	if err != nil {
 		log.Fatalf("Failed to create jobsD: %v", err)
