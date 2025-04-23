@@ -216,5 +216,26 @@ func main() {
 			profileInsertSQL, // The specific INSERT SQL
 			profileBinder,    // The specific binder function
 		)
+
+		// --- Load _externalAuths ---
+		// Define the specific SQL for the _externalAuths table
+		externalAuthInsertSQL := "INSERT INTO _externalAuths (collectionRef, provider, providerId, recordRef) VALUES ('_pb_users_auth_', 'microsoft', {:provider_id}, {:record_ref})"
+
+		// Define the binder function for the ExternalAuth type
+		externalAuthBinder := func(item load.Profile) dbx.Params {
+			return dbx.Params{
+				"providerId": item.AzureId,
+				"recordRef":  item.UserId,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/Profiles.parquet",
+			"../app/test_pb_data/data.db",
+			"_externalAuths",      // Table name (for logging)
+			externalAuthInsertSQL, // The specific INSERT SQL
+			externalAuthBinder,    // The specific binder function
+		)
 	}
 }

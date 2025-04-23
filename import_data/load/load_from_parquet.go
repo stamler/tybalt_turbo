@@ -21,8 +21,8 @@ import (
 	2. ✅ Upload Contacts.parquet to the sqlite database (these reference clients)
 	3. ✅ Upload Jobs.parquet to the sqlite database (these reference clients and contacts)
 	4. ✅ Upload Profiles.parquet to the sqlite database users table
-	5. Upload Profiles.parquet to the sqlite database admin_profiles table
-	6. Upload Profiles.parquet to the sqlite database (these reference divisions and time types)
+	5. ✅ Upload Profiles.parquet to the sqlite database admin_profiles table
+	6. ✅ Upload Profiles.parquet to the sqlite database profiles table (these reference divisions and time types)
 	7. Upload TimeSheets.parquet to the sqlite database (these reference profiles)
 	8. Upload TimeEntries.parquet to the sqlite database (these reference timesheets, jobs, and profiles)
 	7. Upload TimeAmendments.parquet to the sqlite database (these reference timesheets, jobs, divisions, time types, and profiles)
@@ -80,17 +80,17 @@ type Job struct {
 }
 
 type Profile struct {
-	Surname                        string  `parquet:"surname"`              // profiles, users
-	GivenName                      string  `parquet:"givenName"`            // profiles, users
-	OpeningDateTimeOff             string  `parquet:"openingDateTimeOff"`   // admin_profiles
-	OpeningOP                      float64 `parquet:"openingOP"`            // admin_profiles
-	OpeningOV                      float64 `parquet:"openingOV"`            // admin_profiles
-	UntrackedTimeOff               bool    `parquet:"untrackedTimeOff"`     // admin_profiles
-	DefaultChargeOutRate           float64 `parquet:"defaultChargeOutRate"` // admin_profiles
-	Email                          string  `parquet:"email"`                // users
-	MobilePhone                    string  `parquet:"mobilePhone"`          // admin_profiles
-	JobTitle                       string  `parquet:"jobTitle"`             // admin_profiles
-	AzureId                        string  `parquet:"azureId"`
+	Surname                        string  `parquet:"surname"`                        // profiles, users
+	GivenName                      string  `parquet:"givenName"`                      // profiles, users
+	OpeningDateTimeOff             string  `parquet:"openingDateTimeOff"`             // admin_profiles
+	OpeningOP                      float64 `parquet:"openingOP"`                      // admin_profiles
+	OpeningOV                      float64 `parquet:"openingOV"`                      // admin_profiles
+	UntrackedTimeOff               bool    `parquet:"untrackedTimeOff"`               // admin_profiles
+	DefaultChargeOutRate           float64 `parquet:"defaultChargeOutRate"`           // admin_profiles
+	Email                          string  `parquet:"email"`                          // users
+	MobilePhone                    string  `parquet:"mobilePhone"`                    // admin_profiles
+	JobTitle                       string  `parquet:"jobTitle"`                       // admin_profiles
+	AzureId                        string  `parquet:"azureId"`                        // _externalAuths
 	Salary                         bool    `parquet:"salary"`                         // admin_profiles
 	DefaultDivision                string  `parquet:"pocketbase_defaultDivision"`     // profiles
 	ManagerId                      string  `parquet:"pocketbase_manager"`             // profiles
