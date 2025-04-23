@@ -219,7 +219,7 @@ func main() {
 
 		// --- Load _externalAuths ---
 		// Define the specific SQL for the _externalAuths table
-		externalAuthInsertSQL := "INSERT INTO _externalAuths (collectionRef, provider, providerId, recordRef) VALUES ('_pb_users_auth_', 'microsoft', {:provider_id}, {:record_ref})"
+		externalAuthInsertSQL := "INSERT INTO _externalAuths (collectionRef, provider, providerId, recordRef) VALUES ('_pb_users_auth_', 'microsoft', {:providerId}, {:recordRef})"
 
 		// Define the binder function for the ExternalAuth type
 		externalAuthBinder := func(item load.Profile) dbx.Params {
