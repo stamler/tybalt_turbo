@@ -134,6 +134,17 @@ func ToParquet() {
 				) TO 'parquet/Profiles.parquet' (FORMAT PARQUET)
 			`
 
+		} else if table == "TimeSheets" {
+			// weekEnding should be a string in the format YYYY-MM-DD
+			query = `
+				COPY (
+					SELECT 
+						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id,
+						* EXCLUDE (weekEnding),
+						CAST(weekEnding AS VARCHAR) AS weekEnding
+					FROM mysql_db.TimeSheets
+				) TO 'parquet/TimeSheets.parquet' (FORMAT PARQUET)
+			`
 		} else {
 			// Generic query for other tables, just adding pocketbase_id
 			query = fmt.Sprintf(`
