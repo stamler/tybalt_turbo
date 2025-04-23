@@ -80,31 +80,31 @@ type Job struct {
 }
 
 type Profile struct {
-	Surname                        string  `parquet:"surname"`              // profiles and users
-	GivenName                      string  `parquet:"givenName"`            // profiles and users
+	Surname                        string  `parquet:"surname"`              // profiles, users
+	GivenName                      string  `parquet:"givenName"`            // profiles, users
 	OpeningDateTimeOff             string  `parquet:"openingDateTimeOff"`   // admin_profiles
 	OpeningOP                      float64 `parquet:"openingOP"`            // admin_profiles
 	OpeningOV                      float64 `parquet:"openingOV"`            // admin_profiles
 	UntrackedTimeOff               bool    `parquet:"untrackedTimeOff"`     // admin_profiles
 	DefaultChargeOutRate           float64 `parquet:"defaultChargeOutRate"` // admin_profiles
 	Email                          string  `parquet:"email"`                // users
-	MobilePhone                    string  `parquet:"mobilePhone"`
-	JobTitle                       string  `parquet:"jobTitle"`
+	MobilePhone                    string  `parquet:"mobilePhone"`          // admin_profiles
+	JobTitle                       string  `parquet:"jobTitle"`             // admin_profiles
 	AzureId                        string  `parquet:"azureId"`
-	Salary                         bool    `parquet:"salary"`                     // admin_profiles
-	DefaultDivision                string  `parquet:"pocketbase_defaultDivision"` // profiles
-	ManagerId                      string  `parquet:"pocketbase_manager"`         // profiles
-	TimeSheetExpected              bool    `parquet:"timeSheetExpected"`          // admin_profiles
-	PayrollId                      string  `parquet:"payrollId"`                  // admin_profiles
-	OffRotationPermitted           bool    `parquet:"offRotation"`                // admin_profiles
-	PersonalVehicleInsuranceExpiry string  `parquet:"personalVehicleInsuranceExpiry"`
-	AllowPersonalReimbursement     bool    `parquet:"allowPersonalReimbursement"`   // admin_profiles
-	SkipMinTimeCheckOnNextBundle   bool    `parquet:"skipMinTimeCheckOnNextBundle"` // admin_profiles
-	WorkWeekHours                  float64 `parquet:"workWeekHours"`                // admin_profiles
-	AlternateManager               string  `parquet:"pocketbase_alternateManager"`  // profiles
-	DoNotAcceptSubmissions         bool    `parquet:"doNotAcceptSubmissions"`
+	Salary                         bool    `parquet:"salary"`                         // admin_profiles
+	DefaultDivision                string  `parquet:"pocketbase_defaultDivision"`     // profiles
+	ManagerId                      string  `parquet:"pocketbase_manager"`             // profiles
+	TimeSheetExpected              bool    `parquet:"timeSheetExpected"`              // admin_profiles
+	PayrollId                      string  `parquet:"payrollId"`                      // admin_profiles
+	OffRotationPermitted           bool    `parquet:"offRotation"`                    // admin_profiles
+	PersonalVehicleInsuranceExpiry string  `parquet:"personalVehicleInsuranceExpiry"` // admin_profiles
+	AllowPersonalReimbursement     bool    `parquet:"allowPersonalReimbursement"`     // admin_profiles
+	SkipMinTimeCheckOnNextBundle   bool    `parquet:"skipMinTimeCheckOnNextBundle"`   // admin_profiles
+	WorkWeekHours                  float64 `parquet:"workWeekHours"`                  // admin_profiles
+	AlternateManager               string  `parquet:"pocketbase_alternateManager"`    // profiles
+	DoNotAcceptSubmissions         bool    `parquet:"doNotAcceptSubmissions"`         // profiles
 	PocketbaseId                   string  `parquet:"pocketbase_id"`
-	UserId                         string  `parquet:"pocketbase_uid"` // users, profiles, admin_profiles
+	UserId                         string  `parquet:"pocketbase_uid"` // profiles, users, admin_profiles
 }
 
 type Category struct {

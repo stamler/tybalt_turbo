@@ -193,17 +193,18 @@ func main() {
 
 		// --- Load Profiles ---
 		// Define the specific SQL for the profiles table
-		profileInsertSQL := "INSERT INTO profiles (surname, given_name, manager, alternate_manager, default_division, uid, notification_type) VALUES ({:surname}, {:given_name}, {:manager}, {:alternate_manager}, {:default_division}, {:uid}, 'email_text')"
+		profileInsertSQL := "INSERT INTO profiles (surname, given_name, manager, alternate_manager, default_division, uid, notification_type, do_not_accept_submissions) VALUES ({:surname}, {:given_name}, {:manager}, {:alternate_manager}, {:default_division}, {:uid}, 'email_text', {:do_not_accept_submissions})"
 
 		// Define the binder function for the Profile type
 		profileBinder := func(item load.Profile) dbx.Params {
 			return dbx.Params{
-				"surname":           item.Surname,
-				"given_name":        item.GivenName,
-				"manager":           item.ManagerId,
-				"alternate_manager": item.AlternateManager,
-				"default_division":  item.DefaultDivision,
-				"uid":               item.UserId,
+				"surname":                   item.Surname,
+				"given_name":                item.GivenName,
+				"manager":                   item.ManagerId,
+				"alternate_manager":         item.AlternateManager,
+				"default_division":          item.DefaultDivision,
+				"uid":                       item.UserId,
+				"do_not_accept_submissions": item.DoNotAcceptSubmissions,
 			}
 		}
 
