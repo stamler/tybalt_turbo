@@ -78,7 +78,7 @@ func main() {
 		// Define the binder function for the User type
 		userBinder := func(item load.Profile) dbx.Params {
 			return dbx.Params{
-				"id":       item.PocketbaseUserId,
+				"id":       item.UserId,
 				"email":    item.Email,
 				"username": strings.Split(item.Email, "@")[0],
 				"name":     item.GivenName + " " + item.Surname,

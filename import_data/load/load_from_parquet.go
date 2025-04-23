@@ -80,11 +80,31 @@ type Job struct {
 }
 
 type Profile struct {
-	PocketbaseId     string `parquet:"pocketbase_id"`
-	PocketbaseUserId string `parquet:"pocketbase_uid"`
-	Email            string `parquet:"email"`
-	Surname          string `parquet:"surname"`
-	GivenName        string `parquet:"givenName"`
+	Surname                        string  `parquet:"surname"`
+	GivenName                      string  `parquet:"givenName"`
+	OpeningDateTimeOff             string  `parquet:"openingDateTimeOff"`
+	OpeningOP                      float64 `parquet:"openingOP"`
+	OpeningOV                      float64 `parquet:"openingOV"`
+	UntrackedTimeOff               bool    `parquet:"untrackedTimeOff"`
+	DefaultChargeOutRate           float64 `parquet:"defaultChargeOutRate"`
+	Email                          string  `parquet:"email"`
+	MobilePhone                    string  `parquet:"mobilePhone"`
+	JobTitle                       string  `parquet:"jobTitle"`
+	AzureId                        string  `parquet:"azureId"`
+	Salary                         bool    `parquet:"salary"`
+	DefaultDivision                string  `parquet:"pocketbase_defaultDivision"`
+	ManagerId                      string  `parquet:"pocketbase_manager"`
+	TimeSheetExpected              bool    `parquet:"timeSheetExpected"`
+	PayrollId                      string  `parquet:"payrollId"`
+	OffRotationPermitted           bool    `parquet:"offRotation"`
+	PersonalVehicleInsuranceExpiry string  `parquet:"personalVehicleInsuranceExpiry"`
+	AllowPersonalReimbursement     bool    `parquet:"allowPersonalReimbursement"`
+	SkipMinTimeCheckOnNextBundle   bool    `parquet:"skipMinTimeCheckOnNextBundle"`
+	WorkWeekHours                  float64 `parquet:"workWeekHours"`
+	AlternateManager               string  `parquet:"pocketbase_alternateManager"`
+	DoNotAcceptSubmissions         bool    `parquet:"doNotAcceptSubmissions"`
+	PocketbaseId                   string  `parquet:"pocketbase_id"`
+	UserId                         string  `parquet:"pocketbase_uid"`
 }
 
 type Category struct {
@@ -92,8 +112,6 @@ type Category struct {
 	Name string `parquet:"name"`
 	Job  string `parquet:"job"`
 }
-
-// TODO: Add struct definitions for other tables (Contacts, Jobs, etc.) here or elsewhere.
 
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
 // T: The struct type corresponding to the Parquet file schema.
