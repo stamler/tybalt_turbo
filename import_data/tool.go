@@ -152,5 +152,34 @@ func main() {
 			categoryInsertSQL, // The specific INSERT SQL
 			categoryBinder,    // The specific binder function
 		)
+
+		// --- Load Admin Profiles ---
+		// Define the specific SQL for the admin profiles table
+		adminProfileInsertSQL := "INSERT INTO admin_profiles (uid, work_week_hours, salary, default_charge_out_rate, off_rotation_permitted, skip_min_time_check, opening_date, opening_op, opening_ov, payroll_id) VALUES ({:uid}, {:work_week_hours}, {:salary}, {:default_charge_out_rate}, {:off_rotation_permitted}, {:skip_min_time_check}, {:opening_date}, {:opening_op}, {:opening_ov}, {:payroll_id})"
+
+		// Define the binder function for the Admin type
+		adminProfileBinder := func(item load.Profile) dbx.Params {
+			return dbx.Params{
+				"uid":                     item.UserId,
+				"work_week_hours":         item.WorkWeekHours,
+				"salary":                  item.Salary,
+				"default_charge_out_rate": item.DefaultChargeOutRate,
+				"off_rotation_permitted":  item.OffRotationPermitted,
+				"skip_min_time_check":     item.SkipMinTimeCheckOnNextBundle,
+				"opening_date":            item.OpeningDateTimeOff,
+				"opening_op":              item.OpeningOP,
+				"opening_ov":              item.OpeningOV,
+				"payroll_id":              item.PayrollId,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/Profiles.parquet",
+			"../app/test_pb_data/data.db",
+			"admin_profiles",      // Table name (for logging)
+			adminProfileInsertSQL, // The specific INSERT SQL
+			adminProfileBinder,    // The specific binder function
+		)
 	}
 }
