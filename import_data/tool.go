@@ -184,5 +184,30 @@ func main() {
 			adminProfileInsertSQL, // The specific INSERT SQL
 			adminProfileBinder,    // The specific binder function
 		)
+
+		// --- Load Profiles ---
+		// Define the specific SQL for the profiles table
+		profileInsertSQL := "INSERT INTO profiles (surname, given_name, manager, alternate_manager, default_division, uid, notification_type) VALUES ({:surname}, {:given_name}, {:manager}, {:alternate_manager}, {:default_division}, {:uid}, 'email_text')"
+
+		// Define the binder function for the Profile type
+		profileBinder := func(item load.Profile) dbx.Params {
+			return dbx.Params{
+				"surname":           item.Surname,
+				"given_name":        item.GivenName,
+				"manager":           item.ManagerId,
+				"alternate_manager": item.AlternateManager,
+				"default_division":  item.DefaultDivision,
+				"uid":               item.UserId,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/Profiles.parquet",
+			"../app/test_pb_data/data.db",
+			"profiles",       // Table name (for logging)
+			profileInsertSQL, // The specific INSERT SQL
+			profileBinder,    // The specific binder function
+		)
 	}
 }
