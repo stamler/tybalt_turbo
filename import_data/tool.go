@@ -155,7 +155,10 @@ func main() {
 
 		// --- Load Admin Profiles ---
 		// Define the specific SQL for the admin profiles table
-		adminProfileInsertSQL := "INSERT INTO admin_profiles (uid, work_week_hours, salary, default_charge_out_rate, off_rotation_permitted, skip_min_time_check, opening_date, opening_op, opening_ov, payroll_id) VALUES ({:uid}, {:work_week_hours}, {:salary}, {:default_charge_out_rate}, {:off_rotation_permitted}, {:skip_min_time_check}, {:opening_date}, {:opening_op}, {:opening_ov}, {:payroll_id})"
+		// default_charge_out_rate, opening_ov are type Decimal and so need to be case to float then divided by 100 (Decimal 6,2), opening_op needs to be divided by 10 (Decimal 5,1)
+		// if work_week_hours is 0, set it to 40
+		// default_charge_out_rate should be set to 50 if it is 0
+		adminProfileInsertSQL := "INSERT INTO admin_profiles (uid, work_week_hours, salary, default_charge_out_rate, off_rotation_permitted, skip_min_time_check, opening_date, opening_op, opening_ov, payroll_id) VALUES ({:uid}, IIF({:work_week_hours} = 0, 40, {:work_week_hours}), {:salary}, CAST({:default_charge_out_rate} AS REAL) / 100, {:off_rotation_permitted}, IIF({:skip_min_time_check} IS false, 'no', 'on_next_bundle'), {:opening_date}, CAST({:opening_op} AS REAL) / 10, CAST({:opening_ov} AS REAL) / 100, {:payroll_id})"
 
 		// Define the binder function for the Admin type
 		adminProfileBinder := func(item load.Profile) dbx.Params {
