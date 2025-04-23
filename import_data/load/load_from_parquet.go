@@ -80,12 +80,12 @@ type Job struct {
 }
 
 type Profile struct {
-	Surname                        string  `parquet:"surname"`            // profiles and users
-	GivenName                      string  `parquet:"givenName"`          // profiles and users
-	OpeningDateTimeOff             string  `parquet:"openingDateTimeOff"` // admin_profiles
-	OpeningOP                      float64 `parquet:"openingOP"`          // admin_profiles
-	OpeningOV                      float64 `parquet:"openingOV"`          // admin_profiles
-	UntrackedTimeOff               bool    `parquet:"untrackedTimeOff"`
+	Surname                        string  `parquet:"surname"`              // profiles and users
+	GivenName                      string  `parquet:"givenName"`            // profiles and users
+	OpeningDateTimeOff             string  `parquet:"openingDateTimeOff"`   // admin_profiles
+	OpeningOP                      float64 `parquet:"openingOP"`            // admin_profiles
+	OpeningOV                      float64 `parquet:"openingOV"`            // admin_profiles
+	UntrackedTimeOff               bool    `parquet:"untrackedTimeOff"`     // admin_profiles
 	DefaultChargeOutRate           float64 `parquet:"defaultChargeOutRate"` // admin_profiles
 	Email                          string  `parquet:"email"`                // users
 	MobilePhone                    string  `parquet:"mobilePhone"`
@@ -94,11 +94,11 @@ type Profile struct {
 	Salary                         bool    `parquet:"salary"`                     // admin_profiles
 	DefaultDivision                string  `parquet:"pocketbase_defaultDivision"` // profiles
 	ManagerId                      string  `parquet:"pocketbase_manager"`         // profiles
-	TimeSheetExpected              bool    `parquet:"timeSheetExpected"`
-	PayrollId                      string  `parquet:"payrollId"`   // admin_profiles
-	OffRotationPermitted           bool    `parquet:"offRotation"` // admin_profiles
+	TimeSheetExpected              bool    `parquet:"timeSheetExpected"`          // admin_profiles
+	PayrollId                      string  `parquet:"payrollId"`                  // admin_profiles
+	OffRotationPermitted           bool    `parquet:"offRotation"`                // admin_profiles
 	PersonalVehicleInsuranceExpiry string  `parquet:"personalVehicleInsuranceExpiry"`
-	AllowPersonalReimbursement     bool    `parquet:"allowPersonalReimbursement"`
+	AllowPersonalReimbursement     bool    `parquet:"allowPersonalReimbursement"`   // admin_profiles
 	SkipMinTimeCheckOnNextBundle   bool    `parquet:"skipMinTimeCheckOnNextBundle"` // admin_profiles
 	WorkWeekHours                  float64 `parquet:"workWeekHours"`                // admin_profiles
 	AlternateManager               string  `parquet:"pocketbase_alternateManager"`  // profiles
