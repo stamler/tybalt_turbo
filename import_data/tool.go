@@ -158,24 +158,27 @@ func main() {
 		// default_charge_out_rate, opening_ov are type Decimal and so need to be case to float then divided by 100 (Decimal 6,2), opening_op needs to be divided by 10 (Decimal 5,1)
 		// if work_week_hours is 0, set it to 40
 		// default_charge_out_rate should be set to 50 if it is 0
-		adminProfileInsertSQL := "INSERT INTO admin_profiles (uid, work_week_hours, salary, default_charge_out_rate, off_rotation_permitted, skip_min_time_check, opening_date, opening_op, opening_ov, payroll_id, untracked_time_off, time_sheet_expected, allow_personal_reimbursement) VALUES ({:uid}, IIF({:work_week_hours} = 0, 40, {:work_week_hours}), {:salary}, IIF({:default_charge_out_rate} = 0, 50, CAST({:default_charge_out_rate} AS REAL) / 100), {:off_rotation_permitted}, IIF({:skip_min_time_check} IS false, 'no', 'on_next_bundle'), {:opening_date}, CAST({:opening_op} AS REAL) / 10, CAST({:opening_ov} AS REAL) / 100, {:payroll_id}, {:untracked_time_off}, {:time_sheet_expected}, {:allow_personal_reimbursement})"
+		adminProfileInsertSQL := "INSERT INTO admin_profiles (uid, work_week_hours, salary, default_charge_out_rate, off_rotation_permitted, skip_min_time_check, opening_date, opening_op, opening_ov, payroll_id, untracked_time_off, time_sheet_expected, allow_personal_reimbursement, mobile_phone, job_title, personal_vehicle_insurance_expiry) VALUES ({:uid}, IIF({:work_week_hours} = 0, 40, {:work_week_hours}), {:salary}, IIF({:default_charge_out_rate} = 0, 50, CAST({:default_charge_out_rate} AS REAL) / 100), {:off_rotation_permitted}, IIF({:skip_min_time_check} IS false, 'no', 'on_next_bundle'), {:opening_date}, CAST({:opening_op} AS REAL) / 10, CAST({:opening_ov} AS REAL) / 100, {:payroll_id}, {:untracked_time_off}, {:time_sheet_expected}, {:allow_personal_reimbursement}, {:mobile_phone}, {:job_title}, {:personal_vehicle_insurance_expiry})"
 
 		// Define the binder function for the Admin type
 		adminProfileBinder := func(item load.Profile) dbx.Params {
 			return dbx.Params{
-				"uid":                          item.UserId,
-				"work_week_hours":              item.WorkWeekHours,
-				"salary":                       item.Salary,
-				"default_charge_out_rate":      item.DefaultChargeOutRate,
-				"off_rotation_permitted":       item.OffRotationPermitted,
-				"skip_min_time_check":          item.SkipMinTimeCheckOnNextBundle,
-				"opening_date":                 item.OpeningDateTimeOff,
-				"opening_op":                   item.OpeningOP,
-				"opening_ov":                   item.OpeningOV,
-				"payroll_id":                   item.PayrollId,
-				"untracked_time_off":           item.UntrackedTimeOff,
-				"time_sheet_expected":          item.TimeSheetExpected,
-				"allow_personal_reimbursement": item.AllowPersonalReimbursement,
+				"uid":                               item.UserId,
+				"work_week_hours":                   item.WorkWeekHours,
+				"salary":                            item.Salary,
+				"default_charge_out_rate":           item.DefaultChargeOutRate,
+				"off_rotation_permitted":            item.OffRotationPermitted,
+				"skip_min_time_check":               item.SkipMinTimeCheckOnNextBundle,
+				"opening_date":                      item.OpeningDateTimeOff,
+				"opening_op":                        item.OpeningOP,
+				"opening_ov":                        item.OpeningOV,
+				"payroll_id":                        item.PayrollId,
+				"untracked_time_off":                item.UntrackedTimeOff,
+				"time_sheet_expected":               item.TimeSheetExpected,
+				"allow_personal_reimbursement":      item.AllowPersonalReimbursement,
+				"mobile_phone":                      item.MobilePhone,
+				"job_title":                         item.JobTitle,
+				"personal_vehicle_insurance_expiry": item.PersonalVehicleInsuranceExpiry,
 			}
 		}
 
