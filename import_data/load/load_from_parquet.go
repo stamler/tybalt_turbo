@@ -9,14 +9,8 @@ import (
 	_ "modernc.org/sqlite" // Import modernc SQLite driver for side-effect registration
 )
 
-// TODO: shape the data into the target form then ATTACH the sqlite database
-// and write the data to the corresponding tables in the sqlite database,
-// honouring foreign key constraints and primary keys.
-
-// https://duckdb.org/2024/01/26/multi-database-support-in-duckdb.html
-
 /*
-	Anticipated order of operations:
+	Order of operations:
 	1. ✅ Upload Clients.parquet to the sqlite database
 	2. ✅ Upload Contacts.parquet to the sqlite database (these reference clients)
 	3. ✅ Upload Jobs.parquet to the sqlite database (these reference clients and contacts)
@@ -24,7 +18,7 @@ import (
 	5. ✅ Upload Profiles.parquet to the sqlite database admin_profiles table
 	6. ✅ Upload Profiles.parquet to the sqlite database profiles table (these reference divisions and time types)
 	7. ✅ Upload Profiles.parquet to the sqlite database _externalAuths table
-	8. Upload TimeSheets.parquet to the sqlite database (these reference profiles)
+	8. ✅ Upload TimeSheets.parquet to the sqlite database (these reference users)
 	9. Upload TimeEntries.parquet to the sqlite database (these reference timesheets, jobs, and profiles)
 	10. Upload TimeAmendments.parquet to the sqlite database (these reference timesheets, jobs, divisions, time types, and profiles)
 	11. Upload Expenses.parquet to the sqlite database (these reference jobs, profiles, and purchase orders) We may not do this because there aren't many purchase orders and we can archive the attachments.
@@ -33,7 +27,6 @@ import (
 // --- Struct definitions for Parquet data ---
 // TODO: Move these definitions to a more shared location if used outside this package.
 
-// Client represents the schema for the Clients.parquet file.
 type Client struct {
 	Id   string `parquet:"id"`
 	Name string `parquet:"name"`
