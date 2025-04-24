@@ -37,6 +37,8 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 		log.Fatalf("Failed to create time_sheetsA: %v", err)
 	}
 
+	// TODO: Load uid_replacements.csv and replace old uids with new uids in the time_sheetsA table
+
 	// overwrite the timesheets table with the final augmented table
 	_, err = db.Exec("COPY time_sheetsA TO 'parquet/TimeSheets.parquet' (FORMAT PARQUET)") // Output to TimeSheets.parquet
 	if err != nil {

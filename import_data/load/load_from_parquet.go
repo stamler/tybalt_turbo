@@ -114,6 +114,16 @@ type Category struct {
 	Job  string `parquet:"job"`
 }
 
+type TimeSheet struct {
+	Id            string  `parquet:"pocketbase_id"`
+	Uid           string  `parquet:"pocketbase_uid"`
+	WeekEnding    string  `parquet:"weekEnding"`
+	ApproverUid   string  `parquet:"pocketbase_approver_uid"`
+	PayrollId     string  `parquet:"payrollId"`
+	Salary        bool    `parquet:"salary"`
+	WorkWeekHours float64 `parquet:"workWeekHours"`
+}
+
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
 // T: The struct type corresponding to the Parquet file schema.
 // parquetFilePath: Path to the input Parquet file.

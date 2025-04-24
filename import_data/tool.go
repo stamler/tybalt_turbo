@@ -6,6 +6,7 @@ import (
 	"imports/extract"
 	"imports/load"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pocketbase/dbx"
@@ -236,6 +237,40 @@ func main() {
 			"_externalAuths",      // Table name (for logging)
 			externalAuthInsertSQL, // The specific INSERT SQL
 			externalAuthBinder,    // The specific binder function
+		)
+
+		// --- Load TimeSheets ---
+		// create a time value for the committed and approved fields
+		now := time.Now()
+		// format the time value as a string like 2024-10-18 12:00:00.000Z
+		nowString := now.Format("2006-01-02 15:04:05.000Z")
+		// Define the specific SQL for the time_sheets table
+		timeSheetInsertSQL := "INSERT INTO time_sheets (id, uid, work_week_hours, salary, week_ending, submitted, approver, approved, committed, committer, payroll_id) VALUES ({:id}, {:uid}, {:work_week_hours}, {:salary}, {:week_ending}, 1, {:approver}, {:approved}, {:committed}, {:committer}, {:payroll_id})"
+
+		// Define the binder function for the TimeSheet type
+		timeSheetBinder := func(item load.TimeSheet) dbx.Params {
+			return dbx.Params{
+				"id":              item.Id,
+				"uid":             item.Uid,
+				"approver":        item.ApproverUid,
+				"work_week_hours": item.WorkWeekHours,
+				"payroll_id":      item.PayrollId,
+				"salary":          item.Salary,
+				"week_ending":     item.WeekEnding,
+				"submitted":       nowString,
+				"approved":        nowString,
+				"committed":       nowString,
+				"committer":       "wegviunlyr2jjjv", // a temporary value that works for the test database
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/TimeSheets.parquet",
+			"../app/test_pb_data/data.db",
+			"time_sheets",      // Table name (for logging)
+			timeSheetInsertSQL, // The specific INSERT SQL
+			timeSheetBinder,    // The specific binder function
 		)
 	}
 }
