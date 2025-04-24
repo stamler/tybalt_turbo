@@ -177,13 +177,10 @@ func ToParquet() {
 
 	// Augment the Jobs.parquet data by adding the manager_id column.
 	augmentJobs()
-	// We will need a merge clients function to merge duplicate clients and then
-	// update all the jobs that reference the old client to reference the newly
-	// merged client.
 
-	// We will need a merge contacts function to merge duplicate contacts within
-	// the same client and then update all the jobs that reference the old contact
-	// to reference the newly merged contact.
+	// Augment TimeSheets.parquet data creating the pocketbase_uid and
+	// pocketbase_approver_uid columns.
+	augmentTimeSheets()
 
 	// Independent Collections (Profiles, Jobs) must be loaded first.
 	// TimeSheets can be loaded next because TimeEntries references TimeSheets.
