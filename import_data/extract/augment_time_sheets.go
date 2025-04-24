@@ -39,7 +39,11 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 
 	// Replace any instances of the previousUid column value with the currentUid column value in the time_sheets table
 	// This must be done before the fold in so the uids are correct for the approver and committer
-	_, err = db.Exec("UPDATE time_sheets SET uid = (SELECT currentUid FROM uid_replacements WHERE previousUid = time_sheets.uid)")
+	_, err = db.Exec(`
+		UPDATE time_sheets
+		SET uid = (SELECT currentUid FROM uid_replacements WHERE previousUid = time_sheets.uid)
+		WHERE EXISTS (SELECT 1 FROM uid_replacements WHERE previousUid = time_sheets.uid)
+	`)
 	if err != nil {
 		log.Fatalf("Failed to replace uids: %v", err)
 	}
