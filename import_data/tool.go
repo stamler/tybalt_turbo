@@ -272,5 +272,38 @@ func main() {
 			timeSheetInsertSQL, // The specific INSERT SQL
 			timeSheetBinder,    // The specific binder function
 		)
+
+		// --- Load TimeEntries ---
+		// Define the specific SQL for the time_entries table
+		timeEntryInsertSQL := "INSERT INTO time_entries (division, uid, hours, description, time_type, meals_hours, job, work_record, payout_request_amount, date, week_ending, tsid, category) VALUES ({:division}, {:uid}, {:hours}, {:description}, {:time_type}, {:meals_hours}, {:job}, {:work_record}, {:payout_request_amount}, {:date}, {:week_ending}, {:tsid}, {:category})"
+
+		// Define the binder function for the TimeEntry type
+		timeEntryBinder := func(item load.TimeEntry) dbx.Params {
+			return dbx.Params{
+				"division":              item.Division,
+				"uid":                   item.UserId,
+				"hours":                 item.Hours,
+				"description":           item.Description,
+				"time_type":             item.TimeType,
+				"meals_hours":           item.MealsHours,
+				"job":                   item.Job,
+				"work_record":           item.WorkRecord,
+				"payout_request_amount": item.PayoutRequestAmount,
+				"date":                  item.Date,
+				"week_ending":           item.WeekEnding,
+				"tsid":                  item.TimeSheet,
+				"category":              item.Category,
+				"job_hours":             item.JobHours,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/TimeEntries.parquet",
+			"../app/test_pb_data/data.db",
+			"time_entries",     // Table name (for logging)
+			timeEntryInsertSQL, // The specific INSERT SQL
+			timeEntryBinder,    // The specific binder function
+		)
 	}
 }

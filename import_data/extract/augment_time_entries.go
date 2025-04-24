@@ -68,7 +68,8 @@ func augmentTimeEntries() {
 				ts.pocketbase_id AS pocketbase_tsid,
 				j.pocketbase_id AS pocketbase_jobid,
 				tt.id AS timetype_id,
-				d.id AS division_id
+				d.id AS division_id,
+				ts.weekEnding AS week_ending
 			FROM time_entries 
 			LEFT JOIN profiles p ON time_entries.uid = p.id
 			LEFT JOIN time_sheets ts ON time_entries.tsid = ts.id

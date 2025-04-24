@@ -117,6 +117,24 @@ type TimeSheet struct {
 	WorkWeekHours float64 `parquet:"workWeekHours"`
 }
 
+type TimeEntry struct {
+	Id                  string  `parquet:"pocketbase_id"`
+	UserId              string  `parquet:"pocketbase_uid"`
+	Job                 string  `parquet:"pocketbase_jobid"`
+	TimeType            string  `parquet:"timetype_id"`
+	Division            string  `parquet:"division_id"`
+	TimeSheet           string  `parquet:"pocketbase_tsid"`
+	Date                string  `parquet:"date"`
+	WeekEnding          string  `parquet:"week_ending"`
+	WorkRecord          string  `parquet:"workrecord"`
+	Hours               float64 `parquet:"hours"`
+	JobHours            float64 `parquet:"jobHours"`
+	MealsHours          float64 `parquet:"mealsHours"`
+	Description         string  `parquet:"workDescription"`
+	PayoutRequestAmount float64 `parquet:"payoutRequestAmount"`
+	Category            string  `parquet:"category"`
+}
+
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
 // T: The struct type corresponding to the Parquet file schema.
 // parquetFilePath: Path to the input Parquet file.
