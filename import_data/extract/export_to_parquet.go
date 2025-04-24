@@ -192,6 +192,9 @@ func ToParquet() {
 	// pocketbase_approver_uid columns.
 	augmentTimeSheets()
 
+	// Augment TimeEntries.parquet data
+	augmentTimeEntries()
+
 	// Independent Collections (Profiles, Jobs) must be loaded first.
 	// TimeSheets can be loaded next because TimeEntries references TimeSheets.
 	// TimeEntries can be loaded next because it references TimeSheets and Jobs.
