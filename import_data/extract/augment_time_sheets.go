@@ -54,6 +54,25 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 		log.Fatalf("Failed to create time_sheetsA: %v", err)
 	}
 
+	// Look for missing pocketbase_uid values
+	rows, err := db.Query("SELECT DISTINCT uid, givenName, surname FROM time_sheetsA WHERE pocketbase_uid IS NULL")
+	if err != nil {
+		log.Fatalf("Failed to query time_sheetsA: %v", err)
+	}
+	// If there are 1 or more rows report an error since we need to have a complete parquet file
+	if rows.Next() {
+		log.Println("Missing pocketbase_uid values for TimeSheets.parquet")
+		for rows.Next() {
+			var uid, givenName, surname string
+			err = rows.Scan(&uid, &givenName, &surname)
+			if err != nil {
+				log.Fatalf("Failed to scan row: %v", err)
+			}
+			log.Printf("%s: %s %s", uid, givenName, surname)
+		}
+		log.Fatal("Please update uid_replacements.csv with the missing pocketbase_uid values and rerun this script")
+	}
+
 	// overwrite the timesheets table with the final augmented table
 	_, err = db.Exec("COPY time_sheetsA TO 'parquet/TimeSheets.parquet' (FORMAT PARQUET)") // Output to TimeSheets.parquet
 	if err != nil {
