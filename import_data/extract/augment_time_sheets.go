@@ -2,6 +2,7 @@ package extract
 
 import (
 	"database/sql"
+	"fmt"
 	"log"
 )
 
@@ -59,16 +60,27 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 	if err != nil {
 		log.Fatalf("Failed to query time_sheetsA: %v", err)
 	}
-	// If there are 1 or more rows report an error since we need to have a complete parquet file
-	if rows.Next() {
+	defer rows.Close()
+
+	var missingUIDs []string
+
+	for rows.Next() {
+		var uid, givenName, surname string
+		err = rows.Scan(&uid, &givenName, &surname)
+		if err != nil {
+			log.Fatalf("Failed to scan row: %v", err)
+		}
+		missingUIDs = append(missingUIDs, fmt.Sprintf("%s: %s %s", uid, givenName, surname))
+	}
+
+	if err = rows.Err(); err != nil {
+		log.Fatalf("Error iterating rows: %v", err)
+	}
+
+	if len(missingUIDs) > 0 {
 		log.Println("Missing pocketbase_uid values for TimeSheets.parquet")
-		for rows.Next() {
-			var uid, givenName, surname string
-			err = rows.Scan(&uid, &givenName, &surname)
-			if err != nil {
-				log.Fatalf("Failed to scan row: %v", err)
-			}
-			log.Printf("%s: %s %s", uid, givenName, surname)
+		for _, missing := range missingUIDs {
+			log.Println(missing)
 		}
 		log.Fatal("Please update uid_replacements.csv with the missing pocketbase_uid values and rerun this script")
 	}
