@@ -19,7 +19,7 @@ import (
 	6. ✅ Upload Profiles.parquet to the sqlite database profiles table (these reference divisions and time types)
 	7. ✅ Upload Profiles.parquet to the sqlite database _externalAuths table
 	8. ✅ Upload TimeSheets.parquet to the sqlite database (these reference users)
-	9. Upload TimeEntries.parquet to the sqlite database (these reference timesheets, jobs, and profiles)
+	9. ✅ Upload TimeEntries.parquet to the sqlite database (these reference timesheets, jobs, and profiles)
 	10. Upload TimeAmendments.parquet to the sqlite database (these reference timesheets, jobs, divisions, time types, and profiles)
 	11. Upload Expenses.parquet to the sqlite database (these reference jobs, profiles, and purchase orders) We may not do this because there aren't many purchase orders and we can archive the attachments.
 */

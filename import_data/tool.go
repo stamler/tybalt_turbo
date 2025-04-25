@@ -310,7 +310,6 @@ func main() {
 			)`
 
 		// Define the binder function for the TimeEntry type
-		// TODO: FIX SEVERAL ISSUES WITH LOADING OF TIME ENTRIES, INCLUDING BUT NOT LIMITED TO CATEGORY NOT BEING A RELATION
 		timeEntryBinder := func(item load.TimeEntry) dbx.Params {
 			return dbx.Params{
 				"division":              item.Division,
