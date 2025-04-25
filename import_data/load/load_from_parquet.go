@@ -135,6 +135,32 @@ type TimeEntry struct {
 	Category            string  `parquet:"category_id"`
 }
 
+type TimeAmendment struct {
+	Id                  string  `parquet:"pocketbase_id"`
+	Creator             string  `parquet:"creator"`
+	Committer           string  `parquet:"commit_uid"`
+	Created             string  `parquet:"created"`
+	CommittedWeekEnding string  `parquet:"committedWeekEnding"`
+	User                string  `parquet:"pocketbase_uid"`
+	PayrollId           string  `parquet:"payrollId"`
+	WorkWeekHours       float64 `parquet:"workWeekHours"`
+	Salary              bool    `parquet:"salary"`
+	WeekEnding          string  `parquet:"week_ending"`
+	Date                string  `parquet:"date"`
+	TimeType            string  `parquet:"timetype_id"`
+	Division            string  `parquet:"division_id"`
+	Job                 string  `parquet:"pocketbase_jobid"`
+	WorkRecord          string  `parquet:"workrecord"`
+	Hours               float64 `parquet:"hours"`
+	JobHours            float64 `parquet:"jobHours"`
+	MealsHours          float64 `parquet:"mealsHours"`
+	Description         string  `parquet:"workDescription"`
+	PayoutRequestAmount float64 `parquet:"payoutRequestAmount"`
+
+	TimeSheet string `parquet:"pocketbase_tsid"`
+	Category  string `parquet:"category_id"`
+}
+
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
 // T: The struct type corresponding to the Parquet file schema.
 // parquetFilePath: Path to the input Parquet file.

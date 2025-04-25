@@ -155,6 +155,20 @@ func ToParquet() {
 					FROM mysql_db.TimeEntries
 				) TO 'parquet/TimeEntries.parquet' (FORMAT PARQUET)
 			`
+		} else if table == "TimeAmendments" {
+			// weekEnding should be a string in the format YYYY-MM-DD
+			query = `
+				COPY (
+					SELECT * EXCLUDE (commitTime, created, committedWeekEnding, weekEnding, date),
+						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id,
+						CAST(commitTime AS VARCHAR) AS commitTime,
+						CAST(created AS VARCHAR) AS created,
+						CAST(committedWeekEnding AS VARCHAR) AS committedWeekEnding,
+						CAST(weekEnding AS VARCHAR) AS weekEnding,
+						CAST(date AS VARCHAR) AS date
+					FROM mysql_db.TimeAmendments
+				) TO 'parquet/TimeAmendments.parquet' (FORMAT PARQUET)
+			`
 		} else {
 			// Generic query for other tables, just adding pocketbase_id
 			query = fmt.Sprintf(`
@@ -194,6 +208,9 @@ func ToParquet() {
 
 	// Augment TimeEntries.parquet data
 	augmentTimeEntries()
+
+	// Augment TimeAmendments.parquet data
+	augmentTimeAmendments()
 
 	// Independent Collections (Profiles, Jobs) must be loaded first.
 	// TimeSheets can be loaded next because TimeEntries references TimeSheets.
