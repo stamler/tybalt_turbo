@@ -302,7 +302,7 @@ func main() {
 				CAST({:meals_hours} AS REAL) / 10, 
 				{:job}, 
 				{:work_record}, 
-				{:payout_request_amount}, 
+				CAST({:payout_request_amount} AS REAL) / 100, 
 				{:date}, 
 				{:week_ending}, 
 				{:tsid}, 
