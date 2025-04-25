@@ -295,7 +295,7 @@ func main() {
 				category
 			) VALUES (
 			 	{:division}, 
-				{:uid}, 
+				{:uid},
 				CAST((COALESCE({:job_hours}, 0) + COALESCE({:hours}, 0)) AS REAL) / 10, 
 				{:description}, 
 				{:time_type}, 
@@ -336,6 +336,82 @@ func main() {
 			"time_entries",     // Table name (for logging)
 			timeEntryInsertSQL, // The specific INSERT SQL
 			timeEntryBinder,    // The specific binder function
+		)
+
+		// --- Load TimeAmendments ---
+		// Define the specific SQL for the time_amendments table
+		timeAmendmentInsertSQL := `
+			INSERT INTO time_amendments (
+				division,
+				uid,
+				hours,
+				description,
+				time_type,
+				meals_hours,
+				job,
+				work_record,
+				payout_request_amount,
+				date,
+				week_ending,
+				tsid,
+				category,
+				creator,
+				committed,
+				committer,
+				committed_week_ending,
+				skip_tsid_check
+			) VALUES (
+				{:division},
+				{:uid},
+				CAST((COALESCE({:job_hours}, 0) + COALESCE({:hours}, 0)) AS REAL) / 10,
+				{:description},
+				{:time_type},
+				CAST({:meals_hours} AS REAL) / 10, 
+				{:job},
+				{:work_record},
+				CAST({:payout_request_amount} AS REAL) / 100, 
+				{:date},
+				{:week_ending},
+				{:tsid},
+				{:category},
+				{:creator},
+				{:committed},
+				{:committer},
+				{:committed_week_ending},
+				false
+			)`
+
+		// Define the binder function for the TimeAmendment type
+		timeAmendmentBinder := func(item load.TimeAmendment) dbx.Params {
+			return dbx.Params{
+				"division":              item.Division,
+				"uid":                   item.User,
+				"hours":                 item.Hours,
+				"description":           item.Description,
+				"time_type":             item.TimeType,
+				"meals_hours":           item.MealsHours,
+				"job":                   item.Job,
+				"work_record":           item.WorkRecord,
+				"payout_request_amount": item.PayoutRequestAmount,
+				"date":                  item.Date,
+				"week_ending":           item.WeekEnding,
+				"tsid":                  item.TimeSheet,
+				"category":              item.Category,
+				"creator":               item.Creator,
+				"committed":             item.Committed.Format("2006-01-02 15:04:05.000Z"),
+				"committer":             item.Committer,
+				"committed_week_ending": item.CommittedWeekEnding,
+				"job_hours":             item.JobHours,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/TimeAmendments.parquet",
+			"../app/test_pb_data/data.db",
+			"time_amendments",      // Table name (for logging)
+			timeAmendmentInsertSQL, // The specific INSERT SQL
+			timeAmendmentBinder,    // The specific binder function
 		)
 	}
 }

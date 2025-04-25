@@ -3,6 +3,7 @@ package load
 import (
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/parquet-go/parquet-go"
 	"github.com/pocketbase/dbx"
@@ -136,29 +137,29 @@ type TimeEntry struct {
 }
 
 type TimeAmendment struct {
-	Id                  string  `parquet:"pocketbase_id"`
-	Creator             string  `parquet:"creator"`
-	Committer           string  `parquet:"commit_uid"`
-	Created             string  `parquet:"created"`
-	CommittedWeekEnding string  `parquet:"committedWeekEnding"`
-	User                string  `parquet:"pocketbase_uid"`
-	PayrollId           string  `parquet:"payrollId"`
-	WorkWeekHours       float64 `parquet:"workWeekHours"`
-	Salary              bool    `parquet:"salary"`
-	WeekEnding          string  `parquet:"week_ending"`
-	Date                string  `parquet:"date"`
-	TimeType            string  `parquet:"timetype_id"`
-	Division            string  `parquet:"division_id"`
-	Job                 string  `parquet:"pocketbase_jobid"`
-	WorkRecord          string  `parquet:"workrecord"`
-	Hours               float64 `parquet:"hours"`
-	JobHours            float64 `parquet:"jobHours"`
-	MealsHours          float64 `parquet:"mealsHours"`
-	Description         string  `parquet:"workDescription"`
-	PayoutRequestAmount float64 `parquet:"payoutRequestAmount"`
-
-	TimeSheet string `parquet:"pocketbase_tsid"`
-	Category  string `parquet:"category_id"`
+	Id                  string    `parquet:"pocketbase_id"`
+	Creator             string    `parquet:"pocketbase_creator_uid"`
+	Committer           string    `parquet:"pocketbase_commit_uid"`
+	Created             string    `parquet:"created"`
+	CommittedWeekEnding string    `parquet:"committedWeekEnding"`
+	User                string    `parquet:"pocketbase_uid"`
+	PayrollId           string    `parquet:"payrollId"`
+	WorkWeekHours       float64   `parquet:"workWeekHours"`
+	Salary              bool      `parquet:"salary"`
+	WeekEnding          string    `parquet:"week_ending"`
+	Date                string    `parquet:"date"`
+	TimeType            string    `parquet:"timetype_id"`
+	Division            string    `parquet:"division_id"`
+	Job                 string    `parquet:"pocketbase_jobid"`
+	WorkRecord          string    `parquet:"workrecord"`
+	Hours               float64   `parquet:"hours"`
+	JobHours            float64   `parquet:"jobHours"`
+	MealsHours          float64   `parquet:"mealsHours"`
+	Description         string    `parquet:"workDescription"`
+	PayoutRequestAmount float64   `parquet:"payoutRequestAmount"`
+	TimeSheet           string    `parquet:"pocketbase_tsid"`
+	Category            string    `parquet:"category_id"`
+	Committed           time.Time `parquet:"commitTime"`
 }
 
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
