@@ -17,6 +17,13 @@ func augmentTimeAmendments() {
 	}
 	defer db.Close()
 
+	// Load the ICU extension
+	_, err = db.Exec("INSTALL icu; LOAD icu;")
+	if err != nil {
+		// It might fail if already installed/loaded, potentially log this instead of Fatal
+		log.Printf("Warning: Failed to install/load ICU extension (might be already available): %v", err)
+	}
+
 	// Load base tables from Parquet
 	_, err = db.Exec("CREATE TABLE time_sheets AS SELECT * FROM read_parquet('parquet/TimeSheets.parquet')")
 	if err != nil {
@@ -111,6 +118,19 @@ func augmentTimeAmendments() {
 		log.Fatalf("Failed to create time_amendmentsA: %v", err)
 	}
 
+	// add commited and created_date columns by converting commitTime and created
+	// timestamps from UTC to America/Thunder_Bay then format as YYYY-MM-DD
+	_, err = db.Exec(`
+		CREATE TABLE time_amendmentsB AS
+			SELECT time_amendmentsA.*,
+				strftime(timezone('America/Thunder_Bay', commitTime), '%Y-%m-%d') AS committed,
+				strftime(timezone('America/Thunder_Bay', created), '%Y-%m-%d') AS created_date
+			FROM time_amendmentsA
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create time_amendmentsB: %v", err)
+	}
+
 	// augment time_amendmentsA with category_id
 	// COMMENTED OUT BECAUSE CATEGORIES ARE NOT PRESENT IN THE DATA
 	// SHOULD THIS FEATURE BE CREATED? (CATEGORIES FOR AMENDMENTS)
@@ -126,7 +146,7 @@ func augmentTimeAmendments() {
 	// }
 
 	// overwrite the time_amendments table with the final augmented table
-	_, err = db.Exec("COPY time_amendmentsA TO 'parquet/TimeAmendments.parquet' (FORMAT PARQUET)") // Output to TimeAmendments.parquet
+	_, err = db.Exec("COPY time_amendmentsB TO 'parquet/TimeAmendments.parquet' (FORMAT PARQUET)") // Output to TimeAmendments.parquet
 	if err != nil {
 		log.Fatalf("Failed to copy time_amendments to Parquet: %v", err)
 	}

@@ -159,10 +159,8 @@ func ToParquet() {
 			// weekEnding should be a string in the format YYYY-MM-DD
 			query = `
 				COPY (
-					SELECT * EXCLUDE (commitTime, created, committedWeekEnding, weekEnding, date),
+					SELECT * EXCLUDE (committedWeekEnding, weekEnding, date),
 						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id,
-						CAST(commitTime AS VARCHAR) AS commitTime,
-						CAST(created AS VARCHAR) AS created,
 						CAST(committedWeekEnding AS VARCHAR) AS committedWeekEnding,
 						CAST(weekEnding AS VARCHAR) AS weekEnding,
 						CAST(date AS VARCHAR) AS date
