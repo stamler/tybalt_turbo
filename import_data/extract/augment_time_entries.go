@@ -42,6 +42,10 @@ func augmentTimeEntries() {
 	if err != nil {
 		log.Fatalf("Failed to load TimeEntries.parquet: %v", err)
 	}
+	_, err = db.Exec("CREATE TABLE categories AS SELECT * FROM read_parquet('parquet/Categories.parquet')")
+	if err != nil {
+		log.Fatalf("Failed to load Categories.parquet: %v", err)
+	}
 
 	// Load uid_replacements.csv into a duckdb table and replace old uids with new uids in the time_entries table
 	_, err = db.Exec("CREATE TABLE uid_replacements AS SELECT * FROM read_csv('uid_replacements.csv')")
@@ -81,8 +85,20 @@ func augmentTimeEntries() {
 		log.Fatalf("Failed to create time_entriesA: %v", err)
 	}
 
+	// augment time_entriesA with category_id
+	_, err = db.Exec(`
+		CREATE TABLE time_entriesB AS
+			SELECT time_entriesA.*,
+				c.id AS category_id
+			FROM time_entriesA
+			LEFT JOIN categories c ON time_entriesA.category = c.name AND time_entriesA.pocketbase_jobid = c.job
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create time_entriesB: %v", err)
+	}
+
 	// overwrite the time_entries table with the final augmented table
-	_, err = db.Exec("COPY time_entriesA TO 'parquet/TimeEntries.parquet' (FORMAT PARQUET)") // Output to TimeEntries.parquet
+	_, err = db.Exec("COPY time_entriesB TO 'parquet/TimeEntries.parquet' (FORMAT PARQUET)") // Output to TimeEntries.parquet
 	if err != nil {
 		log.Fatalf("Failed to copy time_entries to Parquet: %v", err)
 	}

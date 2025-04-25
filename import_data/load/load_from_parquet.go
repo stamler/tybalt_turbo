@@ -132,7 +132,7 @@ type TimeEntry struct {
 	MealsHours          float64 `parquet:"mealsHours"`
 	Description         string  `parquet:"workDescription"`
 	PayoutRequestAmount float64 `parquet:"payoutRequestAmount"`
-	Category            string  `parquet:"category"`
+	Category            string  `parquet:"category_id"`
 }
 
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
