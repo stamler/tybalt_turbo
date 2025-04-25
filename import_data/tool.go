@@ -275,9 +275,42 @@ func main() {
 
 		// --- Load TimeEntries ---
 		// Define the specific SQL for the time_entries table
-		timeEntryInsertSQL := "INSERT INTO time_entries (division, uid, hours, description, time_type, meals_hours, job, work_record, payout_request_amount, date, week_ending, tsid, category) VALUES ({:division}, {:uid}, {:hours}, {:description}, {:time_type}, {:meals_hours}, {:job}, {:work_record}, {:payout_request_amount}, {:date}, {:week_ending}, {:tsid}, {:category})"
+		// hours, job_hours, and meals_hours are type Decimal and so needs to be cast to a float then divided by 10 (Decimal 3,1)
+		// we sum hours and job_hours to get the total hours since after June 11, 2021 the job_hours and hours fields were mutually exclusive
+		// and job_hours were only allowed to be non-zero if a job was selected. This destroys information about the split of hours prior to that date.
+		timeEntryInsertSQL := `
+			INSERT INTO time_entries (
+				division,
+				uid,
+				hours,
+				description,
+				time_type,
+				meals_hours,
+				job,
+				work_record,
+				payout_request_amount,
+				date,
+				week_ending,
+				tsid,
+				category
+			) VALUES (
+			 	{:division}, 
+				{:uid}, 
+				CAST((COALESCE({:job_hours}, 0) + COALESCE({:hours}, 0)) AS REAL) / 10, 
+				{:description}, 
+				{:time_type}, 
+				CAST({:meals_hours} AS REAL) / 10, 
+				{:job}, 
+				{:work_record}, 
+				{:payout_request_amount}, 
+				{:date}, 
+				{:week_ending}, 
+				{:tsid}, 
+				{:category}
+			)`
 
 		// Define the binder function for the TimeEntry type
+		// TODO: FIX SEVERAL ISSUES WITH LOADING OF TIME ENTRIES, INCLUDING BUT NOT LIMITED TO CATEGORY NOT BEING A RELATION
 		timeEntryBinder := func(item load.TimeEntry) dbx.Params {
 			return dbx.Params{
 				"division":              item.Division,
