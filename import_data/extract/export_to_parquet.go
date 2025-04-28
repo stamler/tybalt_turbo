@@ -187,8 +187,12 @@ func ToParquet() {
 
 	// Normalize the Jobs.parquet data by creating Clients.parquet and
 	// Contacts.parquet and updating Jobs.parquet to reference clients and
-	// contacts via UUID foreign keys.
+	// contacts via foreign keys.
 	jobsToClientsAndContacts()
+
+	// Normalize the Expenses.parquet data by creating Vendors.parquet and
+	// updating Expenses.parquet to reference vendors via foreign keys.
+	expensesToVendors()
 
 	// Dump the pre-populated tables from the sqlite test database.
 	sqliteTableDumps("../app/test_pb_data/data.db", "divisions")
@@ -209,6 +213,9 @@ func ToParquet() {
 
 	// Augment TimeAmendments.parquet data
 	augmentTimeAmendments()
+
+	// Augment Expenses.parquet data
+	augmentExpenses()
 
 	// Independent Collections (Profiles, Jobs) must be loaded first.
 	// TimeSheets can be loaded next because TimeEntries references TimeSheets.

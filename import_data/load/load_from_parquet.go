@@ -162,6 +162,39 @@ type TimeAmendment struct {
 	Committed           time.Time `parquet:"commitTime"`
 }
 
+type Vendor struct {
+	Id   string `parquet:"id"`
+	Name string `parquet:"name"`
+}
+
+type Expense struct {
+	Id                  string  `parquet:"pocketbase_id"`
+	Uid                 string  `parquet:"pocketbase_uid"`
+	PayrollId           string  `parquet:"payrollId"`
+	Division            string  `parquet:"division_id"`
+	Job                 string  `parquet:"pocketbase_jobid"`
+	Category            string  `parquet:"category"`
+	Date                string  `parquet:"date"`
+	PayPeriodEnding     string  `parquet:"payPeriodEnding"`
+	Description         string  `parquet:"description"`
+	Breakfast           bool    `parquet:"breakfast"`
+	Lunch               bool    `parquet:"lunch"`
+	Dinner              bool    `parquet:"dinner"`
+	Lodging             bool    `parquet:"lodging"`
+	VendorName          string  `parquet:"vendorName"`
+	Distance            float64 `parquet:"distance"`
+	Total               float64 `parquet:"total"`
+	PaymentType         string  `parquet:"paymentType"`
+	Attachment          string  `parquet:"attachment"`
+	CCLast4Digits       string  `parquet:"ccLast4Digits"`
+	PurchaseOrderNumber string  `parquet:"po"`
+	Approver            string  `parquet:"pocketbase_manager_uid"`
+	Approved            string  `parquet:"approved"`
+	Committer           string  `parquet:"pocketbase_commit_uid"`
+	Committed           string  `parquet:"commitTime"`
+	CommittedWeekEnding string  `parquet:"committedWeekEnding"`
+}
+
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
 // T: The struct type corresponding to the Parquet file schema.
 // parquetFilePath: Path to the input Parquet file.

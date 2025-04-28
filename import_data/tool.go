@@ -413,5 +413,27 @@ func main() {
 			timeAmendmentInsertSQL, // The specific INSERT SQL
 			timeAmendmentBinder,    // The specific binder function
 		)
+
+		// --- Load Vendors ---
+		// Define the specific SQL for the vendors table
+		vendorInsertSQL := "INSERT INTO vendors (id, name, status) VALUES ({:id}, {:name}, {:status})"
+
+		// Define the binder function for the Vendor type
+		vendorBinder := func(item load.Vendor) dbx.Params {
+			return dbx.Params{
+				"id":     item.Id,
+				"name":   item.Name,
+				"status": "Active",
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/Vendors.parquet",
+			"../app/test_pb_data/data.db",
+			"vendors",       // Table name (for logging)
+			vendorInsertSQL, // The specific INSERT SQL
+			vendorBinder,    // The specific binder function
+		)
 	}
 }
