@@ -56,6 +56,23 @@ func augmentExpenses() {
 		log.Fatalf("Failed to replace uids: %v", err)
 	}
 
+	// add the ccLast4Digits_string column which is a blank string if ccLast4Digits is null
+	// and the value of ccLast4Digits left padded with zeros to 4 digits if it is not null
+	_, err = db.Exec(`
+		ALTER TABLE expenses ADD COLUMN ccLast4Digits_string TEXT
+	`)
+	if err != nil {
+		log.Fatalf("Failed to add ccLast4Digits_string: %v", err)
+	}
+	_, err = db.Exec(`
+		UPDATE expenses
+		SET ccLast4Digits_string = LPAD(CAST(ccLast4Digits AS TEXT), 4, '0')
+		WHERE ccLast4Digits IS NOT NULL
+	`)
+	if err != nil {
+		log.Fatalf("Failed to pad ccLast4Digits: %v", err)
+	}
+
 	// fold in pocketbase_uid and pocketbase_approver_uid
 	_, err = db.Exec(`
 		CREATE TABLE expensesA AS 

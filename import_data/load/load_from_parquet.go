@@ -186,7 +186,7 @@ type Expense struct {
 	Total               float64 `parquet:"total"`
 	PaymentType         string  `parquet:"paymentType"`
 	Attachment          string  `parquet:"attachment"`
-	CCLast4Digits       string  `parquet:"ccLast4Digits"`
+	CCLast4Digits       string  `parquet:"ccLast4Digits_string"`
 	PurchaseOrderNumber string  `parquet:"po"`
 	Approver            string  `parquet:"pocketbase_approver_uid"`
 	Approved            string  `parquet:"approved"`
