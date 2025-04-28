@@ -104,7 +104,6 @@ func augmentTimeAmendments() {
 				j.pocketbase_id AS pocketbase_jobid,
 				tt.id AS timetype_id,
 				d.id AS division_id,
-				ts.weekEnding AS week_ending,
 			FROM time_amendments 
 			LEFT JOIN profiles p ON time_amendments.uid = p.id
 			LEFT JOIN profiles p2 ON time_amendments.commitUid = p2.id

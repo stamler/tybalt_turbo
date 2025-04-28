@@ -146,7 +146,7 @@ type TimeAmendment struct {
 	PayrollId           string    `parquet:"payrollId"`
 	WorkWeekHours       float64   `parquet:"workWeekHours"`
 	Salary              bool      `parquet:"salary"`
-	WeekEnding          string    `parquet:"week_ending"`
+	WeekEnding          string    `parquet:"weekEnding"`
 	Date                string    `parquet:"date"`
 	TimeType            string    `parquet:"timetype_id"`
 	Division            string    `parquet:"division_id"`
