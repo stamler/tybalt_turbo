@@ -61,10 +61,14 @@ func augmentExpenses() {
 		CREATE TABLE expensesA AS 
 			SELECT expenses.*, 
 				p.pocketbase_uid AS pocketbase_uid,
+				p2.pocketbase_uid AS pocketbase_approver_uid,
+				p3.pocketbase_uid AS pocketbase_commit_uid,
 				j.pocketbase_id AS pocketbase_jobid,
 				d.id AS division_id
 			FROM expenses 
 			LEFT JOIN profiles p ON expenses.uid = p.id
+			LEFT JOIN profiles p2 ON expenses.managerUid = p2.id
+			LEFT JOIN profiles p3 ON expenses.commitUid = p3.id
 			LEFT JOIN jobs j ON expenses.job = j.id
 			LEFT JOIN divisions d ON expenses.division = d.code
 	`)

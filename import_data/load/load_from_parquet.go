@@ -173,7 +173,7 @@ type Expense struct {
 	PayrollId           string  `parquet:"payrollId"`
 	Division            string  `parquet:"division_id"`
 	Job                 string  `parquet:"pocketbase_jobid"`
-	Category            string  `parquet:"category"`
+	Category            string  `parquet:"category_id"`
 	Date                string  `parquet:"date"`
 	PayPeriodEnding     string  `parquet:"payPeriodEnding"`
 	Description         string  `parquet:"description"`
@@ -181,14 +181,14 @@ type Expense struct {
 	Lunch               bool    `parquet:"lunch"`
 	Dinner              bool    `parquet:"dinner"`
 	Lodging             bool    `parquet:"lodging"`
-	VendorName          string  `parquet:"vendorName"`
+	Vendor              string  `parquet:"vendor_id"`
 	Distance            float64 `parquet:"distance"`
 	Total               float64 `parquet:"total"`
 	PaymentType         string  `parquet:"paymentType"`
 	Attachment          string  `parquet:"attachment"`
 	CCLast4Digits       string  `parquet:"ccLast4Digits"`
 	PurchaseOrderNumber string  `parquet:"po"`
-	Approver            string  `parquet:"pocketbase_manager_uid"`
+	Approver            string  `parquet:"pocketbase_approver_uid"`
 	Approved            string  `parquet:"approved"`
 	Committer           string  `parquet:"pocketbase_commit_uid"`
 	Committed           string  `parquet:"commitTime"`

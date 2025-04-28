@@ -435,5 +435,90 @@ func main() {
 			vendorInsertSQL, // The specific INSERT SQL
 			vendorBinder,    // The specific binder function
 		)
+
+		// --- Load Expenses ---
+		// Define the specific SQL for the expenses table
+		expenseInsertSQL := `INSERT INTO expenses (
+			uid,
+			division,
+			job,
+			category,
+			date,
+			pay_period_ending,
+			description,
+			vendor,
+			distance,
+			total,
+			payment_type,
+			attachment,
+			cc_last_4_digits,
+			purchase_order,
+			submitted,
+			approver,
+			approved,
+			committer,
+			committed,
+			committed_week_ending
+		) VALUES (
+			{:uid},
+			{:division},
+			{:job},
+			{:category},
+			{:date},
+			{:pay_period_ending},
+			{:description},
+			{:vendor},
+			{:distance},
+			CAST({:total} AS REAL) / 100,
+			{:payment_type},
+			{:attachment},
+			{:cc_last_4_digits},
+			{:purchase_order},
+			true,
+			{:approver},
+			{:approved},
+			{:committer},
+			{:committed},
+			{:committed_week_ending}
+		)`
+
+		// Define the binder function for the Expense type
+		expenseBinder := func(item load.Expense) dbx.Params {
+			return dbx.Params{
+				// "payroll_id":            item.PayrollId,
+				// "breakfast":             item.Breakfast,
+				// "lunch":                 item.Lunch,
+				// "dinner":                item.Dinner,
+				// "lodging":               item.Lodging,
+				"purchase_order":        item.PurchaseOrderNumber, // This must change to id in the future
+				"uid":                   item.Uid,
+				"division":              item.Division,
+				"job":                   item.Job,
+				"category":              item.Category,
+				"date":                  item.Date,
+				"pay_period_ending":     item.PayPeriodEnding,
+				"description":           item.Description,
+				"vendor":                item.Vendor,
+				"distance":              item.Distance,
+				"total":                 item.Total,
+				"payment_type":          item.PaymentType,
+				"attachment":            item.Attachment,
+				"cc_last_4_digits":      item.CCLast4Digits,
+				"approver":              item.Approver,
+				"approved":              nowString,
+				"committer":             item.Committer,
+				"committed":             item.Committed,
+				"committed_week_ending": item.CommittedWeekEnding,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/Expenses.parquet",
+			"../app/test_pb_data/data.db",
+			"expenses",       // Table name (for logging)
+			expenseInsertSQL, // The specific INSERT SQL
+			expenseBinder,    // The specific binder function
+		)
 	}
 }
