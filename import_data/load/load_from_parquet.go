@@ -13,15 +13,15 @@ import (
 /*
 	Order of operations:
 	1. ✅ Upload Clients.parquet to the sqlite database
-	2. ✅ Upload Contacts.parquet to the sqlite database (these reference clients)
-	3. ✅ Upload Jobs.parquet to the sqlite database (these reference clients and contacts)
+	2. ✅ Upload Contacts.parquet to the sqlite database
+	3. ✅ Upload Jobs.parquet to the sqlite database
 	4. ✅ Upload Profiles.parquet to the sqlite database users table
 	5. ✅ Upload Profiles.parquet to the sqlite database admin_profiles table
-	6. ✅ Upload Profiles.parquet to the sqlite database profiles table (these reference divisions and time types)
+	6. ✅ Upload Profiles.parquet to the sqlite database profiles table
 	7. ✅ Upload Profiles.parquet to the sqlite database _externalAuths table
-	8. ✅ Upload TimeSheets.parquet to the sqlite database (these reference users)
-	9. ✅ Upload TimeEntries.parquet to the sqlite database (these reference timesheets, jobs, and profiles)
-	10. Upload TimeAmendments.parquet to the sqlite database (these reference timesheets, jobs, divisions, time types, and profiles)
+	8. ✅ Upload TimeSheets.parquet to the sqlite database
+	9. ✅ Upload TimeEntries.parquet to the sqlite database
+	10. ✅ Upload TimeAmendments.parquet to the sqlite database
 	11. Upload Expenses.parquet to the sqlite database (these reference jobs, profiles, and purchase orders) We may not do this because there aren't many purchase orders and we can archive the attachments.
 */
 
