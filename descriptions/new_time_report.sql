@@ -1,5 +1,6 @@
 -- WIP, built somewhat from scratch against SQLite.
 -- The payroll report for a specific week
+-- TODO: fold in time_amendments
 
 SELECT payrollId,
   weekEnding,
@@ -42,7 +43,7 @@ SELECT payrollId,
   Vacation,
   overtimeHoursToBank "overtime hours to bank",
   overtimePayoutRequested "Overtime Payout Requested",
-  "TBD" hasAmendmentsForWeeksEnding,
+  hasAmendmentsForWeeksEnding,
   CASE WHEN salary = 1 THEN "TRUE" ELSE "FALSE" END salary
 FROM (
   SELECT ap.payroll_id payrollId,
@@ -63,6 +64,7 @@ FROM (
     SUM(CASE WHEN tt.code = "OV" THEN IFNULL(hours,0) ELSE 0 END) Vacation,
     SUM(CASE WHEN tt.code = "RB" THEN IFNULL(hours,0) ELSE 0 END) overtimeHoursToBank,
     SUM(IFNULL(te.payout_request_amount,0)) overtimePayoutRequested,
+    NULL hasAmendmentsForWeeksEnding,
     ts.salary salary,
     MAX(ts.work_week_hours) workWeekHours
   FROM time_entries te
