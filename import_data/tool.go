@@ -1,10 +1,12 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"fmt"
 	"imports/extract"
 	"imports/load"
+	"log"
 	"strings"
 	"time"
 
@@ -452,6 +454,7 @@ func main() {
 			payment_type,
 			attachment,
 			cc_last_4_digits,
+			allowance_types,
 			purchase_order,
 			submitted,
 			approver,
@@ -473,6 +476,7 @@ func main() {
 			{:payment_type},
 			{:attachment},
 			{:cc_last_4_digits},
+			{:allowance_types},
 			{:purchase_order},
 			true,
 			{:approver},
@@ -481,6 +485,31 @@ func main() {
 			{:committed},
 			{:committed_week_ending}
 		)`
+
+		// allowance_types is a json array of strings that are the types of
+		// allowances that are allowed for the expense. Choices are "Breakfast",
+		// "Lunch", "Dinner", "Lodging". If the expense is not an allowance, the
+		// array is empty. Here we create the json array from the boolean fields.
+		createAllowanceTypes := func(item load.Expense) string {
+			allowanceTypes := []string{}
+			if item.Breakfast {
+				allowanceTypes = append(allowanceTypes, "Breakfast")
+			}
+			if item.Lunch {
+				allowanceTypes = append(allowanceTypes, "Lunch")
+			}
+			if item.Dinner {
+				allowanceTypes = append(allowanceTypes, "Dinner")
+			}
+			if item.Lodging {
+				allowanceTypes = append(allowanceTypes, "Lodging")
+			}
+			jsonArray, err := json.Marshal(allowanceTypes)
+			if err != nil {
+				log.Fatal(err)
+			}
+			return string(jsonArray)
+		}
 
 		// Define the binder function for the Expense type
 		expenseBinder := func(item load.Expense) dbx.Params {
@@ -500,6 +529,7 @@ func main() {
 				"description":           item.Description,
 				"vendor":                item.Vendor,
 				"distance":              item.Distance,
+				"allowance_types":       createAllowanceTypes(item),
 				"total":                 item.Total,
 				"payment_type":          item.PaymentType,
 				"attachment":            item.Attachment,
@@ -507,7 +537,7 @@ func main() {
 				"approver":              item.Approver,
 				"approved":              nowString,
 				"committer":             item.Committer,
-				"committed":             item.Committed,
+				"committed":             item.Committed.Format("2006-01-02 15:04:05.000Z"),
 				"committed_week_ending": item.CommittedWeekEnding,
 			}
 		}
