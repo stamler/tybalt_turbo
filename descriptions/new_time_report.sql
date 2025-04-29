@@ -47,7 +47,9 @@ SELECT payrollId,
 FROM (
   
 SELECT ap.payroll_id payrollId,
-  te.week_ending  weekEnding,
+  strftime('%Y', te.week_ending) || ' ' ||
+  substr('  JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', te.week_ending) * 3, 3) || ' ' ||
+  strftime('%d', te.week_ending) AS weekEnding,
   p.surname surname,
   p.given_name givenName,
   p.given_name || ' ' ||  p. surname name,
