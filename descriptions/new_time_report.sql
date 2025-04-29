@@ -28,7 +28,13 @@ SELECT payrollId,
       WHEN salary = 0 AND hoursWorked > 44 THEN hoursWorked - 44
       ELSE 0
   END AS "total overtime hours",
-  "TBD" "overtime hours to pay",
+  CASE
+      WHEN salary = 0 THEN CASE
+          WHEN overtimeHoursToBank > 0 THEN (CASE WHEN hoursWorked > 44 THEN hoursWorked - 44 ELSE 0 END) - overtimeHoursToBank
+          ELSE (CASE WHEN hoursWorked > 44 THEN hoursWorked - 44 ELSE 0 END)
+      END
+      ELSE 0
+  END "overtime hours to pay",
   Bereavement,
   Stat "Stat Holiday",
   PPTO,
