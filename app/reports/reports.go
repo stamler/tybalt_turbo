@@ -9,8 +9,8 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-//go:embed payroll_time_component.sql
-var payrollTimeComponentQuery string
+//go:embed new_time_report.sql
+var newTimeReportQuery string
 
 // CreatePayrollTimeReportHandler returns a function that creates a payroll time report for a given week
 func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) error {
@@ -34,12 +34,12 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 		// }
 
 		// Execute the query
-		var report []map[string]any
-		err = app.DB().NewQuery(payrollTimeComponentQuery).Bind(dbx.Params{
+		var report []dbx.NullStringMap // TODO: make a type for this
+		err = app.DB().NewQuery(newTimeReportQuery).Bind(dbx.Params{
 			"weekEnding": payrollEndingDate.Format("2006-01-02"),
 		}).All(&report)
 		if err != nil {
-			return e.Error(http.StatusInternalServerError, "failed to execute query", nil)
+			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 
 		return e.JSON(http.StatusOK, report)

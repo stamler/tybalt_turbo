@@ -73,7 +73,7 @@ FROM (
   LEFT JOIN profiles p ON p.uid = te.uid
   LEFT JOIN profiles pm ON pm.uid = ts.approver
   LEFT JOIN time_types tt ON te.time_type = tt.id 
-  WHERE te.week_ending = '2025-04-19'
+  WHERE te.week_ending = {:weekEnding}
 
   UNION ALL
 
@@ -116,7 +116,7 @@ FROM (
     ) DistinctTriplets
     GROUP BY uid, committed_week_ending
   ) y ON ta.uid = y.uid AND ta.committed_week_ending = y.committed_week_ending
-  WHERE ta.committed_week_ending = '2025-04-19'
+  WHERE ta.committed_week_ending = {:weekEnding}
 )
 GROUP BY payrollId
 ORDER BY LENGTH(payrollId), payrollId
