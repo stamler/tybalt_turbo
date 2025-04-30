@@ -22,7 +22,10 @@ export enum Collections {
   Expenses = "expenses",
   Jobs = "jobs",
   Managers = "managers",
+  NotificationTemplates = "notification_templates",
+  Notifications = "notifications",
   PayrollYearEndDates = "payroll_year_end_dates",
+  PendingItemsForQualifiedPoSecondApprovers = "pending_items_for_qualified_po_second_approvers",
   PoApprovalThresholds = "po_approval_thresholds",
   PoApproverProps = "po_approver_props",
   Profiles = "profiles",
@@ -31,6 +34,7 @@ export enum Collections {
   TimeAmendments = "time_amendments",
   TimeEntries = "time_entries",
   TimeOff = "time_off",
+  TimeReportWeekEndings = "time_report_week_endings",
   TimeSheetReviewers = "time_sheet_reviewers",
   TimeSheets = "time_sheets",
   TimeTypes = "time_types",
@@ -45,15 +49,20 @@ export type IsoDateString = string;
 export type RecordIdString = string;
 export type HTMLString = string;
 
+type ExpandType<T> = unknown extends T
+  ? T extends unknown
+    ? { expand: unknown }
+    : { expand: T }
+  : { expand: T };
+
 // System fields
-export type BaseSystemFields<T = never> = {
+export type BaseSystemFields<T = unknown> = {
   id: RecordIdString;
   collectionId: string;
   collectionName: Collections;
-  expand: T;
-};
+} & ExpandType<T>;
 
-export type AuthSystemFields<T = never> = {
+export type AuthSystemFields<T = unknown> = {
   email: string;
   emailVisibility: boolean;
   username: string;
@@ -127,17 +136,23 @@ export enum AdminProfilesSkipMinTimeCheckOptions {
   "yes" = "yes",
 }
 export type AdminProfilesRecord = {
+  allow_personal_reimbursement: boolean;
   created: IsoDateString;
   default_charge_out_rate: number;
   id: string;
+  job_title: string;
+  mobile_phone: string;
   off_rotation_permitted: boolean;
   opening_date: string;
   opening_op: number;
   opening_ov: number;
   payroll_id: string;
+  personal_vehicle_insurance_expiry: string;
   salary: boolean;
   skip_min_time_check: AdminProfilesSkipMinTimeCheckOptions;
+  time_sheet_expected: boolean;
   uid: RecordIdString;
+  untracked_time_off: boolean;
   updated: IsoDateString;
   work_week_hours: number;
 };
@@ -241,14 +256,30 @@ export type ExpensesRecord = {
   vendor: RecordIdString;
 };
 
+export enum JobsStatusOptions {
+  "Active" = "Active",
+  "Closed" = "Closed",
+  "Cancelled" = "Cancelled",
+  "Awarded" = "Awarded",
+  "Not Awarded" = "Not Awarded",
+}
 export type JobsRecord = {
+  alternate_manager: RecordIdString;
   client: RecordIdString;
   contact: RecordIdString;
   created: IsoDateString;
   description: string;
+  divisions: RecordIdString[];
+  fn_agreement: boolean;
   id: string;
+  job_owner: RecordIdString;
   manager: RecordIdString;
   number: string;
+  project_award_date: string;
+  proposal: RecordIdString;
+  proposal_opening_date: string;
+  proposal_submission_due_date: string;
+  status: JobsStatusOptions;
   updated: IsoDateString;
 };
 
@@ -258,11 +289,47 @@ export type ManagersRecord = {
   surname: string;
 };
 
+export type NotificationTemplatesRecord = {
+  code: string;
+  created: IsoDateString;
+  description: string;
+  html_email: string;
+  id: string;
+  subject: string;
+  text_email: string;
+  updated: IsoDateString;
+};
+
+export enum NotificationsStatusOptions {
+  "pending" = "pending",
+  "inflight" = "inflight",
+  "sent" = "sent",
+  "error" = "error",
+}
+export type NotificationsRecord<Tdata = unknown> = {
+  created: IsoDateString;
+  data: null | Tdata;
+  error: string;
+  id: string;
+  recipient: RecordIdString;
+  status: NotificationsStatusOptions;
+  status_updated: IsoDateString;
+  system_notification: boolean;
+  template: RecordIdString;
+  updated: IsoDateString;
+  user: RecordIdString;
+};
+
 export type PayrollYearEndDatesRecord = {
   created: IsoDateString;
   date: string;
   id: string;
   updated: IsoDateString;
+};
+
+export type PendingItemsForQualifiedPoSecondApproversRecord = {
+  id: string;
+  num_pos_qualified: number;
 };
 
 export type PoApprovalThresholdsRecord = {
@@ -282,13 +349,19 @@ export type PoApproverPropsRecord = {
   user_claim: RecordIdString;
 };
 
+export enum ProfilesNotificationTypeOptions {
+  "email_text" = "email_text",
+  "email_html" = "email_html",
+}
 export type ProfilesRecord = {
   alternate_manager: RecordIdString;
   created: IsoDateString;
   default_division: RecordIdString;
+  do_not_accept_submissions: boolean;
   given_name: string;
   id: string;
   manager: RecordIdString;
+  notification_type: ProfilesNotificationTypeOptions;
   surname: string;
   uid: RecordIdString;
   updated: IsoDateString;
@@ -421,6 +494,11 @@ export type TimeOffRecord = {
   used_ov: number;
 };
 
+export type TimeReportWeekEndingsRecord = {
+  id: string;
+  week_ending: string;
+};
+
 export type TimeSheetReviewersRecord = {
   created: IsoDateString;
   id: string;
@@ -437,6 +515,7 @@ export type TimeSheetsRecord = {
   committer: RecordIdString;
   created: IsoDateString;
   id: string;
+  payroll_id: string;
   rejected: IsoDateString;
   rejection_reason: string;
   rejector: RecordIdString;
@@ -602,8 +681,16 @@ export type JobsResponse<Texpand = JobsRecordExpands> = Required<JobsRecord> &
   BaseSystemFields<Texpand>;
 export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
   BaseSystemFields<Texpand>;
+export type NotificationTemplatesResponse<Texpand = unknown> =
+  Required<NotificationTemplatesRecord> & BaseSystemFields<Texpand>;
+export type NotificationsResponse<Tdata = unknown, Texpand = unknown> = Required<
+  NotificationsRecord<Tdata>
+> &
+  BaseSystemFields<Texpand>;
 export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYearEndDatesRecord> &
   BaseSystemFields<Texpand>;
+export type PendingItemsForQualifiedPoSecondApproversResponse<Texpand = unknown> =
+  Required<PendingItemsForQualifiedPoSecondApproversRecord> & BaseSystemFields<Texpand>;
 export type PoApprovalThresholdsResponse<Texpand = unknown> = Required<PoApprovalThresholdsRecord> &
   BaseSystemFields<Texpand>;
 export type PoApproverPropsResponse<Texpand = unknown> = Required<PoApproverPropsRecord> &
@@ -620,6 +707,8 @@ export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<T
   BaseSystemFields<Texpand>;
 export type TimeOffResponse<Texpand = unknown> = Required<TimeOffRecord> &
   BaseSystemFields<Texpand>;
+export type TimeReportWeekEndingsResponse<Texpand = unknown> =
+  Required<TimeReportWeekEndingsRecord> & BaseSystemFields<Texpand>;
 export type TimeSheetReviewersResponse<Texpand = TimeSheetReviewersRecordExpands> =
   Required<TimeSheetReviewersRecord> & BaseSystemFields<Texpand>;
 export type TimeSheetsResponse<Texpand = unknown> = Required<TimeSheetsRecord> &
@@ -654,7 +743,10 @@ export type CollectionRecords = {
   expenses: ExpensesRecord;
   jobs: JobsRecord;
   managers: ManagersRecord;
+  notification_templates: NotificationTemplatesRecord;
+  notifications: NotificationsRecord;
   payroll_year_end_dates: PayrollYearEndDatesRecord;
+  pending_items_for_qualified_po_second_approvers: PendingItemsForQualifiedPoSecondApproversRecord;
   po_approval_thresholds: PoApprovalThresholdsRecord;
   po_approver_props: PoApproverPropsRecord;
   profiles: ProfilesRecord;
@@ -663,6 +755,7 @@ export type CollectionRecords = {
   time_amendments: TimeAmendmentsRecord;
   time_entries: TimeEntriesRecord;
   time_off: TimeOffRecord;
+  time_report_week_endings: TimeReportWeekEndingsRecord;
   time_sheet_reviewers: TimeSheetReviewersRecord;
   time_sheets: TimeSheetsRecord;
   time_types: TimeTypesRecord;
@@ -689,7 +782,10 @@ export type CollectionResponses = {
   expenses: ExpensesResponse;
   jobs: JobsResponse;
   managers: ManagersResponse;
+  notification_templates: NotificationTemplatesResponse;
+  notifications: NotificationsResponse;
   payroll_year_end_dates: PayrollYearEndDatesResponse;
+  pending_items_for_qualified_po_second_approvers: PendingItemsForQualifiedPoSecondApproversResponse;
   po_approval_thresholds: PoApprovalThresholdsResponse;
   po_approver_props: PoApproverPropsResponse;
   profiles: ProfilesResponse;
@@ -698,6 +794,7 @@ export type CollectionResponses = {
   time_amendments: TimeAmendmentsResponse;
   time_entries: TimeEntriesResponse;
   time_off: TimeOffResponse;
+  time_report_week_endings: TimeReportWeekEndingsResponse;
   time_sheet_reviewers: TimeSheetReviewersResponse;
   time_sheets: TimeSheetsResponse;
   time_types: TimeTypesResponse;
@@ -727,7 +824,12 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "expenses"): RecordService<ExpensesResponse>;
   collection(idOrName: "jobs"): RecordService<JobsResponse>;
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
+  collection(idOrName: "notification_templates"): RecordService<NotificationTemplatesResponse>;
+  collection(idOrName: "notifications"): RecordService<NotificationsResponse>;
   collection(idOrName: "payroll_year_end_dates"): RecordService<PayrollYearEndDatesResponse>;
+  collection(
+    idOrName: "pending_items_for_qualified_po_second_approvers",
+  ): RecordService<PendingItemsForQualifiedPoSecondApproversResponse>;
   collection(idOrName: "po_approval_thresholds"): RecordService<PoApprovalThresholdsResponse>;
   collection(idOrName: "po_approver_props"): RecordService<PoApproverPropsResponse>;
   collection(idOrName: "profiles"): RecordService<ProfilesResponse>;
@@ -736,6 +838,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "time_amendments"): RecordService<TimeAmendmentsResponse>;
   collection(idOrName: "time_entries"): RecordService<TimeEntriesResponse>;
   collection(idOrName: "time_off"): RecordService<TimeOffResponse>;
+  collection(idOrName: "time_report_week_endings"): RecordService<TimeReportWeekEndingsResponse>;
   collection(idOrName: "time_sheet_reviewers"): RecordService<TimeSheetReviewersResponse>;
   collection(idOrName: "time_sheets"): RecordService<TimeSheetsResponse>;
   collection(idOrName: "time_types"): RecordService<TimeTypesResponse>;
