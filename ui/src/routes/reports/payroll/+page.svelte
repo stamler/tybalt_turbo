@@ -2,8 +2,12 @@
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
-  import { globalStore } from "$lib/stores/global";
+  import type { PageData } from "./$types";
+  import type { TimeReportWeekEndingsResponse } from "$lib/pocketbase-types";
   import { shortDate, hoursWorked, jobs, divisions, payoutRequests } from "$lib/utilities";
+
+  let { data }: { data: PageData } = $props();
+  let weekEndings = $state(data.items);
 
   async function fetchTimeReport(weekEnding: string, week: number) {
     try {
@@ -18,17 +22,17 @@
   }
 </script>
 
-{#snippet anchor()}
-  Date
+{#snippet anchor({ week_ending }: TimeReportWeekEndingsResponse)}
+  {week_ending}
 {/snippet}
 {#snippet headline()}
   Payroll
 {/snippet}
-{#snippet actions()}
+{#snippet actions({ week_ending }: TimeReportWeekEndingsResponse)}
   Week 1
   <DsActionButton
     action={() => {
-      fetchTimeReport("2025-04-05", 1);
+      fetchTimeReport(week_ending, 1);
     }}
     icon="mdi:download"
     title="Download"
@@ -37,4 +41,6 @@
 {/snippet}
 
 <!-- Show the list of items here -->
-<DsList items={$globalStore.time_sheets_tallies} search={true} {anchor} {headline} {actions} />
+{#if weekEndings}
+  <DsList items={weekEndings} search={true} {anchor} {headline} {actions} />
+{/if}
