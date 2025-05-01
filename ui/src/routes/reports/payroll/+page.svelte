@@ -33,14 +33,6 @@
       // Get the response body as text
       const csvString = await response.text();
 
-      // --- DEBUGGING (Optional: Keep for now) ---
-      console.log("Type of response text:", typeof csvString);
-      console.log(
-        "Response value text:",
-        csvString ? csvString.substring(0, 500) + "..." : "EMPTY",
-      ); // Log first 500 chars
-      // --- END DEBUGGING ---
-
       if (typeof csvString !== "string") {
         throw new Error("Received non-string response from server.");
       }
