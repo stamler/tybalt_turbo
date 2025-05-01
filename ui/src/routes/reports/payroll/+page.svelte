@@ -11,13 +11,51 @@
 
   async function fetchTimeReport(weekEnding: string, week: number) {
     try {
-      const timeReport = await pb.send(`/api/reports/payroll_time/${weekEnding}/${week}`, {
+      // Construct the full URL
+      const url = `${pb.baseUrl}/api/reports/payroll_time/${weekEnding}/${week}`;
+
+      // Prepare headers, including Authorization if the user is logged in
+      const headers: HeadersInit = {};
+      if (pb.authStore.isValid) {
+        headers["Authorization"] = pb.authStore.token;
+      }
+
+      // Use standard fetch API
+      const response = await fetch(url, {
         method: "GET",
+        headers: headers,
       });
 
-      console.log(timeReport);
+      if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}: ${await response.text()}`);
+      }
+
+      // Get the response body as text
+      const csvString = await response.text();
+
+      // --- DEBUGGING (Optional: Keep for now) ---
+      console.log("Type of response text:", typeof csvString);
+      console.log(
+        "Response value text:",
+        csvString ? csvString.substring(0, 500) + "..." : "EMPTY",
+      ); // Log first 500 chars
+      // --- END DEBUGGING ---
+
+      if (typeof csvString !== "string") {
+        throw new Error("Received non-string response from server.");
+      }
+
+      // Create a Blob from the string response
+      const timeReportCSV = new Blob([csvString], { type: "text/csv" });
+
+      // Create an object URL from the Blob
+      const blobUrl = URL.createObjectURL(timeReportCSV);
+      window.open(blobUrl, "_blank");
+      // Consider revoking the URL after a delay
+      // setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
     } catch (error) {
       console.error("Error fetching time report:", error);
+      // Optionally: Show an error message to the user
     }
   }
 </script>

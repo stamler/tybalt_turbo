@@ -42,7 +42,17 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 
-		return e.JSON(http.StatusOK, report)
+		// convert the report to a csv string
+		csvString, err := convertToCSV(report)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to generate CSV report: "+err.Error(), err)
+		}
+
+		// Set content type and return the CSV string
+		e.Response.Header().Set("Content-Type", "text/csv")
+		// set a filename for download
+		e.Response.Header().Set("Content-Disposition", "attachment; filename=\"payroll_time_report.csv\"")
+		return e.String(http.StatusOK, csvString)
 	}
 }
 
