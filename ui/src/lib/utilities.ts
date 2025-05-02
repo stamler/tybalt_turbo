@@ -294,3 +294,52 @@ export async function fetchClientContacts(clientId: string): Promise<ClientConta
     return Promise.resolve([] as ClientContactsResponse[]);
   }
 }
+
+export async function downloadCSV(endpoint: string, fileName: string) {
+  try {
+    // Prepare headers, including Authorization if the user is logged in
+    const headers: HeadersInit = {};
+    if (pb.authStore.isValid) {
+      headers["Authorization"] = pb.authStore.token;
+    }
+
+    // Use standard fetch API
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers: headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}: ${await response.text()}`);
+    }
+
+    // Get the response body as text
+    const csvString = await response.text();
+
+    if (typeof csvString !== "string") {
+      throw new Error("Received non-string response from server.");
+    }
+
+    // Create a Blob from the string response
+    const timeReportCSV = new Blob([csvString], { type: "text/csv" });
+
+    // Create an object URL from the Blob
+    const blobUrl = URL.createObjectURL(timeReportCSV);
+
+    // Create a temporary anchor element to trigger the download
+    const anchor = document.createElement("a");
+    anchor.href = blobUrl;
+    // Suggest a filename (the browser might override it, but it's good practice)
+    // We can construct a dynamic filename based on the inputs
+    anchor.download = fileName;
+    document.body.appendChild(anchor); // Append to body to make it clickable
+    anchor.click(); // Programmatically click the anchor to trigger download
+    document.body.removeChild(anchor); // Clean up the anchor element
+
+    // Revoke the object URL to free up memory, potentially after a small delay
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
+  } catch (error) {
+    console.error("Error fetching CSV:", error);
+    // Optionally: Show an error message to the user
+  }
+}

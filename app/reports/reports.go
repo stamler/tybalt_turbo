@@ -27,6 +27,11 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 			return err
 		}
 
+		// if week is 1, subtract 7 days from the payroll ending date
+		if week == "1" {
+			payrollEndingDate = payrollEndingDate.AddDate(0, 0, -7)
+		}
+
 		// Load the query from the descriptions/payroll_time_component.sql file
 		// query, err := os.ReadFile("descriptions/payroll_time_component.sql")
 		// if err != nil {
@@ -50,8 +55,6 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 
 		// Set content type and return the CSV string
 		e.Response.Header().Set("Content-Type", "text/csv")
-		// set a filename for download
-		e.Response.Header().Set("Content-Disposition", "attachment; filename=\"payroll_time_report.csv\"")
 		return e.String(http.StatusOK, csvString)
 	}
 }
@@ -101,6 +104,17 @@ func getPayrollEndingDate(e *core.RequestEvent) (time.Time, error) {
 	// if payrollEnding is not a Saturday, return an error
 	if payrollEndingDate.Weekday() != time.Saturday {
 		return time.Time{}, e.Error(http.StatusBadRequest, "payrollEnding must be a Saturday", nil)
+	}
+
+	// Check if payrollEndingDate is an integer multiple of 2 weeks (14 days)
+	// before or after the reference date 2025-03-01.
+	// We calculate the difference in days first.
+	// TODO: make a constant PAYROLL_EPOCH that's usable throughtout the app
+	// For example, this could be used in time_report_week_endings or a similar
+	// view to ensure that the payroll ending date is a valid payroll ending date
+	daysDifference := int(payrollEndingDate.Sub(time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)).Hours() / 24)
+	if daysDifference%14 != 0 {
+		return time.Time{}, e.Error(http.StatusBadRequest, "payrollEnding must be an integer multiple of 2 weeks before or after 2025-03-01", nil)
 	}
 
 	return payrollEndingDate, nil

@@ -4,51 +4,15 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import type { PageData } from "./$types";
   import type { TimeReportWeekEndingsResponse } from "$lib/pocketbase-types";
-  import { shortDate, hoursWorked, jobs, divisions, payoutRequests } from "$lib/utilities";
+  import { shortDate, downloadCSV } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
   let weekEndings = $state(data.items);
 
   async function fetchTimeReport(weekEnding: string, week: number) {
-    try {
-      // Construct the full URL
-      const url = `${pb.baseUrl}/api/reports/payroll_time/${weekEnding}/${week}`;
-
-      // Prepare headers, including Authorization if the user is logged in
-      const headers: HeadersInit = {};
-      if (pb.authStore.isValid) {
-        headers["Authorization"] = pb.authStore.token;
-      }
-
-      // Use standard fetch API
-      const response = await fetch(url, {
-        method: "GET",
-        headers: headers,
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error ${response.status}: ${await response.text()}`);
-      }
-
-      // Get the response body as text
-      const csvString = await response.text();
-
-      if (typeof csvString !== "string") {
-        throw new Error("Received non-string response from server.");
-      }
-
-      // Create a Blob from the string response
-      const timeReportCSV = new Blob([csvString], { type: "text/csv" });
-
-      // Create an object URL from the Blob
-      const blobUrl = URL.createObjectURL(timeReportCSV);
-      window.open(blobUrl, "_blank");
-      // Consider revoking the URL after a delay
-      // setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
-    } catch (error) {
-      console.error("Error fetching time report:", error);
-      // Optionally: Show an error message to the user
-    }
+    const url = `${pb.baseUrl}/api/reports/payroll_time/${weekEnding}/${week}`;
+    const fileName = `payroll_time_report_${weekEnding}_week${week}.csv`;
+    await downloadCSV(url, fileName);
   }
 </script>
 
@@ -59,15 +23,20 @@
   Payroll
 {/snippet}
 {#snippet actions({ week_ending }: TimeReportWeekEndingsResponse)}
-  Week 1
   <DsActionButton
     action={() => {
       fetchTimeReport(week_ending, 1);
     }}
-    icon="mdi:download"
-    title="Download"
-    color="orange"
-  />
+    title="Week 1"
+    color="orange">Week 1</DsActionButton
+  >
+  <DsActionButton
+    action={() => {
+      fetchTimeReport(week_ending, 2);
+    }}
+    title="Week 2"
+    color="orange">Week 2</DsActionButton
+  >
 {/snippet}
 
 <!-- Show the list of items here -->
