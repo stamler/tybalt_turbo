@@ -9,6 +9,8 @@
 
 package constants
 
+import "time"
+
 const (
 	// The maximum number of days between the start and end dates for a recurring
 	// purchase order.
@@ -32,3 +34,6 @@ const (
 	// The claim ID for the po_approver claim
 	PO_APPROVER_CLAIM_ID = "5vh881k048bboim"
 )
+
+// The epoch date for the payroll, initialized as a variable.
+var PAYROLL_EPOCH = time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)

@@ -4,6 +4,7 @@ import (
 	_ "embed" // Needed for //go:embed
 	"net/http"
 	"time"
+	"tybalt/constants"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -106,15 +107,11 @@ func getPayrollEndingDate(e *core.RequestEvent) (time.Time, error) {
 		return time.Time{}, e.Error(http.StatusBadRequest, "payrollEnding must be a Saturday", nil)
 	}
 
-	// Check if payrollEndingDate is an integer multiple of 2 weeks (14 days)
-	// before or after the reference date 2025-03-01.
-	// We calculate the difference in days first.
-	// TODO: make a constant PAYROLL_EPOCH that's usable throughtout the app
-	// For example, this could be used in time_report_week_endings or a similar
-	// view to ensure that the payroll ending date is a valid payroll ending date
-	daysDifference := int(payrollEndingDate.Sub(time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)).Hours() / 24)
+	// Check if payrollEndingDate is a multiple of 2 weeks (14 days) before or
+	// after the PAYROLL_EPOCH.
+	daysDifference := int(payrollEndingDate.Sub(constants.PAYROLL_EPOCH).Hours() / 24)
 	if daysDifference%14 != 0 {
-		return time.Time{}, e.Error(http.StatusBadRequest, "payrollEnding must be an integer multiple of 2 weeks before or after 2025-03-01", nil)
+		return time.Time{}, e.Error(http.StatusBadRequest, "payrollEnding must be a multiple of 2 weeks before or after 2025-03-01", nil)
 	}
 
 	return payrollEndingDate, nil
