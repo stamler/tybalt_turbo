@@ -10,7 +10,37 @@ import { Collections } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import flatpickr from "flatpickr";
 
-export interface TimeSheetTally extends BaseSystemFields {
+export interface TimeSheetTallyQueryRow {
+  id: string;
+  approved: string;
+  bank_entry_dates: string[];
+  division_names: string[];
+  divisions: string[];
+  job_numbers: string[];
+  meals_hours: number;
+  non_work_total_hours: number;
+  ob_hours: number;
+  off_rotation_dates: string[];
+  off_week_dates: string[];
+  op_hours: number;
+  os_hours: number;
+  ov_hours: number;
+  rb_hours: number;
+  payout_request_amount: number;
+  payout_request_dates: string[];
+  rejected: string;
+  rejection_reason: string;
+  salary: string;
+  time_type_names: string[];
+  time_types: string[];
+  week_ending: string;
+  work_hours: number;
+  work_job_hours: number;
+  work_total_hours: number;
+  work_week_hours: number;
+}
+
+export interface TimeEntriesSummary extends BaseSystemFields {
   // These TimeSheetRecord-specific properties will be "" if there is no
   // corresponding time sheet record for the time entries
   week_ending: string;
@@ -47,7 +77,7 @@ export interface TimeSheetTally extends BaseSystemFields {
   };
 }
 
-export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]): TimeSheetTally {
+export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]): TimeEntriesSummary {
   let items: TimeEntriesResponse[];
   let id: string = "";
   let week_ending: string = "";
@@ -79,7 +109,7 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
       "time_entries_via_tsid"
     ];
   }
-  const tallies: TimeSheetTally = {
+  const tallies: TimeEntriesSummary = {
     id,
     week_ending,
     salary,
@@ -161,7 +191,7 @@ export function shortDate(dateString: string, includeYear = false) {
   const day = parseInt(dateParts[2], 10);
   return `${month} ${day}${includeYear ? `, ${dateParts[0]}` : ""}`;
 }
-
+/*
 export const hoursWorked = function (item: TimeSheetTally) {
   let workedHours = 0;
   workedHours += item.workHoursTally.hours;
@@ -202,7 +232,7 @@ export const payoutRequests = function (item: TimeSheetTally) {
     return "no payout requests";
   }
 };
-
+*/
 const nFormatter = function (num: number, digits: number) {
   const lookup = [
     { value: 1, symbol: "" },

@@ -6,8 +6,8 @@
   import { goto } from "$app/navigation";
   import ShareModal from "$lib/components/ShareModal.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
-  import { shortDate, hoursWorked, jobs, divisions, payoutRequests } from "$lib/utilities";
-  import type { TimeSheetTally } from "$lib/utilities";
+  import { shortDate } from "$lib/utilities";
+  import type { TimeSheetTallyQueryRow } from "$lib/utilities";
   import type { SvelteComponent } from "svelte";
   let shareModal: SvelteComponent;
   let rejectModal: SvelteComponent;
@@ -22,7 +22,7 @@
       });
 
       // refresh the time sheets list in the global store
-      globalStore.refresh("time_sheets");
+      globalStore.refresh("time_sheets_tallies");
 
       // navigate to the time entries list to show the unbundled time entries
       goto(`/time/entries/list`);
@@ -41,7 +41,7 @@
       });
 
       // refresh the time sheets list in the global store
-      globalStore.refresh("time_sheets");
+      globalStore.refresh("time_sheets_tallies");
     } catch (error) {
       globalStore.addError(error?.response.error);
     }
@@ -52,42 +52,48 @@
   }
 </script>
 
-{#snippet anchor({ week_ending }: TimeSheetTally)}
+{#snippet anchor({ week_ending }: TimeSheetTallyQueryRow)}
   <a class="font-bold hover:underline" href="/time/sheets/details">{shortDate(week_ending)}</a>
 {/snippet}
-{#snippet headline(tally: TimeSheetTally)}
-  <span>{hoursWorked(tally)}</span>
+{#snippet headline(tally: TimeSheetTallyQueryRow)}
+  {#if tally.work_total_hours > 0}
+    <span>{tally.work_total_hours} hours worked</span>
+  {:else}
+    <span>no work</span>
+  {/if}
 {/snippet}
-{#snippet byline(tally: TimeSheetTally)}
-  {#if tally.offWeek.length > 0}
+{#snippet byline(tally: TimeSheetTallyQueryRow)}
+  {#if tally.off_week_dates.length > 0}
     <span>/ off rotation week</span>
   {:else}
-    <span>/ {tally.nonWorkHoursTally.total} hours off</span>
-    {#if tally.offRotationDates.length > 0}
-      <span>/ {tally.offRotationDates.length} day(s) off rotation</span>
+    <span>/ {tally.non_work_total_hours} hours off</span>
+    {#if tally.off_rotation_dates.length > 0}
+      <span>/ {tally.off_rotation_dates.length} day(s) off rotation</span>
     {/if}
-    {#if tally.bankEntries.length > 0}
-      <span>/ {tally.bankEntries.reduce((sum, entry) => sum + entry.hours, 0)} hours banked</span>
+    {#if tally.bank_entry_dates.length > 0}
+      <span>/ {tally.rb_hours} hours banked</span>
     {/if}
   {/if}
 {/snippet}
-{#snippet line2(tally: TimeSheetTally)}
-  <span>{divisions(tally)}</span>
+{#snippet line2(tally: TimeSheetTallyQueryRow)}
+  <span>{tally.divisions.join(", ")}</span>
 {/snippet}
-{#snippet line1(tally: TimeSheetTally)}
-  <span>{jobs(tally)}</span>
+{#snippet line1(tally: TimeSheetTallyQueryRow)}
+  <span>{tally.job_numbers.join(", ")}</span>
 {/snippet}
-{#snippet line3(tally: TimeSheetTally)}
+{#snippet line3(tally: TimeSheetTallyQueryRow)}
   {#if tally.rejected}
     <span class="text-red-600">Rejected: {tally.rejection_reason}</span>
   {/if}
-  {#if tally.payoutRequests.length > 0}
-    <span>{payoutRequests(tally)}</span>
+  {#if tally.payout_request_dates.length > 0}
+    <span>$${tally.payout_request_amount.toFixed(2)} in payout requests</span>
+  {:else}
+    <span>no payout requests</span>
   {/if}
   <!-- TODO: implement viewers, reviewed -->
   <span>Viewers, Reviewed</span>
 {/snippet}
-{#snippet actions({ id, approved }: TimeSheetTally)}
+{#snippet actions({ id, approved }: TimeSheetTallyQueryRow)}
   <DsActionButton action={() => unbundle(id)} icon="mdi:rewind" title="Recall" color="orange" />
   {#if approved === ""}
     <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />

@@ -9,7 +9,6 @@ import type {
   DivisionsResponse,
   JobsResponse,
   ManagersResponse,
-  TimeSheetsResponse,
   VendorsResponse,
   UserPoPermissionDataResponse,
 } from "$lib/pocketbase-types";
@@ -20,8 +19,7 @@ import { get } from "svelte/store";
 import { ClientResponseError } from "pocketbase";
 import MiniSearch from "minisearch";
 import type { Readable, Invalidator, Subscriber } from "svelte/store";
-import { calculateTallies } from "$lib/utilities";
-import type { TimeSheetTally } from "$lib/utilities";
+import type { TimeSheetTallyQueryRow } from "$lib/utilities";
 
 interface StoreItem<T> {
   items: T;
@@ -36,7 +34,6 @@ export type CollectionName =
   | "jobs"
   | "vendors"
   | "managers"
-  | "time_sheets"
   | "time_sheets_tallies";
 type CollectionType = {
   clients: ClientsResponse[];
@@ -45,8 +42,7 @@ type CollectionType = {
   jobs: JobsResponse[];
   vendors: VendorsResponse[];
   managers: ManagersResponse[];
-  time_sheets: TimeSheetsResponse[];
-  time_sheets_tallies: TimeSheetTally[];
+  time_sheets_tallies: TimeSheetTallyQueryRow[];
 };
 
 interface ErrorMessage {
@@ -101,7 +97,6 @@ const createStore = () => {
       // 1 day
       time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
-      time_sheets: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       time_sheets_tallies: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       // 5 minutes
       jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
@@ -139,7 +134,15 @@ const createStore = () => {
       update((state) => ({
         ...state,
         user_po_permission_data: {
-          ...userPoPermissionData[0],
+          // If the user has no user_po_permission_data, set the default values
+          ...(userPoPermissionData.length > 0 ? userPoPermissionData[0] : {
+            id: "",
+            max_amount: 0,
+            lower_threshold: 0,
+            upper_threshold: 0,
+            divisions: [],
+            claims: [],
+          }),
           lastRefresh: new Date(),
           maxAge: state.user_po_permission_data.maxAge,
         },
@@ -154,7 +157,6 @@ const createStore = () => {
     update((state) => ({ ...state, isLoading: true, error: null }));
     try {
       let items: CollectionType[typeof key];
-      const userId = get(authStore)?.model?.id || "";
       switch (key) {
         case "clients":
           items = (await pb.collection("clients").getFullList<ClientsResponse>({
@@ -191,13 +193,10 @@ const createStore = () => {
             requestKey: "vendor",
           })) as CollectionType[typeof key];
           break;
-        case "time_sheets":
-          items = (await pb.collection("time_sheets").getFullList<TimeSheetsResponse>({
-            requestKey: "time_sheets",
-            filter: pb.filter("uid={:userId}", { userId }),
-            expand:
-              "time_entries_via_tsid.time_type,time_entries_via_tsid.job,time_entries_via_tsid.division",
-            sort: "-week_ending",
+        case "time_sheets_tallies":
+          // TODO: reload time_sheets_tallies by subscribing to changes on the time_sheets collection
+          items = (await pb.send("/api/time_sheets/tallies", {
+            requestKey: "time_sheets_tallies",
           })) as CollectionType[typeof key];
           break;
       }
@@ -239,15 +238,6 @@ const createStore = () => {
           });
           clientsIndex.addAll(items as ClientsResponse[]);
           newState.clientsIndex = clientsIndex;
-        }
-
-        if (key === "time_sheets") {
-          const tallies = items.map((item) => calculateTallies(item as TimeSheetsResponse));
-          newState.collections.time_sheets_tallies = {
-            items: tallies,
-            lastRefresh: new Date(),
-            maxAge: newState.collections.time_sheets.maxAge,
-          };
         }
 
         return { ...newState, isLoading: false, error: null };
