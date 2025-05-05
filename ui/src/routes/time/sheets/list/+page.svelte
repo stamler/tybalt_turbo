@@ -26,8 +26,8 @@
 
       // navigate to the time entries list to show the unbundled time entries
       goto(`/time/entries/list`);
-    } catch (error) {
-      globalStore.addError(error?.response.error);
+    } catch (error: any) {
+      globalStore.addError(error?.response?.error || "An unknown error occurred");
     }
   }
 
@@ -42,8 +42,8 @@
 
       // refresh the time sheets list in the global store
       globalStore.refresh("time_sheets_tallies");
-    } catch (error) {
-      globalStore.addError(error?.response.error);
+    } catch (error: any) {
+      globalStore.addError(error?.response?.error || "An unknown error occurred");
     }
   }
 

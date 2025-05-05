@@ -7,7 +7,7 @@
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { invalidate, goto } from "$app/navigation";
-  import { calculateTallies } from "$lib/utilities";
+  import { calculateTally } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
@@ -110,7 +110,7 @@
   <div class="flex items-center justify-center px-4 py-2">Totals</div>
   <div class="flex flex-col py-2">
     {#if Array.isArray(items)}
-      {@const tallies = calculateTallies(items)}
+      {@const tallies = calculateTally(items)}
       <div class="headline_wrapper">
         <div class="headline">
           {tallies.workHoursTally.total + tallies.nonWorkHoursTally.total} hours

@@ -1,12 +1,8 @@
 import type {
   TimeEntriesResponse,
-  TimeSheetsResponse,
-  BaseSystemFields,
-  IsoDateString,
   CategoriesResponse,
   ClientContactsResponse,
 } from "$lib/pocketbase-types";
-import { Collections } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import flatpickr from "flatpickr";
 
@@ -40,17 +36,7 @@ export interface TimeSheetTallyQueryRow {
   work_week_hours: number;
 }
 
-export interface TimeEntriesSummary extends BaseSystemFields {
-  // These TimeSheetRecord-specific properties will be "" if there is no
-  // corresponding time sheet record for the time entries
-  week_ending: string;
-  salary: boolean;
-  work_week_hours: number;
-  rejected: IsoDateString;
-  rejection_reason: string;
-  approved: IsoDateString;
-
-  // These are the tallies for the time entries
+export interface TimeEntriesSummary {
   workHoursTally: {
     jobHours: number;
     hours: number;
@@ -77,50 +63,8 @@ export interface TimeEntriesSummary extends BaseSystemFields {
   };
 }
 
-export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]): TimeEntriesSummary {
-  let items: TimeEntriesResponse[];
-  let id: string = "";
-  let week_ending: string = "";
-  let salary: boolean = false;
-  let work_week_hours: number = 0;
-  let rejected: IsoDateString = "";
-  let rejection_reason: string = "";
-  let approved: IsoDateString = "";
-  let created: IsoDateString = "";
-  let updated: IsoDateString = "";
-  let collectionId: string = "";
-  let collectionName = Collections.TimeSheets;
-  if (Array.isArray(arg)) {
-    items = arg;
-  } else {
-    // Existing assignment for TimeSheetsResponse case
-    id = arg.id;
-    week_ending = arg.week_ending;
-    salary = arg.salary;
-    work_week_hours = arg.work_week_hours;
-    rejected = arg.rejected;
-    rejection_reason = arg.rejection_reason;
-    created = arg.created;
-    updated = arg.updated;
-    collectionId = arg.collectionId;
-    collectionName = arg.collectionName;
-    approved = arg.approved;
-    items = (arg.expand as { time_entries_via_tsid: TimeEntriesResponse[] })[
-      "time_entries_via_tsid"
-    ];
-  }
+export function calculateTally(entries: TimeEntriesResponse[]): TimeEntriesSummary {
   const tallies: TimeEntriesSummary = {
-    id,
-    week_ending,
-    salary,
-    work_week_hours,
-    rejected,
-    rejection_reason,
-    created,
-    updated,
-    collectionId,
-    collectionName,
-    approved,
     workHoursTally: { jobHours: 0, hours: 0, total: 0 },
     nonWorkHoursTally: { total: 0 },
     mealsHoursTally: 0,
@@ -132,7 +76,7 @@ export function calculateTallies(arg: TimeSheetsResponse | TimeEntriesResponse[]
     divisionsTally: {},
   };
 
-  items.forEach((item) => {
+  entries.forEach((item) => {
     if (!item.expand) {
       alert("Error: expand field is missing from time entry record.");
       return;

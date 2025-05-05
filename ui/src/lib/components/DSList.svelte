@@ -1,7 +1,6 @@
-<script lang="ts" generics="T extends BaseSystemFields<any>">
+<script lang="ts" generics="T extends { id: string; expand?: unknown }">
   // TODO: a better type parameter for BaseSystemFields than any?
   import type { Snippet } from "svelte";
-  import type { BaseSystemFields } from "$lib/pocketbase-types";
   import { groupBy } from "lodash";
   import DSInListHeader from "./DSInListHeader.svelte";
   let {
