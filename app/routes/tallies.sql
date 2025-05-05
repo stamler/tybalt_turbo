@@ -28,7 +28,7 @@ SELECT
   JSON_GROUP_ARRAY(te.date) FILTER (WHERE tt.code = 'OTO') payout_request_dates,
   JSON_GROUP_ARRAY(te.date) FILTER (WHERE tt.code = 'RB') bank_entry_dates
   FROM time_entries te
-LEFT JOIN time_sheets ts ON te.tsid = ts.id
+INNER JOIN time_sheets ts ON te.tsid = ts.id -- use INNER JOIN to exclude time entries without a time sheet
 LEFT JOIN divisions d ON  te.division = d.id
 LEFT JOIN time_types tt ON te.time_type = tt.id
 LEFT JOIN jobs j ON te.job = j.id
