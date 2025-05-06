@@ -211,8 +211,14 @@ const createStore = () => {
 
         if (key === "jobs") {
           const jobsIndex = new MiniSearch<JobsResponse>({
-            fields: ["id", "number", "description", "expand.client.name"],
-            storeFields: ["id", "number", "description", "expand.client.name"],
+            fields: ["id", "number", "description", "client"],
+            storeFields: ["id", "number", "description", "client"],
+            extractField: (document, fieldName) => {
+              if (fieldName === "client") {
+                return document.expand?.client?.name;
+              }
+              return document[fieldName as keyof JobsResponse] as string;
+            },
           });
           jobsIndex.addAll(items as JobsResponse[]);
           newState.jobsIndex = jobsIndex;

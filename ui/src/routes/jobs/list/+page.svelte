@@ -1,6 +1,8 @@
 <script lang="ts">
   import DsSearchList from "$lib/components/DSSearchList.svelte";
   import { globalStore } from "$lib/stores/global";
+  // TODO: JobsResponse isn't actually the correct type for the items in the
+  // index, but hobbles along for now
   import type { JobsResponse } from "$lib/pocketbase-types";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
 </script>
@@ -9,12 +11,7 @@
   <DsSearchList index={$globalStore.jobsIndex} fieldName="job" uiName="search...">
     {#snippet anchor({ number }: JobsResponse)}{number}{/snippet}
     {#snippet headline({ description }: JobsResponse)}{description}{/snippet}
-    {#snippet byline({ expand }: JobsResponse)}{expand?.client.name}{/snippet}
-    {#snippet line1({ expand }: JobsResponse)}
-      {#each expand?.categories_via_job as category}
-        <span class="rounded-sm border border-cyan-100 bg-cyan-50 px-1">{category.name}</span>
-      {/each}
-    {/snippet}
+    {#snippet byline({ client }: JobsResponse)}{client}{/snippet}
     {#snippet actions({ id }: JobsResponse)}
       <DsActionButton action="/jobs/{id}/edit" icon="mdi:pencil" title="Edit" color="blue" />
       <DsActionButton
