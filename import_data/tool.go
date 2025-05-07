@@ -550,5 +550,26 @@ func main() {
 			expenseInsertSQL, // The specific INSERT SQL
 			expenseBinder,    // The specific binder function
 		)
+
+		// --- Load User Claims ---
+		// Define the specific SQL for the user_claims table
+		userClaimInsertSQL := `INSERT INTO user_claims (uid, cid) VALUES ({:uid}, {:cid})`
+
+		// Define the binder function for the UserClaim type
+		userClaimBinder := func(item load.UserClaim) dbx.Params {
+			return dbx.Params{
+				"uid": item.Uid,
+				"cid": item.Cid,
+			}
+		}
+
+		// Call the generic function, specifying the type and providing SQL + binder
+		load.FromParquet(
+			"./parquet/UserClaims.parquet",
+			"../app/test_pb_data/data.db",
+			"user_claims",      // Table name (for logging)
+			userClaimInsertSQL, // The specific INSERT SQL
+			userClaimBinder,    // The specific binder function
+		)
 	}
 }

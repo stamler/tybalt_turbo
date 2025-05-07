@@ -195,6 +195,11 @@ type Expense struct {
 	CommittedWeekEnding string    `parquet:"committedWeekEnding"`
 }
 
+type UserClaim struct {
+	Uid string `parquet:"uid"`
+	Cid string `parquet:"cid"`
+}
+
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
 // T: The struct type corresponding to the Parquet file schema.
 // parquetFilePath: Path to the input Parquet file.

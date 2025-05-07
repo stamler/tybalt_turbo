@@ -197,6 +197,7 @@ func ToParquet() {
 	// Dump the pre-populated tables from the sqlite test database.
 	sqliteTableDumps("../app/test_pb_data/data.db", "divisions")
 	sqliteTableDumps("../app/test_pb_data/data.db", "time_types")
+	sqliteTableDumps("../app/test_pb_data/data.db", "claims")
 
 	// Augment the Profiles.parquet data by adding the pocketbase_uid column.
 	augmentProfiles()
@@ -216,6 +217,9 @@ func ToParquet() {
 
 	// Augment Expenses.parquet data
 	augmentExpenses()
+
+	// Extract the UserClaims.parquet file from the Profiles.parquet file.
+	profilesToUserClaims()
 
 	// Independent Collections (Profiles, Jobs) must be loaded first.
 	// TimeSheets can be loaded next because TimeEntries references TimeSheets.
