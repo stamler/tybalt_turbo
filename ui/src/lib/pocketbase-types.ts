@@ -24,13 +24,14 @@ export enum Collections {
   Managers = "managers",
   NotificationTemplates = "notification_templates",
   Notifications = "notifications",
+  PayrollReportWeekEndings = "payroll_report_week_endings",
   PayrollYearEndDates = "payroll_year_end_dates",
   PendingItemsForQualifiedPoSecondApprovers = "pending_items_for_qualified_po_second_approvers",
   PoApprovalThresholds = "po_approval_thresholds",
   PoApproverProps = "po_approver_props",
   Profiles = "profiles",
-  PurchaseOrdersAugmented = "purchase_orders_augmented",
   PurchaseOrders = "purchase_orders",
+  PurchaseOrdersAugmented = "purchase_orders_augmented",
   TimeAmendments = "time_amendments",
   TimeEntries = "time_entries",
   TimeOff = "time_off",
@@ -320,6 +321,11 @@ export type NotificationsRecord<Tdata = unknown> = {
   user: RecordIdString;
 };
 
+export type PayrollReportWeekEndingsRecord = {
+  id: string;
+  week_ending: string;
+};
+
 export type PayrollYearEndDatesRecord = {
   created: IsoDateString;
   date: string;
@@ -427,12 +433,81 @@ export type PurchaseOrdersRecord = {
   vendor: RecordIdString;
 };
 
+export enum PurchaseOrdersAugmentedStatusOptions {
+  "Unapproved" = "Unapproved",
+  "Active" = "Active",
+  "Cancelled" = "Cancelled",
+  "Closed" = "Closed",
+}
+
+export enum PurchaseOrdersAugmentedTypeOptions {
+  "Normal" = "Normal",
+  "Cumulative" = "Cumulative",
+  "Recurring" = "Recurring",
+}
+
+export enum PurchaseOrdersAugmentedFrequencyOptions {
+  "Weekly" = "Weekly",
+  "Biweekly" = "Biweekly",
+  "Monthly" = "Monthly",
+}
+
+export enum PurchaseOrdersAugmentedPaymentTypeOptions {
+  "OnAccount" = "OnAccount",
+  "Expense" = "Expense",
+  "CorporateCreditCard" = "CorporateCreditCard",
+}
 export type PurchaseOrdersAugmentedRecord = {
   approval_total: number;
+  approved: IsoDateString;
+  approver: RecordIdString;
+  approver_name: string;
+  attachment: string;
+  cancelled: IsoDateString;
+  canceller: RecordIdString;
+  category: RecordIdString;
+  category_name: string;
+  client_name: string;
+  closed: IsoDateString;
+  closed_by_system: boolean;
+  closer: RecordIdString;
   committed_expenses_count: number;
+  created: IsoDateString;
+  date: string;
+  description: string;
+  division: RecordIdString;
+  division_code: string;
+  division_name: string;
+  end_date: string;
+  frequency: PurchaseOrdersAugmentedFrequencyOptions;
   id: string;
+  job: RecordIdString;
+  job_description: string;
+  job_number: string;
   lower_threshold: number;
+  parent_po: RecordIdString;
+  parent_po_number: string;
+  payment_type: PurchaseOrdersAugmentedPaymentTypeOptions;
+  po_number: string;
+  priority_second_approver: RecordIdString;
+  priority_second_approver_name: string;
+  rejected: IsoDateString;
+  rejection_reason: string;
+  rejector: RecordIdString;
+  rejector_name: string;
+  second_approval: IsoDateString;
+  second_approver: RecordIdString;
+  second_approver_name: string;
+  status: PurchaseOrdersAugmentedStatusOptions;
+  total: number;
+  type: PurchaseOrdersAugmentedTypeOptions;
+  uid: RecordIdString;
+  uid_name: string;
+  updated: IsoDateString;
   upper_threshold: number;
+  vendor: RecordIdString;
+  vendor_alias: string;
+  vendor_name: string;
 };
 
 export type TimeAmendmentsRecord = {
@@ -687,6 +762,8 @@ export type NotificationsResponse<Tdata = unknown, Texpand = unknown> = Required
   NotificationsRecord<Tdata>
 > &
   BaseSystemFields<Texpand>;
+export type PayrollReportWeekEndingsResponse<Texpand = unknown> = Required<PayrollReportWeekEndingsRecord> &
+  BaseSystemFields<Texpand>;
 export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYearEndDatesRecord> &
   BaseSystemFields<Texpand>;
 export type PendingItemsForQualifiedPoSecondApproversResponse<Texpand = unknown> =
@@ -745,6 +822,7 @@ export type CollectionRecords = {
   managers: ManagersRecord;
   notification_templates: NotificationTemplatesRecord;
   notifications: NotificationsRecord;
+  payroll_report_week_endings: PayrollReportWeekEndingsRecord;
   payroll_year_end_dates: PayrollYearEndDatesRecord;
   pending_items_for_qualified_po_second_approvers: PendingItemsForQualifiedPoSecondApproversRecord;
   po_approval_thresholds: PoApprovalThresholdsRecord;
@@ -784,6 +862,7 @@ export type CollectionResponses = {
   managers: ManagersResponse;
   notification_templates: NotificationTemplatesResponse;
   notifications: NotificationsResponse;
+  payroll_report_week_endings: PayrollReportWeekEndingsResponse;
   payroll_year_end_dates: PayrollYearEndDatesResponse;
   pending_items_for_qualified_po_second_approvers: PendingItemsForQualifiedPoSecondApproversResponse;
   po_approval_thresholds: PoApprovalThresholdsResponse;
@@ -826,6 +905,9 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
   collection(idOrName: "notification_templates"): RecordService<NotificationTemplatesResponse>;
   collection(idOrName: "notifications"): RecordService<NotificationsResponse>;
+  collection(
+    idOrName: "payroll_report_week_endings",
+  ): RecordService<PayrollReportWeekEndingsResponse>;
   collection(idOrName: "payroll_year_end_dates"): RecordService<PayrollYearEndDatesResponse>;
   collection(
     idOrName: "pending_items_for_qualified_po_second_approvers",
