@@ -4,12 +4,12 @@
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import type { PageData } from "./$types";
-  import type { TimeAmendmentsResponse } from "$lib/pocketbase-types";
+  import type { TimeAmendmentsAugmentedResponse } from "$lib/pocketbase-types";
 
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
 
-  function hoursString(item: TimeAmendmentsResponse) {
+  function hoursString(item: TimeAmendmentsAugmentedResponse) {
     const hoursArray = [];
     if (item.hours) hoursArray.push(item.hours + " hrs");
     if (item.meals_hours) hoursArray.push(item.meals_hours + " hrs meals");
@@ -31,48 +31,57 @@
   }
 </script>
 
-{#snippet anchor(item: TimeAmendmentsResponse)}{item.date}{/snippet}
+{#snippet anchor(item: TimeAmendmentsAugmentedResponse)}{item.date}{/snippet}
 
-{#snippet headline({ expand }: TimeAmendmentsResponse)}
+{#snippet headline({
+  uid_name,
+  time_type_name,
+  time_type_code,
+  division_name,
+}: TimeAmendmentsAugmentedResponse)}
   <span>
-    {expand.uid.expand?.profiles_via_uid.given_name}
-    {expand.uid.expand?.profiles_via_uid.surname}
+    {uid_name}
   </span>
   -
-  {#if expand?.time_type.code === "R"}
-    <span>{expand.division.name}</span>
+  {#if time_type_code === "R"}
+    <span>{division_name}</span>
   {:else}
-    <span>{expand?.time_type.name}</span>
+    <span>{time_type_name}</span>
   {/if}
 {/snippet}
 
-{#snippet byline({ expand, payout_request_amount }: TimeAmendmentsResponse)}
-  {#if expand?.time_type.code === "OTO"}
+{#snippet byline({ time_type_code, payout_request_amount }: TimeAmendmentsAugmentedResponse)}
+  {#if time_type_code === "OTO"}
     <span>${payout_request_amount}</span>
   {/if}
 {/snippet}
 
-{#snippet line1({ expand, job }: TimeAmendmentsResponse)}
-  {#if expand?.time_type !== undefined && ["R", "RT"].includes(expand.time_type.code) && job !== ""}
+{#snippet line1({
+  time_type_code,
+  job_number,
+  job_description,
+  category_name,
+}: TimeAmendmentsAugmentedResponse)}
+  {#if time_type_code !== undefined && ["R", "RT"].includes(time_type_code) && job_number !== ""}
     <span class="flex items-center gap-1">
-      {expand?.job.number} - {expand?.job.description}
-      {#if expand?.category !== undefined}
-        <DsLabel color="teal">{expand?.category.name}</DsLabel>
+      {job_number} - {job_description}
+      {#if category_name !== undefined}
+        <DsLabel color="teal">{category_name}</DsLabel>
       {/if}
     </span>
   {/if}
 {/snippet}
 
-{#snippet line2(item: TimeAmendmentsResponse)}{hoursString(item)}{/snippet}
+{#snippet line2(item: TimeAmendmentsAugmentedResponse)}{hoursString(item)}{/snippet}
 
-{#snippet line3({ work_record, description }: TimeAmendmentsResponse)}
+{#snippet line3({ work_record, description }: TimeAmendmentsAugmentedResponse)}
   {#if work_record !== ""}
     <span><span class="opacity-50">Work Record</span> {work_record} / </span>
   {/if}
   <span class="opacity-50">{description}</span>
 {/snippet}
 
-{#snippet actions({ id, committed }: TimeAmendmentsResponse)}
+{#snippet actions({ id, committed }: TimeAmendmentsAugmentedResponse)}
   {#if !committed}
     <DsActionButton
       action={`/time/amendments/${id}/edit`}
@@ -89,7 +98,7 @@
 {/snippet}
 
 <DsList
-  items={items as TimeAmendmentsResponse[]}
+  items={items as TimeAmendmentsAugmentedResponse[]}
   search={true}
   inListHeader="Time Amendments"
   groupField="committed_week_ending"

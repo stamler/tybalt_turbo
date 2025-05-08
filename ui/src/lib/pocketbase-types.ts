@@ -33,6 +33,7 @@ export enum Collections {
   PurchaseOrders = "purchase_orders",
   PurchaseOrdersAugmented = "purchase_orders_augmented",
   TimeAmendments = "time_amendments",
+  TimeAmendmentsAugmented = "time_amendments_augmented",
   TimeEntries = "time_entries",
   TimeOff = "time_off",
   TimeReportWeekEndings = "time_report_week_endings",
@@ -534,6 +535,38 @@ export type TimeAmendmentsRecord = {
   work_record: string;
 };
 
+export type TimeAmendmentsAugmentedRecord = {
+  category: RecordIdString;
+  category_name: string;
+  committed: IsoDateString;
+  committed_week_ending: string;
+  committer: RecordIdString;
+  committer_name: string;
+  creator: RecordIdString;
+  creator_name: string;
+  date: string;
+  description: string;
+  division: RecordIdString;
+  division_code: string;
+  division_name: string;
+  hours: number;
+  id: string;
+  job: RecordIdString;
+  job_description: string;
+  job_number: string;
+  meals_hours: number;
+  payout_request_amount: number;
+  skip_tsid_check: boolean;
+  time_type: RecordIdString;
+  time_type_code: string;
+  time_type_name: string;
+  tsid: RecordIdString;
+  uid: RecordIdString;
+  uid_name: string;
+  week_ending: string;
+  work_record: string;
+};
+
 export type TimeEntriesRecord = {
   category: RecordIdString;
   created: IsoDateString;
@@ -780,6 +813,8 @@ export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> =
   Required<PurchaseOrdersRecord> & BaseSystemFields<Texpand>;
 export type TimeAmendmentsResponse<Texpand = TimeAmendmentsRecordExpands> =
   Required<TimeAmendmentsRecord> & BaseSystemFields<Texpand>;
+export type TimeAmendmentsAugmentedResponse<Texpand = unknown> = Required<TimeAmendmentsAugmentedRecord> &
+  BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeOffResponse<Texpand = unknown> = Required<TimeOffRecord> &
@@ -828,9 +863,10 @@ export type CollectionRecords = {
   po_approval_thresholds: PoApprovalThresholdsRecord;
   po_approver_props: PoApproverPropsRecord;
   profiles: ProfilesRecord;
-  purchase_orders_augmented: PurchaseOrdersAugmentedRecord;
   purchase_orders: PurchaseOrdersRecord;
+  purchase_orders_augmented: PurchaseOrdersAugmentedRecord;
   time_amendments: TimeAmendmentsRecord;
+  time_amendments_augmented: TimeAmendmentsAugmentedRecord;
   time_entries: TimeEntriesRecord;
   time_off: TimeOffRecord;
   time_report_week_endings: TimeReportWeekEndingsRecord;
@@ -868,9 +904,10 @@ export type CollectionResponses = {
   po_approval_thresholds: PoApprovalThresholdsResponse;
   po_approver_props: PoApproverPropsResponse;
   profiles: ProfilesResponse;
-  purchase_orders_augmented: PurchaseOrdersAugmentedResponse;
   purchase_orders: PurchaseOrdersResponse;
+  purchase_orders_augmented: PurchaseOrdersAugmentedResponse;
   time_amendments: TimeAmendmentsResponse;
+  time_amendments_augmented: TimeAmendmentsAugmentedResponse;
   time_entries: TimeEntriesResponse;
   time_off: TimeOffResponse;
   time_report_week_endings: TimeReportWeekEndingsResponse;
@@ -915,9 +952,10 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "po_approval_thresholds"): RecordService<PoApprovalThresholdsResponse>;
   collection(idOrName: "po_approver_props"): RecordService<PoApproverPropsResponse>;
   collection(idOrName: "profiles"): RecordService<ProfilesResponse>;
-  collection(idOrName: "purchase_orders_augmented"): RecordService<PurchaseOrdersAugmentedResponse>;
   collection(idOrName: "purchase_orders"): RecordService<PurchaseOrdersResponse>;
+  collection(idOrName: "purchase_orders_augmented"): RecordService<PurchaseOrdersAugmentedResponse>;
   collection(idOrName: "time_amendments"): RecordService<TimeAmendmentsResponse>;
+  collection(idOrName: "time_amendments_augmented"): RecordService<TimeAmendmentsAugmentedResponse>;
   collection(idOrName: "time_entries"): RecordService<TimeEntriesResponse>;
   collection(idOrName: "time_off"): RecordService<TimeOffResponse>;
   collection(idOrName: "time_report_week_endings"): RecordService<TimeReportWeekEndingsResponse>;
@@ -928,33 +966,4 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "user_po_permission_data"): RecordService<UserPoPermissionDataResponse>;
   collection(idOrName: "users"): RecordService<UsersResponse>;
   collection(idOrName: "vendors"): RecordService<VendorsResponse>;
-};
-
-export type SelectOption = { id: string | number };
-
-// Type guards
-export function isBaseSystemFields(item: unknown): item is BaseSystemFields {
-  return (
-    !!item &&
-    typeof item === "object" &&
-    "expand" in item &&
-    !!item.expand &&
-    "id" in item &&
-    typeof item.id === "string"
-  );
-}
-
-export function isExpensesRecord(item: unknown): item is ExpensesRecord {
-  return !!item && typeof item === "object" && "uid" in item && typeof item.uid === "string";
-}
-
-export function isExpensesResponse(item: unknown): item is ExpensesResponse {
-  return isBaseSystemFields(item) && isExpensesRecord(item);
-}
-
-// This is defined in the app/utilities/po_approvers.go file
-export type PoApproversResponse = {
-  id: string;
-  given_name: string;
-  surname: string;
 };

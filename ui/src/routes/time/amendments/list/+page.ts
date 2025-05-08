@@ -1,14 +1,13 @@
-import type { TimeAmendmentsResponse } from "$lib/pocketbase-types";
+import type { TimeAmendmentsAugmentedResponse } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 
 export const load: PageLoad = async () => {
-  let items: TimeAmendmentsResponse[];
+  let items: TimeAmendmentsAugmentedResponse[];
 
   try {
     // load required data
-    items = await pb.collection("time_amendments").getFullList<TimeAmendmentsResponse>({
-      expand: "uid,creator.profiles_via_uid,uid.profiles_via_uid,time_type,division,job,category",
+    items = await pb.collection("time_amendments_augmented").getFullList<TimeAmendmentsAugmentedResponse>({
       sort: "-date",
     });
     return {
