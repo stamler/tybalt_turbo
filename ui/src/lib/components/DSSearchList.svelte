@@ -7,6 +7,9 @@
   import MiniSearch from "minisearch";
   import type { SearchResult } from "minisearch";
 
+  const MAX_RESULTS = 100; // don't render more than 100 results
+  const MIN_SEARCH_LENGTH = 2; // don't search if term is less than 2 characters
+
   // get an id for this instance from the counter in the module context then
   // increment it so the next instance gets a different id
   const thisId = idCounter;
@@ -41,8 +44,14 @@
   let searchTerm = $state("");
 
   function updateResults(event: Event) {
-    const query = (event.target as HTMLInputElement).value;
-    results = index.search(query, { prefix: true });
+    // if the search term is less than 3 characters, don't search and reset the
+    // results
+    searchTerm = (event.target as HTMLInputElement).value;
+    if (searchTerm.length < MIN_SEARCH_LENGTH) {
+      results = [];
+      return;
+    }
+    results = index.search(searchTerm, { prefix: true });
   }
 </script>
 
@@ -61,8 +70,8 @@
     <span>{results.length} items</span>
   </li>
 
-  {#snippet itemList(_processedItems: T[])}
-    {#each _processedItems as item}
+  {#snippet itemList(_items: T[])}
+    {#each _items.slice(0, MAX_RESULTS) as item}
       <li class="contents">
         <div class="col-span-3 grid grid-cols-subgrid bg-[inherit]">
           {#if anchor !== undefined}
@@ -99,5 +108,17 @@
 
   {#if results.length > 0}
     {@render itemList(results.map((searchResult) => searchResult as unknown as T))}
+  {:else if searchTerm.length >= MIN_SEARCH_LENGTH}
+    <li class="col-span-3">
+      <div class="flex items-center justify-center p-2">
+        <span class="text-lg text-neutral-500">No results found</span>
+      </div>
+    </li>
+  {:else}
+    <li class="col-span-3">
+      <div class="flex items-center justify-center p-2">
+        <span class="text-lg text-neutral-500">Search for something</span>
+      </div>
+    </li>
   {/if}
 </ul>

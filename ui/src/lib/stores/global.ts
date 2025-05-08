@@ -240,7 +240,9 @@ const createStore = () => {
         if (key === "clients") {
           const clientsIndex = new MiniSearch<ClientsResponse>({
             fields: ["id", "name"],
-            storeFields: ["id", "name"],
+            // store the expand field so we can access
+            // client_contacts_via_client in the search results
+            storeFields: ["id", "name", "expand"],
           });
           clientsIndex.addAll(items as ClientsResponse[]);
           newState.clientsIndex = clientsIndex;

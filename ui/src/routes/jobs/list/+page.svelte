@@ -8,7 +8,7 @@
 </script>
 
 {#if $globalStore.jobsIndex !== null}
-  <DsSearchList index={$globalStore.jobsIndex} fieldName="job" uiName="search...">
+  <DsSearchList index={$globalStore.jobsIndex} fieldName="job" uiName="search jobs...">
     {#snippet anchor({ number }: JobsResponse)}{number}{/snippet}
     {#snippet headline({ description }: JobsResponse)}{description}{/snippet}
     {#snippet byline({ client }: JobsResponse)}{client}{/snippet}
