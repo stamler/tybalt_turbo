@@ -101,7 +101,7 @@
         <nav class="mt-2 px-1">
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Time Management</p>
-            <div class="flex min-h-8 items-center justify-between pr-2">
+            <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/time/entries/list"
                 class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
@@ -114,7 +114,7 @@
                 color="green"
               />
             </div>
-            <div class="flex min-h-8 items-center justify-between pr-2">
+            <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/time/amendments/list"
                 class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
@@ -127,24 +127,26 @@
                 color="green"
               />
             </div>
-            <div class="flex min-h-8 items-center">
+            <div class="flex h-8 items-center pr-2">
               <a
                 href="/time/sheets/list"
-                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
                 >Sheets</a
               >
+              <div class="w-8"></div>
             </div>
-            <div class="flex min-h-8 items-center">
+            <div class="flex h-8 items-center pr-2">
               <a
                 href="/time/off"
-                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
                 >Time Off</a
               >
+              <div class="w-8"></div>
             </div>
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Purchase Orders</p>
-            <div class="flex min-h-8 items-center justify-between pr-2">
+            <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/pos/list"
                 class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
@@ -160,7 +162,7 @@
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Expenses</p>
-            <div class="flex min-h-8 items-center justify-between pr-2">
+            <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/expenses/list"
                 class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
@@ -173,24 +175,26 @@
                 color="green"
               />
             </div>
-            <div class="flex min-h-8 items-center">
+            <div class="flex h-8 items-center pr-2">
               <a
                 href="/expenses/pending"
-                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
                 >Pending My Approval</a
               >
+              <div class="w-8"></div>
             </div>
-            <div class="flex min-h-8 items-center">
+            <div class="flex h-8 items-center pr-2">
               <a
                 href="/expenses/approved"
-                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
                 >Approved By Me</a
               >
+              <div class="w-8"></div>
             </div>
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Business</p>
-            <div class="flex min-h-8 items-center justify-between pr-2">
+            <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/jobs/list"
                 class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600">Jobs</a
@@ -202,7 +206,7 @@
                 color="green"
               />
             </div>
-            <div class="flex min-h-8 items-center justify-between pr-2">
+            <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/clients/list"
                 class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
@@ -215,7 +219,7 @@
                 color="green"
               />
             </div>
-            <div class="flex min-h-8 items-center justify-between pr-2">
+            <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/vendors/list"
                 class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
@@ -231,29 +235,32 @@
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Reports</p>
-            <div class="flex min-h-8 items-center">
+            <div class="flex h-8 items-center pr-2">
               <a
                 href="/reports/payroll"
-                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
                 >Payroll</a
               >
+              <div class="w-8"></div>
             </div>
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Settings</p>
-            <div class="flex min-h-8 items-center">
+            <div class="flex h-8 items-center pr-2">
               <a
                 href="/timetypes"
-                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
                 >Time Types</a
               >
+              <div class="w-8"></div>
             </div>
-            <div class="flex min-h-8 items-center">
+            <div class="flex h-8 items-center pr-2">
               <a
                 href="/divisions"
-                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
                 >Divisions</a
               >
+              <div class="w-8"></div>
             </div>
           </div>
           {#if $authStore?.isValid}
