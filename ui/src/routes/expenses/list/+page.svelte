@@ -7,13 +7,15 @@
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import type { PageData } from "./$types";
-  import type { ExpensesResponse } from "$lib/pocketbase-types";
+  import type { ExpensesAugmentedResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { shortDate } from "$lib/utilities";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { invalidate } from "$app/navigation";
 
   let rejectModal: RejectModal;
+
+  const collectionId = "expenses";
 
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
@@ -90,7 +92,7 @@
 
 <RejectModal on:refresh={refresh} collectionName="expenses" bind:this={rejectModal} />
 <DsList
-  items={items as ExpensesResponse[]}
+  items={items as ExpensesAugmentedResponse[]}
   search={true}
   inListHeader="Expenses"
   groupField="pay_period_ending"
@@ -98,79 +100,94 @@
   {#snippet groupHeader(field: string)}
     Pay Period Ending {field}
   {/snippet}
-  {#snippet anchor(item: ExpensesResponse)}{item.date}{/snippet}
-  {#snippet headline(item: ExpensesResponse)}
+  {#snippet anchor(item: ExpensesAugmentedResponse)}{item.date}{/snippet}
+  {#snippet headline(item: ExpensesAugmentedResponse)}
     <span>{item.description}</span>
   {/snippet}
-  {#snippet byline(item: ExpensesResponse)}
+  {#snippet byline({
+    rejector_name,
+    rejected,
+    rejection_reason,
+    distance,
+    total,
+    payment_type,
+    vendor,
+    vendor_name,
+    vendor_alias,
+    cc_last_4_digits,
+  }: ExpensesAugmentedResponse)}
     <span class="flex items-center gap-2">
-      {#if item.rejected !== ""}
-        <DsLabel color="red" title={`${shortDate(item.rejected)}: ${item.rejection_reason}`}>
+      {#if rejected !== ""}
+        <DsLabel color="red" title={`${shortDate(rejected)}: ${rejection_reason}`}>
           <Icon icon="mdi:cancel" width="24px" class="inline-block" />
-          {item.expand?.rejector.expand?.profiles_via_uid.given_name}
-          {item.expand?.rejector.expand?.profiles_via_uid.surname}
+          {rejector_name}
         </DsLabel>
       {/if}
 
-      {#if item.payment_type === "Mileage"}
-        {item.distance} km / ${item.total}
+      {#if payment_type === "Mileage"}
+        {distance} km / ${total}
       {:else}
-        ${item.total}
+        ${total}
       {/if}
-      {#if item.expand?.vendor}
+      {#if vendor}
         <span class="flex items-center gap-0">
           <Icon icon="mdi:store" width="24px" class="inline-block" />
-          {item.expand?.vendor.name} ({item.expand?.vendor.alias})
+          {vendor_name}
+          {#if vendor_alias}
+            <span class="text-sm text-gray-500">({vendor_alias})</span>
+          {/if}
         </span>
       {/if}
-      {#if item.payment_type === "CorporateCreditCard"}
+      {#if payment_type === "CorporateCreditCard"}
         <DsLabel color="cyan">
           <Icon icon="mdi:credit-card-outline" width="24px" class="inline-block" />
-          **** {item.cc_last_4_digits}
+          **** {cc_last_4_digits}
         </DsLabel>
       {/if}
     </span>
   {/snippet}
-  {#snippet line1(item: ExpensesResponse)}
+  {#snippet line1({ uid_name, division_code, division_name }: ExpensesAugmentedResponse)}
     <span>
-      {item.expand?.uid.expand?.profiles_via_uid.given_name}
-      {item.expand?.uid.expand?.profiles_via_uid.surname}
-      / {item.expand?.division.code}
-      {item.expand?.division.name}
+      {uid_name} / {division_code}
+      {division_name}
     </span>
   {/snippet}
-  {#snippet line2(item: ExpensesResponse)}
-    {#if item.job !== ""}
-      {#if item.expand?.job}
-        <span class="flex items-center gap-1">
-          {item.expand.job.number} - {item.expand.job.expand.client.name}:
-          {item.expand.job.description}
-          {#if item.expand?.category !== undefined}
-            <DsLabel color="teal">{item.expand?.category.name}</DsLabel>
-          {/if}
-        </span>
-      {/if}
+  {#snippet line2({
+    job,
+    job_number,
+    job_description,
+    client_name,
+    category,
+    category_name,
+  }: ExpensesAugmentedResponse)}
+    {#if job !== ""}
+      <span class="flex items-center gap-1">
+        {job_number} - {client_name}:
+        {job_description}
+        {#if category !== undefined}
+          <DsLabel color="teal">{category_name}</DsLabel>
+        {/if}
+      </span>
     {/if}
   {/snippet}
-  {#snippet line3(item: ExpensesResponse)}
+  {#snippet line3({ approved, approver_name, attachment, id }: ExpensesAugmentedResponse)}
     <span class="flex items-center gap-1">
-      {#if item.approved !== ""}
+      {#if approved !== ""}
         <Icon icon="material-symbols:order-approve-outline" width="24px" class="inline-block" />
-        {item.expand.approver.expand?.profiles_via_uid.given_name}
-        {item.expand.approver.expand?.profiles_via_uid.surname}
-        ({shortDate(item.approved)})
+        {approver_name}
+        ({shortDate(approved)})
       {/if}
-      {#if item.attachment}
+      {#if attachment}
         <a
-          href={`${PUBLIC_POCKETBASE_URL}/api/files/${item.collectionId}/${item.id}/${item.attachment}`}
+          href={`${PUBLIC_POCKETBASE_URL}/api/files/${collectionId}/${id}/${attachment}`}
           target="_blank"
         >
-          <DsFileLink filename={item.attachment as string} />
+          <DsFileLink filename={attachment as string} />
         </a>
       {/if}
     </span>
   {/snippet}
-  {#snippet actions({ id, submitted, approved, rejected, committed }: ExpensesResponse)}
+  {#snippet actions({ id, submitted, approved, rejected, committed }: ExpensesAugmentedResponse)}
     {#if !submitted}
       <DsActionButton
         action={`/expenses/${id}/edit`}

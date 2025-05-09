@@ -20,6 +20,7 @@ export enum Collections {
   Divisions = "divisions",
   ExpenseRates = "expense_rates",
   Expenses = "expenses",
+  ExpensesAugmented = "expenses_augmented",
   Jobs = "jobs",
   Managers = "managers",
   NotificationTemplates = "notification_templates",
@@ -256,6 +257,62 @@ export type ExpensesRecord = {
   uid: RecordIdString;
   updated: IsoDateString;
   vendor: RecordIdString;
+};
+
+export enum ExpensesAugmentedPaymentTypeOptions {
+  "OnAccount" = "OnAccount",
+  "Expense" = "Expense",
+  "CorporateCreditCard" = "CorporateCreditCard",
+  "Allowance" = "Allowance",
+  "FuelCard" = "FuelCard",
+  "Mileage" = "Mileage",
+  "PersonalReimbursement" = "PersonalReimbursement",
+}
+
+export enum ExpensesAugmentedAllowanceTypesOptions {
+  "Lodging" = "Lodging",
+  "Breakfast" = "Breakfast",
+  "Lunch" = "Lunch",
+  "Dinner" = "Dinner",
+}
+export type ExpensesAugmentedRecord = {
+  allowance_types: ExpensesAugmentedAllowanceTypesOptions[];
+  approved: IsoDateString;
+  approver: RecordIdString;
+  approver_name: string;
+  attachment: string;
+  category: RecordIdString;
+  category_name: string;
+  cc_last_4_digits: string;
+  client_name: string;
+  committed: IsoDateString;
+  committed_week_ending: string;
+  committer: RecordIdString;
+  date: string;
+  description: string;
+  distance: number;
+  division: RecordIdString;
+  division_code: string;
+  division_name: string;
+  id: string;
+  job: RecordIdString;
+  job_description: string;
+  job_number: string;
+  pay_period_ending: string;
+  payment_type: ExpensesAugmentedPaymentTypeOptions;
+  purchase_order: RecordIdString;
+  purchase_order_number: string;
+  rejected: IsoDateString;
+  rejection_reason: string;
+  rejector: RecordIdString;
+  rejector_name: string;
+  submitted: boolean;
+  total: number;
+  uid: RecordIdString;
+  uid_name: string;
+  vendor: RecordIdString;
+  vendor_alias: string;
+  vendor_name: string;
 };
 
 export enum JobsStatusOptions {
@@ -785,6 +842,8 @@ export type ExpenseRatesResponse<Tmileage = unknown, Texpand = unknown> = Requir
   BaseSystemFields<Texpand>;
 export type ExpensesResponse<Texpand = ExpensesRecordExpands> = Required<ExpensesRecord> &
   BaseSystemFields<Texpand>;
+export type ExpensesAugmentedResponse<Texpand = unknown> = Required<ExpensesAugmentedRecord> &
+  BaseSystemFields<Texpand>;
 export type JobsResponse<Texpand = JobsRecordExpands> = Required<JobsRecord> &
   BaseSystemFields<Texpand>;
 export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
@@ -853,6 +912,7 @@ export type CollectionRecords = {
   divisions: DivisionsRecord;
   expense_rates: ExpenseRatesRecord;
   expenses: ExpensesRecord;
+  expenses_augmented: ExpensesAugmentedRecord;
   jobs: JobsRecord;
   managers: ManagersRecord;
   notification_templates: NotificationTemplatesRecord;
@@ -894,6 +954,7 @@ export type CollectionResponses = {
   divisions: DivisionsResponse;
   expense_rates: ExpenseRatesResponse;
   expenses: ExpensesResponse;
+  expenses_augmented: ExpensesAugmentedResponse;
   jobs: JobsResponse;
   managers: ManagersResponse;
   notification_templates: NotificationTemplatesResponse;
@@ -938,6 +999,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
   collection(idOrName: "expense_rates"): RecordService<ExpenseRatesResponse>;
   collection(idOrName: "expenses"): RecordService<ExpensesResponse>;
+  collection(idOrName: "expenses_augmented"): RecordService<ExpensesAugmentedResponse>;
   collection(idOrName: "jobs"): RecordService<JobsResponse>;
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
   collection(idOrName: "notification_templates"): RecordService<NotificationTemplatesResponse>;
@@ -966,4 +1028,33 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "user_po_permission_data"): RecordService<UserPoPermissionDataResponse>;
   collection(idOrName: "users"): RecordService<UsersResponse>;
   collection(idOrName: "vendors"): RecordService<VendorsResponse>;
+};
+
+export type SelectOption = { id: string | number };
+
+// Type guards
+export function isBaseSystemFields(item: unknown): item is BaseSystemFields {
+  return (
+    !!item &&
+    typeof item === "object" &&
+    "expand" in item &&
+    !!item.expand &&
+    "id" in item &&
+    typeof item.id === "string"
+  );
+}
+
+export function isExpensesRecord(item: unknown): item is ExpensesRecord {
+  return !!item && typeof item === "object" && "uid" in item && typeof item.uid === "string";
+}
+
+export function isExpensesResponse(item: unknown): item is ExpensesResponse {
+  return isBaseSystemFields(item) && isExpensesRecord(item);
+}
+
+// This is defined in the app/utilities/po_approvers.go file
+export type PoApproversResponse = {
+  id: string;
+  given_name: string;
+  surname: string;
 };
