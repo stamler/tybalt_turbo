@@ -6,6 +6,7 @@
   import type { Snippet } from "svelte";
   import MiniSearch from "minisearch";
   import type { SearchResult } from "minisearch";
+  import DSInListHeader from "./DSInListHeader.svelte";
 
   const MAX_RESULTS = 100; // don't render more than 100 results
   const MIN_SEARCH_LENGTH = 2; // don't search if term is less than 2 characters
@@ -19,6 +20,7 @@
 
   let {
     index,
+    inListHeader,
     anchor,
     headline,
     byline,
@@ -30,6 +32,7 @@
     uiName,
   }: {
     index: MiniSearch<T>;
+    inListHeader?: string;
     anchor?: Snippet<[T]>;
     headline: Snippet<[T]>;
     byline?: Snippet<[T]>;
@@ -69,7 +72,9 @@
     />
     <span>{results.length} items</span>
   </li>
-
+  {#if inListHeader !== undefined}
+    <DSInListHeader value={inListHeader} />
+  {/if}
   {#snippet itemList(_items: T[])}
     {#each _items.slice(0, MAX_RESULTS) as item}
       <li class="contents">

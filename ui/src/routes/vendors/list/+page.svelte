@@ -6,7 +6,12 @@
 </script>
 
 {#if $globalStore.vendorsIndex !== null}
-  <DsSearchList index={$globalStore.vendorsIndex} fieldName="vendor" uiName="search vendors...">
+  <DsSearchList
+    index={$globalStore.vendorsIndex}
+    inListHeader="Vendors"
+    fieldName="vendor"
+    uiName="search vendors..."
+  >
     {#snippet headline({ name, alias }: VendorsResponse)}
       <span class="flex items-center gap-2">
         {name}

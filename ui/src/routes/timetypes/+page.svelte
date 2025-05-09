@@ -61,6 +61,7 @@
 <!-- Show the list of items here -->
 <DsList
   items={$globalStore.time_types as TimeTypesResponse[]}
+  inListHeader="Time Types"
   search={true}
   {anchor}
   {headline}

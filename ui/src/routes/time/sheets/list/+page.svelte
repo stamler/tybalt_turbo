@@ -118,6 +118,7 @@
 <!-- Show the list of items here -->
 <DsList
   items={$globalStore.time_sheets_tallies}
+  inListHeader="Time Sheets"
   search={true}
   {anchor}
   {headline}

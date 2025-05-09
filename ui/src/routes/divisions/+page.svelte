@@ -32,7 +32,7 @@
 </script>
 
 <!-- Show the list of items here -->
-<DsList items={$globalStore.divisions} search={true}>
+<DsList items={$globalStore.divisions} inListHeader="Divisions" search={true}>
   {#snippet anchor({ code })}{code}{/snippet}
   {#snippet headline({ name })}{name}{/snippet}
 </DsList>

@@ -41,5 +41,12 @@
 
 <!-- Show the list of items here -->
 {#if weekEndings}
-  <DsList items={weekEndings} search={true} {anchor} {headline} {actions} />
+  <DsList
+    items={weekEndings}
+    inListHeader="Payroll Reports"
+    search={true}
+    {anchor}
+    {headline}
+    {actions}
+  />
 {/if}

@@ -6,7 +6,12 @@
 
 <!-- Show the list of items here -->
 {#if $globalStore.clientsIndex !== null}
-  <DsSearchList index={$globalStore.clientsIndex} fieldName="client" uiName="search clients...">
+  <DsSearchList
+    index={$globalStore.clientsIndex}
+    inListHeader="Clients"
+    fieldName="client"
+    uiName="search clients..."
+  >
     {#snippet headline({ name })}{name}{/snippet}
     {#snippet line1({ expand })}
       {#if expand?.client_contacts_via_client}
