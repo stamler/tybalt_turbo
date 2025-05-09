@@ -7,8 +7,10 @@ export const load: PageLoad = async () => {
 
   try {
     // load required data
-    items = await pb.collection("payroll_report_week_endings").getFullList<TimeReportWeekEndingsResponse>();
-    return {items};
+    items = await pb
+      .collection("payroll_report_week_endings")
+      .getFullList<TimeReportWeekEndingsResponse>();
+    return { items };
   } catch (error) {
     console.error(`loading data: ${error}`);
   }

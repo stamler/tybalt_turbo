@@ -854,8 +854,8 @@ export type NotificationsResponse<Tdata = unknown, Texpand = unknown> = Required
   NotificationsRecord<Tdata>
 > &
   BaseSystemFields<Texpand>;
-export type PayrollReportWeekEndingsResponse<Texpand = unknown> = Required<PayrollReportWeekEndingsRecord> &
-  BaseSystemFields<Texpand>;
+export type PayrollReportWeekEndingsResponse<Texpand = unknown> =
+  Required<PayrollReportWeekEndingsRecord> & BaseSystemFields<Texpand>;
 export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYearEndDatesRecord> &
   BaseSystemFields<Texpand>;
 export type PendingItemsForQualifiedPoSecondApproversResponse<Texpand = unknown> =
@@ -872,8 +872,8 @@ export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> =
   Required<PurchaseOrdersRecord> & BaseSystemFields<Texpand>;
 export type TimeAmendmentsResponse<Texpand = TimeAmendmentsRecordExpands> =
   Required<TimeAmendmentsRecord> & BaseSystemFields<Texpand>;
-export type TimeAmendmentsAugmentedResponse<Texpand = unknown> = Required<TimeAmendmentsAugmentedRecord> &
-  BaseSystemFields<Texpand>;
+export type TimeAmendmentsAugmentedResponse<Texpand = unknown> =
+  Required<TimeAmendmentsAugmentedRecord> & BaseSystemFields<Texpand>;
 export type TimeEntriesResponse<Texpand = TimeEntriesRecordExpands> = Required<TimeEntriesRecord> &
   BaseSystemFields<Texpand>;
 export type TimeOffResponse<Texpand = unknown> = Required<TimeOffRecord> &

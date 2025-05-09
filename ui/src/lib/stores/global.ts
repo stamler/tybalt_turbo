@@ -135,14 +135,16 @@ const createStore = () => {
         ...state,
         user_po_permission_data: {
           // If the user has no user_po_permission_data, set the default values
-          ...(userPoPermissionData.length > 0 ? userPoPermissionData[0] : {
-            id: "",
-            max_amount: 0,
-            lower_threshold: 0,
-            upper_threshold: 0,
-            divisions: [],
-            claims: [],
-          }),
+          ...(userPoPermissionData.length > 0
+            ? userPoPermissionData[0]
+            : {
+                id: "",
+                max_amount: 0,
+                lower_threshold: 0,
+                upper_threshold: 0,
+                divisions: [],
+                claims: [],
+              }),
           lastRefresh: new Date(),
           maxAge: state.user_po_permission_data.maxAge,
         },

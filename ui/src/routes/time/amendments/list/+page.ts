@@ -7,9 +7,11 @@ export const load: PageLoad = async () => {
 
   try {
     // load required data
-    items = await pb.collection("time_amendments_augmented").getFullList<TimeAmendmentsAugmentedResponse>({
-      sort: "-date",
-    });
+    items = await pb
+      .collection("time_amendments_augmented")
+      .getFullList<TimeAmendmentsAugmentedResponse>({
+        sort: "-date",
+      });
     return {
       items,
     };
