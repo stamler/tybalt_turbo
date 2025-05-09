@@ -4,4 +4,4 @@
   let { data }: { data: ExpensesPageData } = $props();
 </script>
 
-<ExpensesList {data} />
+<ExpensesList inListHeader="Expenses Pending My Approval" {data} />

@@ -17,7 +17,7 @@
 
   const collectionId = "expenses";
 
-  let { data }: { data: PageData } = $props();
+  let { inListHeader, data }: { inListHeader?: string; data: PageData } = $props();
   let items = $state(data.items);
 
   async function refresh() {
@@ -94,7 +94,7 @@
 <DsList
   items={items as ExpensesAugmentedResponse[]}
   search={true}
-  inListHeader="Expenses"
+  {inListHeader}
   groupField="pay_period_ending"
 >
   {#snippet groupHeader(field: string)}

@@ -10,7 +10,7 @@ export const load: PageLoad = async () => {
     items = await pb
       .collection("time_amendments_augmented")
       .getFullList<TimeAmendmentsAugmentedResponse>({
-        sort: "-date",
+        sort: "-committed_week_ending,-date",
       });
     return {
       items,

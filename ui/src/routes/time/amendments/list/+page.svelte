@@ -61,11 +61,12 @@
   job_number,
   job_description,
   category_name,
+  category,
 }: TimeAmendmentsAugmentedResponse)}
   {#if time_type_code !== undefined && ["R", "RT"].includes(time_type_code) && job_number !== ""}
     <span class="flex items-center gap-1">
       {job_number} - {job_description}
-      {#if category_name !== undefined}
+      {#if category !== ""}
         <DsLabel color="teal">{category_name}</DsLabel>
       {/if}
     </span>
