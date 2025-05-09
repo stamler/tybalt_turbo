@@ -257,6 +257,8 @@ const createStore = () => {
     }
   };
 
+  // TODO: instead of manually calling refresh(), we should use the subscribe
+  // function to refresh the store based on events.
   const refresh = async (key: CollectionName | null = null) => {
     // refresh() should no-op if the user is not logged in. Failure to do so
     // will cause the lastRefresh date to be set to now, which will prevent
