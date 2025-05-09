@@ -79,7 +79,9 @@ FROM (
 
   SELECT
     ap.payroll_id payrollId,
-    ta.committed_week_ending weekEnding, -- Amendments use commit week
+    strftime('%Y', ta.committed_week_ending) || ' ' ||
+    substr('  JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', ta.committed_week_ending) * 3, 3) || ' ' ||
+    strftime('%d', ta.committed_week_ending) AS weekEnding, -- Amendments use commit week
     p.surname,
     p.given_name givenName,
     p.given_name || ' ' || p.surname AS name,
