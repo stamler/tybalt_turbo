@@ -12,23 +12,39 @@
   // Because time_off is a view collection, it cannot be updated so there's no
   // need to implement any reactive statements. We can just fetch the data once
   // and use that result.
-  import ObjectTable from "$lib/components/ObjectTable.svelte";
+  import DsList from "$lib/components/DSList.svelte";
+  import type { TimeOffResponse } from "$lib/pocketbase-types";
   import type { PageData } from "./$types";
   let { data }: { data: PageData } = $props();
 </script>
 
-<ObjectTable
-  tableData={data.items || []}
-  tableConfig={{
-    omitColumns: ["collectionId", "collectionName", "createdBy", "createdAt", "updatedAt"],
-    columnFormatters: {
-      type: (value) => {
-        return value;
-      },
-    },
-  }}
->
-  {#snippet rowActions(id)}
-    {id}
+<DsList items={data.items || []} inListHeader="Time Off" search={true}>
+  {#snippet anchor(item: TimeOffResponse)}
+    {item.opening_date}
   {/snippet}
-</ObjectTable>
+  {#snippet headline(item: TimeOffResponse)}
+    {item.name}
+  {/snippet}
+  {#snippet line1(item: TimeOffResponse)}
+    <span class="opacity-30">PPTO Available</span>
+    {item.opening_op - item.used_op}
+    <span class="opacity-30">Opening</span>
+    {item.opening_op}
+    <span class="opacity-30">Used</span>
+    {item.used_op}
+    <span class="opacity-30">({item.timesheet_op} on timesheets)</span>
+    <span class="opacity-30">As of</span>
+    {item.last_op}
+  {/snippet}
+  {#snippet line2(item: TimeOffResponse)}
+    <span class="opacity-30">Vacation Available</span>
+    {item.opening_ov - item.used_ov}
+    <span class="opacity-30">Opening</span>
+    {item.opening_ov}
+    <span class="opacity-30">Used</span>
+    {item.used_ov}
+    <span class="opacity-30">({item.timesheet_ov} on timesheets)</span>
+    <span class="opacity-30">As of</span>
+    {item.last_ov}
+  {/snippet}
+</DsList>
