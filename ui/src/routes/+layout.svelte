@@ -104,7 +104,7 @@
             <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/time/entries/list"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Entries</a
               >
               <DsActionButton
@@ -117,7 +117,7 @@
             <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/time/amendments/list"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Amendments</a
               >
               <DsActionButton
@@ -130,7 +130,7 @@
             <div class="flex h-8 items-center pr-2">
               <a
                 href="/time/sheets/list"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Sheets</a
               >
               <div class="w-8"></div>
@@ -138,7 +138,7 @@
             <div class="flex h-8 items-center pr-2">
               <a
                 href="/time/off"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Time Off</a
               >
               <div class="w-8"></div>
@@ -149,7 +149,7 @@
             <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/pos/list"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Purchase Orders</a
               >
               <DsActionButton
@@ -165,7 +165,7 @@
             <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/expenses/list"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >My Expenses</a
               >
               <DsActionButton
@@ -178,7 +178,7 @@
             <div class="flex h-8 items-center pr-2">
               <a
                 href="/expenses/pending"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Pending My Approval</a
               >
               <div class="w-8"></div>
@@ -186,7 +186,7 @@
             <div class="flex h-8 items-center pr-2">
               <a
                 href="/expenses/approved"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Approved By Me</a
               >
               <div class="w-8"></div>
@@ -197,7 +197,8 @@
             <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/jobs/list"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600">Jobs</a
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
+                >Jobs</a
               >
               <DsActionButton
                 action="/jobs/add"
@@ -209,7 +210,7 @@
             <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/clients/list"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Clients</a
               >
               <DsActionButton
@@ -222,7 +223,7 @@
             <div class="flex h-8 items-center justify-between pr-2">
               <a
                 href="/vendors/list"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Vendors</a
               >
               <DsActionButton
@@ -238,7 +239,7 @@
             <div class="flex h-8 items-center pr-2">
               <a
                 href="/reports/payroll"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Payroll</a
               >
               <div class="w-8"></div>
@@ -249,7 +250,7 @@
             <div class="flex h-8 items-center pr-2">
               <a
                 href="/timetypes"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Time Types</a
               >
               <div class="w-8"></div>
@@ -257,7 +258,7 @@
             <div class="flex h-8 items-center pr-2">
               <a
                 href="/divisions"
-                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Divisions</a
               >
               <div class="w-8"></div>
@@ -268,12 +269,12 @@
               <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Account</p>
               <a
                 href="/profile/{$authStore?.model?.id}"
-                class="block rounded pl-6 pr-2 hover:bg-neutral-600"
+                class="ml-4 block rounded pl-2 pr-2 hover:bg-neutral-600"
               >
                 {$authStore?.model?.email}
               </a>
               <button
-                class="w-full rounded pl-6 pr-2 text-left text-red-400 hover:bg-neutral-600"
+                class="ml-4 w-full rounded pl-2 pr-2 text-left text-red-400 hover:bg-neutral-600"
                 onclick={authStore.logout}
               >
                 Logout
