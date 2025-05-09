@@ -17,7 +17,7 @@ SELECT payrollId,
   END AS salaryHoursOver44,
   CASE
     WHEN salary = 1 THEN CASE
-      WHEN SUM(hoursWorked) + IFNULL(Stat,0) + IFNULL(Bereavement,0) > workWeekHours THEN workWeekHours - IFNULL(Stat,0) - IFNULL(Bereavement,0)
+      WHEN SUM(hoursWorked) + IFNULL(SUM(Stat),0) + IFNULL(SUM(Bereavement),0) > workWeekHours THEN workWeekHours - IFNULL(SUM(Stat),0) - IFNULL(SUM(Bereavement),0)
       ELSE SUM(hoursWorked)
     END
     ELSE CASE
@@ -31,7 +31,7 @@ SELECT payrollId,
   END AS "total overtime hours",
   CASE
     WHEN salary = 0 THEN CASE
-      WHEN overtimeHoursToBank > 0 THEN (CASE WHEN SUM(hoursWorked) > 44 THEN SUM(hoursWorked) - 44 ELSE 0 END) - overtimeHoursToBank
+      WHEN SUM(overtimeHoursToBank) > 0 THEN (CASE WHEN SUM(hoursWorked) > 44 THEN SUM(hoursWorked) - 44 ELSE 0 END) - SUM(overtimeHoursToBank)
       ELSE (CASE WHEN SUM(hoursWorked) > 44 THEN SUM(hoursWorked) - 44 ELSE 0 END)
     END
     ELSE 0

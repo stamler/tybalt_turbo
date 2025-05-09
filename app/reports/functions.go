@@ -9,23 +9,25 @@ import (
 )
 
 // convertToCSV takes a slice of dbx.NullStringMap and converts it into a CSV formatted string.
-func convertToCSV(report []dbx.NullStringMap) (string, error) {
+func convertToCSV(report []dbx.NullStringMap, headers []string) (string, error) {
 	if len(report) == 0 {
 		return "", nil // Return empty string for empty report
 	}
 
-	// Collect all unique headers
-	headerMap := make(map[string]struct{})
-	for _, row := range report {
-		for key := range row {
-			headerMap[key] = struct{}{}
+	if headers == nil {
+		// Collect all unique headers
+		headerMap := make(map[string]struct{})
+		for _, row := range report {
+			for key := range row {
+				headerMap[key] = struct{}{}
+			}
 		}
+		headers = make([]string, 0, len(headerMap))
+		for key := range headerMap {
+			headers = append(headers, key)
+		}
+		sort.Strings(headers) // Sort headers for consistent column order
 	}
-	headers := make([]string, 0, len(headerMap))
-	for key := range headerMap {
-		headers = append(headers, key)
-	}
-	sort.Strings(headers) // Sort headers for consistent column order
 
 	var builder strings.Builder
 	writer := csv.NewWriter(&builder)

@@ -33,12 +33,6 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 			payrollEndingDate = payrollEndingDate.AddDate(0, 0, -7)
 		}
 
-		// Load the query from the descriptions/payroll_time_component.sql file
-		// query, err := os.ReadFile("descriptions/payroll_time_component.sql")
-		// if err != nil {
-		// 	return e.Error(http.StatusInternalServerError, "failed to read query file", nil)
-		// }
-
 		// Execute the query
 		var report []dbx.NullStringMap // TODO: make a type for this
 		err = app.DB().NewQuery(payrollTimeQuery).Bind(dbx.Params{
@@ -49,7 +43,8 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 		}
 
 		// convert the report to a csv string
-		csvString, err := convertToCSV(report)
+		headers := []string{"payrollId", "weekEnding", "surname", "givenName", "name", "manager", "meals", "days off rotation", "hours worked", "salaryHoursOver44", "adjustedHoursWorked", "total overtime hours", "overtime hours to pay", "Bereavement", "Stat Holiday", "PPTO", "Sick", "Vacation", "overtime hours to bank", "Overtime Payout Requested", "hasAmendmentsForWeeksEnding", "salary"}
+		csvString, err := convertToCSV(report, headers)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to generate CSV report: "+err.Error(), err)
 		}
