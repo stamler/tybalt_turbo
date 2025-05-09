@@ -101,10 +101,12 @@
         <nav class="mt-2 px-1">
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Time Management</p>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/time/entries/list">Entries</a>
+            <div class="flex min-h-8 items-center justify-between pr-2">
+              <a
+                href="/time/entries/list"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                >Entries</a
+              >
               <DsActionButton
                 action="/time/entries/add"
                 icon="feather:plus-circle"
@@ -112,10 +114,12 @@
                 color="green"
               />
             </div>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/time/amendments/list">Amendments</a>
+            <div class="flex min-h-8 items-center justify-between pr-2">
+              <a
+                href="/time/amendments/list"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                >Amendments</a
+              >
               <DsActionButton
                 action="/time/amendments/add"
                 icon="feather:plus-circle"
@@ -123,19 +127,29 @@
                 color="green"
               />
             </div>
-            <div class="flex min-h-8 items-center rounded pl-6 pr-2 hover:bg-neutral-600">
-              <a href="/time/sheets/list">Sheets</a>
+            <div class="flex min-h-8 items-center">
+              <a
+                href="/time/sheets/list"
+                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                >Sheets</a
+              >
             </div>
-            <div class="flex min-h-8 items-center rounded pl-6 pr-2 hover:bg-neutral-600">
-              <a href="/time/off">Time Off</a>
+            <div class="flex min-h-8 items-center">
+              <a
+                href="/time/off"
+                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                >Time Off</a
+              >
             </div>
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Purchase Orders</p>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/pos/list">Purchase Orders</a>
+            <div class="flex min-h-8 items-center justify-between pr-2">
+              <a
+                href="/pos/list"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                >Purchase Orders</a
+              >
               <DsActionButton
                 action="/pos/add"
                 icon="feather:plus-circle"
@@ -146,10 +160,12 @@
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Expenses</p>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/expenses/list">My Expenses</a>
+            <div class="flex min-h-8 items-center justify-between pr-2">
+              <a
+                href="/expenses/list"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                >My Expenses</a
+              >
               <DsActionButton
                 action="/expenses/add"
                 icon="feather:plus-circle"
@@ -157,23 +173,28 @@
                 color="green"
               />
             </div>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/expenses/pending">Pending My Approval</a>
+            <div class="flex min-h-8 items-center">
+              <a
+                href="/expenses/pending"
+                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                >Pending My Approval</a
+              >
             </div>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/expenses/approved">Approved By Me</a>
+            <div class="flex min-h-8 items-center">
+              <a
+                href="/expenses/approved"
+                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                >Approved By Me</a
+              >
             </div>
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Business</p>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/jobs/list">Jobs</a>
+            <div class="flex min-h-8 items-center justify-between pr-2">
+              <a
+                href="/jobs/list"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600">Jobs</a
+              >
               <DsActionButton
                 action="/jobs/add"
                 icon="feather:plus-circle"
@@ -181,10 +202,12 @@
                 color="green"
               />
             </div>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/clients/list">Clients</a>
+            <div class="flex min-h-8 items-center justify-between pr-2">
+              <a
+                href="/clients/list"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                >Clients</a
+              >
               <DsActionButton
                 action="/clients/add"
                 icon="feather:plus-circle"
@@ -192,10 +215,12 @@
                 color="green"
               />
             </div>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/vendors/list">Vendors</a>
+            <div class="flex min-h-8 items-center justify-between pr-2">
+              <a
+                href="/vendors/list"
+                class="flex h-full flex-grow items-center rounded pl-6 hover:bg-neutral-600"
+                >Vendors</a
+              >
               <DsActionButton
                 action="/vendors/add"
                 icon="feather:plus-circle"
@@ -206,19 +231,29 @@
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Reports</p>
-            <div
-              class="flex min-h-8 items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600"
-            >
-              <a href="/reports/payroll">Payroll</a>
+            <div class="flex min-h-8 items-center">
+              <a
+                href="/reports/payroll"
+                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                >Payroll</a
+              >
             </div>
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Settings</p>
-            <div class="flex min-h-8 items-center rounded pl-6 pr-2 hover:bg-neutral-600">
-              <a href="/timetypes">Time Types</a>
+            <div class="flex min-h-8 items-center">
+              <a
+                href="/timetypes"
+                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                >Time Types</a
+              >
             </div>
-            <div class="flex min-h-8 items-center rounded pl-6 pr-2 hover:bg-neutral-600">
-              <a href="/divisions">Divisions</a>
+            <div class="flex min-h-8 items-center">
+              <a
+                href="/divisions"
+                class="flex h-full w-full items-center rounded pl-6 pr-2 hover:bg-neutral-600"
+                >Divisions</a
+              >
             </div>
           </div>
           {#if $authStore?.isValid}
