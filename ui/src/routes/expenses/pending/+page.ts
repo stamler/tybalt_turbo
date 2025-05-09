@@ -8,14 +8,16 @@ export const load: PageLoad = async ({ depends }) => {
   depends("app:expenses");
 
   try {
-    // load all of the caller's own expenses
+    // load all of the pending expenses for the caller
     const userId = get(authStore)?.model?.id || "";
 
     const result = await pb
       .collection("expenses_augmented")
       .getFullList<ExpensesAugmentedResponse>({
         sort: "-date",
-        filter: pb.filter("uid={:userId}", { userId }),
+        filter: pb.filter("approver={:approver} && approved='' && submitted=true", {
+          approver: userId,
+        }),
       });
     return {
       items: result,

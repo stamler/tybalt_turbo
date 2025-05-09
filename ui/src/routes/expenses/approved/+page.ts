@@ -8,17 +8,19 @@ export const load: PageLoad = async ({ depends }) => {
   depends("app:expenses");
 
   try {
-    // load all of the caller's own expenses
+    // load the last 50 expenses the caller has approved
     const userId = get(authStore)?.model?.id || "";
 
     const result = await pb
       .collection("expenses_augmented")
-      .getFullList<ExpensesAugmentedResponse>({
+      .getList<ExpensesAugmentedResponse>(1, 50, {
         sort: "-date",
-        filter: pb.filter("uid={:userId}", { userId }),
+        filter: pb.filter("approver={:approver} && approved!=''", {
+          approver: userId,
+        }),
       });
     return {
-      items: result,
+      items: result.items,
     };
   } catch (error) {
     console.error(`loading data: ${error}`);

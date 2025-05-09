@@ -98,23 +98,10 @@
         <div class="hidden h-10 items-center px-4 text-lg font-semibold lg:flex">
           <a href="/" class="text-white">Tybalt</a>
         </div>
-        <nav class="mt-4 space-y-1 px-2">
-          <div class="space-y-1">
-            <p class="px-2 text-xs font-semibold uppercase text-neutral-400">Purchase Orders</p>
-            <div class="flex items-center justify-between rounded px-2 py-1 hover:bg-neutral-600">
-              <a href="/pos/list">POs</a>
-              <DsActionButton
-                action="/pos/add"
-                icon="feather:plus-circle"
-                title="New PO"
-                color="green"
-              />
-            </div>
-          </div>
-
-          <div class="mt-4 space-y-1">
-            <p class="px-2 text-xs font-semibold uppercase text-neutral-400">Time Management</p>
-            <div class="flex items-center justify-between rounded px-2 py-1 hover:bg-neutral-600">
+        <nav class="mt-2 px-1">
+          <div class="mt-2">
+            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Time Management</p>
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
               <a href="/time/entries/list">Entries</a>
               <DsActionButton
                 action="/time/entries/add"
@@ -123,7 +110,7 @@
                 color="green"
               />
             </div>
-            <div class="flex items-center justify-between rounded px-2 py-1 hover:bg-neutral-600">
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
               <a href="/time/amendments/list">Amendments</a>
               <DsActionButton
                 action="/time/amendments/add"
@@ -132,15 +119,44 @@
                 color="green"
               />
             </div>
-            <a href="/time/sheets/list" class="block rounded px-2 py-1 hover:bg-neutral-600"
+            <a href="/time/sheets/list" class="block rounded pl-6 pr-2 hover:bg-neutral-600"
               >Sheets</a
             >
-            <a href="/time/off" class="block rounded px-2 py-1 hover:bg-neutral-600">Time Off</a>
+            <a href="/time/off" class="block rounded pl-6 pr-2 hover:bg-neutral-600">Time Off</a>
           </div>
-
-          <div class="mt-4 space-y-1">
-            <p class="px-2 text-xs font-semibold uppercase text-neutral-400">Jobs & Expenses</p>
-            <div class="flex items-center justify-between rounded px-2 py-1 hover:bg-neutral-600">
+          <div class="mt-2">
+            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Purchase Orders</p>
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
+              <a href="/pos/list">Purchase Orders</a>
+              <DsActionButton
+                action="/pos/add"
+                icon="feather:plus-circle"
+                title="New PO"
+                color="green"
+              />
+            </div>
+          </div>
+          <div class="mt-2">
+            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Expenses</p>
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
+              <a href="/expenses/list">My Expenses</a>
+              <DsActionButton
+                action="/expenses/add"
+                icon="feather:plus-circle"
+                title="New Expense"
+                color="green"
+              />
+            </div>
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
+              <a href="/expenses/pending">Pending My Approval</a>
+            </div>
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
+              <a href="/expenses/approved">Approved By Me</a>
+            </div>
+          </div>
+          <div class="mt-2">
+            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Business</p>
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
               <a href="/jobs/list">Jobs</a>
               <DsActionButton
                 action="/jobs/add"
@@ -149,20 +165,7 @@
                 color="green"
               />
             </div>
-            <div class="flex items-center justify-between rounded px-2 py-1 hover:bg-neutral-600">
-              <a href="/expenses/list">Expenses</a>
-              <DsActionButton
-                action="/expenses/add"
-                icon="feather:plus-circle"
-                title="New Expense"
-                color="green"
-              />
-            </div>
-          </div>
-
-          <div class="mt-4 space-y-1">
-            <p class="px-2 text-xs font-semibold uppercase text-neutral-400">Business</p>
-            <div class="flex items-center justify-between rounded px-2 py-1 hover:bg-neutral-600">
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
               <a href="/clients/list">Clients</a>
               <DsActionButton
                 action="/clients/add"
@@ -171,7 +174,7 @@
                 color="green"
               />
             </div>
-            <div class="flex items-center justify-between rounded px-2 py-1 hover:bg-neutral-600">
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
               <a href="/vendors/list">Vendors</a>
               <DsActionButton
                 action="/vendors/add"
@@ -181,30 +184,28 @@
               />
             </div>
           </div>
-          <div class="mt-4 space-y-1">
-            <p class="px-2 text-xs font-semibold uppercase text-neutral-400">Reports</p>
-            <div class="flex items-center justify-between rounded px-2 py-1 hover:bg-neutral-600">
+          <div class="mt-2">
+            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Reports</p>
+            <div class="flex items-center justify-between rounded pl-6 pr-2 hover:bg-neutral-600">
               <a href="/reports/payroll">Payroll</a>
             </div>
           </div>
-
-          <div class="mt-4 space-y-1">
-            <p class="px-2 text-xs font-semibold uppercase text-neutral-400">Settings</p>
-            <a href="/timetypes" class="block rounded px-2 py-1 hover:bg-neutral-600">Time Types</a>
-            <a href="/divisions" class="block rounded px-2 py-1 hover:bg-neutral-600">Divisions</a>
+          <div class="mt-2">
+            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Settings</p>
+            <a href="/timetypes" class="block rounded pl-6 pr-2 hover:bg-neutral-600">Time Types</a>
+            <a href="/divisions" class="block rounded pl-6 pr-2 hover:bg-neutral-600">Divisions</a>
           </div>
-
           {#if $authStore?.isValid}
-            <div class="mt-4 space-y-1">
-              <p class="px-2 text-xs font-semibold uppercase text-neutral-400">Account</p>
+            <div class="mt-2">
+              <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Account</p>
               <a
                 href="/profile/{$authStore?.model?.id}"
-                class="block rounded px-2 py-1 hover:bg-neutral-600"
+                class="block rounded pl-6 pr-2 hover:bg-neutral-600"
               >
                 {$authStore?.model?.email}
               </a>
               <button
-                class="w-full rounded px-2 py-1 text-left text-red-400 hover:bg-neutral-600"
+                class="w-full rounded pl-6 pr-2 text-left text-red-400 hover:bg-neutral-600"
                 onclick={authStore.logout}
               >
                 Logout
