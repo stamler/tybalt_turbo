@@ -330,6 +330,7 @@ export async function downloadCSV(endpoint: string, fileName: string) {
     collectionName: string,
     viewName: string,
     updateCallback: (newArray: ViewResponse[]) => void,
+    createdItemIsVisible: (record: CollectionResponse) => boolean | undefined,
   ): Promise<UnsubscribeFunc> {
     // Subscribe to collectionName and act on the changes
     return pb.collection(collectionName).subscribe<CollectionResponse>("*", async (e) => {
@@ -340,6 +341,11 @@ export async function downloadCSV(endpoint: string, fileName: string) {
       console.log(`Update with action ${e.action} for record ${id}`);
       switch (e.action) {
         case "create":
+          // if the record should be ignored, return immediately
+          if (createdItemIsVisible !== undefined && !createdItemIsVisible(e.record)) {
+            console.log(`Ignoring ${id} due to createdItemIsVisible returning false`);
+            return;
+          }
           // load the augmented record and insert it at the top of the list
           augmentedRecord = await pb.collection(viewName).getOne(id);
           localArray = [augmentedRecord, ...localArray];

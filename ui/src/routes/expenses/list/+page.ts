@@ -3,10 +3,7 @@ import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 import { authStore } from "$lib/stores/auth";
 import { get } from "svelte/store";
-export const load: PageLoad = async ({ depends }) => {
-  // Declare dependency on 'app:expenses'
-  depends("app:expenses");
-
+export const load: PageLoad = async () => {
   try {
     // load all of the caller's own expenses
     const userId = get(authStore)?.model?.id || "";
@@ -19,6 +16,9 @@ export const load: PageLoad = async ({ depends }) => {
       });
     return {
       items: result,
+      // createdItemIsVisible: (record: ExpensesResponse) => {
+      //   return record.uid === userId;
+      // },
     };
   } catch (error) {
     console.error(`loading data: ${error}`);

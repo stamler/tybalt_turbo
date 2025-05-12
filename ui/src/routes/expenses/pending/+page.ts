@@ -3,9 +3,7 @@ import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 import { authStore } from "$lib/stores/auth";
 import { get } from "svelte/store";
-export const load: PageLoad = async ({ depends }) => {
-  // Declare dependency on 'app:expenses'
-  depends("app:expenses");
+export const load: PageLoad = async () => {
 
   try {
     // load all of the pending expenses for the caller
@@ -21,6 +19,13 @@ export const load: PageLoad = async ({ depends }) => {
       });
     return {
       items: result,
+      // createdItemIsVisible: (record: ExpensesResponse) => {
+        // only show items where the caller is the approver. It should be
+        // unnecessary to check whether the record is submitted because listRule
+        // should prevent visibility of unsubmitted records by a user other than
+        // the creator.
+        // return record.approver === userId;
+      // },
     };
   } catch (error) {
     console.error(`loading data: ${error}`);

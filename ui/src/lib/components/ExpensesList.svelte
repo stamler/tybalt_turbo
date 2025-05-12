@@ -7,23 +7,41 @@
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import type { PageData } from "./$types";
-  import type { ExpensesAugmentedResponse } from "$lib/pocketbase-types";
+  import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { shortDate } from "$lib/utilities";
   import RejectModal from "$lib/components/RejectModal.svelte";
-  import { invalidate } from "$app/navigation";
-
+  import { onMount, onDestroy } from "svelte";
+  import { augmentedProxySubscription } from "$lib/utilities";
+  import { type UnsubscribeFunc } from "pocketbase";
   let rejectModal: RejectModal;
 
   const collectionId = "expenses";
 
   let { inListHeader, data }: { inListHeader?: string; data: PageData } = $props();
   let items = $state(data.items);
+  let createdItemIsVisible = $state(data.createdItemIsVisible);
 
-  async function refresh() {
-    await invalidate("app:expenses");
-    items = data.items;
-  }
+  // Subscribe to the base collection but update the items from the augmented
+  // view
+  let unsubscribeFunc: UnsubscribeFunc;
+  onMount(async () => {
+    if (items === undefined) {
+      return;
+    }
+    unsubscribeFunc = await augmentedProxySubscription<ExpensesResponse, ExpensesAugmentedResponse>(
+      items,
+      "expenses",
+      "expenses_augmented",
+      (newItems) => {
+        items = newItems;
+      },
+      createdItemIsVisible,
+    );
+  });
+  onDestroy(async () => {
+    unsubscribeFunc();
+  });
 
   async function del(id: string): Promise<void> {
     // return immediately if items is not an array
@@ -46,7 +64,6 @@
           "Content-Type": "application/json",
         },
       });
-      await refresh();
     } catch (error: any) {
       globalStore.addError(error?.response.error);
     }
@@ -57,7 +74,6 @@
       await pb.send(`/api/expenses/${id}/commit`, {
         method: "POST",
       });
-      await refresh();
     } catch (error: any) {
       globalStore.addError(error?.response.error);
     }
@@ -68,7 +84,6 @@
       await pb.send(`/api/expenses/${id}/submit`, {
         method: "POST",
       });
-      await refresh();
     } catch (error: any) {
       globalStore.addError(error?.response.error);
     }
@@ -79,7 +94,6 @@
       await pb.send(`/api/expenses/${id}/recall`, {
         method: "POST",
       });
-      await refresh();
     } catch (error: any) {
       globalStore.addError(error?.response.error);
     }
@@ -90,7 +104,7 @@
   }
 </script>
 
-<RejectModal on:refresh={refresh} collectionName="expenses" bind:this={rejectModal} />
+<RejectModal collectionName="expenses" bind:this={rejectModal} />
 <DsList
   items={items as ExpensesAugmentedResponse[]}
   search={true}
