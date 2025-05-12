@@ -150,6 +150,7 @@ func createBundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error
 			// set values in the new time sheet
 			newTimeSheet.Set("work_week_hours", admin_profile.Get("work_week_hours"))
 			newTimeSheet.Set("salary", admin_profile.Get("salary"))
+			newTimeSheet.Set("payroll_id", admin_profile.Get("payroll_id"))
 
 			if err := txApp.Save(newTimeSheet); err != nil {
 				return fmt.Errorf("error creating new time sheet: %v", err)
