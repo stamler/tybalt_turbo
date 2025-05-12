@@ -19,7 +19,6 @@ import { get } from "svelte/store";
 import { ClientResponseError } from "pocketbase";
 import MiniSearch from "minisearch";
 import type { Readable, Invalidator, Subscriber } from "svelte/store";
-import type { TimeSheetTallyQueryRow } from "$lib/utilities";
 
 interface StoreItem<T> {
   items: T;
@@ -34,7 +33,6 @@ export type CollectionName =
   | "jobs"
   | "vendors"
   | "managers"
-  | "time_sheets_tallies";
 type CollectionType = {
   clients: ClientsResponse[];
   time_types: TimeTypesResponse[];
@@ -42,7 +40,6 @@ type CollectionType = {
   jobs: JobsResponse[];
   vendors: VendorsResponse[];
   managers: ManagersResponse[];
-  time_sheets_tallies: TimeSheetTallyQueryRow[];
 };
 
 interface ErrorMessage {
@@ -97,7 +94,6 @@ const createStore = () => {
       // 1 day
       time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
-      time_sheets_tallies: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       // 5 minutes
       jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
       // 1 hour
@@ -193,12 +189,6 @@ const createStore = () => {
         case "vendors":
           items = (await pb.collection("vendors").getFullList<VendorsResponse>({
             requestKey: "vendor",
-          })) as CollectionType[typeof key];
-          break;
-        case "time_sheets_tallies":
-          // TODO: reload time_sheets_tallies by subscribing to changes on the time_sheets collection
-          items = (await pb.send("/api/time_sheets/tallies", {
-            requestKey: "time_sheets_tallies",
           })) as CollectionType[typeof key];
           break;
       }

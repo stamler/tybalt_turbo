@@ -2,6 +2,7 @@
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import { timesheets } from "$lib/stores/timesheets";
   import { globalStore } from "$lib/stores/global";
   import { goto } from "$app/navigation";
   import ShareModal from "$lib/components/ShareModal.svelte";
@@ -21,9 +22,6 @@
         },
       });
 
-      // refresh the time sheets list in the global store
-      globalStore.refresh("time_sheets_tallies");
-
       // navigate to the time entries list to show the unbundled time entries
       goto(`/time/entries/list`);
     } catch (error: any) {
@@ -39,9 +37,6 @@
           "Content-Type": "application/json",
         },
       });
-
-      // refresh the time sheets list in the global store
-      globalStore.refresh("time_sheets_tallies");
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "An unknown error occurred");
     }
@@ -117,7 +112,7 @@
 
 <!-- Show the list of items here -->
 <DsList
-  items={$globalStore.time_sheets_tallies}
+  items={$timesheets.tallies}
   inListHeader="Time Sheets"
   search={true}
   {anchor}
