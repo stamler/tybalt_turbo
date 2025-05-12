@@ -41,7 +41,7 @@ func createUnbundleTimesheetHandler(app core.App) func(e *core.RequestEvent) err
 
 			// approved time sheets must be rejected before being unbundled
 			if !timeSheet.GetDateTime("approved").IsZero() {
-				if !timeSheet.GetBool("rejected") {
+				if timeSheet.GetDateTime("rejected").IsZero() {
 					return fmt.Errorf("approved time sheets must be rejected before being unbundled")
 				}
 			}
