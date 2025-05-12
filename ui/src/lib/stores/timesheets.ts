@@ -3,6 +3,9 @@ import type { TimeSheetTallyQueryRow } from '$lib/utilities';
 import { pb } from '$lib/pocketbase';
 import { type UnsubscribeFunc } from "pocketbase";
 
+// TODO: This could be changed to a readable store rather than a writable store.
+// since the data is never updated outside of the store.
+
 // Define the type for our store data
 type DataStore = {
   tallies: TimeSheetTallyQueryRow[];
