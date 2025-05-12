@@ -6,6 +6,7 @@
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
   import { type UnsubscribeFunc } from "pocketbase";
+  import { augmentedProxySubscription } from "$lib/utilities";
   import DsList from "$lib/components/DSList.svelte";
   import type { PageData } from "./$types";
   import type {
@@ -24,7 +25,24 @@
   // Load the initial data
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
+
+  // Subscribe to the base collection but update the items from the augmented
+  // view
   let unsubscribeFunc: UnsubscribeFunc;
+  onMount(async () => {
+    if (items === undefined) {
+      return;
+    }
+    unsubscribeFunc = await augmentedProxySubscription<
+      PurchaseOrdersResponse,
+      PurchaseOrdersAugmentedResponse
+    >(items, "purchase_orders", "purchase_orders_augmented", (newItems) => {
+      items = newItems;
+    });
+  });
+  onDestroy(async () => {
+    unsubscribeFunc();
+  });
 
   // Set to true to show all buttons regardless of user permissions or PO
   // status. This is used for testing purposes.
@@ -92,38 +110,6 @@
     }
     return false;
   }
-
-  onMount(async () => {
-    // Subscribe to the purchase_orders collection and act on the changes
-    unsubscribeFunc = await pb
-      .collection("purchase_orders")
-      .subscribe<PurchaseOrdersResponse>("*", async (e) => {
-        // return immediately if items is not an array
-        if (!Array.isArray(items)) return;
-        const id = e.record.id;
-        switch (e.action) {
-          case "create":
-            let augmentedRecord: PurchaseOrdersAugmentedResponse;
-            // load the augmented record and insert it at the top of the list
-            augmentedRecord = await pb.collection("purchase_orders_augmented").getOne(id);
-            items = [augmentedRecord, ...items];
-            break;
-          case "update":
-            // reload the corresponding augmented record and replace the old
-            // item in the list with the new one
-            augmentedRecord = await pb.collection("purchase_orders_augmented").getOne(id);
-            items = items.map((item) => (item.id === e.record.id ? augmentedRecord : item));
-            break;
-          case "delete":
-            items = items.filter((item) => item.id !== e.record.id);
-            break;
-        }
-      });
-  });
-
-  onDestroy(async () => {
-    unsubscribeFunc();
-  });
 
   async function del(id: string): Promise<void> {
     // return immediately if items is not an array

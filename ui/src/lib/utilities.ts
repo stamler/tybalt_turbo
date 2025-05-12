@@ -2,7 +2,9 @@ import type {
   TimeEntriesResponse,
   CategoriesResponse,
   ClientContactsResponse,
+  BaseSystemFields,
 } from "$lib/pocketbase-types";
+import { type UnsubscribeFunc } from "pocketbase";
 import { pb } from "$lib/pocketbase";
 import flatpickr from "flatpickr";
 
@@ -317,3 +319,42 @@ export async function downloadCSV(endpoint: string, fileName: string) {
     // Optionally: Show an error message to the user
   }
 }
+
+  // This function subscribes to collectionName and updates the items in its
+  // first argument using the record with the corresponding id from the view
+  export function augmentedProxySubscription<
+    CollectionResponse extends BaseSystemFields,
+    ViewResponse extends { id: string },
+  >(
+    localArray: ViewResponse[],
+    collectionName: string,
+    viewName: string,
+    updateCallback: (newArray: ViewResponse[]) => void,
+  ): Promise<UnsubscribeFunc> {
+    // Subscribe to collectionName and act on the changes
+    return pb.collection(collectionName).subscribe<CollectionResponse>("*", async (e) => {
+      // return immediately if items is not an array
+      if (!Array.isArray(localArray)) return;
+      const id = e.record.id;
+      let augmentedRecord: ViewResponse;
+      console.log(`Update with action ${e.action} for record ${id}`);
+      switch (e.action) {
+        case "create":
+          // load the augmented record and insert it at the top of the list
+          augmentedRecord = await pb.collection(viewName).getOne(id);
+          localArray = [augmentedRecord, ...localArray];
+          break;
+        case "update":
+          // reload the corresponding augmented record and replace the old
+          // item in the list with the new one
+          augmentedRecord = await pb.collection(viewName).getOne(id);
+          localArray = localArray.map((item) => (item.id === e.record.id ? augmentedRecord : item));
+          break;
+        case "delete":
+          localArray = localArray.filter((item) => item.id !== e.record.id);
+          break;
+      }
+      updateCallback(localArray);
+    });
+  }
+
