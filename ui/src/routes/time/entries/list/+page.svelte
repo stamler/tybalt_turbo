@@ -71,9 +71,6 @@
         },
       });
 
-      // refresh the time sheets list in the global store
-      globalStore.refresh("time_sheets");
-
       // navigate to the time sheets list to show the bundled time sheets
       goto(`/time/sheets/list`);
     } catch (error: any) {
