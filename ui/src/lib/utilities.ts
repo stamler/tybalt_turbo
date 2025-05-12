@@ -330,7 +330,7 @@ export async function downloadCSV(endpoint: string, fileName: string) {
     collectionName: string,
     viewName: string,
     updateCallback: (newArray: ViewResponse[]) => void,
-    createdItemIsVisible: (record: CollectionResponse) => boolean | undefined,
+    createdItemIsVisible: undefined | ((record: CollectionResponse) => boolean) = undefined,
   ): Promise<UnsubscribeFunc> {
     // Subscribe to collectionName and act on the changes
     return pb.collection(collectionName).subscribe<CollectionResponse>("*", async (e) => {

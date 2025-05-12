@@ -2,10 +2,7 @@ import type { TimeEntriesResponse } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 
-export const load: PageLoad = async ({ depends }) => {
-  // Declare dependency on 'app:timeEntries'
-  depends("app:timeEntries");
-
+export const load: PageLoad = async () => {
   let items: TimeEntriesResponse[];
 
   try {

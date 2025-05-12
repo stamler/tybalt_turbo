@@ -6,11 +6,46 @@
   import type { PageData } from "./$types";
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { invalidate, goto } from "$app/navigation";
+  import { goto } from "$app/navigation";
   import { calculateTally } from "$lib/utilities";
-
+  import { type UnsubscribeFunc } from "pocketbase";
+  import { onMount, onDestroy } from "svelte";
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
+
+  // Subscribe to the base collection but update the items from the augmented
+  // view
+  let unsubscribeFunc: UnsubscribeFunc;
+  onMount(async () => {
+    if (items === undefined) {
+      return;
+    }
+    unsubscribeFunc = await pb.collection("time_entries").subscribe<TimeEntriesResponse>(
+      "*",
+      async (e) => {
+        // return immediately if items is not an array
+        if (!Array.isArray(items)) return;
+        switch (e.action) {
+          case "create":
+            items = [e.record, ...items];
+            break;
+          case "update":
+            items = items.map((item) => (item.id === e.record.id ? e.record : item));
+            break;
+          case "delete":
+            items = items.filter((item) => item.id !== e.record.id);
+            break;
+        }
+      },
+      {
+        filter: "tsid = ''", // does this filter even work? It could replace the visibility check in the create case
+        expand: "job,time_type,division,category",
+      },
+    );
+  });
+  onDestroy(async () => {
+    unsubscribeFunc();
+  });
 
   function hoursString(item: TimeEntriesResponse) {
     const hoursArray = [];
@@ -20,16 +55,10 @@
   }
 
   async function del(id: string): Promise<void> {
-    // return immediately if items is not an array
-    if (!Array.isArray(items)) return;
-
     try {
       await pb.collection("time_entries").delete(id);
-
-      // remove the item from the list
-      items = items.filter((item) => item.id !== id);
     } catch (error: any) {
-      alert(error.data.message);
+      globalStore.addError(error?.response?.message);
     }
   }
 
@@ -44,9 +73,6 @@
 
       // refresh the time sheets list in the global store
       globalStore.refresh("time_sheets");
-
-      // Rerun the load function to refresh the list of time entries
-      await invalidate("app:timeEntries");
 
       // navigate to the time sheets list to show the bundled time sheets
       goto(`/time/sheets/list`);
