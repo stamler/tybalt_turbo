@@ -110,14 +110,14 @@ func ToParquet() {
 
 		if table == "Jobs" {
 			// Specific query for Jobs table to format dates as strings (YYYY-MM-DD or empty)
-			// and add pocketbase_id. Use %% for literal % in fmt.Sprintf.
+			// and add pocketbase_id. Use %% for literal % in fmt.Sprintf. pocketbase_id
+			// is already in the table derived from MD5 of the id.
 			query = fmt.Sprintf(`
 				COPY (
 					SELECT * EXCLUDE (projectAwardDate, proposalOpeningDate, proposalSubmissionDueDate),
 						strftime(projectAwardDate, '%%Y-%%m-%%d') AS projectAwardDate,
 						strftime(proposalOpeningDate, '%%Y-%%m-%%d') AS proposalOpeningDate,
 						strftime(proposalSubmissionDueDate, '%%Y-%%m-%%d') AS proposalSubmissionDueDate,
-						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id
 					FROM mysql_db.Jobs
 				) TO 'parquet/Jobs.parquet' (FORMAT PARQUET)
 		 `)
@@ -125,22 +125,17 @@ func ToParquet() {
 		} else if table == "Profiles" {
 			// Specific query for Profiles to add both pocketbase_id and pocketbase_uid
 			// Use different random seeds to avoid potential caching issues if needed.
+			// pocketbase_id is already in the table derived from LEFT 15 characters of ID
+			// pocketbase_uid is already in the table derived from RIGHT 15 characters of ID
 			query = `
-				COPY (
-					SELECT *,
-						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id,
-						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.71 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_uid
-					FROM mysql_db.Profiles
-				) TO 'parquet/Profiles.parquet' (FORMAT PARQUET)
+				COPY ( SELECT * FROM mysql_db.Profiles ) TO 'parquet/Profiles.parquet' (FORMAT PARQUET)
 			`
 
 		} else if table == "TimeSheets" {
 			// weekEnding should be a string in the format YYYY-MM-DD
 			query = `
 				COPY (
-					SELECT 
-						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id,
-						* EXCLUDE (weekEnding),
+					SELECT * EXCLUDE (weekEnding),
 						CAST(weekEnding AS VARCHAR) AS weekEnding
 					FROM mysql_db.TimeSheets
 				) TO 'parquet/TimeSheets.parquet' (FORMAT PARQUET)
@@ -157,15 +152,20 @@ func ToParquet() {
 			`
 		} else if table == "TimeAmendments" {
 			// weekEnding should be a string in the format YYYY-MM-DD
+			// pocketbase_id is already in the table derived from LEFT 15 characters of ID
 			query = `
 				COPY (
 					SELECT * EXCLUDE (committedWeekEnding, weekEnding, date),
-						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id,
 						CAST(committedWeekEnding AS VARCHAR) AS committedWeekEnding,
 						CAST(weekEnding AS VARCHAR) AS weekEnding,
 						CAST(date AS VARCHAR) AS date
 					FROM mysql_db.TimeAmendments
 				) TO 'parquet/TimeAmendments.parquet' (FORMAT PARQUET)
+			`
+		} else if table == "Expenses" {
+			// pocketbase_id is already in the table
+			query = `
+				COPY ( SELECT * FROM mysql_db.Expenses ) TO 'parquet/Expenses.parquet' (FORMAT PARQUET)
 			`
 		} else {
 			// Generic query for other tables, just adding pocketbase_id
