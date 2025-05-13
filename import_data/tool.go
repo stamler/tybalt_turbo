@@ -21,6 +21,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	_ "github.com/marcboeker/go-duckdb" // DuckDB driver (blank import for side-effect registration)
 	"github.com/pocketbase/dbx"
 	"google.golang.org/api/option"
@@ -31,6 +32,12 @@ import (
 // This file is used to run either an export or an import.
 
 func main() {
+	// Load environment variables
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+
 	// Parse command line arguments
 	exportFlag := flag.Bool("export", false, "Export data to Parquet files")
 	importFlag := flag.Bool("import", false, "Import data from Parquet files")
@@ -597,17 +604,17 @@ func main() {
 
 		// 1. setup the Google Cloud Storage client
 		ctx := context.Background()
-		gcsClient, err := storage.NewClient(ctx, option.WithCredentialsFile(gcsServiceAccountJSON))
+		gcsClient, err := storage.NewClient(ctx, option.WithCredentialsFile(os.Getenv("GCS_SERVICE_ACCOUNT_JSON")))
 		if err != nil {
 			log.Fatalf("Failed to create Google Cloud Storage client: %v", err)
 		}
 		defer gcsClient.Close()
-		_ = gcsClient.Bucket(gcsBucketName)
+		_ = gcsClient.Bucket(os.Getenv("GCS_BUCKET_NAME"))
 
 		// 2. setup the AWS S3 client
 		sess, err := session.NewSession(&aws.Config{
-			Region:      aws.String(awsRegion),
-			Credentials: credentials.NewStaticCredentials(accessKeyID, secretAccessKey, ""),
+			Region:      aws.String(os.Getenv("AWS_REGION")),
+			Credentials: credentials.NewStaticCredentials(os.Getenv("AWS_ACCESS_KEY_ID"), os.Getenv("AWS_SECRET_ACCESS_KEY"), ""),
 		})
 		if err != nil {
 			log.Fatalf("Failed to create AWS session: %v", err)
@@ -686,13 +693,13 @@ func main() {
 			gcsObjectPath := *info.Attachment
 			s3ObjectKey := *info.DestinationAttachment
 
-			log.Printf("Processing attachment: GCS: gs://%s/%s -> S3: s3://%s/%s", gcsBucketName, gcsObjectPath, awsS3BucketName, s3ObjectKey)
+			log.Printf("Processing attachment: GCS: gs://%s/%s -> S3: s3://%s/%s", os.Getenv("GCS_BUCKET_NAME"), gcsObjectPath, os.Getenv("AWS_S3_BUCKET_NAME"), s3ObjectKey)
 
 			//    1. download the attachment from Google Cloud Storage to the local file system
-			gcsObject := gcsClient.Bucket(gcsBucketName).Object(gcsObjectPath)
+			gcsObject := gcsClient.Bucket(os.Getenv("GCS_BUCKET_NAME")).Object(gcsObjectPath)
 			rc, err := gcsObject.NewReader(ctx)
 			if err != nil {
-				log.Printf("ERROR: Failed to create reader for GCS object gs://%s/%s: %v", gcsBucketName, gcsObjectPath, err)
+				log.Printf("ERROR: Failed to create reader for GCS object gs://%s/%s: %v", os.Getenv("GCS_BUCKET_NAME"), gcsObjectPath, err)
 				continue
 			}
 
@@ -712,7 +719,7 @@ func main() {
 			}
 
 			if _, err := io.Copy(localFile, rc); err != nil {
-				log.Printf("ERROR: Failed to download GCS object gs://%s/%s to %s: %v", gcsBucketName, gcsObjectPath, localTempFilePath, err)
+				log.Printf("ERROR: Failed to download GCS object gs://%s/%s to %s: %v", os.Getenv("GCS_BUCKET_NAME"), gcsObjectPath, localTempFilePath, err)
 				rc.Close()
 				localFile.Close()
 				os.Remove(localTempFilePath) // Attempt to clean up temp file
@@ -720,7 +727,7 @@ func main() {
 			}
 			rc.Close()
 			localFile.Close()
-			log.Printf("Successfully downloaded gs://%s/%s to %s", gcsBucketName, gcsObjectPath, localTempFilePath)
+			log.Printf("Successfully downloaded gs://%s/%s to %s", os.Getenv("GCS_BUCKET_NAME"), gcsObjectPath, localTempFilePath)
 
 			//    2. upload the file to AWS S3 using the destination_attachment path
 			fileToUpload, err := os.Open(localTempFilePath)
@@ -731,18 +738,18 @@ func main() {
 			}
 
 			_, err = s3Svc.PutObject(&s3.PutObjectInput{
-				Bucket: aws.String(awsS3BucketName),
+				Bucket: aws.String(os.Getenv("AWS_S3_BUCKET_NAME")),
 				Key:    aws.String(destinationCollectionId + "/" + s3ObjectKey),
 				Body:   fileToUpload,
 			})
 			fileToUpload.Close() // Close the file before attempting to remove it
 
 			if err != nil {
-				log.Printf("ERROR: Failed to upload %s to S3 bucket %s key %s: %v", localTempFilePath, awsS3BucketName, s3ObjectKey, err)
+				log.Printf("ERROR: Failed to upload %s to S3 bucket %s key %s: %v", localTempFilePath, os.Getenv("AWS_S3_BUCKET_NAME"), s3ObjectKey, err)
 				os.Remove(localTempFilePath) // Attempt to clean up temp file
 				continue
 			}
-			log.Printf("Successfully uploaded %s to S3 bucket %s key %s", localTempFilePath, awsS3BucketName, s3ObjectKey)
+			log.Printf("Successfully uploaded %s to S3 bucket %s key %s", localTempFilePath, os.Getenv("AWS_S3_BUCKET_NAME"), s3ObjectKey)
 
 			// Clean up the temporary file
 			if err := os.Remove(localTempFilePath); err != nil {
