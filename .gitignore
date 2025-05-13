@@ -13,4 +13,6 @@ app/pb_public/
 import_data/*.parquet
 import_data/*.duckdb
 import_data/parquet
+import_data/charade*.json
+import_data/temp_attachments/*
 .env
