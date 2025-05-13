@@ -597,7 +597,7 @@ func main() {
 
 		// 1. setup the Google Cloud Storage client
 		ctx := context.Background()
-		gcsClient, err := storage.NewClient(ctx, option.WithAPIKey(gcsAPIKey), option.WithCredentialsFile(gcsServiceAccountJSON))
+		gcsClient, err := storage.NewClient(ctx, option.WithCredentialsFile(gcsServiceAccountJSON))
 		if err != nil {
 			log.Fatalf("Failed to create Google Cloud Storage client: %v", err)
 		}
@@ -732,7 +732,7 @@ func main() {
 
 			_, err = s3Svc.PutObject(&s3.PutObjectInput{
 				Bucket: aws.String(awsS3BucketName),
-				Key:    aws.String(s3ObjectKey),
+				Key:    aws.String(destinationCollectionId + "/" + s3ObjectKey),
 				Body:   fileToUpload,
 			})
 			fileToUpload.Close() // Close the file before attempting to remove it
