@@ -584,6 +584,6 @@ func main() {
 	}
 
 	if *attachmentsFlag {
-		attachments.MigrateAttachments("./parquet/Expenses.parquet", "o1vpz1mm7qsfoyy")
+		attachments.MigrateAttachments("./parquet/Expenses.parquet", "attachment", "destination_attachment", "o1vpz1mm7qsfoyy")
 	}
 }
