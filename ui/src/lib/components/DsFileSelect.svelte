@@ -56,13 +56,20 @@
       {:else}
         <!-- The file is not stored on the server, so we can show the name but
         not link to it directly -->
-        <span>
+        <span class="flex items-center gap-1">
           {newFileName}
-          <Icon
-            icon="bxs:file-pdf"
-            width="24px"
-            class="inline-block text-neutral-500 hover:text-neutral-800"
-          />
+          <span class="flex gap-1 text-neutral-500 hover:text-neutral-800">
+            {#if newFileName.toLowerCase().endsWith(".pdf")}
+              <Icon icon="bxs:file-pdf" width="24px" />
+            {:else if newFileName.toLowerCase().endsWith(".jpeg") || newFileName
+                .toLowerCase()
+                .endsWith(".jpg")}
+              <Icon icon="simple-icons:jpeg" width="24px" />
+            {:else if newFileName.toLowerCase().endsWith(".png")}
+              <Icon icon="bxs:file-png" width="24px" />
+            {/if}
+            <!-- {newFileName} -->
+          </span>
         </span>
       {/if}
       <!-- use the 'as any' type assertion to tell the compiler that we know
