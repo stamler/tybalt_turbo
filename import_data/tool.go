@@ -524,11 +524,6 @@ func main() {
 		// Define the binder function for the Expense type
 		expenseBinder := func(item load.Expense) dbx.Params {
 			return dbx.Params{
-				// "payroll_id":            item.PayrollId,
-				// "breakfast":             item.Breakfast,
-				// "lunch":                 item.Lunch,
-				// "dinner":                item.Dinner,
-				// "lodging":               item.Lodging,
 				"purchase_order":        item.PurchaseOrderNumber, // This must change to id in the future
 				"uid":                   item.Uid,
 				"division":              item.Division,
