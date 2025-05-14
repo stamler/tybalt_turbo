@@ -79,6 +79,7 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 	var attachmentInfos []Attachment
 	// Initialize skippedAttachments here, before it's used in the Parquet processing loop
 	skippedAttachments := 0
+	parquetS3Keys := make(map[string]bool) // ADDED: map to store all S3 keys defined in Parquet
 
 	// Setup DuckDB
 	// The empty string for the DSN typically means an in-memory database for DuckDB.
@@ -126,7 +127,6 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 	log.Printf("Loading attachment rows from %s...", parquetPath)
 	processedRows := 0
 	for rows.Next() {
-		var a Attachment
 		var attachment, destAttachment string
 		if err := rows.Scan(&attachment, &destAttachment); err != nil {
 			log.Printf("Warning: Failed to scan row from DuckDB result: %v. Skipping row.", err)
@@ -136,21 +136,24 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 		// Construct the potential S3 key to check against pre-fetched list
 		if attachment != "" && destAttachment != "" {
 			s3ObjectFullPath := collectionId + "/" + destAttachment
+			parquetS3Keys[s3ObjectFullPath] = true // Mark this key as defined by Parquet
+
+			// Check if this Parquet-defined object already exists in S3
 			if _, exists := existingS3Objects[s3ObjectFullPath]; exists {
 				// Object already exists in S3, so skip adding it to attachmentInfos
 				skippedAttachments++ // We can count skipped items here as well
-				continue
+			} else {
+				// Object is in Parquet but NOT in S3. Add to attachmentInfos for upload.
+				// Both attachment (GCS path) and destAttachment (S3 key part) are guaranteed non-empty here.
+				currentAttachment := Attachment{
+					Attachment:            &attachment,
+					DestinationAttachment: &destAttachment,
+				}
+				attachmentInfos = append(attachmentInfos, currentAttachment)
 			}
-		}
-
-		if attachment != "" {
-			a.Attachment = &attachment
-		}
-		if destAttachment != "" {
-			a.DestinationAttachment = &destAttachment
-		}
-		if a.Attachment != nil { // Only add if it's a valid attachment and not skipped
-			attachmentInfos = append(attachmentInfos, a)
+		} else {
+			// Log if essential parts for forming an S3 key or identifying a GCS source are missing
+			log.Printf("Warning: Skipping row from Parquet due to missing GCS source ('%s') or S3 destination part ('%s').", attachment, destAttachment)
 		}
 		processedRows++
 	}
@@ -179,14 +182,6 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 		gcsObjectPath := *info.Attachment
 		s3ObjectKey := *info.DestinationAttachment // s3ObjectFullPath was used for check, use s3ObjectKey for PutObject's Key
 		s3ObjectFullPathForUpload := collectionId + "/" + s3ObjectKey
-
-		// The check for S3 existence is no longer needed here as attachmentInfos is pre-filtered.
-		// if _, exists := existingS3Objects[s3ObjectFullPath]; exists {
-		// // Object exists, skip everything for this attachment
-		// skippedAttachments++
-		// log.Printf("S3 Progress: %d uploaded + %d skipped / %d total (Object %s already exists)", uploadedAttachments, skippedAttachments, totalAttachmentsToUpload, s3ObjectFullPath)
-		// continue // Skip to the next attachment
-		// }
 
 		// Object does not exist in our pre-fetched list, proceed with download and upload.
 
@@ -231,48 +226,6 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 			continue
 		}
 
-		// Check if the object already exists in S3 using the pre-fetched list
-		// s3ObjectFullPath := collectionId + "/" + s3ObjectKey // Defined earlier
-		// if _, exists := existingS3Objects[s3ObjectFullPath]; exists {
-		// Object exists, clean up temp file and skip upload
-		// skippedAttachments++
-		// log.Printf("S3 Progress: %d uploaded + %d skipped / %d total (Object %s already exists)", uploadedAttachments, skippedAttachments, totalAttachmentsToUpload, s3ObjectFullPath)
-		// fileToUpload.Close()
-		// os.Remove(localTempFilePath) // Clean up temp file
-		// continue
-		// }
-		// Object does not exist in our pre-fetched list, proceed with upload attempt.
-		// The original HeadObject call and its error handling logic below can be removed or commented out.
-
-		// Check if the object already exists in S3
-		// headObjectInput := &s3.HeadObjectInput{
-		// 	Bucket: aws.String(os.Getenv("AWS_S3_BUCKET_NAME")),
-		// 	Key:    aws.String(collectionId + "/" + s3ObjectKey),
-		// }
-
-		// _, err = s3Svc.HeadObject(headObjectInput)
-		// if err == nil {
-		// 	// Object exists, clean up temp file and skip upload
-		// 	skippedAttachments++
-		// 	log.Printf("S3 Progress: %d uploaded + %d skipped / %d total (Object %s already exists)", uploadedAttachments, skippedAttachments, totalAttachmentsToUpload, s3ObjectFullPath)
-		// 	fileToUpload.Close()
-		// 	os.Remove(localTempFilePath) // Clean up temp file
-		// 	continue
-		// } else {
-		// 	// Check if the error is because the object was not found
-		// 	if aerr, ok := err.(awserr.Error); ok {
-		// 		if aerr.Code() != s3.ErrCodeNoSuchKey && aerr.Code() != "NotFound" {
-		// 			// An unexpected error occurred with HeadObject, other than "NotFound"
-		// 			log.Printf("ERROR: Failed to check S3 object existence for key %s: %v. Proceeding with upload attempt.", s3ObjectKey, err)
-		// 			// Depending on policy, you might choose to not proceed or handle differently
-		// 		}
-		// 		// If err is "NotFound" or s3.ErrCodeNoSuchKey, we continue to PutObject
-		// 	} else {
-		// 		// Non-AWS error, log it and proceed with upload attempt cautiously
-		// 		log.Printf("ERROR: Unexpected error type checking S3 object existence for key %s: %v. Proceeding with upload attempt.", s3ObjectKey, err)
-		// 	}
-		// }
-
 		_, err = s3Svc.PutObject(&s3.PutObjectInput{
 			Bucket: aws.String(os.Getenv("AWS_S3_BUCKET_NAME")),
 			Key:    aws.String(s3ObjectFullPathForUpload), // Use s3ObjectFullPathForUpload here
@@ -296,5 +249,42 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 		existingS3Objects[s3ObjectFullPathForUpload] = true
 		log.Printf("S3 Progress: %d uploaded %d total", uploadedAttachments, totalAttachmentsToUpload)
 	}
+
+	// --- Deletion Phase: Remove S3 objects not found in the Parquet file ---
+	log.Println("Starting S3 deletion phase for objects not in Parquet file...")
+	objectsToDelete := []string{}
+	// Iterate over all objects found in S3 for the given collectionId
+	for s3KeyInBucket := range existingS3Objects {
+		// Check if this S3 object (which includes collectionId prefix) is in our map of Parquet-defined keys
+		if _, foundInParquet := parquetS3Keys[s3KeyInBucket]; !foundInParquet {
+			// This S3 object was not listed in the Parquet source, so it should be deleted.
+			objectsToDelete = append(objectsToDelete, s3KeyInBucket)
+		}
+	}
+
+	if len(objectsToDelete) > 0 {
+		log.Printf("Found %d S3 objects to delete (not present in Parquet specification under collectionId %s).", len(objectsToDelete), collectionId)
+		deletedCount := 0
+		for i, s3KeyToDelete := range objectsToDelete {
+			// s3KeyToDelete already includes the collectionId prefix, e.g., "collectionId/objectName.txt"
+			log.Printf("Deleting S3 object %d/%d: s3://%s/%s", i+1, len(objectsToDelete), os.Getenv("AWS_S3_BUCKET_NAME"), s3KeyToDelete)
+			_, err := s3Svc.DeleteObject(&s3.DeleteObjectInput{
+				Bucket: aws.String(os.Getenv("AWS_S3_BUCKET_NAME")),
+				Key:    aws.String(s3KeyToDelete), // Key is the full path within the bucket
+			})
+			if err != nil {
+				log.Printf("ERROR: Failed to delete S3 object %s: %v", s3KeyToDelete, err)
+				// Depending on policy, you might choose to not proceed or stop on error
+			} else {
+				deletedCount++
+				// Log for each successful deletion can be verbose, summary log is preferred.
+				// log.Printf("Successfully deleted S3 object %s", s3KeyToDelete)
+			}
+		}
+		log.Printf("Deletion phase complete. Successfully deleted %d of %d targeted S3 objects.", deletedCount, len(objectsToDelete))
+	} else {
+		log.Printf("No S3 objects found for deletion under collectionId %s (all existing S3 objects are specified in Parquet or the bucket was empty for this prefix).", collectionId)
+	}
+	// --- End Deletion Phase ---
 
 }
