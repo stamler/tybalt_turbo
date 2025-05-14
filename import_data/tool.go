@@ -8,6 +8,7 @@ import (
 	"imports/extract"
 	"imports/load"
 	"log"
+	"path"
 	"strings"
 	"time"
 
@@ -16,6 +17,8 @@ import (
 	_ "github.com/marcboeker/go-duckdb" // DuckDB driver (blank import for side-effect registration)
 	"github.com/pocketbase/dbx"
 )
+
+var expenseCollectionId = "o1vpz1mm7qsfoyy"
 
 // This file is used to run either an export or an import.
 
@@ -396,6 +399,7 @@ func main() {
 		// Define the binder function for the TimeAmendment type
 		timeAmendmentBinder := func(item load.TimeAmendment) dbx.Params {
 			return dbx.Params{
+				"id":                    item.Id,
 				"division":              item.Division,
 				"uid":                   item.User,
 				"hours":                 item.Hours,
@@ -451,6 +455,7 @@ func main() {
 		// --- Load Expenses ---
 		// Define the specific SQL for the expenses table
 		expenseInsertSQL := `INSERT INTO expenses (
+			id,
 			uid,
 			division,
 			job,
@@ -473,6 +478,7 @@ func main() {
 			committed,
 			committed_week_ending
 		) VALUES (
+			{:id},
 			{:uid},
 			{:division},
 			{:job},
@@ -524,20 +530,26 @@ func main() {
 		// Define the binder function for the Expense type
 		expenseBinder := func(item load.Expense) dbx.Params {
 			return dbx.Params{
-				"purchase_order":        item.PurchaseOrderNumber, // This must change to id in the future
-				"uid":                   item.Uid,
-				"division":              item.Division,
-				"job":                   item.Job,
-				"category":              item.Category,
-				"date":                  item.Date,
-				"pay_period_ending":     item.PayPeriodEnding,
-				"description":           item.Description,
-				"vendor":                item.Vendor,
-				"distance":              item.Distance,
-				"allowance_types":       createAllowanceTypes(item),
-				"total":                 item.Total,
-				"payment_type":          item.PaymentType,
-				"attachment":            item.Attachment,
+				"id":                item.Id,
+				"purchase_order":    item.PurchaseOrderNumber, // This must change to id in the future
+				"uid":               item.Uid,
+				"division":          item.Division,
+				"job":               item.Job,
+				"category":          item.Category,
+				"date":              item.Date,
+				"pay_period_ending": item.PayPeriodEnding,
+				"description":       item.Description,
+				"vendor":            item.Vendor,
+				"distance":          item.Distance,
+				"allowance_types":   createAllowanceTypes(item),
+				"total":             item.Total,
+				"payment_type":      item.PaymentType,
+				"attachment": func() string {
+					if item.Attachment == "" {
+						return "" // otherwise path.Base will return "."
+					}
+					return path.Base(item.Attachment)
+				}(),
 				"cc_last_4_digits":      item.CCLast4Digits,
 				"approver":              item.Approver,
 				"approved":              nowString,
@@ -579,6 +591,6 @@ func main() {
 	}
 
 	if *attachmentsFlag {
-		attachments.MigrateAttachments("./parquet/Expenses.parquet", "attachment", "destination_attachment", "o1vpz1mm7qsfoyy")
+		attachments.MigrateAttachments("./parquet/Expenses.parquet", "attachment", "destination_attachment", expenseCollectionId)
 	}
 }
