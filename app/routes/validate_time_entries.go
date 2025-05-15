@@ -246,13 +246,21 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 		}
 	}
 
-	// return an error if openingDate is not a Sunday
-	if openingDateAsTime.Weekday() != time.Sunday {
-		return &CodeError{
-			Code:    "opening_date_not_sunday",
-			Message: "opening_date on your admin_profile must be a Sunday, contact support",
-		}
-	}
+	// return an error if openingDate is not a Sunday (is this necessary?, why
+	// can't it be any other day of the week?). In original Tybalt,
+	// openingDateTimeOff was a Saturday at 11:59:59 PM UNLESS it hadn't yet been
+	// set upon profile creation. In that case, it was the moment the profile was
+	// created. Logically it makes sense to require that the opening_date is a
+	// Sunday because it's the opening balance in a given payroll period and
+	// Sunday is the first day of a payroll period. However since the opening
+	// values for OV and OP are set to zero by default, it won't matter what the
+	// opening_date is. So we will comment out this check.
+	// if openingDateAsTime.Weekday() != time.Sunday {
+	// 	return &CodeError{
+	// 		Code:    "opening_date_not_sunday",
+	// 		Message: "opening_date on your admin_profile must be a Sunday, contact support",
+	// 	}
+	// }
 
 	// return an error if weekEnding is not a valid date in the format
 	// "2006-01-02"
