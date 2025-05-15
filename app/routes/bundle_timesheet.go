@@ -76,12 +76,12 @@ func createBundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error
 				return fmt.Errorf("error fetching user's admin profile: %v", err)
 			}
 
-			// the payroll_year_end_dates collection stores the dates representing the
-			// moment when the PPTO and Vacation balances are reset each year. It is
-			// the last Saturday of the year. The most recent record from this
+			// the payroll_year_end_dates collection stores the dates after which
+			// the PPTO and Vacation balances are reset each year. They are the last
+			// Saturdays of their respective years. The most recent record from this
 			// collection that is less than the weekEnding of the new timesheet is
 			// used to validate the time entries for the new timesheet.This
-			// payroll_year_end_dates date must be less than or equal to the
+			// payroll_year_end_dates date (a Saturday) must be less than the (Sunday)
 			// opening_date value in the admin_profile. If it isn't, then the opening
 			// balances are out of date and the timesheet cannot be submitted until
 			// the opening balances are updated by accounting. This is to prevent the

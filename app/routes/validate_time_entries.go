@@ -276,10 +276,10 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 		}
 	}
 
-	// Each timesheet submission is checked against the most payrollYearEndDate
+	// Each timesheet submission is checked against the most recent payrollYearEndDate
 	// that is less than the weekEnding of that timesheet. The actual value is
 	// passed as an argument to this function. This most recent date must be less
-	// than or equal to the opening_date value in the admin_profile. If it isn't,
+	// than the opening_date value in the admin_profile. If it isn't,
 	// then the opening balances are out of date and the timesheet cannot be
 	// submitted until the opening balances are updated by accounting. This is to
 	// prevent the user from claiming expired time off from a previous year on a
