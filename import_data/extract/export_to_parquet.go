@@ -15,7 +15,7 @@ import (
 
 // The tablesToDump variable is used to specify the tables that should be
 // exported to Parquet format.
-var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "Profiles", "Jobs"}
+var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs"}
 
 func ToParquet() {
 	err := godotenv.Load()
@@ -167,6 +167,11 @@ func ToParquet() {
 			query = `
 				COPY ( SELECT * FROM mysql_db.Expenses ) TO 'parquet/Expenses.parquet' (FORMAT PARQUET)
 			`
+		} else if table == "MileageResetDates" {
+			// pocketbase_id is already in the table
+			query = `
+				COPY ( SELECT pocketbase_id, CAST(date AS VARCHAR) AS date FROM mysql_db.MileageResetDates ) TO 'parquet/MileageResetDates.parquet' (FORMAT PARQUET)
+				`
 		} else {
 			// Generic query for other tables, just adding pocketbase_id
 			query = fmt.Sprintf(`

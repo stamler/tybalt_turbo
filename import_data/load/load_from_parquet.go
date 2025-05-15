@@ -200,6 +200,11 @@ type UserClaim struct {
 	Cid string `parquet:"cid"`
 }
 
+type MileageResetDate struct {
+	Id   string `parquet:"pocketbase_id"`
+	Date string `parquet:"date"`
+}
+
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
 // T: The struct type corresponding to the Parquet file schema.
 // parquetFilePath: Path to the input Parquet file.

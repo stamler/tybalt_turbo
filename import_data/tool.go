@@ -588,6 +588,21 @@ func main() {
 			userClaimInsertSQL, // The specific INSERT SQL
 			userClaimBinder,    // The specific binder function
 		)
+
+		// --- Load MileageResetDates ---
+		// Define the specific SQL for the mileage_reset_dates table
+		load.FromParquet(
+			"./parquet/MileageResetDates.parquet",
+			"../app/test_pb_data/data.db",
+			"mileage_reset_dates", // Table name (for logging)
+			`INSERT INTO mileage_reset_dates (id, date) VALUES ({:id}, {:date})`,
+			func(item load.MileageResetDate) dbx.Params {
+				return dbx.Params{
+					"id":   item.Id,
+					"date": item.Date,
+				}
+			},
+		)
 	}
 
 	if *attachmentsFlag {
