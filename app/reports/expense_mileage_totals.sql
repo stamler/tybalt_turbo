@@ -19,32 +19,28 @@ base AS (
     e.id,
     e.uid,
     e.date,
-    r.date AS reset_mileage_date,
-    -- interval start = cumulative distance - this row's distance
-    SUM(e.distance) OVER (
-      PARTITION BY e.uid, r.date
-      ORDER BY e.date
-    ) - e.distance AS start_distance,
+    -- This ends up being faster than joining to mileage_reset_dates
+    (
+      SELECT MAX(r.date)
+      FROM mileage_reset_dates r
+      WHERE r.date <= e.date
+    ) AS reset_mileage_date,
     e.distance,
     -- interval end = cumulative distance
     SUM(e.distance) OVER (
-      PARTITION BY e.uid, r.date
+      PARTITION BY e.uid, (
+        SELECT MAX(r.date)
+        FROM mileage_reset_dates r
+        WHERE r.date <= e.date
+      )
       ORDER BY e.date
     ) AS end_distance,
-    m.effective_date
+    (
+      SELECT MAX(m.effective_date)
+      FROM expense_rates m
+      WHERE m.effective_date <= e.date
+    ) AS effective_date
   FROM expenses e
-  INNER JOIN mileage_reset_dates r
-    ON r.date = (
-      SELECT MAX(r2.date)
-      FROM mileage_reset_dates r2
-      WHERE r2.date <= e.date
-    )
-  INNER JOIN expense_rates m
-    ON m.effective_date = (
-      SELECT MAX(m2.effective_date)
-      FROM expense_rates m2
-      WHERE m2.effective_date <= e.date
-    )
   WHERE e.payment_type = 'Mileage'
 ),
 
@@ -59,16 +55,16 @@ of rows in overlaps can be more than the number of rows in expenses.
 overlaps AS (
   SELECT
     b.id,
-    b.start_distance,
+    b.end_distance - b.distance AS start_distance,
     b.end_distance,
     r.tier_lower,
-    r.tier_upper,
+    COALESCE(r.tier_upper, 1e9) AS tier_upper,
     r.tier_rate
   FROM base b
   JOIN rates_expanded r
     ON r.effective_date = b.effective_date
   WHERE b.end_distance > r.tier_lower
-    AND (r.tier_upper IS NULL OR b.start_distance < r.tier_upper)
+    AND (r.tier_upper IS NULL OR (b.end_distance - b.distance) < r.tier_upper)
 ),
 
 /*
@@ -87,15 +83,10 @@ for each expense × tier row, compute how many kilometres of the expense fall in
 tier_calcs AS (
   SELECT
     id,
-    CASE
-      WHEN tier_upper IS NULL THEN
-        max(0, end_distance - max(start_distance, tier_lower))
-      ELSE
-        max(0,
-          min(end_distance, tier_upper)
-          - max(start_distance, tier_lower)
-        )
-    END AS overlap_km,
+    max(0,
+      min(end_distance, tier_upper)
+      - max(start_distance, tier_lower)
+    ) AS overlap_km,
     tier_rate
   FROM overlaps
 )
