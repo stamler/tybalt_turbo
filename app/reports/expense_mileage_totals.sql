@@ -93,13 +93,19 @@ tier_calcs AS (
 
 -- 5) Sum up reimbursement per expense
 SELECT
-  b.*,
-  COALESCE(
+  b.id,
+  b.uid,
+  b.date,
+  b.reset_mileage_date,
+  b.distance,
+  b.end_distance AS cumulative,
+  b.effective_date,
+  ROUND(COALESCE(
     -- sum up this expense’s (overlap × rate) directly
     (SELECT SUM(overlap_km * tier_rate)
      FROM tier_calcs tc
      WHERE tc.id = b.id),
     0
-  ) AS mileage_total
+  ), 2) AS mileage_total
 FROM base b
 ORDER BY b.date;
