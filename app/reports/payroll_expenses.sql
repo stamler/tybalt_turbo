@@ -5,12 +5,12 @@ SELECT ap.payroll_id payrollId,
   j.number "Job #",
   c.name Client,
   j.description "Job Description",
-  d.name "Div",
+  d.code "Div",
   -- get the last two digits of the date
-  SUBSTRING(e2.date, 9, 2) Date,
+  CAST(SUBSTRING(e2.date, 9, 2) AS INTEGER) Date,
   substr('  JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', e2.date) * 3, 3) Month,
-  SUBSTRING(e2.date, 1, 4) Year,
-  ROUND(e2.merged_total - ROUND(e2.merged_total * 13 / 113, 2),2) calculatedSubtotal,
+  CAST(SUBSTRING(e2.date, 1, 4) AS INTEGER) Year,
+  ROUND(e2.merged_total - ROUND(e2.merged_total * 13 / 113, 2), 2) calculatedSubtotal,
   ROUND(e2.merged_total * 13 / 113, 2) calculatedOntarioHST,
   e2.merged_total Total,
   po.po_number "PO#",
@@ -35,11 +35,11 @@ SELECT e.id,
   e.cc_last_4_digits,
   e.purchase_order,
   e.vendor,
-  CASE
+  CAST(CASE
     WHEN e.payment_type = "Mileage" THEN m.mileage_total
     WHEN e.payment_type = "Allowance" OR e.payment_type = "Meals" THEN a.allowance_total
     ELSE e.total
-  END merged_total,
+  END AS REAL) merged_total,
   CASE
     WHEN e.payment_type = "Allowance" OR e.payment_type = "Meals" THEN a.allowance_description
     ELSE e.description
@@ -157,13 +157,13 @@ LEFT JOIN (
     b.distance,
     b.end_distance AS cumulative,
     b.effective_date,
-    ROUND(COALESCE(
+    COALESCE(
       -- sum up this expense’s (overlap × rate) directly
       (SELECT SUM(overlap_km * tier_rate)
       FROM tier_calcs tc
       WHERE tc.id = b.id),
       0
-    ), 2) AS mileage_total
+    ) AS mileage_total
   FROM base b
 ) m ON m.id = e.id
 LEFT JOIN (

@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define source and destination directories
-SOURCE_DIR="new_unmodified"
-DEST_DIR="new_preprocessed"
+SOURCE_DIR="old_unmodified"
+DEST_DIR="old_preprocessed"
 
 # Check if source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -30,10 +30,10 @@ for file in "$DEST_DIR"/*.csv; do
   if [ -f "$file" ]; then
     echo "Processing $file..."
     # Apply transformations
-    perl -i -pe 's/(?<=^|,)(?!")((?!(?:TRUE|FALSE)(?:,|$))[^",\r\n]*[A-Za-z_][^",\r\n]*)(?=,|$)/"\1"/g' "$file"
-    sed -i '' 's/,TRUE/,true/g' "$file"
-    sed -i '' 's/,FALSE/,false/g' "$file"
-    sed -i '' 's/,,/,"",/g' "$file"
+    sed -i '' 's/Dinner "/Dinner"/g' "$file"
+    sed -i '' 's/Lunch "/Lunch"/g' "$file"
+    sed -i '' 's/Breakfast "/Breakfast"/g' "$file"
+    sed -i '' 's/Lodging "/Lodging"/g' "$file"
   fi
 done
 
