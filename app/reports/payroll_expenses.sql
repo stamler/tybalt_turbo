@@ -36,12 +36,12 @@ SELECT e.id,
   e.purchase_order,
   e.vendor,
   CAST(CASE
-    WHEN e.payment_type = "Mileage" THEN m.mileage_total
-    WHEN e.payment_type = "Allowance" OR e.payment_type = "Meals" THEN a.allowance_total
+    WHEN e.payment_type = 'Mileage' THEN m.mileage_total
+    WHEN e.payment_type = 'Allowance' OR e.payment_type = 'Meals' THEN a.allowance_total
     ELSE e.total
   END AS REAL) merged_total,
   CASE
-    WHEN e.payment_type = "Allowance" OR e.payment_type = "Meals" THEN a.allowance_description
+    WHEN e.payment_type = 'Allowance' OR e.payment_type = 'Meals' THEN a.allowance_description
     ELSE e.description
   END merged_description
 FROM Expenses e
@@ -157,13 +157,13 @@ LEFT JOIN (
     b.distance,
     b.end_distance AS cumulative,
     b.effective_date,
-    COALESCE(
+    ROUND(COALESCE(
       -- sum up this expense’s (overlap × rate) directly
       (SELECT SUM(overlap_km * tier_rate)
       FROM tier_calcs tc
       WHERE tc.id = b.id),
       0
-    ) AS mileage_total
+    ), 2) AS mileage_total
   FROM base b
 ) m ON m.id = e.id
 LEFT JOIN (
