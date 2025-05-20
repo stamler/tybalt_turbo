@@ -10,7 +10,7 @@ SELECT ap.payroll_id payrollId,
   SUBSTRING(e2.date, 9, 2) Date,
   substr('  JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', e2.date) * 3, 3) Month,
   SUBSTRING(e2.date, 1, 4) Year,
-  e2.merged_total - ROUND(e2.merged_total * 13 / 113, 2) calculatedSubtotal,
+  ROUND(e2.merged_total - ROUND(e2.merged_total * 13 / 113, 2),2) calculatedSubtotal,
   ROUND(e2.merged_total * 13 / 113, 2) calculatedOntarioHST,
   e2.merged_total Total,
   po.po_number "PO#",
@@ -150,14 +150,20 @@ LEFT JOIN (
 
   -- 5) Sum up reimbursement per expense
   SELECT
-    b.*,
-    COALESCE(
+    b.id,
+    b.uid,
+    b.date,
+    b.reset_mileage_date,
+    b.distance,
+    b.end_distance AS cumulative,
+    b.effective_date,
+    ROUND(COALESCE(
       -- sum up this expense’s (overlap × rate) directly
       (SELECT SUM(overlap_km * tier_rate)
       FROM tier_calcs tc
       WHERE tc.id = b.id),
       0
-    ) AS mileage_total
+    ), 2) AS mileage_total
   FROM base b
 ) m ON m.id = e.id
 LEFT JOIN (
