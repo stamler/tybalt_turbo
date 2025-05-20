@@ -31,7 +31,7 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 	splitQuery := `
 		-- Load Expenses.parquet into a table called expenses
 		CREATE TABLE expenses AS
-		SELECT *, TRIM(po) AS t_po FROM read_parquet('parquet/Expenses.parquet');
+		SELECT *, regexp_replace(po, '^[^0-9]+|[^0-9]+$', '', 'g') AS t_po FROM read_parquet('parquet/Expenses.parquet');
 
 		-- Create the purchase_orders table, removing duplicate names
 		CREATE TABLE purchase_orders AS

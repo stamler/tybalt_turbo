@@ -188,6 +188,7 @@ type Expense struct {
 	Attachment          string    `parquet:"destination_attachment"`
 	CCLast4Digits       string    `parquet:"ccLast4Digits_string"`
 	PurchaseOrderNumber string    `parquet:"po"`
+	PurchaseOrderId     string    `parquet:"purchase_order_id"`
 	Approver            string    `parquet:"pocketbase_approver_uid"`
 	Approved            string    `parquet:"approved"`
 	Committer           string    `parquet:"pocketbase_commit_uid"`
@@ -203,6 +204,11 @@ type UserClaim struct {
 type MileageResetDate struct {
 	Id   string `parquet:"pocketbase_id"`
 	Date string `parquet:"date"`
+}
+
+type PurchaseOrder struct {
+	Id       string `parquet:"id"`
+	PoNumber string `parquet:"number"`
 }
 
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.

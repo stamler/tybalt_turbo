@@ -452,6 +452,21 @@ func main() {
 			vendorBinder,    // The specific binder function
 		)
 
+		// --- Load Purchase Orders ---
+		// Define the specific SQL for the purchase_orders table
+		load.FromParquet(
+			"./parquet/purchase_orders.parquet",
+			"../app/test_pb_data/data.db",
+			"purchase_orders", // Table name (for logging)
+			`INSERT INTO purchase_orders (id, po_number, type, status, closed_by_system, description) VALUES ({:id}, {:po_number}, 'Normal', 'Closed', 1, 'Imported from Firebase Expenses')`,
+			func(item load.PurchaseOrder) dbx.Params {
+				return dbx.Params{
+					"id":        item.Id,
+					"po_number": item.PoNumber,
+				}
+			},
+		)
+
 		// --- Load Expenses ---
 		// Define the specific SQL for the expenses table
 		expenseInsertSQL := `INSERT INTO expenses (
@@ -531,7 +546,7 @@ func main() {
 		expenseBinder := func(item load.Expense) dbx.Params {
 			return dbx.Params{
 				"id":                item.Id,
-				"purchase_order":    item.PurchaseOrderNumber, // This must change to id in the future
+				"purchase_order":    item.PurchaseOrderId,
 				"uid":               item.Uid,
 				"division":          item.Division,
 				"job":               item.Job,
