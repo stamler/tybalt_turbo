@@ -196,8 +196,10 @@ func ToParquet() {
 	jobsToClientsAndContacts()
 
 	// Normalize the Expenses.parquet data by creating Vendors.parquet and
-	// updating Expenses.parquet to reference vendors via foreign keys.
+	// purchase_orders.parquet and updating Expenses.parquet to reference
+	// vendors and purchase_orders via foreign keys.
 	expensesToVendors()
+	expensesToPurchaseOrders()
 
 	// Dump the pre-populated tables from the sqlite test database.
 	sqliteTableDumps("../app/test_pb_data/data.db", "divisions")
