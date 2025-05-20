@@ -14,6 +14,12 @@
     const fileName = `payroll_time_report_${weekEnding}_week${week}.csv`;
     await downloadCSV(url, fileName);
   }
+
+  async function fetchExpenseReport(payrollEnding: string) {
+    const url = `${pb.baseUrl}/api/reports/payroll_expense/${payrollEnding}`;
+    const fileName = `payroll_expense_report_${payrollEnding}.csv`;
+    await downloadCSV(url, fileName);
+  }
 </script>
 
 {#snippet anchor({ week_ending }: TimeReportWeekEndingsResponse)}
@@ -36,6 +42,13 @@
     }}
     title="Week 2"
     color="orange">Week 2</DsActionButton
+  >
+  <DsActionButton
+    action={() => {
+      fetchExpenseReport(week_ending);
+    }}
+    title="Expense Report"
+    color="orange">Expenses</DsActionButton
   >
 {/snippet}
 

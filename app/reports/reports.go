@@ -13,6 +13,9 @@ import (
 //go:embed payroll_time.sql
 var payrollTimeQuery string
 
+//go:embed payroll_expenses.sql
+var payrollExpensesQuery string
+
 // CreatePayrollTimeReportHandler returns a function that creates a payroll time report for a given week
 func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -63,9 +66,25 @@ func CreatePayrollExpenseReportHandler(app core.App) func(e *core.RequestEvent) 
 			return err
 		}
 
-		// TODO: Implement the logic to create the payroll expense report
+		// Execute the query
+		var report []dbx.NullStringMap // TODO: make a type for this
+		err = app.DB().NewQuery(payrollExpensesQuery).Bind(dbx.Params{
+			"pay_period_ending": payrollEndingDate.Format("2006-01-02"),
+		}).All(&report)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
+		}
 
-		return e.JSON(http.StatusOK, map[string]any{"message": "Payroll expense report for " + payrollEndingDate.Format("2006-01-02")})
+		// convert the report to a csv string
+		headers := []string{"payrollId", "Acct/Visa/Exp", "Job #", "Client", "Job Description", "Div", "Date", "Month", "Year", "calculatedSubtotal", "calculatedOntarioHST", "Total", "PO#", "Description", "Company", "Employee", "Approved By"}
+		csvString, err := convertToCSV(report, headers)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to generate CSV report: "+err.Error(), err)
+		}
+
+		// Set content type and return the CSV string
+		e.Response.Header().Set("Content-Type", "text/csv")
+		return e.String(http.StatusOK, csvString)
 	}
 }
 
