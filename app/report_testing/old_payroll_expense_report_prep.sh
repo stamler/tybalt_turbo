@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define source and destination directories
-SOURCE_DIR="old_unmodified"
-DEST_DIR="old_preprocessed"
+SOURCE_DIR="expenses/old_unmodified"
+DEST_DIR="expenses/old_preprocessed"
 
 # Check if source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
