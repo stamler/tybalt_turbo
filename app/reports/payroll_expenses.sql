@@ -98,6 +98,7 @@ LEFT JOIN (
       ) AS effective_date
     FROM expenses e
     WHERE e.payment_type = 'Mileage'
+      AND e.committed != ''
       AND e.uid IN (
         SELECT DISTINCT ee.uid
         FROM expenses ee
@@ -216,8 +217,10 @@ LEFT JOIN (
   LEFT JOIN expense_rates r ON ((r.effective_date = (SELECT MAX(i.effective_date) FROM expense_rates i WHERE (i.effective_date <= e.date))))
   WHERE e.payment_type IN ('Allowance','Meals')
   AND e.pay_period_ending = {:pay_period_ending}
+  AND e.committed != ''
 ) a ON a.id = e.id
 WHERE e.pay_period_ending = {:pay_period_ending}
+AND e.committed != ''
 ) AS e2
 LEFT JOIN admin_profiles ap ON ap.uid = e2.uid
 LEFT JOIN profiles p ON p.uid = e2.uid

@@ -1,6 +1,4 @@
--- WIP, built somewhat from scratch against SQLite.
--- The payroll report for a specific week
--- TODO: fold in time_amendments
+-- The payroll report for a specific weekEnding
 
 SELECT payrollId,
   weekEnding,
@@ -68,12 +66,15 @@ FROM (
     ts.salary salary,
     ts.work_week_hours workWeekHours
   FROM time_entries te
-  lEFT JOIN time_sheets ts ON te.tsid = ts.id
+  LEFT JOIN time_sheets ts ON te.tsid = ts.id
   LEFT JOIN admin_profiles ap ON ap.uid = te.uid 
   LEFT JOIN profiles p ON p.uid = te.uid
   LEFT JOIN profiles pm ON pm.uid = ts.approver
   LEFT JOIN time_types tt ON te.time_type = tt.id 
   WHERE te.week_ending = {:weekEnding}
+  -- Ensure the time entry belongs to a committed timesheet
+  AND te.tsid != ''
+  AND ts.committed != ''
 
   UNION ALL
 
@@ -115,10 +116,12 @@ FROM (
     FROM (
       SELECT DISTINCT uid, committed_week_ending, week_ending
       FROM time_amendments
+      WHERE time_amendments.committed != ''
     ) DistinctTriplets
     GROUP BY uid, committed_week_ending
   ) y ON ta.uid = y.uid AND ta.committed_week_ending = y.committed_week_ending
   WHERE ta.committed_week_ending = {:weekEnding}
+  AND ta.committed != ''
 )
 GROUP BY payrollId
 ORDER BY LENGTH(payrollId), payrollId
