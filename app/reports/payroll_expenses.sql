@@ -69,13 +69,13 @@ LEFT JOIN (
     CROSS JOIN json_each(m.mileage) AS t
   ),
 
-  -- 2) Base: compute cumulative & interval boundaries
-  base AS (
+  -- 2) Calculate cumulative mileage for relevant users, then filter to pay period
+  CumulativeMileage AS (
     SELECT
       e.id,
       e.uid,
       e.date,
-      -- This ends up being faster than joining to mileage_reset_dates
+      e.pay_period_ending, -- Keep this to filter on later
       (
         SELECT MAX(r.date)
         FROM mileage_reset_dates r
@@ -98,7 +98,24 @@ LEFT JOIN (
       ) AS effective_date
     FROM expenses e
     WHERE e.payment_type = 'Mileage'
-    AND e.pay_period_ending = {:pay_period_ending}
+      AND e.uid IN (
+        SELECT DISTINCT ee.uid
+        FROM expenses ee
+        WHERE ee.payment_type = 'Mileage' AND ee.pay_period_ending = {:pay_period_ending}
+      )
+  ),
+
+  base AS (
+    SELECT
+      cm.id,
+      cm.uid,
+      cm.date,
+      cm.reset_mileage_date,
+      cm.distance,
+      cm.end_distance,
+      cm.effective_date
+    FROM CumulativeMileage cm
+    WHERE cm.pay_period_ending = {:pay_period_ending}
   ),
 
   /* 
@@ -210,4 +227,4 @@ LEFT JOIN jobs j ON j.id = e2.job
 LEFT JOIN clients c ON c.id = j.client
 LEFT JOIN purchase_orders po ON po.id = e2.purchase_order
 LEFT JOIN vendors v ON v.id = e2.vendor
-ORDER BY e2.date
+ORDER BY e2.date, ap.payroll_id, e2.merged_total

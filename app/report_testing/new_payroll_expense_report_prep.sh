@@ -32,8 +32,7 @@ for file in "$DEST_DIR"/*.csv; do
     # Apply transformations
     # perl -i -pe 's/(?<=^|,)(?!")([^",\r\n]*[A-Za-z_][^",\r\n]*)(?=,|$)/"\1"/g' "$file"
     perl -i -pe 's/(?<=^|,)(?!")((?!(?:\d+(?:\.\d+)?)(?=,|$))[^",\r\n]+)(?=,|$)/"\1"/g' "$file"
-
-
+    sed -i '' 's/Joseph Za/Joe Za/g' "$file"
   fi
 done
 
