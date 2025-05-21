@@ -2,6 +2,7 @@ package reports
 
 import (
 	_ "embed" // Needed for //go:embed
+	"fmt"
 	"net/http"
 	"time"
 	"tybalt/constants"
@@ -10,11 +11,16 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+var expenseCollectionId = "o1vpz1mm7qsfoyy"
+
 //go:embed payroll_time.sql
 var payrollTimeQuery string
 
 //go:embed payroll_expenses.sql
 var payrollExpensesQuery string
+
+//go:embed payroll_attachments.sql
+var payrollAttachmentsQuery string
 
 // CreatePayrollTimeReportHandler returns a function that creates a payroll time report for a given week
 func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) error {
@@ -96,9 +102,55 @@ func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent)
 			return err
 		}
 
-		// TODO: Implement the logic to create the payroll receipts zip archive
+		// Execute the query
+		var report []dbx.NullStringMap // TODO: make a type for this
+		err = app.DB().NewQuery(payrollAttachmentsQuery).Bind(dbx.Params{
+			"pay_period_ending": payrollEndingDate.Format("2006-01-02"),
+		}).All(&report)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
+		}
 
-		return e.JSON(http.StatusOK, map[string]any{"message": "Payroll receipts report for " + payrollEndingDate.Format("2006-01-02")})
+		// Define a struct to hold the result from the goroutine
+		type zipResult struct {
+			data []byte
+			err  error
+		}
+
+		// Create a channel to receive the result. A buffered channel of size 1 allows
+		// the goroutine to send the result and exit without waiting for the receiver.
+		resultChan := make(chan zipResult, 1)
+
+		// Launch the goroutine to perform the zipping operation.
+		// This allows the zipping (which can be I/O intensive) to happen concurrently.
+		go func() {
+			// The 'report' variable is captured from the outer function's scope.
+			// The 'zipAttachments' function is defined in functions.go within the same package.
+			zipData, err := zipAttachments(app, report, expenseCollectionId)
+			resultChan <- zipResult{data: zipData, err: err}
+		}()
+
+		// Wait for the result from the goroutine.
+		res := <-resultChan
+
+		// Handle any error returned from the zipAttachments function.
+		if res.err != nil {
+			// Optionally, log the error on the server side here using app.Logger()
+			// For example: app.Logger().Error("Failed to generate zip archive", "error", res.err)
+			return e.Error(http.StatusInternalServerError, "failed to generate zip archive: "+res.err.Error(), res.err)
+		}
+
+		zipData := res.data
+		// The 'payrollEndingDate' variable is available from the outer function's scope.
+
+		// Set appropriate HTTP headers for the file download.
+		filename := fmt.Sprintf("receipts-%s.zip", payrollEndingDate.Format("2006-01-02"))
+		e.Response.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
+
+		// Send the zip file bytes as the HTTP response.
+		// If zipData is nil (e.g., if the report was empty and zipAttachments returned nil, nil),
+		// e.Bytes will send an empty body, which correctly represents an empty zip file.
+		return e.Blob(http.StatusOK, "application/zip", zipData)
 	}
 }
 

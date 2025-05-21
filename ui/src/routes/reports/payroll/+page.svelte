@@ -4,7 +4,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import type { PageData } from "./$types";
   import type { TimeReportWeekEndingsResponse } from "$lib/pocketbase-types";
-  import { shortDate, downloadCSV } from "$lib/utilities";
+  import { downloadCSV, downloadZip } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
   let weekEndings = $state(data.items);
@@ -19,6 +19,12 @@
     const url = `${pb.baseUrl}/api/reports/payroll_expense/${payrollEnding}`;
     const fileName = `payroll_expense_report_${payrollEnding}.csv`;
     await downloadCSV(url, fileName);
+  }
+
+  async function fetchReceiptsReport(payrollEnding: string) {
+    const url = `${pb.baseUrl}/api/reports/payroll_receipts/${payrollEnding}`;
+    const fileName = `payroll_receipts_report_${payrollEnding}.zip`;
+    await downloadZip(url, fileName);
   }
 </script>
 
@@ -49,6 +55,13 @@
     }}
     title="Expense Report"
     color="orange">Expenses</DsActionButton
+  >
+  <DsActionButton
+    action={() => {
+      fetchReceiptsReport(week_ending);
+    }}
+    title="Receipts Archive"
+    color="orange">Receipts</DsActionButton
   >
 {/snippet}
 
