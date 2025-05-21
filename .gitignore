@@ -16,7 +16,4 @@ import_data/parquet
 import_data/charade*.json
 import_data/temp_attachments/*
 .env
-app/report_testing/new_unmodified/*
-app/report_testing/new_preprocessed/*
-app/report_testing/old_unmodified/*
-app/report_testing/old_preprocessed/*
+app/report_testing/**/*.csv
