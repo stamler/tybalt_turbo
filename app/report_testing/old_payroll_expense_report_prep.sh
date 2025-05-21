@@ -34,6 +34,9 @@ for file in "$DEST_DIR"/*.csv; do
     sed -i '' 's/Lunch "/Lunch"/g' "$file"
     sed -i '' 's/Breakfast "/Breakfast"/g' "$file"
     sed -i '' 's/Lodging "/Lodging"/g' "$file"
+
+    # now strip quotes around any field that doesn't contain a comma:
+    sed -i '' -E 's/"([^",]*)"/\1/g' "$file"
   fi
 done
 
