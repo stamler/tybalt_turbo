@@ -8,6 +8,7 @@
 
   let { data }: { data: PageData } = $props();
   let weekEndings = $state(data.items);
+  let receiptsLoading = $state(false);
 
   async function fetchTimeReport(weekEnding: string, week: number) {
     const url = `${pb.baseUrl}/api/reports/payroll_time/${weekEnding}/${week}`;
@@ -22,9 +23,11 @@
   }
 
   async function fetchReceiptsReport(payrollEnding: string) {
+    receiptsLoading = true;
     const url = `${pb.baseUrl}/api/reports/payroll_receipts/${payrollEnding}`;
     const fileName = `payroll_receipts_report_${payrollEnding}.zip`;
     await downloadZip(url, fileName);
+    receiptsLoading = false;
   }
 </script>
 
@@ -60,6 +63,7 @@
     action={() => {
       fetchReceiptsReport(week_ending);
     }}
+    loading={receiptsLoading}
     title="Receipts Archive"
     color="orange">Receipts</DsActionButton
   >

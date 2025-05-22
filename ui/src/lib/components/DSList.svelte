@@ -139,7 +139,7 @@
             {/if}
           </div>
           {#if actions !== undefined}
-            <div class="flex items-center gap-1 px-2 py-2">{@render actions(item)}</div>
+            <div class="flex items-center gap-1 p-2">{@render actions(item)}</div>
           {/if}
         </div>
       </li>
