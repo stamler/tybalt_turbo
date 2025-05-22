@@ -112,6 +112,7 @@
                 icon="feather:plus-circle"
                 title="New Entry"
                 color="green"
+                transparentBackground
               />
             </div>
             <div class="flex h-8 items-center justify-between pr-2">
@@ -125,6 +126,7 @@
                 icon="feather:plus-circle"
                 title="New Amendment"
                 color="green"
+                transparentBackground
               />
             </div>
             <div class="flex h-8 items-center pr-2">
@@ -157,6 +159,7 @@
                 icon="feather:plus-circle"
                 title="New PO"
                 color="green"
+                transparentBackground
               />
             </div>
           </div>
@@ -173,6 +176,7 @@
                 icon="feather:plus-circle"
                 title="New Expense"
                 color="green"
+                transparentBackground
               />
             </div>
             <div class="flex h-8 items-center pr-2">
@@ -205,6 +209,7 @@
                 icon="feather:plus-circle"
                 title="New Job"
                 color="green"
+                transparentBackground
               />
             </div>
             <div class="flex h-8 items-center justify-between pr-2">
@@ -218,6 +223,7 @@
                 icon="feather:plus-circle"
                 title="New Client"
                 color="green"
+                transparentBackground
               />
             </div>
             <div class="flex h-8 items-center justify-between pr-2">
@@ -231,6 +237,7 @@
                 icon="feather:plus-circle"
                 title="New Vendor"
                 color="green"
+                transparentBackground
               />
             </div>
           </div>

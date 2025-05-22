@@ -8,6 +8,7 @@
     icon,
     title,
     color,
+    transparentBackground = false,
     action,
     children,
     loading = false,
@@ -16,6 +17,7 @@
     icon?: string;
     title?: string;
     color?: string;
+    transparentBackground?: boolean;
     action?: (() => void) | string;
     children?: Snippet<[]>;
     loading?: boolean;
@@ -33,9 +35,9 @@
   {type}
   {title}
   disabled={loading}
-  class="flex items-center rounded-sm bg-{normalizedColor}-200 px-1 {isIconContent
-    ? 'py-1'
-    : 'py-0'} {isIconContent
+  class="flex items-center rounded-sm {transparentBackground
+    ? ''
+    : 'bg-' + normalizedColor + '-200'} px-1 {isIconContent ? 'py-1' : 'py-0'} {isIconContent
     ? 'text-neutral-500'
     : 'text-black'} hover:bg-{normalizedColor}-300 hover:text-{normalizedColor}-500 active:text-{normalizedColor}-800 active:shadow-inner"
 >
