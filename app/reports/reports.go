@@ -150,6 +150,7 @@ func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent)
 		}
 		if zipCacheRecord != nil {
 			url := zipCacheRecord.BaseFilesPath() + "/" + zipCacheRecord.GetString("zip")
+			app.Logger().Debug("zip_cache hit for payroll ending date: " + payrollEndingDate.Format("2006-01-02"))
 			return e.JSON(http.StatusOK, map[string]string{"url": url})
 		}
 		app.Logger().Debug("zip_cache miss for payroll ending date: " + payrollEndingDate.Format("2006-01-02"))

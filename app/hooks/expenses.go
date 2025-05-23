@@ -124,10 +124,21 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		expenseRecord.Set("total", totalMileageExpense)
 		expenseRecord.Set("vendor", "")
 
+		// Mileage expenses do not have attachments, so we set the attachment
+		// property to an empty string
+		expenseRecord.Set("attachment", "")
+
 		// NOTE: during commit, we re-run the mileage calculation factoring in the
 		// entire year's mileage total that is committed. This solves the issue of
 		// out-of-order mileage expenses and acknowledges only committed expenses as
 		// the source of truth.
+
+		// NOTE: As of 2025-05-23, we are not using the mileage calculation for
+		// payroll. See payroll_expenses.sql for the query that is used to calculate
+		// the mileage total for payroll.
+		// TODO: remove this note when we start using the mileage calculation for
+		// payroll and figure out how to calculate the total for imported expenses
+		// that don't have the total property set.
 
 	case "Allowance":
 		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
@@ -166,6 +177,17 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		expenseRecord.Set("total", total)
 		expenseRecord.Set("description", allowanceDescription)
 		expenseRecord.Set("vendor", "")
+
+		// NOTE: As of 2025-05-23, we are not using the allowance calculation for
+		// payroll. See payroll_expenses.sql for the query that is used to calculate
+		// the allowance total for payroll.
+		// TODO: remove this note when we start using the allowance calculation for
+		// payroll and figure out how to calculate the total for imported expenses
+		// that don't have the total property set.
+
+		// Allowance expenses do not have attachments, so we set the attachment
+		// property to an empty string
+		expenseRecord.Set("attachment", "")
 	}
 	return nil
 }
