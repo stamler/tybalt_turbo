@@ -328,18 +328,34 @@ export async function downloadZip(endpoint: string, fileName: string) {
       headers["Authorization"] = pb.authStore.token;
     }
 
-    // Use standard fetch API
-    const response = await fetch(endpoint, {
+    // First fetch: get the URL of the zip file
+    const urlResponse = await fetch(endpoint, {
       method: "GET",
       headers: headers,
     });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error ${response.status}: ${await response.text()}`);
+    if (!urlResponse.ok) {
+      throw new Error(`HTTP error ${urlResponse.status} while fetching file URL: ${await urlResponse.text()}`);
+    }
+
+    const responseData = await urlResponse.json();
+    const fileUrl = responseData.url;
+
+    if (typeof fileUrl !== 'string') {
+      throw new Error("Invalid file URL received from server.");
+    }
+
+    // Second fetch: get the actual file blob from the retrieved URL
+    // Note: Depending on the source of fileUrl, it might or might not need auth headers.
+    // For simplicity, not adding auth headers here. If needed, they can be added.
+    const fileResponse = await fetch(`${pb.baseUrl}/api/files/${fileUrl}`);
+
+    if (!fileResponse.ok) {
+      throw new Error(`HTTP error ${fileResponse.status} while downloading file: ${await fileResponse.text()}`);
     }
 
     // Get the response body as a blob
-    const zipBlob = await response.blob();
+    const zipBlob = await fileResponse.blob();
 
     // Create an object URL from the Blob
     const blobUrl = URL.createObjectURL(zipBlob);

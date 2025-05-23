@@ -1,6 +1,10 @@
 -- FORMAT
 -- payment_type-surname,given_name-YYYY_MMM_DD-total-filename.extension
 -- This query is a modified version of payroll_expenses.sql
+-- This CAN BE radically simplified because Mileage, Allowance, and Meals payment_types
+-- NEVER have attachments, so we can ignore the complex joins used to get the 
+-- totals for those payment_types and just find committed expenses with attachments
+-- for the specific pay period.
 WITH expenses_having_attachments AS (
 SELECT
   e2.id,
@@ -12,7 +16,8 @@ SELECT
   substr('  JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', e2.date) * 3, 3) Month,
   SUBSTRING(e2.date, 9, 2) Date,
   e2.merged_total total,
-  e2.attachment
+  e2.attachment,
+  e2.attachment_hash
 FROM (
 SELECT e.id,
   e.uid,
@@ -21,6 +26,7 @@ SELECT e.id,
   e.description,
   e.payment_type,
   e.attachment,
+  e.attachment_hash,
   e.approver,
   e.job,
   e.category,
@@ -224,6 +230,9 @@ ORDER BY e2.date, ap.payroll_id, e2.merged_total
 )
 
 SELECT 
-  a.payment_type || '-' || a.surname || ',' || a.given_name || '-' || a.Year || '_' || a.Month || '_' || a.Date || '-' || a.total || '-' || a.attachment AS filename,
-  a.id || '/' || a.attachment AS source_path
+  a.id AS id,
+  a.attachment AS filename,
+  a.payment_type || '-' || a.surname || ',' || a.given_name || '-' || a.Year || '_' || a.Month || '_' || a.Date || '-' || a.total || '-' || a.attachment AS zip_filename,
+  a.id || '/' || a.attachment AS source_path,
+  a.attachment_hash AS sha256
 FROM expenses_having_attachments a

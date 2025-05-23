@@ -2,7 +2,6 @@ package reports
 
 import (
 	_ "embed" // Needed for //go:embed
-	"fmt"
 	"net/http"
 	"time"
 	"tybalt/constants"
@@ -12,6 +11,16 @@ import (
 )
 
 var expenseCollectionId = "o1vpz1mm7qsfoyy"
+
+// Attachment represents a file attachment to an record.
+// It is used to store the filename, source path, and SHA-256 hash of the attachment.
+type Attachment struct {
+	Id          string `db:"id"`
+	Filename    string `db:"filename"`
+	ZipFilename string `db:"zip_filename"`
+	SourcePath  string `db:"source_path"`
+	Sha256      string `db:"sha256"`
+}
 
 //go:embed payroll_time.sql
 var payrollTimeQuery string
@@ -111,10 +120,46 @@ func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent)
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 
+		// build a list of attachments
+		attachments := []Attachment{}
+		for _, rowMap := range report {
+			idVal, idOk := rowMap["id"]
+			sourcePathVal, sourcePathOk := rowMap["source_path"]
+			filenameVal, filenameOk := rowMap["filename"]
+			zipFilenameVal, zipFilenameOk := rowMap["zip_filename"]
+			sha256Val, sha256Ok := rowMap["sha256"]
+			if !idOk || !sourcePathOk || !filenameOk || !zipFilenameOk || !sha256Ok {
+				// skip rows that don't have all the required fields
+				continue
+			}
+			attachments = append(attachments, Attachment{
+				Id:          idVal.String,
+				Filename:    filenameVal.String,
+				ZipFilename: zipFilenameVal.String,
+				SourcePath:  sourcePathVal.String,
+				Sha256:      sha256Val.String,
+			})
+		}
+
+		// Check the zip cache for a record that matches the payrollEndingDate and
+		// attachments. If there's a cache hit, return the file url. The class for
+		// this zip is "payroll_expenses_attachments".
+		zipCacheRecord, err := zipCacheLookup(app, payrollEndingDate.Format("2006-01-02"), "payroll_expenses_attachments", attachments)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to lookup zip cache: "+err.Error(), err)
+		}
+		if zipCacheRecord != nil {
+			url := zipCacheRecord.BaseFilesPath() + "/" + zipCacheRecord.GetString("zip")
+			return e.JSON(http.StatusOK, map[string]string{"url": url})
+		}
+		app.Logger().Debug("zip_cache miss for payroll ending date: " + payrollEndingDate.Format("2006-01-02"))
+
+		// If we get here, we have a cache miss. Create the zip and store it in the cache.
+
 		// Define a struct to hold the result from the goroutine
 		type zipResult struct {
-			data []byte
-			err  error
+			zipCacheRecord *core.Record
+			err            error
 		}
 
 		// Create a channel to receive the result. A buffered channel of size 1 allows
@@ -126,8 +171,8 @@ func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent)
 		go func() {
 			// The 'report' variable is captured from the outer function's scope.
 			// The 'zipAttachments' function is defined in functions.go within the same package.
-			zipData, err := zipAttachments(app, report, expenseCollectionId)
-			resultChan <- zipResult{data: zipData, err: err}
+			zipCacheRecord, err := zipAttachments(app, attachments, expenseCollectionId, "payroll_expenses_attachments", payrollEndingDate.Format("2006-01-02"))
+			resultChan <- zipResult{zipCacheRecord: zipCacheRecord, err: err}
 		}()
 
 		// Wait for the result from the goroutine.
@@ -140,17 +185,8 @@ func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent)
 			return e.Error(http.StatusInternalServerError, "failed to generate zip archive: "+res.err.Error(), res.err)
 		}
 
-		zipData := res.data
-		// The 'payrollEndingDate' variable is available from the outer function's scope.
-
-		// Set appropriate HTTP headers for the file download.
-		filename := fmt.Sprintf("receipts-%s.zip", payrollEndingDate.Format("2006-01-02"))
-		e.Response.Header().Set("Content-Disposition", "attachment; filename=\""+filename+"\"")
-
-		// Send the zip file bytes as the HTTP response.
-		// If zipData is nil (e.g., if the report was empty and zipAttachments returned nil, nil),
-		// e.Bytes will send an empty body, which correctly represents an empty zip file.
-		return e.Blob(http.StatusOK, "application/zip", zipData)
+		url := res.zipCacheRecord.BaseFilesPath() + "/" + res.zipCacheRecord.GetString("zip")
+		return e.JSON(http.StatusOK, map[string]string{"url": url})
 	}
 }
 
