@@ -3,6 +3,7 @@ package routes
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -27,6 +28,7 @@ import (
 // production code depends on. This maintains proper dependency direction - tests depend
 // on production code, not vice versa.
 type recordFinder interface {
+	Logger() *slog.Logger
 	FindRecordById(collectionModelOrIdentifier any, id string, expands ...func(*dbx.SelectQuery) error) (*core.Record, error)
 	FindRecordsByFilter(collectionModelOrIdentifier any, filter string, sort string, limit int, offset int, params ...dbx.Params) ([]*core.Record, error)
 	FindFirstRecordByFilter(collectionModelOrIdentifier any, filter string, params ...dbx.Params) (*core.Record, error)
@@ -95,11 +97,13 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			// the record, we check for both.
 			callerIsApprover, callerIsQualifiedSecondApprover, err := isApprover(txApp, authRecord, po)
 			if err != nil {
+				httpResponseStatusCode = http.StatusForbidden
 				return err
 			}
 
 			thresholds, err := utilities.GetPOApprovalThresholds(txApp)
 			if err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
 					Code:    "error_fetching_approval_thresholds",
 					Message: fmt.Sprintf("error fetching approval thresholds: %v", err),
@@ -158,6 +162,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				po.Set("status", "Active")
 				poNumber, err := GeneratePONumber(txApp, po)
 				if err != nil {
+					httpResponseStatusCode = http.StatusInternalServerError
 					return &CodeError{
 						Code:    "error_generating_po_number",
 						Message: fmt.Sprintf("error generating PO number: %v", err),
@@ -167,6 +172,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			}
 
 			if err := txApp.Save(po); err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
 					Code:    "error_updating_purchase_order",
 					Message: fmt.Sprintf("error updating purchase order: %v", err),
@@ -647,19 +653,23 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) func(e *core.Re
 }
 
 // GeneratePONumber generates a unique PO number in one of two formats:
-// 1. Parent PO format: YYYY-NNNN (e.g., 2024-0001)
-// 2. Child PO format:  YYYY-NNNN-XX (e.g., 2024-0001-01)
-// where YYYY is the current year, NNNN is a sequential number,
-// and XX is a sequential suffix for child POs (01-99).
+// 1. Parent PO format: YYMM-NNNN (e.g., 2401-0001)
+// 2. Child PO format:  YYMM-NNNN-XX (e.g., 2401-0001-01)
+// where YY is the last two digits of the current year, MM is the current month,
+// NNNN is a sequential number, and XX is a sequential suffix for child POs
+// (01-99).
 func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) (string, error) {
 	currentYear := time.Now().Year()
+	currentMonth := time.Now().Month()
 	if len(testYear) > 0 {
 		currentYear = testYear[0]
 	}
-	prefix := fmt.Sprintf("%d-", currentYear)
+	prefix := fmt.Sprintf("%d%02d-", currentYear%100, currentMonth)
+	txApp.Logger().Debug("Generating PO number", "prefix", prefix)
 
 	// If this is a child PO, handle differently
 	if record.GetString("parent_po") != "" {
+		txApp.Logger().Debug("Generating child PO number", "parent_po", record.GetString("parent_po"))
 		parentId := record.GetString("parent_po")
 		// don't bother storing the error since the parent will be nil both if it
 		// doesn't exist and for any other error
@@ -725,6 +735,7 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 
 		return childNumber, nil
 	}
+	txApp.Logger().Debug("Generating parent PO number", "prefix", prefix)
 
 	// Handle parent PO number generation
 	// We can just filter over all POs and get the last one regardless of whether
@@ -734,11 +745,11 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 	// year rather than the current year.
 	existingPOs, err := txApp.FindRecordsByFilter(
 		"purchase_orders",
-		`po_number ~ '{:current_year}-%'`,
+		`po_number ~ '{:prefix}-%'`,
 		"-po_number",
 		1,
 		0,
-		dbx.Params{"current_year": currentYear},
+		dbx.Params{"prefix": prefix},
 	)
 	if err != nil {
 		return "", fmt.Errorf("error querying existing PO numbers: %v", err)
@@ -747,12 +758,12 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 	var lastNumber int
 	if len(existingPOs) > 0 {
 		lastPO := existingPOs[0].Get("po_number").(string)
-		_, err := fmt.Sscanf(lastPO, "%d-%04d", &currentYear, &lastNumber)
+		_, err := fmt.Sscanf(lastPO, "%d%02d-%04d", &currentYear, &currentMonth, &lastNumber)
 		if err != nil {
 			return "", fmt.Errorf("error parsing last PO number: %v", err)
 		}
 	}
-
+	txApp.Logger().Debug("Last PO number", "lastNumber", lastNumber)
 	// Generate the new PO number
 	for i := lastNumber + 1; i < 5000; i++ {
 		newPONumber := fmt.Sprintf("%s%04d", prefix, i)

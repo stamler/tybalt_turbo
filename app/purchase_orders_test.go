@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 	"tybalt/internal/testutils"
 	"tybalt/routes"
 
@@ -930,6 +931,9 @@ func TestPurchaseOrdersRead(t *testing.T) {
 }
 
 func TestGeneratePONumber(t *testing.T) {
+	currentYear := time.Now().Year() % 100
+	currentMonth := time.Now().Month()
+	currentPoPrefix := fmt.Sprintf("%d%02d-", currentYear, currentMonth)
 	app := testutils.SetupTestApp(t)
 	poCollection, err := app.FindCollectionByNameOrId("purchase_orders")
 	if err != nil {
@@ -1131,25 +1135,24 @@ func TestGeneratePONumber(t *testing.T) {
 			// Test Case 6: First PO of the year
 			// This test verifies that when creating the first PO of the year:
 			// - No existing POs are found
-			// - The generated number follows the format: Year + "-0001"
+			// - The generated number follows the format: YYMM + "-0001"
 			// - The number is unique in the database
 			name: "first PO of the year",
-			year: 2025,
 			record: func() *core.Record {
 				return core.NewRecord(poCollection)
 			}(),
 			setup: func(t *testing.T, app *tests.TestApp) {
-				// Delete all POs from 2025 to ensure we're starting fresh
+				// Delete all POs from current period to ensure we're starting fresh
 				records, err := app.FindRecordsByFilter(
 					"purchase_orders",
-					`po_number ~ '{:current_year}-%'`,
+					`po_number ~ '{:prefix}-%'`,
 					"",
 					0,
 					0,
-					dbx.Params{"current_year": 2025},
+					dbx.Params{"prefix": currentPoPrefix},
 				)
 				if err != nil {
-					t.Fatalf("failed to find 2025 POs: %v", err)
+					t.Fatalf("failed to find current period POs: %v", err)
 				}
 				for _, record := range records {
 					if err := app.Delete(record); err != nil {
@@ -1157,7 +1160,7 @@ func TestGeneratePONumber(t *testing.T) {
 					}
 				}
 			},
-			expected: "2025-0001",
+			expected: fmt.Sprintf("%s0001", currentPoPrefix),
 		},
 		{
 			// Test Case 7: Parent PO not found
@@ -1189,8 +1192,8 @@ func TestGeneratePONumber(t *testing.T) {
 			if tt.year != 0 {
 				result, err = routes.GeneratePONumber(app, tt.record, tt.year)
 			} else {
-				// default to 2024 since the test DB is seeded with 2024 POs
-				result, err = routes.GeneratePONumber(app, tt.record, 2024)
+				// default to current year
+				result, err = routes.GeneratePONumber(app, tt.record, currentYear)
 			}
 
 			if tt.expectedError != "" {

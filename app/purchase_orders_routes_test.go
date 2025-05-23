@@ -47,7 +47,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 
 	// Get current date in UTC for approval timestamp validation
 	currentDate := time.Now().UTC().Format("2006-01-02")
-	currentYear := time.Now().UTC().Format("2006")
+	currentPoPrefix := fmt.Sprintf("%d%02d-", time.Now().Year()%100, time.Now().Month())
 
 	// Get approval tier values from the database
 	app := testutils.SetupTestApp(t)
@@ -64,10 +64,10 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				fmt.Sprintf(`"approved":"%s`, currentDate),   // Should have today's date
-				fmt.Sprintf(`"po_number":"%s-`, currentYear), // Should start with current year
-				`"status":"Active"`,                          // Status should be Active
-				`"approver":"etysnrlup2f6bak"`,               // Should be set to the approver's ID
+				fmt.Sprintf(`"approved":"%s`, currentDate),      // Should have today's date
+				fmt.Sprintf(`"po_number":"%s`, currentPoPrefix), // Should start with current year
+				`"status":"Active"`,                             // Status should be Active
+				`"approver":"etysnrlup2f6bak"`,                  // Should be set to the approver's ID
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate":   1, // notification record is created
@@ -114,7 +114,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				fmt.Sprintf(`"approved":"%s`, currentDate),        // Should have today's date
 				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have same timestamp
 				`"status":"Active"`,                               // Status should become Active
-				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
+				fmt.Sprintf(`"po_number":"%s`, currentPoPrefix),   // Should get PO number
 				`"approver":"6bq4j0eb26631dy"`,                    // caller becomes first approver
 				`"second_approver":"6bq4j0eb26631dy"`,             // caller also becomes second approver
 			},
@@ -138,7 +138,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				`"approved":"2025-01-29 14:22:29.563Z"`,           // Should keep original first approval
 				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have today's date
 				`"status":"Active"`,                               // Status should become Active
-				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
+				fmt.Sprintf(`"po_number":"%s`, currentPoPrefix),   // Should get PO number
 				`"approver":"wegviunlyr2jjjv"`,                    // Should keep original approver
 				`"second_approver":"6bq4j0eb26631dy"`,             // Should be set to caller's ID
 			},
@@ -439,7 +439,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				`"approved":"2025-01-29 17:00:02.493Z"`,           // already approved, should not change
 				fmt.Sprintf(`"second_approval":"%s`, currentDate), // Should have same timestamp
 				`"status":"Active"`,                               // Status should become Active
-				fmt.Sprintf(`"po_number":"%s-`, currentYear),      // Should get PO number
+				fmt.Sprintf(`"po_number":"%s`, currentPoPrefix),   // Should get PO number
 				`"approver":"f2j5a8vk006baub"`,                    // approver does not change
 				`"second_approver":"66ct66w380ob6w8"`,             // po_approver_tier3 holder becomes second approver
 			},
