@@ -3,7 +3,6 @@ package routes
 import (
 	"database/sql"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,26 +12,6 @@ import (
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
-
-// recordFinder defines the minimal interface needed for PO number generation operations.
-//
-// This interface exists for two main reasons:
-//  1. Interface Segregation: It specifies only the database operations required for PO number
-//     generation, making the code's dependencies explicit and minimal.
-//  2. Testability: It enables testing of PO number generation logic without requiring a full
-//     database connection. The production code uses *daos.Dao while tests can use a mock
-//     implementation that only implements these specific methods.
-//
-// Note: While this interface is primarily useful for testing, it lives in the production
-// code (not in test packages) because it represents a real business capability that the
-// production code depends on. This maintains proper dependency direction - tests depend
-// on production code, not vice versa.
-type recordFinder interface {
-	Logger() *slog.Logger
-	FindRecordById(collectionModelOrIdentifier any, id string, expands ...func(*dbx.SelectQuery) error) (*core.Record, error)
-	FindRecordsByFilter(collectionModelOrIdentifier any, filter string, sort string, limit int, offset int, params ...dbx.Params) ([]*core.Record, error)
-	FindFirstRecordByFilter(collectionModelOrIdentifier any, filter string, params ...dbx.Params) (*core.Record, error)
-}
 
 func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -658,13 +637,17 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) func(e *core.Re
 // where YY is the last two digits of the current year, MM is the current month,
 // NNNN is a sequential number, and XX is a sequential suffix for child POs
 // (01-99).
-func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) (string, error) {
+func GeneratePONumber(txApp core.App, record *core.Record, testDateComponents ...int) (string, error) {
 	currentYear := time.Now().Year()
-	currentMonth := time.Now().Month()
-	if len(testYear) > 0 {
-		currentYear = testYear[0]
+	currentMonth := int(time.Now().Month())
+	var prefix string
+	if len(testDateComponents) > 1 {
+		currentYear = testDateComponents[0]
+		currentMonth = testDateComponents[1]
+		prefix = fmt.Sprintf("%d%02d-", currentYear%100, currentMonth)
+	} else {
+		prefix = fmt.Sprintf("%d%02d-", currentYear%100, currentMonth)
 	}
-	prefix := fmt.Sprintf("%d%02d-", currentYear%100, currentMonth)
 	txApp.Logger().Debug("Generating PO number", "prefix", prefix)
 
 	// If this is a child PO, handle differently
@@ -745,11 +728,11 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 	// year rather than the current year.
 	existingPOs, err := txApp.FindRecordsByFilter(
 		"purchase_orders",
-		`po_number ~ '{:prefix}-%'`,
+		`po_number ~ {:prefix}`,
 		"-po_number",
 		1,
 		0,
-		dbx.Params{"prefix": prefix},
+		dbx.Params{"prefix": prefix + "%"},
 	)
 	if err != nil {
 		return "", fmt.Errorf("error querying existing PO numbers: %v", err)
@@ -757,11 +740,14 @@ func GeneratePONumber(txApp recordFinder, record *core.Record, testYear ...int) 
 
 	var lastNumber int
 	if len(existingPOs) > 0 {
-		lastPO := existingPOs[0].Get("po_number").(string)
-		_, err := fmt.Sscanf(lastPO, "%d%02d-%04d", &currentYear, &currentMonth, &lastNumber)
+		lastPO := existingPOs[0].GetString("po_number")
+		// Extract the numeric suffix after the prefix
+		numericSuffix := strings.TrimPrefix(lastPO, prefix)
+		parsedNum, err := strconv.Atoi(numericSuffix)
 		if err != nil {
 			return "", fmt.Errorf("error parsing last PO number: %v", err)
 		}
+		lastNumber = parsedNum
 	}
 	txApp.Logger().Debug("Last PO number", "lastNumber", lastNumber)
 	// Generate the new PO number

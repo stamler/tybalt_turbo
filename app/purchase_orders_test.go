@@ -942,7 +942,8 @@ func TestGeneratePONumber(t *testing.T) {
 
 	tests := []struct {
 		name          string
-		year          int // 0 for default 2024
+		year          int // 0 for current year
+		month         int // 0 for current month
 		record        *core.Record
 		setup         func(t *testing.T, app *tests.TestApp)
 		cleanup       func(t *testing.T, app *tests.TestApp)
@@ -1034,20 +1035,18 @@ func TestGeneratePONumber(t *testing.T) {
 			expected: "2024-0008-02",
 		},
 		{
-			// Test Case 3: Parent PO Number Generation
-			// This test verifies that when creating a new parent PO:
-			// - The next sequential number after the highest existing PO is generated
-			// - The number is unique in the database
-			//
-			// The test:
-			// 1. Creates a new parent PO record
-			// 2. Generates a PO number based on existing POs in the database
-			name: "sequential parent PO",
+			// Test Case 3: Parent PO Number Generation (for current YYMM)
+			// This test verifies that when creating a new parent PO for the current year/month:
+			// - A PO is set up with number YYMM-NNNN.
+			// - The next generated sequential number is YYMM-(NNNN+1).
+			// - The number is unique in the database.
+			name:  "sequential parent PO",
+			year:  2024,
+			month: 1,
 			record: func() *core.Record {
-				r := core.NewRecord(poCollection)
-				return r
+				return core.NewRecord(poCollection)
 			}(),
-			expected: "2024-0010", // Next after 2024-0009 in test DB
+			expected: "2401-0010", // Next after 2024-0009 in test DB
 		},
 		{
 			// Test Case 4: Parent PO Without Number
@@ -1190,10 +1189,10 @@ func TestGeneratePONumber(t *testing.T) {
 			var result string
 			var err error
 			if tt.year != 0 {
-				result, err = routes.GeneratePONumber(app, tt.record, tt.year)
+				result, err = routes.GeneratePONumber(app, tt.record, tt.year, tt.month)
 			} else {
-				// default to current year
-				result, err = routes.GeneratePONumber(app, tt.record, currentYear)
+				// default to current year/month
+				result, err = routes.GeneratePONumber(app, tt.record)
 			}
 
 			if tt.expectedError != "" {
