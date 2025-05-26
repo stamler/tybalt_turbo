@@ -29,6 +29,12 @@
     await downloadZip(url, fileName);
     receiptsLoading = false;
   }
+
+  async function fetchTimeSummaryByEmployee(week_ending: string) {
+    const url = `${pb.baseUrl}/api/reports/weekly_time_by_employee/${week_ending}`;
+    const fileName = `weekly_time_by_employee_${week_ending}.csv`;
+    await downloadCSV(url, fileName);
+  }
 </script>
 
 {#snippet anchor({ week_ending }: TimeReportWeekEndingsResponse)}
@@ -44,6 +50,13 @@
     }}
     title="Time Report"
     color="orange">Time</DsActionButton
+  >
+  <DsActionButton
+    action={() => {
+      fetchTimeSummaryByEmployee(week_ending);
+    }}
+    title="Time Summary by Employee"
+    color="orange">Time Summary</DsActionButton
   >
   <DsActionButton
     action={() => {

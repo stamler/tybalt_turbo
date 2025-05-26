@@ -32,6 +32,9 @@ var expensesQueryTemplate string
 //go:embed receipts.sql
 var receiptsQueryTemplate string
 
+//go:embed weekly_time_by_employee.sql
+var weeklyTimeByEmployeeQueryTemplate string
+
 // CreatePayrollTimeReportHandler returns a function that creates a payroll time report for a given week
 func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -63,6 +66,35 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 
 		// convert the report to a csv string
 		headers := []string{"payrollId", "weekEnding", "surname", "givenName", "name", "manager", "meals", "days off rotation", "hours worked", "salaryHoursOver44", "adjustedHoursWorked", "total overtime hours", "overtime hours to pay", "Bereavement", "Stat Holiday", "PPTO", "Sick", "Vacation", "overtime hours to bank", "Overtime Payout Requested", "hasAmendmentsForWeeksEnding", "salary"}
+		csvString, err := convertToCSV(report, headers)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to generate CSV report: "+err.Error(), err)
+		}
+
+		// Set content type and return the CSV string
+		e.Response.Header().Set("Content-Type", "text/csv")
+		return e.String(http.StatusOK, csvString)
+	}
+}
+
+// CreateTimeSummaryByEmployeeHandler returns a function that creates a time summary by employee report for a given value of date_column (provided in the request path)
+func CreateTimeSummaryByEmployeeHandler(app core.App, dateColumnName string) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		dateColumnValue, err := getDateColumnValue(e, false)
+		if err != nil {
+			return err
+		}
+		weeklyTimeByEmployeeQuery := strings.ReplaceAll(weeklyTimeByEmployeeQueryTemplate, "{:date_column}", dateColumnName)
+		var report []dbx.NullStringMap // TODO: make a type for this
+		err = app.DB().NewQuery(weeklyTimeByEmployeeQuery).Bind(dbx.Params{
+			"date_column_value": dateColumnValue.Format("2006-01-02"),
+		}).All(&report)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
+		}
+
+		// convert the report to a csv string
+		headers := []string{"Employee", "divisions", "c", "nc", "total", "percentChargeable", "percentNCWorked", "nc_worked", "nc_unworked"}
 		csvString, err := convertToCSV(report, headers)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to generate CSV report: "+err.Error(), err)
