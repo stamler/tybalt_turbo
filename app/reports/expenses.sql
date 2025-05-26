@@ -76,6 +76,7 @@ LEFT JOIN (
       e.uid,
       e.date,
       e.pay_period_ending, -- Keep this to filter on later
+      e.committed_week_ending, -- Keep this to filter on later
       (
         SELECT MAX(r.date)
         FROM mileage_reset_dates r
@@ -102,7 +103,7 @@ LEFT JOIN (
       AND e.uid IN (
         SELECT DISTINCT ee.uid
         FROM expenses ee
-        WHERE ee.payment_type = 'Mileage' AND ee.pay_period_ending = {:pay_period_ending}
+        WHERE ee.payment_type = 'Mileage' AND ee.{:date_column} = {:date_column_value}
       )
   ),
 
@@ -116,7 +117,7 @@ LEFT JOIN (
       cm.end_distance,
       cm.effective_date
     FROM CumulativeMileage cm
-    WHERE cm.pay_period_ending = {:pay_period_ending}
+    WHERE cm.{:date_column} = {:date_column_value}
   ),
 
   /* 
@@ -216,10 +217,10 @@ LEFT JOIN (
   FROM expenses e 
   LEFT JOIN expense_rates r ON ((r.effective_date = (SELECT MAX(i.effective_date) FROM expense_rates i WHERE (i.effective_date <= e.date))))
   WHERE e.payment_type IN ('Allowance','Meals')
-  AND e.pay_period_ending = {:pay_period_ending}
+  AND e.{:date_column} = {:date_column_value}
   AND e.committed != ''
 ) a ON a.id = e.id
-WHERE e.pay_period_ending = {:pay_period_ending}
+WHERE e.{:date_column} = {:date_column_value}
 AND e.committed != ''
 ) AS e2
 LEFT JOIN admin_profiles ap ON ap.uid = e2.uid

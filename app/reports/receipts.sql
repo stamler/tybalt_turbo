@@ -19,7 +19,7 @@ SELECT
 FROM Expenses e
 LEFT JOIN admin_profiles ap ON ap.uid = e.uid
 LEFT JOIN profiles p ON p.uid = e.uid
-WHERE e.pay_period_ending = {:pay_period_ending}
+WHERE e.{:date_column} = {:date_column_value}
 AND e.committed != ''
 AND e.attachment != ''
 )

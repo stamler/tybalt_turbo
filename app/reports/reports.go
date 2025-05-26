@@ -3,6 +3,7 @@ package reports
 import (
 	_ "embed" // Needed for //go:embed
 	"net/http"
+	"strings"
 	"time"
 	"tybalt/constants"
 
@@ -25,11 +26,11 @@ type Attachment struct {
 //go:embed payroll_time.sql
 var payrollTimeQuery string
 
-//go:embed payroll_expenses.sql
-var payrollExpensesQuery string
+//go:embed expenses.sql
+var expensesQueryTemplate string
 
-//go:embed payroll_attachments.sql
-var payrollAttachmentsQuery string
+//go:embed receipts.sql
+var receiptsQueryTemplate string
 
 // CreatePayrollTimeReportHandler returns a function that creates a payroll time report for a given week
 func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) error {
@@ -41,20 +42,20 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 			return e.Error(http.StatusBadRequest, "week must be either 1 or 2", nil)
 		}
 
-		payrollEndingDate, err := getPayrollEndingDate(e)
+		dateColumnValue, err := getDateColumnValue(e, true)
 		if err != nil {
 			return err
 		}
 
 		// if week is 1, subtract 7 days from the payroll ending date
 		if week == "1" {
-			payrollEndingDate = payrollEndingDate.AddDate(0, 0, -7)
+			dateColumnValue = dateColumnValue.AddDate(0, 0, -7)
 		}
 
 		// Execute the query
 		var report []dbx.NullStringMap // TODO: make a type for this
 		err = app.DB().NewQuery(payrollTimeQuery).Bind(dbx.Params{
-			"weekEnding": payrollEndingDate.Format("2006-01-02"),
+			"weekEnding": dateColumnValue.Format("2006-01-02"),
 		}).All(&report)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
@@ -73,18 +74,24 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 	}
 }
 
-// CreatePayrollExpenseReportHandler returns a function that creates a payroll expense report for a given payroll ending date
-func CreatePayrollExpenseReportHandler(app core.App) func(e *core.RequestEvent) error {
+// CreateExpenseReportHandler returns a function that creates an expense report for a given value of date_column (provided in the request path)
+func CreateExpenseReportHandler(app core.App, dateColumnName string) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		payrollEndingDate, err := getPayrollEndingDate(e)
+		dateColumnValue, err := getDateColumnValue(e, dateColumnName == "pay_period_ending")
 		if err != nil {
 			return err
 		}
 
+		// Replace the placeholder in the query string with the column name. We do
+		// this instead of using Bind() because the column name will be incorrectly
+		// quoted by Bind() for SQLite (it will be enclosed in single quotes which
+		// SQL will interpret as a string literal rather than as an identifier).
+		expensesQuery := strings.ReplaceAll(expensesQueryTemplate, "{:date_column}", dateColumnName)
+
 		// Execute the query
 		var report []dbx.NullStringMap // TODO: make a type for this
-		err = app.DB().NewQuery(payrollExpensesQuery).Bind(dbx.Params{
-			"pay_period_ending": payrollEndingDate.Format("2006-01-02"),
+		err = app.DB().NewQuery(expensesQuery).Bind(dbx.Params{
+			"date_column_value": dateColumnValue.Format("2006-01-02"),
 		}).All(&report)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
@@ -103,25 +110,31 @@ func CreatePayrollExpenseReportHandler(app core.App) func(e *core.RequestEvent) 
 	}
 }
 
-// CreatePayrollReceiptsReportHandler returns a function that creates a payroll receipts zip archive for a given payroll ending date
-func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent) error {
+// CreateReceiptsReportHandler returns a function that creates a payroll receipts zip archive for a given value of date_column (provided in the request path)
+func CreateReceiptsReportHandler(app core.App, dateColumnName string) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		payrollEndingDate, err := getPayrollEndingDate(e)
+		dateColumnValue, err := getDateColumnValue(e, dateColumnName == "pay_period_ending")
 		if err != nil {
 			return err
 		}
 
+		// Replace the placeholder in the query string with the column name. We do
+		// this instead of using Bind() because the column name will be incorrectly
+		// quoted by Bind() for SQLite (it will be enclosed in single quotes which
+		// SQL will interpret as a string literal rather than as an identifier).
+		receiptsQuery := strings.ReplaceAll(receiptsQueryTemplate, "{:date_column}", dateColumnName)
+
 		// Execute the query
 		var report []dbx.NullStringMap // TODO: make a type for this
-		err = app.DB().NewQuery(payrollAttachmentsQuery).Bind(dbx.Params{
-			"pay_period_ending": payrollEndingDate.Format("2006-01-02"),
+		err = app.DB().NewQuery(receiptsQuery).Bind(dbx.Params{
+			"date_column_value": dateColumnValue.Format("2006-01-02"),
 		}).All(&report)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 
-		// build a list of attachments
-		attachments := []Attachment{}
+		// build a list of receipts
+		receipts := []Attachment{}
 		for _, rowMap := range report {
 			idVal, idOk := rowMap["id"]
 			sourcePathVal, sourcePathOk := rowMap["source_path"]
@@ -132,7 +145,7 @@ func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent)
 				// skip rows that don't have all the required fields
 				continue
 			}
-			attachments = append(attachments, Attachment{
+			receipts = append(receipts, Attachment{
 				Id:          idVal.String,
 				Filename:    filenameVal.String,
 				ZipFilename: zipFilenameVal.String,
@@ -141,19 +154,19 @@ func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent)
 			})
 		}
 
-		// Check the zip cache for a record that matches the payrollEndingDate and
-		// attachments. If there's a cache hit, return the file url. The class for
-		// this zip is "payroll_expenses_attachments".
-		zipCacheRecord, err := zipCacheLookup(app, payrollEndingDate.Format("2006-01-02"), "payroll_expenses_attachments", attachments)
+		// Check the zip cache for a record that matches the dateColumnValue in the
+		// specified class and receipts. If there's a cache hit, return the file
+		// url. The class for this zip is "receipts_by_" + dateColumnName.
+		zipCacheRecord, err := zipCacheLookup(app, dateColumnValue.Format("2006-01-02"), "receipts_by_"+dateColumnName, receipts)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to lookup zip cache: "+err.Error(), err)
 		}
 		if zipCacheRecord != nil {
 			url := zipCacheRecord.BaseFilesPath() + "/" + zipCacheRecord.GetString("zip")
-			app.Logger().Debug("zip_cache hit for payroll ending date: " + payrollEndingDate.Format("2006-01-02"))
+			app.Logger().Debug("zip_cache hit", dateColumnName, dateColumnValue.Format("2006-01-02"))
 			return e.JSON(http.StatusOK, map[string]string{"url": url})
 		}
-		app.Logger().Debug("zip_cache miss for payroll ending date: " + payrollEndingDate.Format("2006-01-02"))
+		app.Logger().Debug("zip_cache miss", dateColumnName, dateColumnValue.Format("2006-01-02"))
 
 		// If we get here, we have a cache miss. Create the zip and store it in the cache.
 
@@ -172,7 +185,7 @@ func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent)
 		go func() {
 			// The 'report' variable is captured from the outer function's scope.
 			// The 'zipAttachments' function is defined in functions.go within the same package.
-			zipCacheRecord, err := zipAttachments(app, attachments, expenseCollectionId, "payroll_expenses_attachments", payrollEndingDate.Format("2006-01-02"))
+			zipCacheRecord, err := zipAttachments(app, receipts, expenseCollectionId, "receipts_by_"+dateColumnName, dateColumnValue.Format("2006-01-02"))
 			resultChan <- zipResult{zipCacheRecord: zipCacheRecord, err: err}
 		}()
 
@@ -191,31 +204,33 @@ func CreatePayrollReceiptsReportHandler(app core.App) func(e *core.RequestEvent)
 	}
 }
 
-// getPayrollEndingDate returns the parsed and validated payroll ending date
+// getDateColumnValue returns the parsed and validated date column value
 // from the request path after ensuring it is a valid date and a Saturday
-func getPayrollEndingDate(e *core.RequestEvent) (time.Time, error) {
-	payrollEnding := e.Request.PathValue("payrollEnding")
-	if payrollEnding == "" {
-		return time.Time{}, e.Error(http.StatusBadRequest, "payrollEnding is required", nil)
+func getDateColumnValue(e *core.RequestEvent, forPayroll bool) (time.Time, error) {
+	dateColumnValue := e.Request.PathValue("date_column_value")
+	if dateColumnValue == "" {
+		return time.Time{}, e.Error(http.StatusBadRequest, "date_column_value is required", nil)
 	}
 
-	// if payrollEnding is not a valid date, return an error
-	payrollEndingDate, err := time.Parse("2006-01-02", payrollEnding)
+	// if dateColumnValue is not a valid date, return an error
+	dateColumnValueDate, err := time.Parse("2006-01-02", dateColumnValue)
 	if err != nil {
-		return time.Time{}, e.Error(http.StatusBadRequest, "payrollEnding must be a valid date", nil)
+		return time.Time{}, e.Error(http.StatusBadRequest, "date_column_value must be a valid date", nil)
 	}
 
-	// if payrollEnding is not a Saturday, return an error
-	if payrollEndingDate.Weekday() != time.Saturday {
-		return time.Time{}, e.Error(http.StatusBadRequest, "payrollEnding must be a Saturday", nil)
+	// if dateColumnValueDate is not a Saturday, return an error
+	if dateColumnValueDate.Weekday() != time.Saturday {
+		return time.Time{}, e.Error(http.StatusBadRequest, "date_column_value must be a Saturday", nil)
 	}
 
-	// Check if payrollEndingDate is a multiple of 2 weeks (14 days) before or
-	// after the PAYROLL_EPOCH.
-	daysDifference := int(payrollEndingDate.Sub(constants.PAYROLL_EPOCH).Hours() / 24)
-	if daysDifference%14 != 0 {
-		return time.Time{}, e.Error(http.StatusBadRequest, "payrollEnding must be a multiple of 2 weeks before or after 2025-03-01", nil)
+	// If forPayroll is true, check if dateColumnValueDate is a multiple of 2
+	// weeks (14 days) before or after the PAYROLL_EPOCH.
+	if forPayroll {
+		daysDifference := int(dateColumnValueDate.Sub(constants.PAYROLL_EPOCH).Hours() / 24)
+		if daysDifference%14 != 0 {
+			return time.Time{}, e.Error(http.StatusBadRequest, "date_column_value must be a multiple of 2 weeks before or after 2025-03-01 when forPayroll is true", nil)
+		}
 	}
 
-	return payrollEndingDate, nil
+	return dateColumnValueDate, nil
 }

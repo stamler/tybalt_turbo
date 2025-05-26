@@ -265,6 +265,14 @@
               >
               <div class="w-8"></div>
             </div>
+            <div class="flex h-8 items-center pr-2">
+              <a
+                href="/reports/weekly"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
+                >Weekly</a
+              >
+              <div class="w-8"></div>
+            </div>
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Settings</p>
