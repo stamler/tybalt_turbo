@@ -101,7 +101,8 @@ func AddRoutes(app core.App) {
 
 		reportsGroup := se.Router.Group("/api/reports")
 		reportsGroup.Bind(apis.RequireAuth("users"))
-		reportsGroup.GET("/payroll_time/{payrollEnding}/{week}", reports.CreatePayrollTimeReportHandler(app))
+		reportsGroup.GET("/payroll_time/{date_column_value}/{week}", reports.CreatePayrollTimeReportHandler(app))
+		reportsGroup.GET("/weekly_time/{date_column_value}", reports.CreateTimeReportHandler(app, "week_ending"))
 		reportsGroup.GET("/weekly_time_by_employee/{date_column_value}", reports.CreateTimeSummaryByEmployeeHandler(app, "week_ending"))
 		reportsGroup.GET("/payroll_expense/{date_column_value}", reports.CreateExpenseReportHandler(app, "pay_period_ending"))
 		reportsGroup.GET("/weekly_expense/{date_column_value}", reports.CreateExpenseReportHandler(app, "committed_week_ending"))
