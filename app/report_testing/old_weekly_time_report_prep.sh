@@ -30,7 +30,19 @@ for file in "$DEST_DIR"/*.csv; do
   if [ -f "$file" ]; then
     echo "Processing $file..."
     # Apply transformations
-    uvx --from csvkit csvsort -c year,month,date,timetype,job,division,qty,nc,surname,givenName "$file" > "$file.sorted" && mv "$file.sorted" "$file"
+    # TODO: csvsort places empty strings after non-empty strings, so we should use miller instead
+    # to first replace empty strings with a string like 0000_first, then sort, then replace the string with an empty string
+    # uvx --from csvkit csvsort -c year,month,date,timetype,job,division,qty,nc,surname,givenName "$file" > "$file.sorted" && mv "$file.sorted" "$file"
+    mlr --csv put '
+      for (k, v in $*) {
+        if (v == "") { $[k] = "0000_first" }
+      }
+    ' "$file" | mlr --csv sort -n -f year,month,date,timetype,job,division,qty,nc,surname,givenName | mlr --csv put '
+      for (k, v in $*) {
+        if (v == "0000_first") { $[k] = "" }
+      }
+    ' > "${file}.sorted" && mv "${file}.sorted" "$file"
+
   fi
 done
 
