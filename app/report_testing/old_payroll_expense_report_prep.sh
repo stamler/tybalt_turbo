@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define source and destination directories
-SOURCE_DIR="expenses/old_unmodified"
-DEST_DIR="expenses/old_preprocessed"
+SOURCE_DIR="expenses_payroll/old_unmodified"
+DEST_DIR="expenses_payroll/old_preprocessed"
 
 # Check if source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -35,8 +35,8 @@ for file in "$DEST_DIR"/*.csv; do
     sed -i '' 's/Breakfast "/Breakfast"/g' "$file"
     sed -i '' 's/Lodging "/Lodging"/g' "$file"
 
-    # now strip quotes to minimal
-    uvx --from csvkit csvformat -U 0 "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+    # miller defaults to minimal quoting. Use cat here to strip quotes.
+    mlr --csv cat "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
   fi
 done
 
