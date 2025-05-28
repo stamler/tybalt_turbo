@@ -31,7 +31,10 @@ for file in "$DEST_DIR"/*.csv; do
     echo "Processing $file..."
     # Trim trailing whitespace from Description field
     mlr --csv put 'for (k in $*) { 
-      $Description = gsub($Description, " +$", "")
+      $Description = gsub($Description, " +$", "");
+      if (typeof($[k]) == "string") {
+        $[k] = gsub($[k], "Joe Za", "Joseph Za")
+      }
     }' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
   fi
 done
