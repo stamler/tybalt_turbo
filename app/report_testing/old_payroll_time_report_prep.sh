@@ -2,7 +2,7 @@
 
 # Define source and destination directories
 SOURCE_DIR="time_payroll/week2/old_unmodified"
-DEST_DIR="time_payrollc/week2/old_preprocessed"
+DEST_DIR="time_payroll/week2/old_preprocessed"
 
 # Check if source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
