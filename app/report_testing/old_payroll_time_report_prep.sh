@@ -35,6 +35,11 @@ for file in "$DEST_DIR"/*.csv; do
         if (v == "" && is_numeric_field(k)) {
           $[k] = 0
         }
+        if (typeof($[k]) == "string") {
+          $[k] = gsub($[k], "Joe Za", "Joseph Za")
+        }
+        $salary = gsub($salary, "true", "TRUE");
+        $salary = gsub($salary, "false", "FALSE");
       }
 
       func is_numeric_field(k) {
