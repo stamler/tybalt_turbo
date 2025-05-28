@@ -59,7 +59,7 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 		}
 
 		// Execute the query
-		var report []dbx.NullStringMap // TODO: make a type for this
+		var report []dbx.NullStringMap
 		err = app.DB().NewQuery(payrollTimeQuery).Bind(dbx.Params{
 			"weekEnding": dateColumnValue.Format("2006-01-02"),
 		}).All(&report)
@@ -91,7 +91,7 @@ func CreateTimeReportHandler(app core.App, dateColumnName string) func(e *core.R
 		timeQuery := strings.ReplaceAll(weeklyTimeQueryTemplate, "{:date_column}", dateColumnName)
 
 		// Execute the query
-		var report []dbx.NullStringMap // TODO: make a type for this
+		var report []dbx.NullStringMap
 		err = app.DB().NewQuery(timeQuery).Bind(dbx.Params{
 			"company_short_name": "TBTE",
 			"date_column_value":  dateColumnValue.Format("2006-01-02"),
@@ -121,7 +121,7 @@ func CreateTimeSummaryByEmployeeHandler(app core.App, dateColumnName string) fun
 			return err
 		}
 		weeklyTimeByEmployeeQuery := strings.ReplaceAll(weeklyTimeByEmployeeQueryTemplate, "{:date_column}", dateColumnName)
-		var report []dbx.NullStringMap // TODO: make a type for this
+		var report []dbx.NullStringMap
 		err = app.DB().NewQuery(weeklyTimeByEmployeeQuery).Bind(dbx.Params{
 			"date_column_value": dateColumnValue.Format("2006-01-02"),
 		}).All(&report)
@@ -157,7 +157,7 @@ func CreateExpenseReportHandler(app core.App, dateColumnName string) func(e *cor
 		expensesQuery := strings.ReplaceAll(expensesQueryTemplate, "{:date_column}", dateColumnName)
 
 		// Execute the query
-		var report []dbx.NullStringMap // TODO: make a type for this
+		var report []dbx.NullStringMap
 		err = app.DB().NewQuery(expensesQuery).Bind(dbx.Params{
 			"date_column_value": dateColumnValue.Format("2006-01-02"),
 		}).All(&report)
@@ -193,7 +193,7 @@ func CreateReceiptsReportHandler(app core.App, dateColumnName string) func(e *co
 		receiptsQuery := strings.ReplaceAll(receiptsQueryTemplate, "{:date_column}", dateColumnName)
 
 		// Execute the query
-		var report []dbx.NullStringMap // TODO: make a type for this
+		var report []dbx.NullStringMap
 		err = app.DB().NewQuery(receiptsQuery).Bind(dbx.Params{
 			"date_column_value": dateColumnValue.Format("2006-01-02"),
 		}).All(&report)
