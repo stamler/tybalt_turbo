@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define source and destination directories
-SOURCE_DIR="time/week2/old_unmodified"
-DEST_DIR="time/week2/old_preprocessed"
+SOURCE_DIR="time_payroll/week2/old_unmodified"
+DEST_DIR="time_payrollc/week2/old_preprocessed"
 
 # Check if source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -30,8 +30,18 @@ for file in "$DEST_DIR"/*.csv; do
   if [ -f "$file" ]; then
     echo "Processing $file..."
     # Apply transformations
-    sed -i '' 's/,,/,0,/g' "$file"
-    sed -i '' 's/,,/,0,/g' "$file"
+    mlr --csv put '
+      for (k, v in $*) {
+        if (v == "" && is_numeric_field(k)) {
+          $[k] = 0
+        }
+      }
+
+      func is_numeric_field(k) {
+        return (k == "Bereavement" || k == "Stat Holiday" || k == "PPTO" || k == "Sick" || k == "Vacation")
+      }
+    ' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+
   fi
 done
 
