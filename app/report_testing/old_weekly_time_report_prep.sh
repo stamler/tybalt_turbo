@@ -29,10 +29,12 @@ echo "Processing files in '$DEST_DIR'..."
 for file in "$DEST_DIR"/*.csv; do
   if [ -f "$file" ]; then
     echo "Processing $file..."
-    # Apply transformations
-    # TODO: csvsort places empty strings after non-empty strings, so we should use miller instead
-    # to first replace empty strings with a string like 0000_first, then sort, then replace the string with an empty string
-    # uvx --from csvkit csvsort -c year,month,date,timetype,job,division,qty,nc,surname,givenName "$file" > "$file.sorted" && mv "$file.sorted" "$file"
+    # Apply transformations. csvsort and miller both place empty strings after
+    # non-empty strings, so we must first replace empty strings with a
+    # placeholder string like 0000_first, then sort, then replace the
+    # placeholder string with an empty string. This is relatively simple in
+    # miller, but not in csvsort. Here we use miller to perform and undo the
+    # substitutions, sorting the records in between.
     mlr --csv put '
       for (k, v in $*) {
         if (v == "") { $[k] = "0000_first" }
