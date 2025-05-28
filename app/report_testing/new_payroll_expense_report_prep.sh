@@ -1,8 +1,8 @@
 #!/bin/bash
 
 # Define source and destination directories
-SOURCE_DIR="expenses/new_unmodified"
-DEST_DIR="expenses/new_preprocessed"
+SOURCE_DIR="expenses_payroll/new_unmodified"
+DEST_DIR="expenses_payroll/new_preprocessed"
 
 # Check if source directory exists
 if [ ! -d "$SOURCE_DIR" ]; then
@@ -29,8 +29,8 @@ echo "Processing files in '$DEST_DIR'..."
 for file in "$DEST_DIR"/*.csv; do
   if [ -f "$file" ]; then
     echo "Processing $file..."
-    # Apply transformations
-    sed -i '' 's/Joseph Za/Joe Za/g' "$file"
+    # Apply transformations using miller for CSV processing
+    mlr --csv put 'for (k in $*) { $[k] = gsub($[k], "Joseph Za", "Joe Za") }' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
   fi
 done
 
