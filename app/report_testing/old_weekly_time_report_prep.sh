@@ -29,12 +29,7 @@ echo "Processing files in '$DEST_DIR'..."
 for file in "$DEST_DIR"/*.csv; do
   if [ -f "$file" ]; then
     echo "Processing $file..."
-    # Apply transformations. csvsort and miller both place empty strings after
-    # non-empty strings, so we must first replace empty strings with a
-    # placeholder string like 0000_first, then sort, then replace the
-    # placeholder string with an empty string. This is relatively simple in
-    # miller, but not in csvsort. Here we use miller to perform and undo the
-    # substitutions, sorting the records in between.
+    # Apply transformations
     mlr --csv put '
       for (k, v in $*) {
         if (v == "") { $[k] = "0000_first" }
@@ -43,7 +38,7 @@ for file in "$DEST_DIR"/*.csv; do
       for (k, v in $*) {
         if (v == "0000_first") { $[k] = "" }
       }
-    ' > "${file}.sorted" && mv "${file}.sorted" "$file"
+    ' > "${file}.tmp" && mv "${file}.tmp" "$file"
 
   fi
 done
