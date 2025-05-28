@@ -29,14 +29,10 @@ echo "Processing files in '$DEST_DIR'..."
 for file in "$DEST_DIR"/*.csv; do
   if [ -f "$file" ]; then
     echo "Processing $file..."
-    # Apply transformations
-    sed -i '' 's/Dinner "/Dinner"/g' "$file"
-    sed -i '' 's/Lunch "/Lunch"/g' "$file"
-    sed -i '' 's/Breakfast "/Breakfast"/g' "$file"
-    sed -i '' 's/Lodging "/Lodging"/g' "$file"
-
-    # miller defaults to minimal quoting. Use cat here to strip quotes.
-    mlr --csv cat "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+    # Trim trailing whitespace from Description field
+    mlr --csv put 'for (k in $*) { 
+      $Description = gsub($Description, " +$", "")
+    }' "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
   fi
 done
 
