@@ -81,14 +81,15 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 }
 
 // CreateTimeReportHandler returns a function that creates a weekly time report for a given value of date_column (provided in the request path)
-func CreateTimeReportHandler(app core.App, dateColumnName string) func(e *core.RequestEvent) error {
+func CreateTimeReportHandler(app core.App, dateColumnEntriesName string, dateColumnAmendmentsName string) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		dateColumnValue, err := getDateColumnValue(e, false)
 		if err != nil {
 			return err
 		}
 
-		timeQuery := strings.ReplaceAll(weeklyTimeQueryTemplate, "{:date_column}", dateColumnName)
+		timeQuery := strings.ReplaceAll(weeklyTimeQueryTemplate, "{:date_column_entries}", dateColumnEntriesName)
+		timeQuery = strings.ReplaceAll(timeQuery, "{:date_column_amendments}", dateColumnAmendmentsName)
 
 		// Execute the query
 		var report []dbx.NullStringMap

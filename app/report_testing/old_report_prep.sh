@@ -95,6 +95,11 @@ process_weekly_time() {
     mlr --csv put '
       for (k, v in $*) {
         if (v == "") { $[k] = "0000_first" }
+        $client = gsub($client, " +$", "");
+        if (typeof($[k]) == "string") {
+          $[k] = gsub($[k], "Joe Za", "Joseph Za");
+          $[k] = gsub($[k], "Chris Yl", "Christopher Yl")
+        }
       }
     ' "$file" | mlr --csv sort -n -f year,month,date,timetype,job,division,qty,nc,surname,givenName | mlr --csv put '
       for (k, v in $*) {

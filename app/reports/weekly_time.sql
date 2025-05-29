@@ -33,7 +33,7 @@ FROM (
   LEFT JOIN time_sheets ts ON te_int.tsid = ts.id
   WHERE tsid != ''
     AND ts.committed != ''
-    AND te_int.{:date_column} = {:date_column_value}
+    AND te_int.{:date_column_entries} = {:date_column_value}
 
   UNION ALL
   SELECT ta.uid,
@@ -45,10 +45,10 @@ FROM (
   ta.meals_hours,
   ta.work_record,
   ta.description,
-  'True' amended
+  'true' amended
   FROM time_amendments ta
   WHERE ta.committed != ''
-    AND ta.{:date_column} = {:date_column_value}
+    AND ta.{:date_column_amendments} = {:date_column_value}
 ) te
 LEFT JOIN jobs j ON te.job = j.id
 LEFT JOIN clients c ON j.client = c.id
