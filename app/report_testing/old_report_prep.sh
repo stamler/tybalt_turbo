@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Usage: ./old_report_prep.sh <base_dir> <processing_type>
-# Processing types: expense, payroll_time, weekly_time
+# Processing types: expense, payroll_time, weekly_time, time_summary
 
 # Check if correct number of arguments provided
 if [ "$#" -ne 2 ]; then
     echo "Usage: $0 <base_dir> <processing_type>"
-    echo "Processing types: expense, payroll_time, weekly_time"
+    echo "Processing types: expense, payroll_time, weekly_time, time_summary"
     echo "Expected structure: <base_dir>/old_unmodified/ (source)"
     echo "Will create: <base_dir>/old_preprocessed/ (destination)"
     exit 1
@@ -22,11 +22,11 @@ DEST_DIR="$BASE_DIR/old_preprocessed"
 
 # Validate processing type
 case "$PROCESSING_TYPE" in
-    expense|payroll_time|weekly_time)
+    expense|payroll_time|weekly_time|time_summary)
         ;;
     *)
         echo "Invalid processing type: $PROCESSING_TYPE"
-        echo "Valid types: expense, payroll_time, weekly_time"
+        echo "Valid types: expense, payroll_time, weekly_time, time_summary"
         exit 1
         ;;
 esac
@@ -108,6 +108,11 @@ process_weekly_time() {
     ' > "${file}.tmp" && mv "${file}.tmp" "$file"
 }
 
+# Function to process time summary files
+process_time_summary() {
+    local file="$1"
+    mlr --csv cat "$file" > "${file}.tmp" && mv "${file}.tmp" "$file"
+}
 # Process each CSV file in the destination directory
 echo "Processing files in '$DEST_DIR' with $PROCESSING_TYPE processing..."
 for file in "$DEST_DIR"/*.csv; do
@@ -122,6 +127,9 @@ for file in "$DEST_DIR"/*.csv; do
             ;;
         weekly_time)
             process_weekly_time "$file"
+            ;;
+        time_summary)
+            process_time_summary "$file"
             ;;
     esac
   fi
