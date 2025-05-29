@@ -3,6 +3,7 @@ import type {
   CategoriesResponse,
   ClientContactsResponse,
   BaseSystemFields,
+  PurchaseOrdersAugmentedResponse,
 } from "$lib/pocketbase-types";
 import { type UnsubscribeFunc } from "pocketbase";
 import { pb } from "$lib/pocketbase";
@@ -378,47 +379,55 @@ export async function downloadZip(endpoint: string, fileName: string) {
 }
 
 
-  // This function subscribes to collectionName and updates the items in its
-  // first argument using the record with the corresponding id from the view
-  export function augmentedProxySubscription<
-    CollectionResponse extends BaseSystemFields,
-    ViewResponse extends { id: string },
-  >(
-    localArray: ViewResponse[],
-    collectionName: string,
-    viewName: string,
-    updateCallback: (newArray: ViewResponse[]) => void,
-    createdItemIsVisible: undefined | ((record: CollectionResponse) => boolean) = undefined,
-  ): Promise<UnsubscribeFunc> {
-    // Subscribe to collectionName and act on the changes
-    return pb.collection(collectionName).subscribe<CollectionResponse>("*", async (e) => {
-      // return immediately if items is not an array
-      if (!Array.isArray(localArray)) return;
-      const id = e.record.id;
-      let augmentedRecord: ViewResponse;
-      console.log(`Update with action ${e.action} for record ${id}`);
-      switch (e.action) {
-        case "create":
-          // if the record should be ignored, return immediately
-          if (createdItemIsVisible !== undefined && !createdItemIsVisible(e.record)) {
-            console.log(`Ignoring ${id} due to createdItemIsVisible returning false`);
-            return;
-          }
-          // load the augmented record and insert it at the top of the list
-          augmentedRecord = await pb.collection(viewName).getOne(id);
-          localArray = [augmentedRecord, ...localArray];
-          break;
-        case "update":
-          // reload the corresponding augmented record and replace the old
-          // item in the list with the new one
-          augmentedRecord = await pb.collection(viewName).getOne(id);
-          localArray = localArray.map((item) => (item.id === e.record.id ? augmentedRecord : item));
-          break;
-        case "delete":
-          localArray = localArray.filter((item) => item.id !== e.record.id);
-          break;
-      }
-      updateCallback(localArray);
-    });
-  }
+// This function subscribes to collectionName and updates the items in its
+// first argument using the record with the corresponding id from the view
+export function augmentedProxySubscription<
+  CollectionResponse extends BaseSystemFields,
+  ViewResponse extends { id: string },
+>(
+  localArray: ViewResponse[],
+  collectionName: string,
+  viewName: string,
+  updateCallback: (newArray: ViewResponse[]) => void,
+  createdItemIsVisible: undefined | ((record: CollectionResponse) => boolean) = undefined,
+): Promise<UnsubscribeFunc> {
+  // Subscribe to collectionName and act on the changes
+  return pb.collection(collectionName).subscribe<CollectionResponse>("*", async (e) => {
+    // return immediately if items is not an array
+    if (!Array.isArray(localArray)) return;
+    const id = e.record.id;
+    let augmentedRecord: ViewResponse;
+    console.log(`Update with action ${e.action} for record ${id}`);
+    switch (e.action) {
+      case "create":
+        // if the record should be ignored, return immediately
+        if (createdItemIsVisible !== undefined && !createdItemIsVisible(e.record)) {
+          console.log(`Ignoring ${id} due to createdItemIsVisible returning false`);
+          return;
+        }
+        // load the augmented record and insert it at the top of the list
+        augmentedRecord = await pb.collection(viewName).getOne(id);
+        localArray = [augmentedRecord, ...localArray];
+        break;
+      case "update":
+        // reload the corresponding augmented record and replace the old
+        // item in the list with the new one
+        augmentedRecord = await pb.collection(viewName).getOne(id);
+        localArray = localArray.map((item) => (item.id === e.record.id ? augmentedRecord : item));
+        break;
+      case "delete":
+        localArray = localArray.filter((item) => item.id !== e.record.id);
+        break;
+    }
+    updateCallback(localArray);
+  });
+}
 
+export function poActiveDate(record: PurchaseOrdersAugmentedResponse): string {
+  // return the first 10 characters the second_approval (if not undefined) or of
+  // the approved.
+  if (record.second_approval) {
+    return record.second_approval.substring(0, 10);
+  }
+  return record.approved.substring(0, 10);
+}

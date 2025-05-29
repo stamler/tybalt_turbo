@@ -176,6 +176,13 @@
                 >All Active</a
               >
             </div>
+            <div class="flex h-8 items-center pr-2">
+              <a
+                href="/pos/stale"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
+                >Stale</a
+              >
+            </div>
           </div>
           <div class="mt-2">
             <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Expenses</p>

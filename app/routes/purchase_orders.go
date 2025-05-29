@@ -751,7 +751,7 @@ func GeneratePONumber(txApp core.App, record *core.Record, testDateComponents ..
 	}
 	txApp.Logger().Debug("Last PO number", "lastNumber", lastNumber)
 	// Generate the new PO number
-	for i := lastNumber + 1; i < 5000; i++ {
+	for i := lastNumber + 1; i < 6000; i++ {
 		newPONumber := fmt.Sprintf("%s%04d", prefix, i)
 
 		// Check if the generated PO number is unique
