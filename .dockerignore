@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+
+# Documentation
+README.md
+*.md
+
+# IDE and editor files
+.vscode/
+.cursor/
+.DS_Store
+
+# Node.js
+ui/node_modules/
+ui/.svelte-kit/
+ui/build/
+
+# Go
+app/tybalt
+app/pb_data/
+app/test_pb_data/
+app/coverage.out
+app/*.log
+
+# Build artifacts
+build/
+dist/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+tmp/
+temp/
+
+# OS generated files
+Thumbs.db
+*.swp
+*.swo
+*~
+
+# Test files
+*_test.go
+
+# Development specific
+import_data/
+descriptions/
+prompts/ 

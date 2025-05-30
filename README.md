@@ -1,14 +1,61 @@
 # Tybalt Turbo
 
-A modern, fast implementation of Tybalt built with Go and SvelteKit.
+A PocketBase-powered application with Svelte frontend.
 
 ## Project Structure
 
-- `app/` - Backend application written in Go using the PocketBase framework
-- `ui/` - Frontend application written in SvelteKit with Svelte 5
-- `descriptions/` - Project documentation and descriptions
-- `import_data/` - Data import utilities
-- `prompts/` - System prompts and configurations
+```text
+/
+├── app/                    # Go backend (PocketBase)
+│   ├── migrations/         # Database migrations
+│   ├── routes/             # API routes
+│   ├── hooks/              # Database hooks
+│   └── main.go             # Application entry point
+├── ui/                     # Svelte frontend
+│   ├── src/                # Svelte source code
+│   └── build/              # Built UI assets
+├── scripts/                # Deployment and utility scripts
+│   ├── deploy.sh           # Production deployment script
+│   └── docker-run.sh       # Docker/Podman convenience script
+├── docs/                   # Documentation
+│   └── DEPLOYMENT.md       # Deployment guide
+├── Dockerfile              # Container build instructions
+├── docker-compose.yml      # Container orchestration
+└── .dockerignore           # Docker build exclusions
+```
+
+## Key Features
+
+- **PocketBase backend** with custom Go extensions
+- **Svelte frontend** with modern UI components
+- **Docker/Podman support** for containerized deployment
+- **Automatic migrations** for database schema changes
+- **HTTPS support** with Let's Encrypt integration
+- **Production-ready** deployment scripts with backup/rollback
+
+## Quick Start
+
+### Production Deployment
+
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for comprehensive deployment instructions.
+
+**Quick deployment:**
+
+```bash
+./scripts/deploy.sh deploy
+```
+
+### Development Setup
+
+**Quick start:**
+
+```bash
+# Backend
+cd app && go run main.go serve
+
+# Frontend  
+cd ui && npm run dev
+```
 
 ## Getting Started
 
@@ -40,8 +87,6 @@ go mod download
 cd ui
 npm install  # or pnpm install
 ```
-
-## Development
 
 ### Running the Application
 

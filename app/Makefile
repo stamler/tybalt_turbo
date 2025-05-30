@@ -1,4 +1,4 @@
-.PHONY: all clean ui-build go-build
+.PHONY: all clean ui-build go-build dev run migrate-up migrate-down migrate-list migrate-up-step migrate-down-step deploy-build test-report
 
 # Default target
 all: clean ui-build go-build
@@ -33,6 +33,35 @@ dev: all
 run:
 	@echo "Starting server..."
 	./tybalt serve
+
+# Migration commands
+migrate-up:
+	@echo "Applying migrations..."
+	./tybalt migrate up
+
+migrate-down:
+	@echo "Rolling back last migration..."
+	./tybalt migrate down --step=1
+
+migrate-list:
+	@echo "Listing migration status..."
+	./tybalt migrate list
+
+# Apply specific number of migrations
+migrate-up-step:
+	@echo "Applying migrations (step by step)..."
+	@read -p "Number of steps: " steps; \
+	./tybalt migrate up --step=$$steps
+
+# Rollback specific number of migrations  
+migrate-down-step:
+	@echo "Rolling back migrations (step by step)..."
+	@read -p "Number of steps: " steps; \
+	./tybalt migrate down --step=$$steps
+
+# Production deployment helper
+deploy-build: all
+	@echo "Production build complete. Ready for deployment."
 
 test-report:
 	go test ./... -v --cover -coverprofile=coverage.out
