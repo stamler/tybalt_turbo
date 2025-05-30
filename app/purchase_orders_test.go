@@ -520,8 +520,8 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
 				"type": "Normal",
-				"job": "non-matching-job",
-				"category": "t5nmdl188gtlhz0"
+				"job": "tt4eipt6wapu9zh",
+				"category": "he1f7oej613mxh7"
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,

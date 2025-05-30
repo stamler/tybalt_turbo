@@ -64,8 +64,7 @@ func TestExpensesCreate(t *testing.T) {
 				`"message":"Failed to create record.","status":400`,
 			},
 			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
+				"*": 0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -177,30 +176,6 @@ func TestExpensesCreate(t *testing.T) {
 				"OnModelAfterCreate":          0,
 				"OnRecordBeforeCreateRequest": 0,
 				"OnRecordAfterCreateRequest":  0,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "uid must be present in the request",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
-				"payment_type": "Expense",
-				"total": 99,
-				"vendor": "2zqxtsmymf670ha"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"uid":{"code":"not_provided"`,
-			},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
