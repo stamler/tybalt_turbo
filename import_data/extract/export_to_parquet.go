@@ -142,10 +142,11 @@ func ToParquet() {
 			`
 		} else if table == "TimeEntries" {
 			// weekEnding should be a string in the format YYYY-MM-DD
+			// Generate deterministic pocketbase_id using MD5 hash of the existing id
 			query = `
 				COPY (
 					SELECT * EXCLUDE (date),
-						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id,
+						substr(md5(CAST(id AS VARCHAR)), 1, 15) AS pocketbase_id,
 						CAST(date AS VARCHAR) AS date
 					FROM mysql_db.TimeEntries
 				) TO 'parquet/TimeEntries.parquet' (FORMAT PARQUET)
@@ -174,10 +175,11 @@ func ToParquet() {
 				`
 		} else {
 			// Generic query for other tables, just adding pocketbase_id
+			// Generate deterministic pocketbase_id using MD5 hash of the existing id
 			query = fmt.Sprintf(`
 				COPY (
 					SELECT *,
-						array_to_string(array_slice(array_apply(range(15), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, 15), '') AS pocketbase_id
+						substr(md5(CAST(id AS VARCHAR)), 1, 15) AS pocketbase_id
 					FROM mysql_db.%s
 				) TO 'parquet/%s.parquet' (FORMAT PARQUET)
 			`, table, table)

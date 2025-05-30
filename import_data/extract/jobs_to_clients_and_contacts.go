@@ -18,13 +18,13 @@ func jobsToClientsAndContacts() {
 		log.Fatalf("Failed to open database: %v", err)
 	}
 
-	// Create random_string() UDF in DuckDB
+	// Create deterministic ID generation macro in DuckDB
 	_, err = db.Exec(`
-CREATE OR REPLACE MACRO make_pocketbase_id(length)
-AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, length), '');
+CREATE OR REPLACE MACRO make_pocketbase_id(source_value, length)
+AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 `)
 	if err != nil {
-		log.Fatalf("Failed to create random_string() UDF: %v", err)
+		log.Fatalf("Failed to create make_pocketbase_id macro: %v", err)
 	}
 
 	defer db.Close()
@@ -36,23 +36,24 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 
 		-- Create the clients table, removing duplicate names and including job owners
 		CREATE TABLE clients AS
-		SELECT make_pocketbase_id(15) AS id, name
+		SELECT make_pocketbase_id(name, 15) AS id, name
 		FROM (
 		    SELECT DISTINCT t_client AS name FROM jobs WHERE t_client IS NOT NULL AND t_client != ''
 		    UNION
 		    SELECT DISTINCT t_jobOwner AS name FROM jobs WHERE t_jobOwner IS NOT NULL AND t_jobOwner != ''
-		);
+		) ORDER BY name;
 
 		COPY clients TO 'parquet/Clients.parquet' (FORMAT PARQUET);
 
 		-- Create the contacts table where name is trimmed
 		CREATE TABLE contacts AS
-		SELECT make_pocketbase_id(15) AS id, clientContact AS name, c.id AS client_id
+		SELECT make_pocketbase_id(CONCAT(clientContact, '|', client), 15) AS id, clientContact AS name, c.id AS client_id
 		FROM (
 				SELECT DISTINCT t_clientContact AS clientContact, t_client AS client
 				FROM jobs
 				WHERE t_clientContact IS NOT NULL AND t_clientContact != '' 
 					AND t_client IS NOT NULL AND t_client != ''
+				ORDER BY t_clientContact, t_client
 		) unique_contacts
 		JOIN clients c ON unique_contacts.client = c.name;
 
@@ -78,7 +79,8 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 			ELSE array_to_string(list_slice(parts, 1, len(parts) - 1), ' ')
 		END AS givenName
 		FROM
-			NameParts;
+			NameParts
+		ORDER BY name, client_id;
 
 		COPY contacts_augmented TO 'parquet/Contacts.parquet' (FORMAT PARQUET);
 		
@@ -98,7 +100,8 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 		FROM jobs
 		LEFT JOIN clients ON jobs.client_id = clients.id
 		LEFT JOIN clients AS job_owners ON jobs.job_owner_id = clients.id
-		LEFT JOIN contacts ON jobs.contact_id = contacts.id;
+		LEFT JOIN contacts ON jobs.contact_id = contacts.id
+		ORDER BY jobs.id;
 
 		COPY jobs_audit TO 'parquet/Jobs_audit.parquet' (FORMAT PARQUET);
 
@@ -109,7 +112,7 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 		-- ALTER TABLE jobs RENAME client_id TO client;
 		-- ALTER TABLE jobs RENAME contact_id TO clientContact;
 
-		COPY jobs TO 'parquet/Jobs.parquet' (FORMAT PARQUET);`
+		COPY (SELECT * FROM jobs ORDER BY id) TO 'parquet/Jobs.parquet' (FORMAT PARQUET);`
 
 	_, err = db.Exec(splitQuery)
 	if err != nil {

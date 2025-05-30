@@ -17,13 +17,13 @@ func expensesToPurchaseOrders() {
 		log.Fatalf("Failed to open database: %v", err)
 	}
 
-	// Create random_string() UDF in DuckDB
+	// Create deterministic ID generation macro in DuckDB
 	_, err = db.Exec(`
-CREATE OR REPLACE MACRO make_pocketbase_id(length)
-AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, length), '');
+CREATE OR REPLACE MACRO make_pocketbase_id(source_value, length)
+AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 `)
 	if err != nil {
-		log.Fatalf("Failed to create random_string() UDF: %v", err)
+		log.Fatalf("Failed to create make_pocketbase_id macro: %v", err)
 	}
 
 	defer db.Close()
@@ -35,9 +35,10 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 
 		-- Create the purchase_orders table, removing duplicate names
 		CREATE TABLE purchase_orders AS
-		SELECT make_pocketbase_id(15) AS id, number
+		SELECT make_pocketbase_id(number, 15) AS id, number
 		FROM (
 		    SELECT DISTINCT t_po AS number FROM expenses WHERE t_po IS NOT NULL AND t_po != ''
+		    ORDER BY number
 		);
 
 		COPY purchase_orders TO 'parquet/purchase_orders.parquet' (FORMAT PARQUET);

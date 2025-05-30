@@ -3,6 +3,7 @@ package load
 import (
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/parquet-go/parquet-go"
@@ -218,7 +219,8 @@ type PurchaseOrder struct {
 // sqliteTableName: Name of the target table (used for logging).
 // insertSQL: The parameterized INSERT statement (e.g., "INSERT INTO table (col1, col2) VALUES ({:p1}, {:p2})").
 // binder: A function that takes an item of type T and returns a dbx.Params map suitable for binding to insertSQL.
-func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTableName string, insertSQL string, binder func(item T) dbx.Params) {
+// upsert: If true, uses INSERT OR REPLACE to handle duplicate keys gracefully.
+func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTableName string, insertSQL string, binder func(item T) dbx.Params, upsert bool) {
 	// --- Parquet Reading (Generic) ---
 	items, err := parquet.ReadFile[T](parquetFilePath)
 	if err != nil {
@@ -231,6 +233,11 @@ func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTable
 		panic(err)
 	}
 	defer db.Close()
+
+	// Convert INSERT to INSERT OR REPLACE if upsert is true
+	if upsert {
+		insertSQL = strings.Replace(insertSQL, "INSERT INTO", "INSERT OR REPLACE INTO", 1)
+	}
 
 	fmt.Printf("Inserting %d items into %s...\n", len(items), sqliteTableName)
 	insertedCount := 0

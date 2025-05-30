@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -10,12 +11,12 @@ import (
 	"log"
 	"path"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/marcboeker/go-duckdb" // DuckDB driver (blank import for side-effect registration)
 	"github.com/pocketbase/dbx"
+	_ "modernc.org/sqlite" // SQLite driver for deletion cleanup
 )
 
 var expenseCollectionId = "o1vpz1mm7qsfoyy"
@@ -33,6 +34,7 @@ func main() {
 	exportFlag := flag.Bool("export", false, "Export data to Parquet files")
 	importFlag := flag.Bool("import", false, "Import data from Parquet files")
 	attachmentsFlag := flag.Bool("attachments", false, "Import attachments from GCS to S3")
+	cleanupFlag := flag.Bool("cleanup", false, "Clean up deleted records after import")
 	flag.Parse()
 
 	if *exportFlag {
@@ -45,7 +47,7 @@ func main() {
 
 		// --- Load Clients ---
 		// Define the specific SQL for the clients table
-		clientInsertSQL := "INSERT INTO clients (id, name) VALUES ({:id}, {:name})"
+		clientInsertSQL := "INSERT INTO clients (id, name, _imported) VALUES ({:id}, {:name}, true)"
 
 		// Define the binder function for the Client type
 		clientBinder := func(item load.Client) dbx.Params {
@@ -62,11 +64,12 @@ func main() {
 			"clients",       // Table name (for logging)
 			clientInsertSQL, // The specific INSERT SQL
 			clientBinder,    // The specific binder function
+			true,            // Enable upsert for idempotency
 		)
 
 		// --- Load Contacts ---
 		// Define the specific SQL for the contacts table
-		contactInsertSQL := "INSERT INTO client_contacts (id, surname, given_name, client) VALUES ({:id}, {:surname}, {:given_name}, {:client})"
+		contactInsertSQL := "INSERT INTO client_contacts (id, surname, given_name, client, _imported) VALUES ({:id}, {:surname}, {:given_name}, {:client}, true)"
 
 		// Define the binder function for the Contact type
 		contactBinder := func(item load.ClientContact) dbx.Params {
@@ -85,6 +88,7 @@ func main() {
 			"client_contacts", // Table name (for logging)
 			contactInsertSQL,  // The specific INSERT SQL
 			contactBinder,     // The specific binder function
+			true,              // Enable upsert for idempotency
 		)
 
 		// --- Load Users ---
@@ -110,12 +114,13 @@ func main() {
 			"users",       // Table name (for logging)
 			userInsertSQL, // The specific INSERT SQL
 			userBinder,    // The specific binder function
+			true,          // Enable upsert for idempotency
 		)
 
 		// --- Load Jobs ---
 		// Define the specific SQL for the jobs table
 		// TODO: categories
-		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal, divisions, job_owner) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal}, {:divisions}, {:job_owner})"
+		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal, divisions, job_owner, _imported) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal}, {:divisions}, {:job_owner}, true)"
 
 		// Define the binder function for the Job type
 		jobBinder := func(item load.Job) dbx.Params {
@@ -145,11 +150,12 @@ func main() {
 			"jobs",       // Table name (for logging)
 			jobInsertSQL, // The specific INSERT SQL
 			jobBinder,    // The specific binder function
+			true,         // Enable upsert for idempotency
 		)
 
 		// --- Load Categories ---
 		// Define the specific SQL for the categories table
-		categoryInsertSQL := "INSERT INTO categories (id, name, job) VALUES ({:id}, {:name}, {:job})"
+		categoryInsertSQL := "INSERT INTO categories (id, name, job, _imported) VALUES ({:id}, {:name}, {:job}, true)"
 
 		// Define the binder function for the Category type
 		categoryBinder := func(item load.Category) dbx.Params {
@@ -167,6 +173,7 @@ func main() {
 			"categories",      // Table name (for logging)
 			categoryInsertSQL, // The specific INSERT SQL
 			categoryBinder,    // The specific binder function
+			true,              // Enable upsert for idempotency
 		)
 
 		// --- Load Admin Profiles ---
@@ -174,7 +181,7 @@ func main() {
 		// default_charge_out_rate, opening_ov are type Decimal and so need to be case to float then divided by 100 (Decimal 6,2), opening_op needs to be divided by 10 (Decimal 5,1)
 		// if work_week_hours is 0, set it to 40
 		// default_charge_out_rate should be set to 50 if it is 0
-		adminProfileInsertSQL := "INSERT INTO admin_profiles (uid, work_week_hours, salary, default_charge_out_rate, off_rotation_permitted, skip_min_time_check, opening_date, opening_op, opening_ov, payroll_id, untracked_time_off, time_sheet_expected, allow_personal_reimbursement, mobile_phone, job_title, personal_vehicle_insurance_expiry) VALUES ({:uid}, IIF({:work_week_hours} = 0, 40, {:work_week_hours}), {:salary}, IIF({:default_charge_out_rate} = 0, 50, CAST({:default_charge_out_rate} AS REAL) / 100), {:off_rotation_permitted}, IIF({:skip_min_time_check} IS false, 'no', 'on_next_bundle'), {:opening_date}, CAST({:opening_op} AS REAL) / 10, CAST({:opening_ov} AS REAL) / 100, {:payroll_id}, {:untracked_time_off}, {:time_sheet_expected}, {:allow_personal_reimbursement}, {:mobile_phone}, {:job_title}, {:personal_vehicle_insurance_expiry})"
+		adminProfileInsertSQL := "INSERT INTO admin_profiles (uid, work_week_hours, salary, default_charge_out_rate, off_rotation_permitted, skip_min_time_check, opening_date, opening_op, opening_ov, payroll_id, untracked_time_off, time_sheet_expected, allow_personal_reimbursement, mobile_phone, job_title, personal_vehicle_insurance_expiry, _imported) VALUES ({:uid}, IIF({:work_week_hours} = 0, 40, {:work_week_hours}), {:salary}, IIF({:default_charge_out_rate} = 0, 50, CAST({:default_charge_out_rate} AS REAL) / 100), {:off_rotation_permitted}, IIF({:skip_min_time_check} IS false, 'no', 'on_next_bundle'), {:opening_date}, CAST({:opening_op} AS REAL) / 10, CAST({:opening_ov} AS REAL) / 100, {:payroll_id}, {:untracked_time_off}, {:time_sheet_expected}, {:allow_personal_reimbursement}, {:mobile_phone}, {:job_title}, {:personal_vehicle_insurance_expiry}, true)"
 
 		// Define the binder function for the Admin type
 		adminProfileBinder := func(item load.Profile) dbx.Params {
@@ -205,11 +212,12 @@ func main() {
 			"admin_profiles",      // Table name (for logging)
 			adminProfileInsertSQL, // The specific INSERT SQL
 			adminProfileBinder,    // The specific binder function
+			true,                  // Enable upsert for idempotency
 		)
 
 		// --- Load Profiles ---
 		// Define the specific SQL for the profiles table
-		profileInsertSQL := "INSERT INTO profiles (surname, given_name, manager, alternate_manager, default_division, uid, notification_type, do_not_accept_submissions) VALUES ({:surname}, {:given_name}, {:manager}, {:alternate_manager}, {:default_division}, {:uid}, 'email_text', {:do_not_accept_submissions})"
+		profileInsertSQL := "INSERT INTO profiles (surname, given_name, manager, alternate_manager, default_division, uid, notification_type, do_not_accept_submissions, _imported) VALUES ({:surname}, {:given_name}, {:manager}, {:alternate_manager}, {:default_division}, {:uid}, 'email_text', {:do_not_accept_submissions}, true)"
 
 		// Define the binder function for the Profile type
 		profileBinder := func(item load.Profile) dbx.Params {
@@ -231,6 +239,7 @@ func main() {
 			"profiles",       // Table name (for logging)
 			profileInsertSQL, // The specific INSERT SQL
 			profileBinder,    // The specific binder function
+			true,             // Enable upsert for idempotency
 		)
 
 		// --- Load _externalAuths ---
@@ -252,15 +261,14 @@ func main() {
 			"_externalAuths",      // Table name (for logging)
 			externalAuthInsertSQL, // The specific INSERT SQL
 			externalAuthBinder,    // The specific binder function
+			true,                  // Enable upsert for idempotency
 		)
 
 		// --- Load TimeSheets ---
-		// create a time value for the committed and approved fields
-		now := time.Now()
-		// format the time value as a string like 2024-10-18 12:00:00.000Z
-		nowString := now.Format("2006-01-02 15:04:05.000Z")
+		// Use a fixed timestamp for idempotency instead of dynamic time.Now()
+		fixedTimestamp := "2025-05-30 00:00:00.000Z"
 		// Define the specific SQL for the time_sheets table
-		timeSheetInsertSQL := "INSERT INTO time_sheets (id, uid, work_week_hours, salary, week_ending, submitted, approver, approved, committed, committer, payroll_id) VALUES ({:id}, {:uid}, {:work_week_hours}, {:salary}, {:week_ending}, 1, {:approver}, {:approved}, {:committed}, {:committer}, {:payroll_id})"
+		timeSheetInsertSQL := "INSERT INTO time_sheets (id, uid, work_week_hours, salary, week_ending, submitted, approver, approved, committed, committer, payroll_id, _imported) VALUES ({:id}, {:uid}, {:work_week_hours}, {:salary}, {:week_ending}, 1, {:approver}, {:approved}, {:committed}, {:committer}, {:payroll_id}, true)"
 
 		// Define the binder function for the TimeSheet type
 		timeSheetBinder := func(item load.TimeSheet) dbx.Params {
@@ -272,9 +280,9 @@ func main() {
 				"payroll_id":      item.PayrollId,
 				"salary":          item.Salary,
 				"week_ending":     item.WeekEnding,
-				"submitted":       nowString,
-				"approved":        nowString,
-				"committed":       nowString,
+				"submitted":       fixedTimestamp,
+				"approved":        fixedTimestamp,
+				"committed":       fixedTimestamp,
 				"committer":       "wegviunlyr2jjjv", // a temporary value that works for the test database
 			}
 		}
@@ -286,6 +294,7 @@ func main() {
 			"time_sheets",      // Table name (for logging)
 			timeSheetInsertSQL, // The specific INSERT SQL
 			timeSheetBinder,    // The specific binder function
+			true,               // Enable upsert for idempotency
 		)
 
 		// --- Load TimeEntries ---
@@ -307,7 +316,8 @@ func main() {
 				date,
 				week_ending,
 				tsid,
-				category
+				category,
+				_imported
 			) VALUES (
 			 	{:division}, 
 				{:uid},
@@ -321,7 +331,8 @@ func main() {
 				{:date}, 
 				{:week_ending}, 
 				{:tsid}, 
-				{:category}
+				{:category},
+				true
 			)`
 
 		// Define the binder function for the TimeEntry type
@@ -351,6 +362,7 @@ func main() {
 			"time_entries",     // Table name (for logging)
 			timeEntryInsertSQL, // The specific INSERT SQL
 			timeEntryBinder,    // The specific binder function
+			true,               // Enable upsert for idempotency
 		)
 
 		// --- Load TimeAmendments ---
@@ -374,7 +386,8 @@ func main() {
 				committed,
 				committer,
 				committed_week_ending,
-				skip_tsid_check
+				skip_tsid_check,
+				_imported
 			) VALUES (
 				{:division},
 				{:uid},
@@ -393,7 +406,8 @@ func main() {
 				{:committed},
 				{:committer},
 				{:committed_week_ending},
-				false
+				false,
+				true
 			)`
 
 		// Define the binder function for the TimeAmendment type
@@ -428,11 +442,12 @@ func main() {
 			"time_amendments",      // Table name (for logging)
 			timeAmendmentInsertSQL, // The specific INSERT SQL
 			timeAmendmentBinder,    // The specific binder function
+			true,                   // Enable upsert for idempotency
 		)
 
 		// --- Load Vendors ---
 		// Define the specific SQL for the vendors table
-		vendorInsertSQL := "INSERT INTO vendors (id, name, status) VALUES ({:id}, {:name}, {:status})"
+		vendorInsertSQL := "INSERT INTO vendors (id, name, status, _imported) VALUES ({:id}, {:name}, {:status}, true)"
 
 		// Define the binder function for the Vendor type
 		vendorBinder := func(item load.Vendor) dbx.Params {
@@ -450,6 +465,7 @@ func main() {
 			"vendors",       // Table name (for logging)
 			vendorInsertSQL, // The specific INSERT SQL
 			vendorBinder,    // The specific binder function
+			true,            // Enable upsert for idempotency
 		)
 
 		// --- Load Purchase Orders ---
@@ -458,13 +474,14 @@ func main() {
 			"./parquet/purchase_orders.parquet",
 			"../app/test_pb_data/data.db",
 			"purchase_orders", // Table name (for logging)
-			`INSERT INTO purchase_orders (id, po_number, type, status, closed_by_system, description) VALUES ({:id}, {:po_number}, 'Normal', 'Closed', 1, 'Imported from Firebase Expenses')`,
+			`INSERT INTO purchase_orders (id, po_number, type, status, closed_by_system, description, _imported) VALUES ({:id}, {:po_number}, 'Normal', 'Closed', 1, 'Imported from Firebase Expenses', true)`,
 			func(item load.PurchaseOrder) dbx.Params {
 				return dbx.Params{
 					"id":        item.Id,
 					"po_number": item.PoNumber,
 				}
 			},
+			true, // Enable upsert for idempotency
 		)
 
 		// --- Load Expenses ---
@@ -491,7 +508,8 @@ func main() {
 			approved,
 			committer,
 			committed,
-			committed_week_ending
+			committed_week_ending,
+			_imported
 		) VALUES (
 			{:id},
 			{:uid},
@@ -514,7 +532,8 @@ func main() {
 			{:approved},
 			{:committer},
 			{:committed},
-			{:committed_week_ending}
+			{:committed_week_ending},
+			true
 		)`
 
 		// allowance_types is a json array of strings that are the types of
@@ -567,7 +586,7 @@ func main() {
 				}(),
 				"cc_last_4_digits":      item.CCLast4Digits,
 				"approver":              item.Approver,
-				"approved":              nowString,
+				"approved":              item.Approved,
 				"committer":             item.Committer,
 				"committed":             item.Committed.Format("2006-01-02 15:04:05.000Z"),
 				"committed_week_ending": item.CommittedWeekEnding,
@@ -581,11 +600,12 @@ func main() {
 			"expenses",       // Table name (for logging)
 			expenseInsertSQL, // The specific INSERT SQL
 			expenseBinder,    // The specific binder function
+			true,             // Enable upsert for idempotency
 		)
 
 		// --- Load User Claims ---
 		// Define the specific SQL for the user_claims table
-		userClaimInsertSQL := `INSERT INTO user_claims (uid, cid) VALUES ({:uid}, {:cid})`
+		userClaimInsertSQL := `INSERT INTO user_claims (uid, cid, _imported) VALUES ({:uid}, {:cid}, true)`
 
 		// Define the binder function for the UserClaim type
 		userClaimBinder := func(item load.UserClaim) dbx.Params {
@@ -602,6 +622,7 @@ func main() {
 			"user_claims",      // Table name (for logging)
 			userClaimInsertSQL, // The specific INSERT SQL
 			userClaimBinder,    // The specific binder function
+			true,               // Enable upsert for idempotency
 		)
 
 		// --- Load MileageResetDates ---
@@ -610,17 +631,253 @@ func main() {
 			"./parquet/MileageResetDates.parquet",
 			"../app/test_pb_data/data.db",
 			"mileage_reset_dates", // Table name (for logging)
-			`INSERT INTO mileage_reset_dates (id, date) VALUES ({:id}, {:date})`,
+			`INSERT INTO mileage_reset_dates (id, date, _imported) VALUES ({:id}, {:date}, true)`,
 			func(item load.MileageResetDate) dbx.Params {
 				return dbx.Params{
 					"id":   item.Id,
 					"date": item.Date,
 				}
 			},
+			true, // Enable upsert for idempotency
 		)
+
+		// Automatically run cleanup after import
+		if *cleanupFlag {
+			fmt.Println("Cleaning up deleted records...")
+			cleanupDeletedRecords()
+		}
+	}
+
+	if *cleanupFlag && !*importFlag {
+		fmt.Println("Cleaning up deleted records...")
+		cleanupDeletedRecords()
 	}
 
 	if *attachmentsFlag {
 		attachments.MigrateAttachments("./parquet/Expenses.parquet", "attachment", "destination_attachment", expenseCollectionId)
 	}
+}
+
+// cleanupDeletedRecords removes imported records that no longer exist in the current MySQL export
+func cleanupDeletedRecords() {
+	// Open connection to SQLite database
+	db, err := sql.Open("sqlite", "../app/test_pb_data/data.db")
+	if err != nil {
+		log.Fatalf("Failed to open database: %v", err)
+	}
+	defer db.Close()
+
+	// Define collections to clean up
+	cleanupTasks := []struct {
+		tableName   string
+		parquetFile string
+		idField     string // field name in parquet that contains the ID
+	}{
+		{"clients", "./parquet/Clients.parquet", "id"},
+		{"client_contacts", "./parquet/Contacts.parquet", "id"},
+		{"jobs", "./parquet/Jobs.parquet", "pocketbase_id"},
+		{"categories", "./parquet/Categories.parquet", "id"},
+		{"vendors", "./parquet/Vendors.parquet", "id"},
+		{"purchase_orders", "./parquet/purchase_orders.parquet", "id"},
+		{"expenses", "./parquet/Expenses.parquet", "pocketbase_id"},
+		{"profiles", "./parquet/Profiles.parquet", "pocketbase_id"},
+		{"admin_profiles", "./parquet/Profiles.parquet", "pocketbase_uid"},
+		{"user_claims", "./parquet/UserClaims.parquet", "uid"}, // user_claims uses uid+cid composite key, handle separately
+		{"time_sheets", "./parquet/TimeSheets.parquet", "pocketbase_id"},
+		{"time_entries", "./parquet/TimeEntries.parquet", "pocketbase_id"},
+		{"time_amendments", "./parquet/TimeAmendments.parquet", "pocketbase_id"},
+		{"mileage_reset_dates", "./parquet/MileageResetDates.parquet", "pocketbase_id"},
+	}
+
+	for _, task := range cleanupTasks {
+		fmt.Printf("Cleaning up %s...\n", task.tableName)
+
+		// Special handling for user_claims which has composite key
+		if task.tableName == "user_claims" {
+			cleanupUserClaims(db)
+			continue
+		}
+
+		// Get current IDs from Parquet file
+		currentIDs, err := getIDsFromParquet(task.parquetFile, task.idField)
+		if err != nil {
+			log.Printf("Error getting IDs from %s: %v", task.parquetFile, err)
+			continue
+		}
+
+		// Delete records that are imported but not in currentIDs
+		deletedCount, err := deleteOrphanedRecords(db, task.tableName, currentIDs)
+		if err != nil {
+			log.Printf("Error cleaning up %s: %v", task.tableName, err)
+			continue
+		}
+
+		if deletedCount > 0 {
+			fmt.Printf("  Deleted %d orphaned records from %s\n", deletedCount, task.tableName)
+		} else {
+			fmt.Printf("  No orphaned records found in %s\n", task.tableName)
+		}
+	}
+}
+
+// getIDsFromParquet extracts all IDs from a Parquet file
+func getIDsFromParquet(parquetFile, idField string) (map[string]bool, error) {
+	ids := make(map[string]bool)
+
+	// Setup DuckDB connection
+	db, err := sql.Open("duckdb", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open DuckDB: %v", err)
+	}
+	defer db.Close()
+
+	// Query to extract IDs from Parquet file
+	query := fmt.Sprintf("SELECT DISTINCT %s FROM read_parquet(?)", idField)
+	rows, err := db.Query(query, parquetFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Parquet file %s: %v", parquetFile, err)
+	}
+	defer rows.Close()
+
+	// Collect all IDs
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("failed to scan ID: %v", err)
+		}
+		if id != "" { // Skip empty IDs
+			ids[id] = true
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %v", err)
+	}
+
+	return ids, nil
+}
+
+// deleteOrphanedRecords deletes records where _imported=true but ID not in currentIDs
+func deleteOrphanedRecords(db *sql.DB, tableName string, currentIDs map[string]bool) (int, error) {
+	// Build list of current IDs for SQL IN clause
+	if len(currentIDs) == 0 {
+		// If no current IDs, delete all imported records
+		result, err := db.Exec(fmt.Sprintf("DELETE FROM %s WHERE _imported = true", tableName))
+		if err != nil {
+			return 0, err
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		return int(rowsAffected), err
+	}
+
+	// Convert map keys to slice for SQL IN clause
+	idList := make([]string, 0, len(currentIDs))
+	for id := range currentIDs {
+		idList = append(idList, fmt.Sprintf("'%s'", id))
+	}
+
+	// Delete imported records whose IDs are not in the current export
+	query := fmt.Sprintf("DELETE FROM %s WHERE _imported = true AND id NOT IN (%s)",
+		tableName, strings.Join(idList, ","))
+
+	result, err := db.Exec(query)
+	if err != nil {
+		return 0, err
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	return int(rowsAffected), err
+}
+
+// cleanupUserClaims handles the special case of user_claims with composite key
+func cleanupUserClaims(db *sql.DB) {
+	// Get current uid+cid pairs from Parquet file
+	currentPairs, err := getUserClaimPairsFromParquet("./parquet/UserClaims.parquet")
+	if err != nil {
+		log.Printf("Error getting user claim pairs from UserClaims.parquet: %v", err)
+		return
+	}
+
+	if len(currentPairs) == 0 {
+		// If no current pairs, delete all imported user_claims
+		result, err := db.Exec("DELETE FROM user_claims WHERE _imported = true")
+		if err != nil {
+			log.Printf("Error deleting all imported user_claims: %v", err)
+			return
+		}
+
+		rowsAffected, err := result.RowsAffected()
+		if err == nil && rowsAffected > 0 {
+			fmt.Printf("  Deleted %d orphaned records from user_claims\n", rowsAffected)
+		} else {
+			fmt.Printf("  No orphaned records found in user_claims\n")
+		}
+		return
+	}
+
+	// Build WHERE conditions for each current pair
+	var conditions []string
+	for pair := range currentPairs {
+		conditions = append(conditions, fmt.Sprintf("(uid = '%s' AND cid = '%s')", pair.uid, pair.cid))
+	}
+
+	// Delete imported records whose uid+cid combinations are not in the current export
+	query := fmt.Sprintf("DELETE FROM user_claims WHERE _imported = true AND NOT (%s)",
+		strings.Join(conditions, " OR "))
+
+	result, err := db.Exec(query)
+	if err != nil {
+		log.Printf("Error cleaning up user_claims: %v", err)
+		return
+	}
+
+	rowsAffected, err := result.RowsAffected()
+	if err == nil && rowsAffected > 0 {
+		fmt.Printf("  Deleted %d orphaned records from user_claims\n", rowsAffected)
+	} else {
+		fmt.Printf("  No orphaned records found in user_claims\n")
+	}
+}
+
+type userClaimPair struct {
+	uid string
+	cid string
+}
+
+// getUserClaimPairsFromParquet extracts all uid+cid pairs from UserClaims.parquet
+func getUserClaimPairsFromParquet(parquetFile string) (map[userClaimPair]bool, error) {
+	pairs := make(map[userClaimPair]bool)
+
+	// Setup DuckDB connection
+	db, err := sql.Open("duckdb", "")
+	if err != nil {
+		return nil, fmt.Errorf("failed to open DuckDB: %v", err)
+	}
+	defer db.Close()
+
+	// Query to extract uid+cid pairs from Parquet file
+	query := "SELECT DISTINCT uid, cid FROM read_parquet(?)"
+	rows, err := db.Query(query, parquetFile)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query Parquet file %s: %v", parquetFile, err)
+	}
+	defer rows.Close()
+
+	// Collect all pairs
+	for rows.Next() {
+		var uid, cid string
+		if err := rows.Scan(&uid, &cid); err != nil {
+			return nil, fmt.Errorf("failed to scan uid+cid: %v", err)
+		}
+		if uid != "" && cid != "" { // Skip empty values
+			pairs[userClaimPair{uid: uid, cid: cid}] = true
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("row iteration error: %v", err)
+	}
+
+	return pairs, nil
 }

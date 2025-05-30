@@ -13,10 +13,10 @@ func augmentTimeSheets() {
 	}
 	defer db.Close()
 
-	// Define PocketBase-like ID generation macro
+	// Define PocketBase-like ID generation macro using deterministic hash
 	_, err = db.Exec(`
-CREATE OR REPLACE MACRO make_pocketbase_id(length)
-AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, length), '');
+CREATE OR REPLACE MACRO make_pocketbase_id(source_value, length)
+AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 `)
 	if err != nil {
 		log.Fatalf("Failed to create make_pocketbase_id macro: %v", err)

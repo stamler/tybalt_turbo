@@ -42,7 +42,8 @@ func profilesToUserClaims() {
 			1,
 			array_length(string_to_array(customClaims, ','))
 		) AS gs(idx)
-		JOIN claims ON split_part(customClaims, ',', gs.idx) = claims.name;
+		JOIN claims ON split_part(customClaims, ',', gs.idx) = claims.name
+		ORDER BY pocketbase_uid, claims.id;
 
 		-- Now we'll load the user_claims table into a parquet file
 		COPY user_claims TO 'parquet/UserClaims.parquet' (FORMAT PARQUET);

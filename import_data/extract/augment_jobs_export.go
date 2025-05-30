@@ -12,10 +12,10 @@ func augmentJobs() {
 	}
 	defer db.Close()
 
-	// Define PocketBase-like ID generation macro
+	// Define PocketBase-like ID generation macro using deterministic hash
 	_, err = db.Exec(`
-CREATE OR REPLACE MACRO make_pocketbase_id(length)
-AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random() < 0.72 THEN chr(CAST(floor(random() * 26) + 97 AS INTEGER)) ELSE CAST(CAST(floor(random() * 10) AS INTEGER) AS VARCHAR) END), 1, length), '');
+CREATE OR REPLACE MACRO make_pocketbase_id(source_value, length)
+AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 `)
 	if err != nil {
 		log.Fatalf("Failed to create make_pocketbase_id macro: %v", err)
@@ -122,10 +122,11 @@ AS array_to_string(array_slice(array_apply(range(length), i -> CASE WHEN random(
 	_, err = db.Exec(`
 	CREATE TABLE categories_export AS
 	SELECT
-	    make_pocketbase_id(15) AS id, -- Use the macro here
+	    make_pocketbase_id(CONCAT(category_name, '|', job_id), 15) AS id, -- Use the macro here with source value
 	    category_name AS name,
 	    job_id AS job
-	FROM categories_extracted;
+	FROM categories_extracted
+	ORDER BY category_name, job_id;
 	`)
 	if err != nil {
 		log.Fatalf("Failed to create categories_export: %v", err)
