@@ -119,7 +119,22 @@ func main() {
 
 		// --- Load Jobs ---
 		// Define the specific SQL for the jobs table
-		// TODO: categories
+		//
+		// IMPORTANT: This INSERT OR REPLACE operates on the `number` field, NOT the `id` field!
+		// The jobs table has a unique constraint on `number` (job number like "24-321").
+		// When a job with an existing number is imported:
+		//   1. SQLite detects unique constraint violation on `number` field
+		//   2. OR REPLACE triggers, replacing the ENTIRE existing row
+		//   3. The `id` field gets updated to the new pocketbase_id from MySQL export
+		//   4. All other fields get updated with fresh MySQL data
+		//   5. `_imported` flag gets set to true, marking it as MySQL-sourced data
+		//
+		// This means:
+		//   - Job number remains stable (business key)
+		//   - Internal ID changes to maintain consistency with current MySQL export
+		//   - Local modifications to imported jobs get overwritten with MySQL data
+		//   - Related records (time entries, etc.) work correctly since they also get updated IDs
+		//
 		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal, divisions, job_owner, _imported) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal}, {:divisions}, {:job_owner}, true)"
 
 		// Define the binder function for the Job type
