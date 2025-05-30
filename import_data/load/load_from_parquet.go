@@ -3,7 +3,7 @@ package load
 import (
 	"fmt"
 	"log"
-	"strings"
+	"regexp"
 	"time"
 
 	"github.com/parquet-go/parquet-go"
@@ -236,7 +236,9 @@ func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTable
 
 	// Convert INSERT to INSERT OR REPLACE if upsert is true
 	if upsert {
-		insertSQL = strings.Replace(insertSQL, "INSERT INTO", "INSERT OR REPLACE INTO", 1)
+		// Use regex to handle whitespace before INSERT INTO
+		re := regexp.MustCompile(`(?i)\s*INSERT\s+INTO`)
+		insertSQL = re.ReplaceAllString(insertSQL, " INSERT OR REPLACE INTO")
 	}
 
 	fmt.Printf("Inserting %d items into %s...\n", len(items), sqliteTableName)

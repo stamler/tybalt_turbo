@@ -319,6 +319,7 @@ func main() {
 		// and job_hours were only allowed to be non-zero if a job was selected. This destroys information about the split of hours prior to that date.
 		timeEntryInsertSQL := `
 			INSERT INTO time_entries (
+				id,
 				division,
 				uid,
 				hours,
@@ -334,6 +335,7 @@ func main() {
 				category,
 				_imported
 			) VALUES (
+				{:id},
 			 	{:division}, 
 				{:uid},
 				CAST((COALESCE({:job_hours}, 0) + COALESCE({:hours}, 0)) AS REAL) / 10, 
@@ -353,6 +355,7 @@ func main() {
 		// Define the binder function for the TimeEntry type
 		timeEntryBinder := func(item load.TimeEntry) dbx.Params {
 			return dbx.Params{
+				"id":                    item.Id,
 				"division":              item.Division,
 				"uid":                   item.UserId,
 				"hours":                 item.Hours,
@@ -384,6 +387,7 @@ func main() {
 		// Define the specific SQL for the time_amendments table
 		timeAmendmentInsertSQL := `
 			INSERT INTO time_amendments (
+				id,
 				division,
 				uid,
 				hours,
@@ -404,6 +408,7 @@ func main() {
 				skip_tsid_check,
 				_imported
 			) VALUES (
+				{:id},
 				{:division},
 				{:uid},
 				CAST((COALESCE({:job_hours}, 0) + COALESCE({:hours}, 0)) AS REAL) / 10,
