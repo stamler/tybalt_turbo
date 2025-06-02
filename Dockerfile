@@ -38,13 +38,13 @@ COPY app/ ./
 COPY --from=ui-builder /app/ui/build ./pb_public
 
 # Build the Go application
-RUN CGO_ENABLED=1 go build -o tybalt main.go
+RUN CGO_ENABLED=0 go build -o tybalt main.go
 
 # Stage 3: Final runtime image
 FROM alpine:latest
 
 # Install ca-certificates for HTTPS support
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates tzdata
 
 # Create app directory
 WORKDIR /pb
