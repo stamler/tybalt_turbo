@@ -1,0 +1,16 @@
+dbs:
+  - path: /pb/pb_data/data.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: tybalt
+        region: ${LITESTREAM_REGION:-us-east-1}
+        endpoint: ${LITESTREAM_ENDPOINT:-https://fly.storage.tigris.dev}
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+        # Sync every 10 seconds in production
+        sync-interval: 10s
+        # Retain snapshots for 72 hours
+        retention: 72h
+        # Validate checksums
+        validate-interval: 1h

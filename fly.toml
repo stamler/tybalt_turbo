@@ -1,0 +1,28 @@
+app = "your-app-name"  # Change this to your desired app name
+primary_region = "sjc"  # Change to your preferred region
+
+[build]
+
+[env]
+  PORT = "8080"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = "off"  # Keep running for database consistency
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    method = "GET"
+    path = "/api/health"
+    interval = "30s"
+    timeout = "10s"
+
+# No volume mount needed - using litestream for persistence
+# Set these secrets with: flyctl secrets set LITESTREAM_ACCESS_KEY_ID=xxx LITESTREAM_SECRET_ACCESS_KEY=xxx LITESTREAM_BUCKET=xxx
+
+[[vm]]
+  memory = '1gb'
+  cpu_kind = 'shared'
+  cpus = 1 

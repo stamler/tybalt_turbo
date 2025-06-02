@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for Tybalt PocketBase Application
+# Multi-stage Dockerfile for Tybalt PocketBase Application with Litestream
 
 # Stage 1: Build the Svelte UI
 FROM node:20-alpine AS ui-builder
@@ -43,8 +43,11 @@ RUN CGO_ENABLED=0 go build -o tybalt main.go
 # Stage 3: Final runtime image
 FROM alpine:latest
 
-# Install ca-certificates for HTTPS support
+# Install dependencies
 RUN apk add --no-cache ca-certificates tzdata
+
+# Install litestream
+RUN wget https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.tar.gz -O - | tar -xzf - -C /usr/local/bin
 
 # Create app directory
 WORKDIR /pb
@@ -55,11 +58,18 @@ COPY --from=go-builder /app/tybalt ./tybalt
 # Copy the UI assets
 COPY --from=go-builder /app/pb_public ./pb_public
 
+# Copy litestream configuration
+COPY litestream.yml /etc/litestream.yml
+
+# Copy startup script
+COPY start.sh /start.sh
+RUN chmod +x /start.sh
+
 # Create pb_data directory for database persistence
 RUN mkdir -p /pb/pb_data
 
 # Expose port 8080
 EXPOSE 8080
 
-# Start the application
-CMD ["./tybalt", "serve", "--http=0.0.0.0:8080"] 
+# Use the startup script
+CMD ["/start.sh"] 
