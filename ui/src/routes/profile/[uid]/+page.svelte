@@ -12,7 +12,7 @@
     DivisionsResponse,
   } from "$lib/pocketbase-types";
   import DsLabel from "$lib/components/DsLabel.svelte";
-
+  import { authStore } from "$lib/stores/auth";
   let { data }: { data: PageData } = $props();
   let errors = $state({} as any);
   let item = data.item as ProfilesResponse;
@@ -94,6 +94,7 @@
     fieldName="division"
     uiName="Default Division"
   />
+  <p>Token expiration date: {authStore.tokenExpirationDate() ?? "No token"}</p>
   <span class="flex w-full gap-2">
     <DsActionButton action={save}>Save</DsActionButton>
   </span>

@@ -11,39 +11,48 @@ type DataStore = {
   tallies: TimeSheetTallyQueryRow[];
   loading: boolean;
   error: string | null;
+  initialized: boolean;
 };
 
 // Create the store
 const store = writable<DataStore>({
   tallies: [],
-  loading: true,
-  error: null
+  loading: false,
+  error: null,
+  initialized: false
 });
 
 // Initialize the store with data
 async function initializeStore() {
   try {
+    store.update(state => ({ ...state, loading: true, error: null }));
     const tallies = await pb.send("/api/time_sheets/tallies", {
       requestKey: "tallies",
     });
     store.update(state => ({
       ...state,
       tallies,
-      loading: false
+      loading: false,
+      initialized: true
     }));
   } catch (error) {
     store.update(state => ({
       ...state,
       error: error instanceof Error ? error.message : 'Failed to load time sheets',
-      loading: false
+      loading: false,
+      initialized: true
     }));
   }
 }
 
 // Set up PocketBase realtime subscription
-let unsubscribeFunc: UnsubscribeFunc;
+let unsubscribeFunc: UnsubscribeFunc | null = null;
 
 async function setupSubscription() {
+  if (unsubscribeFunc) {
+    unsubscribeFunc(); // Clean up existing subscription
+  }
+  
   unsubscribeFunc = await pb.collection('time_sheets').subscribe('*', async () => {
     // reload all the tallies. We can't specify a specific tally because there isn't a
     // time_sheets_augmented collection, but rather just an endpoint that returns all
@@ -57,12 +66,25 @@ async function setupSubscription() {
   });
 }
 
-// Initialize the store and subscription
-await initializeStore();
-await setupSubscription();
+// Track initialization state
+let initializationPromise: Promise<void> | null = null;
 
 export const timesheets = {
   subscribe: store.subscribe,
+  
+  // Initialize the store and subscription (call this when the store is first used)
+  init: async () => {
+    if (initializationPromise) {
+      return initializationPromise; // Return existing promise if already initializing
+    }
+    
+    initializationPromise = (async () => {
+      await initializeStore();
+      await setupSubscription();
+    })();
+    
+    return initializationPromise;
+  },
   
   // Refresh the data manually if needed
   refresh: async () => {
@@ -72,6 +94,9 @@ export const timesheets = {
   
   // Clean up subscription when the store is no longer needed
   unsubscribe: () => {
-    unsubscribeFunc();
+    if (unsubscribeFunc) {
+      unsubscribeFunc();
+      unsubscribeFunc = null;
+    }
   }
 };

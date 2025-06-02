@@ -10,8 +10,20 @@
   import { shortDate } from "$lib/utilities";
   import type { TimeSheetTallyQueryRow } from "$lib/utilities";
   import type { SvelteComponent } from "svelte";
+  import { onMount } from "svelte";
+
   let shareModal: SvelteComponent;
   let rejectModal: SvelteComponent;
+
+  // Initialize the timesheets store when component mounts
+  onMount(async () => {
+    try {
+      await timesheets.init();
+    } catch (error) {
+      console.error("Failed to initialize timesheets:", error);
+      globalStore.addError("Failed to load timesheets");
+    }
+  });
 
   async function unbundle(id: string) {
     try {
