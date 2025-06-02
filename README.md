@@ -142,7 +142,7 @@ Litestream continuously replicates your SQLite database to S3-compatible storage
 flyctl ssh console
 
 # Restore from latest backup
-litestream restore -if-replica-exists /pb/pb_data/data.db
+litestream restore -if-replica-exists /app/pb_data/data.db
 ```
 
 ## Testing

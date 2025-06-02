@@ -1,5 +1,5 @@
 dbs:
-  - path: /pb/pb_data/data.db
+  - path: /app/pb_data/data.db
     replicas:
       - type: s3
         bucket: ${LITESTREAM_BUCKET}

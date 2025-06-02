@@ -50,7 +50,7 @@ RUN apk add --no-cache ca-certificates tzdata
 RUN wget https://github.com/benbjohnson/litestream/releases/download/v0.3.13/litestream-v0.3.13-linux-amd64.tar.gz -O - | tar -xzf - -C /usr/local/bin
 
 # Create app directory
-WORKDIR /pb
+WORKDIR /app
 
 # Copy the built application and UI
 COPY --from=go-builder /app/tybalt ./tybalt
@@ -66,7 +66,7 @@ COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
 # Create pb_data directory for database persistence
-RUN mkdir -p /pb/pb_data
+RUN mkdir -p /app/pb_data
 
 # Expose port 8080
 EXPOSE 8080

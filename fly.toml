@@ -1,5 +1,5 @@
-app = "your-app-name"  # Change this to your desired app name
-primary_region = "sjc"  # Change to your preferred region
+app = "tybalt"
+primary_region = "yul"
 
 [build]
 
@@ -18,9 +18,6 @@ primary_region = "sjc"  # Change to your preferred region
     path = "/api/health"
     interval = "30s"
     timeout = "10s"
-
-# No volume mount needed - using litestream for persistence
-# Set these secrets with: flyctl secrets set LITESTREAM_ACCESS_KEY_ID=xxx LITESTREAM_SECRET_ACCESS_KEY=xxx LITESTREAM_BUCKET=xxx
 
 [[vm]]
   memory = '1gb'

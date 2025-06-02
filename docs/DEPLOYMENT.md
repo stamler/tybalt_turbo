@@ -72,6 +72,65 @@ flyctl deploy
 
 Database migrations are applied automatically on startup.
 
+## Database Management
+
+### Deploying Local Database Changes to Production
+
+When you need to push local database changes (schema changes, seed data, etc.) to production:
+
+#### Setup for Database Deployment
+
+1. **Install Litestream locally:**
+
+   ```bash
+   brew install benbjohnson/litestream/litestream
+   ```
+
+2. **Get environment variables from your Fly app:**
+
+   ```bash
+   flyctl machine exec --app your-app-name MACHINE_ID -- printenv | grep LITESTREAM
+   ```
+
+3. **Set environment variables locally:**
+
+   ```bash
+   export LITESTREAM_ACCESS_KEY_ID="your_access_key"
+   export LITESTREAM_SECRET_ACCESS_KEY="your_secret_key"  
+   export LITESTREAM_BUCKET="your_bucket_name"
+   export LITESTREAM_ENDPOINT="your_endpoint"
+   export LITESTREAM_REGION="your_region"
+   ```
+
+#### Push Local Database to Production
+
+1. **Push your local database to S3:**
+
+   ```bash
+   litestream replicate -config litestream.yml
+   ```
+
+   Let this run for 30-60 seconds to ensure the backup completes.
+
+2. **Restart the Fly app to pick up the new database:**
+
+   ```bash
+   flyctl apps restart your-app-name
+   ```
+
+#### Use Cases
+
+- **Fixing corrupted production data**
+- **Rolling back** to a known good state
+- **Initial seeding** (including superuser setup)
+
+#### ⚠️ Important Notes
+
+- This replaces the **entire production database** with your local one
+- Make sure your local database contains the state you want in production
+- Old backups are retained according to retention policy (72 hours by default)
+- Always test locally before deploying database changes
+
 ## Database Backups
 
 Litestream continuously replicates your SQLite database to S3-compatible storage.
@@ -83,7 +142,7 @@ Litestream continuously replicates your SQLite database to S3-compatible storage
 flyctl ssh console
 
 # Check litestream status
-litestream snapshots -config /etc/litestream.yml /pb/pb_data/data.db
+litestream snapshots -config /etc/litestream.yml /app/pb_data/data.db
 ```
 
 ### Restore from Backup
@@ -98,7 +157,7 @@ flyctl ssh console
 pkill tybalt
 
 # Restore from latest backup
-litestream restore -config /etc/litestream.yml -if-replica-exists /pb/pb_data/data.db
+litestream restore -config /etc/litestream.yml -if-replica-exists /app/pb_data/data.db
 
 # Restart (or restart the machine from outside)
 /start.sh &
