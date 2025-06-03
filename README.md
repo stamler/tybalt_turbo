@@ -32,12 +32,18 @@ flyctl deploy
 ├── ui/                     # Svelte frontend
 │   ├── src/                # Svelte source code
 │   └── build/              # Built UI assets
+├── scripts/                # Database rollback and management scripts
+│   ├── setup-env.sh        # Environment variable setup
+│   ├── list-generations.sh # List available database generations
+│   ├── rollback.sh         # Automated database rollback
+│   └── README.md           # Scripts documentation
 ├── docs/                   # Documentation
 │   └── DEPLOYMENT.md       # Deployment guide
 ├── Dockerfile              # Container build for fly.io
 ├── start.sh                # Container startup script
 ├── fly.toml                # Fly.io deployment configuration
-├── litestream.yml          # Database replication configuration
+├── litestream.yml          # Database replication configuration (production)
+├── litestream.local.yml    # Database replication configuration (local)
 └── .dockerignore           # Container build exclusions
 ```
 
@@ -141,6 +147,23 @@ This project uses two litestream configuration files:
 
 - **`litestream.yml`** - Production config (absolute paths for Docker)
 - **`litestream.local.yml`** - Local development config (relative paths)
+
+### Automated Rollback System
+
+For robust deployment operations, use the automated rollback scripts:
+
+```bash
+# Set up environment (one-time)
+source scripts/setup-env.sh
+
+# List available generations
+./scripts/list-generations.sh
+
+# Rollback to specific generation
+./scripts/rollback.sh <generation_id>
+```
+
+See [`scripts/README.md`](scripts/README.md) for complete documentation.
 
 ### Local Development
 
