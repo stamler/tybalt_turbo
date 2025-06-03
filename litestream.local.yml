@@ -14,3 +14,8 @@ dbs:
         retention: 72h
         # Validate checksums
         validate-interval: 1h
+
+logging:
+  level: debug
+  type: text
+  stderr: true

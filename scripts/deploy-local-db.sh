@@ -57,22 +57,70 @@ flyctl machine stop $MACHINE_ID
 
 # Push to production
 echo "☁️  Pushing local database to S3..."
-litestream replicate -config "$LOCAL_CONFIG" &
+echo "📊 Starting replication with real-time monitoring..."
+echo "📝 Watch the logs below - when you see replication activity slow down, press Ctrl-C to cancel replication and restart the app"
+echo "----------------------------------------"
+
+# Set up signal trapping for graceful Ctrl-C handling
+cleanup_and_continue() {
+    echo ""
+    echo "----------------------------------------"
+    echo "🛑 Stopping replication..."
+    
+    # Kill the litestream process
+    if [ ! -z "$REPLICATE_PID" ] && kill -0 $REPLICATE_PID 2>/dev/null; then
+        kill $REPLICATE_PID 2>/dev/null
+        wait $REPLICATE_PID 2>/dev/null
+    fi
+    
+    echo "✅ Replication stopped"
+    echo "🧹 Cleaning up..."
+    
+    # Remove temp log if it exists
+    [ -f "$TEMP_LOG" ] && rm -f "$TEMP_LOG"
+    
+    echo "✅ Cleanup complete"
+    echo ""
+    echo "📋 Next step: Starting production app..."
+    
+    # Continue with the rest of the script
+    start_production_app
+}
+
+start_production_app() {
+    echo "🚀 Starting production app..."
+    flyctl machine start $MACHINE_ID
+    echo "✅ Production app started!"
+
+    echo ""
+    echo "🎉 Deployment complete!"
+    echo "🌐 Check your app at: https://$(grep '^app = ' fly.toml | sed 's/app = "\(.*\)"/\1/').fly.dev"
+}
+
+# Set up the signal trap
+trap cleanup_and_continue SIGINT
+
+# Use a temporary log file to capture litestream output and show it in real-time
+TEMP_LOG="/tmp/litestream_deploy_$$.log"
+
+# Start litestream and show output in real-time
+litestream replicate -config "$LOCAL_CONFIG" 2>&1 | tee "$TEMP_LOG" &
 REPLICATE_PID=$!
 
-# Wait for replication to start (give it 20 seconds, but this is a guess)
-sleep 20
+# Wait for the process (or Ctrl-C)
+set +e  # Temporarily disable exit on error so SIGINT doesn't cause immediate exit
+wait $REPLICATE_PID 2>/dev/null
+WAIT_EXIT_CODE=$?
+set -e  # Re-enable exit on error
 
-# Kill the replication process (it would run forever otherwise)
-kill $REPLICATE_PID 2>/dev/null || true
+# If we get here without Ctrl-C, the process exited on its own (shouldn't happen)
+if [ $WAIT_EXIT_CODE -eq 0 ]; then
+    echo ""
+    echo "⚠️  Replication process exited unexpectedly"
+    echo "📋 Log contents:"
+    cat "$TEMP_LOG" 2>/dev/null
+    cleanup_and_continue
+fi
 
-echo "✅ Database pushed to S3"
-
-# Start production app - it will restore from our new backup
-echo "🚀 Starting production app..."
-flyctl machine start $MACHINE_ID
-echo "✅ Production app started!"
-
-echo ""
-echo "🎉 Deployment complete!"
-echo "🌐 Check your app at: https://$(grep '^app = ' fly.toml | sed 's/app = "\(.*\)"/\1/').fly.dev" 
+# If we get here, it means we were interrupted by SIGINT
+# The trap will handle cleanup automatically 
