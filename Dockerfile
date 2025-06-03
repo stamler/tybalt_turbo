@@ -26,7 +26,7 @@ COPY ui/ ./
 
 # Generate version info for UI (after copying source code)
 RUN mkdir -p src/lib && \
-    /app/scripts/version.sh ts > src/lib/version.ts || \
+    (cd /app && ./scripts/version.sh ts) > src/lib/version.ts || \
     echo "// Fallback version\nexport const VERSION_INFO = {\n  name: 'Tybalt Turbo',\n  version: '0.1',\n  build: 1,\n  fullVersion: '0.1.1',\n  gitCommit: 'unknown',\n  gitCommitShort: 'unknown',\n  gitBranch: 'unknown',\n  buildTime: '$(date -u +"%Y-%m-%dT%H:%M:%SZ")'\n} as const;\n\nexport type VersionInfo = typeof VERSION_INFO;" > src/lib/version.ts
 
 # Set the PocketBase URL for the production build
@@ -61,7 +61,7 @@ COPY app/ ./
 
 # Generate version info for Go (after copying source code)
 RUN mkdir -p constants && \
-    /app/scripts/version.sh go > constants/version.go || \
+    (cd /app && ./scripts/version.sh go) > constants/version.go || \
     (echo 'package constants'; \
      echo ''; \
      echo 'const ('; \
