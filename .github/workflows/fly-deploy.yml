@@ -44,6 +44,8 @@ jobs:
           chmod +x scripts/version.sh
           echo "full_version=$(./scripts/version.sh short)" >> $GITHUB_OUTPUT
           echo "git_commit=$(git rev-parse HEAD)" >> $GITHUB_OUTPUT
+          echo "git_commit_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "git_branch=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
 
       - name: Commit version bump
         run: |
@@ -57,6 +59,6 @@ jobs:
           git push origin "v${{ steps.version.outputs.full_version }}"
 
       - uses: superfly/flyctl-actions/setup-flyctl@master
-      - run: flyctl deploy --remote-only
+      - run: flyctl deploy --remote-only --build-arg GIT_COMMIT="${{ steps.version.outputs.git_commit }}" --build-arg GIT_COMMIT_SHORT="${{ steps.version.outputs.git_commit_short }}" --build-arg GIT_BRANCH="${{ steps.version.outputs.git_branch }}"
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

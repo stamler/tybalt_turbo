@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # Version generation script for Tybalt Turbo
 # This script generates version information and outputs it in multiple formats
@@ -10,10 +10,10 @@ VERSION=$(jq -r '.version' version.json)
 BUILD=$(jq -r '.build' version.json)
 NAME=$(jq -r '.name' version.json)
 
-# Get git information
-GIT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
-GIT_COMMIT_SHORT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
-GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+# Get git information - prefer build args/env vars, fallback to git commands
+GIT_COMMIT=${GIT_COMMIT:-$(git rev-parse HEAD 2>/dev/null || echo "unknown")}
+GIT_COMMIT_SHORT=${GIT_COMMIT_SHORT:-$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")}
+GIT_BRANCH=${GIT_BRANCH:-$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")}
 BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # Create full version string

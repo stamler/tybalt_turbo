@@ -26,7 +26,7 @@ COPY ui/ ./
 
 # Generate version info for UI (after copying source code)
 RUN mkdir -p src/lib && \
-    (cd /app && ./scripts/version.sh ts) > src/lib/version.ts || \
+    cd /app && ./scripts/version.sh ts > ui/src/lib/version.ts || \
     echo "// Fallback version\nexport const VERSION_INFO = {\n  name: 'Tybalt Turbo',\n  version: '0.1',\n  build: 1,\n  fullVersion: '0.1.1',\n  gitCommit: 'unknown',\n  gitCommitShort: 'unknown',\n  gitBranch: 'unknown',\n  buildTime: '$(date -u +"%Y-%m-%dT%H:%M:%SZ")'\n} as const;\n\nexport type VersionInfo = typeof VERSION_INFO;" > src/lib/version.ts
 
 # Set the PocketBase URL for the production build
@@ -45,6 +45,16 @@ RUN apk add --no-cache git ca-certificates jq
 
 WORKDIR /app
 
+# Accept git info as build args (only needed for Go stage)
+ARG GIT_COMMIT
+ARG GIT_COMMIT_SHORT
+ARG GIT_BRANCH
+
+# Set them as environment variables for the version script
+ENV GIT_COMMIT=${GIT_COMMIT}
+ENV GIT_COMMIT_SHORT=${GIT_COMMIT_SHORT}
+ENV GIT_BRANCH=${GIT_BRANCH}
+
 # Copy version files and scripts
 COPY version.json ./
 COPY scripts/version.sh ./scripts/
@@ -61,7 +71,7 @@ COPY app/ ./
 
 # Generate version info for Go (after copying source code)
 RUN mkdir -p constants && \
-    (cd /app && ./scripts/version.sh go) > constants/version.go || \
+    ./scripts/version.sh go > constants/version.go || \
     (echo 'package constants'; \
      echo ''; \
      echo 'const ('; \
