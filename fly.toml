@@ -2,6 +2,8 @@ app = "tybalt"
 primary_region = "yul"
 
 [build]
+  [build.args]
+    PUBLIC_POCKETBASE_URL = "https://tybalt.fly.dev"
 
 [deploy]
   strategy = "immediate"  # Replace machines immediately instead of creating new ones first

@@ -6,6 +6,17 @@ A PocketBase-powered application with Svelte frontend, deployed on fly.io with l
 
 ### Development
 
+**Important**: For authentication to work properly, you need to set the `PUBLIC_POCKETBASE_URL` environment variable in your UI development environment.
+
+Create a `.env` file in the `ui/` directory:
+
+```bash
+# ui/.env
+PUBLIC_POCKETBASE_URL=http://localhost:8090
+```
+
+Start the development servers:
+
 ```bash
 # Backend
 cd app && go run main.go serve

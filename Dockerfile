@@ -14,6 +14,11 @@ RUN npm ci
 # Copy UI source code
 COPY ui/ ./
 
+# Set the PocketBase URL for the production build
+# This will be baked into the static build since SvelteKit uses adapter-static
+ARG PUBLIC_POCKETBASE_URL
+ENV PUBLIC_POCKETBASE_URL=${PUBLIC_POCKETBASE_URL}
+
 # Build the UI
 RUN npm run build
 
