@@ -112,7 +112,7 @@
 
     {#if showDetails}
       <div
-        class="absolute right-0 top-full z-50 mt-1 min-w-64 rounded-md border border-neutral-600 bg-neutral-800 p-3 text-xs text-white shadow-lg"
+        class="absolute right-0 top-full z-50 mt-1 w-56 rounded-md border border-neutral-600 bg-neutral-800 p-3 text-xs text-white shadow-lg lg:fixed lg:right-4 lg:top-12 lg:w-48"
       >
         <div class="space-y-1">
           <div class="border-b border-neutral-600 pb-1 font-semibold">{versionInfo.name}</div>
