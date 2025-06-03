@@ -135,7 +135,26 @@ Migrations are applied automatically on startup.
 
 Litestream continuously replicates your SQLite database to S3-compatible storage. No manual backups needed.
 
-**Restore from backup:**
+### Configuration
+
+This project uses two litestream configuration files:
+
+- **`litestream.yml`** - Production config (absolute paths for Docker)
+- **`litestream.local.yml`** - Local development config (relative paths)
+
+### Local Development
+
+```bash
+# Check backup status locally
+litestream generations -config litestream.local.yml
+
+# Or query S3 directly
+litestream generations -replica s3://${LITESTREAM_BUCKET}/tybalt
+```
+
+### Restore from backup
+
+**Production:**
 
 ```bash
 # Connect to your app
@@ -143,6 +162,13 @@ flyctl ssh console
 
 # Restore from latest backup
 litestream restore -if-replica-exists /app/pb_data/data.db
+```
+
+**Local:**
+
+```bash
+# Restore from backup to local database
+litestream restore -config litestream.local.yml -if-replica-exists app/pb_data/data.db
 ```
 
 ## Testing

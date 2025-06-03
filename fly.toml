@@ -3,6 +3,9 @@ primary_region = "yul"
 
 [build]
 
+[deploy]
+  strategy = "immediate"  # Replace machines immediately instead of creating new ones first
+
 [env]
   PORT = "8080"
 
@@ -12,6 +15,8 @@ primary_region = "yul"
   auto_stop_machines = "off"  # Keep running for database consistency
   auto_start_machines = true
   min_machines_running = 1
+  max_machines_running = 1
+  concurrency = { type = "connections", hard_limit = 1000, soft_limit = 800 }
 
   [[http_service.checks]]
     method = "GET"

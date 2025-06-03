@@ -74,6 +74,38 @@ Database migrations are applied automatically on startup.
 
 ## Database Management
 
+### Configuration Files
+
+This project uses two litestream configuration files:
+
+- **`litestream.yml`** - Production config with absolute paths (used in Docker)
+- **`litestream.local.yml`** - Local development config with relative paths
+
+### Local Development Commands
+
+For local development, use the local config file:
+
+```bash
+# Check database generations/snapshots
+litestream generations -config litestream.local.yml
+
+# Check what's backed up in S3
+litestream snapshots -config litestream.local.yml
+
+# Replicate local database to S3
+litestream replicate -config litestream.local.yml
+```
+
+**Alternative**: You can also query S3 directly (works regardless of config):
+
+```bash
+# Check generations directly from S3
+litestream generations -replica s3://${LITESTREAM_BUCKET}/tybalt
+
+# Check snapshots directly from S3  
+litestream snapshots -replica s3://${LITESTREAM_BUCKET}/tybalt
+```
+
 ### Deploying Local Database Changes to Production
 
 When you need to push local database changes (schema changes, seed data, etc.) to production:
@@ -107,7 +139,7 @@ When you need to push local database changes (schema changes, seed data, etc.) t
 1. **Push your local database to S3:**
 
    ```bash
-   litestream replicate -config litestream.yml
+   litestream replicate -config litestream.local.yml
    ```
 
    Let this run for 30-60 seconds to ensure the backup completes.
