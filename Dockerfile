@@ -3,6 +3,19 @@
 # Stage 1: Build the Svelte UI
 FROM node:20-alpine AS ui-builder
 
+WORKDIR /app
+
+# Install jq for version processing
+RUN apk add --no-cache jq git
+
+# Copy version files and scripts
+COPY version.json ./
+COPY scripts/version.sh ./scripts/
+RUN chmod +x scripts/version.sh
+
+# Generate version info for UI
+RUN ./scripts/version.sh ts > ui/src/lib/version.ts || echo "// Fallback version\nexport const VERSION_INFO = { version: '0.1.0', build: 1, name: 'Tybalt Turbo', fullVersion: '0.1.0.1', gitCommit: 'unknown', gitCommitShort: 'unknown', gitBranch: 'unknown', buildTime: '$(date -u +"%Y-%m-%dT%H:%M:%SZ")' } as const;" > ui/src/lib/version.ts
+
 WORKDIR /app/ui
 
 # Copy package files
@@ -25,10 +38,18 @@ RUN npm run build
 # Stage 2: Build the Go application
 FROM golang:1.23-alpine AS go-builder
 
-# Install git and other build dependencies
-RUN apk add --no-cache git ca-certificates
+# Install git, jq and other build dependencies
+RUN apk add --no-cache git ca-certificates jq
 
 WORKDIR /app
+
+# Copy version files and scripts
+COPY version.json ./
+COPY scripts/version.sh ./scripts/
+RUN chmod +x scripts/version.sh
+
+# Generate version info for Go
+RUN ./scripts/version.sh go > app/constants/version.go || echo "package constants\nconst (\n\tAppName = \"Tybalt Turbo\"\n\tVersion = \"0.1.0\"\n\tBuild = 1\n\tFullVersion = \"0.1.0.1\"\n\tGitCommit = \"unknown\"\n\tGitCommitShort = \"unknown\"\n\tGitBranch = \"unknown\"\n\tBuildTime = \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"\n)" > app/constants/version.go
 
 # Copy go mod files
 COPY app/go.mod app/go.sum ./

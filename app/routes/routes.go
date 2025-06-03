@@ -2,6 +2,7 @@ package routes
 
 import (
 	"net/http"
+	"tybalt/constants"
 	"tybalt/notifications"
 	"tybalt/reports"
 
@@ -29,6 +30,20 @@ func AddRoutes(app core.App) {
 
 	// Add the bundle timesheet route
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+
+		// Version endpoint - publicly accessible
+		se.Router.GET("/api/version", func(e *core.RequestEvent) error {
+			return e.JSON(http.StatusOK, map[string]any{
+				"name":           constants.AppName,
+				"version":        constants.Version,
+				"build":          constants.Build,
+				"fullVersion":    constants.FullVersion,
+				"gitCommit":      constants.GitCommit,
+				"gitCommitShort": constants.GitCommitShort,
+				"gitBranch":      constants.GitBranch,
+				"buildTime":      constants.BuildTime,
+			})
+		})
 
 		// TODO: This is a temporary route to send a single notification for testing
 		// purposes remove this before going to production

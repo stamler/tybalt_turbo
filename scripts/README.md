@@ -50,7 +50,7 @@ source scripts/setup-env.sh
 
 **Output example**:
 
-```
+```text
 🗂️  Available database generations:
 
 name  generation        lag       start                 end

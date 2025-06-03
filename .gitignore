@@ -17,3 +17,7 @@ import_data/charade*.json
 import_data/temp_attachments/*
 .env
 app/report_testing/**/*.csv
+
+# Generated version files (created at build time)
+app/constants/version.go
+ui/src/lib/version.ts

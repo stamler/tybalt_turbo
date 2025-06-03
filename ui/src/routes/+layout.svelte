@@ -8,6 +8,7 @@
   import "../app.css";
   import ErrorBar from "$lib/components/ErrorBar.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import VersionInfo from "$lib/components/VersionInfo.svelte";
 
   // children is a function that we will call to render the current route
   // https://svelte-5-preview.vercel.app/docs/snippets#passing-snippets-to-components
@@ -63,8 +64,9 @@
       </svg>
     </button>
     <span class="text-lg font-semibold">Tybalt</span>
-    {#if $authStore?.isValid}
-      <div class="flex items-center gap-2">
+    <div class="flex items-center gap-2">
+      <VersionInfo />
+      {#if $authStore?.isValid}
         <button
           class="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-700"
           onclick={authStore.logout}
@@ -83,8 +85,8 @@
             />
           </svg>
         </button>
-      </div>
-    {/if}
+      {/if}
+    </div>
   </header>
 
   <div class="flex h-[calc(100vh-2.5rem)] lg:h-screen">
@@ -95,8 +97,9 @@
       } z-30`}
     >
       <div class="h-full overflow-y-auto">
-        <div class="hidden h-10 items-center px-4 text-lg font-semibold lg:flex">
+        <div class="hidden h-10 items-center justify-between px-4 text-lg font-semibold lg:flex">
           <a href="/" class="text-white">Tybalt</a>
+          <VersionInfo />
         </div>
         <nav class="mt-2 px-1">
           <div class="mt-2">
