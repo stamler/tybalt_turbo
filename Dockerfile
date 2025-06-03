@@ -13,9 +13,6 @@ COPY version.json ./
 COPY scripts/version.sh ./scripts/
 RUN chmod +x scripts/version.sh
 
-# Generate version info for UI
-RUN ./scripts/version.sh ts > ui/src/lib/version.ts || echo "// Fallback version\nexport const VERSION_INFO = { version: '0.1.0', build: 1, name: 'Tybalt Turbo', fullVersion: '0.1.0.1', gitCommit: 'unknown', gitCommitShort: 'unknown', gitBranch: 'unknown', buildTime: '$(date -u +"%Y-%m-%dT%H:%M:%SZ")' } as const;" > ui/src/lib/version.ts
-
 WORKDIR /app/ui
 
 # Copy package files
@@ -26,6 +23,11 @@ RUN npm ci
 
 # Copy UI source code
 COPY ui/ ./
+
+# Generate version info for UI (after copying source code)
+RUN mkdir -p src/lib && \
+    /app/scripts/version.sh ts > src/lib/version.ts || \
+    echo "// Fallback version\nexport const VERSION_INFO = {\n  name: 'Tybalt Turbo',\n  version: '0.1',\n  build: 1,\n  fullVersion: '0.1.1',\n  gitCommit: 'unknown',\n  gitCommitShort: 'unknown',\n  gitBranch: 'unknown',\n  buildTime: '$(date -u +"%Y-%m-%dT%H:%M:%SZ")'\n} as const;\n\nexport type VersionInfo = typeof VERSION_INFO;" > src/lib/version.ts
 
 # Set the PocketBase URL for the production build
 # This will be baked into the static build since SvelteKit uses adapter-static
@@ -48,9 +50,6 @@ COPY version.json ./
 COPY scripts/version.sh ./scripts/
 RUN chmod +x scripts/version.sh
 
-# Generate version info for Go
-RUN ./scripts/version.sh go > app/constants/version.go || echo "package constants\nconst (\n\tAppName = \"Tybalt Turbo\"\n\tVersion = \"0.1.0\"\n\tBuild = 1\n\tFullVersion = \"0.1.0.1\"\n\tGitCommit = \"unknown\"\n\tGitCommitShort = \"unknown\"\n\tGitBranch = \"unknown\"\n\tBuildTime = \"$(date -u +"%Y-%m-%dT%H:%M:%SZ")\"\n)" > app/constants/version.go
-
 # Copy go mod files
 COPY app/go.mod app/go.sum ./
 
@@ -59,6 +58,22 @@ RUN go mod download
 
 # Copy Go source code
 COPY app/ ./
+
+# Generate version info for Go (after copying source code)
+RUN mkdir -p constants && \
+    /app/scripts/version.sh go > constants/version.go || \
+    (echo 'package constants'; \
+     echo ''; \
+     echo 'const ('; \
+     echo '    AppName        = "Tybalt Turbo"'; \
+     echo '    Version        = "0.1"'; \
+     echo '    Build          = 1'; \
+     echo '    FullVersion    = "0.1.1"'; \
+     echo '    GitCommit      = "unknown"'; \
+     echo '    GitCommitShort = "unknown"'; \
+     echo '    GitBranch      = "unknown"'; \
+     echo '    BuildTime      = "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"'; \
+     echo ')') > constants/version.go
 
 # Copy built UI from previous stage
 COPY --from=ui-builder /app/ui/build ./pb_public

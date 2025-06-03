@@ -12,7 +12,7 @@
     buildTime: string;
   }
 
-  let versionInfo: VersionInfo | null = null;
+  let versionInfo = $state<VersionInfo | null>(null);
   let showDetails = $state(false);
   let loading = $state(true);
   let error = $state<string | null>(null);
