@@ -1,213 +1,116 @@
 # Tybalt Turbo Versioning System
 
-This document describes the comprehensive versioning system implemented for Tybalt Turbo, which tracks versions across both the UI (Svelte) and backend (Go/PocketBase) components.
+## Overview
 
-## Version Format
+Tybalt Turbo uses a comprehensive versioning system with automatic build incrementing, git commit tracking, and UI display. The system uses a simplified 2-tier approach:
 
-The application uses a simplified hybrid versioning format: `v{major}.{minor}.{build}`
+- **Production**: Displays version from backend API (real git info, build numbers)
+- **Development**: Displays version from `version.json` + ".dev" suffix
 
-- **Major.Minor**: Semantic versioning for significant changes (e.g., `0.1`)
-- **Build**: Auto-incrementing build number for all deployments (e.g., `123`)
-- **Full Version**: Combined format (e.g., `v0.1.123`)
+## Architecture
 
-This format provides unique deployment tracking while maintaining semantic meaning for major releases and feature updates.
-
-## Version Storage
-
-The version information is centrally managed in `version.json`:
-
-```json
-{
-  "version": "0.1",
-  "build": 1,
-  "name": "Tybalt Turbo"
-}
-```
-
-## Implementation Components
-
-### 1. Version Generation Script (`scripts/version.sh`)
-
-Generates version information in multiple formats:
-
-```bash
-# Display all version info
-./scripts/version.sh
-
-# Generate TypeScript constants for UI
-./scripts/version.sh ts > ui/src/lib/version.ts
-
-# Generate Go constants for backend
-./scripts/version.sh go > app/constants/version.go
-
-# Get just the version number
-./scripts/version.sh short  # outputs: 0.1.123
-
-# Get version with git info
-./scripts/version.sh full   # outputs: 0.1.123 (abc1234)
-```
-
-### 2. Version Increment Script (`scripts/increment-version.sh`)
-
-Manages version updates:
-
-```bash
-# Increment build number only (most common - used for all deployments)
-./scripts/increment-version.sh build
-
-# Increment semantic version components
-./scripts/increment-version.sh minor  # 0.1 -> 0.2 (build resets to 1)
-./scripts/increment-version.sh major  # 0.1 -> 1.0 (build resets to 1)
-```
-
-### 3. Backend API Endpoint
-
-**Endpoint**: `GET /api/version`
-
-Returns comprehensive version information:
+### Source of Truth: `version.json`
 
 ```json
 {
   "name": "Tybalt Turbo",
   "version": "0.1",
-  "build": 123,
-  "fullVersion": "0.1.123",
-  "gitCommit": "full-40-char-hash",
-  "gitCommitShort": "abc1234",
-  "gitBranch": "main",
-  "buildTime": "2024-01-15T10:30:00Z"
+  "build": 4
 }
 ```
 
-### 4. UI Version Display
+### Components
 
-The version is displayed in the top-right corner of the application:
+1. **Version Scripts**
+   - `scripts/version.sh` - Multi-format version generation (JSON, Go, environment)
+   - `scripts/increment-version.sh` - Version management (increment major/minor/build)
 
-- **Desktop**: In the sidebar header
-- **Mobile**: In the mobile header bar
+2. **Backend Integration**
+   - `/api/version` endpoint serves version info with real git data
+   - Go constants generated at build time from `version.sh go`
 
-Features:
+3. **UI Display**
+   - `VersionInfo.svelte` component shows version in top-right corner
+   - Production: Fetches from `/api/version`
+   - Development: Reads `/version.json` and shows `v0.1.dev`
 
-- Compact display showing `v0.1.123`
-- Click to expand detailed information
-- Copy git commit hash functionality
-- Fallback to build-time constants if API fails
+4. **Deployment Integration**
+   - GitHub Actions automatically increments build number
+   - Git tagging with `v0.1.4` format
+   - Docker builds with version info baked in
 
-## Deployment Integration
+## Development Workflow
 
-### Automatic Build Increment
-
-The GitHub Actions workflow (`fly-deploy.yml`) automatically:
-
-1. Increments the build number on each deployment
-2. Commits the version change
-3. Creates a git tag (e.g., `v0.1.123`)
-4. Pushes the changes and tag
-
-### Docker Build Process
-
-The Dockerfile generates version files during build:
-
-1. **UI Stage**: Generates `ui/src/lib/version.ts`
-2. **Backend Stage**: Generates `app/constants/version.go`
-3. Both include git commit information and build timestamp
-
-## Manual Version Management
-
-### For Feature Releases
+### Local Development
 
 ```bash
-# For new features (minor version)
+# Copy version.json to UI static folder for development
+cp version.json ui/static/version.json
+
+# Start development - shows "v0.1.dev"
+npm run dev
+```
+
+### Manual Version Changes
+
+```bash
+# Increment build number
+./scripts/increment-version.sh build
+
+# Increment minor version (resets build to 1)
 ./scripts/increment-version.sh minor
-git add version.json
-git commit -m "Release v0.2 - New features"
-git tag v0.2.1
-git push origin main --tags
-```
 
-### For Major Releases
-
-```bash
-# For breaking changes (major version)
+# Increment major version (resets minor and build)
 ./scripts/increment-version.sh major
-git add version.json
-git commit -m "Release v1.0 - Major release"
-git tag v1.0.1
-git push origin main --tags
 ```
 
-### For Regular Deployments
+### Deployment
 
-```bash
-# Regular deployments (automatic via GitHub Actions)
-# Build number increments automatically: 0.1.123 -> 0.1.124
+GitHub Actions automatically:
+
+1. Increments build number
+2. Commits version changes
+3. Tags release with `v0.1.4`
+4. Pushes changes back to repo
+5. Deploys to Fly.io with version info
+
+## Version Display
+
+**Format**: `v{version}.{build}` or `v{version}.dev`
+
+**Examples**:
+
+- Production: `v0.1.4` (shows build number)
+- Development: `v0.1.dev` (shows dev suffix)
+
+**UI Behavior**:
+
+- Clickable button in top-right corner
+- Expandable details popup with git info, build time
+- Copy commit hash functionality
+- Responsive positioning (mobile/desktop)
+
+## File Structure
+
+```
+version.json                 # Source of truth
+scripts/
+  ├── version.sh            # Multi-format generation
+  └── increment-version.sh  # Version management
+ui/
+  ├── static/version.json   # Copy for development (manual)
+  └── src/lib/components/
+      └── VersionInfo.svelte # UI component
+app/
+  ├── constants/version.go  # Generated Go constants
+  └── handlers/version.go   # API endpoint
+docs/versioning.md          # This documentation
 ```
 
-## Version Semantics
+## Key Design Principles
 
-### **Major Version** (`X.y.build`)
-
-- Breaking changes
-- Major architectural changes
-- API compatibility breaks
-
-### **Minor Version** (`x.Y.build`)
-
-- New features
-- Enhancements
-- Non-breaking changes
-- Build resets to 1
-
-### **Build Number** (`x.y.BUILD`)
-
-- Every deployment
-- Bug fixes
-- Configuration changes
-- Auto-incremented
-
-## Version Tracking Benefits
-
-1. **Deployment Tracking**: Each deployment has a unique build number
-2. **Git Integration**: Full commit hash tracked for every version
-3. **User Visibility**: Users can see exactly which version they're running
-4. **Debugging**: Easy to correlate user reports with specific builds
-5. **Simplified Workflow**: No confusion between patch vs build increments
-6. **Clean Display**: Shorter version strings in UI
-
-## Rollback Support
-
-To rollback to a previous version:
-
-```bash
-# Find the desired version tag
-git tag -l "v*"
-
-# Reset to specific version
-git checkout v0.1.120
-# Update version.json to match
-# Deploy normally
-```
-
-## Development vs Production
-
-- **Development**: Version files are gitignored and generated locally
-- **Production**: Version files generated during Docker build with actual git info
-- **API Fallback**: UI gracefully handles API unavailability using build-time constants
-
-## Monitoring
-
-The version endpoint can be used for:
-
-- Health checks
-- Monitoring dashboards  
-- Automated deployment verification
-- User support (version identification)
-
-## Future Enhancements
-
-Potential additions:
-
-- Changelog integration
-- Release notes automation
-- Version comparison APIs
-- Deployment metrics correlation
+1. **Single Source of Truth**: All version info derives from `version.json`
+2. **No Fake Fallbacks**: System shows errors rather than fake version numbers
+3. **Environment-Specific**: Production uses API, development uses static file
+4. **Automatic Deployment**: Build numbers increment automatically on deploy
+5. **Git Integration**: Full commit tracking and branch information

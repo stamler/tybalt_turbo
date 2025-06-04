@@ -62,24 +62,6 @@ const (
 )
 EOF
     ;;
-  "ts")
-    # Generate TypeScript constants file
-    cat << EOF
-// Version information generated at build time
-export const VERSION_INFO = {
-  name: '${NAME}',
-  version: '${VERSION}',
-  build: ${BUILD},
-  fullVersion: '${FULL_VERSION}',
-  gitCommit: '${GIT_COMMIT}',
-  gitCommitShort: '${GIT_COMMIT_SHORT}',
-  gitBranch: '${GIT_BRANCH}',
-  buildTime: '${BUILD_TIME}'
-} as const;
-
-export type VersionInfo = typeof VERSION_INFO;
-EOF
-    ;;
   "short")
     echo "${FULL_VERSION}"
     ;;

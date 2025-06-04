@@ -24,11 +24,6 @@ RUN npm ci
 # Copy UI source code
 COPY ui/ ./
 
-# Generate version info for UI (after copying source code)
-RUN mkdir -p src/lib && \
-    cd /app && ./scripts/version.sh ts > ui/src/lib/version.ts || \
-    echo "// Fallback version\nexport const VERSION_INFO = {\n  name: 'Tybalt Turbo',\n  version: '0.1',\n  build: 1,\n  fullVersion: '0.1.1',\n  gitCommit: 'unknown',\n  gitCommitShort: 'unknown',\n  gitBranch: 'unknown',\n  buildTime: '$(date -u +"%Y-%m-%dT%H:%M:%SZ")'\n} as const;\n\nexport type VersionInfo = typeof VERSION_INFO;" > src/lib/version.ts
-
 # Set the PocketBase URL for the production build
 # This will be baked into the static build since SvelteKit uses adapter-static
 ARG PUBLIC_POCKETBASE_URL
@@ -69,21 +64,9 @@ RUN go mod download
 # Copy Go source code
 COPY app/ ./
 
-# Generate version info for Go (after copying source code)
-RUN mkdir -p constants && \
-    ./scripts/version.sh go > constants/version.go || \
-    (echo 'package constants'; \
-     echo ''; \
-     echo 'const ('; \
-     echo '    AppName        = "Tybalt Turbo"'; \
-     echo '    Version        = "0.1"'; \
-     echo '    Build          = 1'; \
-     echo '    FullVersion    = "0.1.1"'; \
-     echo '    GitCommit      = "unknown"'; \
-     echo '    GitCommitShort = "unknown"'; \
-     echo '    GitBranch      = "unknown"'; \
-     echo '    BuildTime      = "'$(date -u +"%Y-%m-%dT%H:%M:%SZ")'"'; \
-     echo ')') > constants/version.go
+# Generate version information for the UI build
+RUN cd /app && ./scripts/version.sh go > constants/version.go || \
+    echo "Warning: Failed to generate version constants"
 
 # Copy built UI from previous stage
 COPY --from=ui-builder /app/ui/build ./pb_public

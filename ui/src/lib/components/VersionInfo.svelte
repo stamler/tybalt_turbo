@@ -1,10 +1,19 @@
 <script lang="ts">
   import { onMount } from "svelte";
 
+  /**
+   * VersionInfo Component - Simple version display
+   *
+   * Production: Fetches version from /api/version (backend with real git info)
+   * Development: Reads version.json + shows ".dev" suffix
+   *
+   * Displays as a clickable button (e.g. "v0.1.4") that shows details popup
+   */
+
   interface VersionInfo {
     name: string;
     version: string;
-    build: number;
+    build: number | string;
     fullVersion: string;
     gitCommit: string;
     gitCommitShort: string;
@@ -17,58 +26,50 @@
   let loading = $state(true);
   let error = $state<string | null>(null);
 
-  interface ApiVersionResponse {
-    name: string;
-    version: string;
-    build: number;
-    fullVersion: string;
-    gitCommit: string;
-    gitCommitShort: string;
-    gitBranch: string;
-    buildTime: string;
-  }
-
   async function fetchVersionInfo() {
-    try {
-      loading = true;
-      error = null;
+    const isProduction = typeof window !== "undefined" && window.location.hostname !== "localhost";
 
-      // Try to fetch from the API first
-      const response = await fetch("/api/version");
-      if (response.ok) {
-        const data: ApiVersionResponse = await response.json();
-        versionInfo = {
-          name: data.name,
-          version: data.version,
-          build: data.build,
-          fullVersion: data.fullVersion,
-          gitCommit: data.gitCommit,
-          gitCommitShort: data.gitCommitShort,
-          gitBranch: data.gitBranch,
-          buildTime: data.buildTime,
-        };
+    try {
+      if (isProduction) {
+        // Production: Get version from backend API
+        const response = await fetch("/api/version");
+        if (response.ok) {
+          versionInfo = await response.json();
+          return;
+        }
+        throw new Error("API failed");
       } else {
-        // Fallback to build-time constants if API fails
-        const versionModule = await import("$lib/version");
-        versionInfo = versionModule.VERSION_INFO;
+        // Development: Read version.json and add ".dev"
+        const response = await fetch("/version.json");
+        if (response.ok) {
+          const data = await response.json();
+          if (!data.version || !data.name) {
+            throw new Error("Invalid version.json");
+          }
+          versionInfo = {
+            name: data.name,
+            version: data.version,
+            build: "dev",
+            fullVersion: `${data.version}.dev`,
+            gitCommit: "local-development",
+            gitCommitShort: "local",
+            gitBranch: "dev",
+            buildTime: new Date().toISOString(),
+          };
+          return;
+        }
+        throw new Error("version.json not found");
       }
     } catch (err) {
-      console.warn("Failed to fetch version from API, using build-time version:", err);
-      try {
-        // Fallback to build-time constants
-        const versionModule = await import("$lib/version");
-        versionInfo = versionModule.VERSION_INFO;
-      } catch (buildErr) {
-        console.error("Failed to load version info:", buildErr);
-        error = "Version info unavailable";
-      }
-    } finally {
-      loading = false;
+      console.warn("Version fetch failed:", err);
+      error = "Version unavailable";
     }
   }
 
   onMount(() => {
-    fetchVersionInfo();
+    fetchVersionInfo().finally(() => {
+      loading = false;
+    });
   });
 
   function toggleDetails() {
