@@ -21,3 +21,4 @@ app/report_testing/**/*.csv
 # Generated version files (created at build time)
 app/constants/version.go
 ui/src/lib/version.ts
+ui/static/version.json

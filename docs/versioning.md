@@ -44,12 +44,15 @@ Tybalt Turbo uses a comprehensive versioning system with automatic build increme
 ### Local Development
 
 ```bash
-# Copy version.json to UI static folder for development
-cp version.json ui/static/version.json
-
-# Start development - shows "v0.1.dev"
+# Start development - automatically copies version.json and shows "v0.1.dev"
 npm run dev
 ```
+
+The `npm run dev` command automatically:
+
+1. Copies `version.json` to `ui/static/version.json`
+2. Starts the development server
+3. UI displays current version with ".dev" suffix
 
 ### Manual Version Changes
 
@@ -98,7 +101,7 @@ scripts/
   ├── version.sh            # Multi-format generation
   └── increment-version.sh  # Version management
 ui/
-  ├── static/version.json   # Copy for development (manual)
+  ├── static/version.json   # Auto-generated copy (ignored by git)
   └── src/lib/components/
       └── VersionInfo.svelte # UI component
 app/
