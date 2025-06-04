@@ -16,8 +16,9 @@ The import tool (`tool.go`) provides **unidirectional synchronization** from MyS
 | `--import` | Import Parquet files into SQLite/PocketBase |
 | `--cleanup` | Clean up deleted MySQL records from SQLite |
 | `--attachments` | Migrate attachments from GCS to S3 |
+| `--db PATH` | Path to target database (default: `../app/test_pb_data/data.db`) |
 
-Options can be combined: `./tool --import --cleanup`
+Options can be combined: `./tool --import --cleanup --db /path/to/custom.db`
 
 ## Core Concepts
 
@@ -50,7 +51,7 @@ Options can be combined: `./tool --import --cleanup`
 ### Import (`--import`)
 
 **Purpose**: Load Parquet data into SQLite/PocketBase
-**Target**: `../app/test_pb_data/data.db`
+**Target**: Configurable via `--db` flag (default: `../app/test_pb_data/data.db`)
 **Collections Imported**:
 
 - Core: clients, client_contacts, jobs, categories, vendors, purchase_orders, expenses
@@ -105,6 +106,12 @@ MySQL → [--export] → Parquet Files → [--import] → SQLite/PocketBase
 
 # Migrate attachments
 ./tool --attachments
+
+# Use custom database path
+./tool --import --cleanup --db /path/to/production.db
+
+# Export with custom sqlite database source
+./tool --export --db /path/to/custom.db
 ```
 
 ## Technical Details
@@ -112,7 +119,7 @@ MySQL → [--export] → Parquet Files → [--import] → SQLite/PocketBase
 ### Database Connections
 
 - **DuckDB**: Used for Parquet file processing (in-memory)
-- **SQLite**: Target database at `../app/test_pb_data/data.db`
+- **SQLite**: Target database (configurable via `--db` flag)
 - **MySQL**: Source database (via export process)
 
 ### ID Field Mapping

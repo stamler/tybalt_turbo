@@ -36,11 +36,15 @@ func main() {
 	importFlag := flag.Bool("import", false, "Import data from Parquet files")
 	attachmentsFlag := flag.Bool("attachments", false, "Import attachments from GCS to S3")
 	cleanupFlag := flag.Bool("cleanup", false, "Clean up deleted records after import")
+	dbFlag := flag.String("db", "../app/test_pb_data/data.db", "Path to the target database")
 	flag.Parse()
+
+	// Use the database path from the flag
+	targetDatabase = *dbFlag
 
 	if *exportFlag {
 		fmt.Println("Exporting data to Parquet files...")
-		extract.ToParquet()
+		extract.ToParquet(targetDatabase)
 	}
 
 	if *importFlag {

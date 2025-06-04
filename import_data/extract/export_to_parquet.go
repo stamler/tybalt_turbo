@@ -17,9 +17,7 @@ import (
 // exported to Parquet format.
 var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs"}
 
-var targetDatabase = "../app/test_pb_data/data.db"
-
-func ToParquet() {
+func ToParquet(sourceSQLiteDb string) {
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -206,9 +204,9 @@ func ToParquet() {
 	expensesToPurchaseOrders()
 
 	// Dump the pre-populated tables from the sqlite test database.
-	sqliteTableDumps(targetDatabase, "divisions")
-	sqliteTableDumps(targetDatabase, "time_types")
-	sqliteTableDumps(targetDatabase, "claims")
+	sqliteTableDumps(sourceSQLiteDb, "divisions")
+	sqliteTableDumps(sourceSQLiteDb, "time_types")
+	sqliteTableDumps(sourceSQLiteDb, "claims")
 
 	// Augment the Profiles.parquet data by adding the pocketbase_uid column.
 	augmentProfiles()
