@@ -20,6 +20,7 @@ import (
 )
 
 var expenseCollectionId = "o1vpz1mm7qsfoyy"
+var targetDatabase = "../app/test_pb_data/data.db"
 
 // This file is used to run either an export or an import.
 
@@ -60,7 +61,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Clients.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"clients",       // Table name (for logging)
 			clientInsertSQL, // The specific INSERT SQL
 			clientBinder,    // The specific binder function
@@ -84,7 +85,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Contacts.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"client_contacts", // Table name (for logging)
 			contactInsertSQL,  // The specific INSERT SQL
 			contactBinder,     // The specific binder function
@@ -110,7 +111,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Profiles.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"users",       // Table name (for logging)
 			userInsertSQL, // The specific INSERT SQL
 			userBinder,    // The specific binder function
@@ -161,7 +162,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Jobs.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"jobs",       // Table name (for logging)
 			jobInsertSQL, // The specific INSERT SQL
 			jobBinder,    // The specific binder function
@@ -184,7 +185,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Categories.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"categories",      // Table name (for logging)
 			categoryInsertSQL, // The specific INSERT SQL
 			categoryBinder,    // The specific binder function
@@ -223,7 +224,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Profiles.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"admin_profiles",      // Table name (for logging)
 			adminProfileInsertSQL, // The specific INSERT SQL
 			adminProfileBinder,    // The specific binder function
@@ -250,7 +251,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Profiles.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"profiles",       // Table name (for logging)
 			profileInsertSQL, // The specific INSERT SQL
 			profileBinder,    // The specific binder function
@@ -272,7 +273,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Profiles.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"_externalAuths",      // Table name (for logging)
 			externalAuthInsertSQL, // The specific INSERT SQL
 			externalAuthBinder,    // The specific binder function
@@ -305,7 +306,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/TimeSheets.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"time_sheets",      // Table name (for logging)
 			timeSheetInsertSQL, // The specific INSERT SQL
 			timeSheetBinder,    // The specific binder function
@@ -376,7 +377,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/TimeEntries.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"time_entries",     // Table name (for logging)
 			timeEntryInsertSQL, // The specific INSERT SQL
 			timeEntryBinder,    // The specific binder function
@@ -458,7 +459,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/TimeAmendments.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"time_amendments",      // Table name (for logging)
 			timeAmendmentInsertSQL, // The specific INSERT SQL
 			timeAmendmentBinder,    // The specific binder function
@@ -481,7 +482,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Vendors.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"vendors",       // Table name (for logging)
 			vendorInsertSQL, // The specific INSERT SQL
 			vendorBinder,    // The specific binder function
@@ -492,7 +493,7 @@ func main() {
 		// Define the specific SQL for the purchase_orders table
 		load.FromParquet(
 			"./parquet/purchase_orders.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"purchase_orders", // Table name (for logging)
 			`INSERT INTO purchase_orders (id, po_number, type, status, closed_by_system, description, _imported) VALUES ({:id}, {:po_number}, 'Normal', 'Closed', 1, 'Imported from Firebase Expenses', true)`,
 			func(item load.PurchaseOrder) dbx.Params {
@@ -616,7 +617,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/Expenses.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"expenses",       // Table name (for logging)
 			expenseInsertSQL, // The specific INSERT SQL
 			expenseBinder,    // The specific binder function
@@ -638,7 +639,7 @@ func main() {
 		// Call the generic function, specifying the type and providing SQL + binder
 		load.FromParquet(
 			"./parquet/UserClaims.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"user_claims",      // Table name (for logging)
 			userClaimInsertSQL, // The specific INSERT SQL
 			userClaimBinder,    // The specific binder function
@@ -649,7 +650,7 @@ func main() {
 		// Define the specific SQL for the mileage_reset_dates table
 		load.FromParquet(
 			"./parquet/MileageResetDates.parquet",
-			"../app/test_pb_data/data.db",
+			targetDatabase,
 			"mileage_reset_dates", // Table name (for logging)
 			`INSERT INTO mileage_reset_dates (id, date, _imported) VALUES ({:id}, {:date}, true)`,
 			func(item load.MileageResetDate) dbx.Params {
@@ -681,7 +682,7 @@ func main() {
 // cleanupDeletedRecords removes imported records that no longer exist in the current MySQL export
 func cleanupDeletedRecords() {
 	// Open connection to SQLite database
-	db, err := sql.Open("sqlite", "../app/test_pb_data/data.db")
+	db, err := sql.Open("sqlite", targetDatabase)
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
