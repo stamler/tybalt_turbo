@@ -18,7 +18,7 @@ import { authStore } from "$lib/stores/auth";
 import { get } from "svelte/store";
 import { ClientResponseError } from "pocketbase";
 import MiniSearch from "minisearch";
-import type { Readable, Invalidator, Subscriber } from "svelte/store";
+import type { Readable, Subscriber } from "svelte/store";
 
 interface StoreItem<T> {
   items: T;
@@ -359,10 +359,10 @@ const wrappedStore: Readable<WrappedStoreValue> & {
   dismissError: typeof _globalStore.dismissError;
   deleteItem: typeof _globalStore.deleteItem;
 } = {
-  subscribe: (run: Subscriber<WrappedStoreValue>, invalidate?: Invalidator<WrappedStoreValue>) => {
+  subscribe: (run: Subscriber<WrappedStoreValue>, invalidate?: () => void) => {
     return _globalStore.subscribe(
       (value) => run(new Proxy(value, proxyHandler) as unknown as WrappedStoreValue),
-      invalidate as Invalidator<StoreState> | undefined,
+      invalidate,
     );
   },
   refresh: _globalStore.refresh,
