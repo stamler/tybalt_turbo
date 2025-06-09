@@ -99,7 +99,7 @@ func zipAttachments(app core.App, report []Attachment, collectionId string, clas
 		fullPath := collectionId + "/" + attachment.SourcePath
 		filenameInZip := attachment.Filename
 
-		blob, err := fsys.GetFile(fullPath)
+		blob, err := fsys.GetReader(fullPath)
 		if err != nil {
 			// If a file can't be fetched, the original function's error handling implies failing the entire zip.
 			// Consider logging and continuing for a more robust zip process if partial zips are acceptable.

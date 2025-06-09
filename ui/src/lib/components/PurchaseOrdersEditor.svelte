@@ -12,6 +12,10 @@
   import type { CategoriesResponse, PoApproversResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DsLabel from "./DsLabel.svelte";
+  import { jobs } from "$lib/stores/jobs";
+
+  // initialize the jobs store, noop if already initialized
+  jobs.init();
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
 
@@ -255,10 +259,10 @@
     {/snippet}
   </DsSelector>
 
-  {#if $globalStore.jobsIndex !== null}
+  {#if $jobs.index !== null}
     <DsAutoComplete
       bind:value={item.job as string}
-      index={$globalStore.jobsIndex}
+      index={$jobs.index}
       {errors}
       fieldName="job"
       uiName="Job"

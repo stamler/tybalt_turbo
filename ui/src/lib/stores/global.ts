@@ -7,7 +7,6 @@ import type {
   ClientsResponse,
   TimeTypesResponse,
   DivisionsResponse,
-  JobsResponse,
   ManagersResponse,
   VendorsResponse,
   UserPoPermissionDataResponse,
@@ -30,14 +29,12 @@ export type CollectionName =
   | "clients"
   | "time_types"
   | "divisions"
-  | "jobs"
   | "vendors"
   | "managers"
 type CollectionType = {
   clients: ClientsResponse[];
   time_types: TimeTypesResponse[];
   divisions: DivisionsResponse[];
-  jobs: JobsResponse[];
   vendors: VendorsResponse[];
   managers: ManagersResponse[];
 };
@@ -51,7 +48,6 @@ interface StoreState {
   collections: {
     [K in CollectionName]: StoreItem<CollectionType[K]>;
   };
-  jobsIndex: MiniSearch<JobsResponse> | null;
   clientsIndex: MiniSearch<ClientsResponse> | null;
   vendorsIndex: MiniSearch<VendorsResponse> | null;
   isLoading: boolean;
@@ -94,14 +90,11 @@ const createStore = () => {
       // 1 day
       time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
-      // 5 minutes
-      jobs: { items: [], maxAge: 5 * 60 * 1000, lastRefresh: new Date(0) },
       // 1 hour
       vendors: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
       managers: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
       clients: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
     },
-    jobsIndex: null,
     clientsIndex: null,
     vendorsIndex: null,
     isLoading: false,
@@ -152,6 +145,17 @@ const createStore = () => {
   };
 
   const loadData = async <K extends CollectionName>(key: K) => {
+    // immediately return if already loading so we don't restart the loading
+    // process and trigger an auto-cancel of the request.
+
+    // TODO: this logic is flawed because it immediately returns even if
+    // loadData() was called with a different key. We need to approach this
+    // differently.
+    if (get({subscribe}).isLoading) {
+      console.log("Already loading, skipping refresh");
+      return;
+    }
+
     update((state) => ({ ...state, isLoading: true, error: null }));
     try {
       let items: CollectionType[typeof key];
@@ -174,13 +178,6 @@ const createStore = () => {
             requestKey: "div",
           })) as CollectionType[typeof key];
           break;
-        case "jobs":
-          items = (await pb.collection("jobs").getFullList<JobsResponse>({
-            expand: "categories_via_job,client",
-            sort: "-number",
-            requestKey: "job",
-          })) as CollectionType[typeof key];
-          break;
         case "managers":
           items = (await pb.collection("managers").getFullList<ManagersResponse>({
             requestKey: "manager",
@@ -200,21 +197,6 @@ const createStore = () => {
           items,
           lastRefresh: new Date(),
         };
-
-        if (key === "jobs") {
-          const jobsIndex = new MiniSearch<JobsResponse>({
-            fields: ["id", "number", "description", "client"],
-            storeFields: ["id", "number", "description", "client"],
-            extractField: (document, fieldName) => {
-              if (fieldName === "client") {
-                return document.expand?.client?.name;
-              }
-              return document[fieldName as keyof JobsResponse] as string;
-            },
-          });
-          jobsIndex.addAll(items as JobsResponse[]);
-          newState.jobsIndex = jobsIndex;
-        }
 
         if (key === "vendors") {
           const vendorsIndex = new MiniSearch<VendorsResponse>({

@@ -18,6 +18,9 @@
   // Initialize the timesheets store when component mounts
   onMount(async () => {
     try {
+      // TODO: This runs every time the page is loaded which defeats the purpose
+      // of a store. We need to find a way to only run this once when the app is
+      // loaded.
       await timesheets.init();
     } catch (error) {
       console.error("Failed to initialize timesheets:", error);

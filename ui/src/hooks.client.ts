@@ -1,6 +1,7 @@
 import { pb } from "$lib/pocketbase";
 import { authStore } from "$lib/stores/auth";
 import { AUTH_CONFIG } from "$lib/config";
+import { jobs } from "$lib/stores/jobs";
 
 /**
  * CLIENT-SIDE AUTH INITIALIZATION
@@ -75,3 +76,7 @@ pb.authStore.onChange(() => {
     authStore.setupTokenRefresh();
   }
 }, true); // The 'true' parameter means this callback also fires immediately with current state
+
+
+// initialize the jobs store
+jobs.init();

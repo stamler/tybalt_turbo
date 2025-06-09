@@ -14,6 +14,10 @@
   import { isExpensesResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import CumulativePOOverflowModal from "./CumulativePOOverflowModal.svelte";
+  import { jobs } from "$lib/stores/jobs";
+
+  // initialize the jobs store, noop if already initialized
+  jobs.init();
 
   let { data }: { data: ExpensesPageData } = $props();
 
@@ -160,10 +164,10 @@
         FuelCard, or PersonalReimbursement
      3. hide them otherwise
    -->
-  {#if $globalStore.jobsIndex !== null}
+  {#if $jobs.index !== null}
     <DsAutoComplete
       bind:value={item.job as string}
-      index={$globalStore.jobsIndex}
+      index={$jobs.index}
       {errors}
       fieldName="job"
       uiName="Job"

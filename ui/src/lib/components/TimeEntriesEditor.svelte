@@ -9,12 +9,11 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
-  import type {
-    JobsRecord,
-    TimeTypesRecord,
-    DivisionsRecord,
-    CategoriesResponse,
-  } from "$lib/pocketbase-types";
+  import type { TimeTypesRecord, DivisionsRecord, CategoriesResponse } from "$lib/pocketbase-types";
+  import { jobs } from "$lib/stores/jobs";
+
+  // initialize the jobs store, noop if already initialized
+  jobs.init();
 
   let { data }: { data: TimeEntriesPageData } = $props();
 
@@ -155,10 +154,10 @@
       fieldName="division"
       uiName="Division"
     />
-    {#if $globalStore.jobsIndex !== null}
+    {#if $jobs.index !== null}
       <DsAutoComplete
         bind:value={item.job as string}
-        index={$globalStore.jobsIndex}
+        index={$jobs.index}
         {errors}
         fieldName="job"
         uiName="Job"

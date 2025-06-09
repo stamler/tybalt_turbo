@@ -24,35 +24,27 @@ const store = writable<DataStore>({
 
 // Initialize the store with data
 async function initializeStore() {
-  try {
-    const jobs = await pb.collection("jobs").getFullList<JobsResponse>({
-      expand: "categories_via_job,client",
-      sort: "-number",
-      requestKey: "job",
-    });
-    const jobsIndex = new MiniSearch<JobsResponse>({
-      fields: ["id", "number", "description", "client"],
-      storeFields: ["id", "number", "description", "client"],
-      extractField: (document, fieldName) => {
-        if (fieldName === "client") {
-          return document.expand?.client?.name;
-        }
-        return document[fieldName as keyof JobsResponse] as string;
-      },
-    });
-    jobsIndex.addAll(jobs as JobsResponse[]);
-    store.update(state => ({
-      ...state,
-      jobs,
-      index: jobsIndex,
-    }));
-  } catch (error) {
-    store.update(state => ({
-      ...state,
-      error: error instanceof Error ? error.message : 'Failed to load jobs',
-    }));
-    throw error;
-  }
+  const jobs = await pb.collection("jobs").getFullList<JobsResponse>({
+    expand: "categories_via_job,client",
+    sort: "-number",
+    requestKey: "job",
+  });
+  const jobsIndex = new MiniSearch<JobsResponse>({
+    fields: ["id", "number", "description", "client"],
+    storeFields: ["id", "number", "description", "client"],
+    extractField: (document, fieldName) => {
+      if (fieldName === "client") {
+        return document.expand?.client?.name ?? "";
+      }
+      return document[fieldName as keyof JobsResponse] as string;
+    },
+  });
+  jobsIndex.addAll(jobs as JobsResponse[]);
+  store.update(state => ({
+    ...state,
+    jobs,
+    index: jobsIndex,
+  }));
 }
 
 // Set up PocketBase realtime subscription
@@ -72,7 +64,12 @@ async function setupSubscription() {
     // efficient by refactoring the jobs endpoint to allow us to specify a job id
     // and get a single job then just update that one job in the store. This works
     // for now.
-    await initializeStore();
+    try {
+      await initializeStore();
+    } catch (error) {
+      // handle error, ensure initialized is false
+      store.update(state => ({ ...state, loading: false, initialized: false, error: error instanceof Error ? error.message : 'Failed to load jobs' }));
+    }
   });
 }
 
@@ -98,8 +95,13 @@ export const jobs = {
   // Refresh the data manually if needed
   refresh: async () => {
     store.update(state => ({ ...state, loading: true }));
-    await initializeStore();
-    store.update(state => ({ ...state, loading: false }));
+    try {
+      await initializeStore();
+      store.update(state => ({ ...state, loading: false }));
+    } catch (error) {
+      // handle error, ensure initialized is false
+      store.update(state => ({ ...state, loading: false, error: error instanceof Error ? error.message : 'Failed to load jobs' }));
+    }
   },
   
   // Clean up subscription when the store is no longer needed
