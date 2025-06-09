@@ -31,14 +31,14 @@ export const jobs = createCollectionStore<JobsResponse>(
     }));
   },
   async (item) => {
-    // Fetch the updated record with expand options and add to store
+    // Fetch the updated record with expand options and replace in store
     const fullRecord = await pb.collection("jobs").getOne<JobsResponse>(item.id, {
       expand: "categories_via_job,client",
     });
     jobs.update((state) => ({
       ...state,
-      items: [...state.items, fullRecord],
-      index: state.index?.add(fullRecord) || state.index,
+      items: state.items.map((i) => (i.id === item.id ? fullRecord : i)),
+      index: state.index?.replace(fullRecord) || state.index,
     }));
   },
 );

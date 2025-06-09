@@ -15,6 +15,7 @@
     inListHeader="Vendors"
     fieldName="vendor"
     uiName="search vendors..."
+    collectionName="vendors"
   >
     {#snippet headline({ name, alias }: VendorsResponse)}
       <span class="flex items-center gap-2">

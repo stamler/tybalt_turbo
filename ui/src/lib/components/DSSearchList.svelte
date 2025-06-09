@@ -7,6 +7,8 @@
   import MiniSearch from "minisearch";
   import type { SearchResult } from "minisearch";
   import DSInListHeader from "./DSInListHeader.svelte";
+  import { collectionEvents } from "$lib/stores/collectionEvents";
+  import { onMount } from "svelte";
 
   const MAX_RESULTS = 100; // don't render more than 100 results
   const MIN_SEARCH_LENGTH = 2; // don't search if term is less than 2 characters
@@ -30,6 +32,7 @@
     actions,
     fieldName,
     uiName,
+    collectionName,
   }: {
     index: MiniSearch<T>;
     inListHeader?: string;
@@ -42,20 +45,37 @@
     actions?: Snippet<[T]>;
     fieldName: string;
     uiName: string;
+    collectionName: string;
   } = $props();
 
   let searchTerm = $state("");
 
-  function updateResults(event: Event) {
+  function updateResults(event?: Event) {
+    // if an event is provided, update the search term from the input
+    if (event) {
+      searchTerm = (event.target as HTMLInputElement).value;
+    }
+
     // if the search term is less than 3 characters, don't search and reset the
     // results
-    searchTerm = (event.target as HTMLInputElement).value;
     if (searchTerm.length < MIN_SEARCH_LENGTH) {
       results = [];
       return;
     }
     results = index.search(searchTerm, { prefix: true });
   }
+
+  // Subscribe to collection events and refresh when relevant events occur
+  onMount(() => {
+    const unsubscribe = collectionEvents.subscribe((event) => {
+      if (event && event.collection === collectionName && searchTerm.length >= MIN_SEARCH_LENGTH) {
+        // Only refresh if we have an active search
+        updateResults();
+      }
+    });
+
+    return unsubscribe;
+  });
 </script>
 
 <ul

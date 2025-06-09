@@ -5,6 +5,7 @@ import MiniSearch from "minisearch";
 import type { RecordFullListOptions, RecordModel } from "pocketbase";
 import type { Options } from "minisearch";
 import type { BaseSystemFields } from "$lib/pocketbase-types";
+import { emitCollectionEvent } from "./collectionEvents";
 
 // Define the type for our store data
 type DataStore<T> = {
@@ -60,15 +61,20 @@ export function createCollectionStore<T extends BaseSystemFields>(
       // by removing the record from the store and discarding it from the index.
       store.update((state) => ({ ...state, loading: true }));
       try {
-        if (e.action === "create") await onCreate(e.record);
-        else if (e.action === "update") await onUpdate(e.record);
-        else if (e.action === "delete") {
+        if (e.action === "create") {
+          await onCreate(e.record);
+          emitCollectionEvent(collectionName, "create", e.record.id);
+        } else if (e.action === "update") {
+          await onUpdate(e.record);
+          emitCollectionEvent(collectionName, "update", e.record.id);
+        } else if (e.action === "delete") {
           // Remove the deleted record from the store and discard it from the index
           store.update((state) => ({
             ...state,
             items: state.items.filter((i) => i.id !== e.record.id),
             index: state.index?.discard(e.record.id) || state.index,
           }));
+          emitCollectionEvent(collectionName, "delete", e.record.id);
         }
         store.update((state) => ({ ...state, loading: false }));
       } catch (error) {
