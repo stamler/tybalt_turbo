@@ -2,8 +2,9 @@ import { get, writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { type UnsubscribeFunc } from "pocketbase";
 import MiniSearch from "minisearch";
-import type { RecordFullListOptions } from "pocketbase";
+import type { RecordFullListOptions, RecordModel } from "pocketbase";
 import type { Options } from "minisearch";
+import type { BaseSystemFields } from "$lib/pocketbase-types";
 
 // Define the type for our store data
 type DataStore<T> = {
@@ -14,10 +15,12 @@ type DataStore<T> = {
   initialized: boolean;
 };
 
-export function createCollectionStore<T>(
+export function createCollectionStore<T extends BaseSystemFields>(
   collectionName: string,
   queryOptions: RecordFullListOptions,
   indexOptions: Options<T>,
+  onCreate: (item: RecordModel) => Promise<void>,
+  onUpdate: (item: RecordModel) => Promise<void>,
 ) {
   // Create the store
   const store = writable<DataStore<T>>({
@@ -48,15 +51,25 @@ export function createCollectionStore<T>(
       unsubscribeFunc(); // Clean up existing subscription
     }
 
-    unsubscribeFunc = await pb.collection(collectionName).subscribe("*", async () => {
+    unsubscribeFunc = await pb.collection(collectionName).subscribe("*", async (e) => {
       // TODO: make this more efficient. Instead of reloading the
       // entire collection, we should just reload the single item that changed.
       // TODO: This function should be passed in as a parameter to the store
-      // constructor, either as multiple parameters (one each for create, update, delete)
-      // or as a single function that checks each case.
+      // constructor, either as multiple parameters (one each for create, update)
+      // or as a single function that checks each case. Delete is always handled
+      // by removing the record from the store and discarding it from the index.
       store.update((state) => ({ ...state, loading: true }));
       try {
-        await initializeStore();
+        if (e.action === "create") await onCreate(e.record);
+        else if (e.action === "update") await onUpdate(e.record);
+        else if (e.action === "delete") {
+          // Remove the deleted record from the store and discard it from the index
+          store.update((state) => ({
+            ...state,
+            items: state.items.filter((i) => i.id !== e.record.id),
+            index: state.index?.discard(e.record.id) || state.index,
+          }));
+        }
         store.update((state) => ({ ...state, loading: false }));
       } catch (error) {
         // handle error, ensure initialized is false
@@ -72,6 +85,8 @@ export function createCollectionStore<T>(
 
   return {
     subscribe: store.subscribe,
+    // Expose update method for callbacks to use
+    update: store.update,
 
     // Initialize the store and subscription (call this when the store is first used)
     init: async () => {
