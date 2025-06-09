@@ -3,20 +3,31 @@ import type { JobsResponse } from '$lib/pocketbase-types';
 import { pb } from '$lib/pocketbase';
 import { type UnsubscribeFunc } from "pocketbase";
 import MiniSearch from 'minisearch';
+import type { RecordFullListOptions } from 'pocketbase';
+import type { Options } from 'minisearch';
 
-const collectionName = "jobs";
+// Define a constraint for types that can be used with this store
+interface ExpandableRecord {
+  expand?: {
+    client?: {
+      name?: string;
+    };
+  };
+  [key: string]: unknown; // Allow other properties
+}
 
 // Define the type for our store data
-type DataStore = {
-  items: JobsResponse[];
-  index: MiniSearch<JobsResponse> | null;
+type DataStore<T> = {
+  items: T[];
+  index: MiniSearch<T> | null;
   loading: boolean;
   error: string | null;
   initialized: boolean;
 };
 
+function createCollectionStore<T extends ExpandableRecord>(collectionName: string, queryOptions: RecordFullListOptions, indexOptions: Options<T>) {
 // Create the store
-const store = writable<DataStore>({
+const store = writable<DataStore<T>>({
   items: [],
   index: null,
   loading: false,
@@ -26,22 +37,9 @@ const store = writable<DataStore>({
 
 // Initialize the store with data
 async function initializeStore() {
-  const items = await pb.collection(collectionName).getFullList<JobsResponse>({
-    expand: "categories_via_job,client",
-    sort: "-number",
-    requestKey: "job",
-  });
-  const itemsIndex = new MiniSearch<JobsResponse>({
-    fields: ["id", "number", "description", "client"],
-    storeFields: ["id", "number", "description", "client"],
-    extractField: (document, fieldName) => {
-      if (fieldName === "client") {
-        return document.expand?.client?.name ?? "";
-      }
-      return document[fieldName as keyof JobsResponse] as string;
-    },
-  });
-  itemsIndex.addAll(items as JobsResponse[]);
+  const items = await pb.collection(collectionName).getFullList<T>(queryOptions);
+  const itemsIndex = new MiniSearch<T>(indexOptions);
+  itemsIndex.addAll(items);
   store.update(state => ({
     ...state,
     items,
@@ -71,7 +69,7 @@ async function setupSubscription() {
   });
 }
 
-export const collectionStore = {
+return {
   subscribe: store.subscribe,
   
   // Initialize the store and subscription (call this when the store is first used)
@@ -109,4 +107,19 @@ export const collectionStore = {
       unsubscribeFunc = null;
     }
   }
-};
+}
+}
+export const collectionStore = createCollectionStore<JobsResponse>("jobs",{
+  expand: "categories_via_job,client",
+  sort: "-number",
+  requestKey: "job",
+},{
+  fields: ["id", "number", "description", "client"],
+  storeFields: ["id", "number", "description", "client"],
+  extractField: (document, fieldName) => {
+    if (fieldName === "client") {
+      return document.expand?.client?.name ?? "";
+    }
+    return document[fieldName as keyof typeof document] as string;
+  },
+});
