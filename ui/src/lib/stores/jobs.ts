@@ -4,9 +4,11 @@ import { pb } from '$lib/pocketbase';
 import { type UnsubscribeFunc } from "pocketbase";
 import MiniSearch from 'minisearch';
 
+const collectionName = "jobs";
+
 // Define the type for our store data
 type DataStore = {
-  jobs: JobsResponse[];
+  items: JobsResponse[];
   index: MiniSearch<JobsResponse> | null;
   loading: boolean;
   error: string | null;
@@ -15,7 +17,7 @@ type DataStore = {
 
 // Create the store
 const store = writable<DataStore>({
-  jobs: [],
+  items: [],
   index: null,
   loading: false,
   error: null,
@@ -24,12 +26,12 @@ const store = writable<DataStore>({
 
 // Initialize the store with data
 async function initializeStore() {
-  const jobs = await pb.collection("jobs").getFullList<JobsResponse>({
+  const items = await pb.collection(collectionName).getFullList<JobsResponse>({
     expand: "categories_via_job,client",
     sort: "-number",
     requestKey: "job",
   });
-  const jobsIndex = new MiniSearch<JobsResponse>({
+  const itemsIndex = new MiniSearch<JobsResponse>({
     fields: ["id", "number", "description", "client"],
     storeFields: ["id", "number", "description", "client"],
     extractField: (document, fieldName) => {
@@ -39,11 +41,11 @@ async function initializeStore() {
       return document[fieldName as keyof JobsResponse] as string;
     },
   });
-  jobsIndex.addAll(jobs as JobsResponse[]);
+  itemsIndex.addAll(items as JobsResponse[]);
   store.update(state => ({
     ...state,
-    jobs,
-    index: jobsIndex,
+    items,
+    index: itemsIndex,
   }));
 }
 
@@ -55,11 +57,7 @@ async function setupSubscription() {
     unsubscribeFunc(); // Clean up existing subscription
   }
   
-  unsubscribeFunc = await pb.collection('jobs').subscribe('*', async () => {
-    // reload all the jobs. We can't specify a specific job because there isn't a
-    // jobs_augmented collection, but rather just an endpoint that returns all
-    // the jobs.
-
+  unsubscribeFunc = await pb.collection(collectionName).subscribe('*', async () => {
     // TODO (EFFICIENCY): there's probably a way to make this SIGNIFICANTLY more
     // efficient by refactoring the jobs endpoint to allow us to specify a job id
     // and get a single job then just update that one job in the store. This works
@@ -68,12 +66,12 @@ async function setupSubscription() {
       await initializeStore();
     } catch (error) {
       // handle error, ensure initialized is false
-      store.update(state => ({ ...state, loading: false, initialized: false, error: error instanceof Error ? error.message : 'Failed to load jobs' }));
+      store.update(state => ({ ...state, loading: false, initialized: false, error: error instanceof Error ? error.message : 'Failed to load items' }));
     }
   });
 }
 
-export const jobs = {
+export const collectionStore = {
   subscribe: store.subscribe,
   
   // Initialize the store and subscription (call this when the store is first used)
@@ -88,7 +86,7 @@ export const jobs = {
       store.update(state => ({ ...state, loading: false, initialized: true }));    
     } catch (error) {
       // handle error, ensure initialized is false
-      store.update(state => ({ ...state, loading: false, initialized: false, error: error instanceof Error ? error.message : 'Failed to load jobs' }));
+      store.update(state => ({ ...state, loading: false, initialized: false, error: error instanceof Error ? error.message : 'Failed to load items' }));
     }
   },
   
@@ -100,7 +98,7 @@ export const jobs = {
       store.update(state => ({ ...state, loading: false }));
     } catch (error) {
       // handle error, ensure initialized is false
-      store.update(state => ({ ...state, loading: false, error: error instanceof Error ? error.message : 'Failed to load jobs' }));
+      store.update(state => ({ ...state, loading: false, error: error instanceof Error ? error.message : 'Failed to load items' }));
     }
   },
   

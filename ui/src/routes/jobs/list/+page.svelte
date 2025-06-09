@@ -1,6 +1,6 @@
 <script lang="ts">
   import DsSearchList from "$lib/components/DSSearchList.svelte";
-  import { jobs } from "$lib/stores/jobs";
+  import { collectionStore as jobs } from "$lib/stores/jobs";
   // TODO: JobsResponse isn't actually the correct type for the items in the
   // index, but hobbles along for now
   import type { JobsResponse } from "$lib/pocketbase-types";

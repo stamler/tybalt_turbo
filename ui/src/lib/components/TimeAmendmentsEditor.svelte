@@ -18,7 +18,7 @@
     CategoriesResponse,
     ProfilesResponse,
   } from "$lib/pocketbase-types";
-  import { jobs } from "$lib/stores/jobs";
+  import { collectionStore as jobs } from "$lib/stores/jobs";
 
   // initialize the jobs store, noop if already initialized
   jobs.init();

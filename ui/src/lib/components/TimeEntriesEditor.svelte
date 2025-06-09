@@ -10,7 +10,7 @@
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
   import type { TimeTypesRecord, DivisionsRecord, CategoriesResponse } from "$lib/pocketbase-types";
-  import { jobs } from "$lib/stores/jobs";
+  import { collectionStore as jobs } from "$lib/stores/jobs";
 
   // initialize the jobs store, noop if already initialized
   jobs.init();
