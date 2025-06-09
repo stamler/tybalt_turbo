@@ -6,16 +6,6 @@ import MiniSearch from 'minisearch';
 import type { RecordFullListOptions } from 'pocketbase';
 import type { Options } from 'minisearch';
 
-// Define a constraint for types that can be used with this store
-interface ExpandableRecord {
-  expand?: {
-    client?: {
-      name?: string;
-    };
-  };
-  [key: string]: unknown; // Allow other properties
-}
-
 // Define the type for our store data
 type DataStore<T> = {
   items: T[];
@@ -25,7 +15,7 @@ type DataStore<T> = {
   initialized: boolean;
 };
 
-function createCollectionStore<T extends ExpandableRecord>(collectionName: string, queryOptions: RecordFullListOptions, indexOptions: Options<T>) {
+function createCollectionStore<T>(collectionName: string, queryOptions: RecordFullListOptions, indexOptions: Options<T>) {
 // Create the store
 const store = writable<DataStore<T>>({
   items: [],
