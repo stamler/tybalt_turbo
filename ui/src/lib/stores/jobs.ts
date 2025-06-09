@@ -46,12 +46,12 @@ async function setupSubscription() {
   }
   
   unsubscribeFunc = await pb.collection(collectionName).subscribe('*', async () => {
-    // TODO (EFFICIENCY): there's probably a way to make this SIGNIFICANTLY more
-    // efficient by refactoring the jobs endpoint to allow us to specify a job id
-    // and get a single job then just update that one job in the store. This works
-    // for now.
+    // TODO: make this more efficient. Instead of reloading the
+    // entire collection, we should just reload the single item that changed.
+    store.update(state => ({ ...state, loading: true }));
     try {
       await initializeStore();
+      store.update(state => ({ ...state, loading: false }));
     } catch (error) {
       // handle error, ensure initialized is false
       store.update(state => ({ ...state, loading: false, initialized: false, error: error instanceof Error ? error.message : 'Failed to load items' }));
