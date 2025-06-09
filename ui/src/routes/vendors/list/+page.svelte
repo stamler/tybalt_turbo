@@ -1,13 +1,17 @@
 <script lang="ts">
   import DsSearchList from "$lib/components/DSSearchList.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
-  import { globalStore } from "$lib/stores/global";
   import type { VendorsResponse } from "$lib/pocketbase-types";
+  import { pb } from "$lib/pocketbase";
+  import { vendors } from "$lib/stores/vendors";
+
+  // initialize the stores, noop if already initialized
+  vendors.init();
 </script>
 
-{#if $globalStore.vendorsIndex !== null}
+{#if $vendors.index !== null}
   <DsSearchList
-    index={$globalStore.vendorsIndex}
+    index={$vendors.index}
     inListHeader="Vendors"
     fieldName="vendor"
     uiName="search vendors..."
@@ -29,7 +33,7 @@
         color="blue"
       />
       <DsActionButton
-        action={() => globalStore.deleteItem("vendors", id)}
+        action={() => pb.collection("vendors").delete(id)}
         icon="mdi:delete"
         title="Delete"
         color="red"

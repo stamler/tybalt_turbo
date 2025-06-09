@@ -51,6 +51,9 @@ export function createCollectionStore<T>(
     unsubscribeFunc = await pb.collection(collectionName).subscribe("*", async () => {
       // TODO: make this more efficient. Instead of reloading the
       // entire collection, we should just reload the single item that changed.
+      // TODO: This function should be passed in as a parameter to the store
+      // constructor, either as multiple parameters (one each for create, update, delete)
+      // or as a single function that checks each case.
       store.update((state) => ({ ...state, loading: true }));
       try {
         await initializeStore();

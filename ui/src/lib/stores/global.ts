@@ -8,7 +8,6 @@ import type {
   TimeTypesResponse,
   DivisionsResponse,
   ManagersResponse,
-  VendorsResponse,
   UserPoPermissionDataResponse,
 } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
@@ -29,13 +28,11 @@ export type CollectionName =
   | "clients"
   | "time_types"
   | "divisions"
-  | "vendors"
   | "managers"
 type CollectionType = {
   clients: ClientsResponse[];
   time_types: TimeTypesResponse[];
   divisions: DivisionsResponse[];
-  vendors: VendorsResponse[];
   managers: ManagersResponse[];
 };
 
@@ -49,7 +46,6 @@ interface StoreState {
     [K in CollectionName]: StoreItem<CollectionType[K]>;
   };
   clientsIndex: MiniSearch<ClientsResponse> | null;
-  vendorsIndex: MiniSearch<VendorsResponse> | null;
   isLoading: boolean;
   user_po_permission_data: {
     id: string;
@@ -91,12 +87,10 @@ const createStore = () => {
       time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       // 1 hour
-      vendors: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
       managers: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
       clients: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
     },
     clientsIndex: null,
-    vendorsIndex: null,
     isLoading: false,
     user_po_permission_data: {
       id: "",
@@ -183,11 +177,6 @@ const createStore = () => {
             requestKey: "manager",
           })) as CollectionType[typeof key];
           break;
-        case "vendors":
-          items = (await pb.collection("vendors").getFullList<VendorsResponse>({
-            requestKey: "vendor",
-          })) as CollectionType[typeof key];
-          break;
       }
 
       update((state) => {
@@ -197,19 +186,6 @@ const createStore = () => {
           items,
           lastRefresh: new Date(),
         };
-
-        if (key === "vendors") {
-          const vendorsIndex = new MiniSearch<VendorsResponse>({
-            fields: ["id", "name", "alias"],
-            storeFields: ["id", "name", "alias"],
-          });
-          // only index Active vendors so users don't see inactive vendors in
-          // the vendor dropdown
-          vendorsIndex.addAll(
-            (items as VendorsResponse[]).filter((item) => item.status === "Active"),
-          );
-          newState.vendorsIndex = vendorsIndex;
-        }
 
         if (key === "clients") {
           const clientsIndex = new MiniSearch<ClientsResponse>({

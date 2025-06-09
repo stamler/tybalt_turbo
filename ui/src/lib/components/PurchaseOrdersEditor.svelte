@@ -13,9 +13,11 @@
   import DsActionButton from "./DSActionButton.svelte";
   import DsLabel from "./DsLabel.svelte";
   import { jobs } from "$lib/stores/jobs";
+  import { vendors } from "$lib/stores/vendors";
 
-  // initialize the jobs store, noop if already initialized
+  // initialize the stores, noop if already initialized
   jobs.init();
+  vendors.init();
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
 
@@ -306,10 +308,10 @@
     min={0}
   />
 
-  {#if $globalStore.vendorsIndex !== null}
+  {#if $vendors.index !== null}
     <DsAutoComplete
       bind:value={item.vendor as string}
-      index={$globalStore.vendorsIndex}
+      index={$vendors.index}
       {errors}
       fieldName="vendor"
       uiName="Vendor"
