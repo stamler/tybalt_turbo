@@ -56,9 +56,6 @@
         await pb.collection("categories").delete(categoryId);
       }
 
-      // reload jobs in the global store
-      globalStore.refresh("jobs");
-
       errors = {};
       goto("/jobs/list");
     } catch (error: any) {
@@ -95,18 +92,52 @@
   enctype="multipart/form-data"
   onsubmit={save}
 >
-  <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
-    <label for="date">Date</label>
+  <span class="flex w-full gap-2 {errors.project_award_date !== undefined ? 'bg-red-200' : ''}">
+    <label for="project_award_date">Project Award Date</label>
     <input
       class="flex-1"
       type="text"
-      name="date"
-      placeholder="Date"
+      name="project_award_date"
+      placeholder="Project Award Date"
       use:flatpickrAction
-      bind:value={item.date}
+      bind:value={item.project_award_date}
     />
-    {#if errors.date !== undefined}
-      <span class="text-red-600">{errors.date.message}</span>
+    {#if errors.project_award_date !== undefined}
+      <span class="text-red-600">{errors.project_award_date.message}</span>
+    {/if}
+  </span>
+
+  <span class="flex w-full gap-2 {errors.proposal_opening_date !== undefined ? 'bg-red-200' : ''}">
+    <label for="proposal_opening_date">Proposal Opening Date</label>
+    <input
+      class="flex-1"
+      type="text"
+      name="proposal_opening_date"
+      placeholder="Proposal Opening Date"
+      use:flatpickrAction
+      bind:value={item.proposal_opening_date}
+    />
+    {#if errors.proposal_opening_date !== undefined}
+      <span class="text-red-600">{errors.proposal_opening_date.message}</span>
+    {/if}
+  </span>
+
+  <span
+    class="flex w-full gap-2 {errors.proposal_submission_due_date !== undefined
+      ? 'bg-red-200'
+      : ''}"
+  >
+    <label for="proposal_submission_due_date">Proposal Submission Due Date</label>
+    <input
+      class="flex-1"
+      type="text"
+      name="proposal_submission_due_date"
+      placeholder="Proposal Submission Due Date"
+      use:flatpickrAction
+      bind:value={item.proposal_submission_due_date}
+    />
+    {#if errors.proposal_submission_due_date !== undefined}
+      <span class="text-red-600">{errors.proposal_submission_due_date.message}</span>
     {/if}
   </span>
 
