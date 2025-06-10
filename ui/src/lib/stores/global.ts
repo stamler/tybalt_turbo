@@ -5,7 +5,6 @@
 
 import type {
   TimeTypesResponse,
-  DivisionsResponse,
   ManagersResponse,
   UserPoPermissionDataResponse,
 } from "$lib/pocketbase-types";
@@ -24,11 +23,9 @@ interface StoreItem<T> {
 
 export type CollectionName =
   | "time_types"
-  | "divisions"
   | "managers"
 type CollectionType = {
   time_types: TimeTypesResponse[];
-  divisions: DivisionsResponse[];
   managers: ManagersResponse[];
 };
 
@@ -80,7 +77,6 @@ const createStore = () => {
     collections: {
       // 1 day
       time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
-      divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       // 1 hour
       managers: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
     },
@@ -151,12 +147,6 @@ const createStore = () => {
           items = (await pb.collection("time_types").getFullList<TimeTypesResponse>({
             sort: "code",
             requestKey: "tt",
-          })) as CollectionType[typeof key];
-          break;
-        case "divisions":
-          items = (await pb.collection("divisions").getFullList<DivisionsResponse>({
-            sort: "code",
-            requestKey: "div",
           })) as CollectionType[typeof key];
           break;
         case "managers":

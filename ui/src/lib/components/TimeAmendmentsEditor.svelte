@@ -1,6 +1,8 @@
 <script lang="ts">
   import { flatpickrAction, fetchCategories } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
+  import { jobs } from "$lib/stores/jobs";
+  import { divisions } from "$lib/stores/divisions";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
@@ -18,10 +20,10 @@
     CategoriesResponse,
     ProfilesResponse,
   } from "$lib/pocketbase-types";
-  import { jobs } from "$lib/stores/jobs";
 
-  // initialize the jobs store, noop if already initialized
+  // initialize the stores, noop if already initialized
   jobs.init();
+  divisions.init();
 
   let { data }: { data: TimeAmendmentsPageData } = $props();
 
@@ -183,14 +185,17 @@
   <!-- FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
   <!----------------------------------------------->
   {#if isWorkTime}
-    <DsSelector
-      bind:value={item.division as string}
-      items={$globalStore.divisions}
-      {errors}
-      {optionTemplate}
-      fieldName="division"
-      uiName="Division"
-    />
+    {#if $divisions.index !== null}
+      <DsAutoComplete
+        bind:value={item.division as string}
+        index={$divisions.index}
+        {errors}
+        fieldName="division"
+        uiName="Division"
+      >
+        {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
+      </DsAutoComplete>
+    {/if}
     {#if $jobs.index !== null}
       <DsAutoComplete
         bind:value={item.job as string}

@@ -13,9 +13,20 @@
   } from "$lib/pocketbase-types";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import { authStore } from "$lib/stores/auth";
+  import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
+  import { divisions } from "$lib/stores/divisions";
+
+  // initialize the stores, noop if already initialized
+  divisions.init();
+
   let { data }: { data: PageData } = $props();
   let errors = $state({} as any);
-  let item = data.item as ProfilesResponse;
+  let item = $state(data.item as ProfilesResponse);
+
+  // Sync item with data.item when it changes (e.g., when navigating to different profiles)
+  $effect(() => {
+    item = data.item as ProfilesResponse;
+  });
 
   const collectionAges = $derived.by(() => {
     // return an array of objects with the key and age of the corresponding
@@ -86,14 +97,17 @@
   {#snippet divisionsOptionTemplate(item: DivisionsResponse)}
     {item.code} - {item.name}
   {/snippet}
-  <DsSelector
-    bind:value={item.default_division as string}
-    items={$globalStore.divisions}
-    {errors}
-    optionTemplate={divisionsOptionTemplate}
-    fieldName="division"
-    uiName="Default Division"
-  />
+  {#if $divisions.index !== null}
+    <DSAutoComplete
+      bind:value={item.default_division as string}
+      index={$divisions.index}
+      {errors}
+      fieldName="default_division"
+      uiName="Default Division"
+    >
+      {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
+    </DSAutoComplete>
+  {/if}
   <p>Token expiration date: {authStore.tokenExpirationDate() ?? "No token"}</p>
   <span class="flex w-full gap-2">
     <DsActionButton action={save}>Save</DsActionButton>

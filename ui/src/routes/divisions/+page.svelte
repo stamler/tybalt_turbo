@@ -2,8 +2,12 @@
   import DsList from "$lib/components/DSList.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import { pb } from "$lib/pocketbase";
-  import { globalStore } from "$lib/stores/global";
+  import { divisions } from "$lib/stores/divisions";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+
+  // initialize the store, noop if already initialized
+  divisions.init();
+
   let errors = $state({} as any);
   const defaultItem = {
     code: "",
@@ -17,9 +21,8 @@
     try {
       await pb.collection("divisions").create(item);
 
-      // save was successful, clear the form and refresh the divisions
+      // save was successful, clear the form
       clearForm();
-      globalStore.refresh("divisions");
     } catch (error: any) {
       errors = error.data.data;
     }
@@ -32,7 +35,7 @@
 </script>
 
 <!-- Show the list of items here -->
-<DsList items={$globalStore.divisions} inListHeader="Divisions" search={true}>
+<DsList items={$divisions.items} inListHeader="Divisions" search={true}>
   {#snippet anchor({ code })}{code}{/snippet}
   {#snippet headline({ name })}{name}{/snippet}
 </DsList>

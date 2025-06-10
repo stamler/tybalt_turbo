@@ -146,16 +146,19 @@
   </span>
 
   <!-- <DsSelector
-    bind:value={item.job_division as string}
-    items={$globalStore.divisions}
-    {errors}
-    fieldName="division"
-    uiName="Division"
-  >
-    {#snippet optionTemplate(item)}
-      {item.code} - {item.name}
-    {/snippet}
-  </DsSelector> -->
+    // TODO: Implement multiple division selection for jobs
+    {#if $divisions.index !== null}
+      <DsAutoComplete
+        bind:value={item.division as string}
+        index={$divisions.index}
+        {errors}
+        fieldName="division"
+        uiName="Division"
+      >
+        {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
+      </DsAutoComplete>
+    {/if}
+   -->
 
   <DsTextInput bind:value={item.number as string} {errors} fieldName="number" uiName="Number" />
 

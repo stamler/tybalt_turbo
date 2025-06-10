@@ -8,6 +8,7 @@
   import DsFileSelect from "$lib/components/DsFileSelect.svelte";
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { authStore } from "$lib/stores/auth";
+  import { divisions } from "$lib/stores/divisions";
   import { goto } from "$app/navigation";
   import type { ExpensesPageData } from "$lib/svelte-types";
   import type { CategoriesResponse, ExpensesAllowanceTypesOptions } from "$lib/pocketbase-types";
@@ -20,7 +21,7 @@
   // initialize the stores, noop if already initialized
   jobs.init();
   vendors.init();
-
+  divisions.init();
   let { data }: { data: ExpensesPageData } = $props();
 
   let errors = $state({} as any);
@@ -123,18 +124,17 @@
     </span>
   {/if}
 
-  <DsSelector
-    bind:value={item.division as string}
-    items={$globalStore.divisions}
-    {errors}
-    fieldName="division"
-    uiName="Division"
-    disabled={item.purchase_order !== ""}
-  >
-    {#snippet optionTemplate(item)}
-      {item.code} - {item.name}
-    {/snippet}
-  </DsSelector>
+  {#if $divisions.index !== null}
+    <DsAutoComplete
+      bind:value={item.division as string}
+      index={$divisions.index}
+      {errors}
+      fieldName="division"
+      uiName="Division"
+    >
+      {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
+    </DsAutoComplete>
+  {/if}
 
   <DsSelector
     bind:value={item.payment_type as string}

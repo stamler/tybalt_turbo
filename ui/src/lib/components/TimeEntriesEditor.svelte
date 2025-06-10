@@ -1,6 +1,8 @@
 <script lang="ts">
   import { flatpickrAction, fetchCategories } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
+  import { divisions } from "$lib/stores/divisions";
+  import { jobs } from "$lib/stores/jobs";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
@@ -10,10 +12,10 @@
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
   import type { TimeTypesRecord, DivisionsRecord, CategoriesResponse } from "$lib/pocketbase-types";
-  import { jobs } from "$lib/stores/jobs";
 
-  // initialize the jobs store, noop if already initialized
+  // initialize the stores, noop if already initialized
   jobs.init();
+  divisions.init();
 
   let { data }: { data: TimeEntriesPageData } = $props();
 
@@ -146,14 +148,17 @@
   <!-- FIELDS VISIBLE ONLY FOR R or RT TimeTypes -->
   <!----------------------------------------------->
   {#if isWorkTime}
-    <DsSelector
-      bind:value={item.division as string}
-      items={$globalStore.divisions}
-      {errors}
-      {optionTemplate}
-      fieldName="division"
-      uiName="Division"
-    />
+    {#if $divisions.index !== null}
+      <DsAutoComplete
+        bind:value={item.division as string}
+        index={$divisions.index}
+        {errors}
+        fieldName="division"
+        uiName="Division"
+      >
+        {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
+      </DsAutoComplete>
+    {/if}
     {#if $jobs.index !== null}
       <DsAutoComplete
         bind:value={item.job as string}

@@ -4,7 +4,7 @@ import { AUTH_CONFIG } from "$lib/config";
 import { jobs } from "$lib/stores/jobs";
 import { vendors } from "$lib/stores/vendors";
 import { clients } from "$lib/stores/clients";
-
+import { divisions } from "$lib/stores/divisions";
 /**
  * CLIENT-SIDE AUTH INITIALIZATION
  * ===============================
@@ -84,3 +84,4 @@ pb.authStore.onChange(() => {
 jobs.init();
 vendors.init();
 clients.init();
+divisions.init();

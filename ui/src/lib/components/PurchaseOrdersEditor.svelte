@@ -1,6 +1,8 @@
 <script lang="ts">
   import { flatpickrAction, fetchCategories } from "$lib/utilities";
-  import { globalStore } from "$lib/stores/global";
+  import { jobs } from "$lib/stores/jobs";
+  import { vendors } from "$lib/stores/vendors";
+  import { divisions } from "$lib/stores/divisions";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
@@ -12,12 +14,11 @@
   import type { CategoriesResponse, PoApproversResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DsLabel from "./DsLabel.svelte";
-  import { jobs } from "$lib/stores/jobs";
-  import { vendors } from "$lib/stores/vendors";
 
   // initialize the stores, noop if already initialized
   jobs.init();
   vendors.init();
+  divisions.init();
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
 
@@ -232,17 +233,17 @@
     {/if}
   </span>
 
-  <DsSelector
-    bind:value={item.division as string}
-    items={$globalStore.divisions}
-    {errors}
-    fieldName="division"
-    uiName="Division"
-  >
-    {#snippet optionTemplate(item)}
-      {item.code} - {item.name}
-    {/snippet}
-  </DsSelector>
+  {#if $divisions.index !== null}
+    <DsAutoComplete
+      bind:value={item.division as string}
+      index={$divisions.index}
+      {errors}
+      fieldName="division"
+      uiName="Division"
+    >
+      {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
+    </DsAutoComplete>
+  {/if}
 
   <DsSelector
     bind:value={item.payment_type as string}
