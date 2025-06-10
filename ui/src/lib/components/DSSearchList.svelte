@@ -45,7 +45,7 @@
     actions?: Snippet<[T]>;
     fieldName: string;
     uiName: string;
-    collectionName: string;
+    collectionName?: string;
   } = $props();
 
   let searchTerm = $state("");

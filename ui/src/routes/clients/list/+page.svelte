@@ -2,6 +2,7 @@
   import DsSearchList from "$lib/components/DSSearchList.svelte";
   import { globalStore } from "$lib/stores/global";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import { pb } from "$lib/pocketbase";
 </script>
 
 <!-- Show the list of items here -->
@@ -11,6 +12,7 @@
     inListHeader="Clients"
     fieldName="client"
     uiName="search clients..."
+    collectionName="clients"
   >
     {#snippet headline({ name })}{name}{/snippet}
     {#snippet line1({ expand })}
@@ -42,7 +44,7 @@
         color="yellow"
       />
       <DsActionButton
-        action={() => globalStore.deleteItem("clients", id)}
+        action={() => pb.collection("clients").delete(id)}
         icon="mdi:delete"
         title="Delete"
         color="red"
