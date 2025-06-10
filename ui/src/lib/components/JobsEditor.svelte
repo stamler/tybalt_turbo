@@ -8,8 +8,12 @@
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
   import { globalStore } from "$lib/stores/global";
+  import { clients } from "$lib/stores/clients";
   import type { ClientContactsResponse } from "$lib/pocketbase-types";
   let { data }: { data: JobsPageData } = $props();
+
+  // initialize the stores, noop if already initialized
+  clients.init();
 
   let errors = $state({} as any);
   let item = $state(data.item);
@@ -174,10 +178,10 @@
     uiName="Description"
   />
 
-  {#if $globalStore.clientsIndex !== null}
+  {#if $clients.index !== null}
     <DsAutoComplete
       bind:value={item.client as string}
-      index={$globalStore.clientsIndex}
+      index={$clients.index}
       {errors}
       fieldName="client"
       uiName="Client"

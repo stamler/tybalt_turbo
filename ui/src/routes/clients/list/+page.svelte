@@ -1,14 +1,17 @@
 <script lang="ts">
   import DsSearchList from "$lib/components/DSSearchList.svelte";
-  import { globalStore } from "$lib/stores/global";
+  import { clients } from "$lib/stores/clients";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { pb } from "$lib/pocketbase";
+
+  // initialize the stores, noop if already initialized
+  clients.init();
 </script>
 
 <!-- Show the list of items here -->
-{#if $globalStore.clientsIndex !== null}
+{#if $clients.index !== null}
   <DsSearchList
-    index={$globalStore.clientsIndex}
+    index={$clients.index}
     inListHeader="Clients"
     fieldName="client"
     uiName="search clients..."

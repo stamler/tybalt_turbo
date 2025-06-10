@@ -4,7 +4,6 @@
  */
 
 import type {
-  ClientsResponse,
   TimeTypesResponse,
   DivisionsResponse,
   ManagersResponse,
@@ -15,7 +14,6 @@ import { pb } from "$lib/pocketbase";
 import { authStore } from "$lib/stores/auth";
 import { get } from "svelte/store";
 import { ClientResponseError } from "pocketbase";
-import MiniSearch from "minisearch";
 import type { Readable, Subscriber } from "svelte/store";
 
 interface StoreItem<T> {
@@ -25,12 +23,10 @@ interface StoreItem<T> {
 }
 
 export type CollectionName =
-  | "clients"
   | "time_types"
   | "divisions"
   | "managers"
 type CollectionType = {
-  clients: ClientsResponse[];
   time_types: TimeTypesResponse[];
   divisions: DivisionsResponse[];
   managers: ManagersResponse[];
@@ -45,7 +41,6 @@ interface StoreState {
   collections: {
     [K in CollectionName]: StoreItem<CollectionType[K]>;
   };
-  clientsIndex: MiniSearch<ClientsResponse> | null;
   isLoading: boolean;
   user_po_permission_data: {
     id: string;
@@ -88,9 +83,7 @@ const createStore = () => {
       divisions: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
       // 1 hour
       managers: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
-      clients: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
     },
-    clientsIndex: null,
     isLoading: false,
     user_po_permission_data: {
       id: "",
@@ -154,12 +147,6 @@ const createStore = () => {
     try {
       let items: CollectionType[typeof key];
       switch (key) {
-        case "clients":
-          items = (await pb.collection("clients").getFullList<ClientsResponse>({
-            requestKey: "client",
-            expand: "client_contacts_via_client",
-          })) as CollectionType[typeof key];
-          break;
         case "time_types":
           items = (await pb.collection("time_types").getFullList<TimeTypesResponse>({
             sort: "code",
@@ -186,17 +173,6 @@ const createStore = () => {
           items,
           lastRefresh: new Date(),
         };
-
-        if (key === "clients") {
-          const clientsIndex = new MiniSearch<ClientsResponse>({
-            fields: ["id", "name"],
-            // store the expand field so we can access
-            // client_contacts_via_client in the search results
-            storeFields: ["id", "name", "expand"],
-          });
-          clientsIndex.addAll(items as ClientsResponse[]);
-          newState.clientsIndex = clientsIndex;
-        }
 
         return { ...newState, isLoading: false, error: null };
       });

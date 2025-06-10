@@ -2,6 +2,8 @@ import { pb } from "$lib/pocketbase";
 import { authStore } from "$lib/stores/auth";
 import { AUTH_CONFIG } from "$lib/config";
 import { jobs } from "$lib/stores/jobs";
+import { vendors } from "$lib/stores/vendors";
+import { clients } from "$lib/stores/clients";
 
 /**
  * CLIENT-SIDE AUTH INITIALIZATION
@@ -78,5 +80,7 @@ pb.authStore.onChange(() => {
 }, true); // The 'true' parameter means this callback also fires immediately with current state
 
 
-// initialize the jobs store
+// initialize stores
 jobs.init();
+vendors.init();
+clients.init();
