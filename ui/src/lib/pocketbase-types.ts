@@ -764,8 +764,8 @@ type TimeAmendmentsRecordExpands = {
 };
 
 type TimeSheetReviewersRecordExpands = {
-  reviewer: ManagersRecord;
-  time_sheet: TimeSheetsRecord;
+  reviewer: ManagersResponse;
+  time_sheet: TimeSheetsResponse;
 };
 
 type ExpensesRecordExpands = {
@@ -794,6 +794,10 @@ type PurchaseOrdersRecordExpands = {
 };
 
 type UsersRecordExpands = {
+  profiles_via_uid: ProfilesResponse;
+};
+
+type ManagersRecordExpands = {
   profiles_via_uid: ProfilesResponse;
 };
 
@@ -846,7 +850,7 @@ export type ExpensesAugmentedResponse<Texpand = unknown> = Required<ExpensesAugm
   BaseSystemFields<Texpand>;
 export type JobsResponse<Texpand = JobsRecordExpands> = Required<JobsRecord> &
   BaseSystemFields<Texpand>;
-export type ManagersResponse<Texpand = unknown> = Required<ManagersRecord> &
+export type ManagersResponse<Texpand = ManagersRecordExpands> = Required<ManagersRecord> &
   BaseSystemFields<Texpand>;
 export type NotificationTemplatesResponse<Texpand = unknown> =
   Required<NotificationTemplatesRecord> & BaseSystemFields<Texpand>;

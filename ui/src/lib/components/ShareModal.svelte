@@ -1,10 +1,12 @@
 <script lang="ts">
-  import Icon from "@iconify/svelte";
   import DsActionButton from "./DSActionButton.svelte";
   import { fade } from "svelte/transition";
   import { pb } from "$lib/pocketbase";
-  import { globalStore } from "$lib/stores/global";
+  import { managers } from "$lib/stores/managers";
   import type { TimeSheetReviewersResponse } from "$lib/pocketbase-types";
+
+  // initialize the stores, noop if already initialized
+  managers.init();
 
   let { collectionName }: { collectionName: string } = $props();
 
@@ -24,8 +26,8 @@
     show = true;
     itemId = id;
     reviewers = await pb.collection(collectionName).getFullList<TimeSheetReviewersResponse>({
-      filter: pb.filter(`time_sheet="${itemId}"`),
-      expand: "reviewer.profiles(uid)",
+      filter: pb.filter("time_sheet={:tsid}", { tsid: itemId }),
+      expand: "reviewer.profiles_via_uid",
       sort: "-reviewed",
     });
   }
@@ -40,8 +42,8 @@
     );
     try {
       reviewers = await pb.collection(collectionName).getFullList<TimeSheetReviewersResponse>({
-        filter: pb.filter(`time_sheet="${itemId}"`),
-        expand: "reviewer.profiles(uid)",
+        filter: pb.filter("time_sheet={:tsid}", { tsid: itemId }),
+        expand: "reviewer.profiles_via_uid",
         sort: "-reviewed",
       });
     } catch (error) {
@@ -55,8 +57,8 @@
     // then update the reviewers state
     await pb.collection(collectionName).delete(reviewerRecordId);
     reviewers = await pb.collection(collectionName).getFullList<TimeSheetReviewersResponse>({
-      filter: pb.filter(`time_sheet="${itemId}"`),
-      expand: "reviewer.profiles(uid)",
+      filter: pb.filter("time_sheet={:tsid}", { tsid: itemId }),
+      expand: "reviewer.profiles_via_uid",
       sort: "-reviewed",
     });
   }
@@ -81,8 +83,8 @@
           {#each reviewers as reviewer}
             <span class="flex items-center gap-1">
               <span>
-                {reviewer.expand?.reviewer.expand["profiles(uid)"].surname},
-                {reviewer.expand?.reviewer.expand["profiles(uid)"].given_name}
+                {reviewer.expand?.reviewer.expand?.profiles_via_uid.surname},
+                {reviewer.expand?.reviewer.expand?.profiles_via_uid.given_name}
               </span>
               <DsActionButton
                 action={() => deleteViewer(reviewer.id)}
@@ -97,7 +99,7 @@
         <span class="flex items-center gap-1">
           <select name="manager" bind:value={newViewer} class="rounded bg-neutral-700 p-1">
             <option disabled selected>- select manager -</option>
-            {#each $globalStore.managers as m (m.id)}
+            {#each $managers.items as m (m.id)}
               <option value={m.id}>
                 {m.surname}, {m.given_name}
               </option>
