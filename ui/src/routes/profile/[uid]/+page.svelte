@@ -2,22 +2,19 @@
   import type { PageData } from "./$types";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
-  import DsSelector from "$lib/components/DSSelector.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { globalStore } from "$lib/stores/global";
   import type { CollectionName } from "$lib/stores/global";
-  import type {
-    ManagersResponse,
-    ProfilesResponse,
-    DivisionsResponse,
-  } from "$lib/pocketbase-types";
+  import type { ProfilesResponse } from "$lib/pocketbase-types";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import { authStore } from "$lib/stores/auth";
   import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { divisions } from "$lib/stores/divisions";
+  import { managers } from "$lib/stores/managers";
 
   // initialize the stores, noop if already initialized
   divisions.init();
+  managers.init();
 
   let { data }: { data: PageData } = $props();
   let errors = $state({} as any);
@@ -58,8 +55,6 @@
       // submission was successful, clear the errors
       errors = {};
 
-      globalStore.refresh("managers");
-
       // TODO: notify the user that save was successful
     } catch (error: any) {
       errors = error.data.data;
@@ -75,28 +70,26 @@
     uiName="Given Name"
   />
   <DsTextInput bind:value={item.surname as string} {errors} fieldName="surname" uiName="Surname" />
-  {#snippet managerOptionTemplate(item: ManagersResponse)}
-    {item.surname}, {item.given_name}
-  {/snippet}
-  <DsSelector
-    bind:value={item.manager as string}
-    items={$globalStore.managers}
-    {errors}
-    optionTemplate={managerOptionTemplate}
-    fieldName="manager"
-    uiName="Manager"
-  />
-  <DsSelector
-    bind:value={item.alternate_manager as string}
-    items={$globalStore.managers}
-    {errors}
-    optionTemplate={managerOptionTemplate}
-    fieldName="alternate_manager"
-    uiName="Alternate Manager"
-  />
-  {#snippet divisionsOptionTemplate(item: DivisionsResponse)}
-    {item.code} - {item.name}
-  {/snippet}
+  {#if $managers.index !== null}
+    <DSAutoComplete
+      bind:value={item.manager as string}
+      index={$managers.index}
+      {errors}
+      fieldName="manager"
+      uiName="Manager"
+    >
+      {#snippet resultTemplate(item)}{item.surname}, {item.given_name}{/snippet}
+    </DSAutoComplete>
+    <DSAutoComplete
+      bind:value={item.alternate_manager as string}
+      index={$managers.index}
+      {errors}
+      fieldName="alternate_manager"
+      uiName="Alternate Manager"
+    >
+      {#snippet resultTemplate(item)}{item.surname}, {item.given_name}{/snippet}
+    </DSAutoComplete>
+  {/if}
   {#if $divisions.index !== null}
     <DSAutoComplete
       bind:value={item.default_division as string}

@@ -5,7 +5,6 @@
 
 import type {
   TimeTypesResponse,
-  ManagersResponse,
   UserPoPermissionDataResponse,
 } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
@@ -23,10 +22,8 @@ interface StoreItem<T> {
 
 export type CollectionName =
   | "time_types"
-  | "managers"
 type CollectionType = {
   time_types: TimeTypesResponse[];
-  managers: ManagersResponse[];
 };
 
 interface ErrorMessage {
@@ -77,8 +74,6 @@ const createStore = () => {
     collections: {
       // 1 day
       time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
-      // 1 hour
-      managers: { items: [], maxAge: 3600 * 1000, lastRefresh: new Date(0) },
     },
     isLoading: false,
     user_po_permission_data: {
@@ -147,11 +142,6 @@ const createStore = () => {
           items = (await pb.collection("time_types").getFullList<TimeTypesResponse>({
             sort: "code",
             requestKey: "tt",
-          })) as CollectionType[typeof key];
-          break;
-        case "managers":
-          items = (await pb.collection("managers").getFullList<ManagersResponse>({
-            requestKey: "manager",
           })) as CollectionType[typeof key];
           break;
       }

@@ -7,13 +7,14 @@
   import { goto } from "$app/navigation";
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
-  import { globalStore } from "$lib/stores/global";
+  import { managers } from "$lib/stores/managers";
   import { clients } from "$lib/stores/clients";
   import type { ClientContactsResponse } from "$lib/pocketbase-types";
   let { data }: { data: JobsPageData } = $props();
 
   // initialize the stores, noop if already initialized
   clients.init();
+  managers.init();
 
   let errors = $state({} as any);
   let item = $state(data.item);
@@ -162,17 +163,19 @@
 
   <DsTextInput bind:value={item.number as string} {errors} fieldName="number" uiName="Number" />
 
-  <DsSelector
-    bind:value={item.manager as string}
-    items={$globalStore.managers}
-    {errors}
-    fieldName="manager"
-    uiName="Manager"
-  >
-    {#snippet optionTemplate(item)}
-      {item.surname}, {item.given_name}
-    {/snippet}
-  </DsSelector>
+  {#if $managers.index !== null}
+    <DsAutoComplete
+      bind:value={item.manager as string}
+      index={$managers.index}
+      {errors}
+      fieldName="manager"
+      uiName="Manager"
+    >
+      {#snippet resultTemplate(item)}
+        {item.surname}, {item.given_name}
+      {/snippet}
+    </DsAutoComplete>
+  {/if}
 
   <DsTextInput
     bind:value={item.description as string}

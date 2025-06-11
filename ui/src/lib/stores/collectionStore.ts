@@ -20,8 +20,9 @@ export function createCollectionStore<T extends BaseSystemFields>(
   collectionName: string,
   queryOptions: RecordFullListOptions,
   indexOptions: Options<T>,
-  onCreate: (item: RecordModel) => Promise<void>,
-  onUpdate: (item: RecordModel) => Promise<void>,
+  onCreate?: (item: RecordModel) => Promise<void> | undefined,
+  onUpdate?: (item: RecordModel) => Promise<void> | undefined,
+  proxyCollectionName?: string, // if provided, watch this collection for subscription events
 ) {
   // Create the store
   const store = writable<DataStore<T>>({
@@ -52,21 +53,19 @@ export function createCollectionStore<T extends BaseSystemFields>(
       unsubscribeFunc(); // Clean up existing subscription
     }
 
-    unsubscribeFunc = await pb.collection(collectionName).subscribe("*", async (e) => {
-      // TODO: make this more efficient. Instead of reloading the
-      // entire collection, we should just reload the single item that changed.
-      // TODO: This function should be passed in as a parameter to the store
-      // constructor, either as multiple parameters (one each for create, update)
-      // or as a single function that checks each case. Delete is always handled
-      // by removing the record from the store and discarding it from the index.
+    unsubscribeFunc = await pb.collection(proxyCollectionName ?? collectionName).subscribe("*", async (e) => {
       store.update((state) => ({ ...state, loading: true }));
       try {
         if (e.action === "create") {
-          await onCreate(e.record);
-          emitCollectionEvent(collectionName, "create", e.record.id);
+          if (onCreate !== undefined) {
+            await onCreate(e.record);
+            emitCollectionEvent(collectionName, "create", e.record.id);
+          }
         } else if (e.action === "update") {
-          await onUpdate(e.record);
-          emitCollectionEvent(collectionName, "update", e.record.id);
+          if (onUpdate !== undefined) {
+            await onUpdate(e.record);
+            emitCollectionEvent(collectionName, "update", e.record.id);
+          }
         } else if (e.action === "delete") {
           // Remove the deleted record from the store and discard it from the index
           store.update((state) => ({
