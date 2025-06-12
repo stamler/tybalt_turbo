@@ -5,7 +5,6 @@
   import DsActionButton from "./DSActionButton.svelte";
   import { goto } from "$app/navigation";
   import type { VendorsPageData } from "$lib/svelte-types";
-  import { globalStore } from "$lib/stores/global";
 
   let { data }: { data: VendorsPageData } = $props();
 
@@ -21,10 +20,6 @@
       } else {
         await pb.collection("vendors").create(item);
       }
-
-      // refresh vendors in the global store
-      globalStore.refresh("vendors");
-
       errors = {};
       goto("/vendors/list");
     } catch (error: any) {

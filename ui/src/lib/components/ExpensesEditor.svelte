@@ -1,6 +1,5 @@
 <script lang="ts">
   import { flatpickrAction, fetchCategories } from "$lib/utilities";
-  import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
