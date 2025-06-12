@@ -115,19 +115,27 @@ export function createCollectionStore<T extends BaseSystemFields>(
     },
 
     // Refresh the data manually if needed
-    refresh: async () => {
+    refresh: async (id?: string) => {
       store.update((state) => ({ ...state, loading: true }));
-      try {
-        await initializeStore();
-        store.update((state) => ({ ...state, loading: false }));
-      } catch (error) {
-        // handle error, ensure initialized is false
-        store.update((state) => ({
-          ...state,
-          loading: false,
-          error: error instanceof Error ? error.message : "Failed to load items",
-        }));
-      }
+      if (id !== undefined) {
+        // Just call the onUpdate callback for this item
+        if (onUpdate !== undefined) {
+          await onUpdate({ id } as RecordModel);
+        }
+      } else {
+        // refresh all items
+        try {
+          await initializeStore();
+          store.update((state) => ({ ...state, loading: false }));
+        } catch (error) {
+          // handle error, ensure initialized is false
+          store.update((state) => ({
+            ...state,
+            loading: false,
+            error: error instanceof Error ? error.message : "Failed to load items",
+          }));
+        }
+    }
     },
 
     // Clean up subscription when the store is no longer needed

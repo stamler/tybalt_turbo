@@ -4,7 +4,7 @@
     ClientContactsResponse,
     AbsorbActionsResponse,
   } from "$lib/pocketbase-types";
-  import { globalStore } from "$lib/stores/global";
+  import { clients } from "$lib/stores/clients";
   import DsSelector from "./DSSelector.svelte";
   import DsActionButton from "./DSActionButton.svelte";
   import { pb } from "$lib/pocketbase";
@@ -49,7 +49,7 @@
           availableRecords = contacts;
         });
     } else if (collectionName === "clients") {
-      availableRecords = $globalStore.clients || [];
+      availableRecords = $clients.items || [];
     }
   });
 

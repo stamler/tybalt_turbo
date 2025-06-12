@@ -6,6 +6,7 @@
   import DsActionButton from "./DSActionButton.svelte";
   import type { ClientContactsRecord, ClientContactsResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
+  import { clients } from "$lib/stores/clients";
 
   let { data }: { data: ClientsPageData } = $props();
 
@@ -33,7 +34,8 @@
     given_name: "",
     surname: "",
     email: "",
-  } as ClientContactsRecord);
+    client: "",
+  });
   let newContacts = $state([] as ClientContactWithTempId[]);
   let clientContactsToDelete = $state([] as (ClientContactsResponse | ClientContactWithTempId)[]);
 
@@ -57,13 +59,15 @@
       // Add new client_contacts
       for (const contact of newContacts) {
         try {
-          await pb.collection("client_contacts").create(
-            {
-              ...contact,
-              client: clientId,
-            },
-            { returnRecord: true },
-          );
+          await pb.collection("client_contacts").create({
+            ...contact,
+            client: clientId,
+          });
+          // manually reload this client in the clients store so the new
+          // contact is visible
+          if (clientId !== null) {
+            clients.refresh(clientId);
+          }
         } catch (error: any) {
           globalStore.addError(
             `error creating contact ${contact.surname}, ${contact.given_name}: ${error}`,
@@ -78,16 +82,17 @@
         }
         try {
           await pb.collection("client_contacts").delete(contact.id);
+          // manually reload this client in the clients store so the deleted
+          // contact is removed
+          if (clientId !== null) {
+            clients.refresh(clientId);
+          }
         } catch (error: any) {
           globalStore.addError(
             `error deleting contact ${contact.surname}, ${contact.given_name}: ${error}`,
           );
         }
       }
-
-      // reload clients in the global store
-      globalStore.refresh("clients");
-
       errors = {};
       goto("/clients/list");
     } catch (error: any) {
