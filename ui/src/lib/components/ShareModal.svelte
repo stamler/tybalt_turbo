@@ -3,6 +3,7 @@
   import { fade } from "svelte/transition";
   import { pb } from "$lib/pocketbase";
   import { managers } from "$lib/stores/managers";
+  import { globalStore } from "$lib/stores/global";
 
   type Reviewer = {
     id: string;
@@ -30,39 +31,48 @@
     reviewers = [];
   }
 
-  export async function openModal(id: string) {
-    show = true;
-    itemId = id;
-    reviewers = await pb.send("/api/time_sheets/" + itemId + "/reviewers", {
-      method: "GET",
-    });
-  }
-
-  async function addViewer() {
-    const result = await pb.collection(collectionName).create(
-      {
-        time_sheet: itemId,
-        reviewer: newViewer,
-      },
-      { returnRecord: true },
-    );
+  async function reloadReviewers() {
     try {
       reviewers = await pb.send("/api/time_sheets/" + itemId + "/reviewers", {
         method: "GET",
       });
-    } catch (error) {
-      console.log(error);
+      newViewer = "";
+    } catch (error: any) {
+      globalStore.addError(`Failed to load reviewers: ${error}`);
+      reviewers = []; // Ensure we have valid state even on error
     }
-    newViewer = "";
+  }
+
+  export async function openModal(id: string) {
+    show = true;
+    itemId = id;
+    reloadReviewers();
+  }
+
+  async function addViewer() {
+    if (!newViewer) {
+      globalStore.addError("Please select a manager to add as viewer");
+      return;
+    }
+
+    try {
+      await pb.collection(collectionName).create({
+        time_sheet: itemId,
+        reviewer: newViewer,
+      });
+      reloadReviewers();
+    } catch (error: any) {
+      globalStore.addError(`Failed to add viewer: ${error}`);
+    }
   }
 
   async function deleteViewer(reviewerRecordId: string) {
-    // first delete the record from the time_sheet_reviewers collection,
-    // then update the reviewers state
-    await pb.collection(collectionName).delete(reviewerRecordId);
-    reviewers = await pb.send("/api/time_sheets/" + itemId + "/reviewers", {
-      method: "GET",
-    });
+    try {
+      await pb.collection(collectionName).delete(reviewerRecordId);
+      reloadReviewers();
+    } catch (error: any) {
+      globalStore.addError(`Failed to remove viewer: ${error}`);
+    }
   }
 </script>
 
