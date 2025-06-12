@@ -3,10 +3,7 @@
  * app.
  */
 
-import type {
-  TimeTypesResponse,
-  UserPoPermissionDataResponse,
-} from "$lib/pocketbase-types";
+import type { UserPoPermissionDataResponse } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { authStore } from "$lib/stores/auth";
@@ -14,27 +11,12 @@ import { get } from "svelte/store";
 import { ClientResponseError } from "pocketbase";
 import type { Readable, Subscriber } from "svelte/store";
 
-interface StoreItem<T> {
-  items: T;
-  maxAge: number;
-  lastRefresh: Date;
-}
-
-export type CollectionName =
-  | "time_types"
-type CollectionType = {
-  time_types: TimeTypesResponse[];
-};
-
 interface ErrorMessage {
   message: string;
   id: string;
 }
 
 interface StoreState {
-  collections: {
-    [K in CollectionName]: StoreItem<CollectionType[K]>;
-  };
   isLoading: boolean;
   user_po_permission_data: {
     id: string;
@@ -50,31 +32,8 @@ interface StoreState {
   errorMessages: ErrorMessage[];
 }
 
-// Define a type for the wrapped store value
-type WrappedStoreValue = {
-  [K in CollectionName]: CollectionType[K];
-} & Omit<StoreState, "collections"> & {
-    collections: StoreState["collections"];
-    errorMessages: ErrorMessage[];
-    addError: (message: string) => void;
-    dismissError: (id: string) => void;
-    claims: string[];
-    user_po_permission_data: {
-      id: string;
-      max_amount: number;
-      lower_threshold: number;
-      upper_threshold: number;
-      divisions: string[];
-      claims: string[];
-    };
-  };
-
 const createStore = () => {
   const { subscribe, update } = writable<StoreState>({
-    collections: {
-      // 1 day
-      time_types: { items: [], maxAge: 86400 * 1000, lastRefresh: new Date(0) },
-    },
     isLoading: false,
     user_po_permission_data: {
       id: "",
@@ -122,55 +81,8 @@ const createStore = () => {
     }
   };
 
-  const loadData = async <K extends CollectionName>(key: K) => {
-    // immediately return if already loading so we don't restart the loading
-    // process and trigger an auto-cancel of the request.
-
-    // TODO: this logic is flawed because it immediately returns even if
-    // loadData() was called with a different key. We need to approach this
-    // differently.
-    if (get({subscribe}).isLoading) {
-      console.log("Already loading, skipping refresh");
-      return;
-    }
-
-    update((state) => ({ ...state, isLoading: true, error: null }));
-    try {
-      let items: CollectionType[typeof key];
-      switch (key) {
-        case "time_types":
-          items = (await pb.collection("time_types").getFullList<TimeTypesResponse>({
-            sort: "code",
-            requestKey: "tt",
-          })) as CollectionType[typeof key];
-          break;
-      }
-
-      update((state) => {
-        const newState = { ...state };
-        newState.collections[key] = {
-          ...newState.collections[key],
-          items,
-          lastRefresh: new Date(),
-        };
-
-        return { ...newState, isLoading: false, error: null };
-      });
-    } catch (error: unknown) {
-      const typedErr = error as ClientResponseError;
-      console.error(`Error loading ${key}:`, typedErr);
-      update((state) => ({ ...state, isLoading: false, error: typedErr }));
-    }
-  };
-
-  // TODO: instead of manually calling refresh(), we should use the subscribe
-  // function to refresh the store based on events.
-  const refresh = async (key: CollectionName | null = null) => {
-    // refresh() should no-op if the user is not logged in. Failure to do so
-    // will cause the lastRefresh date to be set to now, which will prevent
-    // subsequent refreshes from happening until maxAge milliseconds have passed
-    // leaving blank data on the UI because calling the backend with no auth
-    // token will return no results.
+  const refresh = async () => {
+    // refresh() should no-op if the user is not logged in
     if (!get(authStore)?.isValid) {
       console.log("User is not logged in, skipping refresh");
       return;
@@ -185,20 +97,6 @@ const createStore = () => {
         state.user_po_permission_data.maxAge
       ) {
         loadUserPoPermissionData();
-      }
-
-      if (key !== null) {
-        // refresh immediately when the key is specified
-        loadData(key);
-      } else {
-        // if the key is not specified, refresh all collections that are older
-        // than their maxAge
-        for (const k of Object.keys(newState.collections) as CollectionName[]) {
-          const item = newState.collections[k];
-          if (now.getTime() - item.lastRefresh.getTime() >= item.maxAge) {
-            loadData(k);
-          }
-        }
       }
 
       return newState;
@@ -232,29 +130,25 @@ const createStore = () => {
 
 const _globalStore = createStore();
 
-// Proxy handler to allow access like $globalStore.time_types
+// Proxy handler to allow access like $globalStore.claims
 const proxyHandler: ProxyHandler<StoreState> = {
   get(target, prop: string | symbol) {
     if (prop === "claims") {
       return target.user_po_permission_data.claims;
-    }
-    if (prop in target.collections) {
-      const items = target.collections[prop as CollectionName].items;
-      return items || []; // Return an empty array if items is undefined
     }
     return target[prop as keyof StoreState];
   },
 };
 
 // Wrapped store that provides access to the collections directly
-const wrappedStore: Readable<WrappedStoreValue> & {
+const wrappedStore: Readable<StoreState> & {
   refresh: typeof _globalStore.refresh;
   addError: typeof _globalStore.addError;
   dismissError: typeof _globalStore.dismissError;
 } = {
-  subscribe: (run: Subscriber<WrappedStoreValue>, invalidate?: () => void) => {
+  subscribe: (run: Subscriber<StoreState>, invalidate?: () => void) => {
     return _globalStore.subscribe(
-      (value) => run(new Proxy(value, proxyHandler) as unknown as WrappedStoreValue),
+      (value) => run(new Proxy(value, proxyHandler) as unknown as StoreState),
       invalidate,
     );
   },

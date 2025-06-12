@@ -1,8 +1,8 @@
 <script lang="ts">
   import { flatpickrAction, fetchCategories } from "$lib/utilities";
-  import { globalStore } from "$lib/stores/global";
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
+  import { timeTypes } from "$lib/stores/time_types";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
@@ -24,6 +24,7 @@
   // initialize the stores, noop if already initialized
   jobs.init();
   divisions.init();
+  timeTypes.init();
 
   let { data }: { data: TimeAmendmentsPageData } = $props();
 
@@ -74,12 +75,12 @@
   // given a list of time type codes, return true if the item's time type is in
   // the list
   function hasTimeType(typelist: string[]) {
-    if ($globalStore.time_types.length === 0) {
+    if ($timeTypes.items.length === 0) {
       return false;
     }
     return typelist
       .map((c) => {
-        const foundTimeType = $globalStore.time_types.find((t) => t.code === c);
+        const foundTimeType = $timeTypes.items.find((t) => t.code === c);
         return foundTimeType ? foundTimeType.id : null;
       })
       .includes(item.time_type);
@@ -169,7 +170,7 @@
   {/snippet}
   <DsSelector
     bind:value={item.time_type as string}
-    items={$globalStore.time_types}
+    items={$timeTypes.items}
     {errors}
     {optionTemplate}
     fieldName="time_type"

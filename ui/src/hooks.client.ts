@@ -5,6 +5,8 @@ import { jobs } from "$lib/stores/jobs";
 import { vendors } from "$lib/stores/vendors";
 import { clients } from "$lib/stores/clients";
 import { divisions } from "$lib/stores/divisions";
+import { timeTypes } from "$lib/stores/time_types";
+
 /**
  * CLIENT-SIDE AUTH INITIALIZATION
  * ===============================
@@ -85,3 +87,4 @@ jobs.init();
 vendors.init();
 clients.init();
 divisions.init();
+timeTypes.init();

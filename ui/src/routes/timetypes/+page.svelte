@@ -5,7 +5,9 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { pb } from "$lib/pocketbase";
   import type { TimeTypesResponse } from "$lib/pocketbase-types";
-  import { globalStore } from "$lib/stores/global";
+  import { timeTypes } from "$lib/stores/time_types";
+
+  timeTypes.init();
 
   let errors = $state({} as any);
   const defaultItem = {
@@ -24,7 +26,6 @@
 
       // save was successful, clear the form and refresh the divisions
       clearForm();
-      globalStore.refresh("time_types");
     } catch (error: any) {
       // if error.data.data is not an empty object, then set errors to that,
       // otherwise set errors to error.data.message
@@ -60,7 +61,7 @@
 
 <!-- Show the list of items here -->
 <DsList
-  items={$globalStore.time_types as TimeTypesResponse[]}
+  items={$timeTypes.items as TimeTypesResponse[]}
   inListHeader="Time Types"
   search={true}
   {anchor}

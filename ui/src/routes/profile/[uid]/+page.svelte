@@ -4,7 +4,6 @@
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { globalStore } from "$lib/stores/global";
-  import type { CollectionName } from "$lib/stores/global";
   import type { ProfilesResponse } from "$lib/pocketbase-types";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import { authStore } from "$lib/stores/auth";
@@ -23,18 +22,6 @@
   // Sync item with data.item when it changes (e.g., when navigating to different profiles)
   $effect(() => {
     item = data.item as ProfilesResponse;
-  });
-
-  const collectionAges = $derived.by(() => {
-    // return an array of objects with the key and age of the corresponding
-    // collection
-    return (Object.keys($globalStore.collections) as CollectionName[]).map((key) => {
-      const collection = $globalStore.collections[key];
-      return {
-        key,
-        age: Math.round((new Date().getTime() - collection.lastRefresh.getTime()) / 1000),
-      };
-    });
   });
 
   async function save() {
@@ -105,12 +92,6 @@
   <span class="flex w-full gap-2">
     <DsActionButton action={save}>Save</DsActionButton>
   </span>
-  <p>Store ages:</p>
-  <ul>
-    {#each collectionAges as age}
-      <li>{age.key}: {age.age}s</li>
-    {/each}
-  </ul>
 
   <p>Claims:</p>
   <ul class="flex flex-row gap-2">
