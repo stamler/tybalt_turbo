@@ -80,6 +80,7 @@ func AddRoutes(app core.App) {
 		tsGroup.POST("/{id}/unbundle", createUnbundleTimesheetHandler(app))
 		tsGroup.POST("/{id}/approve", createApproveRecordHandler(app, "time_sheets"))
 		tsGroup.POST("/{id}/reject", createRejectRecordHandler(app, "time_sheets"))
+		tsGroup.GET("/{id}/reviewers", createGetReviewersHandler(app))
 		tsGroup.GET("/tallies", createTimesheetTalliesHandler(app))
 
 		expensesGroup := se.Router.Group("/api/expenses")

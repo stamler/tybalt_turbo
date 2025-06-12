@@ -3,7 +3,15 @@
   import { fade } from "svelte/transition";
   import { pb } from "$lib/pocketbase";
   import { managers } from "$lib/stores/managers";
-  import type { TimeSheetReviewersResponse } from "$lib/pocketbase-types";
+
+  type Reviewer = {
+    id: string;
+    time_sheet: string;
+    reviewer: string;
+    reviewed: string;
+    surname: string;
+    given_name: string;
+  };
 
   // initialize the stores, noop if already initialized
   managers.init();
@@ -13,7 +21,7 @@
   let show = $state(false);
   let itemId = $state("");
   let newViewer = $state("");
-  let reviewers = $state([] as TimeSheetReviewersResponse[]);
+  let reviewers = $state([] as Reviewer[]);
 
   function closeModal() {
     show = false;
@@ -25,10 +33,8 @@
   export async function openModal(id: string) {
     show = true;
     itemId = id;
-    reviewers = await pb.collection(collectionName).getFullList<TimeSheetReviewersResponse>({
-      filter: pb.filter("time_sheet={:tsid}", { tsid: itemId }),
-      expand: "reviewer.profiles_via_uid",
-      sort: "-reviewed",
+    reviewers = await pb.send("/api/time_sheets/" + itemId + "/reviewers", {
+      method: "GET",
     });
   }
 
@@ -41,10 +47,8 @@
       { returnRecord: true },
     );
     try {
-      reviewers = await pb.collection(collectionName).getFullList<TimeSheetReviewersResponse>({
-        filter: pb.filter("time_sheet={:tsid}", { tsid: itemId }),
-        expand: "reviewer.profiles_via_uid",
-        sort: "-reviewed",
+      reviewers = await pb.send("/api/time_sheets/" + itemId + "/reviewers", {
+        method: "GET",
       });
     } catch (error) {
       console.log(error);
@@ -56,10 +60,8 @@
     // first delete the record from the time_sheet_reviewers collection,
     // then update the reviewers state
     await pb.collection(collectionName).delete(reviewerRecordId);
-    reviewers = await pb.collection(collectionName).getFullList<TimeSheetReviewersResponse>({
-      filter: pb.filter("time_sheet={:tsid}", { tsid: itemId }),
-      expand: "reviewer.profiles_via_uid",
-      sort: "-reviewed",
+    reviewers = await pb.send("/api/time_sheets/" + itemId + "/reviewers", {
+      method: "GET",
     });
   }
 </script>
@@ -83,8 +85,7 @@
           {#each reviewers as reviewer}
             <span class="flex items-center gap-1">
               <span>
-                {reviewer.expand?.reviewer.expand?.profiles_via_uid.surname},
-                {reviewer.expand?.reviewer.expand?.profiles_via_uid.given_name}
+                {reviewer.surname}, {reviewer.given_name}
               </span>
               <DsActionButton
                 action={() => deleteViewer(reviewer.id)}
