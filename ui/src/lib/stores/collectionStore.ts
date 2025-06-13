@@ -144,6 +144,7 @@ export function createCollectionStore<T extends BaseSystemFields>(
         unsubscribeFunc();
         unsubscribeFunc = null;
       }
+      store.update((state) => ({ ...state, initialized: false, items: [], index: null, loading: false, error: null }));
     },
   };
 }

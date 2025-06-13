@@ -7,6 +7,8 @@ import { clients } from "$lib/stores/clients";
 import { divisions } from "$lib/stores/divisions";
 import { timeTypes } from "$lib/stores/time_types";
 
+const allStores = [jobs, vendors, clients, divisions, timeTypes];
+
 /**
  * CLIENT-SIDE AUTH INITIALIZATION
  * ===============================
@@ -78,13 +80,43 @@ pb.authStore.onChange(() => {
   // If user is not authenticated, setupTokenRefresh() will clear any existing timer
   if (pb.authStore.token && pb.authStore.model) {
     authStore.setupTokenRefresh();
+
+    // initialize stores
+    /*
+     * === Asynchronous init() calls ===
+     * Each `store.init()` returns a Promise because it fetches the initial
+     * data set from PocketBase and then registers a realtime subscription.
+     *
+     * The loop below intentionally _does not_ await these Promises; the
+     * operations are "fire-and-forget" so the UI can remain responsive while
+     * each collection loads in the background.
+     *
+     * If you later decide that subsequent logic (for example showing the
+     * application shell) must wait until _all_ collections are fully loaded,
+     * you have two straightforward options:
+     *
+     * 1. Make the `onChange` callback itself `async` and `await` them:
+     *
+     *        pb.authStore.onChange(async () => {
+     *          authStore.refresh();
+     *          if (authenticated) {
+     *            await Promise.all(allStores.map(s => s.init()));
+     *          }
+     *        }, true);
+     *
+     * 2. Keep the callback synchronous and wrap the awaited work in an IIFE:
+     *
+     *        (async () => {
+     *          await Promise.all(allStores.map(s => s.init()));
+     *        })();
+     *
+     * Both variants will block until every collection has completed its
+     * initial fetch, allowing you to toggle a global loading indicator or
+     * similar UX affordance.
+     */
+    allStores.forEach((store) => store.init());
+  } else {
+    // clear the stores
+    allStores.forEach((store) => store.unsubscribe());
   }
 }, true); // The 'true' parameter means this callback also fires immediately with current state
-
-
-// initialize stores
-jobs.init();
-vendors.init();
-clients.init();
-divisions.init();
-timeTypes.init();
