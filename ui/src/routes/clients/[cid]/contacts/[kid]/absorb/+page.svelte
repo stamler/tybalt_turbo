@@ -7,15 +7,6 @@
 
 <AbsorbEditor collectionName="client_contacts" targetRecordId={data.params.kid}>
   {#snippet recordSnippet(item: ClientContactsResponse)}
-    <div class="rounded bg-neutral-100 p-2">
-      <a
-        href="mailto:{item.email}"
-        class="rounded-md p-1 hover:cursor-pointer hover:bg-neutral-300"
-        title={item.email}
-      >
-        {item.given_name}
-        {item.surname}
-      </a>
-    </div>
+    {item.given_name} {item.surname} — {item.email}
   {/snippet}
 </AbsorbEditor>

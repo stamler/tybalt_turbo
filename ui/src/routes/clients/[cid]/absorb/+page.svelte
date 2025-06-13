@@ -7,8 +7,6 @@
 
 <AbsorbEditor collectionName="clients" targetRecordId={data.params.cid}>
   {#snippet recordSnippet(item: ClientsResponse)}
-    <div class="rounded bg-neutral-100 p-2">
-      <span class="font-bold">{item.name}</span>
-    </div>
+    {item.name}
   {/snippet}
 </AbsorbEditor>

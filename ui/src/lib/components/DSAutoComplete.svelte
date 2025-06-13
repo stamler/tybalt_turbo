@@ -36,6 +36,14 @@
   let results = $state([] as SearchResult[]);
   let selectedIndex = $state(-1);
 
+  // reference to the internal input element so we can expose a focus helper
+  // svelte-ignore non_reactive_update
+  let inputElement: HTMLInputElement | null = null;
+  // Allows parent components to focus the internal input element via `componentRef.focus()`.
+  export function focus() {
+    inputElement?.focus();
+  }
+
   function updateResults(event: Event) {
     const query = (event.target as HTMLInputElement).value;
     results = index.search(query, { prefix: true });
@@ -105,6 +113,7 @@
           placeholder={uiName}
           oninput={updateResults}
           {disabled}
+          bind:this={inputElement}
         />
       {/if}
     </span>

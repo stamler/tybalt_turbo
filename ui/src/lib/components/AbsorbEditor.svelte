@@ -5,12 +5,13 @@
     AbsorbActionsResponse,
   } from "$lib/pocketbase-types";
   import { clients } from "$lib/stores/clients";
-  import DsSelector from "./DSSelector.svelte";
   import DsActionButton from "./DSActionButton.svelte";
+  import DsAutoComplete from "./DSAutoComplete.svelte";
   import { pb } from "$lib/pocketbase";
   import { page } from "$app/stores";
   import type { Snippet } from "svelte";
   import type { BaseSystemFields } from "$lib/pocketbase-types";
+  import type MiniSearch from "minisearch";
 
   let {
     collectionName,
@@ -31,6 +32,28 @@
   let availableRecords = $state<(ClientsResponse | ClientContactsResponse)[]>([]);
   let items = $state<(ClientsResponse | ClientContactsResponse)[]>([]);
   let targetRecord = $state<T | null>(null);
+
+  // Reference to the DsAutoComplete component so we can call its exposed focus() helper.
+  // svelte-ignore non_reactive_update
+  let autoCompleteRef: any = null;
+
+  // Provide a correctly-typed index for the autocomplete component.
+  // We use a union so the component can work with both Clients and Client-contacts.
+  let autoCompleteIndex = $state<MiniSearch<ClientsResponse | ClientContactsResponse> | null>(null);
+
+  // Update the autocomplete index whenever the collection changes or stores initialise.
+  $effect(() => {
+    if (collectionName === "clients") {
+      autoCompleteIndex = $clients.index as unknown as MiniSearch<
+        ClientsResponse | ClientContactsResponse
+      >;
+    } else if (collectionName === "client_contacts") {
+      // TODO: replace with client-contacts store index when available
+      autoCompleteIndex = null;
+    } else {
+      autoCompleteIndex = null;
+    }
+  });
 
   // Update items whenever availableRecords or recordsToAbsorb changes
   $effect(() => {
@@ -116,10 +139,12 @@
   }
 
   $effect(() => {
-    if (selectedRecord && !recordsToAbsorb.includes(selectedRecord)) {
+    if (selectedRecord !== "" && !recordsToAbsorb.includes(selectedRecord)) {
       recordsToAbsorb = [...recordsToAbsorb, selectedRecord];
-      selectedRecord = ""; // Reset selection after adding
     }
+    selectedRecord = ""; // Reset selection even if the record is already in the list
+    // Re-focus the autocomplete's internal input so the user can keep typing.
+    autoCompleteRef?.focus?.();
   });
 
   async function handleAbsorb() {
@@ -198,17 +223,25 @@
     <div class="flex flex-col gap-2">
       <h2 class="text-xl font-bold">Records to Absorb</h2>
       {#if items.length > 0}
-        <DsSelector
-          bind:value={selectedRecord}
-          {items}
-          {errors}
-          fieldName="records_to_absorb"
-          uiName="Select Record"
-        >
-          {#snippet optionTemplate(item)}
-            {@render recordSnippet(item as unknown as T)}
-          {/snippet}
-        </DsSelector>
+        {#if autoCompleteIndex}
+          <DsAutoComplete
+            bind:this={autoCompleteRef}
+            bind:value={selectedRecord}
+            index={autoCompleteIndex as unknown as MiniSearch<unknown>}
+            {errors}
+            fieldName="records_to_absorb"
+            uiName="Select Record"
+          >
+            {#snippet resultTemplate(item: any)}
+              <div class:bg-red-200={recordsToAbsorb.includes(item.id)}>
+                {#if recordsToAbsorb.includes(item.id)}
+                  ✅
+                {/if}
+                {@render recordSnippet(item as unknown as T)}
+              </div>
+            {/snippet}
+          </DsAutoComplete>
+        {/if}
       {:else}
         <p class="text-neutral-500">No more records available to absorb</p>
       {/if}
