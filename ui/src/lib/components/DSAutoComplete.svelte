@@ -22,6 +22,7 @@
     uiName,
     disabled = false,
     idField = "id", // the field in the index that is the id, defaults to "id"
+    excludeIds = [] as (string | number)[], // optional list of ids to exclude from results
   }: {
     value: string;
     index: MiniSearch<T>;
@@ -31,6 +32,7 @@
     uiName: string;
     disabled?: boolean;
     idField?: string;
+    excludeIds?: (string | number)[];
   } = $props();
 
   let results = $state([] as SearchResult[]);
@@ -46,7 +48,10 @@
 
   function updateResults(event: Event) {
     const query = (event.target as HTMLInputElement).value;
-    results = index.search(query, { prefix: true });
+    // Search then filter out any excluded ids
+    results = index
+      .search(query, { prefix: true })
+      .filter((r) => !excludeIds.includes(r[idField] as unknown as string | number));
   }
 
   function keydown(event: KeyboardEvent) {
@@ -74,15 +79,19 @@
   }
 
   function getDocumentById(index: MiniSearch<T>, id: string) {
+    // Ensure we don't return a document that has been excluded
     const results = index.search(id.toString(), {
       fields: [idField],
       prefix: true,
       combineWith: "AND",
     });
-    if (results.length === 0) {
+    const filtered = results.filter(
+      (r) => !excludeIds.includes(r[idField] as unknown as string | number),
+    );
+    if (filtered.length === 0) {
       throw new Error(`No document found with ${idField} ${id}`);
     }
-    return results[0];
+    return filtered[0];
   }
 
   function clearValue() {

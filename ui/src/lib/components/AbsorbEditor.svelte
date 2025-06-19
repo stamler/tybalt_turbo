@@ -110,7 +110,13 @@
   }
 
   $effect(() => {
-    if (selectedRecord !== "" && !recordsToAbsorb.includes(selectedRecord)) {
+    // Don't add the target record, a blank record, or a record that is already
+    // in the list, to the list of records to absorb.
+    if (
+      selectedRecord !== "" &&
+      selectedRecord !== targetRecordId &&
+      !recordsToAbsorb.includes(selectedRecord)
+    ) {
       recordsToAbsorb = [...recordsToAbsorb, selectedRecord];
     }
     selectedRecord = ""; // Reset selection even if the record is already in the list
@@ -199,17 +205,13 @@
             bind:this={autoCompleteRef}
             bind:value={selectedRecord}
             index={autoCompleteIndex as unknown as MiniSearch<unknown>}
+            excludeIds={[targetRecordId, ...recordsToAbsorb]}
             {errors}
             fieldName="records_to_absorb"
             uiName="Select Record"
           >
             {#snippet resultTemplate(item: any)}
-              <div class:bg-red-200={recordsToAbsorb.includes(item.id)}>
-                {#if recordsToAbsorb.includes(item.id)}
-                  ✅
-                {/if}
-                {@render recordSnippet(item as unknown as T)}
-              </div>
+              {@render recordSnippet(item as unknown as T)}
             {/snippet}
           </DsAutoComplete>
         {:else}
