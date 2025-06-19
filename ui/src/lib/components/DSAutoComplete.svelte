@@ -137,6 +137,20 @@
   }
 
   const item = $derived.by(() => getDocumentById(index, value));
+
+  function commitChoice(chosen: string | number) {
+    if (multi) {
+      choose?.(chosen);
+      results = results.filter((r) => r[idField] !== chosen);
+      selectedIndex = -1;
+    } else {
+      value = chosen as unknown as string;
+      results = [];
+      selectedIndex = -1;
+    }
+    // ensure keyboard interaction continues after mouse selection
+    inputElement?.focus();
+  }
 </script>
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
@@ -171,8 +185,25 @@
     {#if results.length > 0}
       <ul class="suggestions">
         {#each results as choice, index}
-          <li class="result" class:bg-blue-400={index === selectedIndex}>
-            {@render resultTemplate(choice)}
+          <li
+            class="result cursor-pointer"
+            class:bg-blue-400={index === selectedIndex}
+            onmouseenter={() => (selectedIndex = index)}
+          >
+            <div
+              role="button"
+              tabindex="0"
+              class="w-full"
+              onclick={() => commitChoice(choice[idField])}
+              onkeydown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  commitChoice(choice[idField]);
+                }
+              }}
+            >
+              {@render resultTemplate(choice)}
+            </div>
           </li>
         {/each}
       </ul>
