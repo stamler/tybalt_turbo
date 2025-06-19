@@ -147,6 +147,13 @@
   function removeRecord(id: string) {
     recordsToAbsorb = recordsToAbsorb.filter((recordId) => recordId !== id);
   }
+
+  function addRecord(id: string | number) {
+    const idStr = id.toString();
+    if (idStr !== targetRecordId && !recordsToAbsorb.includes(idStr)) {
+      recordsToAbsorb = [...recordsToAbsorb, idStr];
+    }
+  }
 </script>
 
 <div class="flex w-full flex-col gap-4 p-4">
@@ -202,10 +209,12 @@
       {#if items.length > 0}
         {#if autoCompleteIndex}
           <DsAutoComplete
+            multi
             bind:this={autoCompleteRef}
-            bind:value={selectedRecord}
             index={autoCompleteIndex as unknown as MiniSearch<unknown>}
             excludeIds={[targetRecordId, ...recordsToAbsorb]}
+            value={selectedRecord}
+            choose={addRecord}
             {errors}
             fieldName="records_to_absorb"
             uiName="Select Record"

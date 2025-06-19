@@ -23,6 +23,8 @@
     disabled = false,
     idField = "id", // the field in the index that is the id, defaults to "id"
     excludeIds = [] as (string | number)[], // optional list of ids to exclude from results
+    multi = false,
+    choose,
   }: {
     value: string;
     index: MiniSearch<T>;
@@ -33,6 +35,8 @@
     disabled?: boolean;
     idField?: string;
     excludeIds?: (string | number)[];
+    multi?: boolean;
+    choose?: (id: string | number) => void;
   } = $props();
 
   let results = $state([] as SearchResult[]);
@@ -67,14 +71,48 @@
       // decrement the selected index modulo the number of results
       selectedIndex = (selectedIndex - 1 + results.length) % results.length;
     }
-    if (event.key === "Enter") {
+    const commitKey = multi ? " " : "Enter";
+    if (event.key === commitKey) {
       event.preventDefault();
       event.stopPropagation();
       if (selectedIndex !== -1) {
-        value = results[selectedIndex][idField];
-        results = [];
-        selectedIndex = -1;
+        const chosen = results[selectedIndex][idField] as unknown as string | number;
+
+        if (multi) {
+          // Call the provided callback if available
+          choose?.(chosen);
+
+          // Remove chosen item from current results so list stays open.
+          results = results.filter((r) => r[idField] !== chosen);
+          selectedIndex = -1;
+        } else {
+          value = chosen as unknown as string;
+          results = [];
+          selectedIndex = -1;
+        }
       }
+    }
+
+    // In multi-select mode, allow Enter to close the list without selection
+    if (multi && event.key === "Enter") {
+      event.preventDefault();
+      event.stopPropagation();
+      if (selectedIndex !== -1) {
+        const chosen = results[selectedIndex][idField] as unknown as string | number;
+        choose?.(chosen);
+      }
+
+      // Close list
+      results = [];
+      selectedIndex = -1;
+      // Clear the current input value so user can start a fresh search
+      if (inputElement) inputElement.value = "";
+    }
+
+    // Escape always closes the list in either mode
+    if (event.key === "Escape") {
+      results = [];
+      selectedIndex = -1;
     }
   }
 
