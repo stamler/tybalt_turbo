@@ -352,16 +352,20 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 		usedOP = results[0].TotalHours
 	}
 
-	// return an error if usedVacation exceeds openingOV
-	if usedOV > openingOV {
+	// Only enforce the openingOV balance check if at least one OV entry exists on this
+	// timesheet. This prevents an error when the user's available vacation balance
+	// is already negative from previous activity but no additional vacation is
+	// being claimed in the current bundle (see issue #25).
+	if _, ovClaimed := nonWorkHoursTally["OV"]; ovClaimed && usedOV > openingOV {
 		return &CodeError{
 			Code:    "ov_claim_exceeds_balance",
 			Message: "your vacation claim exceeds your available vacation balance",
 		}
 	}
 
-	// return an error if usedPpto exceeds openingOP
-	if usedOP > openingOP {
+	// Similarly, only enforce the PPTO balance check if at least one OP entry is
+	// present on this timesheet.
+	if _, opClaimed := nonWorkHoursTally["OP"]; opClaimed && usedOP > openingOP {
 		return &CodeError{
 			Code:    "ppto_claim_exceeds_balance",
 			Message: "your PPTO claim exceeds your available PPTO balance",
