@@ -1,5 +1,7 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
+  import { authStore } from "$lib/stores/auth";
+  import { get } from "svelte/store";
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
@@ -20,6 +22,8 @@
     if (items === undefined) {
       return;
     }
+    const userId = get(authStore)?.model?.id || "";
+
     unsubscribeFunc = await pb.collection("time_entries").subscribe<TimeEntriesResponse>(
       "*",
       async (e) => {
@@ -38,7 +42,7 @@
         }
       },
       {
-        filter: "tsid = ''", // does this filter even work? It could replace the visibility check in the create case
+        filter: pb.filter("tsid='' && uid={:userId}", { userId }),
         expand: "job,time_type,division,category",
       },
     );
