@@ -5,22 +5,16 @@ import type { ClientContactsResponse } from "$lib/pocketbase-types";
 
 export const load: PageLoad = async ({ params }) => {
   try {
-    // Get the target contact
-    const contact = await pb
-      .collection("client_contacts")
-      .getOne<ClientContactsResponse>(params.kid);
-
-    // Get all contacts for this client
+    // Fetch all contacts that belong to the current client. The page component
+    // handles everything else.
     const contacts = await pb
       .collection("client_contacts")
       .getFullList<ClientContactsResponse>({ filter: `client = "${params.cid}"` });
 
     return {
-      contact,
       contacts,
-      params,
     };
   } catch (err) {
-    throw error(404, `Contact not found: ${err}`);
+    throw error(404, `Failed to load contacts: ${err}`);
   }
 };

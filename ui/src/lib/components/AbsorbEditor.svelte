@@ -4,9 +4,9 @@
     ClientContactsResponse,
     AbsorbActionsResponse,
   } from "$lib/pocketbase-types";
-  import { clients } from "$lib/stores/clients";
   import DsActionButton from "./DSActionButton.svelte";
   import DsAutoComplete from "./DSAutoComplete.svelte";
+  import DsSelector from "./DSSelector.svelte";
   import { pb } from "$lib/pocketbase";
   import { page } from "$app/stores";
   import type { Snippet } from "svelte";
@@ -17,10 +17,14 @@
     collectionName,
     targetRecordId,
     recordSnippet,
+    availableRecords,
+    autoCompleteIndex = null,
   }: {
     collectionName: string;
     targetRecordId: string;
     recordSnippet: Snippet<[T]>;
+    availableRecords: (ClientsResponse | ClientContactsResponse)[];
+    autoCompleteIndex?: MiniSearch<ClientsResponse | ClientContactsResponse> | null;
   } = $props();
 
   let errors = $state<Record<string, { message: string }>>({});
@@ -29,7 +33,6 @@
   let existingAbsorbAction = $state<AbsorbActionsResponse | null>(null);
   let showUndoConfirm = $state(false);
   let showCommitConfirm = $state(false);
-  let availableRecords = $state<(ClientsResponse | ClientContactsResponse)[]>([]);
   let items = $state<(ClientsResponse | ClientContactsResponse)[]>([]);
   let targetRecord = $state<T | null>(null);
 
@@ -37,43 +40,11 @@
   // svelte-ignore non_reactive_update
   let autoCompleteRef: any = null;
 
-  // Provide a correctly-typed index for the autocomplete component.
-  // We use a union so the component can work with both Clients and Client-contacts.
-  let autoCompleteIndex = $state<MiniSearch<ClientsResponse | ClientContactsResponse> | null>(null);
-
-  // Update the autocomplete index whenever the collection changes or stores initialise.
-  $effect(() => {
-    if (collectionName === "clients") {
-      autoCompleteIndex = $clients.index as unknown as MiniSearch<
-        ClientsResponse | ClientContactsResponse
-      >;
-    } else if (collectionName === "client_contacts") {
-      // TODO: replace with client-contacts store index when available
-      autoCompleteIndex = null;
-    } else {
-      autoCompleteIndex = null;
-    }
-  });
-
   // Update items whenever availableRecords or recordsToAbsorb changes
   $effect(() => {
     items = availableRecords.filter(
       (c) => c.id !== targetRecordId && !recordsToAbsorb.includes(c.id),
     );
-  });
-
-  // Get available records based on collection and context
-  $effect(() => {
-    if (collectionName === "client_contacts" && $page.params.cid) {
-      // For client contacts, filter by the current client
-      pb.collection("client_contacts")
-        .getFullList<ClientContactsResponse>({ filter: `client = "${$page.params.cid}"` })
-        .then((contacts) => {
-          availableRecords = contacts;
-        });
-    } else if (collectionName === "clients") {
-      availableRecords = $clients.items || [];
-    }
   });
 
   // Check for existing absorb action on mount
@@ -241,6 +212,18 @@
               </div>
             {/snippet}
           </DsAutoComplete>
+        {:else}
+          <DsSelector
+            bind:value={selectedRecord}
+            {items}
+            {errors}
+            fieldName="records_to_absorb"
+            uiName="Select Record"
+          >
+            {#snippet optionTemplate(item: any)}
+              {@render recordSnippet(item as unknown as T)}
+            {/snippet}
+          </DsSelector>
         {/if}
       {:else}
         <p class="text-neutral-500">No more records available to absorb</p>
