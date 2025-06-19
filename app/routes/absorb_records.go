@@ -405,6 +405,13 @@ func GetConfigsAndTable(collectionName string) ([]RefConfig, *ParentConstraint, 
 				Field:      "client",
 			}, nil
 
+	// Vendor collection: update references in purchase_orders and expenses
+	case "vendors":
+		return []RefConfig{
+			{"purchase_orders", "vendor"},
+			{"expenses", "vendor"},
+		}, nil, nil
+
 	// Add more cases as needed
 	default:
 		// return an error if the collection is not supported

@@ -115,6 +115,12 @@ func AddRoutes(app core.App) {
 		clientContactsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "client_contacts"))
 		clientContactsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "client_contacts"))
 
+		// Vendor absorb routes
+		vendorsGroup := se.Router.Group("/api/vendors")
+		vendorsGroup.Bind(apis.RequireAuth("users"))
+		vendorsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "vendors"))
+		vendorsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "vendors"))
+
 		reportsGroup := se.Router.Group("/api/reports")
 		reportsGroup.Bind(apis.RequireAuth("users"))
 		reportsGroup.GET("/payroll_time/{date_column_value}/{week}", reports.CreatePayrollTimeReportHandler(app))
