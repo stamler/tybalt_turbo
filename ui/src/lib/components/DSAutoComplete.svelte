@@ -71,8 +71,9 @@
       // decrement the selected index modulo the number of results
       selectedIndex = (selectedIndex - 1 + results.length) % results.length;
     }
-    const commitKey = multi ? " " : "Enter";
-    if (event.key === commitKey) {
+
+    // Handle Enter key for both single and multi-select modes
+    if (event.key === "Enter") {
       event.preventDefault();
       event.stopPropagation();
       if (selectedIndex !== -1) {
@@ -90,23 +91,27 @@
           results = [];
           selectedIndex = -1;
         }
+      } else if (multi) {
+        // In multi-select mode, Enter without selection closes the list
+        results = [];
+        selectedIndex = -1;
+        // Clear the current input value so user can start a fresh search
+        if (inputElement) inputElement.value = "";
       }
     }
 
-    // In multi-select mode, allow Enter to close the list without selection
-    if (multi && event.key === "Enter") {
+    // Handle space key for multi-select mode (only when item is selected)
+    if (multi && event.key === " " && selectedIndex !== -1) {
       event.preventDefault();
       event.stopPropagation();
-      if (selectedIndex !== -1) {
-        const chosen = results[selectedIndex][idField] as unknown as string | number;
-        choose?.(chosen);
-      }
+      const chosen = results[selectedIndex][idField] as unknown as string | number;
 
-      // Close list
-      results = [];
+      // Call the provided callback if available
+      choose?.(chosen);
+
+      // Remove chosen item from current results so list stays open.
+      results = results.filter((r) => r[idField] !== chosen);
       selectedIndex = -1;
-      // Clear the current input value so user can start a fresh search
-      if (inputElement) inputElement.value = "";
     }
 
     // Escape always closes the list in either mode
