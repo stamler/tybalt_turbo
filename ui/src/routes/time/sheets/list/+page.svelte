@@ -62,8 +62,8 @@
   }
 </script>
 
-{#snippet anchor({ week_ending }: TimeSheetTallyQueryRow)}
-  <a class="font-bold hover:underline" href="/time/sheets/details">{shortDate(week_ending)}</a>
+{#snippet anchor({ id, week_ending }: TimeSheetTallyQueryRow)}
+  <a class="font-bold hover:underline" href="/time/sheets/{id}/details">{shortDate(week_ending)}</a>
 {/snippet}
 {#snippet headline(tally: TimeSheetTallyQueryRow)}
   {#if tally.work_total_hours > 0}
