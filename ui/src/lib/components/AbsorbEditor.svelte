@@ -1,9 +1,5 @@
 <script lang="ts" generics="T extends BaseSystemFields<any>">
-  import type {
-    ClientsResponse,
-    ClientContactsResponse,
-    AbsorbActionsResponse,
-  } from "$lib/pocketbase-types";
+  import type { AbsorbActionsResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DsAutoComplete from "./DSAutoComplete.svelte";
   import DsSelector from "./DSSelector.svelte";
@@ -23,8 +19,8 @@
     collectionName: string;
     targetRecordId: string;
     recordSnippet: Snippet<[T]>;
-    availableRecords: (ClientsResponse | ClientContactsResponse)[];
-    autoCompleteIndex?: MiniSearch<ClientsResponse | ClientContactsResponse> | null;
+    availableRecords: T[];
+    autoCompleteIndex?: MiniSearch<T> | null;
   } = $props();
 
   let errors = $state<Record<string, { message: string }>>({});
@@ -33,7 +29,7 @@
   let existingAbsorbAction = $state<AbsorbActionsResponse | null>(null);
   let showUndoConfirm = $state(false);
   let showCommitConfirm = $state(false);
-  let items = $state<(ClientsResponse | ClientContactsResponse)[]>([]);
+  let items = $state<T[]>([]);
   let targetRecord = $state<T | null>(null);
 
   // Reference to the DsAutoComplete component so we can call its exposed focus() helper.

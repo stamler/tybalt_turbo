@@ -34,6 +34,12 @@
         color="blue"
       />
       <DsActionButton
+        action={`/vendors/${id}/absorb`}
+        icon="mdi:merge"
+        title="Absorb other vendors into this one"
+        color="yellow"
+      />
+      <DsActionButton
         action={() => pb.collection("vendors").delete(id)}
         icon="mdi:delete"
         title="Delete"
