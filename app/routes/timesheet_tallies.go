@@ -41,24 +41,21 @@ type TimeSheetTally struct {
 	WorkWeekHours       float64                   `json:"work_week_hours"`
 }
 
-// createTimesheetTalliesHandler returns a function that creates a tally of the timesheets for a given user
-func createTimesheetTalliesHandler(app core.App) func(e *core.RequestEvent) error {
+// createTimesheetTalliesHandler returns a handler that creates a tally of the
+// timesheets based on the supplied role and status filters.
+func createTimesheetTalliesHandler(app core.App, role string, pendingOnly, approvedOnly int) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-
-		// get uid from auth record
-		authRecord := e.Auth
-		uid := authRecord.Id
-
-		// Execute the query
 		var timeSheetTally []TimeSheetTally
 		err := app.DB().NewQuery(talliesQuery).Bind(dbx.Params{
-			"uid": uid,
+			"uid":          e.Auth.Id,
+			"role":         role,
+			"pendingOnly":  pendingOnly,
+			"approvedOnly": approvedOnly,
 		}).All(&timeSheetTally)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 
-		// return the time sheet tally
 		return e.JSON(http.StatusOK, timeSheetTally)
 	}
 }

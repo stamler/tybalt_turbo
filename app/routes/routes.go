@@ -82,7 +82,9 @@ func AddRoutes(app core.App) {
 		tsGroup.POST("/{id}/reject", createRejectRecordHandler(app, "time_sheets"))
 		tsGroup.GET("/{id}/reviewers", createGetReviewersHandler(app))
 		tsGroup.GET("/{id}/approver", createTimesheetApproverHandler(app))
-		tsGroup.GET("/tallies", createTimesheetTalliesHandler(app))
+		tsGroup.GET("/tallies", createTimesheetTalliesHandler(app, "uid", 0, 0))
+		tsGroup.GET("/tallies/pending", createTimesheetTalliesHandler(app, "approver", 1, 0))
+		tsGroup.GET("/tallies/approved", createTimesheetTalliesHandler(app, "approver", 0, 1))
 
 		expensesGroup := se.Router.Group("/api/expenses")
 		expensesGroup.Bind(apis.RequireAuth("users"))

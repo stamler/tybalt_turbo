@@ -1,3 +1,10 @@
+-- Parameterized tallies query
+-- Params:
+--   :uid           - the caller id (required)
+--   :role          - either 'uid' (list by owner) or 'approver' (list by approver) (default 'uid')
+--   :pendingOnly   - 1 to only include sheets with ts.approved = '' (default 0)
+--   :approvedOnly  - 1 to only include sheets with ts.approved != '' (default 0)
+-- The WHERE clause dynamically applies filters based on the above flags.
 SELECT 
   MAX(ts.id) id,
   MAX(ts.week_ending) week_ending,
@@ -27,11 +34,16 @@ SELECT
   JSON_GROUP_ARRAY(te.date) FILTER (WHERE tt.code = 'OW') off_week_dates,
   JSON_GROUP_ARRAY(te.date) FILTER (WHERE tt.code = 'OTO') payout_request_dates,
   JSON_GROUP_ARRAY(te.date) FILTER (WHERE tt.code = 'RB') bank_entry_dates
-  FROM time_entries te
+FROM time_entries te
 INNER JOIN time_sheets ts ON te.tsid = ts.id -- use INNER JOIN to exclude time entries without a time sheet
 LEFT JOIN divisions d ON  te.division = d.id
 LEFT JOIN time_types tt ON te.time_type = tt.id
 LEFT JOIN jobs j ON te.job = j.id
-WHERE te.uid = {:uid}
+WHERE (
+  ( {:role} = 'uid'      AND te.uid      = {:uid} ) OR
+  ( {:role} = 'approver' AND ts.approver = {:uid} )
+)
+  AND ( {:pendingOnly}  = 0 OR ts.approved = '' )
+  AND ( {:approvedOnly} = 0 OR ts.approved != '' )
 GROUP BY te.tsid
 ORDER BY ts.week_ending DESC

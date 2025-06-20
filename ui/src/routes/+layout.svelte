@@ -142,6 +142,22 @@
             </div>
             <div class="flex h-8 items-center pr-2">
               <a
+                href="/time/sheets/pending"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
+                >Pending My Approval</a
+              >
+              <div class="w-8"></div>
+            </div>
+            <div class="flex h-8 items-center pr-2">
+              <a
+                href="/time/sheets/approved"
+                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
+                >Approved By Me</a
+              >
+              <div class="w-8"></div>
+            </div>
+            <div class="flex h-8 items-center pr-2">
+              <a
                 href="/time/off"
                 class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
                 >Time Off</a
