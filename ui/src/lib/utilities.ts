@@ -37,6 +37,13 @@ export interface TimeSheetTallyQueryRow {
   work_job_hours: number;
   work_total_hours: number;
   work_week_hours: number;
+  given_name: string;
+  surname: string;
+  approver: string;
+  committer: string;
+  committed: string;
+  approver_name: string;
+  committer_name: string;
 }
 
 export interface TimeEntriesSummary {

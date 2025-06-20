@@ -16,16 +16,32 @@
     >
   {/snippet}
   {#snippet headline(tally: TimeSheetTallyQueryRow)}
+    {tally.given_name} {tally.surname}
+  {/snippet}
+  {#snippet byline(tally: TimeSheetTallyQueryRow)}
     {#if tally.work_total_hours > 0}
       <span>{tally.work_total_hours} hours worked</span>
     {:else}
       <span>no work</span>
     {/if}
   {/snippet}
-  {#snippet byline(tally: TimeSheetTallyQueryRow)}
+  {#snippet line1(tally: TimeSheetTallyQueryRow)}
     <span>{tally.non_work_total_hours} hours off</span>
   {/snippet}
+  {#snippet line2(tally: TimeSheetTallyQueryRow)}
+    {#if tally.approved !== ""}
+      <div class="flex items-center gap-1">
+        <DsLabel color="green">Approved</DsLabel>
+        <span>on {shortDate(tally.approved, true)}</span>
+      </div>
+    {/if}
+  {/snippet}
   {#snippet line3(tally: TimeSheetTallyQueryRow)}
-    <DsLabel color="green">Approved</DsLabel>
+    {#if tally.committed !== ""}
+      <div class="mt-1 flex items-center gap-1">
+        <DsLabel color="blue">Committed</DsLabel>
+        <span>on {shortDate(tally.committed, true)} by {tally.committer_name}</span>
+      </div>
+    {/if}
   {/snippet}
 </DsList>

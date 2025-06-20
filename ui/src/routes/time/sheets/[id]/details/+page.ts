@@ -6,6 +6,9 @@ import { error } from "@sveltejs/kit";
 
 export const load: PageLoad = async ({ params }) => {
   try {
+    // Prepare holders
+    const committerInfo = { committer_name: "" };
+
     // Load time entries for the specific time sheet
     const items = await pb.collection("time_entries").getFullList<TimeEntriesResponse>({
       filter: pb.filter("tsid={:tsid}", { tsid: params.id }),
@@ -26,6 +29,11 @@ export const load: PageLoad = async ({ params }) => {
         method: "GET",
       });
       approverInfo = approverResponse;
+      committerInfo.committer_name = approverResponse.committer_name || "";
+      const committedDate = approverResponse.committed_date || "";
+      if (committedDate !== "") {
+        timeSheet.committed = committedDate; // ensure field present
+      }
     } catch (err) {
       console.log("Could not fetch approver info:", err);
     }
@@ -36,6 +44,7 @@ export const load: PageLoad = async ({ params }) => {
       timeSheet,
       timesheetId: params.id,
       approverInfo,
+      committerInfo,
     };
   } catch (err) {
     console.error(`loading time sheet details: ${err}`);

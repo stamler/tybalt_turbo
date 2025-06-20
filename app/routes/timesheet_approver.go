@@ -8,8 +8,10 @@ import (
 )
 
 type TimesheetApprover struct {
-	ApproverName string `json:"approver_name"`
-	ApprovedDate string `json:"approved_date"`
+	ApproverName  string `json:"approver_name"`
+	ApprovedDate  string `json:"approved_date"`
+	CommitterName string `json:"committer_name"`
+	CommittedDate string `json:"committed_date"`
 }
 
 // createTimesheetApproverHandler returns a function that gets approver info for a specific timesheet
@@ -23,11 +25,14 @@ func createTimesheetApproverHandler(app core.App) func(e *core.RequestEvent) err
 		// Query to get approver information
 		query := `
 			SELECT 
-				COALESCE(p.given_name || ' ' || p.surname, 'Unknown') as approver_name,
-				ts.approved as approved_date
+				COALESCE(p.given_name || ' ' || p.surname, '') as approver_name,
+				ts.approved as approved_date,
+				COALESCE(cp.given_name || ' ' || cp.surname, '') as committer_name,
+				ts.committed as committed_date
 			FROM time_sheets ts
 			LEFT JOIN profiles p ON ts.approver = p.uid
-			WHERE ts.id = {:timesheetId} AND ts.approved != ''
+			LEFT JOIN profiles cp ON ts.committer = cp.uid
+			WHERE ts.id = {:timesheetId}
 		`
 
 		var result TimesheetApprover
@@ -38,8 +43,10 @@ func createTimesheetApproverHandler(app core.App) func(e *core.RequestEvent) err
 		if err != nil {
 			// If no approved timesheet found, return empty result
 			return e.JSON(http.StatusOK, TimesheetApprover{
-				ApproverName: "",
-				ApprovedDate: "",
+				ApproverName:  "",
+				ApprovedDate:  "",
+				CommitterName: "",
+				CommittedDate: "",
 			})
 		}
 

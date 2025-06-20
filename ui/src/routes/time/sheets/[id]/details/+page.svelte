@@ -15,6 +15,7 @@
   let tallies = $state(data.tallies);
   let timeSheet = $state(data.timeSheet);
   let approverInfo = $state(data.approverInfo);
+  let committerInfo = $state(data.committerInfo);
 
   // Subscribe to time entries changes for this specific time sheet
   let unsubscribeFunc: UnsubscribeFunc;
@@ -74,13 +75,27 @@
   <div class="mb-4">
     <h2 class="text-lg font-semibold">Week Ending: {shortDate(timeSheet.week_ending, true)}</h2>
     <div class="text-gray-600">
-      Status: {#if timeSheet.approved}
-        <span class="font-medium text-green-600">Approved</span>
-        {#if approverInfo.approver_name}
-          by {approverInfo.approver_name}
-          on {shortDate(timeSheet.approved.split("T")[0])}
-        {/if}
-      {:else}
+      {#if timeSheet.approved}
+        <div class="flex items-center gap-1">
+          <DsLabel color="green">Approved</DsLabel>
+          {#if approverInfo.approver_name}
+            <span>by {approverInfo.approver_name}</span>
+          {/if}
+          <span>on {shortDate(timeSheet.approved.split("T")[0])}</span>
+        </div>
+      {/if}
+
+      {#if timeSheet.committed}
+        <div class="mt-1 flex items-center gap-1">
+          <DsLabel color="blue">Committed</DsLabel>
+          {#if committerInfo.committer_name}
+            <span>by {committerInfo.committer_name}</span>
+          {/if}
+          <span>on {shortDate(timeSheet.committed.split("T")[0])}</span>
+        </div>
+      {/if}
+
+      {#if !timeSheet.committed && !timeSheet.approved}
         <span class="font-medium text-orange-600">Pending</span>
       {/if}
     </div>
@@ -207,16 +222,6 @@
         <span><span class="opacity-50">Work Record</span> {work_record} / </span>
       {/if}
       <span class="opacity-50">{description}</span>
-    {/snippet}
-
-    {#snippet actions({ id }: TimeEntriesResponse)}
-      <DsActionButton
-        action={`/time/entries/${id}/edit`}
-        icon="mdi:edit-outline"
-        title="Edit"
-        color="blue"
-      />
-      <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
     {/snippet}
   </DsList>
 </div>

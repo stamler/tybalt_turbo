@@ -13,6 +13,13 @@ SELECT
   MAX(ts.rejected) rejected, 
   MAX(ts.rejection_reason) rejection_reason, 
   MAX(ts.approved) approved,
+  MAX(ts.approver) approver,
+  MAX(ts.committer) committer,
+  MAX(ts.committed) committed,
+  MAX(p.given_name) given_name,
+  MAX(p.surname) surname,
+  MAX(ap.given_name || ' ' || ap.surname) approver_name,
+  MAX(cp.given_name || ' ' || cp.surname) committer_name,
   SUM(CASE WHEN (tt.code = 'R' OR tt.code = 'RT') AND te.job == '' THEN te.hours ELSE 0 END) work_hours,
   SUM(CASE WHEN (tt.code = 'R' OR tt.code = 'RT') AND te.job != '' THEN te.hours ELSE 0 END) work_job_hours,
   SUM(CASE WHEN (tt.code = 'R' OR tt.code = 'RT') THEN te.hours ELSE 0 END) work_total_hours,
@@ -39,6 +46,9 @@ INNER JOIN time_sheets ts ON te.tsid = ts.id -- use INNER JOIN to exclude time e
 LEFT JOIN divisions d ON  te.division = d.id
 LEFT JOIN time_types tt ON te.time_type = tt.id
 LEFT JOIN jobs j ON te.job = j.id
+LEFT JOIN profiles p ON te.uid = p.uid
+LEFT JOIN profiles ap ON ts.approver = ap.uid
+LEFT JOIN profiles cp ON ts.committer = cp.uid
 WHERE (
   ( {:role} = 'uid'      AND te.uid      = {:uid} ) OR
   ( {:role} = 'approver' AND ts.approver = {:uid} )

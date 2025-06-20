@@ -31,14 +31,22 @@
     >
   {/snippet}
   {#snippet headline(tally: TimeSheetTallyQueryRow)}
+    {tally.given_name} {tally.surname}
+  {/snippet}
+  {#snippet byline(tally: TimeSheetTallyQueryRow)}
     {#if tally.work_total_hours > 0}
       <span>{tally.work_total_hours} hours worked</span>
     {:else}
       <span>no work</span>
     {/if}
   {/snippet}
-  {#snippet byline(tally: TimeSheetTallyQueryRow)}
+  {#snippet line1(tally: TimeSheetTallyQueryRow)}
     <span>{tally.non_work_total_hours} hours off</span>
+  {/snippet}
+  {#snippet line2(tally: TimeSheetTallyQueryRow)}
+    {#if tally.committed !== ""}
+      <span>Committed on {shortDate(tally.committed, true)} by {tally.committer_name}</span>
+    {/if}
   {/snippet}
   {#snippet actions({ id }: TimeSheetTallyQueryRow)}
     <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />

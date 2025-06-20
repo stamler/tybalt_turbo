@@ -39,6 +39,13 @@ type TimeSheetTally struct {
 	WorkJobHours        float64                   `json:"work_job_hours"`
 	WorkTotalHours      float64                   `json:"work_total_hours"`
 	WorkWeekHours       float64                   `json:"work_week_hours"`
+	GivenName           string                    `json:"given_name"`
+	Surname             string                    `json:"surname"`
+	Approver            string                    `json:"approver"`
+	Committer           string                    `json:"committer"`
+	Committed           string                    `json:"committed"`
+	ApproverName        string                    `json:"approver_name"`
+	CommitterName       string                    `json:"committer_name"`
 }
 
 // createTimesheetTalliesHandler returns a handler that creates a tally of the
