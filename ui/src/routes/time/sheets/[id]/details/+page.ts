@@ -23,7 +23,14 @@ export const load: PageLoad = async ({ params }) => {
     const timeSheet = await pb.collection("time_sheets").getOne(params.id);
 
     // Get approver information via custom API endpoint
-    let approverInfo = { approver_name: "", approved_date: "" };
+    let approverInfo = { 
+      approver_name: "", 
+      approved_date: "", 
+      committer_name: "", 
+      committed_date: "", 
+      rejector_name: "", 
+      rejected_date: "" 
+    };
     try {
       const approverResponse = await pb.send(`/api/time_sheets/${params.id}/approver`, {
         method: "GET",
@@ -34,6 +41,14 @@ export const load: PageLoad = async ({ params }) => {
       if (committedDate !== "") {
         timeSheet.committed = committedDate; // ensure field present
       }
+      // Propagate rejection details so the UI can display them consistently
+      const rejectedDate = approverResponse.rejected_date || "";
+      if (rejectedDate !== "") {
+        timeSheet.rejected = rejectedDate;
+      }
+      // Ensure rejector_name is present in approverInfo (for type safety)
+      approverInfo.rejector_name = approverResponse.rejector_name || "";
+      approverInfo.rejected_date = rejectedDate;
     } catch (err) {
       console.log("Could not fetch approver info:", err);
     }

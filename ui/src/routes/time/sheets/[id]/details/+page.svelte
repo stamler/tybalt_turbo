@@ -16,7 +16,7 @@
   let items = $state(data.items);
   let tallies = $state(data.tallies);
   let timeSheet = $state(data.timeSheet);
-  let approverInfo = $state(data.approverInfo);
+  let approverInfo = $state(data.approverInfo as any);
   let committerInfo = $state(data.committerInfo);
   let rejectModal: RejectModal;
 
@@ -144,9 +144,13 @@
       {#if timeSheet.rejected !== ""}
         <div class="mt-1 flex items-center gap-1">
           <DsLabel color="red">Rejected</DsLabel>
-          {#if timeSheet.rejection_reason !== ""}
-            <span class="italic text-red-600">{timeSheet.rejection_reason}</span>
+          {#if approverInfo.rejector_name}
+            <span>by {approverInfo.rejector_name}</span>
           {/if}
+          <span>on {shortDate(timeSheet.rejected.split("T")[0])}</span>
+        </div>
+        <div class="mt-1 italic text-red-600">
+          {timeSheet.rejection_reason}
         </div>
       {:else if !timeSheet.committed && !timeSheet.approved && timeSheet.rejected === ""}
         <span class="font-medium text-orange-600">Pending</span>

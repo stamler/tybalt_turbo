@@ -18,8 +18,9 @@ SELECT
   MAX(ts.committed) committed,
   MAX(p.given_name) given_name,
   MAX(p.surname) surname,
-  MAX(COALESCE(ap.given_name || ' ' || ap.surname, '')) AS approver_name,
-  MAX(COALESCE(cp.given_name || ' ' || cp.surname, '')) AS committer_name,
+  MAX(COALESCE(ap.given_name || ' ' || ap.surname, '')) approver_name,
+  MAX(COALESCE(cp.given_name || ' ' || cp.surname, '')) committer_name,
+  MAX(COALESCE(rp.given_name || ' ' || rp.surname, '')) rejector_name,
   SUM(CASE WHEN (tt.code = 'R' OR tt.code = 'RT') AND te.job == '' THEN te.hours ELSE 0 END) work_hours,
   SUM(CASE WHEN (tt.code = 'R' OR tt.code = 'RT') AND te.job != '' THEN te.hours ELSE 0 END) work_job_hours,
   SUM(CASE WHEN (tt.code = 'R' OR tt.code = 'RT') THEN te.hours ELSE 0 END) work_total_hours,
@@ -49,6 +50,7 @@ LEFT JOIN jobs j ON te.job = j.id
 LEFT JOIN profiles p ON te.uid = p.uid
 LEFT JOIN profiles ap ON ts.approver = ap.uid
 LEFT JOIN profiles cp ON ts.committer = cp.uid
+LEFT JOIN profiles rp ON ts.rejector = rp.uid
 WHERE (
   ( {:role} = 'uid'      AND te.uid      = {:uid} ) OR
   ( {:role} = 'approver' AND ts.approver = {:uid} )

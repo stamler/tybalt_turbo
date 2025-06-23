@@ -12,6 +12,8 @@ type TimesheetApprover struct {
 	ApprovedDate  string `json:"approved_date"`
 	CommitterName string `json:"committer_name"`
 	CommittedDate string `json:"committed_date"`
+	RejectorName  string `json:"rejector_name"`
+	RejectedDate  string `json:"rejected_date"`
 }
 
 // createTimesheetApproverHandler returns a function that gets approver info for a specific timesheet
@@ -22,16 +24,19 @@ func createTimesheetApproverHandler(app core.App) func(e *core.RequestEvent) err
 			return e.Error(http.StatusBadRequest, "timesheet id is required", nil)
 		}
 
-		// Query to get approver information
+		// Query to get approver / committer / rejector information
 		query := `
 			SELECT 
-				COALESCE(p.given_name || ' ' || p.surname, '') as approver_name,
-				ts.approved as approved_date,
-				COALESCE(cp.given_name || ' ' || cp.surname, '') as committer_name,
-				ts.committed as committed_date
+				COALESCE(p.given_name || ' ' || p.surname, '')  AS approver_name,
+				ts.approved                                         AS approved_date,
+				COALESCE(cp.given_name || ' ' || cp.surname, '') AS committer_name,
+				ts.committed                                        AS committed_date,
+				COALESCE(rp.given_name || ' ' || rp.surname, '') AS rejector_name,
+				ts.rejected                                         AS rejected_date
 			FROM time_sheets ts
-			LEFT JOIN profiles p ON ts.approver = p.uid
+			LEFT JOIN profiles p  ON ts.approver = p.uid
 			LEFT JOIN profiles cp ON ts.committer = cp.uid
+			LEFT JOIN profiles rp ON ts.rejector  = rp.uid
 			WHERE ts.id = {:timesheetId}
 		`
 
@@ -47,6 +52,8 @@ func createTimesheetApproverHandler(app core.App) func(e *core.RequestEvent) err
 				ApprovedDate:  "",
 				CommitterName: "",
 				CommittedDate: "",
+				RejectorName:  "",
+				RejectedDate:  "",
 			})
 		}
 
