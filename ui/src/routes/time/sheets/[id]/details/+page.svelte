@@ -9,6 +9,8 @@
   import { shortDate } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
   import { onMount, onDestroy } from "svelte";
+  import RejectModal from "$lib/components/RejectModal.svelte";
+  import { goto } from "$app/navigation";
 
   let { data }: { data: PageData } = $props();
   let items = $state(data.items);
@@ -16,6 +18,7 @@
   let timeSheet = $state(data.timeSheet);
   let approverInfo = $state(data.approverInfo);
   let committerInfo = $state(data.committerInfo);
+  let rejectModal: RejectModal;
 
   // Subscribe to time entries changes for this specific time sheet
   let unsubscribeFunc: UnsubscribeFunc;
@@ -68,6 +71,49 @@
       globalStore.addError(error?.response?.message);
     }
   }
+
+  async function approve(id: string) {
+    try {
+      await pb.send(`/api/time_sheets/${id}/approve`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      // Refresh the local timesheet data
+      timeSheet = await pb.collection("time_sheets").getOne(id);
+    } catch (error: any) {
+      globalStore.addError(error?.response?.message);
+    }
+  }
+
+  async function commit(id: string) {
+    try {
+      await pb.send(`/api/time_sheets/${id}/commit`, {
+        method: "POST",
+      });
+      timeSheet = await pb.collection("time_sheets").getOne(id);
+    } catch (error: any) {
+      globalStore.addError(error?.response?.message);
+    }
+  }
+
+  async function recall(id: string) {
+    try {
+      await pb.send(`/api/time_sheets/${id}/unbundle`, {
+        method: "POST",
+      });
+
+      // navigate to the time entries list to show the unbundled time entries
+      goto(`/time/entries/list`);
+    } catch (error: any) {
+      globalStore.addError(error?.response?.message);
+    }
+  }
+
+  function openRejectModal(recordId: string) {
+    rejectModal?.openModal(recordId);
+  }
 </script>
 
 <div class="container mx-auto p-4">
@@ -75,7 +121,7 @@
   <div class="mb-4">
     <h2 class="text-lg font-semibold">Week Ending: {shortDate(timeSheet.week_ending, true)}</h2>
     <div class="text-gray-600">
-      {#if timeSheet.approved}
+      {#if timeSheet.approved && timeSheet.rejected === ""}
         <div class="flex items-center gap-1">
           <DsLabel color="green">Approved</DsLabel>
           {#if approverInfo.approver_name}
@@ -85,7 +131,7 @@
         </div>
       {/if}
 
-      {#if timeSheet.committed}
+      {#if timeSheet.committed && timeSheet.rejected === ""}
         <div class="mt-1 flex items-center gap-1">
           <DsLabel color="blue">Committed</DsLabel>
           {#if committerInfo.committer_name}
@@ -95,10 +141,64 @@
         </div>
       {/if}
 
-      {#if !timeSheet.committed && !timeSheet.approved}
+      {#if timeSheet.rejected !== ""}
+        <div class="mt-1 flex items-center gap-1">
+          <DsLabel color="red">Rejected</DsLabel>
+          {#if timeSheet.rejection_reason !== ""}
+            <span class="italic text-red-600">{timeSheet.rejection_reason}</span>
+          {/if}
+        </div>
+      {:else if !timeSheet.committed && !timeSheet.approved && timeSheet.rejected === ""}
         <span class="font-medium text-orange-600">Pending</span>
       {/if}
     </div>
+  </div>
+
+  <!-- Action Buttons -->
+  <div class="mb-4 flex flex-wrap gap-2">
+    {#if timeSheet.rejected !== ""}
+      <!-- Rejected: allow recall -->
+      <DsActionButton
+        action={() => recall(timeSheet.id)}
+        icon="mdi:rewind"
+        title="Recall"
+        color="orange"
+      />
+    {:else if timeSheet.approved === ""}
+      <!-- Pending: recall, approve, reject -->
+      <DsActionButton
+        action={() => recall(timeSheet.id)}
+        icon="mdi:rewind"
+        title="Recall"
+        color="orange"
+      />
+      <DsActionButton
+        action={() => approve(timeSheet.id)}
+        icon="mdi:approve"
+        title="Approve"
+        color="green"
+      />
+      <DsActionButton
+        action={() => openRejectModal(timeSheet.id)}
+        icon="mdi:cancel"
+        title="Reject"
+        color="orange"
+      />
+    {:else if timeSheet.approved !== "" && timeSheet.committed === ""}
+      <!-- Approved (not committed yet): commit, reject -->
+      <DsActionButton
+        action={() => commit(timeSheet.id)}
+        icon="mdi:check-all"
+        title="Commit"
+        color="green"
+      />
+      <DsActionButton
+        action={() => openRejectModal(timeSheet.id)}
+        icon="mdi:cancel"
+        title="Reject"
+        color="orange"
+      />
+    {/if}
   </div>
 
   <!-- Tallies Summary -->
@@ -224,4 +324,16 @@
       <span class="opacity-50">{description}</span>
     {/snippet}
   </DsList>
+
+  <!-- Reject Modal -->
+  <RejectModal
+    collectionName="time_sheets"
+    bind:this={rejectModal}
+    on:refresh={() => {
+      // refresh the page data when a reject action occurs inside the modal
+      pb.collection("time_sheets")
+        .getOne(timeSheet.id)
+        .then((ts) => (timeSheet = ts));
+    }}
+  />
 </div>

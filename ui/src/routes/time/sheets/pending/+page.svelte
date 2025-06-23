@@ -49,6 +49,11 @@
     {/if}
   {/snippet}
   {#snippet actions({ id }: TimeSheetTallyQueryRow)}
-    <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+    <DsActionButton
+      action={`/time/sheets/${id}/details`}
+      icon="mdi:details"
+      title="Details"
+      color="purple"
+    />
   {/snippet}
 </DsList>
