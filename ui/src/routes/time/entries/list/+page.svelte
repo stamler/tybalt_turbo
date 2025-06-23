@@ -66,6 +66,19 @@
     }
   }
 
+  async function copyToTomorrow(id: string): Promise<void> {
+    try {
+      await pb.send(`/api/time_entries/${id}/copy_to_tomorrow`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    } catch (error: any) {
+      globalStore.addError(error?.response?.message);
+    }
+  }
+
   async function bundle(weekEnding: string) {
     try {
       await pb.send(`/api/time_sheets/${weekEnding}/bundle`, {
@@ -125,6 +138,12 @@
     icon="mdi:edit-outline"
     title="Edit"
     color="blue"
+  />
+  <DsActionButton
+    action={() => copyToTomorrow(id)}
+    icon="mdi:content-copy"
+    title="Copy to tomorrow"
+    color="green"
   />
   <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}

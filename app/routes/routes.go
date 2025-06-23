@@ -98,6 +98,11 @@ func AddRoutes(app core.App) {
 		timeAmendmentsGroup.Bind(apis.RequireAuth("users"))
 		timeAmendmentsGroup.POST("/{id}/commit", createCommitRecordHandler(app, "time_amendments"))
 
+		// Time Entries routes
+		timeEntriesGroup := se.Router.Group("/api/time_entries")
+		timeEntriesGroup.Bind(apis.RequireAuth("users"))
+		timeEntriesGroup.POST("/{id}/copy_to_tomorrow", createCopyTimeEntryHandler(app))
+
 		poGroup := se.Router.Group("/api/purchase_orders")
 		poGroup.Bind(apis.RequireAuth("users"))
 		poGroup.POST("/{id}/approve", createApprovePurchaseOrderHandler(app))
