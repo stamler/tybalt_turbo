@@ -18,11 +18,14 @@ export enum Collections {
   ClientContacts = "client_contacts",
   Clients = "clients",
   Divisions = "divisions",
+  ExpenseAllowanceTotals = "expense_allowance_totals",
+  ExpenseMileageTotals = "expense_mileage_totals",
   ExpenseRates = "expense_rates",
   Expenses = "expenses",
   ExpensesAugmented = "expenses_augmented",
   Jobs = "jobs",
   Managers = "managers",
+  MileageResetDates = "mileage_reset_dates",
   NotificationTemplates = "notification_templates",
   Notifications = "notifications",
   PayrollReportWeekEndings = "payroll_report_week_endings",
@@ -40,11 +43,13 @@ export enum Collections {
   TimeReportWeekEndings = "time_report_week_endings",
   TimeSheetReviewers = "time_sheet_reviewers",
   TimeSheets = "time_sheets",
+  TimeTracking = "time_tracking",
   TimeTypes = "time_types",
   UserClaims = "user_claims",
   UserPoPermissionData = "user_po_permission_data",
   Users = "users",
   Vendors = "vendors",
+  ZipCache = "zip_cache",
 }
 
 // Alias types for improved usability
@@ -139,6 +144,7 @@ export enum AdminProfilesSkipMinTimeCheckOptions {
   "yes" = "yes",
 }
 export type AdminProfilesRecord = {
+  _imported: boolean;
   allow_personal_reimbursement: boolean;
   created: IsoDateString;
   default_charge_out_rate: number;
@@ -161,6 +167,7 @@ export type AdminProfilesRecord = {
 };
 
 export type CategoriesRecord = {
+  _imported: boolean;
   created: IsoDateString;
   id: string;
   job: RecordIdString;
@@ -177,6 +184,7 @@ export type ClaimsRecord = {
 };
 
 export type ClientContactsRecord = {
+  _imported: boolean;
   client: RecordIdString;
   created: IsoDateString;
   email: string;
@@ -187,6 +195,7 @@ export type ClientContactsRecord = {
 };
 
 export type ClientsRecord = {
+  _imported: boolean;
   created: IsoDateString;
   id: string;
   name: string;
@@ -199,6 +208,48 @@ export type DivisionsRecord = {
   id: string;
   name: string;
   updated: IsoDateString;
+};
+
+export enum ExpenseAllowanceTotalsPaymentTypeOptions {
+  "OnAccount" = "OnAccount",
+  "Expense" = "Expense",
+  "CorporateCreditCard" = "CorporateCreditCard",
+  "Allowance" = "Allowance",
+  "FuelCard" = "FuelCard",
+  "Mileage" = "Mileage",
+  "PersonalReimbursement" = "PersonalReimbursement",
+}
+
+export enum ExpenseAllowanceTotalsAllowanceTypesOptions {
+  "Lodging" = "Lodging",
+  "Breakfast" = "Breakfast",
+  "Lunch" = "Lunch",
+  "Dinner" = "Dinner",
+}
+export type ExpenseAllowanceTotalsRecord = {
+  allowance_description: string;
+  allowance_rates_effective_date: string;
+  allowance_total: number;
+  allowance_types: ExpenseAllowanceTotalsAllowanceTypesOptions[];
+  breakfast_rate: number;
+  date: string;
+  dinner_rate: number;
+  id: string;
+  lodging_rate: number;
+  lunch_rate: number;
+  mileage: number;
+  payment_type: ExpenseAllowanceTotalsPaymentTypeOptions;
+};
+
+export type ExpenseMileageTotalsRecord = {
+  cumulative: number;
+  date: string;
+  distance: number;
+  effective_date: string;
+  id: string;
+  mileage_total: number;
+  reset_mileage_date: string;
+  uid: string;
 };
 
 export type ExpenseRatesRecord<Tmileage = unknown> = {
@@ -230,10 +281,12 @@ export enum ExpensesAllowanceTypesOptions {
   "Dinner" = "Dinner",
 }
 export type ExpensesRecord = {
+  _imported: boolean;
   allowance_types: ExpensesAllowanceTypesOptions[];
   approved: IsoDateString;
   approver: RecordIdString;
   attachment: string;
+  attachment_hash: string;
   category: RecordIdString;
   cc_last_4_digits: string;
   committed: IsoDateString;
@@ -323,6 +376,7 @@ export enum JobsStatusOptions {
   "Not Awarded" = "Not Awarded",
 }
 export type JobsRecord = {
+  _imported: boolean;
   alternate_manager: RecordIdString;
   client: RecordIdString;
   contact: RecordIdString;
@@ -346,6 +400,14 @@ export type ManagersRecord = {
   given_name: string;
   id: string;
   surname: string;
+};
+
+export type MileageResetDatesRecord = {
+  _imported: boolean;
+  created: IsoDateString;
+  date: string;
+  id: string;
+  updated: IsoDateString;
 };
 
 export type NotificationTemplatesRecord = {
@@ -418,6 +480,7 @@ export enum ProfilesNotificationTypeOptions {
   "email_html" = "email_html",
 }
 export type ProfilesRecord = {
+  _imported: boolean;
   alternate_manager: RecordIdString;
   created: IsoDateString;
   default_division: RecordIdString;
@@ -456,6 +519,7 @@ export enum PurchaseOrdersPaymentTypeOptions {
   "CorporateCreditCard" = "CorporateCreditCard",
 }
 export type PurchaseOrdersRecord = {
+  _imported: boolean;
   approval_total: number;
   approved: IsoDateString;
   approver: RecordIdString;
@@ -569,6 +633,7 @@ export type PurchaseOrdersAugmentedRecord = {
 };
 
 export type TimeAmendmentsRecord = {
+  _imported: boolean;
   category: RecordIdString;
   committed: IsoDateString;
   committed_week_ending: string;
@@ -625,6 +690,7 @@ export type TimeAmendmentsAugmentedRecord = {
 };
 
 export type TimeEntriesRecord = {
+  _imported: boolean;
   category: RecordIdString;
   created: IsoDateString;
   date: string;
@@ -674,6 +740,7 @@ export type TimeSheetReviewersRecord = {
 };
 
 export type TimeSheetsRecord = {
+  _imported: boolean;
   approved: IsoDateString;
   approver: RecordIdString;
   committed: IsoDateString;
@@ -692,6 +759,14 @@ export type TimeSheetsRecord = {
   work_week_hours: number;
 };
 
+export type TimeTrackingRecord = {
+  approved_count: number;
+  committed_count: number;
+  id: string;
+  submitted_count: number;
+  week_ending: string;
+};
+
 export type TimeTypesRecord = {
   allowed_fields: null | string[];
   code: string;
@@ -704,6 +779,7 @@ export type TimeTypesRecord = {
 };
 
 export type UserClaimsRecord = {
+  _imported: boolean;
   cid: RecordIdString;
   created: IsoDateString;
   id: string;
@@ -738,12 +814,24 @@ export enum VendorsStatusOptions {
   "Inactive" = "Inactive",
 }
 export type VendorsRecord = {
+  _imported: boolean;
   alias: string;
   created: IsoDateString;
   id: string;
   name: string;
   status: VendorsStatusOptions;
   updated: IsoDateString;
+};
+
+export type ZipCacheRecord<Tfilenames = unknown, Thashes = unknown> = {
+  class: string;
+  created: IsoDateString;
+  filenames: null | Tfilenames;
+  hashes: null | Thashes;
+  id: string;
+  key: string;
+  updated: IsoDateString;
+  zip: string;
 };
 
 type TimeEntriesRecordExpands = {
@@ -840,6 +928,10 @@ export type ClientsResponse<Texpand = ClientsRecordExpands> = Required<ClientsRe
   BaseSystemFields<Texpand>;
 export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
   BaseSystemFields<Texpand>;
+export type ExpenseAllowanceTotalsResponse<Texpand = unknown> = 
+  Required<ExpenseAllowanceTotalsRecord> & BaseSystemFields<Texpand>;
+export type ExpenseMileageTotalsResponse<Texpand = unknown> = 
+  Required<ExpenseMileageTotalsRecord> & BaseSystemFields<Texpand>;
 export type ExpenseRatesResponse<Tmileage = unknown, Texpand = unknown> = Required<
   ExpenseRatesRecord<Tmileage>
 > &
@@ -851,6 +943,8 @@ export type ExpensesAugmentedResponse<Texpand = unknown> = Required<ExpensesAugm
 export type JobsResponse<Texpand = JobsRecordExpands> = Required<JobsRecord> &
   BaseSystemFields<Texpand>;
 export type ManagersResponse<Texpand = ManagersRecordExpands> = Required<ManagersRecord> &
+  BaseSystemFields<Texpand>;
+export type MileageResetDatesResponse<Texpand = unknown> = Required<MileageResetDatesRecord> &
   BaseSystemFields<Texpand>;
 export type NotificationTemplatesResponse<Texpand = unknown> =
   Required<NotificationTemplatesRecord> & BaseSystemFields<Texpand>;
@@ -870,10 +964,10 @@ export type PoApproverPropsResponse<Texpand = unknown> = Required<PoApproverProp
   BaseSystemFields<Texpand>;
 export type ProfilesResponse<Texpand = unknown> = Required<ProfilesRecord> &
   BaseSystemFields<Texpand>;
-export type PurchaseOrdersAugmentedResponse<Texpand = unknown> =
-  Required<PurchaseOrdersAugmentedRecord> & BaseSystemFields<Texpand>;
 export type PurchaseOrdersResponse<Texpand = PurchaseOrdersRecordExpands> =
   Required<PurchaseOrdersRecord> & BaseSystemFields<Texpand>;
+export type PurchaseOrdersAugmentedResponse<Texpand = unknown> =
+  Required<PurchaseOrdersAugmentedRecord> & BaseSystemFields<Texpand>;
 export type TimeAmendmentsResponse<Texpand = TimeAmendmentsRecordExpands> =
   Required<TimeAmendmentsRecord> & BaseSystemFields<Texpand>;
 export type TimeAmendmentsAugmentedResponse<Texpand = unknown> =
@@ -888,6 +982,8 @@ export type TimeSheetReviewersResponse<Texpand = TimeSheetReviewersRecordExpands
   Required<TimeSheetReviewersRecord> & BaseSystemFields<Texpand>;
 export type TimeSheetsResponse<Texpand = unknown> = Required<TimeSheetsRecord> &
   BaseSystemFields<Texpand>;
+export type TimeTrackingResponse<Texpand = unknown> = Required<TimeTrackingRecord> &
+  BaseSystemFields<Texpand>;
 export type TimeTypesResponse<Texpand = unknown> = Required<TimeTypesRecord> &
   BaseSystemFields<Texpand>;
 export type UserClaimsResponse<Texpand = UserClaimsRecordExpands> = Required<UserClaimsRecord> &
@@ -897,6 +993,10 @@ export type UserPoPermissionDataResponse<Texpand = unknown> = Required<UserPoPer
 export type UsersResponse<Texpand = UsersRecordExpands> = Required<UsersRecord> &
   AuthSystemFields<Texpand>;
 export type VendorsResponse<Texpand = unknown> = Required<VendorsRecord> &
+  BaseSystemFields<Texpand>;
+export type ZipCacheResponse<Tfilenames = unknown, Thashes = unknown, Texpand = unknown> = Required<
+  ZipCacheRecord<Tfilenames, Thashes>
+> &
   BaseSystemFields<Texpand>;
 
 // Types containing all Records and Responses, useful for creating typing helper functions
@@ -914,11 +1014,14 @@ export type CollectionRecords = {
   client_contacts: ClientContactsRecord;
   clients: ClientsRecord;
   divisions: DivisionsRecord;
+  expense_allowance_totals: ExpenseAllowanceTotalsRecord;
+  expense_mileage_totals: ExpenseMileageTotalsRecord;
   expense_rates: ExpenseRatesRecord;
   expenses: ExpensesRecord;
   expenses_augmented: ExpensesAugmentedRecord;
   jobs: JobsRecord;
   managers: ManagersRecord;
+  mileage_reset_dates: MileageResetDatesRecord;
   notification_templates: NotificationTemplatesRecord;
   notifications: NotificationsRecord;
   payroll_report_week_endings: PayrollReportWeekEndingsRecord;
@@ -936,11 +1039,13 @@ export type CollectionRecords = {
   time_report_week_endings: TimeReportWeekEndingsRecord;
   time_sheet_reviewers: TimeSheetReviewersRecord;
   time_sheets: TimeSheetsRecord;
+  time_tracking: TimeTrackingRecord;
   time_types: TimeTypesRecord;
   user_claims: UserClaimsRecord;
   user_po_permission_data: UserPoPermissionDataRecord;
   users: UsersRecord;
   vendors: VendorsRecord;
+  zip_cache: ZipCacheRecord;
 };
 
 export type CollectionResponses = {
@@ -956,11 +1061,14 @@ export type CollectionResponses = {
   client_contacts: ClientContactsResponse;
   clients: ClientsResponse;
   divisions: DivisionsResponse;
+  expense_allowance_totals: ExpenseAllowanceTotalsResponse;
+  expense_mileage_totals: ExpenseMileageTotalsResponse;
   expense_rates: ExpenseRatesResponse;
   expenses: ExpensesResponse;
   expenses_augmented: ExpensesAugmentedResponse;
   jobs: JobsResponse;
   managers: ManagersResponse;
+  mileage_reset_dates: MileageResetDatesResponse;
   notification_templates: NotificationTemplatesResponse;
   notifications: NotificationsResponse;
   payroll_report_week_endings: PayrollReportWeekEndingsResponse;
@@ -978,11 +1086,13 @@ export type CollectionResponses = {
   time_report_week_endings: TimeReportWeekEndingsResponse;
   time_sheet_reviewers: TimeSheetReviewersResponse;
   time_sheets: TimeSheetsResponse;
+  time_tracking: TimeTrackingResponse;
   time_types: TimeTypesResponse;
   user_claims: UserClaimsResponse;
   user_po_permission_data: UserPoPermissionDataResponse;
   users: UsersResponse;
   vendors: VendorsResponse;
+  zip_cache: ZipCacheResponse;
 };
 
 // Type for usage with type asserted PocketBase instance
@@ -1001,11 +1111,14 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "client_contacts"): RecordService<ClientContactsResponse>;
   collection(idOrName: "clients"): RecordService<ClientsResponse>;
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
+  collection(idOrName: "expense_allowance_totals"): RecordService<ExpenseAllowanceTotalsResponse>;
+  collection(idOrName: "expense_mileage_totals"): RecordService<ExpenseMileageTotalsResponse>;
   collection(idOrName: "expense_rates"): RecordService<ExpenseRatesResponse>;
   collection(idOrName: "expenses"): RecordService<ExpensesResponse>;
   collection(idOrName: "expenses_augmented"): RecordService<ExpensesAugmentedResponse>;
   collection(idOrName: "jobs"): RecordService<JobsResponse>;
   collection(idOrName: "managers"): RecordService<ManagersResponse>;
+  collection(idOrName: "mileage_reset_dates"): RecordService<MileageResetDatesResponse>;
   collection(idOrName: "notification_templates"): RecordService<NotificationTemplatesResponse>;
   collection(idOrName: "notifications"): RecordService<NotificationsResponse>;
   collection(
@@ -1027,11 +1140,13 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "time_report_week_endings"): RecordService<TimeReportWeekEndingsResponse>;
   collection(idOrName: "time_sheet_reviewers"): RecordService<TimeSheetReviewersResponse>;
   collection(idOrName: "time_sheets"): RecordService<TimeSheetsResponse>;
+  collection(idOrName: "time_tracking"): RecordService<TimeTrackingResponse>;
   collection(idOrName: "time_types"): RecordService<TimeTypesResponse>;
   collection(idOrName: "user_claims"): RecordService<UserClaimsResponse>;
   collection(idOrName: "user_po_permission_data"): RecordService<UserPoPermissionDataResponse>;
   collection(idOrName: "users"): RecordService<UsersResponse>;
   collection(idOrName: "vendors"): RecordService<VendorsResponse>;
+  collection(idOrName: "zip_cache"): RecordService<ZipCacheResponse>;
 };
 
 export type SelectOption = { id: string | number };

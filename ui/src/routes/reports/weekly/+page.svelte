@@ -3,7 +3,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import type { PageData } from "./$types";
-  import type { TimeReportWeekEndingsResponse } from "$lib/pocketbase-types";
+  import type { TimeTrackingResponse } from "$lib/pocketbase-types";
   import { downloadCSV, downloadZip } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
@@ -37,13 +37,25 @@
   }
 </script>
 
-{#snippet anchor({ week_ending }: TimeReportWeekEndingsResponse)}
+{#snippet anchor({ week_ending }: TimeTrackingResponse)}
   {week_ending}
 {/snippet}
-{#snippet headline()}
-  Weekly
+{#snippet headline({ committed_count }: TimeTrackingResponse)}
+  {#if committed_count > 0}
+    {committed_count} committed time sheet(s)
+  {/if}
 {/snippet}
-{#snippet actions({ week_ending }: TimeReportWeekEndingsResponse)}
+{#snippet line1({ approved_count }: TimeTrackingResponse)}
+  {#if approved_count > 0}
+    {approved_count} approved
+  {/if}
+{/snippet}
+{#snippet line3({ submitted_count }: TimeTrackingResponse)}
+  {#if submitted_count > 0}
+    {submitted_count} submitted & pending approval
+  {/if}
+{/snippet}
+{#snippet actions({ week_ending }: TimeTrackingResponse)}
   <DsActionButton
     action={() => {
       fetchTimeReport(week_ending);
@@ -83,6 +95,8 @@
     search={true}
     {anchor}
     {headline}
+    {line1}
+    {line3}
     {actions}
   />
 {/if}
