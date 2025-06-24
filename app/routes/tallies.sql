@@ -1,7 +1,7 @@
 -- Parameterized tallies query
 -- Params:
 --   :uid           - the caller id (required)
---   :role          - either 'uid' (list by owner) or 'approver' (list by approver) (default 'uid')
+--   :role          - either 'uid' (list by owner) or 'approver' (list by approver) or 'reviewer' (list sheets shared with the caller) (default 'uid')
 --   :pendingOnly   - 1 to only include sheets with ts.approved = '' (default 0)
 --   :approvedOnly  - 1 to only include sheets with ts.approved != '' (default 0)
 -- The WHERE clause dynamically applies filters based on the above flags.
@@ -53,7 +53,13 @@ LEFT JOIN profiles cp ON ts.committer = cp.uid
 LEFT JOIN profiles rp ON ts.rejector = rp.uid
 WHERE (
   ( {:role} = 'uid'      AND te.uid      = {:uid} ) OR
-  ( {:role} = 'approver' AND ts.approver = {:uid} )
+  ( {:role} = 'approver' AND ts.approver = {:uid} ) OR
+  -- caller is explicitly listed as a reviewer on the time_sheet
+  ( {:role} = 'reviewer' AND EXISTS (
+      SELECT 1 FROM time_sheet_reviewers tsr
+      WHERE tsr.time_sheet = ts.id
+        AND tsr.reviewer   = {:uid}
+  ) )
 )
   AND ( {:pendingOnly}  = 0 OR ts.approved = '' )
   AND ( {:approvedOnly} = 0 OR ts.approved != '' )
