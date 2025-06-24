@@ -83,28 +83,27 @@
   >
     <div class="fixed inset-0 z-10 bg-black bg-opacity-80"></div>
     <div
-      class="relative z-20 mx-auto my-20 flex w-11/12 flex-col rounded-lg bg-neutral-800 p-4 text-neutral-300 md:w-3/5"
+      class="relative z-20 mx-auto my-20 flex w-fit max-w-full flex-col rounded-lg bg-neutral-800 p-4 text-neutral-300"
     >
       <div class="flex items-start justify-between">
         <h1>Share</h1>
         <h5>{itemId}</h5>
       </div>
       <div class="my-2 flex flex-col items-stretch gap-2 overflow-auto">
-        <div class="rounded bg-neutral-700 p-2">
-          <h3>{reviewers.length === 0 ? "No " : ""}Viewers</h3>
-          {#each reviewers as reviewer}
-            <span class="flex items-center gap-1">
-              <span>
-                {reviewer.surname}, {reviewer.given_name}
-              </span>
+        <div class="rounded bg-neutral-700 p-4">
+          <h3 class="text-lg font-semibold">{reviewers.length === 0 ? "No " : ""}Viewers</h3>
+          <!-- Grid layout: two columns (names | delete button) with vertical spacing -->
+          <div class="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2">
+            {#each reviewers as reviewer (reviewer.id)}
+              <span>{reviewer.surname}, {reviewer.given_name}</span>
               <DsActionButton
                 action={() => deleteViewer(reviewer.id)}
                 icon="mdi:delete"
                 color="red"
                 title="Remove Viewer"
               />
-            </span>
-          {/each}
+            {/each}
+          </div>
         </div>
 
         <span class="flex items-center gap-1">
