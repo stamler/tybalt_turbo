@@ -23,19 +23,38 @@
   let itemId = $state("");
   let newViewer = $state("");
   let reviewers = $state([] as Reviewer[]);
+  let ownerName = $state("Share");
+  let timesheetDate = $state("");
 
   function closeModal() {
     show = false;
     itemId = "";
     newViewer = "";
     reviewers = [];
+    ownerName = "Share";
+    timesheetDate = "";
   }
 
   async function reloadReviewers() {
     try {
-      reviewers = await pb.send("/api/time_sheets/" + itemId + "/reviewers", {
+      const summary: any = await pb.send("/api/time_sheets/" + itemId + "/reviewers", {
         method: "GET",
       });
+
+      reviewers = summary.reviewers || [];
+      ownerName = summary.owner_name || "Share";
+
+      if (summary.week_ending) {
+        const dateObj = new Date(summary.week_ending);
+        timesheetDate = dateObj.toLocaleDateString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        });
+      } else {
+        timesheetDate = "";
+      }
+
       newViewer = "";
     } catch (error: any) {
       globalStore.addError(`Failed to load reviewers: ${error}`);
@@ -85,9 +104,11 @@
     <div
       class="relative z-20 mx-auto my-20 flex w-fit max-w-full flex-col rounded-lg bg-neutral-800 p-4 text-neutral-300"
     >
-      <div class="flex items-start justify-between">
-        <h1>Share</h1>
-        <h5>{itemId}</h5>
+      <div class="flex items-baseline justify-between gap-2">
+        <h1 class="text-xl font-bold">{ownerName}</h1>
+        {#if timesheetDate}
+          <h5 class="text-sm text-neutral-400">{timesheetDate}</h5>
+        {/if}
       </div>
       <div class="my-2 flex flex-col items-stretch gap-2 overflow-auto">
         <div class="rounded bg-neutral-700 p-4">
@@ -110,9 +131,11 @@
           <select name="manager" bind:value={newViewer} class="rounded bg-neutral-700 p-1">
             <option disabled selected>- select manager -</option>
             {#each $managers.items as m (m.id)}
-              <option value={m.id}>
-                {m.surname}, {m.given_name}
-              </option>
+              {#if !reviewers.find((r) => r.reviewer === m.id)}
+                <option value={m.id}>
+                  {m.surname}, {m.given_name}
+                </option>
+              {/if}
             {/each}
           </select>
           <DsActionButton

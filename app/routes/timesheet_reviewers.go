@@ -38,6 +38,13 @@ type TimesheetReviewer struct {
 	GivenName   string `json:"given_name" db:"given_name"`
 }
 
+// TimesheetReviewSummary wraps reviewers along with owner name and week ending
+type TimesheetReviewSummary struct {
+	OwnerName  string              `json:"owner_name"`
+	WeekEnding string              `json:"week_ending"`
+	Reviewers  []TimesheetReviewer `json:"reviewers"`
+}
+
 // createGetReviewersHandler returns a function that gets reviewers for a given time_sheets record
 func createGetReviewersHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -58,7 +65,38 @@ func createGetReviewersHandler(app core.App) func(e *core.RequestEvent) error {
 			})
 		}
 
-		// Return the reviewers data
-		return e.JSON(http.StatusOK, reviewers)
+		// 2. Fetch owner name and week ending
+		const metaQuery = `
+SELECT
+    COALESCE(p.given_name || ' ' || p.surname, u.name) AS owner_name,
+    ts.week_ending                                     AS week_ending
+FROM time_sheets ts
+LEFT JOIN profiles p ON p.uid = ts.uid
+LEFT JOIN users    u ON u.id  = ts.uid
+WHERE ts.id = {:timesheetId}
+LIMIT 1`
+
+		type timesheetMeta struct {
+			OwnerName  string `db:"owner_name"`
+			WeekEnding string `db:"week_ending"`
+		}
+
+		var meta timesheetMeta
+		if err := app.DB().NewQuery(metaQuery).
+			Bind(dbx.Params{"timesheetId": timesheetId}).
+			One(&meta); err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"error": "failed to fetch timesheet metadata: " + err.Error(),
+			})
+		}
+
+		// 3. Assemble summary and return
+		summary := TimesheetReviewSummary{
+			OwnerName:  meta.OwnerName,
+			WeekEnding: meta.WeekEnding,
+			Reviewers:  reviewers,
+		}
+
+		return e.JSON(http.StatusOK, summary)
 	}
 }
