@@ -47,7 +47,7 @@
 
 {#if show}
   <div
-    class="z-90 fixed inset-0 overflow-y-auto overflow-x-hidden"
+    class="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden"
     transition:fade={{ duration: 200 }}
   >
     <div class="fixed inset-0 z-10 bg-black bg-opacity-80"></div>
