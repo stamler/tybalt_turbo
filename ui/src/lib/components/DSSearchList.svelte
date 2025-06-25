@@ -98,7 +98,7 @@
   {#snippet itemList(_items: T[])}
     {#each _items.slice(0, MAX_RESULTS) as item}
       <li class="contents">
-        <div class="col-span-3 grid grid-cols-subgrid bg-[inherit]">
+        <div class="col-span-3 grid grid-cols-subgrid items-center bg-[inherit]">
           {#if anchor !== undefined}
             <div class="flex min-w-24 items-center justify-center p-2">
               {@render anchor(item)}

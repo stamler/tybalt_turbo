@@ -113,7 +113,7 @@
   {#snippet itemList(_processedItems: T[])}
     {#each _processedItems as item}
       <li class="contents">
-        <div class="col-span-3 grid grid-cols-subgrid bg-[inherit]">
+        <div class="col-span-3 grid grid-cols-subgrid items-center bg-[inherit]">
           {#if anchor !== undefined}
             <div class="flex min-w-24 items-center justify-center p-2">
               {@render anchor(item)}
@@ -156,7 +156,7 @@
       {@render itemList(processedItems[group])}
       {#if groupFooter !== undefined}
         <li class="contents">
-          <div class="col-span-3 grid grid-cols-subgrid bg-[inherit]">
+          <div class="col-span-3 grid grid-cols-subgrid items-center bg-[inherit]">
             {@render groupFooter(group, processedItems[group])}
           </div>
         </li>
