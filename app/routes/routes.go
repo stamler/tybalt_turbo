@@ -116,6 +116,8 @@ func AddRoutes(app core.App) {
 
 		clientsGroup := se.Router.Group("/api/clients")
 		clientsGroup.Bind(apis.RequireAuth("users"))
+		clientsGroup.GET("", createGetClientsHandler(app))
+		clientsGroup.GET("/{id}", createGetClientsHandler(app))
 		clientsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "clients"))
 		clientsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "clients"))
 

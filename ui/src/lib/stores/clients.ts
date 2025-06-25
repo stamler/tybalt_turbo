@@ -1,54 +1,58 @@
-import type { ClientsResponse } from "$lib/pocketbase-types";
 import { createCollectionStore } from "./collectionStore";
 import { pb } from "$lib/pocketbase";
 
-export const clients = createCollectionStore<ClientsResponse>(
+// Custom API response matching /api/clients
+export interface Contact {
+  id: string;
+  given_name: string;
+  surname: string;
+  email: string;
+}
+
+export interface ClientApiResponse {
+  id: string;
+  name: string;
+  contacts: Contact[];
+}
+
+
+const fetchAllClients = async (): Promise<ClientApiResponse[]> => pb.send("/api/clients", { method: "GET" });
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const clients = createCollectionStore<any>(
   "clients",
+  {},
   {
-    requestKey: "client",
-    expand: "client_contacts_via_client",
+    fields: ["id", "name", "contacts"],
+    storeFields: ["id", "name", "contacts"],
+    extractField: (doc, field) => (doc as Record<string, unknown>)[field] as string,
   },
-  {
-    fields: ["id", "name"],
-    // store the expand field so we can access
-    // client_contacts_via_client in the search results
-    storeFields: ["id", "name", "expand"],
-  },
+  // onCreate
   async (item) => {
-    // Fetch the new record with expand options and add to store
-    const fullRecord = await pb.collection("clients").getOne<ClientsResponse>(item.id, {
-      expand: "client_contacts_via_client",
-    });
-    clients.update((state) => ({
-      ...state,
-      items: [...state.items, fullRecord],
-      index: state.index?.add(fullRecord) || state.index,
-    }));
+    const record: ClientApiResponse = await pb.send(`/api/clients/${item.id}`, { method: "GET" });
+    clients.update((s) => ({ ...s, items: [...s.items, record], index: s.index?.add(record) || s.index }));
   },
+  // onUpdate – re-fetch and replace existing entry in the store
+  /*
+   * NOTE: ClientsEditor.svelte calls clients.refresh(id) after it creates,
+   * updates or deletes related client_contacts. That manual refresh invokes
+   * this onUpdate callback a second time for the same client (once for the
+   * original client.save / contact mutation via realtime, and once for the
+   * explicit refresh).  It's small data so we accept the duplication; this
+   * callback still ensures the store always has the latest contacts array.
+   * We do this because realtime events fire only for the `client_contacts`
+   * collection, not for the parent client record; without the manual refresh
+   * the contacts list in the UI would lag behind the database.
+   */
   async (item) => {
-    // Fetch the updated record with expand options and replace in store
-    const fullRecord = await pb.collection("clients").getOne<ClientsResponse>(item.id, {
-      expand: "client_contacts_via_client",
-    });
-    // This function doesn't capture changes to the save() function in
-    // ClientsEditor.svelte creates or updates the client which immediately
-    // triggers this function, running it before the client_contacts are
-    // subsequently updated in the database. We preserve this update function
-    // here nonetheless, because in the case where the client_contacts are not
-    // updated in the database, this function will still update the client in
-    // the store correctly. However to resolve the issue where the
-    // client_contacts are updated in the database, we need to manually reload
-    // the client in the clients store. We do this by calling the refresh()
-    // function in the clients store and specifying the client id, which
-    // actually calls *this* function since it's the onUpdate callback. This
-    // means that the onUpdate callback is called twice for the same client,
-    // once when the client is created or updated, and once when the
-    // client_contacts are updated. While this isn't efficient, it's very little
-    // data.
+    const fullRecord: ClientApiResponse = await pb.send(`/api/clients/${item.id}`, { method: "GET" });
     clients.update((state) => ({
       ...state,
       items: state.items.map((i) => (i.id === item.id ? fullRecord : i)),
       index: state.index?.replace(fullRecord) || state.index,
     }));
   },
+  // proxy collection
+  "clients",
+  fetchAllClients,
 );

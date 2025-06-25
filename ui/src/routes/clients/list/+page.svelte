@@ -18,10 +18,10 @@
     collectionName="clients"
   >
     {#snippet headline({ name })}{name}{/snippet}
-    {#snippet line1({ expand })}
-      {#if expand?.client_contacts_via_client}
+    {#snippet line1({ contacts })}
+      {#if contacts && contacts.length > 0}
         <span class="opacity-30">contacts</span>
-        {#each expand.client_contacts_via_client as contact}
+        {#each contacts as contact}
           <a
             href="mailto:{contact.email}"
             class="rounded-md p-1 hover:cursor-pointer hover:bg-neutral-300"
