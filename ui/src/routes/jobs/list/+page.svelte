@@ -3,7 +3,7 @@
   import { jobs } from "$lib/stores/jobs";
   // TODO: JobsResponse isn't actually the correct type for the items in the
   // index, but hobbles along for now
-  import type { JobsResponse } from "$lib/pocketbase-types";
+  import type { JobApiResponse } from "$lib/stores/jobs";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
 
   // initialize the jobs store, noop if already initialized
@@ -12,10 +12,10 @@
 
 {#if $jobs.index !== null}
   <DsSearchList index={$jobs.index} inListHeader="Jobs" fieldName="job" uiName="search jobs...">
-    {#snippet anchor({ number }: JobsResponse)}{number}{/snippet}
-    {#snippet headline({ description }: JobsResponse)}{description}{/snippet}
-    {#snippet byline({ client }: JobsResponse)}{client}{/snippet}
-    {#snippet actions({ id }: JobsResponse)}
+    {#snippet anchor({ number }: JobApiResponse)}{number}{/snippet}
+    {#snippet headline({ description }: JobApiResponse)}{description}{/snippet}
+    {#snippet byline({ client }: JobApiResponse)}{client}{/snippet}
+    {#snippet actions({ id }: JobApiResponse)}
       <DsActionButton action="/jobs/{id}/edit" icon="mdi:pencil" title="Edit" color="blue" />
       <DsActionButton
         action="/details/{id}"

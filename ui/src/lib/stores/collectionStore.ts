@@ -23,6 +23,7 @@ export function createCollectionStore<T extends BaseSystemFields>(
   onCreate?: (item: RecordModel) => Promise<void> | undefined,
   onUpdate?: (item: RecordModel) => Promise<void> | undefined,
   proxyCollectionName?: string, // if provided, watch this collection for subscription events
+  fetchAll?: () => Promise<T[]>, // optional custom function to fetch all items – allows bypassing PocketBase when we need to avoid the N+1 queries
 ) {
   // Create the store
   const store = writable<DataStore<T>>({
@@ -35,7 +36,10 @@ export function createCollectionStore<T extends BaseSystemFields>(
 
   // Initialize the store with data
   async function initializeStore() {
-    const items = await pb.collection(collectionName).getFullList<T>(queryOptions);
+    // If a custom fetchAll function is supplied use it, otherwise fall back to PocketBase getFullList
+    const items: T[] = fetchAll
+      ? await fetchAll()
+      : await pb.collection(collectionName).getFullList<T>(queryOptions);
     const itemsIndex = new MiniSearch<T>(indexOptions);
     itemsIndex.addAll(items);
     store.update((state) => ({
