@@ -10,6 +10,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import VersionInfo from "$lib/components/VersionInfo.svelte";
   import { navigating } from "$app/stores";
+  import { navSections } from "$lib/navConfig";
 
   // children is a function that we will call to render the current route
   // https://svelte-5-preview.vercel.app/docs/snippets#passing-snippets-to-components
@@ -103,236 +104,36 @@
           <VersionInfo />
         </div>
         <nav class="mt-2 px-1">
-          <div class="mt-2">
-            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Time Management</p>
-            <div class="flex h-8 items-center justify-between pr-2">
-              <a
-                href="/time/entries/list"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Entries</a
-              >
-              <DsActionButton
-                action="/time/entries/add"
-                icon="feather:plus-circle"
-                title="New Entry"
-                color="green"
-                transparentBackground
-              />
+          {#each navSections as section}
+            <div class="mt-2">
+              <p class="p-2 text-xs font-semibold uppercase text-neutral-400">{section.title}</p>
+              {#each section.items as item}
+                <div class="flex h-8 items-center pr-2" class:justify-between={item.button}>
+                  <a
+                    href={item.href}
+                    class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
+                    >{item.label}</a
+                  >
+                  {#if item.button}
+                    <DsActionButton
+                      action={item.button.action}
+                      icon={item.button.icon}
+                      title={item.button.title}
+                      color={item.button.color}
+                      transparentBackground
+                    />
+                  {:else}
+                    <div class="w-8"></div>
+                  {/if}
+                </div>
+              {/each}
             </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/time/sheets/list"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Sheets</a
-              >
-              <div class="w-8"></div>
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/time/sheets/pending"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Pending My Approval</a
-              >
-              <div class="w-8"></div>
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/time/sheets/approved"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Approved By Me</a
-              >
-              <div class="w-8"></div>
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/time/sheets/shared"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Shared with Me</a
-              >
-              <div class="w-8"></div>
-            </div>
-            <div class="flex h-8 items-center justify-between pr-2">
-              <a
-                href="/time/amendments/list"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Amendments</a
-              >
-              <DsActionButton
-                action="/time/amendments/add"
-                icon="feather:plus-circle"
-                title="New Amendment"
-                color="green"
-                transparentBackground
-              />
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/time/off"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Time Off</a
-              >
-              <div class="w-8"></div>
-            </div>
-          </div>
-          <div class="mt-2">
-            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Purchase Orders</p>
-            <div class="flex h-8 items-center justify-between pr-2">
-              <a
-                href="/pos/list"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >My Purchase Orders</a
-              >
-              <DsActionButton
-                action="/pos/add"
-                icon="feather:plus-circle"
-                title="New PO"
-                color="green"
-                transparentBackground
-              />
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/pos/pending"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Pending My Approval</a
-              >
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/pos/active"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >All Active</a
-              >
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/pos/stale"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Stale</a
-              >
-            </div>
-          </div>
-          <div class="mt-2">
-            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Expenses</p>
-            <div class="flex h-8 items-center justify-between pr-2">
-              <a
-                href="/expenses/list"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >My Expenses</a
-              >
-              <DsActionButton
-                action="/expenses/add"
-                icon="feather:plus-circle"
-                title="New Expense"
-                color="green"
-                transparentBackground
-              />
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/expenses/pending"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Pending My Approval</a
-              >
-              <div class="w-8"></div>
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/expenses/approved"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Approved By Me</a
-              >
-              <div class="w-8"></div>
-            </div>
-          </div>
-          <div class="mt-2">
-            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Business</p>
-            <div class="flex h-8 items-center justify-between pr-2">
-              <a
-                href="/jobs/list"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Jobs</a
-              >
-              <DsActionButton
-                action="/jobs/add"
-                icon="feather:plus-circle"
-                title="New Job"
-                color="green"
-                transparentBackground
-              />
-            </div>
-            <div class="flex h-8 items-center justify-between pr-2">
-              <a
-                href="/clients/list"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Clients</a
-              >
-              <DsActionButton
-                action="/clients/add"
-                icon="feather:plus-circle"
-                title="New Client"
-                color="green"
-                transparentBackground
-              />
-            </div>
-            <div class="flex h-8 items-center justify-between pr-2">
-              <a
-                href="/vendors/list"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Vendors</a
-              >
-              <DsActionButton
-                action="/vendors/add"
-                icon="feather:plus-circle"
-                title="New Vendor"
-                color="green"
-                transparentBackground
-              />
-            </div>
-          </div>
-          <div class="mt-2">
-            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Reports</p>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/reports/payroll"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Payroll</a
-              >
-              <div class="w-8"></div>
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/reports/weekly"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Weekly</a
-              >
-              <div class="w-8"></div>
-            </div>
-          </div>
-          <div class="mt-2">
-            <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Settings</p>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/timetypes"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Time Types</a
-              >
-              <div class="w-8"></div>
-            </div>
-            <div class="flex h-8 items-center pr-2">
-              <a
-                href="/divisions"
-                class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
-                >Divisions</a
-              >
-              <div class="w-8"></div>
-            </div>
-          </div>
+          {/each}
           {#if $authStore?.isValid}
             <div class="mt-2">
               <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Account</p>
               <a
-                href="/profile/{$authStore?.model?.id}"
+                href={`/profile/${$authStore?.model?.id}`}
                 class="ml-4 block rounded pl-2 pr-2 hover:bg-neutral-600"
               >
                 {$authStore?.model?.email}
