@@ -94,24 +94,41 @@
   <div class="flex h-[calc(100vh-2.5rem)] lg:h-screen">
     <!-- Sidebar -->
     <aside
-      class={`fixed inset-y-0 left-0 w-64 transform bg-neutral-700 text-white transition-transform duration-300 ease-in-out lg:static ${
+      class={`fixed inset-y-0 left-0 w-screen transform bg-neutral-700 text-white transition-transform duration-300 ease-in-out lg:static lg:w-64 ${
         isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       } z-30`}
     >
       <div class="h-full overflow-y-auto">
+        <!-- Desktop brand header -->
         <div class="hidden h-10 items-center justify-between px-4 text-lg font-semibold lg:flex">
           <a href="/" class="text-white">Tybalt</a>
           <VersionInfo />
         </div>
+        <!-- Mobile close/header -->
+        <div class="flex h-12 items-center justify-between px-4 lg:hidden">
+          <span class="text-xl font-semibold">Tybalt</span>
+          <button onclick={toggleSidebar} aria-label="Close Menu">
+            <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              />
+            </svg>
+          </button>
+        </div>
         <nav class="mt-2 px-1">
           {#each navSections as section}
             <div class="mt-2">
-              <p class="p-2 text-xs font-semibold uppercase text-neutral-400">{section.title}</p>
+              <p class="p-2 text-base font-semibold uppercase text-neutral-400 lg:text-xs">
+                {section.title}
+              </p>
               {#each section.items as item}
-                <div class="flex h-8 items-center pr-2" class:justify-between={item.button}>
+                <div class="flex h-12 items-center pr-2 lg:h-8" class:justify-between={item.button}>
                   <a
                     href={item.href}
-                    class="ml-4 flex h-full flex-grow items-center rounded pl-2 hover:bg-neutral-600"
+                    class="ml-4 flex h-full flex-grow items-center rounded pl-2 text-lg hover:bg-neutral-600 lg:text-sm"
                     >{item.label}</a
                   >
                   {#if item.button}
