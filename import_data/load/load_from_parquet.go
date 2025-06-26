@@ -191,7 +191,6 @@ type Expense struct {
 	PurchaseOrderNumber string    `parquet:"po"`
 	PurchaseOrderId     string    `parquet:"purchase_order_id"`
 	Approver            string    `parquet:"pocketbase_approver_uid"`
-	Approved            string    `parquet:"approved"`
 	Committer           string    `parquet:"pocketbase_commit_uid"`
 	Committed           time.Time `parquet:"commitTime"`
 	CommittedWeekEnding string    `parquet:"committedWeekEnding"`

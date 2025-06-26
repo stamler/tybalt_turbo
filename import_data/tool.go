@@ -499,11 +499,14 @@ func main() {
 			"./parquet/purchase_orders.parquet",
 			targetDatabase,
 			"purchase_orders", // Table name (for logging)
-			`INSERT INTO purchase_orders (id, po_number, type, status, closed_by_system, description, _imported) VALUES ({:id}, {:po_number}, 'Normal', 'Closed', 1, 'Imported from Firebase Expenses', true)`,
+			`INSERT INTO purchase_orders (id, po_number, approved, second_approval, closed, type, status, closed_by_system, description, _imported) VALUES ({:id}, {:po_number}, {:approved}, {:second_approval}, {:closed}, 'Normal', 'Closed', 1, 'Imported from Firebase Expenses', true)`,
 			func(item load.PurchaseOrder) dbx.Params {
 				return dbx.Params{
-					"id":        item.Id,
-					"po_number": item.PoNumber,
+					"id":              item.Id,
+					"po_number":       item.PoNumber,
+					"approved":        fixedTimestamp,
+					"second_approval": fixedTimestamp,
+					"closed":          fixedTimestamp,
 				}
 			},
 			true, // Enable upsert for idempotency
@@ -611,7 +614,7 @@ func main() {
 				}(),
 				"cc_last_4_digits":      item.CCLast4Digits,
 				"approver":              item.Approver,
-				"approved":              item.Approved,
+				"approved":              item.Committed.Format("2006-01-02 15:04:05.000Z"),
 				"committer":             item.Committer,
 				"committed":             item.Committed.Format("2006-01-02 15:04:05.000Z"),
 				"committed_week_ending": item.CommittedWeekEnding,
