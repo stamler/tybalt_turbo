@@ -9,6 +9,7 @@
   import ErrorBar from "$lib/components/ErrorBar.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import VersionInfo from "$lib/components/VersionInfo.svelte";
+  import { navigating } from "$app/stores";
 
   // children is a function that we will call to render the current route
   // https://svelte-5-preview.vercel.app/docs/snippets#passing-snippets-to-components
@@ -351,6 +352,9 @@
     <!-- Main content -->
     <div class="flex-1 overflow-auto bg-white">
       <ErrorBar />
+      {#if $navigating}
+        <div class="sticky top-0 z-50 h-[4px] w-full animate-pulse bg-purple-500"></div>
+      {/if}
       <div>
         {@render children()}
       </div>
