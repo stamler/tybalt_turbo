@@ -69,24 +69,15 @@
     <div class="flex items-center gap-2">
       <VersionInfo />
       {#if $authStore?.isValid}
-        <button
-          class="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-700"
-          onclick={authStore.logout}
-          aria-label="Logout"
-        >
-          <svg
-            class="h-6 w-6"
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M16.5 3.75a1.5 1.5 0 0 1 1.5 1.5v13.5a1.5 1.5 0 0 1-1.5 1.5h-6a1.5 1.5 0 0 1-1.5-1.5V15a.75.75 0 0 0-1.5 0v3.75a3 3 0 0 0 3 3h6a3 3 0 0 0 3-3V5.25a3 3 0 0 0-3-3h-6a3 3 0 0 0-3 3V9A.75.75 0 1 0 9 9V5.25a1.5 1.5 0 0 1 1.5-1.5h6ZM5.78 8.47a.75.75 0 0 0-1.06 0l-3 3a.75.75 0 0 0 0 1.06l3 3a.75.75 0 0 0 1.06-1.06l-1.72-1.72H15a.75.75 0 0 0 0-1.5H4.06l1.72-1.72a.75.75 0 0 0 0-1.06Z"
-              clip-rule="evenodd"
-            />
-          </svg>
-        </button>
+        <div class="[&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6">
+          <DsActionButton
+            action={authStore.logout}
+            icon="feather:log-out"
+            title="Logout"
+            color="red"
+            transparentBackground
+          />
+        </div>
       {/if}
     </div>
   </header>
@@ -98,7 +89,7 @@
         isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
       } z-30`}
     >
-      <div class="h-full overflow-y-auto">
+      <div class="h-full overflow-y-auto overflow-x-hidden">
         <!-- Desktop brand header -->
         <div class="hidden h-10 items-center justify-between px-4 text-lg font-semibold lg:flex">
           <a href="/" class="text-white">Tybalt</a>
@@ -121,24 +112,29 @@
         <nav class="mt-2 px-1">
           {#each navSections as section}
             <div class="mt-2">
-              <p class="p-2 text-base font-semibold uppercase text-neutral-400 lg:text-xs">
+              <p class="p-2 text-lg font-semibold uppercase text-neutral-400 lg:text-xs">
                 {section.title}
               </p>
               {#each section.items as item}
-                <div class="flex h-12 items-center pr-2 lg:h-8" class:justify-between={item.button}>
+                <div
+                  class="flex h-12 items-center pr-4 lg:h-8 lg:pr-2"
+                  class:justify-between={item.button}
+                >
                   <a
                     href={item.href}
-                    class="ml-4 flex h-full flex-grow items-center rounded pl-2 text-lg hover:bg-neutral-600 lg:text-sm"
+                    class="ml-4 flex h-full flex-grow items-center rounded pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
                     >{item.label}</a
                   >
                   {#if item.button}
-                    <DsActionButton
-                      action={item.button.action}
-                      icon={item.button.icon}
-                      title={item.button.title}
-                      color={item.button.color}
-                      transparentBackground
-                    />
+                    <div class="[&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6">
+                      <DsActionButton
+                        action={item.button.action}
+                        icon={item.button.icon}
+                        title={item.button.title}
+                        color={item.button.color}
+                        transparentBackground
+                      />
+                    </div>
                   {:else}
                     <div class="w-8"></div>
                   {/if}
@@ -147,20 +143,25 @@
             </div>
           {/each}
           {#if $authStore?.isValid}
-            <div class="mt-2">
-              <p class="p-2 text-xs font-semibold uppercase text-neutral-400">Account</p>
-              <a
-                href={`/profile/${$authStore?.model?.id}`}
-                class="ml-4 block rounded pl-2 pr-2 hover:bg-neutral-600"
-              >
-                {$authStore?.model?.email}
-              </a>
-              <button
-                class="ml-4 w-full rounded pl-2 pr-2 text-left text-red-400 hover:bg-neutral-600"
-                onclick={authStore.logout}
-              >
-                Logout
-              </button>
+            <div class="mb-6 mt-2">
+              <p class="p-2 text-lg font-semibold uppercase text-neutral-400 lg:text-xs">Account</p>
+              <div class="flex h-12 items-center justify-between pr-4 lg:h-8 lg:pr-2">
+                <a
+                  href={`/profile/${$authStore?.model?.id}`}
+                  class="ml-4 flex h-full flex-grow items-center rounded pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
+                >
+                  {$authStore?.model?.email}
+                </a>
+                <div class="[&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6">
+                  <DsActionButton
+                    action={authStore.logout}
+                    icon="feather:log-out"
+                    title="Logout"
+                    color="red"
+                    transparentBackground
+                  />
+                </div>
+              </div>
             </div>
           {/if}
         </nav>
