@@ -83,7 +83,7 @@
 >
   <li id="listbar" class="col-span-3 flex items-center gap-x-2 p-2">
     <input
-      class="flex-1 rounded border border-neutral-300 px-1"
+      class="flex-1 rounded border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
       type="text"
       id={`autocomplete-input-${thisId}`}
       name={fieldName}

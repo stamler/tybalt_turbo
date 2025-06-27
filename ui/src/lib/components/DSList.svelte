@@ -94,7 +94,7 @@
         type="textbox"
         placeholder="search..."
         bind:value={searchTerm}
-        class="flex-1 rounded border border-neutral-300 px-1"
+        class="flex-1 rounded border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
       />
       {#if groupField === undefined}
         <span>{processedItems.length} items</span>
