@@ -57,7 +57,7 @@
 <div class="h-screen w-screen overflow-hidden">
   <!-- Mobile header with hamburger -->
   <header
-    class="flex h-10 w-full items-center justify-between bg-neutral-700 px-3 text-white lg:hidden"
+    class="relative flex h-10 w-full items-center justify-between bg-neutral-700 px-3 text-white lg:hidden"
   >
     <button onclick={toggleSidebar} class="text-white" aria-label="Toggle Menu">
       <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,8 +69,8 @@
         />
       </svg>
     </button>
-    <span class="text-lg font-semibold">Tybalt</span>
-    <div class="flex items-center gap-2">
+    <span class="absolute left-1/2 -translate-x-1/2 transform text-lg font-semibold">Tybalt</span>
+    <div class="ml-auto flex items-center gap-2">
       <VersionInfo />
       {#if $authStore?.isValid}
         <div class="[&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6">
