@@ -6,6 +6,7 @@ import type { RecordFullListOptions, RecordModel } from "pocketbase";
 import type { Options } from "minisearch";
 import type { BaseSystemFields } from "$lib/pocketbase-types";
 import { emitCollectionEvent } from "./collectionEvents";
+import { tasks } from "./tasks";
 
 // Define the type for our store data
 type DataStore<T> = {
@@ -36,10 +37,15 @@ export function createCollectionStore<T extends BaseSystemFields>(
 
   // Initialize the store with data
   async function initializeStore() {
+    // Register loading task
+    const taskId = `init-${collectionName}`;
+    tasks.startTask({ id: taskId, message: `Loading ${collectionName}` });
     // If a custom fetchAll function is supplied use it, otherwise fall back to PocketBase getFullList
     const items: T[] = fetchAll
       ? await fetchAll()
       : await pb.collection(collectionName).getFullList<T>(queryOptions);
+    // Task completed
+    tasks.endTask(taskId);
     const itemsIndex = new MiniSearch<T>(indexOptions);
     itemsIndex.addAll(items);
     store.update((state) => ({
@@ -57,39 +63,45 @@ export function createCollectionStore<T extends BaseSystemFields>(
       unsubscribeFunc(); // Clean up existing subscription
     }
 
-    unsubscribeFunc = await pb.collection(proxyCollectionName ?? collectionName).subscribe("*", async (e) => {
-      store.update((state) => ({ ...state, loading: true }));
-      try {
-        if (e.action === "create") {
-          if (onCreate !== undefined) {
-            await onCreate(e.record);
-            emitCollectionEvent(collectionName, "create", e.record.id);
+    const subTaskId = `sub-${collectionName}`;
+    unsubscribeFunc = await pb
+      .collection(proxyCollectionName ?? collectionName)
+      .subscribe("*", async (e) => {
+        store.update((state) => ({ ...state, loading: true }));
+        tasks.startTask({ id: subTaskId, message: `Updating ${collectionName}` });
+        try {
+          if (e.action === "create") {
+            if (onCreate !== undefined) {
+              await onCreate(e.record);
+              emitCollectionEvent(collectionName, "create", e.record.id);
+            }
+          } else if (e.action === "update") {
+            if (onUpdate !== undefined) {
+              await onUpdate(e.record);
+              emitCollectionEvent(collectionName, "update", e.record.id);
+            }
+          } else if (e.action === "delete") {
+            // Remove the deleted record from the store and discard it from the index
+            store.update((state) => ({
+              ...state,
+              items: state.items.filter((i) => i.id !== e.record.id),
+              index: state.index?.discard(e.record.id) || state.index,
+            }));
+            emitCollectionEvent(collectionName, "delete", e.record.id);
           }
-        } else if (e.action === "update") {
-          if (onUpdate !== undefined) {
-            await onUpdate(e.record);
-            emitCollectionEvent(collectionName, "update", e.record.id);
-          }
-        } else if (e.action === "delete") {
-          // Remove the deleted record from the store and discard it from the index
+          store.update((state) => ({ ...state, loading: false }));
+          tasks.endTask(subTaskId);
+        } catch (error) {
+          // handle error, ensure initialized is false
           store.update((state) => ({
             ...state,
-            items: state.items.filter((i) => i.id !== e.record.id),
-            index: state.index?.discard(e.record.id) || state.index,
+            loading: false,
+            initialized: false,
+            error: error instanceof Error ? error.message : "Failed to load items",
           }));
-          emitCollectionEvent(collectionName, "delete", e.record.id);
+          tasks.endTask(subTaskId);
         }
-        store.update((state) => ({ ...state, loading: false }));
-      } catch (error) {
-        // handle error, ensure initialized is false
-        store.update((state) => ({
-          ...state,
-          loading: false,
-          initialized: false,
-          error: error instanceof Error ? error.message : "Failed to load items",
-        }));
-      }
-    });
+      });
   }
 
   return {
@@ -121,6 +133,8 @@ export function createCollectionStore<T extends BaseSystemFields>(
     // Refresh the data manually if needed
     refresh: async (id?: string) => {
       store.update((state) => ({ ...state, loading: true }));
+      const refreshId = `refresh-${collectionName}`;
+      tasks.startTask({ id: refreshId, message: `Refreshing ${collectionName}` });
       if (id !== undefined) {
         // Just call the onUpdate callback for this item
         if (onUpdate !== undefined) {
@@ -131,6 +145,7 @@ export function createCollectionStore<T extends BaseSystemFields>(
         try {
           await initializeStore();
           store.update((state) => ({ ...state, loading: false }));
+          tasks.endTask(refreshId);
         } catch (error) {
           // handle error, ensure initialized is false
           store.update((state) => ({
@@ -138,8 +153,9 @@ export function createCollectionStore<T extends BaseSystemFields>(
             loading: false,
             error: error instanceof Error ? error.message : "Failed to load items",
           }));
+          tasks.endTask(refreshId);
         }
-    }
+      }
     },
 
     // Clean up subscription when the store is no longer needed
@@ -148,7 +164,14 @@ export function createCollectionStore<T extends BaseSystemFields>(
         unsubscribeFunc();
         unsubscribeFunc = null;
       }
-      store.update((state) => ({ ...state, initialized: false, items: [], index: null, loading: false, error: null }));
+      store.update((state) => ({
+        ...state,
+        initialized: false,
+        items: [],
+        index: null,
+        loading: false,
+        error: null,
+      }));
     },
   };
 }

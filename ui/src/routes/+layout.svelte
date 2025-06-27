@@ -10,6 +10,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import VersionInfo from "$lib/components/VersionInfo.svelte";
   import { navigating } from "$app/stores";
+  import { tasks } from "$lib/stores/tasks";
   import { navSections } from "$lib/navConfig";
 
   // children is a function that we will call to render the current route
@@ -18,6 +19,9 @@
   // implicitly becomes part of the children snippet
   let { children } = $props();
   let isSidebarOpen = $state(false);
+
+  // Helper store that reflects whether any task is running
+  const tasksLoading = { subscribe: tasks.showTasks };
 
   afterNavigate((navigation) => {
     // afterNavigate may be called multiple times, but we only want to run once
@@ -171,7 +175,7 @@
     <!-- Main content -->
     <div class="flex-1 overflow-auto bg-white">
       <ErrorBar />
-      {#if $navigating}
+      {#if $navigating || $tasksLoading}
         <div class="sticky top-0 z-50 h-[4px] w-full animate-pulse bg-purple-500"></div>
       {/if}
       <div>
