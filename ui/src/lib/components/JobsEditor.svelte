@@ -261,7 +261,7 @@
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <DsActionButton type="submit">Save</DsActionButton>
-      <DsActionButton action="/jobs/list">Cancel</DsActionButton>
+      <DsActionButton action={`/jobs/${data.id}/details`}>Cancel</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

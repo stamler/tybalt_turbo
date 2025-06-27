@@ -132,7 +132,9 @@
       (r) => !excludeIds.includes(r[idField] as unknown as string | number),
     );
     if (filtered.length === 0) {
-      throw new Error(`No document found with ${idField} ${id}`);
+      // Return a minimal stub so the component can render without error.
+      const stub: any = { [idField]: id };
+      return stub as unknown as SearchResult;
     }
     return filtered[0];
   }
