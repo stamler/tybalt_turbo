@@ -17,7 +17,9 @@
     uiName="search clients..."
     collectionName="clients"
   >
-    {#snippet headline({ name })}{name}{/snippet}
+    {#snippet headline({ id, name })}
+      <a href={`/clients/${id}/details`} class="text-blue-600 hover:underline">{name}</a>
+    {/snippet}
     {#snippet line1({ contacts })}
       {#if contacts && contacts.length > 0}
         <span class="opacity-30">contacts</span>

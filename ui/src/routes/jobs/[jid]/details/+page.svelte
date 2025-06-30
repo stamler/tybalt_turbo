@@ -29,7 +29,12 @@
     {/if}
 
     {#if data.job.client}
-      <div><span class="font-semibold">Client:</span> {data.job.client.name}</div>
+      <div>
+        <span class="font-semibold">Client:</span>
+        <a href={`/clients/${data.job.client.id}/details`} class="text-blue-600 hover:underline">
+          {data.job.client.name}
+        </a>
+      </div>
     {/if}
 
     {#if data.job.contact && (data.job.contact.given_name || data.job.contact.surname)}
