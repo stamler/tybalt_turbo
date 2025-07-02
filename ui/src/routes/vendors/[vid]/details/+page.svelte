@@ -1,6 +1,10 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DsList from "$lib/components/DSList.svelte";
+  import DsLabel from "$lib/components/DsLabel.svelte";
+  import Icon from "@iconify/svelte";
+  import { shortDate } from "$lib/utilities";
 
   export let data: PageData;
 </script>
@@ -41,9 +45,7 @@
     </div>
 
     <div class="flex items-center justify-between">
-      <h2 class="font-semibold capitalize">
-        {data.tab.replace("_", " ")} (page {data.page} / {data.totalPages})
-      </h2>
+      <h2 class="font-semibold">Page {data.page} / {data.totalPages}</h2>
       <div class="flex gap-2">
         {#if data.page > 1}
           <a
@@ -62,35 +64,41 @@
 
     <!-- Lists -->
     {#if data.tab === "purchase_orders"}
-      <ul class="divide-y divide-neutral-200 rounded bg-neutral-100">
-        {#if data.purchaseOrders.length > 0}
-          {#each data.purchaseOrders as po}
-            <li class="flex items-center gap-2 p-2">
-              <a href={`/pos/${po.id}/details`} class="text-blue-600 hover:underline">
-                {po.po_number}
-              </a>
-              <span class="opacity-60">— {po.date} — ${po.total}</span>
-            </li>
-          {/each}
-        {:else}
-          <li class="p-2 italic">No purchase orders found.</li>
-        {/if}
-      </ul>
+      <DsList items={data.purchaseOrders} search={false}>
+        {#snippet anchor(po)}
+          <a href={`/pos/${po.id}/details`} class="text-blue-600 hover:underline">
+            {po.po_number}
+          </a>
+        {/snippet}
+        {#snippet headline({ total, payment_type }: any)}
+          ${total} {payment_type}
+        {/snippet}
+        {#snippet byline(po)}
+          <span class="flex items-center gap-1">
+            {shortDate(po.date)}
+            {#if po.status === "Active"}
+              <DsLabel style="inverted" color="green">{po.status}</DsLabel>
+            {/if}
+            {#if po.type === "Cumulative"}
+              <DsLabel color="teal"><Icon icon="mdi:sigma" width="20" /></DsLabel>
+            {/if}
+          </span>
+        {/snippet}
+      </DsList>
     {:else}
-      <ul class="divide-y divide-neutral-200 rounded bg-neutral-100">
-        {#if data.expenses.length > 0}
-          {#each data.expenses as ex}
-            <li class="flex items-center gap-2 p-2">
-              <a href={`/expenses/${ex.id}/details`} class="text-blue-600 hover:underline">
-                {ex.description || "Expense"}
-              </a>
-              <span class="opacity-60">— {ex.date} — ${ex.total}</span>
-            </li>
-          {/each}
-        {:else}
-          <li class="p-2 italic">No expenses found.</li>
-        {/if}
-      </ul>
+      <DsList items={data.expenses} search={false}>
+        {#snippet anchor(ex)}
+          <a href={`/expenses/${ex.id}/details`} class="text-blue-600 hover:underline">
+            {shortDate(ex.date)}
+          </a>
+        {/snippet}
+        {#snippet headline(ex)}
+          {ex.description || "Expense"}
+        {/snippet}
+        {#snippet byline({ total })}
+          <span>${total}</span>
+        {/snippet}
+      </DsList>
     {/if}
   </section>
 </div>

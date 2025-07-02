@@ -4,7 +4,7 @@
   import DsLabel from "$lib/components/DsLabel.svelte";
   import Icon from "@iconify/svelte";
   import { shortDate } from "$lib/utilities";
-
+  import DsList from "$lib/components/DSList.svelte";
   export let data: PageData;
 </script>
 
@@ -114,20 +114,18 @@
   <!-- Expenses referencing this PO -->
   <section class="mt-6 space-y-2">
     <h2 class="text-xl font-semibold">Expenses ({data.expenses.length})</h2>
-    <ul class="divide-y divide-neutral-200 rounded bg-neutral-100">
-      {#if data.expenses.length > 0}
-        {#each data.expenses as ex}
-          <li class="flex items-center gap-2 p-2">
-            <a href={`/expenses/${ex.id}/details`} class="text-blue-600 hover:underline">
-              {shortDate(ex.date)}
-            </a>
-            <span> — {ex.description || "Expense"}</span>
-            <span class="opacity-60">${ex.total}</span>
-          </li>
-        {/each}
-      {:else}
-        <li class="p-2 italic">No expenses recorded for this PO.</li>
-      {/if}
-    </ul>
+    <DsList items={data.expenses} search={false}>
+      {#snippet anchor(ex)}
+        <a href={`/expenses/${ex.id}/details`} class="text-blue-600 hover:underline">
+          {shortDate(ex.date)}
+        </a>
+      {/snippet}
+      {#snippet headline(ex)}
+        {ex.description || "Expense"}
+      {/snippet}
+      {#snippet byline({ total })}
+        <span>${total}</span>
+      {/snippet}
+    </DsList>
   </section>
 </div>

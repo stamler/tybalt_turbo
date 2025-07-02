@@ -1,6 +1,8 @@
 <script lang="ts">
   import type { PageData } from "./$types";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DsList from "$lib/components/DSList.svelte";
+  import { shortDate } from "$lib/utilities";
 
   export let data: PageData;
 </script>
@@ -36,7 +38,7 @@
     </div>
 
     <div class="flex items-center justify-between">
-      <h2 class="font-semibold capitalize">{data.tab} (page {data.page} / {data.totalPages})</h2>
+      <h2 class="font-semibold">Page {data.page} / {data.totalPages}</h2>
       <div class="flex gap-2">
         {#if data.page > 1}
           <a
@@ -57,20 +59,19 @@
       </div>
     </div>
 
-    <ul class="divide-y divide-neutral-200 rounded bg-neutral-100">
-      {#if data.jobs.length > 0}
-        {#each data.jobs as job}
-          <li class="p-2">
-            <a href={`/jobs/${job.id}/details`} class="text-blue-600 hover:underline">
-              {job.number}
-            </a>
-            <span class="opacity-60"> — {job.description}</span>
-          </li>
-        {/each}
-      {:else}
-        <li class="p-2 italic">No jobs found.</li>
-      {/if}
-    </ul>
+    <DsList items={data.jobs} search={false}>
+      {#snippet anchor(job)}
+        <a href={`/jobs/${job.id}/details`} class="text-blue-600 hover:underline">
+          {job.number}
+        </a>
+      {/snippet}
+      {#snippet headline(job)}
+        {job.description}
+      {/snippet}
+      {#snippet byline(job)}
+        <span class="opacity-60">{shortDate(job.created)}</span>
+      {/snippet}
+    </DsList>
   </section>
 
   <!-- Contacts section -->
