@@ -114,7 +114,11 @@
   {#snippet groupHeader(field: string)}
     Pay Period Ending {field}
   {/snippet}
-  {#snippet anchor(item: ExpensesAugmentedResponse)}{item.date}{/snippet}
+  {#snippet anchor(item: ExpensesAugmentedResponse)}
+    <a href={`/expenses/${item.id}/details`} class="text-blue-600 hover:underline">
+      {item.date}
+    </a>
+  {/snippet}
   {#snippet headline(item: ExpensesAugmentedResponse)}
     <span>{item.description}</span>
   {/snippet}

@@ -181,12 +181,18 @@
     <span class="flex flex-col items-center gap-2">
       {#if item.status === "Active"}
         <DsLabel style="inverted" color="green">
-          {item.po_number}
+          <a href={`/pos/${item.id}/details`} class="hover:underline">
+            {item.po_number}
+          </a>
         </DsLabel>
       {:else if item.status === "Unapproved"}
-        {item.date}
+        <a href={`/pos/${item.id}/details`} class="text-blue-600 hover:underline">
+          {item.date}
+        </a>
       {:else}
-        {item.po_number}
+        <a href={`/pos/${item.id}/details`} class="text-blue-600 hover:underline">
+          {item.po_number}
+        </a>
       {/if}
       <!-- <DsActionButton
       action={() => navigator.clipboard.writeText(JSON.stringify(item))}

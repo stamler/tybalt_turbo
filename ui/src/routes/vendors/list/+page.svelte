@@ -17,9 +17,11 @@
     uiName="search vendors..."
     collectionName="vendors"
   >
-    {#snippet headline({ name, alias }: VendorsResponse)}
+    {#snippet headline({ id, name, alias }: VendorsResponse)}
       <span class="flex items-center gap-2">
-        {name}
+        <a href={`/vendors/${id}/details`} class="text-blue-600 hover:underline">
+          {name}
+        </a>
         {#if alias !== ""}
           <span class="opacity-30">({alias})</span>
         {/if}
