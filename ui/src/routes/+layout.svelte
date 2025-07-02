@@ -84,6 +84,12 @@
         </div>
       {/if}
     </div>
+    {#if $navigating || $tasksLoading}
+      <!-- Mobile loading bar sits at bottom of the header -->
+      <div
+        class="absolute bottom-0 left-0 right-0 h-[4px] animate-pulse bg-purple-500 lg:hidden"
+      ></div>
+    {/if}
   </header>
 
   <div class="flex h-[calc(100vh-2.5rem)] lg:h-screen">
@@ -173,10 +179,13 @@
     </aside>
 
     <!-- Main content -->
-    <div class="flex-1 overflow-auto bg-white">
+    <div class="relative flex-1 overflow-auto bg-white">
       <ErrorBar />
       {#if $navigating || $tasksLoading}
-        <div class="sticky top-0 z-50 h-[4px] w-full animate-pulse bg-purple-500"></div>
+        <!-- Desktop loading bar overlays content without shifting layout -->
+        <div
+          class="absolute left-0 right-0 top-0 z-50 hidden h-[4px] animate-pulse bg-purple-500 lg:block"
+        ></div>
       {/if}
       <div>
         {@render children()}
