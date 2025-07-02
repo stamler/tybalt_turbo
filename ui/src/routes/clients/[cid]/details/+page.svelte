@@ -2,6 +2,7 @@
   import type { PageData } from "./$types";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsList from "$lib/components/DSList.svelte";
+  import DSTabBar from "$lib/components/DSTabBar.svelte";
   import { shortDate } from "$lib/utilities";
 
   export let data: PageData;
@@ -22,20 +23,20 @@
   <!-- Jobs list section -->
   <section class="space-y-2">
     <!-- Tabs -->
-    <div class="flex gap-4 border-b pb-1">
-      <a
-        href={`?tab=projects&projectsPage=${data.projectsPage}&proposalsPage=${data.proposalsPage}`}
-        class={`pb-1 ${data.tab === "projects" ? "border-b-2 font-semibold" : ""}`}
-      >
-        Projects ({data.counts.projects})
-      </a>
-      <a
-        href={`?tab=proposals&projectsPage=${data.projectsPage}&proposalsPage=${data.proposalsPage}`}
-        class={`pb-1 ${data.tab === "proposals" ? "border-b-2 font-semibold" : ""}`}
-      >
-        Proposals ({data.counts.proposals})
-      </a>
-    </div>
+    <DSTabBar
+      tabs={[
+        {
+          label: `Projects (${data.counts.projects})`,
+          href: `?tab=projects&projectsPage=${data.projectsPage}&proposalsPage=${data.proposalsPage}`,
+          active: data.tab === "projects",
+        },
+        {
+          label: `Proposals (${data.counts.proposals})`,
+          href: `?tab=proposals&projectsPage=${data.projectsPage}&proposalsPage=${data.proposalsPage}`,
+          active: data.tab === "proposals",
+        },
+      ]}
+    />
 
     <div class="flex items-center justify-between">
       <h2 class="font-semibold">Page {data.page} / {data.totalPages}</h2>

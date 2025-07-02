@@ -5,6 +5,7 @@
   import DsLabel from "$lib/components/DsLabel.svelte";
   import Icon from "@iconify/svelte";
   import { shortDate } from "$lib/utilities";
+  import DSTabBar, { type TabItem } from "$lib/components/DSTabBar.svelte";
 
   export let data: PageData;
 </script>
@@ -29,20 +30,20 @@
   <!-- Section with tabs -->
   <section class="space-y-2">
     <!-- Tabs -->
-    <div class="flex gap-4 border-b pb-1">
-      <a
-        href={`?tab=purchase_orders&poPage=${data.poPage}&expPage=${data.expPage}`}
-        class={`pb-1 ${data.tab === "purchase_orders" ? "border-b-2 font-semibold" : ""}`}
-      >
-        Purchase Orders ({data.counts.purchase_orders})
-      </a>
-      <a
-        href={`?tab=expenses&poPage=${data.poPage}&expPage=${data.expPage}`}
-        class={`pb-1 ${data.tab === "expenses" ? "border-b-2 font-semibold" : ""}`}
-      >
-        Expenses ({data.counts.expenses})
-      </a>
-    </div>
+    <DSTabBar
+      tabs={[
+        {
+          label: `Purchase Orders (${data.counts.purchase_orders})`,
+          href: `?tab=purchase_orders&poPage=${data.poPage}&expPage=${data.expPage}`,
+          active: data.tab === "purchase_orders",
+        },
+        {
+          label: `Expenses (${data.counts.expenses})`,
+          href: `?tab=expenses&poPage=${data.poPage}&expPage=${data.expPage}`,
+          active: data.tab === "expenses",
+        },
+      ]}
+    />
 
     <div class="flex items-center justify-between">
       <h2 class="font-semibold">Page {data.page} / {data.totalPages}</h2>
