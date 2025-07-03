@@ -50,7 +50,7 @@
           {/if}
         </div>
         <div><span class="font-semibold">Total:</span> ${data.po.total}</div>
-        {#if data.po.approval_total}
+        {#if data.po.type === "Recurring"}
           <div><span class="font-semibold">Approval Total:</span> ${data.po.approval_total}</div>
         {/if}
       </div>
