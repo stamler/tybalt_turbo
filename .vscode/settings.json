@@ -9,5 +9,6 @@
   // Svelte
   "[svelte]": {
     "editor.defaultFormatter": "svelte.svelte-vscode"
-  }
+  },
+  "editor.tabSize": 2
 }
