@@ -22,7 +22,7 @@
             : data.po.status === "Closed"
               ? "gray"
               : data.po.status === "Cancelled"
-                ? "orange"
+                ? "gray"
                 : "yellow"}
         >
           {data.po.status}
@@ -37,9 +37,25 @@
       <div><span class="font-semibold">Description:</span> {data.po.description}</div>
     {/if}
 
-    <div><span class="font-semibold">Date:</span> {shortDate(data.po.date)}</div>
+    <div><span class="font-semibold">Date:</span> {shortDate(data.po.date, true)}</div>
 
-    <div><span class="font-semibold">Total:</span> ${data.po.total}</div>
+    <!-- Grouped Type, Total, and Approval Total -->
+    <div class="flex flex-wrap gap-4">
+      <div>
+        <span class="font-semibold">Type:</span>
+        {data.po.type}
+        {#if data.po.type === "Recurring"}
+          — {data.po.frequency}
+          {#if data.po.end_date}
+            until {shortDate(data.po.end_date, true)}
+          {/if}
+        {/if}
+      </div>
+      <div><span class="font-semibold">Total:</span> ${data.po.total}</div>
+      {#if data.po.approval_total}
+        <div><span class="font-semibold">Approval Total:</span> ${data.po.approval_total}</div>
+      {/if}
+    </div>
 
     {#if data.po.vendor}
       <div>
@@ -53,15 +69,6 @@
       </div>
     {/if}
 
-    {#if data.po.job}
-      <div>
-        <span class="font-semibold">Job:</span>
-        <a href={`/jobs/${data.po.job}/details`} class="text-blue-600 hover:underline">
-          {data.po.job_number}
-        </a>
-      </div>
-    {/if}
-
     {#if data.po.division_code}
       <div>
         <span class="font-semibold">Division:</span>
@@ -71,13 +78,6 @@
 
     {#if data.po.payment_type}
       <div><span class="font-semibold">Payment Type:</span> {data.po.payment_type}</div>
-    {/if}
-
-    {#if data.po.type === "Recurring"}
-      <div><span class="font-semibold">Frequency:</span> {data.po.frequency}</div>
-      {#if data.po.end_date}
-        <div><span class="font-semibold">End Date:</span> {shortDate(data.po.end_date)}</div>
-      {/if}
     {/if}
 
     {#if data.po.approved}
@@ -99,6 +99,103 @@
         <span class="font-semibold">Rejected:</span>
         {shortDate(data.po.rejected)} — {data.po.rejection_reason}
       </div>
+    {/if}
+
+    {#if data.po.attachment}
+      <div>
+        <span class="font-semibold">Attachment:</span>
+        <a
+          href={data.po.attachment}
+          class="text-blue-600 hover:underline"
+          target="_blank"
+          rel="noopener noreferrer">Download</a
+        >
+      </div>
+    {/if}
+
+    {#if data.po.cancelled}
+      <div>
+        <span class="font-semibold">Cancelled:</span>
+        {shortDate(data.po.cancelled)}{#if data.po.canceller}
+          by {data.po.canceller}{/if}
+      </div>
+    {/if}
+
+    {#if data.po.closed}
+      <div>
+        <span class="font-semibold">Closed:</span>
+        {shortDate(data.po.closed)}{#if data.po.closer}
+          by {data.po.closer}{/if}
+      </div>
+    {/if}
+
+    {#if data.po.closed_by_system !== undefined}
+      <div>
+        <span class="font-semibold">Closed By System:</span>
+        {data.po.closed_by_system ? "Yes" : "No"}
+      </div>
+    {/if}
+
+    {#if data.po.category_name}
+      <div><span class="font-semibold">Category:</span> {data.po.category_name}</div>
+    {/if}
+
+    {#if data.po.job || data.po.client_name}
+      <div class="flex flex-wrap gap-4">
+        {#if data.po.job}
+          <div>
+            <span class="font-semibold">Job:</span>
+            <a href={`/jobs/${data.po.job}/details`} class="text-blue-600 hover:underline">
+              {data.po.job_number}
+            </a>
+            {#if data.po.job_description}
+              — {data.po.job_description}
+            {/if}
+          </div>
+        {/if}
+
+        {#if data.po.client_id}
+          <div>
+            <span class="font-semibold">Client:</span>
+            <a href={`/clients/${data.po.client_id}/details`} class="text-blue-600 hover:underline">
+              {data.po.client_name}
+            </a>
+          </div>
+        {:else if data.po.client_name}
+          <div><span class="font-semibold">Client:</span> {data.po.client_name}</div>
+        {/if}
+      </div>
+    {/if}
+
+    {#if data.po.committed_expenses_count !== undefined}
+      <div>
+        <span class="font-semibold">Committed Expenses:</span>
+        {data.po.committed_expenses_count}
+      </div>
+    {/if}
+
+    {#if data.po.parent_po_number}
+      <div>
+        <span class="font-semibold">Parent PO:</span>
+        <a href={`/pos/${data.po.parent_po}/details`} class="text-blue-600 hover:underline"
+          >{data.po.parent_po_number}</a
+        >
+      </div>
+    {/if}
+
+    {#if data.po.priority_second_approver_name}
+      <div>
+        <span class="font-semibold">Priority Second Approver:</span>
+        {data.po.priority_second_approver_name}
+      </div>
+    {/if}
+
+    {#if data.po.rejector_name}
+      <div><span class="font-semibold">Rejector:</span> {data.po.rejector_name}</div>
+    {/if}
+
+    {#if data.po.uid_name}
+      <div><span class="font-semibold">Created By:</span> {data.po.uid_name}</div>
     {/if}
   </div>
 

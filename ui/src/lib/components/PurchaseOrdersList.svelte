@@ -194,83 +194,31 @@
           {item.po_number}
         </a>
       {/if}
-      <!-- <DsActionButton
-      action={() => navigator.clipboard.writeText(JSON.stringify(item))}
-      icon="mdi:clipboard-outline"
-      title="Copy"
-      color="blue"
-    /> -->
-      {#if item.type === "Cumulative"}
-        <DsLabel color="teal">
-          <!-- <Icon icon="mdi:chart-bell-curve-cumulative" width="24px" class="inline-block" /> -->
-          <Icon icon="mdi:sigma" width="24px" class="inline-block" />
-        </DsLabel>
+    </span>
+  {/snippet}
+
+  {#snippet headline({ vendor_name, vendor_alias }: PurchaseOrdersAugmentedResponse)}
+    <span class="flex items-center gap-2">
+      {vendor_name}
+      {#if vendor_alias}
+        ({vendor_alias})
       {/if}
     </span>
   {/snippet}
 
-  {#snippet headline({
-    total,
-    payment_type,
-    parent_po,
-    vendor_name,
-    vendor_alias,
-    parent_po_number,
-  }: PurchaseOrdersAugmentedResponse)}
+  {#snippet byline({ total, status }: PurchaseOrdersAugmentedResponse)}
     <span class="flex items-center gap-2">
       ${total}
-      {payment_type}
-      <span class="flex items-center gap-0">
-        <Icon icon="mdi:store" width="24px" class="inline-block" />
-        {vendor_name} ({vendor_alias})
-      </span>
-      {#if parent_po !== ""}
-        <DsLabel color="blue">
-          child of {parent_po_number}
+      {#if status !== "Active"}
+        <DsLabel color={status === "Closed" || status === "Cancelled" ? "gray" : "yellow"}>
+          {status}
         </DsLabel>
       {/if}
     </span>
   {/snippet}
 
-  {#snippet byline({
-    cancelled,
-    canceller,
-    description,
-    rejected,
-    rejection_reason,
-    status,
-    rejector_name,
-  }: PurchaseOrdersAugmentedResponse)}
-    <span class="flex items-center gap-2">
-      {description}
-      {#if rejected !== ""}
-        <DsLabel color="red" title={`Rejected ${shortDate(rejected)}: ${rejection_reason}`}>
-          <Icon icon="mdi:cancel" width="24px" class="inline-block" />
-          {rejector_name}
-        </DsLabel>
-      {:else if status === "Cancelled"}
-        <DsLabel color="orange" title={`Cancelled ${shortDate(cancelled)}`}>
-          <Icon icon="mdi:cancel" width="24px" class="inline-block" />
-        </DsLabel>
-      {/if}
-    </span>
-  {/snippet}
-
-  {#snippet line1({
-    uid_name,
-    status,
-    date,
-    division_code,
-    division_name,
-  }: PurchaseOrdersAugmentedResponse)}
-    <span>
-      {uid_name}
-      {#if status !== "Unapproved"}
-        ({shortDate(date)})
-      {/if}
-      / {division_code}
-      {division_name}
-    </span>
+  {#snippet line1({ description }: PurchaseOrdersAugmentedResponse)}
+    {description}
   {/snippet}
 
   {#snippet line2({
@@ -291,6 +239,13 @@
   {/snippet}
   {#snippet line3(item: PurchaseOrdersAugmentedResponse)}
     <span class="flex items-center gap-1">
+      <!-- if the item is cumulative, show the sigma icon -->
+      {#if item.type === "Cumulative"}
+        <DsLabel color="cyan">
+          <!-- <Icon icon="mdi:chart-bell-curve-cumulative" width="24px" class="inline-block" /> -->
+          <Icon icon="mdi:sigma" width="24px" class="inline-block" />
+        </DsLabel>
+      {/if}
       <!-- if the item is recurring, show the frequency -->
       {#if item.type === "Recurring"}
         <DsLabel color="cyan">
@@ -298,23 +253,6 @@
           <Icon icon="mdi:recurring-payment" width="24px" class="inline-block" />
           {item.frequency} until {shortDate(item.end_date, true)}
         </DsLabel>
-      {/if}
-      {#if item.approved !== ""}
-        <Icon icon="material-symbols:order-approve-outline" width="24px" class="inline-block" />
-        {item.approver_name}
-        ({shortDate(item.approved)})
-      {:else}
-        <Icon icon="mdi:timer-sand" width="24px" class="inline-block" />
-        {item.approver_name}
-      {/if}
-      {#if item.second_approver !== "" && item.second_approval !== ""}
-        <!-- Item has second approval -->
-        <span class="flex items-center gap-1">
-          /
-          <Icon icon="material-symbols:order-approve-outline" width="24px" class="inline-block" />
-          {item.second_approver_name}
-          ({shortDate(item.second_approval)})
-        </span>
       {/if}
       {#if item.status === "Unapproved" && item.second_approval === "" && item.approved !== ""}
         <!-- Approved, but second approval is required -->

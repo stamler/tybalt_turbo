@@ -590,6 +590,7 @@ export type PurchaseOrdersAugmentedRecord = {
   category: RecordIdString;
   category_name: string;
   client_name: string;
+  client_id: RecordIdString;
   closed: IsoDateString;
   closed_by_system: boolean;
   closer: RecordIdString;
@@ -928,10 +929,10 @@ export type ClientsResponse<Texpand = ClientsRecordExpands> = Required<ClientsRe
   BaseSystemFields<Texpand>;
 export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
   BaseSystemFields<Texpand>;
-export type ExpenseAllowanceTotalsResponse<Texpand = unknown> = 
+export type ExpenseAllowanceTotalsResponse<Texpand = unknown> =
   Required<ExpenseAllowanceTotalsRecord> & BaseSystemFields<Texpand>;
-export type ExpenseMileageTotalsResponse<Texpand = unknown> = 
-  Required<ExpenseMileageTotalsRecord> & BaseSystemFields<Texpand>;
+export type ExpenseMileageTotalsResponse<Texpand = unknown> = Required<ExpenseMileageTotalsRecord> &
+  BaseSystemFields<Texpand>;
 export type ExpenseRatesResponse<Tmileage = unknown, Texpand = unknown> = Required<
   ExpenseRatesRecord<Tmileage>
 > &
