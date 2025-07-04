@@ -26,4 +26,5 @@ AND ({:division} IS NULL OR {:division} = '' OR te.division = {:division})
 AND ({:time_type} IS NULL OR {:time_type} = '' OR te.time_type = {:time_type})
 AND ({:uid} IS NULL OR {:uid} = '' OR te.uid = {:uid})
 AND ({:category} IS NULL OR {:category} = '' OR te.category = {:category})
-ORDER BY date DESC;
+ORDER BY date DESC
+LIMIT {:limit} OFFSET {:offset};

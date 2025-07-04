@@ -4,6 +4,7 @@
   import type { PageData } from "./$types";
   import { onMount } from "svelte";
   import { pb } from "$lib/pocketbase";
+  import DsList from "$lib/components/DSList.svelte";
 
   export let data: PageData;
   // Use data.job directly (Svelte 5 without $:)
@@ -87,7 +88,10 @@
     }
   }
 
-  onMount(fetchSummary);
+  onMount(() => {
+    fetchSummary();
+    fetchEntries(true);
+  });
 
   // Utility to toggle a filter. Passing null clears the filter.
   function toggleFilter(type: "division" | "time_type" | "name" | "category", value: any) {
@@ -106,6 +110,7 @@
         break;
     }
     fetchSummary();
+    fetchEntries(true);
   }
 
   function clearFilter(type: "division" | "time_type" | "name" | "category") {
@@ -114,6 +119,69 @@
     if (type === "name") selectedName = null;
     if (type === "category") selectedCategory = null;
     fetchSummary();
+    fetchEntries(true);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Paginated entries support
+  interface JobTimeEntry {
+    id: string;
+    date: string;
+    hours: number;
+    description: string;
+    work_record: string;
+    week_ending: string;
+    tsid: string;
+    division_code: string;
+    time_type_code: string;
+    surname: string;
+    given_name: string;
+    category_name: string;
+  }
+
+  let entries: JobTimeEntry[] = [];
+  let entriesPage = 1;
+  let entriesLimit = 50;
+  let entriesTotalPages = 1;
+  let entriesLoading = false;
+
+  // resets and fetches first page with current filters
+  async function fetchEntries(reset = false) {
+    if (reset) {
+      entriesPage = 1;
+      entries = [];
+    }
+    entriesLoading = true;
+    try {
+      const params = new URLSearchParams();
+      params.set("page", entriesPage.toString());
+      params.set("limit", entriesLimit.toString());
+      if (selectedDivision) params.set("division", selectedDivision.id);
+      if (selectedTimeType) params.set("time_type", selectedTimeType.id);
+      if (selectedName) params.set("uid", selectedName.id);
+      if (selectedCategory) params.set("category", selectedCategory.id);
+      const query = params.toString();
+      const res: any = await pb.send(`/api/jobs/${data.job.id}/time/entries?${query}`, {
+        method: "GET",
+      });
+      if (Array.isArray(res.data)) {
+        if (reset) entries = res.data;
+        else entries = [...entries, ...res.data];
+      }
+      entriesTotalPages = res.total_pages || 1;
+    } catch (err) {
+      console.error("Failed to fetch time entries", err);
+    } finally {
+      entriesLoading = false;
+    }
+  }
+
+  // load more pages
+  function loadMore() {
+    if (entriesPage < entriesTotalPages) {
+      entriesPage += 1;
+      fetchEntries(false);
+    }
   }
 </script>
 
@@ -227,39 +295,14 @@
     />
   </div>
 
-  <!-- Time Summary Section -->
+  <!-- Time Section (Summary | Entries) -->
   <div class="space-y-4 rounded bg-neutral-50 p-4 shadow-sm">
-    <h2 class="text-xl font-bold">Time Summary</h2>
+    <h2 class="text-xl font-bold">Time</h2>
 
     {#if loading}
       <div>Loading…</div>
     {:else}
-      <!-- Active filters -->
-      {#if selectedDivision || selectedTimeType || selectedName || selectedCategory}
-        <div class="flex flex-wrap gap-2">
-          {#if selectedDivision}
-            <button on:click={() => clearFilter("division")} title="Clear division filter">
-              <DsLabel color="blue" style="inverted">{selectedDivision.code} ✕</DsLabel>
-            </button>
-          {/if}
-          {#if selectedTimeType}
-            <button on:click={() => clearFilter("time_type")} title="Clear time type filter">
-              <DsLabel color="green" style="inverted">{selectedTimeType.code} ✕</DsLabel>
-            </button>
-          {/if}
-          {#if selectedName}
-            <button on:click={() => clearFilter("name")} title="Clear name filter">
-              <DsLabel color="purple" style="inverted">{selectedName.name} ✕</DsLabel>
-            </button>
-          {/if}
-          {#if selectedCategory}
-            <button on:click={() => clearFilter("category")} title="Clear category filter">
-              <DsLabel color="red" style="inverted">{selectedCategory.name} ✕</DsLabel>
-            </button>
-          {/if}
-        </div>
-      {/if}
-
+      <!-- Summary strip -->
       <!-- Aggregates -->
       <div class="space-y-1">
         <div><span class="font-semibold">Total Hours:</span> {summary.total_hours}</div>
@@ -271,58 +314,93 @@
         {/if}
       </div>
 
-      <!-- Clickable lists -->
-      {#if summary.divisions && summary.divisions.length > 0}
-        <div class="flex flex-wrap items-center gap-2 pt-2">
-          <span class="font-semibold">Divisions:</span>
-          {#each summary.divisions as d}
-            <button on:click={() => toggleFilter("division", d)} class="focus:outline-none">
-              <DsLabel color="blue" style={selectedDivision?.id === d.id ? "inverted" : undefined}
-                >{d.code}</DsLabel
-              >
-            </button>
-          {/each}
-        </div>
-      {/if}
+      <!-- Filter chips row -->
+      {#if summary.divisions || summary.time_types || summary.names || summary.categories}
+        <div class="flex flex-wrap gap-2 pt-2">
+          <!-- Division chip list -->
+          {#if summary.divisions && summary.divisions.length > 0}
+            <span class="font-semibold">Divisions:</span>
+            {#each summary.divisions as d}
+              <button on:click={() => toggleFilter("division", d)} class="focus:outline-none">
+                <DsLabel color="blue" style={selectedDivision?.id === d.id ? "inverted" : undefined}
+                  >{d.code}</DsLabel
+                >
+              </button>
+            {/each}
+          {/if}
 
-      {#if summary.time_types && summary.time_types.length > 0}
-        <div class="flex flex-wrap items-center gap-2 pt-2">
-          <span class="font-semibold">Time Types:</span>
-          {#each summary.time_types as tt}
-            <button on:click={() => toggleFilter("time_type", tt)} class="focus:outline-none">
-              <DsLabel color="green" style={selectedTimeType?.id === tt.id ? "inverted" : undefined}
-                >{tt.code}</DsLabel
-              >
-            </button>
-          {/each}
-        </div>
-      {/if}
+          <!-- Time type chips -->
+          {#if summary.time_types && summary.time_types.length > 0}
+            <span class="font-semibold">Time Types:</span>
+            {#each summary.time_types as tt}
+              <button on:click={() => toggleFilter("time_type", tt)} class="focus:outline-none">
+                <DsLabel
+                  color="green"
+                  style={selectedTimeType?.id === tt.id ? "inverted" : undefined}>{tt.code}</DsLabel
+                >
+              </button>
+            {/each}
+          {/if}
 
-      {#if summary.names && summary.names.length > 0}
-        <div class="flex flex-wrap items-center gap-2 pt-2">
-          <span class="font-semibold">Staff:</span>
-          {#each summary.names as n}
-            <button on:click={() => toggleFilter("name", n)} class="focus:outline-none">
-              <DsLabel color="purple" style={selectedName?.id === n.id ? "inverted" : undefined}
-                >{n.name}</DsLabel
-              >
-            </button>
-          {/each}
-        </div>
-      {/if}
+          <!-- Staff chips -->
+          {#if summary.names && summary.names.length > 0}
+            <span class="font-semibold">Staff:</span>
+            {#each summary.names as n}
+              <button on:click={() => toggleFilter("name", n)} class="focus:outline-none">
+                <DsLabel color="purple" style={selectedName?.id === n.id ? "inverted" : undefined}
+                  >{n.name}</DsLabel
+                >
+              </button>
+            {/each}
+          {/if}
 
-      {#if summary.categories && summary.categories.length > 0}
-        <div class="flex flex-wrap items-center gap-2 pt-2">
-          <span class="font-semibold">Categories:</span>
-          {#each summary.categories as c}
-            <button on:click={() => toggleFilter("category", c)} class="focus:outline-none">
-              <DsLabel color="red" style={selectedCategory?.id === c.id ? "inverted" : undefined}
-                >{c.name}</DsLabel
-              >
-            </button>
-          {/each}
+          <!-- Category chips -->
+          {#if summary.categories && summary.categories.length > 0}
+            <span class="font-semibold">Categories:</span>
+            {#each summary.categories as c}
+              <button on:click={() => toggleFilter("category", c)} class="focus:outline-none">
+                <DsLabel color="red" style={selectedCategory?.id === c.id ? "inverted" : undefined}
+                  >{c.name}</DsLabel
+                >
+              </button>
+            {/each}
+          {/if}
         </div>
       {/if}
+    {/if}
+
+    <!-- Entries list always visible -->
+    {#if entriesLoading && entries.length === 0}
+      <div>Loading…</div>
+    {:else if entries.length === 0}
+      <div>No entries found.</div>
+    {:else}
+      <div class="overflow-hidden rounded-lg">
+        <DsList items={entries} search={false} inListHeader="Time Entries">
+          {#snippet anchor(item: JobTimeEntry)}{item.date}{/snippet}
+          {#snippet headline(item: JobTimeEntry)}
+            {#if item.time_type_code === "R"}
+              <span>{item.division_code}</span>
+            {:else}
+              <span>{item.time_type_code}</span>
+            {/if}
+          {/snippet}
+          {#snippet byline(item: JobTimeEntry)}{item.hours}h{/snippet}
+          {#snippet line1(item: JobTimeEntry)}{item.given_name} {item.surname}{/snippet}
+          {#snippet line2(item: JobTimeEntry)}{item.description}{/snippet}
+        </DsList>
+        {#if entriesPage < entriesTotalPages}
+          <div class="mt-4 text-center">
+            <button
+              class="rounded bg-blue-600 px-4 py-2 text-white"
+              on:click={loadMore}
+              disabled={entriesLoading}
+            >
+              {entriesLoading ? "Loading…" : "Load More"}
+            </button>
+          </div>
+        {/if}
+      </div>
     {/if}
   </div>
 </div>
