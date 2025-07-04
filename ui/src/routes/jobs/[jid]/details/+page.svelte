@@ -296,78 +296,83 @@
   </div>
 
   <!-- Time Section (Summary | Entries) -->
-  <div class="space-y-4 rounded bg-neutral-50 p-4 shadow-sm">
-    <h2 class="text-xl font-bold">Time</h2>
+  <div class="space-y-4 rounded bg-neutral-50 py-4 shadow-sm">
+    <div class="px-4">
+      <h2 class="text-xl font-bold">Time</h2>
 
-    {#if loading}
-      <div>Loading…</div>
-    {:else}
-      <!-- Summary strip -->
-      <!-- Aggregates -->
-      <div class="space-y-1">
-        <div><span class="font-semibold">Total Hours:</span> {summary.total_hours}</div>
-        {#if summary.earliest_entry}
-          <div>
-            <span class="font-semibold">Date Range:</span>
-            {summary.earliest_entry} – {summary.latest_entry}
-          </div>
-        {/if}
-      </div>
-
-      <!-- Filter chips row -->
-      {#if summary.divisions || summary.time_types || summary.names || summary.categories}
-        <div class="flex flex-wrap gap-2 pt-2">
-          <!-- Division chip list -->
-          {#if summary.divisions && summary.divisions.length > 0}
-            <span class="font-semibold">Divisions:</span>
-            {#each summary.divisions as d}
-              <button on:click={() => toggleFilter("division", d)} class="focus:outline-none">
-                <DsLabel color="blue" style={selectedDivision?.id === d.id ? "inverted" : undefined}
-                  >{d.code}</DsLabel
-                >
-              </button>
-            {/each}
-          {/if}
-
-          <!-- Time type chips -->
-          {#if summary.time_types && summary.time_types.length > 0}
-            <span class="font-semibold">Time Types:</span>
-            {#each summary.time_types as tt}
-              <button on:click={() => toggleFilter("time_type", tt)} class="focus:outline-none">
-                <DsLabel
-                  color="green"
-                  style={selectedTimeType?.id === tt.id ? "inverted" : undefined}>{tt.code}</DsLabel
-                >
-              </button>
-            {/each}
-          {/if}
-
-          <!-- Staff chips -->
-          {#if summary.names && summary.names.length > 0}
-            <span class="font-semibold">Staff:</span>
-            {#each summary.names as n}
-              <button on:click={() => toggleFilter("name", n)} class="focus:outline-none">
-                <DsLabel color="purple" style={selectedName?.id === n.id ? "inverted" : undefined}
-                  >{n.name}</DsLabel
-                >
-              </button>
-            {/each}
-          {/if}
-
-          <!-- Category chips -->
-          {#if summary.categories && summary.categories.length > 0}
-            <span class="font-semibold">Categories:</span>
-            {#each summary.categories as c}
-              <button on:click={() => toggleFilter("category", c)} class="focus:outline-none">
-                <DsLabel color="red" style={selectedCategory?.id === c.id ? "inverted" : undefined}
-                  >{c.name}</DsLabel
-                >
-              </button>
-            {/each}
+      {#if loading}
+        <div>Loading…</div>
+      {:else}
+        <!-- Summary strip -->
+        <!-- Aggregates -->
+        <div class="space-y-1">
+          <div><span class="font-semibold">Total Hours:</span> {summary.total_hours}</div>
+          {#if summary.earliest_entry}
+            <div>
+              <span class="font-semibold">Date Range:</span>
+              {summary.earliest_entry} – {summary.latest_entry}
+            </div>
           {/if}
         </div>
+
+        <!-- Filter chips row -->
+        {#if summary.divisions || summary.time_types || summary.names || summary.categories}
+          <div class="flex flex-wrap gap-2 pt-2">
+            <!-- Division chip list -->
+            {#if summary.divisions && summary.divisions.length > 0}
+              <span class="font-semibold">Divisions:</span>
+              {#each summary.divisions as d}
+                <button on:click={() => toggleFilter("division", d)} class="focus:outline-none">
+                  <DsLabel
+                    color="blue"
+                    style={selectedDivision?.id === d.id ? "inverted" : undefined}>{d.code}</DsLabel
+                  >
+                </button>
+              {/each}
+            {/if}
+
+            <!-- Time type chips -->
+            {#if summary.time_types && summary.time_types.length > 0}
+              <span class="font-semibold">Time Types:</span>
+              {#each summary.time_types as tt}
+                <button on:click={() => toggleFilter("time_type", tt)} class="focus:outline-none">
+                  <DsLabel
+                    color="green"
+                    style={selectedTimeType?.id === tt.id ? "inverted" : undefined}
+                    >{tt.code}</DsLabel
+                  >
+                </button>
+              {/each}
+            {/if}
+
+            <!-- Staff chips -->
+            {#if summary.names && summary.names.length > 0}
+              <span class="font-semibold">Staff:</span>
+              {#each summary.names as n}
+                <button on:click={() => toggleFilter("name", n)} class="focus:outline-none">
+                  <DsLabel color="purple" style={selectedName?.id === n.id ? "inverted" : undefined}
+                    >{n.name}</DsLabel
+                  >
+                </button>
+              {/each}
+            {/if}
+
+            <!-- Category chips -->
+            {#if summary.categories && summary.categories.length > 0}
+              <span class="font-semibold">Categories:</span>
+              {#each summary.categories as c}
+                <button on:click={() => toggleFilter("category", c)} class="focus:outline-none">
+                  <DsLabel
+                    color="red"
+                    style={selectedCategory?.id === c.id ? "inverted" : undefined}>{c.name}</DsLabel
+                  >
+                </button>
+              {/each}
+            {/if}
+          </div>
+        {/if}
       {/if}
-    {/if}
+    </div>
 
     <!-- Entries list always visible -->
     {#if entriesLoading && entries.length === 0}
@@ -375,19 +380,18 @@
     {:else if entries.length === 0}
       <div>No entries found.</div>
     {:else}
-      <div class="overflow-hidden rounded-lg">
+      <div class="w-full overflow-hidden">
         <DsList items={entries} search={false} inListHeader="Time Entries">
           {#snippet anchor(item: JobTimeEntry)}{item.date}{/snippet}
           {#snippet headline(item: JobTimeEntry)}
-            {#if item.time_type_code === "R"}
-              <span>{item.division_code}</span>
-            {:else}
-              <span>{item.time_type_code}</span>
-            {/if}
+            {item.hours}
           {/snippet}
-          {#snippet byline(item: JobTimeEntry)}{item.hours}h{/snippet}
-          {#snippet line1(item: JobTimeEntry)}{item.given_name} {item.surname}{/snippet}
-          {#snippet line2(item: JobTimeEntry)}{item.description}{/snippet}
+          {#snippet byline(item: JobTimeEntry)}{item.given_name} {item.surname}{/snippet}
+          {#snippet line1(item: JobTimeEntry)}
+            <span class="font-bold">{item.division_code}</span>
+            <span class="font-bold">{item.time_type_code}</span>
+            {item.description}
+          {/snippet}
         </DsList>
         {#if entriesPage < entriesTotalPages}
           <div class="mt-4 text-center">
