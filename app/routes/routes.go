@@ -141,6 +141,8 @@ func AddRoutes(app core.App) {
 		// time_type, user, or category.
 		jobsGroup.GET("/{id}/time/summary", createGetJobTimeSummaryHandler(app))
 		jobsGroup.GET("/{id}/time/entries", createGetJobTimeEntriesHandler(app))
+		jobsGroup.GET("/{id}/expenses/summary", createGetJobExpenseSummaryHandler(app))
+		jobsGroup.GET("/{id}/expenses/list", createGetJobExpensesHandler(app))
 		jobsGroup.GET("/{id}", createGetJobsHandler(app))
 		jobsGroup.GET("", createGetJobsHandler(app))
 
