@@ -45,7 +45,10 @@
 {:else}
   <div class="w-full overflow-hidden">
     <DsList {items} search={false} inListHeader="Expenses">
-      {#snippet anchor(item: JobExpenseEntry)}{item.date}{/snippet}
+      {#snippet anchor(item: JobExpenseEntry)}<a
+          href={`/expenses/${item.id}/details`}
+          class="text-blue-600 hover:underline">{item.date}</a
+        >{/snippet}
       {#snippet headline(item: JobExpenseEntry)}{item.total}{/snippet}
       {#snippet byline(item: JobExpenseEntry)}{item.given_name} {item.surname}{/snippet}
       {#snippet line1(item: JobExpenseEntry)}

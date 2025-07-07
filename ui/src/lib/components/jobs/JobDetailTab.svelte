@@ -163,7 +163,8 @@
       <!-- Filter Chips -->
       <div class="flex flex-wrap gap-2 pt-2">
         {#each filterDefs as def}
-          {#if summary[def.summaryProperty] && summary[def.summaryProperty].length > 0}
+          <!-- Only show filter if there's a choice to be made, or if a filter is already active -->
+          {#if (summary[def.summaryProperty] && summary[def.summaryProperty].length > 1) || selectedFilters[def.type]}
             <span class="font-semibold">{def.label}:</span>
             {#each summary[def.summaryProperty] as item}
               <button onclick={() => toggleFilter(def.type, item)} class="focus:outline-none">

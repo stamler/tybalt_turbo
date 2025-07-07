@@ -243,67 +243,73 @@
 
   <!-- Time Section -->
   <div id="time" class:hidden={activeTab !== "time"}>
-    <JobDetailTab
-      active={activeTab === "time"}
-      jobId={data.job.id}
-      summaryUrl={`/api/jobs/${data.job.id}/time/summary`}
-      listUrl={`/api/jobs/${data.job.id}/time/entries`}
-      filterDefs={timeFilterDefs}
-    >
-      {#snippet children({
-        summary,
-        items,
-        listLoading,
-        loadMore,
-        page,
-        totalPages,
-      }: TabContentProps)}
-        <TimeTabContent {summary} {items} {listLoading} {loadMore} {page} {totalPages} />
-      {/snippet}
-    </JobDetailTab>
+    {#key data.job.id}
+      <JobDetailTab
+        active={activeTab === "time"}
+        jobId={data.job.id}
+        summaryUrl={`/api/jobs/${data.job.id}/time/summary`}
+        listUrl={`/api/jobs/${data.job.id}/time/entries`}
+        filterDefs={timeFilterDefs}
+      >
+        {#snippet children({
+          summary,
+          items,
+          listLoading,
+          loadMore,
+          page,
+          totalPages,
+        }: TabContentProps)}
+          <TimeTabContent {summary} {items} {listLoading} {loadMore} {page} {totalPages} />
+        {/snippet}
+      </JobDetailTab>
+    {/key}
   </div>
 
   <!-- Expenses Section -->
   <div id="expenses" class:hidden={activeTab !== "expenses"}>
-    <JobDetailTab
-      active={activeTab === "expenses"}
-      jobId={data.job.id}
-      summaryUrl={`/api/jobs/${data.job.id}/expenses/summary`}
-      listUrl={`/api/jobs/${data.job.id}/expenses/list`}
-      filterDefs={expenseFilterDefs}
-    >
-      {#snippet children({
-        summary,
-        items,
-        listLoading,
-        loadMore,
-        page,
-        totalPages,
-      }: TabContentProps)}
-        <ExpensesTabContent {summary} {items} {listLoading} {loadMore} {page} {totalPages} />
-      {/snippet}
-    </JobDetailTab>
+    {#key data.job.id}
+      <JobDetailTab
+        active={activeTab === "expenses"}
+        jobId={data.job.id}
+        summaryUrl={`/api/jobs/${data.job.id}/expenses/summary`}
+        listUrl={`/api/jobs/${data.job.id}/expenses/list`}
+        filterDefs={expenseFilterDefs}
+      >
+        {#snippet children({
+          summary,
+          items,
+          listLoading,
+          loadMore,
+          page,
+          totalPages,
+        }: TabContentProps)}
+          <ExpensesTabContent {summary} {items} {listLoading} {loadMore} {page} {totalPages} />
+        {/snippet}
+      </JobDetailTab>
+    {/key}
   </div>
 
   <!-- POs Section -->
   <div id="pos" class:hidden={activeTab !== "pos"}>
-    <JobDetailTab
-      active={activeTab === "pos"}
-      jobId={data.job.id}
-      summaryUrl={`/api/jobs/${data.job.id}/pos/summary`}
-      listUrl={`/api/jobs/${data.job.id}/pos/list`}
-      filterDefs={poFilterDefs}
-    >
-      {#snippet children({
-        summary,
-        items,
-        listLoading,
-        loadMore,
-        page,
-        totalPages,
-      }: TabContentProps)}
-        <POsTabContent {summary} {items} {listLoading} {loadMore} {page} {totalPages} />
-      {/snippet}
-    </JobDetailTab>
+    {#key data.job.id}
+      <JobDetailTab
+        active={activeTab === "pos"}
+        jobId={data.job.id}
+        summaryUrl={`/api/jobs/${data.job.id}/pos/summary`}
+        listUrl={`/api/jobs/${data.job.id}/pos/list`}
+        filterDefs={poFilterDefs}
+      >
+        {#snippet children({
+          summary,
+          items,
+          listLoading,
+          loadMore,
+          page,
+          totalPages,
+        }: TabContentProps)}
+          <POsTabContent {summary} {items} {listLoading} {loadMore} {page} {totalPages} />
+        {/snippet}
+      </JobDetailTab>
+    {/key}
   </div>
 </div>
