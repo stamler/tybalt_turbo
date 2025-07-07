@@ -550,7 +550,7 @@
                 {#each summary.categories as c}
                   <button on:click={() => toggleFilter("category", c)} class="focus:outline-none">
                     <DsLabel
-                      color="red"
+                      color="teal"
                       style={selectedCategory?.id === c.id ? "inverted" : undefined}
                       >{c.name}</DsLabel
                     >
@@ -670,7 +670,7 @@
                     class="focus:outline-none"
                   >
                     <DsLabel
-                      color="red"
+                      color="teal"
                       style={expSelectedCategory?.id === c.id ? "inverted" : undefined}
                       >{c.name}</DsLabel
                     >

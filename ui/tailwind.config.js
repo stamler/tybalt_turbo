@@ -4,19 +4,19 @@ export default {
   safelist: [
     {
       // DsLabel border colors
-      pattern: /border-(cyan|teal|red|green|orange|yellow|blue)-300/,
+      pattern: /border-(cyan|teal|red|green|orange|yellow|blue|purple|gray)-300/,
     },
     {
       // DsLabel background colors
-      pattern: /bg-(cyan|teal|red|green|orange|yellow|blue)-100/,
+      pattern: /bg-(cyan|teal|red|green|orange|yellow|blue|purple|gray)-100/,
     },
     {
       // DsLabel text colors
-      pattern: /text-(cyan|teal|red|green|orange|yellow|blue)-500/,
+      pattern: /text-(cyan|teal|red|green|orange|yellow|blue|purple|gray)-500/,
     },
     {
       // DsHoverIcon colors
-      pattern: /(text|bg)-(green|red|blue|yellow|purple|orange|gray)-(200|300|500|800)/,
+      pattern: /(text|bg)-(cyan|teal|red|green|orange|yellow|blue|purple|gray)-(200|300|500|800)/,
       variants: ["hover", "active"],
     },
     "active:shadow-inner",
