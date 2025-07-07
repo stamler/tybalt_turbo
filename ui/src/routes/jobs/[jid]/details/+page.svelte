@@ -207,6 +207,170 @@
       fetchEntries(false);
     }
   }
+
+  // ---------------------------------------------------------------------------
+  // Expenses summary + list support
+
+  interface ExpenseSummaryRow {
+    total_amount: number | string;
+    earliest_expense?: string;
+    latest_expense?: string;
+    divisions?: any[];
+    payment_types?: any[];
+    names?: any[];
+    categories?: any[];
+  }
+
+  interface JobExpenseEntry {
+    id: string;
+    date: string;
+    total: number;
+    description: string;
+    committed_week_ending: string;
+    division_code: string;
+    payment_type: string;
+    surname: string;
+    given_name: string;
+    category_name: string;
+  }
+
+  let expSummary: ExpenseSummaryRow = {
+    total_amount: 0,
+    divisions: [],
+    payment_types: [],
+    names: [],
+    categories: [],
+  };
+
+  // Expense filters
+  let expSelectedDivision: { id: string; code: string } | null = null;
+  let expSelectedPaymentType: { name: string } | null = null;
+  let expSelectedName: { id: string; name: string } | null = null;
+  let expSelectedCategory: { id: string; name: string } | null = null;
+
+  let expLoading = false;
+
+  // Parse helper re-used
+
+  async function fetchExpenseSummary() {
+    expLoading = true;
+    try {
+      const params = new URLSearchParams();
+      if (expSelectedDivision) params.set("division", expSelectedDivision.id);
+      if (expSelectedPaymentType) params.set("payment_type", expSelectedPaymentType.name);
+      if (expSelectedName) params.set("uid", expSelectedName.id);
+      if (expSelectedCategory) params.set("category", expSelectedCategory.id);
+
+      const query = params.toString();
+      const res: any = await pb.send(
+        `/api/jobs/${data.job.id}/expenses/summary${query ? "?" + query : ""}`,
+        { method: "GET" },
+      );
+
+      expSummary = {
+        total_amount: res.total_amount ?? 0,
+        earliest_expense: res.earliest_expense ?? "",
+        latest_expense: res.latest_expense ?? "",
+        divisions: parseArr(res.divisions),
+        payment_types: parseArr(res.payment_types),
+        names: parseArr(res.names),
+        categories: parseArr(res.categories),
+      };
+    } catch (err) {
+      console.error("Failed to fetch expense summary", err);
+    } finally {
+      expLoading = false;
+    }
+  }
+
+  // Pagination & list for expenses
+  let expenses: JobExpenseEntry[] = [];
+  let expensesPage = 1;
+  let expensesLimit = 50;
+  let expensesTotalPages = 1;
+  let expensesLoading = false;
+
+  async function fetchExpenses(reset = false) {
+    if (reset) {
+      expensesPage = 1;
+      expenses = [];
+    }
+    expensesLoading = true;
+    try {
+      const params = new URLSearchParams();
+      params.set("page", expensesPage.toString());
+      params.set("limit", expensesLimit.toString());
+      if (expSelectedDivision) params.set("division", expSelectedDivision.id);
+      if (expSelectedPaymentType) params.set("payment_type", expSelectedPaymentType.name);
+      if (expSelectedName) params.set("uid", expSelectedName.id);
+      if (expSelectedCategory) params.set("category", expSelectedCategory.id);
+
+      const query = params.toString();
+      const res: any = await pb.send(`/api/jobs/${data.job.id}/expenses/list?${query}`, {
+        method: "GET",
+      });
+
+      if (Array.isArray(res.data)) {
+        expenses = reset ? res.data : [...expenses, ...res.data];
+      }
+      expensesTotalPages = res.total_pages || 1;
+    } catch (err) {
+      console.error("Failed to fetch expenses", err);
+    } finally {
+      expensesLoading = false;
+    }
+  }
+
+  function loadMoreExpenses() {
+    if (expensesPage < expensesTotalPages) {
+      expensesPage += 1;
+      fetchExpenses(false);
+    }
+  }
+
+  // Toggle helpers for expense filters
+  function toggleExpenseFilter(
+    type: "division" | "payment_type" | "name" | "category",
+    value: any,
+  ) {
+    switch (type) {
+      case "division":
+        expSelectedDivision =
+          expSelectedDivision && expSelectedDivision.id === value.id ? null : value;
+        break;
+      case "payment_type":
+        expSelectedPaymentType =
+          expSelectedPaymentType && expSelectedPaymentType.name === value.name ? null : value;
+        break;
+      case "name":
+        expSelectedName = expSelectedName && expSelectedName.id === value.id ? null : value;
+        break;
+      case "category":
+        expSelectedCategory =
+          expSelectedCategory && expSelectedCategory.id === value.id ? null : value;
+        break;
+    }
+    fetchExpenseSummary();
+    fetchExpenses(true);
+  }
+
+  function clearExpenseFilter(type: "division" | "payment_type" | "name" | "category") {
+    if (type === "division") expSelectedDivision = null;
+    if (type === "payment_type") expSelectedPaymentType = null;
+    if (type === "name") expSelectedName = null;
+    if (type === "category") expSelectedCategory = null;
+    fetchExpenseSummary();
+    fetchExpenses(true);
+  }
+
+  let expensesInitialized = false;
+
+  // Fetch expenses when first switching to the tab (covers both hashchange and programmatic changes)
+  $: if (activeTab === "expenses" && !expensesInitialized) {
+    expensesInitialized = true;
+    fetchExpenseSummary();
+    fetchExpenses(true);
+  }
 </script>
 
 <div class="mx-auto space-y-4 p-4">
@@ -433,8 +597,120 @@
   {#if activeTab === "expenses"}
     <div class="space-y-4 rounded bg-neutral-50 py-4 shadow-sm" id="expenses">
       <div class="px-4">
-        <p>Coming soon…</p>
+        {#if expLoading}
+          <div>Loading…</div>
+        {:else}
+          <!-- Summary strip -->
+          <div class="space-y-1">
+            <div><span class="font-semibold">Total:</span> ${expSummary.total_amount}</div>
+            {#if expSummary.earliest_expense}
+              <div>
+                <span class="font-semibold">Date Range:</span>
+                {expSummary.earliest_expense} – {expSummary.latest_expense}
+              </div>
+            {/if}
+          </div>
+
+          <!-- Filter chips row -->
+          {#if expSummary.divisions || expSummary.payment_types || expSummary.names || expSummary.categories}
+            <div class="flex flex-wrap gap-2 pt-2">
+              {#if expSummary.divisions && expSummary.divisions.length > 0}
+                <span class="font-semibold">Divisions:</span>
+                {#each expSummary.divisions as d}
+                  <button
+                    on:click={() => toggleExpenseFilter("division", d)}
+                    class="focus:outline-none"
+                  >
+                    <DsLabel
+                      color="blue"
+                      style={expSelectedDivision?.id === d.id ? "inverted" : undefined}
+                      >{d.code}</DsLabel
+                    >
+                  </button>
+                {/each}
+              {/if}
+
+              {#if expSummary.payment_types && expSummary.payment_types.length > 0}
+                <span class="font-semibold">Payment Types:</span>
+                {#each expSummary.payment_types as pt}
+                  <button
+                    on:click={() => toggleExpenseFilter("payment_type", pt)}
+                    class="focus:outline-none"
+                  >
+                    <DsLabel
+                      color="green"
+                      style={expSelectedPaymentType?.name === pt.name ? "inverted" : undefined}
+                      >{pt.name}</DsLabel
+                    >
+                  </button>
+                {/each}
+              {/if}
+
+              {#if expSummary.names && expSummary.names.length > 0}
+                <span class="font-semibold">Staff:</span>
+                {#each expSummary.names as n}
+                  <button
+                    on:click={() => toggleExpenseFilter("name", n)}
+                    class="focus:outline-none"
+                  >
+                    <DsLabel
+                      color="purple"
+                      style={expSelectedName?.id === n.id ? "inverted" : undefined}
+                      >{n.name}</DsLabel
+                    >
+                  </button>
+                {/each}
+              {/if}
+
+              {#if expSummary.categories && expSummary.categories.length > 0}
+                <span class="font-semibold">Categories:</span>
+                {#each expSummary.categories as c}
+                  <button
+                    on:click={() => toggleExpenseFilter("category", c)}
+                    class="focus:outline-none"
+                  >
+                    <DsLabel
+                      color="red"
+                      style={expSelectedCategory?.id === c.id ? "inverted" : undefined}
+                      >{c.name}</DsLabel
+                    >
+                  </button>
+                {/each}
+              {/if}
+            </div>
+          {/if}
+        {/if}
       </div>
+
+      {#if expensesLoading && expenses.length === 0}
+        <div>Loading…</div>
+      {:else if expenses.length === 0}
+        <div>No expenses found.</div>
+      {:else}
+        <div class="w-full overflow-hidden">
+          <DsList items={expenses} search={false} inListHeader="Expenses">
+            {#snippet anchor(item: JobExpenseEntry)}{item.date}{/snippet}
+            {#snippet headline(item: JobExpenseEntry)}${item.total}{/snippet}
+            {#snippet byline(item: JobExpenseEntry)}{item.given_name} {item.surname}{/snippet}
+            {#snippet line1(item: JobExpenseEntry)}
+              <span class="font-bold">{item.division_code}</span>
+              <span class="font-bold">{item.payment_type}</span>
+              {item.description}
+            {/snippet}
+          </DsList>
+          {#if expensesPage < expensesTotalPages}
+            <div class="mt-4 text-center">
+              <button
+                class="rounded bg-blue-600 px-4 py-2 text-white"
+                on:click={loadMoreExpenses}
+                disabled={expensesLoading}
+              >
+                {expensesLoading ? "Loading…" : "Load More"}
+              </button>
+            </div>
+          {/if}
+        </div>
+      {/if}
     </div>
   {/if}
 </div>
