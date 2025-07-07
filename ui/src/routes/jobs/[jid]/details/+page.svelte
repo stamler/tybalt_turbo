@@ -90,25 +90,30 @@
   }
 
   // Tab management ------------------------------------------------------------
-  let activeTab: "time" | "expenses" = "time";
+  let activeTab: "time" | "expenses" | "pos" = "time";
 
   // Reactive tabs array consumed by DSTabBar
   let tabs: TabItem[] = [];
   $: tabs = [
     { label: "Time", href: "#time", active: activeTab === "time" },
     { label: "Expenses", href: "#expenses", active: activeTab === "expenses" },
+    { label: "Purchase Orders", href: "#pos", active: activeTab === "pos" },
   ];
 
   onMount(() => {
     // Initialize active tab based on hash
-    if (typeof window !== "undefined" && window.location.hash === "#expenses") {
-      activeTab = "expenses";
+    if (typeof window !== "undefined") {
+      if (window.location.hash === "#expenses") activeTab = "expenses";
+      else if (window.location.hash === "#pos") activeTab = "pos";
+      else activeTab = "time";
     }
 
     // Listen for hash changes to update the active tab
     if (typeof window !== "undefined") {
       window.addEventListener("hashchange", () => {
-        activeTab = window.location.hash === "#expenses" ? "expenses" : "time";
+        if (window.location.hash === "#expenses") activeTab = "expenses";
+        else if (window.location.hash === "#pos") activeTab = "pos";
+        else activeTab = "time";
       });
     }
 
@@ -371,6 +376,139 @@
     fetchExpenseSummary();
     fetchExpenses(true);
   }
+
+  // ---------------------------------------------------------------------------
+  // Purchase Orders summary + list support
+
+  interface POSummaryRow {
+    total_amount: number | string;
+    earliest_po?: string;
+    latest_po?: string;
+    divisions?: any[];
+    types?: any[];
+    names?: any[];
+  }
+
+  interface JobPOEntry {
+    id: string;
+    po_number: string;
+    date: string;
+    total: number;
+    type: string;
+    division_code: string;
+    surname: string;
+    given_name: string;
+  }
+
+  let poSummary: POSummaryRow = {
+    total_amount: 0,
+    divisions: [],
+    types: [],
+    names: [],
+  };
+
+  let poSelectedDivision: { id: string; code: string } | null = null;
+  let poSelectedType: { name: string } | null = null;
+  let poSelectedName: { id: string; name: string } | null = null;
+
+  let poLoading = false;
+
+  async function fetchPOSummary() {
+    poLoading = true;
+    try {
+      const params = new URLSearchParams();
+      if (poSelectedDivision) params.set("division", poSelectedDivision.id);
+      if (poSelectedType) params.set("type", poSelectedType.name);
+      if (poSelectedName) params.set("uid", poSelectedName.id);
+
+      const query = params.toString();
+      const res: any = await pb.send(
+        `/api/jobs/${data.job.id}/pos/summary${query ? "?" + query : ""}`,
+        { method: "GET" },
+      );
+
+      poSummary = {
+        total_amount: res.total_amount ?? 0,
+        earliest_po: res.earliest_po ?? "",
+        latest_po: res.latest_po ?? "",
+        divisions: parseArr(res.divisions),
+        types: parseArr(res.types),
+        names: parseArr(res.names),
+      };
+    } catch (err) {
+      console.error("Failed to fetch PO summary", err);
+    } finally {
+      poLoading = false;
+    }
+  }
+
+  let pos: JobPOEntry[] = [];
+  let poPage = 1;
+  let poLimit = 50;
+  let poTotalPages = 1;
+  let posLoading = false;
+
+  async function fetchPOs(reset = false) {
+    if (reset) {
+      poPage = 1;
+      pos = [];
+    }
+    posLoading = true;
+    try {
+      const params = new URLSearchParams();
+      params.set("page", poPage.toString());
+      params.set("limit", poLimit.toString());
+      if (poSelectedDivision) params.set("division", poSelectedDivision.id);
+      if (poSelectedType) params.set("type", poSelectedType.name);
+      if (poSelectedName) params.set("uid", poSelectedName.id);
+
+      const query = params.toString();
+      const res: any = await pb.send(`/api/jobs/${data.job.id}/pos/list?${query}`, {
+        method: "GET",
+      });
+
+      if (Array.isArray(res.data)) {
+        pos = reset ? res.data : [...pos, ...res.data];
+      }
+      poTotalPages = res.total_pages || 1;
+    } catch (err) {
+      console.error("Failed to fetch POs", err);
+    } finally {
+      posLoading = false;
+    }
+  }
+
+  function loadMorePOs() {
+    if (poPage < poTotalPages) {
+      poPage += 1;
+      fetchPOs(false);
+    }
+  }
+
+  function togglePOFilter(type: "division" | "type" | "name", value: any) {
+    switch (type) {
+      case "division":
+        poSelectedDivision =
+          poSelectedDivision && poSelectedDivision.id === value.id ? null : value;
+        break;
+      case "type":
+        poSelectedType = poSelectedType && poSelectedType.name === value.name ? null : value;
+        break;
+      case "name":
+        poSelectedName = poSelectedName && poSelectedName.id === value.id ? null : value;
+        break;
+    }
+    fetchPOSummary();
+    fetchPOs(true);
+  }
+
+  let poInitialized = false;
+
+  $: if (activeTab === "pos" && !poInitialized) {
+    poInitialized = true;
+    fetchPOSummary();
+    fetchPOs(true);
+  }
 </script>
 
 <div class="mx-auto space-y-4 p-4">
@@ -602,7 +740,7 @@
         {:else}
           <!-- Summary strip -->
           <div class="space-y-1">
-            <div><span class="font-semibold">Total:</span> ${expSummary.total_amount}</div>
+            <div><span class="font-semibold">Total:</span> {expSummary.total_amount}</div>
             {#if expSummary.earliest_expense}
               <div>
                 <span class="font-semibold">Date Range:</span>
@@ -690,7 +828,7 @@
         <div class="w-full overflow-hidden">
           <DsList items={expenses} search={false} inListHeader="Expenses">
             {#snippet anchor(item: JobExpenseEntry)}{item.date}{/snippet}
-            {#snippet headline(item: JobExpenseEntry)}${item.total}{/snippet}
+            {#snippet headline(item: JobExpenseEntry)}{item.total}{/snippet}
             {#snippet byline(item: JobExpenseEntry)}{item.given_name} {item.surname}{/snippet}
             {#snippet line1(item: JobExpenseEntry)}
               <span class="font-bold">{item.division_code}</span>
@@ -706,6 +844,101 @@
                 disabled={expensesLoading}
               >
                 {expensesLoading ? "Loading…" : "Load More"}
+              </button>
+            </div>
+          {/if}
+        </div>
+      {/if}
+    </div>
+  {/if}
+
+  {#if activeTab === "pos"}
+    <div class="space-y-4 rounded bg-neutral-50 py-4 shadow-sm" id="pos">
+      <div class="px-4">
+        {#if poLoading}
+          <div>Loading…</div>
+        {:else}
+          <h2 class="text-xl font-bold">UNDER CONSTRUCTION</h2>
+          <!-- Summary strip -->
+          <div class="space-y-1">
+            <div><span class="font-semibold">Total:</span> {poSummary.total_amount}</div>
+            {#if poSummary.earliest_po}
+              <div>
+                <span class="font-semibold">Date Range:</span>
+                {poSummary.earliest_po} – {poSummary.latest_po}
+              </div>
+            {/if}
+          </div>
+
+          <!-- Filter chips row -->
+          {#if poSummary.divisions || poSummary.types || poSummary.names}
+            <div class="flex flex-wrap gap-2 pt-2">
+              {#if poSummary.divisions && poSummary.divisions.length > 0}
+                <span class="font-semibold">Divisions:</span>
+                {#each poSummary.divisions as d}
+                  <button on:click={() => togglePOFilter("division", d)} class="focus:outline-none">
+                    <DsLabel
+                      color="blue"
+                      style={poSelectedDivision?.id === d.id ? "inverted" : undefined}
+                      >{d.code}</DsLabel
+                    >
+                  </button>
+                {/each}
+              {/if}
+
+              {#if poSummary.types && poSummary.types.length > 0}
+                <span class="font-semibold">Types:</span>
+                {#each poSummary.types as t}
+                  <button on:click={() => togglePOFilter("type", t)} class="focus:outline-none">
+                    <DsLabel
+                      color="green"
+                      style={poSelectedType?.name === t.name ? "inverted" : undefined}
+                      >{t.name}</DsLabel
+                    >
+                  </button>
+                {/each}
+              {/if}
+
+              {#if poSummary.names && poSummary.names.length > 0}
+                <span class="font-semibold">Staff:</span>
+                {#each poSummary.names as n}
+                  <button on:click={() => togglePOFilter("name", n)} class="focus:outline-none">
+                    <DsLabel
+                      color="purple"
+                      style={poSelectedName?.id === n.id ? "inverted" : undefined}>{n.name}</DsLabel
+                    >
+                  </button>
+                {/each}
+              {/if}
+            </div>
+          {/if}
+        {/if}
+      </div>
+
+      {#if posLoading && pos.length === 0}
+        <div>Loading…</div>
+      {:else if pos.length === 0}
+        <div>No purchase orders found.</div>
+      {:else}
+        <div class="w-full overflow-hidden">
+          <DsList items={pos} search={false} inListHeader="Purchase Orders">
+            {#snippet anchor(item: JobPOEntry)}{item.date}{/snippet}
+            {#snippet headline(item: JobPOEntry)}{item.po_number}{/snippet}
+            {#snippet byline(item: JobPOEntry)}{item.given_name} {item.surname}{/snippet}
+            {#snippet line1(item: JobPOEntry)}
+              <span class="font-bold">{item.division_code}</span>
+              <span class="font-bold">{item.type}</span>
+              {item.po_number}
+            {/snippet}
+          </DsList>
+          {#if poPage < poTotalPages}
+            <div class="mt-4 text-center">
+              <button
+                class="rounded bg-blue-600 px-4 py-2 text-white"
+                on:click={loadMorePOs}
+                disabled={posLoading}
+              >
+                {posLoading ? "Loading…" : "Load More"}
               </button>
             </div>
           {/if}
