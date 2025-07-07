@@ -58,15 +58,36 @@
   });
 
   // Filter Definitions --------------------------------------------------------
+  const divisionFilter: FilterDef = {
+    type: "division",
+    label: "Divisions",
+    summaryProperty: "divisions",
+    valueProperty: "id",
+    displayProperty: "code",
+    color: "blue",
+  };
+
+  const staffFilter: FilterDef = {
+    type: "name",
+    label: "Staff",
+    queryParam: "uid",
+    summaryProperty: "names",
+    valueProperty: "id",
+    displayProperty: "name",
+    color: "purple",
+  };
+
+  const categoryFilter: FilterDef = {
+    type: "category",
+    label: "Categories",
+    summaryProperty: "categories",
+    valueProperty: "id",
+    displayProperty: "name",
+    color: "teal",
+  };
+
   const timeFilterDefs: FilterDef[] = [
-    {
-      type: "division",
-      label: "Divisions",
-      summaryProperty: "divisions",
-      valueProperty: "id",
-      displayProperty: "code",
-      color: "blue",
-    },
+    divisionFilter,
     {
       type: "time_type",
       label: "Time Types",
@@ -75,34 +96,12 @@
       displayProperty: "code",
       color: "green",
     },
-    {
-      type: "name",
-      label: "Staff",
-      queryParam: "uid",
-      summaryProperty: "names",
-      valueProperty: "id",
-      displayProperty: "name",
-      color: "purple",
-    },
-    {
-      type: "category",
-      label: "Categories",
-      summaryProperty: "categories",
-      valueProperty: "id",
-      displayProperty: "name",
-      color: "teal",
-    },
+    staffFilter,
+    categoryFilter,
   ];
 
   const expenseFilterDefs: FilterDef[] = [
-    {
-      type: "division",
-      label: "Divisions",
-      summaryProperty: "divisions",
-      valueProperty: "id",
-      displayProperty: "code",
-      color: "blue",
-    },
+    divisionFilter,
     {
       type: "payment_type",
       label: "Payment Types",
@@ -111,34 +110,12 @@
       displayProperty: "name",
       color: "green",
     },
-    {
-      type: "name",
-      label: "Staff",
-      queryParam: "uid",
-      summaryProperty: "names",
-      valueProperty: "id",
-      displayProperty: "name",
-      color: "purple",
-    },
-    {
-      type: "category",
-      label: "Categories",
-      summaryProperty: "categories",
-      valueProperty: "id",
-      displayProperty: "name",
-      color: "teal",
-    },
+    staffFilter,
+    categoryFilter,
   ];
 
   const poFilterDefs: FilterDef[] = [
-    {
-      type: "division",
-      label: "Divisions",
-      summaryProperty: "divisions",
-      valueProperty: "id",
-      displayProperty: "code",
-      color: "blue",
-    },
+    divisionFilter,
     {
       type: "type",
       label: "Types",
@@ -147,15 +124,7 @@
       displayProperty: "name",
       color: "green",
     },
-    {
-      type: "name",
-      label: "Staff",
-      queryParam: "uid",
-      summaryProperty: "names",
-      valueProperty: "id",
-      displayProperty: "name",
-      color: "purple",
-    },
+    staffFilter,
   ];
 </script>
 
