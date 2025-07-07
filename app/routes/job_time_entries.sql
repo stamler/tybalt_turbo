@@ -12,7 +12,7 @@ SELECT te.description,
 	tt.code AS time_type_code,
 	p.surname AS surname,
 	p.given_name AS given_name,
-	c.name AS category_name
+	COALESCE(c.name, 'No Category') AS category_name
 FROM time_entries te
 LEFT JOIN divisions d ON te.division = d.id
 LEFT JOIN time_types tt ON te.time_type = tt.id
@@ -25,6 +25,12 @@ AND te.job = {:id}
 AND ({:division} IS NULL OR {:division} = '' OR te.division = {:division})
 AND ({:time_type} IS NULL OR {:time_type} = '' OR te.time_type = {:time_type})
 AND ({:uid} IS NULL OR {:uid} = '' OR te.uid = {:uid})
-AND ({:category} IS NULL OR {:category} = '' OR te.category = {:category})
+AND (
+  ({:category} IS NULL OR {:category} = '')
+  OR
+  ({:category} = 'none' AND te.category = '')
+  OR
+  ({:category} != 'none' AND te.category = {:category})
+)
 ORDER BY date DESC
 LIMIT {:limit} OFFSET {:offset};

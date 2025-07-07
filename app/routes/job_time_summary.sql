@@ -17,7 +17,7 @@ SELECT
     DISTINCT json_object('id', p.uid, 'name', p.given_name || ' ' || p.surname)
   ) names,
   json_group_array(
-    DISTINCT json_object('id', c.id, 'name', c.name)
+    DISTINCT json_object('id', COALESCE(c.id, 'none'), 'name', COALESCE(c.name, 'No Category'))
   ) categories
 FROM time_entries te
 LEFT JOIN divisions   d  ON te.division  = d.id
@@ -31,4 +31,10 @@ WHERE ts.committed != ''
   AND ({:division} IS NULL OR {:division} = '' OR te.division = {:division})
   AND ({:time_type} IS NULL OR {:time_type} = '' OR te.time_type = {:time_type})
   AND ({:uid} IS NULL OR {:uid} = '' OR te.uid = {:uid})
-  AND ({:category} IS NULL OR {:category} = '' OR te.category = {:category});
+  AND (
+    ({:category} IS NULL OR {:category} = '')
+    OR
+    ({:category} = 'none' AND te.category = '')
+    OR
+    ({:category} != 'none' AND te.category = {:category})
+  );

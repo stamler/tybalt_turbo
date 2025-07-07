@@ -44,22 +44,19 @@ func createGetJobTimeSummaryHandler(app core.App) func(e *core.RequestEvent) err
 		uid := q.Get("uid")
 		category := q.Get("category")
 
-		var rows []summaryRow
+		var row summaryRow
 		if err := app.DB().NewQuery(jobTimeSummaryQuery).Bind(dbx.Params{
 			"id":        id,
 			"division":  division,
 			"time_type": timeType,
 			"uid":       uid,
 			"category":  category,
-		}).All(&rows); err != nil {
+		}).One(&row); err != nil {
+			if err == sql.ErrNoRows {
+				return e.JSON(http.StatusOK, map[string]any{})
+			}
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
-
-		if len(rows) == 0 {
-			return e.JSON(http.StatusOK, map[string]any{})
-		}
-
-		r := rows[0]
 
 		// Helper to unwrap sql.NullString to string
 		ns := func(n sql.NullString) string {
@@ -71,20 +68,20 @@ func createGetJobTimeSummaryHandler(app core.App) func(e *core.RequestEvent) err
 
 		// Convert total_hours to float64 if possible; otherwise 0
 		var total float64
-		if r.TotalHours.Valid {
-			if f, err := strconv.ParseFloat(r.TotalHours.String, 64); err == nil {
+		if row.TotalHours.Valid {
+			if f, err := strconv.ParseFloat(row.TotalHours.String, 64); err == nil {
 				total = f
 			}
 		}
 
 		resp := map[string]any{
 			"total_hours":    total,
-			"earliest_entry": ns(r.EarliestEntry),
-			"latest_entry":   ns(r.LatestEntry),
-			"divisions":      ns(r.Divisions),
-			"time_types":     ns(r.TimeTypes),
-			"names":          ns(r.Names),
-			"categories":     ns(r.Categories),
+			"earliest_entry": ns(row.EarliestEntry),
+			"latest_entry":   ns(row.LatestEntry),
+			"divisions":      ns(row.Divisions),
+			"time_types":     ns(row.TimeTypes),
+			"names":          ns(row.Names),
+			"categories":     ns(row.Categories),
 		}
 
 		return e.JSON(http.StatusOK, resp)
