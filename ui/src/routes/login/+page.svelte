@@ -1,5 +1,14 @@
 <script lang="ts">
   import { authStore } from "$lib/stores/auth";
+  import { page } from "$app/stores";
+  import { onMount } from "svelte";
+
+  onMount(() => {
+    const redirectUrl = $page.url.searchParams.get("redirect");
+    if (redirectUrl) {
+      sessionStorage.setItem("redirectUrl", redirectUrl);
+    }
+  });
 </script>
 
 <!-- The login box, centered vertically and horizontally using flex -->
