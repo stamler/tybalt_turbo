@@ -5,6 +5,7 @@
   import DsSelector from "./DSSelector.svelte";
   import { pb } from "$lib/pocketbase";
   import { page } from "$app/stores";
+  import { goto } from "$app/navigation";
   import type { Snippet } from "svelte";
   import type { BaseSystemFields } from "$lib/pocketbase-types";
   import type MiniSearch from "minisearch";
@@ -58,9 +59,9 @@
 
   function redirectBack() {
     if (collectionName === "client_contacts") {
-      window.location.href = `/clients/${$page.params.cid}/edit`;
+      goto(`/clients/${$page.params.cid}/edit`);
     } else {
-      window.location.href = `/${collectionName}/list`;
+      goto(`/${collectionName}/list`);
     }
   }
 
