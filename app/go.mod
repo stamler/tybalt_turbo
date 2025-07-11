@@ -8,6 +8,7 @@ require (
 	github.com/go-ozzo/ozzo-validation/v4 v4.3.0
 	github.com/pocketbase/dbx v1.11.0
 	github.com/pocketbase/pocketbase v0.28.2
+	golang.org/x/sync v0.14.0
 )
 
 require (
@@ -35,7 +36,6 @@ require (
 	golang.org/x/image v0.27.0 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/oauth2 v0.30.0 // indirect
-	golang.org/x/sync v0.14.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
 	golang.org/x/text v0.25.0 // indirect
 	modernc.org/libc v1.65.7 // indirect

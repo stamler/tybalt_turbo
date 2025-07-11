@@ -6,6 +6,9 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/pocketbase/pocketbase/tools/subscriptions"
+	"golang.org/x/sync/errgroup"
+
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -237,6 +240,11 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 		return fmt.Errorf("error absorbing records: %w", err)
 	}
 
+	// Notify clients that an absorb operation has completed for this collection.
+	if err := broadcastAbsorbCompletedEvent(app, collectionName); err != nil {
+		app.Logger().Error("Failed to broadcast absorb_completed event", "err", err)
+	}
+
 	return nil
 }
 
@@ -367,6 +375,11 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 			return apis.NewApiError(http.StatusInternalServerError, "Failed to undo absorb", err)
 		}
 
+		// Notify clients that the absorb undo has completed so that they can refresh.
+		if err := broadcastAbsorbCompletedEvent(app, collectionName); err != nil {
+			app.Logger().Error("Failed to broadcast absorb_completed event (undo)", "err", err)
+		}
+
 		return e.JSON(http.StatusOK, map[string]string{
 			"message": "Successfully undid absorb operation",
 		})
@@ -491,6 +504,45 @@ func serializeRecords(app core.App, collectionName string, ids []string) ([]byte
 	}
 
 	return serialized, nil
+}
+
+// broadcastAbsorbCompletedEvent broadcasts a single custom realtime event indicating
+// that an absorb operation for the specified collection has finished. Clients can
+// listen to this event ("<collection>/absorb_completed") and refresh their data
+// without dealing with individual record mutations.
+func broadcastAbsorbCompletedEvent(app core.App, collectionName string) error {
+	// Topic pattern: "<collection>/absorb_completed"
+	topic := fmt.Sprintf("%s/absorb_completed", collectionName)
+
+	payload := map[string]any{
+		"action":     "absorb_completed",
+		"collection": collectionName,
+	}
+	rawData, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("marshal absorb_completed payload: %w", err)
+	}
+
+	message := subscriptions.Message{
+		Name: topic,
+		Data: rawData,
+	}
+
+	group := new(errgroup.Group)
+	chunks := app.SubscriptionsBroker().ChunkedClients(300) // same chunk size as other broadcasts
+	for _, chunk := range chunks {
+		c := chunk
+		group.Go(func() error {
+			for _, client := range c {
+				if !client.HasSubscription(topic) {
+					continue
+				}
+				client.Send(message)
+			}
+			return nil
+		})
+	}
+	return group.Wait()
 }
 
 // trackReferences tracks reference updates during absorption

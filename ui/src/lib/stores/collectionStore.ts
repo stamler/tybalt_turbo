@@ -104,6 +104,50 @@ export function createCollectionStore<T extends BaseSystemFields>(
       });
   }
 
+  // Refresh the data manually if needed – declared here so other helpers can reference it.
+  const refresh = async (id?: string) => {
+    store.update((state) => ({ ...state, loading: true }));
+    const refreshId = `refresh-${collectionName}`;
+    tasks.startTask({ id: refreshId, message: `Refreshing ${collectionName}` });
+    if (id !== undefined) {
+      if (onUpdate !== undefined) {
+        await onUpdate({ id } as RecordModel);
+      }
+      store.update((state) => ({ ...state, loading: false }));
+      tasks.endTask(refreshId);
+      return;
+    }
+
+    try {
+      await initializeStore();
+      store.update((state) => ({ ...state, loading: false }));
+      tasks.endTask(refreshId);
+    } catch (error) {
+      store.update((state) => ({
+        ...state,
+        loading: false,
+        error: error instanceof Error ? error.message : "Failed to load items",
+      }));
+      tasks.endTask(refreshId);
+    }
+  };
+
+  // Subscribe to custom "absorb_completed" events so the whole collection can refresh after a bulk absorb.
+  // Separate unsubscribe function for the absorb_completed realtime channel
+  let unsubscribeAbsorb: UnsubscribeFunc | null = null;
+  async function setupAbsorbSubscription() {
+    // Clean up existing
+    if (unsubscribeAbsorb) {
+      unsubscribeAbsorb();
+    }
+    // The channel name is "<collection>/absorb_completed"
+    const topic = `${collectionName}/absorb_completed`;
+
+    unsubscribeAbsorb = await pb.realtime.subscribe(topic, async () => {
+      await refresh();
+    });
+  }
+
   return {
     subscribe: store.subscribe,
     // Expose update method for callbacks to use
@@ -117,7 +161,7 @@ export function createCollectionStore<T extends BaseSystemFields>(
       store.update((state) => ({ ...state, loading: true }));
       try {
         await initializeStore();
-        await setupSubscription();
+        await Promise.all([setupSubscription(), setupAbsorbSubscription()]);
         store.update((state) => ({ ...state, loading: false, initialized: true }));
       } catch (error) {
         // handle error, ensure initialized is false
@@ -131,38 +175,17 @@ export function createCollectionStore<T extends BaseSystemFields>(
     },
 
     // Refresh the data manually if needed
-    refresh: async (id?: string) => {
-      store.update((state) => ({ ...state, loading: true }));
-      const refreshId = `refresh-${collectionName}`;
-      tasks.startTask({ id: refreshId, message: `Refreshing ${collectionName}` });
-      if (id !== undefined) {
-        // Just call the onUpdate callback for this item
-        if (onUpdate !== undefined) {
-          await onUpdate({ id } as RecordModel);
-        }
-      } else {
-        // refresh all items
-        try {
-          await initializeStore();
-          store.update((state) => ({ ...state, loading: false }));
-          tasks.endTask(refreshId);
-        } catch (error) {
-          // handle error, ensure initialized is false
-          store.update((state) => ({
-            ...state,
-            loading: false,
-            error: error instanceof Error ? error.message : "Failed to load items",
-          }));
-          tasks.endTask(refreshId);
-        }
-      }
-    },
+    refresh,
 
     // Clean up subscription when the store is no longer needed
     unsubscribe: () => {
       if (unsubscribeFunc) {
         unsubscribeFunc();
         unsubscribeFunc = null;
+      }
+      if (unsubscribeAbsorb) {
+        unsubscribeAbsorb();
+        unsubscribeAbsorb = null;
       }
       store.update((state) => ({
         ...state,
