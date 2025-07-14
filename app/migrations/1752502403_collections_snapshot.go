@@ -18,7 +18,7 @@ func init() {
 				},
 				"authRule": "",
 				"authToken": {
-					"duration": 1209600
+					"duration": 3600
 				},
 				"confirmEmailChangeTemplate": {
 					"body": "<p>Hello,</p>\n<p>Click on the button below to confirm your new email address.</p>\n<p>\n  <a class=\"btn\" href=\"{APP_URL}/_/#/auth/confirm-email-change/{TOKEN}\" target=\"_blank\" rel=\"noopener\">Confirm new email</a>\n</p>\n<p><i>If you didn't ask to change your email address, you can ignore this email.</i></p>\n<p>\n  Thanks,<br/>\n  {APP_NAME} team\n</p>",
@@ -167,7 +167,7 @@ func init() {
 				},
 				"name": "users",
 				"oauth2": {
-					"enabled": false,
+					"enabled": true,
 					"mappedFields": {
 						"avatarURL": "",
 						"id": "",
@@ -205,7 +205,7 @@ func init() {
 				"verificationToken": {
 					"duration": 604800
 				},
-				"viewRule": "// The caller is logged in and either\n@request.auth.id != \"\" &&\n(\n  // 1. The caller id is equal to the record id or\n  @request.auth.id = id ||\n  // 2. The record has the po_approver claim or\n  user_claims_via_uid.cid.name ?= 'po_approver' ||\n  // 3. The record has the tapr claim or\n  user_claims_via_uid.cid.name ?= 'tapr' ||\n  // 4. The caller has the tapr claim\n  @request.auth.user_claims_via_uid.cid.name ?= 'tapr'\n)"
+				"viewRule": "// The caller is logged in and either\n@request.auth.id != \"\" &&\n(\n  // 1. The caller id is equal to the record id or\n  @request.auth.id = id ||\n  // 2. The record has the po_approver claim or\n  user_claims_via_uid.cid.name ?= 'po_approver' ||\n  // 3. The record has the tapr claim or\n  user_claims_via_uid.cid.name ?= 'tapr' ||\n  // 4. The caller has the tapr claim\n  @request.auth.user_claims_via_uid.cid.name ?= 'tapr' ||\n  // 5. The caller is the approver of at least one of users committed expenses\n  (\n    @collection.expenses.approver ?= @request.auth.id &&\n    @collection.expenses.uid ?= id &&\n    @collection.expenses.committed ?!= ''\n  ) ||\n  // 6. The record is the uid, approver, or second_approver of 1+ active purchase order\n  (\n    (\n      @collection.purchase_orders.uid ?= id ||\n      @collection.purchase_orders.approver ?= id ||\n      @collection.purchase_orders.second_approver ?= id\n    ) &&\n    @collection.purchase_orders.status ?= \"Active\"\n  )\n)"
 			},
 			{
 				"createRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'job' &&\n\n// the contact belongs to the client\n@request.body.contact.client = @request.body.client",
@@ -293,6 +293,126 @@ func init() {
 						"type": "relation"
 					},
 					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "relation2937628849",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "alternate_manager",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "bool1047208438",
+						"name": "fn_agreement",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "select2063623452",
+						"maxSelect": 1,
+						"name": "status",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "select",
+						"values": [
+							"Active",
+							"Closed",
+							"Cancelled",
+							"Awarded",
+							"Not Awarded"
+						]
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text2491502081",
+						"max": 0,
+						"min": 0,
+						"name": "project_award_date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text2326674437",
+						"max": 0,
+						"min": 0,
+						"name": "proposal_opening_date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text2013446203",
+						"max": 0,
+						"min": 0,
+						"name": "proposal_submission_due_date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "yovqzrnnomp0lkx",
+						"hidden": false,
+						"id": "relation3219494002",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "proposal",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "3esdddggow6dykr",
+						"hidden": false,
+						"id": "relation1542800728",
+						"maxSelect": 999,
+						"minSelect": 0,
+						"name": "divisions",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "1v6i9rrpniuatcx",
+						"hidden": false,
+						"id": "relation3460061964",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "job_owner",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
 						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
@@ -311,6 +431,15 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_3",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "yovqzrnnomp0lkx",
@@ -424,6 +553,29 @@ func init() {
 					},
 					{
 						"hidden": false,
+						"id": "select2676255945",
+						"maxSelect": 1,
+						"name": "notification_type",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "select",
+						"values": [
+							"email_text",
+							"email_html"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "bool2844658106",
+						"name": "do_not_accept_submissions",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
 						"onCreate": true,
@@ -441,6 +593,15 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_8",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "glmf9xpnwgpwudm",
@@ -452,7 +613,7 @@ func init() {
 				"system": false,
 				"type": "base",
 				"updateRule": "@request.auth.id != \"\" &&\nuid = @request.auth.id",
-				"viewRule": "// The caller is logged in and either\n@request.auth.id != \"\" &&\n(\n  // 1. The caller id matches the record uid or\n  @request.auth.id = uid ||\n  // 2. The record has the tapr claim\n  uid.user_claims_via_uid.cid.name ?= 'tapr' ||\n  // 3. The record has the po_approver claim\n  uid.user_claims_via_uid.cid.name ?= 'po_approver' ||\n  // 4. The caller has the 'tame' claim\n  @request.auth.user_claims_via_uid.cid.name ?= 'tame'\n)"
+				"viewRule": "@request.auth.id != \"\""
 			},
 			{
 				"createRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'tt'",
@@ -851,16 +1012,27 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_12",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "ranctx5xgih6n3a",
-				"indexes": [],
-				"listRule": "@request.auth.id = uid ||\n@request.auth.id = tsid.approver ||\n@request.auth.user_claims_via_uid.cid.name ?= 'report'",
+				"indexes": [
+					"CREATE INDEX ` + "`" + `idx_jgvQezNmMn` + "`" + ` ON ` + "`" + `time_entries` + "`" + ` (` + "`" + `uid` + "`" + `)"
+				],
+				"listRule": "@request.auth.id = uid ||\n(tsid.submitted = true && @request.auth.id = tsid.approver) ||\n(tsid.submitted = true && @request.auth.id ?= tsid.time_sheet_reviewers_via_time_sheet.reviewer) ||\n(tsid.committed != '' && @request.auth.user_claims_via_uid.cid.name ?= 'report')",
 				"name": "time_entries",
 				"system": false,
 				"type": "base",
 				"updateRule": "// the creating user can edit if the entry is not yet part of a timesheet\nuid = @request.auth.id && tsid = \"\" &&\n// if present, the category belongs to the job, otherwise is blank\n(\n  // the job is unchanged, compare the new category to job\n  ( @request.body.job:isset = false && @request.body.category.job = job ) ||\n  // the job has changed, compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
-				"viewRule": "@request.auth.id = uid ||\n@request.auth.id = tsid.approver ||\n@request.auth.user_claims_via_uid.cid.name ?= 'report'"
+				"viewRule": "@request.auth.id = uid ||\n(tsid.submitted = true && @request.auth.id = tsid.approver) ||\n(tsid.submitted = true && @request.auth.id ?= tsid.time_sheet_reviewers_via_time_sheet.reviewer) ||\n(tsid.committed != '' && @request.auth.user_claims_via_uid.cid.name ?= 'report')"
 			},
 			{
 				"createRule": null,
@@ -933,7 +1105,7 @@ func init() {
 				"indexes": [
 					"CREATE UNIQUE INDEX ` + "`" + `idx_3KEX8wA` + "`" + ` ON ` + "`" + `claims` + "`" + ` (` + "`" + `name` + "`" + `)"
 				],
-				"listRule": null,
+				"listRule": "@request.auth.id != \"\"",
 				"name": "claims",
 				"system": false,
 				"type": "base",
@@ -966,7 +1138,7 @@ func init() {
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "uid",
-						"presentable": false,
+						"presentable": true,
 						"required": true,
 						"system": false,
 						"type": "relation"
@@ -979,20 +1151,10 @@ func init() {
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "cid",
-						"presentable": false,
+						"presentable": true,
 						"required": true,
 						"system": false,
 						"type": "relation"
-					},
-					{
-						"hidden": false,
-						"id": "gfyrln8y",
-						"maxSize": 2000000,
-						"name": "payload",
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "json"
 					},
 					{
 						"hidden": false,
@@ -1013,18 +1175,27 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_10",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "pmxhrqhngh60icm",
 				"indexes": [
 					"CREATE UNIQUE INDEX ` + "`" + `idx_6dSZCrb` + "`" + ` ON ` + "`" + `user_claims` + "`" + ` (\n  ` + "`" + `uid` + "`" + `,\n  ` + "`" + `cid` + "`" + `\n)"
 				],
-				"listRule": null,
+				"listRule": "@request.auth.id = uid",
 				"name": "user_claims",
 				"system": false,
 				"type": "base",
 				"updateRule": null,
-				"viewRule": null
+				"viewRule": "@request.auth.id = uid"
 			},
 			{
 				"createRule": null,
@@ -1047,7 +1218,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_k7yd",
+						"id": "_clone_DhDb",
 						"max": 48,
 						"min": 2,
 						"name": "surname",
@@ -1061,7 +1232,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_J0fF",
+						"id": "_clone_zVc0",
 						"max": 48,
 						"min": 2,
 						"name": "given_name",
@@ -1245,6 +1416,20 @@ func init() {
 						"type": "relation"
 					},
 					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3684909290",
+						"max": 0,
+						"min": 0,
+						"name": "payroll_id",
+						"pattern": "^(?:[1-9]\\d*|CMS[0-9]{1,2})$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
 						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
@@ -1263,18 +1448,27 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_11",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "fpri53nrr2xgoov",
 				"indexes": [
 					"CREATE UNIQUE INDEX ` + "`" + `idx_NSP4DAc` + "`" + ` ON ` + "`" + `time_sheets` + "`" + ` (\n  ` + "`" + `uid` + "`" + `,\n  ` + "`" + `week_ending` + "`" + `\n)"
 				],
-				"listRule": "@request.auth.id != \"\" && (\n  uid = @request.auth.id\n)",
+				"listRule": "@request.auth.id = uid ||\n(submitted = true && @request.auth.id = approver) ||\n(submitted = true && @request.auth.id ?= time_sheet_reviewers_via_time_sheet.reviewer) ||\n(committed != '' && @request.auth.user_claims_via_uid.cid.name ?= 'report')",
 				"name": "time_sheets",
 				"system": false,
 				"type": "base",
 				"updateRule": "(rejected = true && rejector != \"\" && rejection_reason != \"\") || (rejected = false)",
-				"viewRule": "@request.auth.id != \"\" && (\n  uid = @request.auth.id\n)"
+				"viewRule": "@request.auth.id = uid ||\n(submitted = true && @request.auth.id = approver) ||\n(submitted = true && @request.auth.id ?= time_sheet_reviewers_via_time_sheet.reviewer) ||\n(committed != '' && @request.auth.user_claims_via_uid.cid.name ?= 'report')"
 			},
 			{
 				"createRule": null,
@@ -1381,7 +1575,7 @@ func init() {
 					{
 						"hidden": false,
 						"id": "gnwvxtyk",
-						"max": 500,
+						"max": 332,
 						"min": 0,
 						"name": "opening_op",
 						"onlyInt": false,
@@ -1393,7 +1587,7 @@ func init() {
 					{
 						"hidden": false,
 						"id": "4pjevdlg",
-						"max": 500,
+						"max": 200,
 						"min": 0,
 						"name": "opening_ov",
 						"onlyInt": false,
@@ -1418,6 +1612,75 @@ func init() {
 					},
 					{
 						"hidden": false,
+						"id": "bool3868584071",
+						"name": "untracked_time_off",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "bool2561885187",
+						"name": "time_sheet_expected",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "bool943649362",
+						"name": "allow_personal_reimbursement",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text178857617",
+						"max": 0,
+						"min": 0,
+						"name": "mobile_phone",
+						"pattern": "^\\+1 \\(\\d{3}\\) \\d{3}-\\d{4}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text711640347",
+						"max": 0,
+						"min": 0,
+						"name": "job_title",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1768657410",
+						"max": 0,
+						"min": 0,
+						"name": "personal_vehicle_insurance_expiry",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
 						"onCreate": true,
@@ -1435,6 +1698,15 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_9",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "zc850lb2wclrr87",
@@ -1450,8 +1722,8 @@ func init() {
 				"viewRule": null
 			},
 			{
-				"createRule": "@request.auth.id != \"\" &&\n@request.auth.time_sheets_via_approver.id ?= time_sheet",
-				"deleteRule": "@request.auth.id != \"\" &&\ntime_sheet ?= @request.auth.time_sheets_via_approver.id",
+				"createRule": "// The caller is authenticated\n@request.auth.id != \"\" &&\n// The caller is the approver of the specified time_sheet\n@request.auth.time_sheets_via_approver.id ?= time_sheet",
+				"deleteRule": "// The caller is authenticated\n@request.auth.id != \"\" &&\n// The caller is the approver of the specified time_sheet\n@request.auth.time_sheets_via_approver.id ?= time_sheet",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -1529,12 +1801,12 @@ func init() {
 				"indexes": [
 					"CREATE UNIQUE INDEX ` + "`" + `idx_MVTW8sD` + "`" + ` ON ` + "`" + `time_sheet_reviewers` + "`" + ` (\n  ` + "`" + `time_sheet` + "`" + `,\n  ` + "`" + `reviewer` + "`" + `\n)"
 				],
-				"listRule": "@request.auth.id = @collection.users.time_sheets_via_approver.approver ||\n@request.auth.id = reviewer",
+				"listRule": null,
 				"name": "time_sheet_reviewers",
 				"system": false,
 				"type": "base",
 				"updateRule": null,
-				"viewRule": "@request.auth.id = @collection.users.time_sheets_via_approver.approver ||\n@request.auth.id = reviewer"
+				"viewRule": null
 			},
 			{
 				"createRule": null,
@@ -1634,7 +1906,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_uIbF",
+						"id": "_clone_VqOQ",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "manager_uid",
@@ -1660,7 +1932,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_YocW",
+						"id": "_clone_AzNd",
 						"max": 0,
 						"min": 0,
 						"name": "opening_date",
@@ -1673,8 +1945,8 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_wdx4",
-						"max": 500,
+						"id": "_clone_KmqD",
+						"max": 200,
 						"min": 0,
 						"name": "opening_ov",
 						"onlyInt": false,
@@ -1685,8 +1957,8 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_dI6X",
-						"max": 500,
+						"id": "_clone_peZE",
+						"max": 332,
 						"min": 0,
 						"name": "opening_op",
 						"onlyInt": false,
@@ -1783,7 +2055,7 @@ func init() {
 				"viewRule": "@request.auth.id = id ||\n@request.auth.id = manager_uid"
 			},
 			{
-				"createRule": "// the caller is authenticated\n@request.auth.id != \"\" &&\n\n// no po_number is submitted\n(@request.body.po_number:isset = false || @request.body.po_number = \"\") &&\n\n// status is Unapproved\n@request.body.status = \"Unapproved\" &&\n\n// the uid is missing or is equal to the authenticated user's id\n(@request.body.uid:isset = false || @request.body.uid = @request.auth.id) &&\n\n// no rejection properties are submitted\n@request.body.rejector:isset = false &&\n@request.body.rejected:isset = false &&\n@request.body.rejection_reason:isset = false &&\n\n// approved isn't set and approver has the right claim. Test divisions in payload in hooks\n@request.body.approved:isset = false &&\n@request.body.approver.user_claims_via_uid.cid.name ?= 'po_approver' &&\n\n// no second approver properties are submitted\n@request.body.second_approver:isset = false &&\n@request.body.second_approval:isset = false &&\n@request.body.second_approver_claim:isset = false &&\n\n// no cancellation properties are submitted\n@request.body.cancelled:isset = false &&\n@request.body.canceller:isset = false &&\n\n// vendor is active\n@request.body.vendor.status = \"Active\" &&\n\n// if present, the category belongs to the job, otherwise is blank\n(\n  // compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
+				"createRule": "// the caller is authenticated\n@request.auth.id != \"\" &&\n\n// no po_number is submitted\n(@request.body.po_number:isset = false || @request.body.po_number = \"\") &&\n\n// status is Unapproved\n@request.body.status = \"Unapproved\" &&\n\n// the uid is missing or is equal to the authenticated user's id\n(@request.body.uid:isset = false || @request.body.uid = @request.auth.id) &&\n\n// no rejection properties are submitted\n@request.body.rejector:isset = false &&\n@request.body.rejected:isset = false &&\n@request.body.rejection_reason:isset = false &&\n\n// approved isn't set. We check that the approver has the appropriate claim and divisions in payload in hooks, commenting out the previous check for po_approver here. \n@request.body.approved:isset = false &&\n//@request.body.approver.user_claims_via_uid.cid.name ?= 'po_approver' &&\n\n// no second approver properties are submitted\n@request.body.second_approver:isset = false &&\n@request.body.second_approval:isset = false &&\n\n// no cancellation properties are submitted\n@request.body.cancelled:isset = false &&\n@request.body.canceller:isset = false &&\n\n// no closed properties are submitted\n@request.body.closed:isset = false &&\n@request.body.closer:isset = false &&\n@request.body.closed_by_system:isset = false &&\n\n// vendor is active\n@request.body.vendor.status = \"Active\" &&\n\n// if present, the category belongs to the job, otherwise is blank\n(\n  // compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
 				"deleteRule": "@request.auth.id = uid && status = 'Unapproved'",
 				"fields": [
 					{
@@ -1807,8 +2079,8 @@ func init() {
 						"max": 0,
 						"min": 0,
 						"name": "po_number",
-						"pattern": "^(20[2-9]\\d)-(0{3}[1-9]|0{2}[1-9]\\d|0[1-9]\\d{2}|[1-3]\\d{3}|4[0-8]\\d{2}|49[0-9]{2})(?:-(0[1-9]|[1-9]\\d))?$",
-						"presentable": false,
+						"pattern": "^([1-9]\\d{3})-(\\d{4})(?:-(0[1-9]|[1-9]\\d))?$",
+						"presentable": true,
 						"primaryKey": false,
 						"required": false,
 						"system": false,
@@ -2038,19 +2310,6 @@ func init() {
 					},
 					{
 						"cascadeDelete": false,
-						"collectionId": "l0tpyvfnr1inncv",
-						"hidden": false,
-						"id": "elntbwwz",
-						"maxSelect": 1,
-						"minSelect": 0,
-						"name": "second_approver_claim",
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "relation"
-					},
-					{
-						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
 						"id": "wwnnme9m",
@@ -2168,18 +2427,85 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "relation4027840693",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "closer",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "date80170468",
+						"max": "",
+						"min": "",
+						"name": "closed",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"hidden": false,
+						"id": "bool1391828026",
+						"name": "closed_by_system",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "relation1897617465",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "priority_second_approver",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "number4065250989",
+						"max": null,
+						"min": null,
+						"name": "approval_total",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_6",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "m19q72syy0e3lvm",
 				"indexes": [
 					"CREATE UNIQUE INDEX ` + "`" + `idx_6Ao8pCT` + "`" + ` ON ` + "`" + `purchase_orders` + "`" + ` (` + "`" + `po_number` + "`" + `) WHERE ` + "`" + `po_number` + "`" + ` != ''"
 				],
-				"listRule": "@request.auth.id = uid ||\n@request.auth.id = approver ||\n@request.auth.id = second_approver",
+				"listRule": "// Active purchase_orders can be viewed by any authenticated user\n(status = \"Active\" && @request.auth.id != \"\") ||\n\n// Cancelled and Closed purchase_orders can be viewed by uid, approver, second_approver, and 'report' claim holder\n(\n  (status = \"Cancelled\" || status = \"Closed\") &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = second_approver || \n    @request.auth.user_claims_via_uid.cid.name ?= 'report'\n  )\n) ||\n\n// TODO: We may also later allow Closed purchase_orders to be viewed by uid, approver, and committer of corresponding expenses, if any, in a rule here\n\n// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of the po_approver claim whose po_approver_props.max_amount >= approval_amount and <= the upper_threshold of the tier.\n(\n  status = \"Unapproved\" &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = priority_second_approver \n  ) || \n  (\n    // updated more than 24 hours ago\n    updated < @yesterday && \n    \n    // caller has the po_approver claim\n    @request.auth.user_claims_via_uid.cid.name ?= \"po_approver\" &&\n\n    // caller max_amount for the po_approver claim >= approval_total\n    @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n\n    // caller user_claims.payload.divisions = null OR includes division\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:length = 0 ||\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:each ?= division\n    ) &&\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n      @collection.purchase_orders_augmented.id ?= id &&\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount ?<= @collection.purchase_orders_augmented.upper_threshold\n    )\n  )\n)",
 				"name": "purchase_orders",
 				"system": false,
 				"type": "base",
-				"updateRule": "// only the creator can update the record\nuid = @request.auth.id &&\n\n// status is Unapproved and no approvals have been performed\nstatus = 'Unapproved' &&\napproved = \"\" &&\nsecond_approval = \"\"\n\n// no po_number is submitted\n(@request.body.po_number:isset = false || po_number = @request.body.po_number) &&\n\n// no rejection properties are submitted\n(@request.body.rejector:isset = false || rejector = @request.body.rejector) &&\n(@request.body.rejected:isset = false || rejected = @request.body.rejected) &&\n(@request.body.rejection_reason:isset = false || rejection_reason = @request.body.rejection_reason) &&\n\n// approved isn't set and approver has the right claim. Test divisions in payload in hooks\n(@request.body.approved:isset = false || approved = @request.body.approved) &&\n@request.body.approver.user_claims_via_uid.cid.name ?= 'po_approver' &&\n\n// no second approver properties are submitted\n(@request.body.second_approver:isset = false || second_approver = @request.body.second_approver) &&\n(@request.body.second_approval:isset = false || second_approval = @request.body.second_approval) &&\n(@request.body.second_approver_claim:isset = false || second_approver_claim = @request.body.second_approver_claim) &&\n\n// no cancellation properties are submitted\n(@request.body.cancelled:isset = false || cancelled = @request.body.cancelled) &&\n(@request.body.canceller:isset = false || canceller = @request.body.canceller) &&\n\n// vendor is active\n@request.body.vendor.status = \"Active\" &&\n\n// if present, the category belongs to the job, otherwise is blank\n(\n  // the job is unchanged, compare the new category to job\n  ( @request.body.job:isset = false && @request.body.category.job = job ) ||\n  // the job has changed, compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
-				"viewRule": "@request.auth.id = uid ||\n@request.auth.id = approver ||\n@request.auth.id = second_approver"
+				"updateRule": "// only the creator can update the record\nuid = @request.auth.id &&\n\n// status is Unapproved and no approvals have been performed\nstatus = 'Unapproved' &&\napproved = \"\" &&\nsecond_approval = \"\"\n\n// no po_number is submitted\n(@request.body.po_number:isset = false || po_number = @request.body.po_number) &&\n\n// no rejection properties are submitted\n(@request.body.rejector:isset = false || rejector = @request.body.rejector) &&\n(@request.body.rejected:isset = false || rejected = @request.body.rejected) &&\n(@request.body.rejection_reason:isset = false || rejection_reason = @request.body.rejection_reason) &&\n\n// approved is unchanged\n(@request.body.approved:isset = false || approved = @request.body.approved) &&\n\n// no second approver properties are submitted\n(@request.body.second_approver:isset = false || second_approver = @request.body.second_approver) &&\n(@request.body.second_approval:isset = false || second_approval = @request.body.second_approval) &&\n\n// no cancellation properties are submitted\n(@request.body.cancelled:isset = false || cancelled = @request.body.cancelled) &&\n(@request.body.canceller:isset = false || canceller = @request.body.canceller) &&\n\n// no closed properties are submitted\n(@request.body.closed:isset = false || closed = @request.body.closed) &&\n(@request.body.closer:isset = false || closer = @request.body.closer) &&\n(@request.body.closed_by_system:isset = false || closed_by_system = @request.body.closed_by_system) &&\n\n// vendor is active\n@request.body.vendor.status = \"Active\" &&\n\n// if present, the category belongs to the job, otherwise is blank\n(\n  // the job is unchanged, compare the new category to job\n  ( @request.body.job:isset = false && @request.body.category.job = job ) ||\n  // the job has changed, compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
+				"viewRule": "// Active purchase_orders can be viewed by any authenticated user\n(status = \"Active\" && @request.auth.id != \"\") ||\n\n// Cancelled and Closed purchase_orders can be viewed by uid, approver, second_approver, and 'report' claim holder\n(\n  (status = \"Cancelled\" || status = \"Closed\") &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = second_approver || \n    @request.auth.user_claims_via_uid.cid.name ?= 'report'\n  )\n) ||\n\n// TODO: We may also later allow Closed purchase_orders to be viewed by uid, approver, and committer of corresponding expenses, if any, in a rule here\n\n// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of the po_approver claim whose po_approver_props.max_amount >= approval_amount and <= the upper_threshold of the tier.\n(\n  status = \"Unapproved\" &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = priority_second_approver \n  ) || \n  (\n    // updated more than 24 hours ago\n    updated < @yesterday && \n    \n    // caller has the po_approver claim\n    @request.auth.user_claims_via_uid.cid.name ?= \"po_approver\" &&\n\n    // caller max_amount for the po_approver claim >= approval_total\n    @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n\n    // caller user_claims.payload.divisions = null OR includes division\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:length = 0 ||\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:each ?= division\n    ) &&\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n      @collection.purchase_orders_augmented.id ?= id &&\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount ?<= @collection.purchase_orders_augmented.upper_threshold\n    )\n  )\n)"
 			},
 			{
 				"createRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'job'",
@@ -2245,6 +2571,15 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_4",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "nrwhbwowokwu6cr",
@@ -2360,20 +2695,6 @@ func init() {
 							"Mileage",
 							"PersonalReimbursement"
 						]
-					},
-					{
-						"autogeneratePattern": "",
-						"hidden": false,
-						"id": "oplty6th",
-						"max": 0,
-						"min": 0,
-						"name": "vendor_name",
-						"pattern": "",
-						"presentable": false,
-						"primaryKey": false,
-						"required": false,
-						"system": false,
-						"type": "text"
 					},
 					{
 						"hidden": false,
@@ -2612,6 +2933,20 @@ func init() {
 						"type": "relation"
 					},
 					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text701200007",
+						"max": 0,
+						"min": 0,
+						"name": "attachment_hash",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
 						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
@@ -2630,10 +2965,23 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_7",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "o1vpz1mm7qsfoyy",
-				"indexes": [],
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `idx_KqwTULTh3p` + "`" + ` ON ` + "`" + `expenses` + "`" + ` (` + "`" + `attachment_hash` + "`" + `) WHERE ` + "`" + `attachment_hash` + "`" + ` != ''",
+					"CREATE INDEX ` + "`" + `idx_8LRpecUoxd` + "`" + ` ON ` + "`" + `expenses` + "`" + ` (\n  ` + "`" + `purchase_order` + "`" + `,\n  ` + "`" + `committed` + "`" + `\n)",
+					"CREATE INDEX ` + "`" + `idx_slBmqtw6SZ` + "`" + ` ON ` + "`" + `expenses` + "`" + ` (` + "`" + `date` + "`" + `)"
+				],
 				"listRule": "uid = @request.auth.id ||\n(approver = @request.auth.id && submitted = true) ||\n(approved != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'commit') ||\n(committed != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'report')",
 				"name": "expenses",
 				"system": false,
@@ -2812,6 +3160,15 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_1",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "1v6i9rrpniuatcx",
@@ -2914,12 +3271,21 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_2",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "3v7wxidd2f9yhf9",
 				"indexes": [
 					"CREATE INDEX ` + "`" + `idx_KxKk01Y` + "`" + ` ON ` + "`" + `client_contacts` + "`" + ` (\n  ` + "`" + `surname` + "`" + `,\n  ` + "`" + `given_name` + "`" + `\n)",
-					"CREATE UNIQUE INDEX ` + "`" + `idx_0KoVkzQ` + "`" + ` ON ` + "`" + `client_contacts` + "`" + ` (` + "`" + `email` + "`" + `)"
+					"CREATE UNIQUE INDEX ` + "`" + `idx_0tGweKG7kJ` + "`" + ` ON ` + "`" + `client_contacts` + "`" + ` (` + "`" + `email` + "`" + `) WHERE email != ''"
 				],
 				"listRule": "@request.auth.id != \"\"",
 				"name": "client_contacts",
@@ -3195,6 +3561,15 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_13",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "5z24r2v5jgh8qft",
@@ -3205,73 +3580,6 @@ func init() {
 				"type": "base",
 				"updateRule": "@request.auth.user_claims_via_uid.cid.name ?= 'tame' &&\ncommitted = \"\" &&\n// no tsid is submitted, it's set in the hook\n(@request.body.tsid:isset = false || tsid = @request.body.tsid) &&\n\n// no committed properties are submitted\n(@request.body.committed:isset = false || committed = @request.body.committed) &&\n(@request.body.committer:isset = false || committer = @request.body.committer) &&\n(@request.body.committed_week_ending:isset = false || committed_week_ending = @request.body.committed_week_ending) &&\n\n// if present, the category belongs to the job, otherwise is blank\n(\n  // the job is unchanged, compare the new category to job\n  ( @request.body.job:isset = false && @request.body.category.job = job ) ||\n  // the job has changed, compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
 				"viewRule": "@request.auth.user_claims_via_uid.cid.name ?= 'tame' ||\n@request.auth.user_claims_via_uid.cid.name ?= 'report'"
-			},
-			{
-				"createRule": null,
-				"deleteRule": null,
-				"fields": [
-					{
-						"autogeneratePattern": "",
-						"hidden": false,
-						"id": "text3208210256",
-						"max": 0,
-						"min": 0,
-						"name": "id",
-						"pattern": "^[a-z0-9]+$",
-						"presentable": false,
-						"primaryKey": true,
-						"required": true,
-						"system": true,
-						"type": "text"
-					},
-					{
-						"autogeneratePattern": "",
-						"hidden": false,
-						"id": "_clone_54ng",
-						"max": 48,
-						"min": 2,
-						"name": "surname",
-						"pattern": "^[a-zA-Z]+(?:-[a-zA-Z]+)*$",
-						"presentable": false,
-						"primaryKey": false,
-						"required": true,
-						"system": false,
-						"type": "text"
-					},
-					{
-						"autogeneratePattern": "",
-						"hidden": false,
-						"id": "_clone_EZkx",
-						"max": 48,
-						"min": 2,
-						"name": "given_name",
-						"pattern": "^[a-zA-Z]+(?:-[a-zA-Z]+)*$",
-						"presentable": false,
-						"primaryKey": false,
-						"required": true,
-						"system": false,
-						"type": "text"
-					},
-					{
-						"hidden": false,
-						"id": "_clone_9Tvi",
-						"maxSize": 2000000,
-						"name": "divisions",
-						"presentable": false,
-						"required": false,
-						"system": false,
-						"type": "json"
-					}
-				],
-				"id": "kn6f5sfmzjogw63",
-				"indexes": [],
-				"listRule": "@request.auth.id != \"\"",
-				"name": "po_approvers",
-				"system": false,
-				"type": "view",
-				"updateRule": null,
-				"viewQuery": "SELECT p.uid AS id, p.surname AS surname, p.given_name AS given_name, u.payload as divisions \nFROM profiles p\nINNER JOIN user_claims u ON p.uid = u.uid\nINNER JOIN claims c ON u.cid = c.id\nWHERE c.name = 'po_approver'",
-				"viewRule": "@request.auth.id != \"\""
 			},
 			{
 				"createRule": "@request.auth.user_claims_via_uid.cid.name ?= 'payables_admin'",
@@ -3352,6 +3660,15 @@ func init() {
 						"presentable": false,
 						"system": false,
 						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_5",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
 					}
 				],
 				"id": "y0xvnesailac971",
@@ -4031,10 +4348,2725 @@ func init() {
 				"type": "base",
 				"updateRule": null,
 				"viewRule": "@request.auth.id != '' && recordRef = @request.auth.id && collectionRef = @request.auth.collectionId"
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "number3950652054",
+						"max": null,
+						"min": null,
+						"name": "threshold",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1843675174",
+						"max": 0,
+						"min": 0,
+						"name": "description",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_3908224191",
+				"indexes": [
+					"CREATE INDEX ` + "`" + `idx_Jij2pFipor` + "`" + ` ON ` + "`" + `po_approval_thresholds` + "`" + ` (` + "`" + `threshold` + "`" + `)"
+				],
+				"listRule": null,
+				"name": "po_approval_thresholds",
+				"system": false,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": null
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "number432058571",
+						"max": null,
+						"min": null,
+						"name": "max_amount",
+						"onlyInt": true,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "3esdddggow6dykr",
+						"hidden": false,
+						"id": "relation1542800728",
+						"maxSelect": 999,
+						"minSelect": 0,
+						"name": "divisions",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pmxhrqhngh60icm",
+						"hidden": false,
+						"id": "relation1168844159",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "user_claim",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_1501628665",
+				"indexes": [],
+				"listRule": null,
+				"name": "po_approver_props",
+				"system": false,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": null
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_Mc1a",
+						"max": 0,
+						"min": 0,
+						"name": "po_number",
+						"pattern": "^([1-9]\\d{3})-(\\d{4})(?:-(0[1-9]|[1-9]\\d))?$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_me6E",
+						"maxSelect": 1,
+						"name": "status",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"Unapproved",
+							"Active",
+							"Cancelled",
+							"Closed"
+						]
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_hryG",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "uid",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_EvbL",
+						"maxSelect": 1,
+						"name": "type",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"Normal",
+							"Cumulative",
+							"Recurring"
+						]
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_zQB6",
+						"max": 0,
+						"min": 0,
+						"name": "date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_MeMa",
+						"max": 0,
+						"min": 0,
+						"name": "end_date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_NOYW",
+						"maxSelect": 1,
+						"name": "frequency",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "select",
+						"values": [
+							"Weekly",
+							"Biweekly",
+							"Monthly"
+						]
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "3esdddggow6dykr",
+						"hidden": false,
+						"id": "_clone_l0q3",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "division",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_ks4I",
+						"max": 0,
+						"min": 5,
+						"name": "description",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_XuOT",
+						"max": null,
+						"min": 0,
+						"name": "total",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_kspy",
+						"maxSelect": 1,
+						"name": "payment_type",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"OnAccount",
+							"Expense",
+							"CorporateCreditCard"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "_clone_jbAG",
+						"maxSelect": 1,
+						"maxSize": 5242880,
+						"mimeTypes": [
+							"application/pdf",
+							"image/jpeg",
+							"image/png",
+							"image/heic"
+						],
+						"name": "attachment",
+						"presentable": false,
+						"protected": false,
+						"required": false,
+						"system": false,
+						"thumbs": null,
+						"type": "file"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_pVvq",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "rejector",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_9z3M",
+						"max": "",
+						"min": "",
+						"name": "rejected",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_4BfG",
+						"max": 0,
+						"min": 5,
+						"name": "rejection_reason",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_UTL3",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "approver",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_MjGZ",
+						"max": "",
+						"min": "",
+						"name": "approved",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_Tk2a",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "second_approver",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_YjpO",
+						"max": "",
+						"min": "",
+						"name": "second_approval",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_6age",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "canceller",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_b9O5",
+						"max": "",
+						"min": "",
+						"name": "cancelled",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "yovqzrnnomp0lkx",
+						"hidden": false,
+						"id": "_clone_NeQl",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "job",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "nrwhbwowokwu6cr",
+						"hidden": false,
+						"id": "_clone_U2CB",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "category",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "y0xvnesailac971",
+						"hidden": false,
+						"id": "_clone_ZaYl",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "vendor",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "m19q72syy0e3lvm",
+						"hidden": false,
+						"id": "_clone_77cZ",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "parent_po",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_a8QB",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_wMJf",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_wlmF",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "closer",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_MFzW",
+						"max": "",
+						"min": "",
+						"name": "closed",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_5ibI",
+						"name": "closed_by_system",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_whiC",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "priority_second_approver",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_1biW",
+						"max": null,
+						"min": null,
+						"name": "approval_total",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "json2651176244",
+						"maxSize": 1,
+						"name": "lower_threshold",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json3779115990",
+						"maxSize": 1,
+						"name": "upper_threshold",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json218485699",
+						"maxSize": 1,
+						"name": "committed_expenses_count",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json3388866023",
+						"maxSize": 1,
+						"name": "uid_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json1197482769",
+						"maxSize": 1,
+						"name": "approver_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json1788389956",
+						"maxSize": 1,
+						"name": "second_approver_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json2279208833",
+						"maxSize": 1,
+						"name": "priority_second_approver_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json1398595088",
+						"maxSize": 1,
+						"name": "rejector_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_WGSx",
+						"max": 0,
+						"min": 0,
+						"name": "parent_po_number",
+						"pattern": "^([1-9]\\d{3})-(\\d{4})(?:-(0[1-9]|[1-9]\\d))?$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_UsRo",
+						"max": 0,
+						"min": 3,
+						"name": "vendor_name",
+						"pattern": "",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_slBo",
+						"max": 0,
+						"min": 3,
+						"name": "vendor_alias",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_sF75",
+						"max": 0,
+						"min": 0,
+						"name": "job_number",
+						"pattern": "^(P)?[0-9]{2}-[0-9]{3,4}(-[0-9]{1,2})?(-[0-9])?$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_xobI",
+						"max": 0,
+						"min": 2,
+						"name": "client_name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "1v6i9rrpniuatcx",
+						"hidden": false,
+						"id": "relation434858273",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "client_id",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_CwH6",
+						"max": 0,
+						"min": 3,
+						"name": "job_description",
+						"pattern": "",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_lgZg",
+						"max": 0,
+						"min": 1,
+						"name": "division_code",
+						"pattern": "",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_Dl7r",
+						"max": 0,
+						"min": 2,
+						"name": "division_name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_fkjQ",
+						"max": 0,
+						"min": 3,
+						"name": "category_name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					}
+				],
+				"id": "pbc_1245168108",
+				"indexes": [],
+				"listRule": "// copy the listRule and viewRule from the purchase_orders collection api rules\n// Active purchase_orders can be viewed by any authenticated user\n(status = \"Active\" && @request.auth.id != \"\") ||\n\n// Cancelled and Closed purchase_orders can be viewed by uid, approver, second_approver, and 'report' claim holder\n(\n  (status = \"Cancelled\" || status = \"Closed\") &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = second_approver || \n    @request.auth.user_claims_via_uid.cid.name ?= 'report'\n  )\n) ||\n\n// TODO: We may also later allow Closed purchase_orders to be viewed by uid, approver, and committer of corresponding expenses, if any, in a rule here\n\n// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of the po_approver claim whose po_approver_props.max_amount >= approval_amount and <= the upper_threshold of the tier.\n(\n  status = \"Unapproved\" &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = priority_second_approver \n  ) || \n  (\n    // updated more than 24 hours ago\n    updated < @yesterday && \n    \n    // caller has the po_approver claim\n    @request.auth.user_claims_via_uid.cid.name ?= \"po_approver\" &&\n\n    // caller max_amount for the po_approver claim >= approval_total\n    @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n\n    // caller user_claims.payload.divisions = null OR includes division\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:length = 0 ||\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:each ?= division\n    ) &&\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n      @collection.purchase_orders_augmented.id ?= id &&\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount ?<= @collection.purchase_orders_augmented.upper_threshold\n    )\n  )\n)",
+				"name": "purchase_orders_augmented",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "SELECT \n  po.id,\n  po.po_number,\n  po.status,\n  po.uid,\n  po.type,\n  po.date,\n  po.end_date,\n  po.frequency,\n  po.division,\n  po.description,\n  po.total,\n  po.payment_type,\n  po.attachment,\n  po.rejector,\n  po.rejected,\n  po.rejection_reason,\n  po.approver,\n  po.approved,\n  po.second_approver,\n  po.second_approval,\n  po.canceller,\n  po.cancelled,\n  po.job,\n  po.category,\n  po.vendor,\n  po.parent_po,\n  po.created,\n  po.updated,\n  po.closer,\n  po.closed,\n  po.closed_by_system,\n  po.priority_second_approver,\n  po.approval_total,\n  COALESCE((SELECT MAX(threshold) \n    FROM po_approval_thresholds \n    WHERE threshold < po.approval_total), 0) AS lower_threshold,\n  COALESCE((SELECT MIN(threshold) \n    FROM po_approval_thresholds \n    WHERE threshold >= po.approval_total),1000000) AS upper_threshold,\n  (SELECT COUNT(*) \n    FROM expenses \n    WHERE expenses.purchase_order = po.id AND expenses.committed != \"\") AS committed_expenses_count,\n  (p0.given_name || \" \" || p0.surname) AS uid_name,\n  (p1.given_name || \" \" || p1.surname) AS approver_name,\n  (p2.given_name || \" \" || p2.surname) AS second_approver_name,\n  (p3.given_name || \" \" || p3.surname) AS priority_second_approver_name,\n  (p4.given_name || \" \" || p4.surname) AS rejector_name,\n  po2.po_number AS parent_po_number,\n  v.name AS vendor_name,\n  v.alias AS vendor_alias,\n  j.number AS job_number,\n  cl.name AS client_name,\n  cl.id AS client_id,\n  j.description AS job_description,\n  d.code AS division_code,\n  d.name AS division_name,\n  c.name AS category_name\nFROM purchase_orders AS po\nLEFT JOIN profiles AS p0 ON po.uid = p0.uid\nLEFT JOIN profiles AS p1 ON po.approver = p1.uid\nLEFT JOIN profiles AS p2 ON po.second_approver = p2.uid\nLEFT JOIN profiles AS p3 ON po.priority_second_approver = p3.uid\nLEFT JOIN profiles AS p4 ON po.rejector = p4.uid\nLEFT JOIN purchase_orders AS po2 ON po.parent_po = po2.id\nLEFT JOIN vendors AS v ON po.vendor = v.id\nLEFT JOIN jobs AS j ON po.job = j.id\nLEFT JOIN divisions AS d ON po.division = d.id\nLEFT JOIN categories AS c ON po.category = c.id\nLEFT JOIN clients AS cl ON j.client = cl.id;",
+				"viewRule": "// copy the listRule and viewRule from the purchase_orders collection api rules\n// Active purchase_orders can be viewed by any authenticated user\n(status = \"Active\" && @request.auth.id != \"\") ||\n\n// Cancelled and Closed purchase_orders can be viewed by uid, approver, second_approver, and 'report' claim holder\n(\n  (status = \"Cancelled\" || status = \"Closed\") &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = second_approver || \n    @request.auth.user_claims_via_uid.cid.name ?= 'report'\n  )\n) ||\n\n// TODO: We may also later allow Closed purchase_orders to be viewed by uid, approver, and committer of corresponding expenses, if any, in a rule here\n\n// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of the po_approver claim whose po_approver_props.max_amount >= approval_amount and <= the upper_threshold of the tier.\n(\n  status = \"Unapproved\" &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = priority_second_approver \n  ) || \n  (\n    // updated more than 24 hours ago\n    updated < @yesterday && \n    \n    // caller has the po_approver claim\n    @request.auth.user_claims_via_uid.cid.name ?= \"po_approver\" &&\n\n    // caller max_amount for the po_approver claim >= approval_total\n    @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n\n    // caller user_claims.payload.divisions = null OR includes division\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:length = 0 ||\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:each ?= division\n    ) &&\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n      @collection.purchase_orders_augmented.id ?= id &&\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount ?<= @collection.purchase_orders_augmented.upper_threshold\n    )\n  )\n)"
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "json432058571",
+						"maxSize": 1,
+						"name": "max_amount",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json2651176244",
+						"maxSize": 1,
+						"name": "lower_threshold",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json3779115990",
+						"maxSize": 1,
+						"name": "upper_threshold",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json29625393",
+						"maxSize": 1,
+						"name": "divisions",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json3198358462",
+						"maxSize": 1,
+						"name": "claims",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					}
+				],
+				"id": "pbc_1959231337",
+				"indexes": [],
+				"listRule": "@request.auth.id = id",
+				"name": "user_po_permission_data",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "WITH user_props AS (\n  SELECT \n    uc.uid AS id,\n    COALESCE(p.max_amount, 0) max_amount,\n    COALESCE(p.divisions, '[]') divisions\n  FROM user_claims uc\n  LEFT JOIN po_approver_props p \n    ON uc.id = p.user_claim\n)\nSELECT \n  up.id,\n  up.max_amount,\n  COALESCE(\n    (SELECT MAX(threshold)\n     FROM po_approval_thresholds\n     WHERE threshold < up.max_amount),\n    0\n  ) AS lower_threshold,\n  COALESCE(\n    (SELECT MIN(threshold)\n     FROM po_approval_thresholds\n     WHERE threshold >= up.max_amount),\n    1000000\n  ) AS upper_threshold,\n  up.divisions,\n  (SELECT json_group_array(c.name)\n   FROM user_claims uc\n   JOIN claims c \n     ON uc.cid = c.id\n   WHERE uc.uid = up.id) AS claims\nFROM user_props up",
+				"viewRule": "@request.auth.id = id"
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1997877400",
+						"max": 0,
+						"min": 3,
+						"name": "code",
+						"pattern": "^[a-z]+(?:_[a-z]+)*$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1843675174",
+						"max": 0,
+						"min": 0,
+						"name": "description",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text4224597626",
+						"max": 0,
+						"min": 0,
+						"name": "subject",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text2972108329",
+						"max": 0,
+						"min": 0,
+						"name": "text_email",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1466244251",
+						"max": 0,
+						"min": 0,
+						"name": "html_email",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_1572233440",
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `idx_BHMSwRwcDq` + "`" + ` ON ` + "`" + `notification_templates` + "`" + ` (` + "`" + `code` + "`" + `)"
+				],
+				"listRule": null,
+				"name": "notification_templates",
+				"system": false,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": null
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "relation1745156937",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "recipient",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pbc_1572233440",
+						"hidden": false,
+						"id": "relation2539659139",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "template",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "select2063623452",
+						"maxSelect": 1,
+						"name": "status",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"pending",
+							"inflight",
+							"sent",
+							"error"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "date3461079410",
+						"max": "",
+						"min": "",
+						"name": "status_updated",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1574812785",
+						"max": 0,
+						"min": 0,
+						"name": "error",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "relation2375276105",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "user",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "bool2892455623",
+						"name": "system_notification",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "json2918445923",
+						"maxSize": 0,
+						"name": "data",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_2301922722",
+				"indexes": [],
+				"listRule": null,
+				"name": "notifications",
+				"system": false,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": null
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "number2431691161",
+						"max": null,
+						"min": null,
+						"name": "num_pos_qualified",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					}
+				],
+				"id": "pbc_540250600",
+				"indexes": [],
+				"listRule": null,
+				"name": "pending_items_for_qualified_po_second_approvers",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "WITH QualifiedUsers AS (\n    SELECT\n        u.id AS user_id,\n        pap.max_amount,\n        pap.divisions\n    FROM users u\n    JOIN user_claims uc ON u.id = uc.uid\n    JOIN claims c ON uc.cid = c.id\n    JOIN po_approver_props pap ON uc.id = pap.user_claim\n    WHERE c.name = 'po_approver'\n),\nPOsNeedingSecondApproval AS (\n    SELECT\n        po.id AS po_id,\n        po.approval_total,\n        po.division,\n        poa.upper_threshold\n    FROM purchase_orders po\n    JOIN purchase_orders_augmented poa ON po.id = poa.id\n    WHERE\n        po.approved != ''\n        AND po.rejected == ''\n        AND po.status = 'Unapproved'\n        AND po.second_approval = ''\n        AND po.updated < strftime('%Y-%m-%d %H:%M:%fZ', 'now', '-24 hours')\n)\nSELECT\n    qu.user_id AS id,\n    COUNT(pnsa.po_id) AS num_pos_qualified\nFROM QualifiedUsers qu\nLEFT JOIN POsNeedingSecondApproval pnsa\n    ON qu.max_amount >= pnsa.approval_total\n    AND (\n        json_valid(qu.divisions) AND json_array_length(qu.divisions) = 0\n        OR (\n           json_valid(qu.divisions) AND EXISTS (SELECT 1 FROM json_each(qu.divisions) WHERE value = pnsa.division)\n        )\n    )\n    AND qu.max_amount <= pnsa.upper_threshold\nGROUP BY qu.user_id;",
+				"viewRule": null
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_sbpV",
+						"max": 0,
+						"min": 0,
+						"name": "week_ending",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					}
+				],
+				"id": "pbc_317365225",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "time_report_week_endings",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "SELECT\n  MIN(id) as id,\n  week_ending\nFROM time_sheets\nWHERE committed != ''\nGROUP BY week_ending\nORDER BY week_ending DESC;",
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_JXVx",
+						"max": 0,
+						"min": 0,
+						"name": "week_ending",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					}
+				],
+				"id": "pbc_1013075334",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "payroll_report_week_endings",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "SELECT\n  MIN(id) as id,\n  week_ending\nFROM time_sheets\nWHERE committed != ''\n  AND (CAST(JULIANDAY(week_ending) - JULIANDAY('2025-03-01') AS INTEGER)) % 14 = 0\nGROUP BY week_ending\nORDER BY week_ending DESC;",
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "3esdddggow6dykr",
+						"hidden": false,
+						"id": "_clone_vor1",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "division",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_PSt3",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "uid",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_C8wU",
+						"max": 18,
+						"min": -18,
+						"name": "hours",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_FEGB",
+						"max": 0,
+						"min": 0,
+						"name": "description",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "cnqv0wm8hly7r3n",
+						"hidden": false,
+						"id": "_clone_Pulu",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "time_type",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_Ay3a",
+						"max": 3,
+						"min": 0,
+						"name": "meals_hours",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "yovqzrnnomp0lkx",
+						"hidden": false,
+						"id": "_clone_kYGH",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "job",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_xRjI",
+						"max": 0,
+						"min": 0,
+						"name": "work_record",
+						"pattern": "^[FKQ][0-9]{2}-[0-9]{3,}(-[0-9]+)?$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_jfFy",
+						"max": null,
+						"min": null,
+						"name": "payout_request_amount",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_RKPL",
+						"max": 0,
+						"min": 0,
+						"name": "date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_KCxg",
+						"max": 0,
+						"min": 0,
+						"name": "week_ending",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "fpri53nrr2xgoov",
+						"hidden": false,
+						"id": "_clone_snuf",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "tsid",
+						"presentable": true,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "nrwhbwowokwu6cr",
+						"hidden": false,
+						"id": "_clone_dn82",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "category",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_o4P2",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "creator",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_Gg6D",
+						"max": "",
+						"min": "",
+						"name": "committed",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_fZSL",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "committer",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_fxkG",
+						"max": 0,
+						"min": 0,
+						"name": "committed_week_ending",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_QRlt",
+						"name": "skip_tsid_check",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "json3388866023",
+						"maxSize": 1,
+						"name": "uid_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json682311642",
+						"maxSize": 1,
+						"name": "creator_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json3621682694",
+						"maxSize": 1,
+						"name": "committer_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_2Q3G",
+						"max": 0,
+						"min": 1,
+						"name": "time_type_code",
+						"pattern": "",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_WDgW",
+						"max": 0,
+						"min": 2,
+						"name": "time_type_name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_XAhg",
+						"max": 0,
+						"min": 0,
+						"name": "job_number",
+						"pattern": "^(P)?[0-9]{2}-[0-9]{3,4}(-[0-9]{1,2})?(-[0-9])?$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_fmak",
+						"max": 0,
+						"min": 3,
+						"name": "job_description",
+						"pattern": "",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_aujY",
+						"max": 0,
+						"min": 3,
+						"name": "category_name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_6NLX",
+						"max": 0,
+						"min": 1,
+						"name": "division_code",
+						"pattern": "",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_OXeo",
+						"max": 0,
+						"min": 2,
+						"name": "division_name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					}
+				],
+				"id": "pbc_3637308620",
+				"indexes": [],
+				"listRule": "// copy the listRule and viewRule from the time_amendments collection api rules\n@request.auth.user_claims_via_uid.cid.name ?= 'tame' ||\n@request.auth.user_claims_via_uid.cid.name ?= 'report'",
+				"name": "time_amendments_augmented",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "SELECT \n  ta.id,\n  ta.division,\n  ta.uid,\n  ta.hours,\n  ta.description,\n  ta.time_type,\n  ta.meals_hours,\n  ta.job,\n  ta.work_record,\n  ta.payout_request_amount,\n  ta.date,\n  ta.week_ending,\n  ta.tsid,\n  ta.category,\n  ta.creator,\n  ta.committed,\n  ta.committer,\n  ta.committed_week_ending,\n  ta.skip_tsid_check,\n  (p0.given_name || ' ' || p0.surname) as uid_name,\n  (p1.given_name || ' ' || p1.surname) as creator_name,\n  (p2.given_name || ' ' || p2.surname) as committer_name,\n  tt.code as time_type_code,\n  tt.name as time_type_name,\n  j.number as job_number,\n  j.description as job_description,\n  c.name as category_name,\n  d.code as division_code,\n  d.name as division_name\nFROM time_amendments ta\nLEFT JOIN time_types tt ON ta.time_type = tt.id\nLEFT JOIN jobs j ON ta.job = j.id\nLEFT JOIN categories c ON ta.category = c.id\nLEFT JOIN divisions d ON ta.division = d.id\nLEFT JOIN profiles p0 ON ta.uid = p0.uid\nLEFT JOIN profiles p1 ON ta.creator = p1.uid\nLEFT JOIN profiles p2 ON ta.committer = p2.uid\nORDER BY ta.date DESC;",
+				"viewRule": "// copy the listRule and viewRule from the time_amendments collection api rules\n@request.auth.user_claims_via_uid.cid.name ?= 'tame' ||\n@request.auth.user_claims_via_uid.cid.name ?= 'report'"
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_CzNQ",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "uid",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_WcUq",
+						"max": 0,
+						"min": 0,
+						"name": "date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "3esdddggow6dykr",
+						"hidden": false,
+						"id": "_clone_JnYY",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "division",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_SzDu",
+						"max": 0,
+						"min": 0,
+						"name": "description",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_Qiq5",
+						"max": null,
+						"min": 0,
+						"name": "total",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_rSs1",
+						"maxSelect": 1,
+						"name": "payment_type",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"OnAccount",
+							"Expense",
+							"CorporateCreditCard",
+							"Allowance",
+							"FuelCard",
+							"Mileage",
+							"PersonalReimbursement"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "_clone_TsrX",
+						"maxSelect": 1,
+						"maxSize": 5242880,
+						"mimeTypes": [
+							"application/pdf",
+							"image/jpeg",
+							"image/png",
+							"image/heic"
+						],
+						"name": "attachment",
+						"presentable": false,
+						"protected": false,
+						"required": false,
+						"system": false,
+						"thumbs": null,
+						"type": "file"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_yE99",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "rejector",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_tckS",
+						"max": "",
+						"min": "",
+						"name": "rejected",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_SBdS",
+						"max": 0,
+						"min": 5,
+						"name": "rejection_reason",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_TLN2",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "approver",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_Ny4M",
+						"max": "",
+						"min": "",
+						"name": "approved",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "yovqzrnnomp0lkx",
+						"hidden": false,
+						"id": "_clone_j8Tz",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "job",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "nrwhbwowokwu6cr",
+						"hidden": false,
+						"id": "_clone_trSA",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "category",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_zacW",
+						"max": 0,
+						"min": 0,
+						"name": "pay_period_ending",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_DRC7",
+						"maxSelect": 4,
+						"name": "allowance_types",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "select",
+						"values": [
+							"Lodging",
+							"Breakfast",
+							"Lunch",
+							"Dinner"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "_clone_s7vl",
+						"name": "submitted",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_a4pc",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "committer",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_P9a5",
+						"max": "",
+						"min": "",
+						"name": "committed",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "date"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_WO0d",
+						"max": 0,
+						"min": 0,
+						"name": "committed_week_ending",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_geb8",
+						"max": null,
+						"min": 0,
+						"name": "distance",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_VtLH",
+						"max": 0,
+						"min": 0,
+						"name": "cc_last_4_digits",
+						"pattern": "^\\d{4}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "m19q72syy0e3lvm",
+						"hidden": false,
+						"id": "_clone_gyIw",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "purchase_order",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "y0xvnesailac971",
+						"hidden": false,
+						"id": "_clone_Pq97",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "vendor",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_wOQp",
+						"max": 0,
+						"min": 0,
+						"name": "purchase_order_number",
+						"pattern": "^([1-9]\\d{3})-(\\d{4})(?:-(0[1-9]|[1-9]\\d))?$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_yony",
+						"max": 0,
+						"min": 2,
+						"name": "client_name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_sKn9",
+						"max": 0,
+						"min": 3,
+						"name": "category_name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_KFiu",
+						"max": 0,
+						"min": 0,
+						"name": "job_number",
+						"pattern": "^(P)?[0-9]{2}-[0-9]{3,4}(-[0-9]{1,2})?(-[0-9])?$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_Gycm",
+						"max": 0,
+						"min": 3,
+						"name": "job_description",
+						"pattern": "",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_hCI1",
+						"max": 0,
+						"min": 2,
+						"name": "division_name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_2NZW",
+						"max": 0,
+						"min": 1,
+						"name": "division_code",
+						"pattern": "",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_qECx",
+						"max": 0,
+						"min": 3,
+						"name": "vendor_name",
+						"pattern": "",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_7SYv",
+						"max": 0,
+						"min": 3,
+						"name": "vendor_alias",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "json3388866023",
+						"maxSize": 1,
+						"name": "uid_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json1197482769",
+						"maxSize": 1,
+						"name": "approver_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json1398595088",
+						"maxSize": 1,
+						"name": "rejector_name",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					}
+				],
+				"id": "pbc_4039657122",
+				"indexes": [],
+				"listRule": "uid = @request.auth.id ||\n(approver = @request.auth.id && submitted = true) ||\n(approved != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'commit') ||\n(committed != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'report')",
+				"name": "expenses_augmented",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "-- The augmented expenses query is to create a view that includes all the required\n-- fields for the expenses list page UI.\n\n-- copy the existing expenses listRule / viewRule\n-- uid = @request.auth.id ||\n-- (approver = @request.auth.id && submitted = true) ||\n-- (approved != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'commit') ||\n-- (committed != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'report')\nSELECT e.id,\n  e.uid,\n  e.date,\n  e.division,\n  e.description,\n  e.total,\n  e.payment_type,\n  e.attachment,\n  e.rejector,\n  e.rejected,\n  e.rejection_reason,\n  e.approver,\n  e.approved,\n  e.job,\n  e.category,\n  e.pay_period_ending,\n  e.allowance_types,\n  e.submitted,\n  e.committer,\n  e.committed,\n  e.committed_week_ending,\n  e.distance,\n  e.cc_last_4_digits,\n  e.purchase_order,\n  e.vendor,\n  po.po_number as purchase_order_number,\n  cl.name as client_name,\n  ca.name as category_name,\n  j.number as job_number,\n  j.description as job_description,\n  d.name as division_name,\n  d.code as division_code,\n  v.name as vendor_name,\n  v.alias as vendor_alias,\n  (p0.given_name || ' ' || p0.surname) as uid_name,\n  (p1.given_name || ' ' || p1.surname) as approver_name,\n  (p2.given_name || ' ' || p2.surname) as rejector_name\nFROM expenses e\nLEFT JOIN jobs j ON e.job = j.id\nLEFT JOIN clients cl ON j.client = cl.id\nLEFT JOIN vendors v ON e.vendor = v.id\nLEFT JOIN divisions d ON e.division = d.id\nLEFT JOIN categories ca ON e.category = ca.id\nLEFT JOIN profiles p0 ON e.uid = p0.uid\nLEFT JOIN profiles p1 ON e.approver = p1.uid\nLEFT JOIN profiles p2 ON e.rejector = p2.uid\nLEFT JOIN purchase_orders po ON e.purchase_order = po.id;",
+				"viewRule": "uid = @request.auth.id ||\n(approver = @request.auth.id && submitted = true) ||\n(approved != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'commit') ||\n(committed != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'report')"
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text2862495610",
+						"max": 0,
+						"min": 0,
+						"name": "date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "bool_imported_14",
+						"name": "_imported",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					}
+				],
+				"id": "pbc_2078099607",
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `idx_0o9BK5jvdD` + "`" + ` ON ` + "`" + `mileage_reset_dates` + "`" + ` (` + "`" + `date` + "`" + `)"
+				],
+				"listRule": null,
+				"name": "mileage_reset_dates",
+				"system": false,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": null
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_jitS",
+						"max": 0,
+						"min": 0,
+						"name": "date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_kgn1",
+						"max": 0,
+						"min": 0,
+						"name": "allowance_rates_effective_date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_rWnH",
+						"maxSelect": 1,
+						"name": "payment_type",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"OnAccount",
+							"Expense",
+							"CorporateCreditCard",
+							"Allowance",
+							"FuelCard",
+							"Mileage",
+							"PersonalReimbursement"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "_clone_Elnr",
+						"maxSelect": 4,
+						"name": "allowance_types",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "select",
+						"values": [
+							"Lodging",
+							"Breakfast",
+							"Lunch",
+							"Dinner"
+						]
+					},
+					{
+						"hidden": false,
+						"id": "_clone_7uef",
+						"max": null,
+						"min": 0,
+						"name": "breakfast_rate",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_ORPg",
+						"max": null,
+						"min": 0,
+						"name": "lunch_rate",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_QBmw",
+						"max": null,
+						"min": 0,
+						"name": "dinner_rate",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_yD4z",
+						"max": null,
+						"min": 0,
+						"name": "lodging_rate",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_1leS",
+						"maxSize": 2000000,
+						"name": "mileage",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json1192429895",
+						"maxSize": 1,
+						"name": "allowance_total",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json211419417",
+						"maxSize": 1,
+						"name": "allowance_description",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					}
+				],
+				"id": "pbc_582883213",
+				"indexes": [],
+				"listRule": null,
+				"name": "expense_allowance_totals",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "SELECT e.id, \n  e.date, \n  r.effective_date allowance_rates_effective_date, \n  e.payment_type,\n  e.allowance_types,\n  r.breakfast breakfast_rate,\n  r.lunch lunch_rate,\n  r.dinner dinner_rate,\n  r.lodging lodging_rate,\n  r.mileage,\n  ((CASE WHEN e.allowance_types LIKE '%\"Breakfast\"%'   THEN r.breakfast ELSE 0 END)\n  + (CASE WHEN e.allowance_types LIKE '%\"Lunch\"%'     THEN r.lunch     ELSE 0 END)\n  + (CASE WHEN e.allowance_types LIKE '%\"Dinner\"%'    THEN r.dinner    ELSE 0 END)\n  + (CASE WHEN e.allowance_types LIKE '%\"Lodging\"%'   THEN r.lodging   ELSE 0 END)\n  )AS allowance_total,\n  RTRIM(\n    (CASE WHEN e.allowance_types LIKE '%\"Breakfast\"%' THEN 'Breakfast ' ELSE '' END) ||\n    (CASE WHEN e.allowance_types LIKE '%\"Lunch\"%'     THEN 'Lunch '     ELSE '' END) ||\n    (CASE WHEN e.allowance_types LIKE '%\"Dinner\"%'    THEN 'Dinner '    ELSE '' END) ||\n    (CASE WHEN e.allowance_types LIKE '%\"Lodging\"%'   THEN 'Lodging '   ELSE '' END)\n  ) AS allowance_description\nFROM expenses e \nLEFT JOIN expense_rates r ON ((r.effective_date = (SELECT MAX(i.effective_date) FROM expense_rates i WHERE (i.effective_date <= e.date))))\nWHERE e.payment_type IN ('Allowance','Meals');",
+				"viewRule": null
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "json1402668550",
+						"maxSize": 1,
+						"name": "uid",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json2862495610",
+						"maxSize": 1,
+						"name": "date",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json226078728",
+						"maxSize": 1,
+						"name": "reset_mileage_date",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json479369857",
+						"maxSize": 1,
+						"name": "distance",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json2857502310",
+						"maxSize": 1,
+						"name": "cumulative",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json790377260",
+						"maxSize": 1,
+						"name": "effective_date",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json792564374",
+						"maxSize": 1,
+						"name": "mileage_total",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					}
+				],
+				"id": "pbc_2931110398",
+				"indexes": [],
+				"listRule": null,
+				"name": "expense_mileage_totals",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "-- 1) Explode + window up front\nWITH rates_expanded AS (\n  SELECT\n    m.effective_date,\n    CAST(t.key   AS INTEGER) AS tier_lower,\n    LEAD(CAST(t.key AS INTEGER)) OVER (\n      PARTITION BY m.effective_date\n      ORDER BY CAST(t.key AS INTEGER)\n    ) AS tier_upper,\n    CAST(t.value AS REAL)    AS tier_rate\n\n  FROM expense_rates m\n  CROSS JOIN json_each(m.mileage) AS t\n),\n\n-- 2) Base: compute cumulative & interval boundaries\nbase AS (\n  SELECT\n    e.id,\n    e.uid,\n    e.date,\n    -- This ends up being faster than joining to mileage_reset_dates\n    (\n      SELECT MAX(r.date)\n      FROM mileage_reset_dates r\n      WHERE r.date <= e.date\n    ) AS reset_mileage_date,\n    e.distance,\n    -- interval end = cumulative distance\n    SUM(e.distance) OVER (\n      PARTITION BY e.uid, (\n        SELECT MAX(r.date)\n        FROM mileage_reset_dates r\n        WHERE r.date <= e.date\n      )\n      ORDER BY e.date\n    ) AS end_distance,\n    (\n      SELECT MAX(m.effective_date)\n      FROM expense_rates m\n      WHERE m.effective_date <= e.date\n    ) AS effective_date\n  FROM expenses e\n  WHERE e.payment_type = 'Mileage'\n),\n\n/* \n3) Join each expense to its tiers, filtering to only those that overlap We are\npairing each expense’s [start_distance, end_distance) interval with only those\ntier intervals [tier_lower, tier_upper) that intersect it. By exploding each\ntier into its own row, an expense whose kilometres cross a tier boundary will\njoin to two (or more, in theory) tier‐rows. Thus we can expect that the number\nof rows in overlaps can be more than the number of rows in expenses.\n*/\noverlaps AS (\n  SELECT\n    b.id,\n    b.end_distance - b.distance AS start_distance,\n    b.end_distance,\n    r.tier_lower,\n    COALESCE(r.tier_upper, 1e9) AS tier_upper,\n    r.tier_rate\n  FROM base b\n  JOIN rates_expanded r\n    ON r.effective_date = b.effective_date\n  WHERE b.end_distance > r.tier_lower\n    AND (r.tier_upper IS NULL OR (b.end_distance - b.distance) < r.tier_upper)\n),\n\n/*\n4) Compute overlap length per tier\nfor each expense × tier row, compute how many kilometres of the expense fall into that tier by:\n  1. Determining the overlap interval between the expense’s [start_distance, end_distance)\n     and the tier’s [tier_lower, tier_upper) interval:\n       • overlap_start = max(start_distance, tier_lower)\n       • overlap_end   = tier_upper IS NULL\n                           ? end_distance\n                           : min(end_distance, tier_upper)\n  2. Calculating overlap_km = max(0, overlap_end − overlap_start)\n       • Ensures negative values (no overlap) are clipped to zero\n  3. Carrying along tier_rate so we can later multiply overlap_km × tier_rate\n*/\ntier_calcs AS (\n  SELECT\n    id,\n    max(0,\n      min(end_distance, tier_upper)\n      - max(start_distance, tier_lower)\n    ) AS overlap_km,\n    tier_rate\n  FROM overlaps\n)\n\n-- 5) Sum up reimbursement per expense\nSELECT\n  b.id,\n  b.uid,\n  b.date,\n  b.reset_mileage_date,\n  b.distance,\n  b.end_distance AS cumulative,\n  b.effective_date,\n  ROUND(COALESCE(\n    -- sum up this expense’s (overlap × rate) directly\n    (SELECT SUM(overlap_km * tier_rate)\n     FROM tier_calcs tc\n     WHERE tc.id = b.id),\n    0\n  ), 2) AS mileage_total\nFROM base b\nORDER BY b.date;\n",
+				"viewRule": null
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text2324736937",
+						"max": 0,
+						"min": 0,
+						"name": "key",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3981121951",
+						"max": 0,
+						"min": 0,
+						"name": "class",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "file1109235014",
+						"maxSelect": 1,
+						"maxSize": 536870912,
+						"mimeTypes": [],
+						"name": "zip",
+						"presentable": false,
+						"protected": false,
+						"required": true,
+						"system": false,
+						"thumbs": [],
+						"type": "file"
+					},
+					{
+						"hidden": false,
+						"id": "json536828135",
+						"maxSize": 0,
+						"name": "hashes",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json652890421",
+						"maxSize": 0,
+						"name": "filenames",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_3202283038",
+				"indexes": [],
+				"listRule": "@request.auth.user_claims_via_uid.cid.name ?= 'report'",
+				"name": "zip_cache",
+				"system": false,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": "@request.auth.user_claims_via_uid.cid.name ?= 'report'"
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_WtML",
+						"max": 0,
+						"min": 0,
+						"name": "week_ending",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": true,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "json2170425494",
+						"maxSize": 1,
+						"name": "committed_count",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json35465996",
+						"maxSize": 1,
+						"name": "approved_count",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json1456061467",
+						"maxSize": 1,
+						"name": "submitted_count",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					}
+				],
+				"id": "pbc_331583008",
+				"indexes": [],
+				"listRule": "@request.auth.user_claims_via_uid.cid.name ?= 'report'",
+				"name": "time_tracking",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "SELECT\n  MIN(id) id,\n  week_ending,\n  SUM(CASE WHEN committed != '' THEN 1 ELSE 0 END) committed_count,\n  SUM(CASE WHEN approved != '' AND committed = '' AND rejected = '' THEN 1 ELSE 0 END) approved_count,\n  SUM(CASE WHEN submitted = 1 AND approved = '' AND committed = '' AND rejected = '' THEN 1 ELSE 0 END) submitted_count\nFROM time_sheets\nGROUP BY week_ending\nORDER BY week_ending DESC; ",
+				"viewRule": "@request.auth.user_claims_via_uid.cid.name ?= 'report'"
 			}
 		]`
 
-		return app.ImportCollectionsByMarshaledJSON([]byte(jsonData), false)
+		return app.ImportCollectionsByMarshaledJSON([]byte(jsonData), true)
 	}, func(app core.App) error {
 		return nil
 	})
