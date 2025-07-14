@@ -129,6 +129,8 @@ func AddRoutes(app core.App) {
 		// Vendor absorb routes
 		vendorsGroup := se.Router.Group("/api/vendors")
 		vendorsGroup.Bind(apis.RequireAuth("users"))
+		vendorsGroup.GET("", createGetVendorsHandler(app))
+		vendorsGroup.GET("/{id}", createGetVendorsHandler(app))
 		vendorsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "vendors"))
 		vendorsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "vendors"))
 

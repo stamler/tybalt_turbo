@@ -1,7 +1,7 @@
 <script lang="ts">
   import DsSearchList from "$lib/components/DSSearchList.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
-  import type { VendorsResponse } from "$lib/pocketbase-types";
+  import type { VendorApiResponse } from "$lib/stores/vendors";
   import { pb } from "$lib/pocketbase";
   import { vendors } from "$lib/stores/vendors";
 
@@ -17,7 +17,7 @@
     uiName="search vendors..."
     collectionName="vendors"
   >
-    {#snippet headline({ id, name, alias }: VendorsResponse)}
+    {#snippet headline({ id, name, alias }: VendorApiResponse)}
       <span class="flex items-center gap-2">
         <a href={`/vendors/${id}/details`} class="text-blue-600 hover:underline">
           {name}
@@ -28,7 +28,23 @@
       </span>
     {/snippet}
 
-    {#snippet actions({ id }: VendorsResponse)}
+    {#snippet byline({ expenses_count, purchase_orders_count }: VendorApiResponse)}
+      <span class="mr-2">
+        {expenses_count === 0
+          ? "no expenses"
+          : expenses_count === 1
+            ? "1 expense"
+            : `${expenses_count} expenses`}
+        •
+        {purchase_orders_count === 0
+          ? "no POs"
+          : purchase_orders_count === 1
+            ? "1 PO"
+            : `${purchase_orders_count} POs`}
+      </span>
+    {/snippet}
+
+    {#snippet actions({ id }: VendorApiResponse)}
       <DsActionButton
         action={`/vendors/${id}/edit`}
         icon="mdi:edit-outline"

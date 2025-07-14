@@ -1,36 +1,49 @@
-import type { VendorsResponse } from "$lib/pocketbase-types";
 import { createCollectionStore } from "./collectionStore";
 import { pb } from "$lib/pocketbase";
 
-export const vendors = createCollectionStore<VendorsResponse>(
+export interface VendorApiResponse {
+  id: string;
+  name: string;
+  alias: string;
+  expenses_count: number;
+  purchase_orders_count: number;
+}
+
+const fetchAllVendors = async (): Promise<VendorApiResponse[]> =>
+  pb.send("/api/vendors", { method: "GET" });
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const vendors = createCollectionStore<any>(
   "vendors",
   {
     filter: "status = 'Active'",
     requestKey: "vendors",
   },
   {
-    fields: ["id", "name", "alias"],
-    storeFields: ["id", "name", "alias"],
+    fields: ["id", "name", "alias", "expenses_count", "purchase_orders_count"],
+    storeFields: ["id", "name", "alias", "expenses_count", "purchase_orders_count"],
   },
+
   async (item) => {
-    // Fetch the new record and add to store
-    const fullRecord = await pb.collection("vendors").getOne<VendorsResponse>(item.id);
-    vendors.update((state) => ({
-      ...state,
-      items: [...state.items, fullRecord],
-      index: state.index?.add(fullRecord) || state.index,
+    const record: VendorApiResponse = await pb.send(`/api/vendors/${item.id}`, { method: "GET" });
+    vendors.update((s) => ({
+      ...s,
+      items: [...s.items, record],
+      index: s.index?.add(record) || s.index,
     }));
   },
+
   async (item) => {
-    // Fetch the updated record and add to store
-    const fullRecord = await pb.collection("vendors").getOne<VendorsResponse>(item.id);
+    const fullRecord: VendorApiResponse = await pb.send(`/api/vendors/${item.id}`, {
+      method: "GET",
+    });
     vendors.update((state) => ({
       ...state,
       items: state.items.map((i) => (i.id === item.id ? fullRecord : i)),
       index: state.index?.replace(fullRecord) || state.index,
     }));
   },
-  undefined,
-  undefined,
+  "vendors",
+  fetchAllVendors,
   true,
 );
