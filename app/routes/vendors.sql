@@ -11,6 +11,7 @@ LEFT JOIN (
     vendor,
     COUNT(*) AS expenses_count
   FROM expenses
+  WHERE expenses.committed != ''
   GROUP BY vendor
 ) ec ON ec.vendor = v.id
 LEFT JOIN (
@@ -18,6 +19,7 @@ LEFT JOIN (
     vendor,
     COUNT(*) AS purchase_orders_count
   FROM purchase_orders
+  WHERE purchase_orders.status = 'Active'
   GROUP BY vendor
 ) poc ON poc.vendor = v.id
 WHERE ({:id} IS NULL OR {:id} = '' OR v.id = {:id})
