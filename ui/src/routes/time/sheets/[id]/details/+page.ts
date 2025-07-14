@@ -23,13 +23,13 @@ export const load: PageLoad = async ({ params }) => {
     const timeSheet = await pb.collection("time_sheets").getOne(params.id);
 
     // Get approver information via custom API endpoint
-    let approverInfo = { 
-      approver_name: "", 
-      approved_date: "", 
-      committer_name: "", 
-      committed_date: "", 
-      rejector_name: "", 
-      rejected_date: "" 
+    let approverInfo = {
+      approver_name: "",
+      approved_date: "",
+      committer_name: "",
+      committed_date: "",
+      rejector_name: "",
+      rejected_date: "",
     };
     try {
       const approverResponse = await pb.send(`/api/time_sheets/${params.id}/approver`, {
@@ -65,4 +65,4 @@ export const load: PageLoad = async ({ params }) => {
     console.error(`loading time sheet details: ${err}`);
     throw error(404, `Failed to load time sheet details: ${err}`);
   }
-}; 
+};

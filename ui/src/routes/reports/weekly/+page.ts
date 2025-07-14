@@ -7,9 +7,7 @@ export const load: PageLoad = async () => {
 
   try {
     // load required data
-    items = await pb
-      .collection("time_tracking")
-      .getFullList<TimeTrackingResponse>();
+    items = await pb.collection("time_tracking").getFullList<TimeTrackingResponse>();
     return { items };
   } catch (error) {
     console.error(`loading data: ${error}`);

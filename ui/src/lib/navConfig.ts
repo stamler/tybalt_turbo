@@ -131,4 +131,4 @@ export const navSections: NavSection[] = [
       { label: "Divisions", href: "/divisions" },
     ],
   },
-]; 
+];

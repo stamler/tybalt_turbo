@@ -343,13 +343,15 @@ export async function downloadZip(endpoint: string, fileName: string) {
     });
 
     if (!urlResponse.ok) {
-      throw new Error(`HTTP error ${urlResponse.status} while fetching file URL: ${await urlResponse.text()}`);
+      throw new Error(
+        `HTTP error ${urlResponse.status} while fetching file URL: ${await urlResponse.text()}`,
+      );
     }
 
     const responseData = await urlResponse.json();
     const fileUrl = responseData.url;
 
-    if (typeof fileUrl !== 'string') {
+    if (typeof fileUrl !== "string") {
       throw new Error("Invalid file URL received from server.");
     }
 
@@ -359,7 +361,9 @@ export async function downloadZip(endpoint: string, fileName: string) {
     const fileResponse = await fetch(`${pb.baseUrl}/api/files/${fileUrl}`);
 
     if (!fileResponse.ok) {
-      throw new Error(`HTTP error ${fileResponse.status} while downloading file: ${await fileResponse.text()}`);
+      throw new Error(
+        `HTTP error ${fileResponse.status} while downloading file: ${await fileResponse.text()}`,
+      );
     }
 
     // Get the response body as a blob
@@ -384,7 +388,6 @@ export async function downloadZip(endpoint: string, fileName: string) {
     throw error; // Re-throw the error so it can be caught by the caller
   }
 }
-
 
 // This function subscribes to collectionName and updates the items in its
 // first argument using the record with the corresponding id from the view

@@ -5,9 +5,9 @@ export default defineConfig({
   plugins: [sveltekit()],
   server: {
     host: true, // or '0.0.0.0'
-    port: 5173  // optional: specify port
+    port: 5173, // optional: specify port
   },
   build: {
-    target: "es2020"
-  }
+    target: "es2020",
+  },
 });
