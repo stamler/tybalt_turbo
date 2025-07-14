@@ -30,4 +30,7 @@ export const vendors = createCollectionStore<VendorsResponse>(
       index: state.index?.replace(fullRecord) || state.index,
     }));
   },
+  undefined,
+  undefined,
+  true,
 );

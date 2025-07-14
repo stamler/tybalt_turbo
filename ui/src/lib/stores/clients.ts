@@ -15,8 +15,8 @@ export interface ClientApiResponse {
   contacts: Contact[];
 }
 
-
-const fetchAllClients = async (): Promise<ClientApiResponse[]> => pb.send("/api/clients", { method: "GET" });
+const fetchAllClients = async (): Promise<ClientApiResponse[]> =>
+  pb.send("/api/clients", { method: "GET" });
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const clients = createCollectionStore<any>(
@@ -30,7 +30,11 @@ export const clients = createCollectionStore<any>(
   // onCreate
   async (item) => {
     const record: ClientApiResponse = await pb.send(`/api/clients/${item.id}`, { method: "GET" });
-    clients.update((s) => ({ ...s, items: [...s.items, record], index: s.index?.add(record) || s.index }));
+    clients.update((s) => ({
+      ...s,
+      items: [...s.items, record],
+      index: s.index?.add(record) || s.index,
+    }));
   },
   // onUpdate – re-fetch and replace existing entry in the store
   /*
@@ -45,7 +49,9 @@ export const clients = createCollectionStore<any>(
    * the contacts list in the UI would lag behind the database.
    */
   async (item) => {
-    const fullRecord: ClientApiResponse = await pb.send(`/api/clients/${item.id}`, { method: "GET" });
+    const fullRecord: ClientApiResponse = await pb.send(`/api/clients/${item.id}`, {
+      method: "GET",
+    });
     clients.update((state) => ({
       ...state,
       items: state.items.map((i) => (i.id === item.id ? fullRecord : i)),
@@ -55,4 +61,5 @@ export const clients = createCollectionStore<any>(
   // proxy collection
   "clients",
   fetchAllClients,
+  true,
 );

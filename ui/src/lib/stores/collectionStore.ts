@@ -25,6 +25,7 @@ export function createCollectionStore<T extends BaseSystemFields>(
   onUpdate?: (item: RecordModel) => Promise<void> | undefined,
   proxyCollectionName?: string, // if provided, watch this collection for subscription events
   fetchAll?: () => Promise<T[]>, // optional custom function to fetch all items – allows bypassing PocketBase when we need to avoid the N+1 queries
+  enableAbsorbSubscription = false, // whether to listen for <collection>/absorb_completed events
 ) {
   // Create the store
   const store = writable<DataStore<T>>({
@@ -136,6 +137,9 @@ export function createCollectionStore<T extends BaseSystemFields>(
   // Separate unsubscribe function for the absorb_completed realtime channel
   let unsubscribeAbsorb: UnsubscribeFunc | null = null;
   async function setupAbsorbSubscription() {
+    // Guard: only setup if enabled
+    if (!enableAbsorbSubscription) return;
+
     // Clean up existing
     if (unsubscribeAbsorb) {
       unsubscribeAbsorb();
@@ -161,7 +165,11 @@ export function createCollectionStore<T extends BaseSystemFields>(
       store.update((state) => ({ ...state, loading: true }));
       try {
         await initializeStore();
-        await Promise.all([setupSubscription(), setupAbsorbSubscription()]);
+        if (enableAbsorbSubscription) {
+          await Promise.all([setupSubscription(), setupAbsorbSubscription()]);
+        } else {
+          await setupSubscription();
+        }
         store.update((state) => ({ ...state, loading: false, initialized: true }));
       } catch (error) {
         // handle error, ensure initialized is false
@@ -183,7 +191,7 @@ export function createCollectionStore<T extends BaseSystemFields>(
         unsubscribeFunc();
         unsubscribeFunc = null;
       }
-      if (unsubscribeAbsorb) {
+      if (enableAbsorbSubscription && unsubscribeAbsorb) {
         unsubscribeAbsorb();
         unsubscribeAbsorb = null;
       }
