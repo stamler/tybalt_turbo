@@ -13,6 +13,7 @@ export interface ClientApiResponse {
   id: string;
   name: string;
   contacts: Contact[];
+  referencing_jobs_count: number;
 }
 
 const fetchAllClients = async (): Promise<ClientApiResponse[]> =>
@@ -23,8 +24,8 @@ export const clients = createCollectionStore<any>(
   "clients",
   {},
   {
-    fields: ["id", "name", "contacts"],
-    storeFields: ["id", "name", "contacts"],
+    fields: ["id", "name", "contacts", "referencing_jobs_count"],
+    storeFields: ["id", "name", "contacts", "referencing_jobs_count"],
     extractField: (doc, field) => (doc as Record<string, unknown>)[field] as string,
   },
   // onCreate

@@ -20,6 +20,15 @@
     {#snippet headline({ id, name })}
       <a href={`/clients/${id}/details`} class="text-blue-600 hover:underline">{name}</a>
     {/snippet}
+    {#snippet byline({ referencing_jobs_count })}
+      <span class="mr-2">
+        {referencing_jobs_count === 0
+          ? "no jobs"
+          : referencing_jobs_count === 1
+            ? "1 job"
+            : `${referencing_jobs_count} jobs`}
+      </span>
+    {/snippet}
     {#snippet line1({ contacts })}
       {#if contacts && contacts.length > 0}
         <span class="opacity-30">contacts</span>

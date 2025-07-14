@@ -24,15 +24,17 @@ type Contact struct {
 }
 
 type clientRow struct {
-	ID           string `db:"id"`
-	Name         string `db:"name"`
-	ContactsJSON string `db:"contacts_json"`
+	ID                   string `db:"id"`
+	Name                 string `db:"name"`
+	ContactsJSON         string `db:"contacts_json"`
+	ReferencingJobsCount int    `db:"referencing_jobs_count"`
 }
 
 type Client struct {
-	ID       string    `json:"id"`
-	Name     string    `json:"name"`
-	Contacts []Contact `json:"contacts"`
+	ID                   string    `json:"id"`
+	Name                 string    `json:"name"`
+	Contacts             []Contact `json:"contacts"`
+	ReferencingJobsCount int       `json:"referencing_jobs_count"`
 }
 
 func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
@@ -47,7 +49,7 @@ func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 		toClient := func(r clientRow) Client {
 			var contacts []Contact
 			_ = json.Unmarshal([]byte(r.ContactsJSON), &contacts)
-			return Client{ID: r.ID, Name: r.Name, Contacts: contacts}
+			return Client{ID: r.ID, Name: r.Name, Contacts: contacts, ReferencingJobsCount: r.ReferencingJobsCount}
 		}
 
 		if id != "" {

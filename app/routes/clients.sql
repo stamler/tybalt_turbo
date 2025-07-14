@@ -16,7 +16,12 @@ SELECT
       WHERE cc.client = c.id
     ),
     '[]'
-  ) AS contacts_json
+  ) AS contacts_json,
+  (
+    SELECT COUNT(*)
+    FROM jobs j
+    WHERE j.client = c.id
+  ) AS referencing_jobs_count
 FROM clients c
 WHERE ({:id} IS NULL OR {:id} = '' OR c.id = {:id})
 ORDER BY c.name; 
