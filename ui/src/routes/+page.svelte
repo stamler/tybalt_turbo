@@ -5,7 +5,7 @@
 <!-- Full-screen flex container to center content -->
 <div class="mt-16 flex w-full flex-col items-center justify-center gap-6 bg-white px-4 md:px-0">
   <!-- Logo -->
-  <img src="/logo.png" alt="Tybalt Logo" class="h-40 w-40 select-none" />
+  <img src="/logo.svg" alt="Tybalt Logo" class="h-40 w-40 select-none" />
 
   <!-- Welcome message card -->
   <div class="w-full max-w-md rounded-lg bg-neutral-100 p-4 text-center shadow">
