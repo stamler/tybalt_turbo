@@ -86,6 +86,14 @@
       fn(event);
     };
   }
+
+  function cancel() {
+    if (data.editing && data.id !== null) {
+      goto(`/jobs/${data.id}/details`);
+    } else {
+      goto("/jobs/list");
+    }
+  }
 </script>
 
 <svelte:head>
@@ -261,7 +269,7 @@
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
       <DsActionButton type="submit">Save</DsActionButton>
-      <DsActionButton action={`/jobs/${data.id}/details`}>Cancel</DsActionButton>
+      <DsActionButton action={cancel}>Cancel</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>
