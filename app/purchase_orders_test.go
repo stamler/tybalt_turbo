@@ -552,7 +552,10 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"message":"Failed to create record.","status":400`,
+				`"status":400`,
+				`"message":"hook error when validating vendor"`,
+				`"vendor":{"code":"inactive_vendor"`,
+				`"message":"provided vendor is not active"`,
 			},
 			ExpectedEvents: map[string]int{},
 			TestAppFactory: testutils.SetupTestApp,
@@ -867,9 +870,12 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 				"type": "Cumulative"
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 404,
+			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"message":"The requested resource wasn't found.","status":404`,
+				`"status":400`,
+				`"message":"hook error when validating vendor"`,
+				`"vendor":{"code":"inactive_vendor"`,
+				`"message":"provided vendor is not active"`,
 			},
 			ExpectedEvents: map[string]int{},
 			TestAppFactory: testutils.SetupTestApp,

@@ -84,7 +84,7 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	return nil
 }
 
-// cross-field validation is performed in this function. It is expected that the
+// validation, including cross-field validation is performed in this function. It is expected that the
 // purchase_order record has already been cleaned by the cleanPurchaseOrder
 // function. This ensures that only the fields that are allowed to be set are
 // present in the record prior to validation. The function returns an error if
@@ -92,6 +92,67 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	isRecurring := purchaseOrderRecord.GetString("type") == "Recurring"
 	isChild := purchaseOrderRecord.GetString("parent_po") != ""
+
+	// Provide friendly errors for required fields that PocketBase schema would
+	// otherwise reject with a generic message. We have intentionally relaxed
+	// the api rules in pocketbase to perform validation here instead. This allows
+	// us to provide more helpful error messages since PocketBase performs API
+	// rules validation prior to this hook.
+	if purchaseOrderRecord.GetString("vendor") == "" {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating purchase order",
+			Data: map[string]errs.CodeError{
+				"vendor": {
+					Code:    "required",
+					Message: "vendor is required",
+				},
+			},
+		}
+	}
+
+	// If a vendor is provided, ensure it exists and is Active
+	if vendorId := purchaseOrderRecord.GetString("vendor"); vendorId != "" {
+		vendorRecord, err := app.FindRecordById("vendors", vendorId)
+		if err != nil || vendorRecord == nil {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating vendor",
+				Data: map[string]errs.CodeError{
+					"vendor": {
+						Code:    "not_found",
+						Message: "vendor not found",
+					},
+				},
+			}
+		}
+		if vendorRecord.GetString("status") != "Active" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating vendor",
+				Data: map[string]errs.CodeError{
+					"vendor": {
+						Code:    "inactive_vendor",
+						Message: "provided vendor is not active",
+					},
+				},
+			}
+		}
+	}
+
+	// The total must be greater than 0.
+	if purchaseOrderRecord.GetFloat("total") <= 0 {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating purchase order",
+			Data: map[string]errs.CodeError{
+				"total": {
+					Code:    "required",
+					Message: "total must be greater than 0",
+				},
+			},
+		}
+	}
 
 	if isChild {
 		// Validate parent PO is active and cumulative
