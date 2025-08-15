@@ -1,10 +1,12 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 	"math/rand"
+	"mime/multipart"
 	"net/http"
-	"strings"
 	"testing"
 	"time"
 	"tybalt/internal/testutils"
@@ -49,24 +51,90 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	tier1, tier2 := testutils.GetApprovalTiers(app)
 
-	scenarios := []tests.ApiScenario{
-		{
-			Name:   "valid purchase order is created",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+	// Helper to convert a JSON body string into multipart/form-data with a tiny PNG attachment
+	makeMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "receipt.png")
+		if err != nil {
+			return nil, "", err
+		}
+		// Minimal PNG header so mime detection passes (image/png)
+		if _, err := fw.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}); err != nil {
+			return nil, "", err
+		}
+		contentType := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, contentType, nil
+	}
+
+	var scenarios []tests.ApiScenario
+
+	// fails when attachment is missing
+	{
+		b := bytes.NewBufferString(`{
+	            "uid": "rzr98oadsp9qc11",
+	            "date": "2024-09-01",
+	            "division": "vccd5fo56ctbigh",
+	            "description": "test purchase order",
+	            "payment_type": "Expense",
+	            "total": 1234.56,
+	            "vendor": "2zqxtsmymf670ha",
+	            "approver": "etysnrlup2f6bak",
+	            "status": "Unapproved",
+	            "type": "Normal"
+	        }`)
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails when attachment is missing",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"attachment":{"code":"required"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// valid purchase order is created
+	{
+		b, ct, err := makeMultipart(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "vccd5fo56ctbigh",
+            "description": "test purchase order",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "Normal"
+        }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "valid purchase order is created",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
@@ -76,26 +144,34 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "recurring purchase order requires end_date and frequency",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Recurring",
-				"end_date": "2024-11-01",
-				"frequency": "Monthly"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+
+	// recurring purchase order requires end_date and frequency
+	{
+		b, ct, err := makeMultipart(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "vccd5fo56ctbigh",
+            "description": "test purchase order",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "Recurring",
+            "end_date": "2024-11-01",
+            "frequency": "Monthly"
+        }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "recurring purchase order requires end_date and frequency",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
@@ -105,25 +181,32 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "recurring purchase order fails without end_date",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Recurring",
-				"frequency": "Monthly"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	// recurring purchase order fails without end_date
+	{
+		b, ct, err := makeMultipart(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "vccd5fo56ctbigh",
+            "description": "test purchase order",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "Recurring",
+            "frequency": "Monthly"
+        }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "recurring purchase order fails without end_date",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"end_date":{"code":"value_required"`,
@@ -132,25 +215,31 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "recurring purchase fails without frequency",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Recurring",
-				"end_date": "2024-11-01"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Recurring",
+			"end_date": "2024-11-01"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "recurring purchase fails without frequency",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"frequency":{"code":"value_required"`,
@@ -159,26 +248,32 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "recurring purchase order fails with less than 2 occurrences",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Recurring",
-				"end_date": "2024-10-01",
-				"frequency": "Monthly"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Recurring",
+			"end_date": "2024-10-01",
+			"frequency": "Monthly"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "recurring purchase order fails with less than 2 occurrences",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"global":{"code":"fewer_than_two_occurrences"`,
@@ -187,26 +282,32 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "recurring purchase order fails if end_date is not after start_date",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Recurring",
-				"end_date": "2024-09-01",
-				"frequency": "Monthly"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Recurring",
+			"end_date": "2024-09-01",
+			"frequency": "Monthly"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "recurring purchase order fails if end_date is not after start_date",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"end_date":{"code":"end_date_not_after_start_date"`,
@@ -215,26 +316,32 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "recurring purchase order allows other frequencies",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Recurring",
-				"end_date": "2024-11-01",
-				"frequency": "Weekly"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Recurring",
+			"end_date": "2024-11-01",
+			"frequency": "Weekly"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "recurring purchase order allows other frequencies",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
@@ -244,26 +351,32 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "recurring purchase order fails when frequency is not valid",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Recurring",
-				"end_date": "2024-11-01",
-				"frequency": "Invalid"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Recurring",
+			"end_date": "2024-11-01",
+			"frequency": "Invalid"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "recurring purchase order fails when frequency is not valid",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"frequency":{"code":"invalid_frequency"`,
@@ -272,24 +385,30 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "otherwise valid purchase order fails when approver is set non-qualified user",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "tqqf7q0f3378rvp",
-				"status": "Unapproved",
-				"type": "Normal"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "tqqf7q0f3378rvp",
+			"status": "Unapproved",
+			"type": "Normal"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "otherwise valid purchase order fails when approver is set non-qualified user",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"approver":{"code":"validation_no_claim"`,
@@ -298,24 +417,30 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "otherwise valid purchase order fails when approver is set to blank string or missing",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "",
-				"status": "Unapproved",
-				"type": "Normal"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "",
+			"status": "Unapproved",
+			"type": "Normal"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "otherwise valid purchase order fails when approver is set to blank string or missing",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"approver":{"code":"value_required"`,
@@ -324,27 +449,33 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "valid child purchase order is created",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"parent_po": "ly8xyzpuj79upq1",
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "this one is cumulative",
-				"payment_type": "OnAccount",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal",
-				"job": "cjf0kt0defhq480",
-				"category": "t5nmdl188gtlhz0"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"parent_po": "ly8xyzpuj79upq1",
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "this one is cumulative",
+			"payment_type": "OnAccount",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal",
+			"job": "cjf0kt0defhq480",
+			"category": "t5nmdl188gtlhz0"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "valid child purchase order is created",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
@@ -354,28 +485,34 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		// We need a test child PO that is status Active
-		{
-			Name:   "a child purchase order cannot itself be a parent",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"parent_po": "25046ft47x49cc2",
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "this one is cumulative",
-				"payment_type": "OnAccount",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal",
-				"job": "cjf0kt0defhq480",
-				"category": "t5nmdl188gtlhz0"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	// We need a test child PO that is status Active
+	{
+		b, ct, err := makeMultipart(`{
+			"parent_po": "25046ft47x49cc2",
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "this one is cumulative",
+			"payment_type": "OnAccount",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal",
+			"job": "cjf0kt0defhq480",
+			"category": "t5nmdl188gtlhz0"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "a child purchase order cannot itself be a parent",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"parent_po":{"code":"child_po_cannot_be_parent"`,
@@ -384,27 +521,33 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "child purchase order may not be of type Cumulative",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"parent_po": "ly8xyzpuj79upq1",
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "this one is cumulative",
-				"payment_type": "OnAccount",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Cumulative",
-				"job": "cjf0kt0defhq480",
-				"category": "t5nmdl188gtlhz0"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"parent_po": "ly8xyzpuj79upq1",
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "this one is cumulative",
+			"payment_type": "OnAccount",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Cumulative",
+			"job": "cjf0kt0defhq480",
+			"category": "t5nmdl188gtlhz0"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "child purchase order may not be of type Cumulative",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"type":{"code":"validation_in_invalid"`,
@@ -413,29 +556,35 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "child purchase order may not be of type Recurring",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"parent_po": "ly8xyzpuj79upq1",
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "this one is cumulative",
-				"payment_type": "OnAccount",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Recurring",
-				"end_date": "2024-11-01",
-				"frequency": "Monthly",
-				"job": "cjf0kt0defhq480",
-				"category": "t5nmdl188gtlhz0"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"parent_po": "ly8xyzpuj79upq1",
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "this one is cumulative",
+			"payment_type": "OnAccount",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Recurring",
+			"end_date": "2024-11-01",
+			"frequency": "Monthly",
+			"job": "cjf0kt0defhq480",
+			"category": "t5nmdl188gtlhz0"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "child purchase order may not be of type Recurring",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"type":{"code":"validation_in_invalid"`,
@@ -444,27 +593,33 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "fails when other child POs with status 'Unapproved' exist",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"parent_po": "y660i6a14ql2355",
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "this one is cumulative",
-				"payment_type": "OnAccount",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal",
-				"job": "cjf0kt0defhq480",
-				"category": "t5nmdl188gtlhz0"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"parent_po": "y660i6a14ql2355",
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "this one is cumulative",
+			"payment_type": "OnAccount",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal",
+			"job": "cjf0kt0defhq480",
+			"category": "t5nmdl188gtlhz0"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails when other child POs with status 'Unapproved' exist",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"parent_po":{"code":"existing_children_with_blocking_status"`,
@@ -474,27 +629,33 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "fails when parent_po is not cumulative",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"parent_po": "2plsetqdxht7esg",
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "this one is cumulative",
-				"payment_type": "OnAccount",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal",
-				"job": "cjf0kt0defhq480",
-				"category": "t5nmdl188gtlhz0"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"parent_po": "2plsetqdxht7esg",
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "this one is cumulative",
+			"payment_type": "OnAccount",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal",
+			"job": "cjf0kt0defhq480",
+			"category": "t5nmdl188gtlhz0"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails when parent_po is not cumulative",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"parent_po":{"code":"invalid_type"`,
@@ -503,27 +664,33 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "fails when job of child purchase order does not match job of parent purchase order",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"parent_po": "ly8xyzpuj79upq1",
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "this one is cumulative",
-				"payment_type": "OnAccount",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal",
-				"job": "tt4eipt6wapu9zh",
-				"category": "he1f7oej613mxh7"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"parent_po": "ly8xyzpuj79upq1",
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "this one is cumulative",
+			"payment_type": "OnAccount",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal",
+			"job": "tt4eipt6wapu9zh",
+			"category": "he1f7oej613mxh7"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails when job of child purchase order does not match job of parent purchase order",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"job":{"code":"value_mismatch"`,
@@ -532,24 +699,30 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "otherwise valid purchase order with Inactive vendor fails",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "ctswqva5onxj75q",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 1234.56,
+			"vendor": "ctswqva5onxj75q",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "otherwise valid purchase order with Inactive vendor fails",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"status":400`,
@@ -559,44 +732,51 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			},
 			ExpectedEvents: map[string]int{},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		/*
-		   This test verifies the basic auto-approval flow for purchase orders.
-		   When a user with the po_approver claim (empty divsions property of po_approver_props = all divisions) creates a PO:
-		   1. The PO should be auto-approved immediately:
-		      - approved timestamp should be set to current date/time
-		      - approver should be set to the creator's ID
-		   2. Status should become "Active" (since no second approval needed for low value)
-		   3. PO number should be generated (format: YYYY-NNNN)
+		})
+	}
+	/*
+	   This test verifies the basic auto-approval flow for purchase orders.
+	   When a user with the po_approver claim (empty divsions property of po_approver_props = all divisions) creates a PO:
+	   1. The PO should be auto-approved immediately:
+	      - approved timestamp should be set to current date/time
+	      - approver should be set to the creator's ID
+	   2. Status should become "Active" (since no second approval needed for low value)
+	   3. PO number should be generated (format: YYYY-NNNN)
 
-		   Test setup:
-		   - Uses user wegviunlyr2jjjv (fakemanager@fakesite.xyz) who has po_approver claim
-		   - Sets PO total to random value below tier1 to avoid triggering second approval
-		   - Uses correct auth token matching the creator's ID
+	   Test setup:
+	   - Uses user wegviunlyr2jjjv (fakemanager@fakesite.xyz) who has po_approver claim
+	   - Sets PO total to random value below tier1 to avoid triggering second approval
+	   - Uses correct auth token matching the creator's ID
 
-		   Verification points:
-		   - approved: Checks timestamp starts with current date
-		   - status: Must be "Active"
-		   - po_number: Must start with current year
-		   - approver: Must be creator's ID (wegviunlyr2jjjv)
-		*/
-		{
-			Name:   "purchase order is not automatically approved when creator has po_approver claim",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(fmt.Sprintf(`{
-				"uid": "wegviunlyr2jjjv",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": %.2f,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal"
-			}`, rand.Float64()*(tier1-1.0)+1.0)), // Random value between 1 and tier1
-			Headers:        map[string]string{"Authorization": poApproverToken},
+	   Verification points:
+	   - approved: Checks timestamp starts with current date
+	   - status: Must be "Active"
+	   - po_number: Must start with current year
+	   - approver: Must be creator's ID (wegviunlyr2jjjv)
+	*/
+	{
+		json := fmt.Sprintf(`{
+			"uid": "wegviunlyr2jjjv",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": %.2f,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal"
+		}`, rand.Float64()*(tier1-1.0)+1.0)
+		b, ct, err := makeMultipart(json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "purchase order is not automatically approved when creator has po_approver claim",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": poApproverToken, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
@@ -608,46 +788,53 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		/*
-		   These tests verify division-specific auto-approval for purchase orders.
-		   User fatt@mac.com (id: etysnrlup2f6bak) has po_approver claim with divisions property:
-		   ["hcd86z57zjty6jo", "fy4i9poneukvq9u", "vccd5fo56ctbigh"] on the po_approver_props record
+		})
+	}
+	/*
+	   These tests verify division-specific auto-approval for purchase orders.
+	   User fatt@mac.com (id: etysnrlup2f6bak) has po_approver claim with divisions property:
+	   ["hcd86z57zjty6jo", "fy4i9poneukvq9u", "vccd5fo56ctbigh"] on the po_approver_props record
 
-		   Test 1 (Success case):
-		   - Creates PO with division "vccd5fo56ctbigh" (in user's po_approver_props divisions property)
-		   - Should auto-approve since user has permission for this division
-		   - Verifies: approval timestamp, Active status, PO number generation
-		   - Creator becomes approver
+	   Test 1 (Success case):
+	   - Creates PO with division "vccd5fo56ctbigh" (in user's po_approver_props divisions property)
+	   - Should auto-approve since user has permission for this division
+	   - Verifies: approval timestamp, Active status, PO number generation
+	   - Creator becomes approver
 
-		   Test 2 (Failure case):
-		   - Creates PO with division "ngpjzurmkrfl8fo" (not in user's po_approver_props divisions property)
-		   - Uses wegviunlyr2jjjv as approver (has empty po_approver_props divisions property = all divisions)
-		   - Should succeed (200) but not auto-approve
-		   - Verifies: no approval, Unapproved status, original approver remains
+	   Test 2 (Failure case):
+	   - Creates PO with division "ngpjzurmkrfl8fo" (not in user's po_approver_props divisions property)
+	   - Uses wegviunlyr2jjjv as approver (has empty po_approver_props divisions property = all divisions)
+	   - Should succeed (200) but not auto-approve
+	   - Verifies: no approval, Unapproved status, original approver remains
 
-		   Both tests:
-		   - Use random total below tier1 to avoid second approval
-		   - Use correct auth token for fatt@mac.com
-		   - Match uid to authenticated user's ID
-		*/
-		{
-			Name:   "purchase order is not automatically approved when creator has po_approver claim for non-matching division",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(fmt.Sprintf(`{
-				"uid": "etysnrlup2f6bak",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": %.2f,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal"
-			}`, rand.Float64()*(tier1-1.0)+1.0)), // Random value between 1 and tier1
-			Headers:        map[string]string{"Authorization": divisionApproverToken},
+	   Both tests:
+	   - Use random total below tier1 to avoid second approval
+	   - Use correct auth token for fatt@mac.com
+	   - Match uid to authenticated user's ID
+	*/
+	{
+		json := fmt.Sprintf(`{
+			"uid": "etysnrlup2f6bak",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": %.2f,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal"
+		}`, rand.Float64()*(tier1-1.0)+1.0)
+		b, ct, err := makeMultipart(json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "purchase order is not automatically approved when creator has po_approver claim for non-matching division",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": divisionApproverToken, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
@@ -659,24 +846,31 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "purchase order is not auto-approved when creator has po_approver claim but non-matching division",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(fmt.Sprintf(`{
-				"uid": "etysnrlup2f6bak",
-				"date": "2024-09-01",
-				"division": "ngpjzurmkrfl8fo",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": %.2f,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "wegviunlyr2jjjv",
-				"status": "Unapproved",
-				"type": "Normal"
-			}`, rand.Float64()*(tier1-1.0)+1.0)), // Random value between 1 and tier1
-			Headers:        map[string]string{"Authorization": divisionApproverToken},
+		})
+	}
+	{
+		json := fmt.Sprintf(`{
+			"uid": "etysnrlup2f6bak",
+			"date": "2024-09-01",
+			"division": "ngpjzurmkrfl8fo",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": %.2f,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "wegviunlyr2jjjv",
+			"status": "Unapproved",
+			"type": "Normal"
+		}`, rand.Float64()*(tier1-1.0)+1.0)
+		b, ct, err := makeMultipart(json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "purchase order is not auto-approved when creator has po_approver claim but non-matching division",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": divisionApproverToken, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,                // Should not be approved
@@ -688,41 +882,48 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		/*
-		   This test verifies auto-approval of high-value purchase orders by users with elevated claims.
-		   User hal@2005.com (id: 66ct66w380ob6w8) has:
-		   - po_approver claim with empty divisions property on the po_approver_props record (can approve for any division)
-		   - po_approver_tier3 claim (can provide second approval for high-value POs)
+		})
+	}
+	/*
+	   This test verifies auto-approval of high-value purchase orders by users with elevated claims.
+	   User hal@2005.com (id: 66ct66w380ob6w8) has:
+	   - po_approver claim with empty divisions property on the po_approver_props record (can approve for any division)
+	   - po_approver_tier3 claim (can provide second approval for high-value POs)
 
-		   Test verifies that when this user creates a high-value PO:
-		   1. First approval is automatic (due to po_approver claim)
-		   2. Second approval is also automatic (due to po_approver_tier3 claim)
-		   3. Status becomes Active and PO number is generated
-		   4. Creator is set as both approver and second_approver
+	   Test verifies that when this user creates a high-value PO:
+	   1. First approval is automatic (due to po_approver claim)
+	   2. Second approval is also automatic (due to po_approver_tier3 claim)
+	   3. Status becomes Active and PO number is generated
+	   4. Creator is set as both approver and second_approver
 
-		   The test:
-		   - Uses total above tier2 to trigger second approval requirement
-		   - Uses random division (since user has empty po_approver_props divisions property)
-		   - Verifies all approval fields and timestamps
-		*/
-		{
-			Name:   "purchase order is not automatically approved when creator has po_approver and po_approver_tier3 claims",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(fmt.Sprintf(`{
-				"uid": "66ct66w380ob6w8",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": %.2f,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal"
-			}`, rand.Float64()*(1000.0)+tier2)), // Random value > tier2
-			Headers:        map[string]string{"Authorization": po_approver_tier3Token},
+	   The test:
+	   - Uses total above tier2 to trigger second approval requirement
+	   - Uses random division (since user has empty po_approver_props divisions property)
+	   - Verifies all approval fields and timestamps
+	*/
+	{
+		json := fmt.Sprintf(`{
+			"uid": "66ct66w380ob6w8",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": %.2f,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal"
+		}`, rand.Float64()*(1000.0)+tier2)
+		b, ct, err := makeMultipart(json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "purchase order is not automatically approved when creator has po_approver and po_approver_tier3 claims",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": po_approver_tier3Token, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
@@ -735,41 +936,48 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		/*
-		   This test verifies auto-approval of mid-range value purchase orders by users with po_approver_tier2 claim.
-		   User author@soup.com (id: f2j5a8vk006baub) has:
-		   - po_approver claim with empty divisions property on the po_approver_props record (can approve for any division)
-		   - po_approver_tier2 claim (can provide second approval for POs between tier1 and tier2)
+		})
+	}
+	/*
+	   This test verifies auto-approval of mid-range value purchase orders by users with po_approver_tier2 claim.
+	   User author@soup.com (id: f2j5a8vk006baub) has:
+	   - po_approver claim with empty divisions property on the po_approver_props record (can approve for any division)
+	   - po_approver_tier2 claim (can provide second approval for POs between tier1 and tier2)
 
-		   Test verifies that when this user creates a mid-range value PO:
-		   1. First approval is automatic (due to po_approver claim)
-		   2. Second approval is also automatic (due to po_approver_tier2 claim)
-		   3. Status becomes Active and PO number is generated
-		   4. Creator is set as both approver and second_approver
+	   Test verifies that when this user creates a mid-range value PO:
+	   1. First approval is automatic (due to po_approver claim)
+	   2. Second approval is also automatic (due to po_approver_tier2 claim)
+	   3. Status becomes Active and PO number is generated
+	   4. Creator is set as both approver and second_approver
 
-		   The test:
-		   - Uses total between tier1 and tier2
-		   - Uses random division (since user has empty po_approver_props divisions property)
-		   - Verifies all approval fields and timestamps
-		*/
-		{
-			Name:   "purchase order is not automatically approved when creator has po_approver and po_approver_tier2 claims",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(fmt.Sprintf(`{
-				"uid": "f2j5a8vk006baub",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": %.2f,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal"
-			}`, rand.Float64()*(tier2-tier1)+tier1)), // Random value between tier1 and tier2
-			Headers:        map[string]string{"Authorization": po_approver_tier2Token},
+	   The test:
+	   - Uses total between tier1 and tier2
+	   - Uses random division (since user has empty po_approver_props divisions property)
+	   - Verifies all approval fields and timestamps
+	*/
+	{
+		json := fmt.Sprintf(`{
+			"uid": "f2j5a8vk006baub",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": %.2f,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal"
+		}`, rand.Float64()*(tier2-tier1)+tier1)
+		b, ct, err := makeMultipart(json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "purchase order is not automatically approved when creator has po_approver and po_approver_tier2 claims",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": po_approver_tier2Token, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
@@ -782,26 +990,32 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		// Add a new test case for priority_second_approver validation
-		{
-			Name:   "fails when priority_second_approver is not authorized for the PO amount",
-			Method: http.MethodPost,
-			URL:    "/api/collections/purchase_orders/records",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 1234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Normal",
-				"priority_second_approver": "regularUser"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+	// Add a new test case for priority_second_approver validation
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 1234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Normal",
+			"priority_second_approver": "regularUser"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails when priority_second_approver is not authorized for the PO amount",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"priority_second_approver":{"code":"invalid_priority_second_approver"`,
@@ -810,7 +1024,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
+		})
 	}
 
 	for _, scenario := range scenarios {
@@ -825,24 +1039,58 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	scenarios := []tests.ApiScenario{
-		{
-			Name:   "valid purchase order is updated",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
-			Body: strings.NewReader(`{
-				"uid": "f2j5a8vk006baub",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 2234.56,
-				"vendor": "2zqxtsmymf670ha",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Cumulative"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+	// multipart builder for updates with attachment
+	updateMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "update.png")
+		if err != nil {
+			return nil, "", err
+		}
+		if _, err := fw.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}); err != nil {
+			return nil, "", err
+		}
+		ct := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, ct, nil
+	}
+
+	var scenarios []tests.ApiScenario
+
+	// valid purchase order is updated
+	{
+		b, ct, err := updateMultipart(`{
+			"uid": "f2j5a8vk006baub",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 2234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Cumulative"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "valid purchase order is updated",
+			Method:         http.MethodPatch,
+			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"approved":""`,
@@ -852,24 +1100,64 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 				"OnRecordUpdate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "otherwise valid purchase order with Inactive vendor fails",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
-			Body: strings.NewReader(`{
-				"uid": "f2j5a8vk006baub",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test purchase order",
-				"payment_type": "Expense",
-				"total": 2234.56,
-				"vendor": "ctswqva5onxj75q",
-				"approver": "etysnrlup2f6bak",
-				"status": "Unapproved",
-				"type": "Cumulative"
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
+		})
+	}
+
+	// fails to update when attachment is cleared and no new file uploaded
+	{
+		b := bytes.NewBufferString(`{
+			"uid": "f2j5a8vk006baub",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 2234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Cumulative",
+			"attachment": ""
+		}`)
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails to update when attachment is cleared and no new file uploaded",
+			Method:         http.MethodPatch,
+			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"attachment":{"code":"required"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// otherwise valid purchase order with Inactive vendor fails
+	{
+		b, ct, err := updateMultipart(`{
+			"uid": "f2j5a8vk006baub",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 2234.56,
+			"vendor": "ctswqva5onxj75q",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Cumulative"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "otherwise valid purchase order with Inactive vendor fails",
+			Method:         http.MethodPatch,
+			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"status":400`,
@@ -879,7 +1167,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 			},
 			ExpectedEvents: map[string]int{},
 			TestAppFactory: testutils.SetupTestApp,
-		},
+		})
 	}
 
 	for _, scenario := range scenarios {

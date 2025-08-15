@@ -98,6 +98,30 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 	// the api rules in pocketbase to perform validation here instead. This allows
 	// us to provide more helpful error messages since PocketBase performs API
 	// rules validation prior to this hook.
+
+	// TODO: Many of these validations return immediately, but we should return
+	// them within the validation.Errors object instead so that the user can see
+	// all the errors at once. This can probably be accomplished using a
+	// combination of built-in validation.Validate() and custom
+	// validation.RuleFunc.
+
+	// Always require an attachment (create and update). Accept either an already
+	// stored filename or a new uploaded file in the current multipart request.
+	hasStoredAttachment := purchaseOrderRecord.GetString("attachment") != ""
+	hasUploadedAttachment := len(purchaseOrderRecord.GetUnsavedFiles("attachment")) > 0
+	if !hasStoredAttachment && !hasUploadedAttachment {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating purchase order",
+			Data: map[string]errs.CodeError{
+				"attachment": {
+					Code:    "required",
+					Message: "attachment is required",
+				},
+			},
+		}
+	}
+
 	if purchaseOrderRecord.GetString("vendor") == "" {
 		return &errs.HookError{
 			Status:  http.StatusBadRequest,
