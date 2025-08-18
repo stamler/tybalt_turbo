@@ -2,6 +2,10 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"testing"
@@ -16,12 +20,37 @@ func TestExpensesCreate(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// multipart builder for creates with attachment
+	makeMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "receipt.png")
+		if err != nil {
+			return nil, "", err
+		}
+		// Minimal PNG header so mime detection passes (image/png)
+		if _, err := fw.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}); err != nil {
+			return nil, "", err
+		}
+		contentType := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, contentType, nil
+	}
+
 	scenarios := []tests.ApiScenario{
-		{
-			Name:   "valid expense gets a correct pay period ending and approver",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
@@ -30,24 +59,28 @@ func TestExpensesCreate(t *testing.T) {
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				`"approved":""`,
-				`"approver":"f2j5a8vk006baub"`,
-				`"pay_period_ending":"2024-09-14"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "writing the committed property is forbidden",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "valid expense gets a correct pay period ending and approver",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					`"approved":""`,
+					`"approver":"f2j5a8vk006baub"`,
+					`"pay_period_ending":"2024-09-14"`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"committed": "2024-11-01 00:00:00",
 				"date": "2024-09-01",
@@ -57,22 +90,24 @@ func TestExpensesCreate(t *testing.T) {
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"message":"Failed to create record.","status":400`,
-			},
-			ExpectedEvents: map[string]int{
-				"*": 0,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "otherwise valid expense with Inactive vendor fails",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "writing the committed property is forbidden",
+				Method:          http.MethodPost,
+				URL:             "/api/collections/expenses/records",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  400,
+				ExpectedContent: []string{`"message":"Failed to create record.","status":400`},
+				ExpectedEvents:  map[string]int{"*": 0},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
@@ -81,20 +116,24 @@ func TestExpensesCreate(t *testing.T) {
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "ctswqva5onxj75q"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"message":"Failed to create record.","status":400`,
-			},
-			ExpectedEvents: map[string]int{},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "expense created against an Active, Normal purchase_orders record succeeds",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "otherwise valid expense with Inactive vendor fails",
+				Method:          http.MethodPost,
+				URL:             "/api/collections/expenses/records",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  400,
+				ExpectedContent: []string{`"message":"Failed to create record.","status":400`},
+				ExpectedEvents:  map[string]int{},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
@@ -106,22 +145,24 @@ func TestExpensesCreate(t *testing.T) {
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "2plsetqdxht7esg"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				`"purchase_order":"2plsetqdxht7esg"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "expense created against a non-Active, Normal purchase_orders record fails",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "expense created against an Active, Normal purchase_orders record succeeds",
+				Method:          http.MethodPost,
+				URL:             "/api/collections/expenses/records",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  200,
+				ExpectedContent: []string{`"purchase_order":"2plsetqdxht7esg"`},
+				ExpectedEvents:  map[string]int{"OnRecordCreate": 1},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
@@ -133,19 +174,143 @@ func TestExpensesCreate(t *testing.T) {
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "gal6e5la2fa4rpn"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"purchase_order":{"code":"not_active"`,
-			},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "expense created against a non-Active, Normal purchase_orders record fails",
+				Method:          http.MethodPost,
+				URL:             "/api/collections/expenses/records",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  400,
+				ExpectedContent: []string{`"data":{"purchase_order":{"code":"not_active"`},
+				ExpectedEvents:  map[string]int{"*": 0, "OnRecordCreateRequest": 1},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "2plsetqdxht7esg"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "setting category with job succeeds if purchase_order is set",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					`"category":"t5nmdl188gtlhz0"`,
+					`"job":"cjf0kt0defhq480"`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "setting category with job fails if purchase_order is not set",
+				Method:          http.MethodPost,
+				URL:             "/api/collections/expenses/records",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  400,
+				ExpectedContent: []string{`"data":{"purchase_order":{"code":"validation_required"`},
+				ExpectedEvents:  map[string]int{"*": 0, "OnRecordCreateRequest": 1},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha",
+				"job": "cjf0kt0defhq480"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "setting job without category fails if purchase_order is not set",
+				Method:          http.MethodPost,
+				URL:             "/api/collections/expenses/records",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  400,
+				ExpectedContent: []string{`"data":{"purchase_order":{"code":"validation_required"`},
+				ExpectedEvents:  map[string]int{"*": 0, "OnRecordCreateRequest": 1},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha",
+				"category": "he1f7oej613mxh7",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "2plsetqdxht7esg"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "setting category with job fails if category does not belong to the job even if purchase_order is set",
+				Method:          http.MethodPost,
+				URL:             "/api/collections/expenses/records",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  400,
+				ExpectedContent: []string{`"message":"Failed to create record."`},
+				ExpectedEvents: map[string]int{
+					"OnModelBeforeCreate":         0,
+					"OnModelAfterCreate":          0,
+					"OnRecordBeforeCreateRequest": 0,
+					"OnRecordAfterCreateRequest":  0,
+				},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
 		// TODO: valid mileage expense gets a correct total calculated and vendor cleared
 		// TODO: valid mileage expense that spans multiple mileage tiers gets a correct total calculated and vendor cleared
 		// TODO: unit test for CalculateMileageTotal
@@ -165,7 +330,8 @@ func TestExpensesCreate(t *testing.T) {
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor": "2zqxtsmymf670ha"
+				"vendor": "2zqxtsmymf670ha",
+				"attachment": "receipt.png"
 				}`),
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
@@ -238,11 +404,8 @@ func TestExpensesCreate(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-		{
-			Name:   "setting category without job fails",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
@@ -252,25 +415,34 @@ func TestExpensesCreate(t *testing.T) {
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"message":"Failed to create record."`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnModelBeforeCreate":         0,
-				"OnModelAfterCreate":          0,
-				"OnRecordBeforeCreateRequest": 0,
-				"OnRecordAfterCreateRequest":  0,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "setting category with job succeeds if purchase_order is set",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:   "setting category without job fails",
+				Method: http.MethodPost,
+				URL:    "/api/collections/expenses/records",
+				Body:   b,
+				Headers: map[string]string{
+					"Authorization": recordToken,
+					"Content-Type":  ct,
+				},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"message":"Failed to create record."`,
+				},
+				ExpectedEvents: map[string]int{
+					"OnModelBeforeCreate":         0,
+					"OnModelAfterCreate":          0,
+					"OnRecordBeforeCreateRequest": 0,
+					"OnRecordAfterCreateRequest":  0,
+				},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
@@ -282,23 +454,29 @@ func TestExpensesCreate(t *testing.T) {
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "2plsetqdxht7esg"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				`"category":"t5nmdl188gtlhz0"`,
-				`"job":"cjf0kt0defhq480"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordCreate": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "setting category with job fails if purchase_order is not set",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "setting category with job succeeds if purchase_order is set",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					`"category":"t5nmdl188gtlhz0"`,
+					`"job":"cjf0kt0defhq480"`,
+				},
+				ExpectedEvents: map[string]int{
+					"OnRecordCreate": 1,
+				},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
@@ -309,23 +487,29 @@ func TestExpensesCreate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"purchase_order":{"code":"validation_required"`,
-			},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "setting job without category fails if purchase_order is not set",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "setting category with job fails if purchase_order is not set",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"data":{"purchase_order":{"code":"validation_required"`,
+				},
+				ExpectedEvents: map[string]int{
+					"*":                     0,
+					"OnRecordCreateRequest": 1,
+				},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
@@ -335,23 +519,29 @@ func TestExpensesCreate(t *testing.T) {
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
 				"job": "cjf0kt0defhq480"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"purchase_order":{"code":"validation_required"`,
-			},
-			ExpectedEvents: map[string]int{
-				"*":                     0,
-				"OnRecordCreateRequest": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "setting category with job fails if category does not belong to the job even if purchase_order is set",
-			Method: http.MethodPost,
-			URL:    "/api/collections/expenses/records",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "setting job without category fails if purchase_order is not set",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"data":{"purchase_order":{"code":"validation_required"`,
+				},
+				ExpectedEvents: map[string]int{
+					"*":                     0,
+					"OnRecordCreateRequest": 1,
+				},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
@@ -363,20 +553,27 @@ func TestExpensesCreate(t *testing.T) {
 				"category": "he1f7oej613mxh7",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "2plsetqdxht7esg"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"message":"Failed to create record."`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnModelBeforeCreate":         0,
-				"OnModelAfterCreate":          0,
-				"OnRecordBeforeCreateRequest": 0,
-				"OnRecordAfterCreateRequest":  0,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "setting category with job fails if category does not belong to the job even if purchase_order is set",
+				Method:          http.MethodPost,
+				URL:             "/api/collections/expenses/records",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  400,
+				ExpectedContent: []string{`"message":"Failed to create record."`},
+				ExpectedEvents: map[string]int{
+					"OnModelBeforeCreate":         0,
+					"OnModelAfterCreate":          0,
+					"OnRecordBeforeCreateRequest": 0,
+					"OnRecordAfterCreateRequest":  0,
+				},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
 	}
 
 	for _, scenario := range scenarios {
@@ -390,12 +587,36 @@ func TestExpensesUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// multipart builder for updates with attachment
+	updateMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "update.png")
+		if err != nil {
+			return nil, "", err
+		}
+		if _, err := fw.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}); err != nil {
+			return nil, "", err
+		}
+		ct := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, ct, nil
+	}
+
 	scenarios := []tests.ApiScenario{
-		{
-			Name:   "valid expense gets a correct pay period ending",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
-			Body: strings.NewReader(`{
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
@@ -403,25 +624,29 @@ func TestExpensesUpdate(t *testing.T) {
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				`"approved":""`,
-				`"approver":"f2j5a8vk006baub"`,
-				`"pay_period_ending":"2024-09-14"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdate": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "writing the committed property is forbidden",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
-			Body: strings.NewReader(`{
-				"committed": "2024-11-01 00:00:00",
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "valid expense gets a correct pay period ending",
+				Method:         http.MethodPatch,
+				URL:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					`"approved":""`,
+					`"approver":"f2j5a8vk006baub"`,
+					`"pay_period_ending":"2024-09-14"`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordUpdate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
+				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
@@ -429,38 +654,140 @@ func TestExpensesUpdate(t *testing.T) {
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 404,
-			ExpectedContent: []string{
-				`"message":"The requested resource wasn't found.","status":404`,
-			},
-			ExpectedEvents: map[string]int{
-				"*": 0,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "otherwise valid expense update with Inactive vendor fails",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "succeeds when uid is present and matches existing value",
+				Method:          http.MethodPatch,
+				URL:             "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  200,
+				ExpectedContent: []string{`"uid":"rzr98oadsp9qc11"`},
+				ExpectedEvents:  map[string]int{"OnRecordUpdate": 1},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
-				"vendor": "ctswqva5onxj75q"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 404,
-			ExpectedContent: []string{
-				`"message":"The requested resource wasn't found."`,
-			},
-			ExpectedEvents: map[string]int{},
-			TestAppFactory: testutils.SetupTestApp,
-		},
+				"vendor": "2zqxtsmymf670ha",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "2plsetqdxht7esg"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "setting category with job succeeds if purchase_order is set",
+				Method:         http.MethodPatch,
+				URL:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					`"category":"t5nmdl188gtlhz0"`,
+					`"job":"cjf0kt0defhq480"`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordUpdate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha",
+				"category": "t5nmdl188gtlhz0"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "setting category with job fails if purchase_order is not set",
+				Method:          http.MethodPatch,
+				URL:             "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  404,
+				ExpectedContent: []string{`"message":"The requested resource wasn't found."`},
+				ExpectedEvents:  map[string]int{"OnModelBeforeUpdate": 0, "OnModelAfterUpdate": 0, "OnRecordBeforeUpdateRequest": 0, "OnRecordAfterUpdateRequest": 0},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha",
+				"job": "cjf0kt0defhq480"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "setting job without category fails if purchase_order is not set",
+				Method:          http.MethodPatch,
+				URL:             "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  400,
+				ExpectedContent: []string{`"data":{"purchase_order":{"code":"validation_required"`},
+				ExpectedEvents:  map[string]int{"OnRecordUpdateRequest": 1, "*": 0},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha",
+				"category": "he1f7oej613mxh7",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "2plsetqdxht7esg"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "setting category with job fails if category does not belong to the job even if purchase_order is set",
+				Method:         http.MethodPatch,
+				URL:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 404,
+				ExpectedContent: []string{
+					`"message":"The requested resource wasn't found."`,
+				},
+				ExpectedEvents: map[string]int{
+					"OnModelBeforeUpdate":         0,
+					"OnModelAfterUpdate":          0,
+					"OnRecordBeforeUpdateRequest": 0,
+					"OnRecordAfterUpdateRequest":  0,
+				},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
 		{
 			Name:   "unauthenticated request fails",
 			Method: http.MethodPatch,
@@ -514,30 +841,6 @@ func TestExpensesUpdate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "succeeds when uid is present and matches existing value",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
-			Body: strings.NewReader(`{
-				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
-				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
-				"payment_type": "Expense",
-				"total": 99,
-				"vendor": "2zqxtsmymf670ha"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				`"uid":"rzr98oadsp9qc11"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdate": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
 			Name:   "setting rejector, rejected, and rejection_reason fails",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
@@ -594,11 +897,8 @@ func TestExpensesUpdate(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-		{
-			Name:   "setting category without job fails",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
-			Body: strings.NewReader(`{
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
@@ -607,25 +907,24 @@ func TestExpensesUpdate(t *testing.T) {
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 404,
-			ExpectedContent: []string{
-				`"message":"The requested resource wasn't found."`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnModelBeforeUpdate":         0,
-				"OnModelAfterUpdate":          0,
-				"OnRecordBeforeUpdateRequest": 0,
-				"OnRecordAfterUpdateRequest":  0,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "setting category with job succeeds if purchase_order is set",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "setting category without job fails",
+				Method:          http.MethodPatch,
+				URL:             "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  404,
+				ExpectedContent: []string{`"message":"The requested resource wasn't found."`},
+				ExpectedEvents:  map[string]int{"OnModelBeforeUpdate": 0, "OnModelAfterUpdate": 0, "OnRecordBeforeUpdateRequest": 0, "OnRecordAfterUpdateRequest": 0},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
@@ -636,23 +935,24 @@ func TestExpensesUpdate(t *testing.T) {
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
 				"purchase_order": "2plsetqdxht7esg"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 200,
-			ExpectedContent: []string{
-				`"category":"t5nmdl188gtlhz0"`,
-				`"job":"cjf0kt0defhq480"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdate": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "setting category with job fails if purchase_order is not set",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "setting category with job succeeds if purchase_order is set",
+				Method:          http.MethodPatch,
+				URL:             "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  200,
+				ExpectedContent: []string{`"category":"t5nmdl188gtlhz0"`, `"job":"cjf0kt0defhq480"`},
+				ExpectedEvents:  map[string]int{"OnRecordUpdate": 1},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
@@ -662,23 +962,24 @@ func TestExpensesUpdate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"purchase_order":{"code":"validation_required"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdateRequest": 1,
-				"*":                     0,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "setting job without category fails if purchase_order is not set",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/expenses/records/2gq9uyxmkcyopa4",
-			Body: strings.NewReader(`{
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:            "setting category with job fails if purchase_order is not set",
+				Method:          http.MethodPatch,
+				URL:             "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:            b,
+				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus:  400,
+				ExpectedContent: []string{`"data":{"purchase_order":{"code":"validation_required"`},
+				ExpectedEvents:  map[string]int{"OnRecordUpdateRequest": 1, "*": 0},
+				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := updateMultipart(`{
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
@@ -687,18 +988,27 @@ func TestExpensesUpdate(t *testing.T) {
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
 				"job": "cjf0kt0defhq480"
-				}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"purchase_order":{"code":"validation_required"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdateRequest": 1,
-				"*":                     0,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "setting job without category fails if purchase_order is not set",
+				Method:         http.MethodPatch,
+				URL:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"data":{"purchase_order":{"code":"validation_required"`,
+				},
+				ExpectedEvents: map[string]int{
+					"OnRecordUpdateRequest": 1,
+					"*":                     0,
+				},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
 		{
 			Name:   "setting category with job fails if category does not belong to the job even if purchase_order is set",
 			Method: http.MethodPatch,

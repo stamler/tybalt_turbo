@@ -113,6 +113,26 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 	isCorporateCreditCard := paymentType == "CorporateCreditCard"
 	isFuelCard := paymentType == "FuelCard"
 
+	// Require an attachment for all types except Allowance, Mileage, and PersonalReimbursement.
+	// Accept either an already stored filename or a new uploaded file in the current multipart request.
+	requiresAttachment := !(isAllowance || isMileage || isPersonalReimbursement)
+	if requiresAttachment {
+		hasStoredAttachment := expenseRecord.GetString("attachment") != ""
+		hasUploadedAttachment := len(expenseRecord.GetUnsavedFiles("attachment")) > 0
+		if !hasStoredAttachment && !hasUploadedAttachment {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating expense",
+				Data: map[string]errs.CodeError{
+					"attachment": {
+						Code:    "required",
+						Message: "attachment is required",
+					},
+				},
+			}
+		}
+	}
+
 	// Throw an error if hasPurchaseOrder is true but poRecordProvided is false
 	if hasPurchaseOrder && !poRecordProvided {
 		return &errs.HookError{
