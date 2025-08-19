@@ -9,12 +9,12 @@
 
   const tableConfig: any = {
     columnFormatters: {
-      division_value_dollars: "dollars" as const,
+      value: "dollars" as const,
       job_value_dollars: "dollars" as const,
-      division_value_percent: "percent" as const,
-      job_hours: formatTwoDecimals,
+      percent: "percent" as const,
+      hours: formatTwoDecimals,
     },
-    omitColumns: [],
+    omitColumns: ["number", "job_value_dollars"],
   };
 </script>
 

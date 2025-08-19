@@ -5,8 +5,8 @@ WITH base AS (
   SELECT j.number,
     d.code AS division_code, 
     d.name AS division_name,
-    SUM(te.hours) AS job_hours,
-    SUM(ap.default_charge_out_rate * te.hours) AS division_value_dollars,
+    SUM(te.hours) AS hours,
+    SUM(ap.default_charge_out_rate * te.hours) AS value,
     SUM(SUM(ap.default_charge_out_rate * te.hours)) over() AS job_value_dollars
   FROM time_entries te
   LEFT JOIN jobs j ON te.job = j.id 
@@ -17,5 +17,5 @@ WITH base AS (
   AND date <= {:end_date}
   GROUP BY job, division
 )
-SELECT *, ROUND((division_value_dollars * 100 / job_value_dollars),1) AS division_value_percent
+SELECT *, ROUND((value * 100 / job_value_dollars),1) AS percent
 FROM base

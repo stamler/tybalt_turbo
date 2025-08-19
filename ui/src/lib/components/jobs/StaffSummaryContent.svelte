@@ -13,7 +13,7 @@
       hours: formatTwoDecimals,
       meals_hours: formatTwoDecimals,
     },
-    omitColumns: ["uid"],
+    omitColumns: ["uid", "number", "meals_hours"],
   };
 </script>
 

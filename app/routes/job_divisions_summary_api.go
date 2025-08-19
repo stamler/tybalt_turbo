@@ -16,10 +16,10 @@ type JobDivisionSummaryRow struct {
 	Number               string  `db:"number" json:"number"`
 	DivisionCode         string  `db:"division_code" json:"division_code"`
 	DivisionName         string  `db:"division_name" json:"division_name"`
-	JobHours             float64 `db:"job_hours" json:"job_hours"`
-	DivisionValueDollars float64 `db:"division_value_dollars" json:"division_value_dollars"`
+	JobHours             float64 `db:"hours" json:"hours"`
+	DivisionValueDollars float64 `db:"value" json:"value"`
 	JobValueDollars      float64 `db:"job_value_dollars" json:"job_value_dollars"`
-	DivisionValuePercent float64 `db:"division_value_percent" json:"division_value_percent"`
+	DivisionValuePercent float64 `db:"percent" json:"percent"`
 }
 
 // createGetJobDivisionsSummaryHandler executes job_divisions_summary.sql for a job and date range
