@@ -8,6 +8,9 @@
   import TimeTabContent from "$lib/components/jobs/TimeTabContent.svelte";
   import ExpensesTabContent from "$lib/components/jobs/ExpensesTabContent.svelte";
   import POsTabContent from "$lib/components/jobs/POsTabContent.svelte";
+  import StaffSummaryContent from "$lib/components/jobs/StaffSummaryContent.svelte";
+  import DivisionsSummaryContent from "$lib/components/jobs/DivisionsSummaryContent.svelte";
+  import { pb } from "$lib/pocketbase";
   import type { FilterDef } from "$lib/components/jobs/types";
 
   type TabContentProps = {
@@ -19,7 +22,7 @@
     totalPages: number;
   };
 
-  export let data: PageData;
+  let { data }: { data: PageData } = $props();
 
   function personName(person: any) {
     if (!person) return "";
@@ -27,35 +30,101 @@
   }
 
   // Tab management ------------------------------------------------------------
-  let activeTab: "time" | "expenses" | "pos" = "time";
+  let activeTab = $state<"time" | "expenses" | "pos">("time");
+  let timeSubTab = $state<"all" | "staff_summary" | "divisions_summary">("all");
 
   // Reactive tabs array consumed by DSTabBar
-  let tabs: TabItem[] = [];
-  $: tabs = [
+  let tabs: TabItem[] = $derived([
     { label: "Time", href: "#time", active: activeTab === "time" },
     { label: "Expenses", href: "#expenses", active: activeTab === "expenses" },
     { label: "Purchase Orders", href: "#pos", active: activeTab === "pos" },
-  ];
+  ]);
+
+  // Secondary tabs under Time
+  let timeTabs: TabItem[] = $derived([
+    { label: "All", href: "#time", active: timeSubTab === "all" },
+    { label: "Staff summary", href: "#staff_summary", active: timeSubTab === "staff_summary" },
+    {
+      label: "Divisions summary",
+      href: "#divisions_summary",
+      active: timeSubTab === "divisions_summary",
+    },
+  ]);
+
+  // Date range for summaries (persist between staff/divisions)
+  let timeRangeStart = $state("");
+  let timeRangeEnd = $state("");
+
+  async function initTimeRange() {
+    try {
+      const res: any = await pb.send(`/api/jobs/${data.job.id}/time/summary`, { method: "GET" });
+      if (res?.earliest_entry) timeRangeStart = res.earliest_entry;
+      if (res?.latest_entry) timeRangeEnd = res.latest_entry;
+    } catch (err) {
+      console.error("Failed to initialize time range", err);
+    }
+  }
 
   onMount(() => {
     // Initialize active tab based on hash
     if (typeof window !== "undefined") {
       const hash = window.location.hash;
-      if (hash === "#expenses") activeTab = "expenses";
-      else if (hash === "#pos") activeTab = "pos";
-      else activeTab = "time";
+      if (hash === "#expenses") {
+        activeTab = "expenses";
+      } else if (hash === "#pos") {
+        activeTab = "pos";
+      } else {
+        activeTab = "time";
+        if (hash === "#staff_summary") timeSubTab = "staff_summary";
+        else if (hash === "#divisions_summary") timeSubTab = "divisions_summary";
+        else timeSubTab = "all";
+      }
     }
 
     // Listen for hash changes to update the active tab
+    let handler: ((this: Window, ev: HashChangeEvent) => any) | null = null;
     if (typeof window !== "undefined") {
-      window.addEventListener("hashchange", () => {
+      handler = () => {
         const hash = window.location.hash;
-        if (hash === "#expenses") activeTab = "expenses";
-        else if (hash === "#pos") activeTab = "pos";
-        else activeTab = "time";
-      });
+        if (hash === "#expenses") {
+          activeTab = "expenses";
+        } else if (hash === "#pos") {
+          activeTab = "pos";
+        } else {
+          activeTab = "time";
+          if (hash === "#staff_summary") timeSubTab = "staff_summary";
+          else if (hash === "#divisions_summary") timeSubTab = "divisions_summary";
+          else timeSubTab = "all";
+        }
+      };
+      window.addEventListener("hashchange", handler);
+    }
+
+    // Avoid initializing date range immediately to prevent racing with
+    // JobDetailTab's own summary fetch which can be auto-cancelled by PB.
+
+    return () => {
+      if (handler && typeof window !== "undefined") {
+        window.removeEventListener("hashchange", handler);
+      }
+    };
+  });
+
+  // Lazily initialize the date range only when entering the summary subtabs
+  // and only if the values are still empty.
+  $effect(() => {
+    if (
+      activeTab === "time" &&
+      (timeSubTab === "staff_summary" || timeSubTab === "divisions_summary")
+    ) {
+      if (!timeRangeStart || !timeRangeEnd) {
+        initTimeRange();
+      }
     }
   });
+
+  // No-op: JobDetailTab initializes itself on first activation. Avoid forcing
+  // repeated refreshes that could trigger PB auto-cancel cascades.
 
   // Filter Definitions --------------------------------------------------------
   const divisionFilter: FilterDef = {
@@ -243,26 +312,88 @@
 
   <!-- Time Section -->
   <div id="time" class:hidden={activeTab !== "time"}>
-    {#key data.job.id}
-      <JobDetailTab
-        active={activeTab === "time"}
+    <!-- Secondary Tab Bar under Time -->
+    <div class="mt-2">
+      <DSTabBar tabs={timeTabs} />
+    </div>
+
+    <!-- All (existing content) -->
+    {#if timeSubTab === "all"}
+      {#key data.job.id}
+        <JobDetailTab
+          active={activeTab === "time"}
+          jobId={data.job.id}
+          summaryUrl={`/api/jobs/${data.job.id}/time/summary`}
+          listUrl={`/api/jobs/${data.job.id}/time/entries`}
+          filterDefs={timeFilterDefs}
+        >
+          {#snippet children({
+            summary,
+            items,
+            listLoading,
+            loadMore,
+            page,
+            totalPages,
+          }: TabContentProps)}
+            <TimeTabContent {summary} {items} {listLoading} {loadMore} {page} {totalPages} />
+          {/snippet}
+        </JobDetailTab>
+      {/key}
+    {/if}
+
+    <!-- Staff summary -->
+    <div id="staff_summary" class:hidden={timeSubTab !== "staff_summary"}>
+      <div class="flex flex-wrap items-end gap-3 px-4 py-2">
+        <div>
+          <label for="staff-start-date" class="block text-sm font-semibold">Start date</label>
+          <input
+            id="staff-start-date"
+            type="date"
+            bind:value={timeRangeStart}
+            class="rounded border px-2 py-1"
+          />
+        </div>
+        <div>
+          <label for="staff-end-date" class="block text-sm font-semibold">End date</label>
+          <input
+            id="staff-end-date"
+            type="date"
+            bind:value={timeRangeEnd}
+            class="rounded border px-2 py-1"
+          />
+        </div>
+      </div>
+      <StaffSummaryContent jobId={data.job.id} startDate={timeRangeStart} endDate={timeRangeEnd} />
+    </div>
+
+    <!-- Divisions summary -->
+    <div id="divisions_summary" class:hidden={timeSubTab !== "divisions_summary"}>
+      <div class="flex flex-wrap items-end gap-3 px-4 py-2">
+        <div>
+          <label for="div-start-date" class="block text-sm font-semibold">Start date</label>
+          <input
+            id="div-start-date"
+            type="date"
+            bind:value={timeRangeStart}
+            class="rounded border px-2 py-1"
+          />
+        </div>
+        <div>
+          <label for="div-end-date" class="block text-sm font-semibold">End date</label>
+          <input
+            id="div-end-date"
+            type="date"
+            bind:value={timeRangeEnd}
+            class="rounded border px-2 py-1"
+          />
+        </div>
+      </div>
+      <DivisionsSummaryContent
         jobId={data.job.id}
-        summaryUrl={`/api/jobs/${data.job.id}/time/summary`}
-        listUrl={`/api/jobs/${data.job.id}/time/entries`}
-        filterDefs={timeFilterDefs}
-      >
-        {#snippet children({
-          summary,
-          items,
-          listLoading,
-          loadMore,
-          page,
-          totalPages,
-        }: TabContentProps)}
-          <TimeTabContent {summary} {items} {listLoading} {loadMore} {page} {totalPages} />
-        {/snippet}
-      </JobDetailTab>
-    {/key}
+        startDate={timeRangeStart}
+        endDate={timeRangeEnd}
+      />
+    </div>
   </div>
 
   <!-- Expenses Section -->
