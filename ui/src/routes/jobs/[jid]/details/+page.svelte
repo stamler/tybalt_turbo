@@ -42,7 +42,7 @@
 
   // Secondary tabs under Time
   let timeTabs: TabItem[] = $derived([
-    { label: "All", href: "#time", active: timeSubTab === "all" },
+    { label: "All", href: "#time_all", active: timeSubTab === "all" },
     { label: "Staff summary", href: "#staff_summary", active: timeSubTab === "staff_summary" },
     {
       label: "Divisions summary",
@@ -57,7 +57,11 @@
 
   async function initTimeRange() {
     try {
-      const res: any = await pb.send(`/api/jobs/${data.job.id}/time/summary`, { method: "GET" });
+      // add a no-op param to avoid PB SDK auto-cancelling the All tab's
+      // identical summary request
+      const res: any = await pb.send(`/api/jobs/${data.job.id}/time/summary?_init=1`, {
+        method: "GET",
+      });
       if (res?.earliest_entry) timeRangeStart = res.earliest_entry;
       if (res?.latest_entry) timeRangeEnd = res.latest_entry;
     } catch (err) {
@@ -77,6 +81,7 @@
         activeTab = "time";
         if (hash === "#staff_summary") timeSubTab = "staff_summary";
         else if (hash === "#divisions_summary") timeSubTab = "divisions_summary";
+        else if (hash === "#time_all" || hash === "#time" || hash === "") timeSubTab = "all";
         else timeSubTab = "all";
       }
     }
@@ -94,14 +99,16 @@
           activeTab = "time";
           if (hash === "#staff_summary") timeSubTab = "staff_summary";
           else if (hash === "#divisions_summary") timeSubTab = "divisions_summary";
+          else if (hash === "#time_all" || hash === "#time" || hash === "") timeSubTab = "all";
           else timeSubTab = "all";
         }
       };
       window.addEventListener("hashchange", handler);
     }
 
-    // Avoid initializing date range immediately to prevent racing with
-    // JobDetailTab's own summary fetch which can be auto-cancelled by PB.
+    // Initialize default date range from time summary so summary subtabs
+    // have values ready when first opened.
+    initTimeRange();
 
     return () => {
       if (handler && typeof window !== "undefined") {
@@ -318,7 +325,7 @@
     </div>
 
     <!-- All (existing content) -->
-    {#if timeSubTab === "all"}
+    <div class:hidden={timeSubTab !== "all"}>
       {#key data.job.id}
         <JobDetailTab
           active={activeTab === "time"}
@@ -339,7 +346,7 @@
           {/snippet}
         </JobDetailTab>
       {/key}
-    {/if}
+    </div>
 
     <!-- Staff summary -->
     <div id="staff_summary" class:hidden={timeSubTab !== "staff_summary"}>

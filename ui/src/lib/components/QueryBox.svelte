@@ -1,21 +1,40 @@
 <script lang="ts">
   import ObjectTable from "./ObjectTable.svelte";
   import DSActionButton from "./DSActionButton.svelte";
+  import type { BaseSystemFields } from "$lib/pocketbase-types";
 
   type TableData = Record<string, any>[];
 
+  type TableConfig = {
+    columnFormatters: Record<string, (<T>(value: T) => string | T) | "dollars" | "percent">;
+    omitColumns?: string[];
+  };
+
   let {
-    queryName,
     queryValues = [],
     dlFileName,
+    tableConfig,
+    fetcher,
+    auto = true,
+    deps,
   } = $props<{
-    queryName?: string;
     queryValues?: unknown[];
     dlFileName?: string;
+    tableConfig?: TableConfig;
+    fetcher: (args: { queryValues?: unknown[] }) => Promise<TableData>;
+    auto?: boolean;
+    deps?: unknown[]; // optional explicit dependencies for re-running
   }>();
+
+  // Optional: pass ObjectTable config as the last element of queryValues
+  let tableConfigResolved = $state<TableConfig>({ columnFormatters: {}, omitColumns: [] });
+  $effect(() => {
+    tableConfigResolved = tableConfig ?? { columnFormatters: {}, omitColumns: [] };
+  });
 
   let queryResult = $state<TableData>([]);
   let loading = $state(false);
+  let errorMsg = $state("");
 
   function toCsv(rows: TableData): string {
     if (!rows || rows.length === 0) return "";
@@ -49,31 +68,40 @@
     URL.revokeObjectURL(url);
   }
 
-  async function runQuery(key: string) {
+  async function runQuery() {
     loading = true;
     try {
-      // TODO: replace with PocketBase-backed endpoint call
-      // Example (to be implemented later):
-      // const data = await pb.send("/api/reports", { key, values: queryValues });
-      // queryResult = data;
-      queryResult = [];
+      errorMsg = "";
+      try {
+        const data = await fetcher({ queryValues });
+        queryResult = Array.isArray(data) ? data : [];
+      } catch (err) {
+        console.error("QueryBox fetcher error", err);
+        errorMsg = "Failed to load data";
+        queryResult = [];
+      }
     } finally {
       loading = false;
     }
   }
 
+  const triggerKey = $derived(JSON.stringify(deps ?? queryValues ?? []));
   $effect(() => {
-    // Re-run whenever either the query name or values change
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    queryValues;
-    void runQuery(queryName ?? "");
+    // Re-run whenever dependencies or queryValues change
+    triggerKey;
+    if (auto) {
+      void runQuery();
+    }
   });
 
   const hasResults = $derived(!!queryResult && queryResult.length > 0);
 </script>
 
 <div>
-  <ObjectTable tableData={queryResult} />
+  <ObjectTable
+    tableData={queryResult as Record<string, any>[] & BaseSystemFields<any>[]}
+    tableConfig={tableConfigResolved}
+  />
   {#if hasResults}
     <DSActionButton
       title="download report"
@@ -83,6 +111,8 @@
       {loading}
       type="button"
     />
+  {:else if errorMsg}
+    <div class="text-sm text-red-700">{errorMsg}</div>
   {/if}
   <!-- Optionally, display a loading indicator outside the button condition -->
   {#if loading}
