@@ -82,7 +82,7 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 		for _, missing := range missingUIDs {
 			log.Println(missing)
 		}
-		log.Fatal("Please update uid_replacements.csv with the missing pocketbase_uid values and rerun this script")
+		log.Fatal("Please update uid_replacements.csv with the missing pocketbase_uid values and rerun this script. Also verify that the defaultDivision of the problematic profiles is set to an existing division in the sqlite database.")
 	}
 
 	// overwrite the timesheets table with the final augmented table
