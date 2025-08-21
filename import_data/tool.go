@@ -699,22 +699,30 @@ func cleanupDeletedRecords() {
 	cleanupTasks := []struct {
 		tableName   string
 		parquetFile string
-		idField     string // field name in parquet that contains the ID
+		idField     string // field name in parquet that contains the identifier to compare
+		dbKeyColumn string // column in the sqlite table to compare against
 	}{
-		{"clients", "./parquet/Clients.parquet", "id"},
-		{"client_contacts", "./parquet/Contacts.parquet", "id"},
-		{"jobs", "./parquet/Jobs.parquet", "pocketbase_id"},
-		{"categories", "./parquet/Categories.parquet", "id"},
-		{"vendors", "./parquet/Vendors.parquet", "id"},
-		{"purchase_orders", "./parquet/purchase_orders.parquet", "id"},
-		{"expenses", "./parquet/Expenses.parquet", "pocketbase_id"},
-		{"profiles", "./parquet/Profiles.parquet", "pocketbase_id"},
-		{"admin_profiles", "./parquet/Profiles.parquet", "pocketbase_uid"},
-		{"user_claims", "./parquet/UserClaims.parquet", "uid"}, // user_claims uses uid+cid composite key, handle separately
-		{"time_sheets", "./parquet/TimeSheets.parquet", "pocketbase_id"},
-		{"time_entries", "./parquet/TimeEntries.parquet", "pocketbase_id"},
-		{"time_amendments", "./parquet/TimeAmendments.parquet", "pocketbase_id"},
-		{"mileage_reset_dates", "./parquet/MileageResetDates.parquet", "pocketbase_id"},
+		// Tables where the business/record key in parquet maps to the same DB column name
+		{"clients", "./parquet/Clients.parquet", "id", "id"},
+		{"client_contacts", "./parquet/Contacts.parquet", "id", "id"},
+		{"categories", "./parquet/Categories.parquet", "id", "id"},
+		{"vendors", "./parquet/Vendors.parquet", "id", "id"},
+		{"purchase_orders", "./parquet/purchase_orders.parquet", "id", "id"},
+
+		// Tables where DB primary key is populated from pocketbase_id in parquet
+		{"jobs", "./parquet/Jobs.parquet", "pocketbase_id", "id"},
+		{"expenses", "./parquet/Expenses.parquet", "pocketbase_id", "id"},
+		{"time_sheets", "./parquet/TimeSheets.parquet", "pocketbase_id", "id"},
+		{"time_entries", "./parquet/TimeEntries.parquet", "pocketbase_id", "id"},
+		{"time_amendments", "./parquet/TimeAmendments.parquet", "pocketbase_id", "id"},
+		{"mileage_reset_dates", "./parquet/MileageResetDates.parquet", "pocketbase_id", "id"},
+
+		// Profiles use uid as the stable key in the DB, mapped from pocketbase_uid in parquet
+		{"profiles", "./parquet/Profiles.parquet", "pocketbase_uid", "uid"},
+		{"admin_profiles", "./parquet/Profiles.parquet", "pocketbase_uid", "uid"},
+
+		// user_claims uses uid+cid composite key, handled separately below
+		{"user_claims", "./parquet/UserClaims.parquet", "uid", "uid"},
 	}
 
 	for _, task := range cleanupTasks {
@@ -734,7 +742,7 @@ func cleanupDeletedRecords() {
 		}
 
 		// Delete records that are imported but not in currentIDs
-		deletedCount, err := deleteOrphanedRecords(db, task.tableName, currentIDs)
+		deletedCount, err := deleteOrphanedRecords(db, task.tableName, task.dbKeyColumn, currentIDs)
 		if err != nil {
 			log.Printf("Error cleaning up %s: %v", task.tableName, err)
 			continue
@@ -786,7 +794,7 @@ func getIDsFromParquet(parquetFile, idField string) (map[string]bool, error) {
 }
 
 // deleteOrphanedRecords deletes records where _imported=true but ID not in currentIDs
-func deleteOrphanedRecords(db *sql.DB, tableName string, currentIDs map[string]bool) (int, error) {
+func deleteOrphanedRecords(db *sql.DB, tableName string, keyColumn string, currentIDs map[string]bool) (int, error) {
 	// Build list of current IDs for SQL IN clause
 	if len(currentIDs) == 0 {
 		// If no current IDs, delete all imported records
@@ -805,9 +813,9 @@ func deleteOrphanedRecords(db *sql.DB, tableName string, currentIDs map[string]b
 		idList = append(idList, fmt.Sprintf("'%s'", id))
 	}
 
-	// Delete imported records whose IDs are not in the current export
-	query := fmt.Sprintf("DELETE FROM %s WHERE _imported = true AND id NOT IN (%s)",
-		tableName, strings.Join(idList, ","))
+	// Delete imported records whose keyColumn value is not in the current export
+	query := fmt.Sprintf("DELETE FROM %s WHERE _imported = true AND %s NOT IN (%s)",
+		tableName, keyColumn, strings.Join(idList, ","))
 
 	result, err := db.Exec(query)
 	if err != nil {
