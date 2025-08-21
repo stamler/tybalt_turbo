@@ -10,6 +10,8 @@
   const tableConfig: any = {
     columnFormatters: {
       value: "dollars" as const,
+      total: "dollars" as const,
+      percent: "percent" as const,
       hours: formatTwoDecimals,
       meals_hours: formatTwoDecimals,
     },

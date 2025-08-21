@@ -18,6 +18,8 @@ type JobStaffSummaryRow struct {
 	Surname    string  `db:"surname" json:"surname"`
 	Hours      float64 `db:"hours" json:"hours"`
 	Value      float64 `db:"value" json:"value"`
+	Total      float64 `db:"total" json:"total"`
+	Percent    float64 `db:"percent" json:"percent"`
 	MealsHours float64 `db:"meals_hours" json:"meals_hours"`
 	UID        string  `db:"uid" json:"uid"`
 }

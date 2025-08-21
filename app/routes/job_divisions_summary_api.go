@@ -18,7 +18,7 @@ type JobDivisionSummaryRow struct {
 	DivisionName         string  `db:"division_name" json:"division_name"`
 	JobHours             float64 `db:"hours" json:"hours"`
 	DivisionValueDollars float64 `db:"value" json:"value"`
-	JobValueDollars      float64 `db:"job_value_dollars" json:"job_value_dollars"`
+	Total                float64 `db:"total" json:"total"`
 	DivisionValuePercent float64 `db:"percent" json:"percent"`
 }
 
