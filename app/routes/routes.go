@@ -142,6 +142,7 @@ func AddRoutes(app core.App) {
 		// the results. The caller can filter by one or more of division,
 		// time_type, user, or category.
 		jobsGroup.GET("/{id}/time/summary", createGetJobTimeSummaryHandler(app))
+		jobsGroup.GET("/{id}/time/full_report", reports.CreateJobTimeReportHandler(app))
 		jobsGroup.GET("/{id}/time/entries", createGetJobTimeEntriesHandler(app))
 		jobsGroup.GET("/{id}/staff/summary", createGetJobStaffSummaryHandler(app))
 		jobsGroup.GET("/{id}/divisions/summary", createGetJobDivisionsSummaryHandler(app))

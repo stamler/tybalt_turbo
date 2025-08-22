@@ -342,7 +342,15 @@
             page,
             totalPages,
           }: TabContentProps)}
-            <TimeTabContent {summary} {items} {listLoading} {loadMore} {page} {totalPages} />
+            <TimeTabContent
+              {summary}
+              {items}
+              {listLoading}
+              {loadMore}
+              {page}
+              {totalPages}
+              jobId={data.job.id}
+            />
           {/snippet}
         </JobDetailTab>
       {/key}

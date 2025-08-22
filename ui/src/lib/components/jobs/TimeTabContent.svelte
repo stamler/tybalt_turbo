@@ -1,5 +1,7 @@
 <script lang="ts">
   import DsList from "$lib/components/DSList.svelte";
+  import { pb } from "$lib/pocketbase";
+  import { downloadCSV } from "$lib/utilities";
 
   interface JobTimeEntry {
     id: string;
@@ -23,9 +25,16 @@
     loadMore: () => void;
     page: number;
     totalPages: number;
+    jobId: string;
   }
 
-  const { summary, items, listLoading, loadMore, page, totalPages } = $props();
+  const { summary, items, listLoading, loadMore, page, totalPages, jobId } = $props();
+
+  async function fetchFullReport() {
+    const url = `${pb.baseUrl}/api/jobs/${jobId}/time/full_report`;
+    const fileName = `job_full_time_report_${jobId}.csv`;
+    await downloadCSV(url, fileName);
+  }
 </script>
 
 <div class="px-4">
@@ -38,6 +47,12 @@
       </div>
     {/if}
   </div>
+</div>
+
+<div class="mt-2 px-4">
+  <button type="button" onclick={fetchFullReport} class="text-blue-600 hover:underline">
+    Full Report (CSV)
+  </button>
 </div>
 
 {#if listLoading && items.length === 0}

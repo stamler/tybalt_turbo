@@ -38,6 +38,9 @@ var weeklyTimeByEmployeeQueryTemplate string
 //go:embed weekly_time.sql
 var weeklyTimeQueryTemplate string
 
+//go:embed job_report.sql
+var jobTimeQueryTemplate string
+
 // CreatePayrollTimeReportHandler returns a function that creates a payroll time report for a given week
 func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -96,6 +99,38 @@ func CreateTimeReportHandler(app core.App, dateColumnEntriesName string, dateCol
 		err = app.DB().NewQuery(timeQuery).Bind(dbx.Params{
 			"company_short_name": "TBTE",
 			"date_column_value":  dateColumnValue.Format("2006-01-02"),
+		}).All(&report)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
+		}
+
+		// convert the report to a csv string
+		headers := []string{"client", "job", "division", "timetype", "date", "month", "year", "qty", "unit", "nc", "meals", "ref", "project", "description", "comments", "employee", "surname", "givenName", "amended"}
+		csvString, err := convertToCSV(report, headers)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to generate CSV report: "+err.Error(), err)
+		}
+
+		// Set content type and return the CSV string
+		e.Response.Header().Set("Content-Type", "text/csv")
+		return e.String(http.StatusOK, csvString)
+	}
+}
+
+// CreateJobTimeReportHandler returns a function that creates a full time report for a specific job.
+// It mirrors CreateTimeReportHandler but uses the job_report.sql query and filters by job id.
+func CreateJobTimeReportHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		jobId := e.Request.PathValue("id")
+		if jobId == "" {
+			return e.Error(http.StatusBadRequest, "id is required", nil)
+		}
+
+		// Execute the query
+		var report []dbx.NullStringMap
+		err := app.DB().NewQuery(jobTimeQueryTemplate).Bind(dbx.Params{
+			"company_short_name": "TBTE",
+			"job_id":             jobId,
 		}).All(&report)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
