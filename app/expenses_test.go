@@ -10,7 +10,9 @@ import (
 	"strings"
 	"testing"
 	"tybalt/internal/testutils"
+	"tybalt/utilities"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -74,6 +76,40 @@ func TestExpensesCreate(t *testing.T) {
 					`"approved":""`,
 					`"approver":"f2j5a8vk006baub"`,
 					`"pay_period_ending":"2024-09-14"`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			// Using 2025-01-10 so the effective allowance rate row is 2025-01-05
+			// Breakfast=20, Lunch=25, Dinner=30, Lodging=50 on that date.
+			// With allowance_types ["Breakfast","Dinner"], total should be 20+30=50.
+			// Vendor is always cleared for Allowance by the cleanExpense hook and
+			// description is set to "Allowance for Breakfast, Dinner".
+			body := strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2025-01-10",
+				"division": "vccd5fo56ctbigh",
+				"payment_type": "Allowance",
+				"allowance_types": ["Breakfast", "Dinner"],
+				"total": 0,
+				"vendor": "2zqxtsmymf670ha",
+				"description": "This will be overwritten"
+			}`)
+			return tests.ApiScenario{
+				Name:           "valid allowance expense calculates total, clears vendor, and sets description",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           body,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					"\"payment_type\":\"Allowance\"",
+					"\"allowance_types\":[\"Breakfast\",\"Dinner\"]",
+					"\"total\":50",
+					"\"vendor\":\"\"",
+					"Allowance for Breakfast, Dinner",
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
@@ -351,7 +387,7 @@ func TestExpensesCreate(t *testing.T) {
 			// and zero prior mileage, expected total is 5000*0.70 + 100*0.64 = 3564.
 			b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
-				"date": "2025-01-10",
+				"date": "2025-01-05",
 				"division": "vccd5fo56ctbigh",
 				"description": "mileage spanning tiers",
 				"payment_type": "Mileage",
@@ -379,8 +415,6 @@ func TestExpensesCreate(t *testing.T) {
 				TestAppFactory: testutils.SetupTestApp,
 			}
 		}(),
-		// TODO: unit test for CalculateMileageTotal
-		// TODO: valid allowance expense gets a correct total calculated and vendor cleared and description set
 
 		// TODO: expenses created against an Active purchase_orders record for which the caller is not allowed to create an expense fail
 		// TODO: enhance validate_expenses_test.go
@@ -1361,4 +1395,116 @@ func TestExpensesRoutes(t *testing.T) {
 	for _, scenario := range scenarios {
 		scenario.Test(t)
 	}
+}
+
+// TestCalculateMileageTotal verifies the standalone mileage calculation helper using
+// the rate tiers effective on 2025-01-05. For a 100 km distance on 2025-01-10 and
+// with no prior mileage in the annual period, total should be 100 * 0.70 = 70.00.
+func TestCalculateMileageTotal(t *testing.T) {
+	// Case 1: No prior mileage, single tier
+	t.Run("no prior mileage, single tier", func(t *testing.T) {
+		app := testutils.SetupTestApp(t)
+		defer app.Cleanup()
+
+		expensesCollection := core.NewCollection("expenses", "expenses")
+		record := core.NewRecord(expensesCollection)
+		record.Load(map[string]any{
+			"date":         "2025-01-10", // selects expense_rates effective 2025-01-05
+			"payment_type": "Mileage",
+			"distance":     100.0,
+		})
+
+		rateRecord, err := utilities.GetExpenseRateRecord(app, record)
+		if err != nil {
+			t.Fatalf("failed to get expense rate record: %v", err)
+		}
+		total, err := utilities.CalculateMileageTotal(app, record, rateRecord)
+		if err != nil {
+			t.Fatalf("unexpected error calculating mileage total: %v", err)
+		}
+		if total != 70.0 {
+			t.Fatalf("expected total 70.0, got %v", total)
+		}
+	})
+
+	// Case 2: No prior mileage, spans two tiers (5100km => 5000*0.70 + 100*0.64 = 3564)
+	t.Run("no prior mileage, spans tiers", func(t *testing.T) {
+		app := testutils.SetupTestApp(t)
+		defer app.Cleanup()
+
+		expensesCollection := core.NewCollection("expenses", "expenses")
+		record := core.NewRecord(expensesCollection)
+		record.Load(map[string]any{
+			"date":         "2025-01-05", // first day of annual period window (no prior mileage)
+			"payment_type": "Mileage",
+			"distance":     5100.0,
+		})
+
+		rateRecord, err := utilities.GetExpenseRateRecord(app, record)
+		if err != nil {
+			t.Fatalf("failed to get expense rate record: %v", err)
+		}
+		total, err := utilities.CalculateMileageTotal(app, record, rateRecord)
+		if err != nil {
+			t.Fatalf("unexpected error calculating mileage total: %v", err)
+		}
+		if total != 3564.0 {
+			t.Fatalf("expected total 3564.0, got %v", total)
+		}
+	})
+
+	// Case 3: Prior mileage near boundary using 2023 fixtures and rates 0.61/0.55.
+	// Prior mileage 4900 (m2023p4900 on 2023-01-08), new distance 200 on 2023-01-10
+	// => 100 @ 0.61 + 100 @ 0.55 = 116.0
+	t.Run("prior mileage pushes across tier boundary (fixture 2023)", func(t *testing.T) {
+		app := testutils.SetupTestApp(t)
+		defer app.Cleanup()
+
+		expensesCollection := core.NewCollection("expenses", "expenses")
+		record := core.NewRecord(expensesCollection)
+		record.Load(map[string]any{
+			"date":         "2023-01-10",
+			"payment_type": "Mileage",
+			"distance":     200.0,
+		})
+
+		rateRecord, err := utilities.GetExpenseRateRecord(app, record)
+		if err != nil {
+			t.Fatalf("failed to get expense rate record: %v", err)
+		}
+		total, err := utilities.CalculateMileageTotal(app, record, rateRecord)
+		if err != nil {
+			t.Fatalf("unexpected error calculating mileage total: %v", err)
+		}
+		if total != 116.0 {
+			t.Fatalf("expected total 116.0, got %v", total)
+		}
+	})
+
+	// Case 4: Prior committed and uncommitted both included (fixtures m2025u1000, m2025c1000)
+	// Prior total 2000, new distance 3500: 3000 @ 0.70 + 500 @ 0.64 = 2420.0
+	t.Run("prior committed and non-committed both included (fixtures 2025)", func(t *testing.T) {
+		app := testutils.SetupTestApp(t)
+		defer app.Cleanup()
+
+		expensesCollection := core.NewCollection("expenses", "expenses")
+		record := core.NewRecord(expensesCollection)
+		record.Load(map[string]any{
+			"date":         "2025-01-10",
+			"payment_type": "Mileage",
+			"distance":     3500.0,
+		})
+
+		rateRecord, err := utilities.GetExpenseRateRecord(app, record)
+		if err != nil {
+			t.Fatalf("failed to get expense rate record: %v", err)
+		}
+		total, err := utilities.CalculateMileageTotal(app, record, rateRecord)
+		if err != nil {
+			t.Fatalf("unexpected error calculating mileage total: %v", err)
+		}
+		if total != 2420.0 {
+			t.Fatalf("expected total 2420.0, got %v", total)
+		}
+	})
 }
