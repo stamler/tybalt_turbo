@@ -311,8 +311,74 @@ func TestExpensesCreate(t *testing.T) {
 				TestAppFactory: testutils.SetupTestApp,
 			}
 		}(),
-		// TODO: valid mileage expense gets a correct total calculated and vendor cleared
-		// TODO: valid mileage expense that spans multiple mileage tiers gets a correct total calculated and vendor cleared
+		func() tests.ApiScenario {
+			// Using 2025-01-10 so the effective expense rate is 2025-01-05
+			// Mileage tiers on that date are {"0": 0.70, "5000": 0.64}
+			// With no prior mileage in test DB for the period and distance 100,
+			// total should be 100 * 0.70 = 70.00 and vendor should be cleared.
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2025-01-10",
+				"division": "vccd5fo56ctbigh",
+				"description": "mileage",
+				"payment_type": "Mileage",
+				"distance": 100,
+				"total": 0,
+				"vendor": "2zqxtsmymf670ha"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "valid mileage expense gets total calculated and vendor cleared",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					"\"payment_type\":\"Mileage\"",
+					"\"distance\":100",
+					"\"total\":70",
+					"\"vendor\":\"\"",
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			// Period starts 2025-01-05; tiers {0:0.70, 5000:0.64}. With distance 5100
+			// and zero prior mileage, expected total is 5000*0.70 + 100*0.64 = 3564.
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2025-01-10",
+				"division": "vccd5fo56ctbigh",
+				"description": "mileage spanning tiers",
+				"payment_type": "Mileage",
+				"distance": 5100,
+				"total": 0,
+				"vendor": "2zqxtsmymf670ha"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "valid mileage expense spanning tiers gets total calculated and vendor cleared",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					"\"payment_type\":\"Mileage\"",
+					"\"distance\":5100",
+					"\"total\":3564",
+					"\"vendor\":\"\"",
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
 		// TODO: unit test for CalculateMileageTotal
 		// TODO: valid allowance expense gets a correct total calculated and vendor cleared and description set
 
