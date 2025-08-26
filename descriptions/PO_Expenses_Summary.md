@@ -37,4 +37,4 @@
 
 1. The only enforced constraint today is that the referenced `purchase_orders` record must have status `Active` (app/hooks/expenses.go: `ProcessExpense`).
 
-2. There are no authorization checks restricting who may create an expense against an Active purchase order; this is explicitly left as a TODO in code (app/hooks/expenses.go: ProcessExpense — "WHO CAN CREATE AN EXPENSE AGAINST AN ACTIVE PURCHASE ORDER?").
+2. There are no authorization checks restricting who may create an expense against an Active purchase order. A decision was made via Teams meeting on August 26, 2025 to allow anybody to submit an expense against any active purchase order provided the other rules are met. If this changes in the future, we will need to add checks here to ensure that the caller is allowed to create an expense for the specified purchase order. This is documented as well within app/hooks/expenses.go as a comment.

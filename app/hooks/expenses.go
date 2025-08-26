@@ -336,8 +336,11 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}.Filter()
 	}
 
-	// TODO: throw an error if the caller is not allowed to create an expense
-	// for this purchase order (define the rules for this)
+	// A decision was made via Teams meeting on August 26, 2025 to allow anybody to
+	// submit an expense against any active purchase order provided the other rules
+	// are met. If this changes in the future, we will need to add checks here to
+	// ensure that the caller is allowed to create an expense for the specified
+	// purchase order.
 
 	// if the purchase_order record's type property is "Cumulative", get the sum
 	// of the total property of all of the expenses associated with this purchase
