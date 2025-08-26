@@ -22,8 +22,8 @@
 
 1. Basic conditions
 
-   (a) the expense has a non-empty `job` and `payment_type` is not one of `Mileage`, `FuelCard`, `PersonalReimbursement`, or `Allowance` (app/hooks/validate_expenses.go: `validateExpense`);
-   (b) for non-exempt types without a `purchase_order`, totals greater than or equal to `constants.NO_PO_EXPENSE_LIMIT` (currently $100) are rejected, effectively requiring a PO unless the caller has the `payables_admin` claim and `payment_type` is `OnAccount` (app/constants/constants.go and app/hooks/validate_expenses.go: `validateExpense` with `byPassTotalLimit` set via app/hooks/expenses.go: `ProcessExpense`).
+   1. the expense has a non-empty `job` and `payment_type` is not one of `Mileage`, `FuelCard`, `PersonalReimbursement`, or `Allowance` (app/hooks/validate_expenses.go: `validateExpense`);
+   2. for non-exempt types without a `purchase_order`, totals greater than or equal to `constants.NO_PO_EXPENSE_LIMIT` (currently $100) are rejected, effectively requiring a PO unless the caller has the `payables_admin` claim and `payment_type` is `OnAccount` (app/constants/constants.go and app/hooks/validate_expenses.go: `validateExpense` with `byPassTotalLimit` set via app/hooks/expenses.go: `ProcessExpense`).
 
 2. Additionally, any provided `purchase_order` must have status `Active` (app/hooks/expenses.go: `ProcessExpense`).
 
