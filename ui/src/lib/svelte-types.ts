@@ -11,6 +11,7 @@ import type {
   VendorsRecord,
   VendorsResponse,
   TimeAmendmentsRecord,
+  AdminProfilesRecord,
 } from "$lib/pocketbase-types";
 
 export interface PageData<T> {
@@ -30,3 +31,4 @@ export type ClientsPageData = PageData<ClientsRecord> & {
   client_contacts: ClientContactsResponse[];
 };
 export type VendorsPageData = PageData<VendorsRecord | VendorsResponse>;
+export type AdminProfilesPageData = PageData<AdminProfilesRecord>;

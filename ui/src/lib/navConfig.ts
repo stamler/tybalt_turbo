@@ -115,6 +115,7 @@ export const navSections: NavSection[] = [
           color: "green",
         },
       },
+      { label: "Admin Profiles", href: "/admin_profiles/list" },
     ],
   },
   {
