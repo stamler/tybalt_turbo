@@ -10,6 +10,7 @@
   import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { divisions } from "$lib/stores/divisions";
   import { managers } from "$lib/stores/managers";
+  import DsCheck from "$lib/components/DsCheck.svelte";
 
   // initialize the stores, noop if already initialized
   divisions.init();
@@ -88,6 +89,12 @@
       {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
     </DSAutoComplete>
   {/if}
+  <DsCheck
+    bind:value={item.do_not_accept_submissions as boolean}
+    {errors}
+    fieldName="do_not_accept_submissions"
+    uiName="Do Not Accept Submissions"
+  />
   <p>Token expiration date: {authStore.tokenExpirationDate() ?? "No token"}</p>
   <span class="flex w-full gap-2">
     <DsActionButton action={save}>Save</DsActionButton>
@@ -95,7 +102,7 @@
 
   <p>Claims:</p>
   <ul class="flex flex-row gap-2">
-    {#each $globalStore.claims as claim}
+    {#each $globalStore.user_po_permission_data.claims as claim}
       <DsLabel color="cyan">{claim}</DsLabel>
     {/each}
   </ul>

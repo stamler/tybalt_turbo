@@ -24,7 +24,7 @@
 </script>
 
 <div class="flex w-full flex-col gap-2 {errors[fieldName] !== undefined ? 'bg-red-200' : ''}">
-  <span class="flex w-full gap-2">
+  <span class="flex w-full items-center gap-2">
     <input
       type="checkbox"
       class="h-4 w-4 {disabled ? 'opacity-50' : ''} {disabled ? 'cursor-not-allowed' : ''}"

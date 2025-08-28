@@ -8,8 +8,7 @@
     <div class="flex items-center gap-2">
       <h1 class="text-2xl font-bold">
         {#if data.item.surname || data.item.given_name}
-          {data.item.surname}{#if data.item.given_name},
-          {/if}{data.item.given_name}
+          {data.item.given_name} {data.item.surname}
         {:else}
           {data.item.job_title || "-"}
         {/if}

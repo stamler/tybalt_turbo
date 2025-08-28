@@ -10,7 +10,8 @@
 <DsList {items} search={true} inListHeader="Staff">
   {#snippet anchor(item: AdminProfilesAugmented)}
     <a href={`/admin_profiles/${item.id}/details`} class="text-blue-600 hover:underline">
-      {item.surname}, {item.given_name}
+      {item.given_name}
+      {item.surname}
     </a>
   {/snippet}
 
