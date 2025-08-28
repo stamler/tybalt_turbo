@@ -12,6 +12,14 @@ package constants
 import "time"
 
 const (
+	// admin_profiles defaults
+	DEFAULT_WORK_WEEK_HOURS = 40
+	DEFAULT_CHARGE_OUT_RATE = 50
+
+	// The default branch id for 'ThunderBay' from the branches collection in the
+	// test database.
+	DEFAULT_BRANCH_ID = "80875lm27v8wgi4"
+
 	// The maximum number of days between the start and end dates for a recurring
 	// purchase order.
 	RECURRING_MAX_DAYS = 400
