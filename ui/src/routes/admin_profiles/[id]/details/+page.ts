@@ -1,5 +1,9 @@
 import type { PageLoad } from "./$types";
-import type { AdminProfilesResponse } from "$lib/pocketbase-types";
+import type {
+  AdminProfilesResponse,
+  ClaimsResponse,
+  UserClaimsResponse,
+} from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 
 export const load: PageLoad = async ({ params }) => {
@@ -8,9 +12,41 @@ export const load: PageLoad = async ({ params }) => {
     const item = await pb
       .collection("admin_profiles_augmented")
       .getOne<AdminProfilesAugmented>(params.id);
-    return { item };
+
+    // Load default branch name if set
+    let defaultBranch: { id: string; name: string } | null = null;
+    try {
+      const defaultBranchId = (item as any)?.default_branch as string | undefined;
+      if (defaultBranchId) {
+        const b = await (pb as any).collection("branches").getOne(defaultBranchId);
+        if (b) defaultBranch = { id: b.id as string, name: (b as any).name as string };
+      }
+    } catch {
+      // noop
+    }
+
+    // Load claims for this user's uid and expand to include claim names
+    let claims: Array<{ id: string; name: string }> = [];
+    if (item?.uid) {
+      try {
+        const list = await pb
+          .collection("user_claims")
+          .getFullList<UserClaimsResponse<{ cid: ClaimsResponse }>>({
+            filter: `uid="${item.uid}"`,
+            expand: "cid",
+          });
+        claims = list
+          .map((uc) => uc.expand?.cid)
+          .filter((c): c is ClaimsResponse => !!c)
+          .map((c) => ({ id: c.id, name: c.name }));
+      } catch {
+        // noop
+      }
+    }
+
+    return { item, claims, defaultBranch };
   } catch (error) {
     console.error(`error loading admin_profile details: ${error}`);
-    return { item: null };
+    return { item: null, claims: [], defaultBranch: null };
   }
 };

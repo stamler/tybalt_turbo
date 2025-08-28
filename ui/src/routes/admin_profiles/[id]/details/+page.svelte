@@ -1,5 +1,6 @@
 <script lang="ts">
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DsLabel from "$lib/components/DsLabel.svelte";
   let { data } = $props();
 </script>
 
@@ -43,6 +44,10 @@
         {data.item.default_charge_out_rate}
       </div>
       <div class="flex gap-2">
+        <span class="font-semibold">Default Branch:</span>
+        {data.defaultBranch?.name || "—"}
+      </div>
+      <div class="flex gap-2">
         <span class="font-semibold">Salary:</span>
         {data.item.salary ? "Yes" : "No"}
       </div>
@@ -82,6 +87,22 @@
         <span class="font-semibold">Personal Vehicle Insurance Expiry:</span>
         {data.item.personal_vehicle_insurance_expiry || "—"}
       </div>
+    </section>
+
+    <!-- Claims, styled like the profile page -->
+    <section class="space-y-2">
+      <h2 class="text-lg font-semibold">Claims</h2>
+      {#if data.claims && data.claims.length > 0}
+        <ul class="flex flex-row flex-wrap gap-2">
+          {#each data.claims as claim (claim.id)}
+            <li>
+              <DsLabel color="cyan">{claim.name}</DsLabel>
+            </li>
+          {/each}
+        </ul>
+      {:else}
+        <p class="text-sm text-neutral-500">No claims assigned.</p>
+      {/if}
     </section>
   </div>
 {:else}
