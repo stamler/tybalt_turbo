@@ -13,6 +13,8 @@ export enum Collections {
   Superusers = "_superusers",
   AbsorbActions = "absorb_actions",
   AdminProfiles = "admin_profiles",
+  AdminProfilesAugmented = "admin_profiles_augmented",
+  Branches = "branches",
   Categories = "categories",
   Claims = "claims",
   ClientContacts = "client_contacts",
@@ -147,6 +149,7 @@ export type AdminProfilesRecord = {
   _imported: boolean;
   allow_personal_reimbursement: boolean;
   created: IsoDateString;
+  default_branch: RecordIdString;
   default_charge_out_rate: number;
   id: string;
   job_title: string;
@@ -164,6 +167,42 @@ export type AdminProfilesRecord = {
   untracked_time_off: boolean;
   updated: IsoDateString;
   work_week_hours: number;
+};
+
+export enum AdminProfilesAugmentedSkipMinTimeCheckOptions {
+  "no" = "no",
+  "on_next_bundle" = "on_next_bundle",
+  "yes" = "yes",
+}
+export type AdminProfilesAugmentedRecord = {
+  allow_personal_reimbursement: boolean;
+  default_branch: RecordIdString;
+  default_charge_out_rate: number;
+  given_name: string;
+  id: string;
+  job_title: string;
+  mobile_phone: string;
+  off_rotation_permitted: boolean;
+  opening_date: string;
+  opening_op: number;
+  opening_ov: number;
+  payroll_id: string;
+  personal_vehicle_insurance_expiry: string;
+  salary: boolean;
+  skip_min_time_check: AdminProfilesAugmentedSkipMinTimeCheckOptions;
+  surname: string;
+  time_sheet_expected: boolean;
+  uid: RecordIdString;
+  untracked_time_off: boolean;
+  work_week_hours: number;
+};
+
+export type BranchesRecord = {
+  code: string;
+  created: IsoDateString;
+  id: string;
+  name: string;
+  updated: IsoDateString;
 };
 
 export type CategoriesRecord = {
@@ -378,6 +417,7 @@ export enum JobsStatusOptions {
 export type JobsRecord = {
   _imported: boolean;
   alternate_manager: RecordIdString;
+  branch: RecordIdString;
   client: RecordIdString;
   contact: RecordIdString;
   created: IsoDateString;
@@ -589,8 +629,8 @@ export type PurchaseOrdersAugmentedRecord = {
   canceller: RecordIdString;
   category: RecordIdString;
   category_name: string;
-  client_name: string;
   client_id: RecordIdString;
+  client_name: string;
   closed: IsoDateString;
   closed_by_system: boolean;
   closer: RecordIdString;
@@ -920,6 +960,10 @@ export type AbsorbActionsResponse<
   BaseSystemFields<Texpand>;
 export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRecord> &
   BaseSystemFields<Texpand>;
+export type AdminProfilesAugmentedResponse<Texpand = unknown> =
+  Required<AdminProfilesAugmentedRecord> & BaseSystemFields<Texpand>;
+export type BranchesResponse<Texpand = unknown> = Required<BranchesRecord> &
+  BaseSystemFields<Texpand>;
 export type CategoriesResponse<Texpand = unknown> = Required<CategoriesRecord> &
   BaseSystemFields<Texpand>;
 export type ClaimsResponse<Texpand = unknown> = Required<ClaimsRecord> & BaseSystemFields<Texpand>;
@@ -933,9 +977,7 @@ export type ExpenseAllowanceTotalsResponse<Texpand = unknown> =
   Required<ExpenseAllowanceTotalsRecord> & BaseSystemFields<Texpand>;
 export type ExpenseMileageTotalsResponse<Texpand = unknown> = Required<ExpenseMileageTotalsRecord> &
   BaseSystemFields<Texpand>;
-export type ExpenseRatesResponse<Tmileage = unknown, Texpand = unknown> = Required<
-  ExpenseRatesRecord<Tmileage>
-> &
+export type ExpenseRatesResponse<Texpand = unknown> = Required<ExpenseRatesRecord> &
   BaseSystemFields<Texpand>;
 export type ExpensesResponse<Texpand = ExpensesRecordExpands> = Required<ExpensesRecord> &
   BaseSystemFields<Texpand>;
@@ -1010,6 +1052,8 @@ export type CollectionRecords = {
   _superusers: SuperusersRecord;
   absorb_actions: AbsorbActionsRecord;
   admin_profiles: AdminProfilesRecord;
+  admin_profiles_augmented: AdminProfilesAugmentedRecord;
+  branches: BranchesRecord;
   categories: CategoriesRecord;
   claims: ClaimsRecord;
   client_contacts: ClientContactsRecord;
@@ -1057,6 +1101,8 @@ export type CollectionResponses = {
   _superusers: SuperusersResponse;
   absorb_actions: AbsorbActionsResponse;
   admin_profiles: AdminProfilesResponse;
+  admin_profiles_augmented: AdminProfilesAugmentedResponse;
+  branches: BranchesResponse;
   categories: CategoriesResponse;
   claims: ClaimsResponse;
   client_contacts: ClientContactsResponse;
@@ -1107,6 +1153,8 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "_superusers"): RecordService<SuperusersResponse>;
   collection(idOrName: "absorb_actions"): RecordService<AbsorbActionsResponse>;
   collection(idOrName: "admin_profiles"): RecordService<AdminProfilesResponse>;
+  collection(idOrName: "admin_profiles_augmented"): RecordService<AdminProfilesAugmentedResponse>;
+  collection(idOrName: "branches"): RecordService<BranchesResponse>;
   collection(idOrName: "categories"): RecordService<CategoriesResponse>;
   collection(idOrName: "claims"): RecordService<ClaimsResponse>;
   collection(idOrName: "client_contacts"): RecordService<ClientContactsResponse>;
