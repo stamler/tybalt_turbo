@@ -101,6 +101,7 @@ type Profile struct {
 	DoNotAcceptSubmissions         bool    `parquet:"doNotAcceptSubmissions"`         // profiles
 	PocketbaseId                   string  `parquet:"pocketbase_id"`
 	UserId                         string  `parquet:"pocketbase_uid"` // profiles, users, admin_profiles
+	DefaultBranch                  string  `parquet:"defaultBranch"`  // admin_profiles
 }
 
 type Category struct {

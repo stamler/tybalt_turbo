@@ -207,6 +207,7 @@ func ToParquet(sourceSQLiteDb string) {
 	sqliteTableDumps(sourceSQLiteDb, "divisions")
 	sqliteTableDumps(sourceSQLiteDb, "time_types")
 	sqliteTableDumps(sourceSQLiteDb, "claims")
+	sqliteTableDumps(sourceSQLiteDb, "branches")
 
 	// Augment the Profiles.parquet data by adding the pocketbase_uid column.
 	augmentProfiles()
