@@ -1,5 +1,5 @@
 import type { PageLoad } from "./$types";
-import type { AdminProfilesRecord } from "$lib/pocketbase-types";
+import type { AdminProfilesAugmentedResponse, AdminProfilesRecord } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { AdminProfilesPageData } from "$lib/svelte-types";
 
@@ -21,13 +21,14 @@ export const load: PageLoad<AdminProfilesPageData> = async ({ params }) => {
     mobile_phone: "",
     job_title: "",
     personal_vehicle_insurance_expiry: "",
+    default_branch: "",
   } as unknown as AdminProfilesRecord;
 
   try {
     // Load from augmented view for display fields (e.g., names)
     const item = await pb
       .collection("admin_profiles_augmented")
-      .getOne<AdminProfilesRecord & { given_name?: string; surname?: string }>(params.id);
+      .getOne<AdminProfilesAugmentedResponse>(params.id);
     return { item, editing: true, id: params.id };
   } catch (error) {
     console.error(`error loading admin_profile, returning default item: ${error}`);

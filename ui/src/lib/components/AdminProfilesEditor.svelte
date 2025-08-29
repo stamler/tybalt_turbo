@@ -10,6 +10,7 @@
     AdminProfilesSkipMinTimeCheckOptions,
     ClaimsResponse,
     UserClaimsResponse,
+    BranchesResponse,
   } from "$lib/pocketbase-types";
   import type { AdminProfilesPageData } from "$lib/svelte-types";
   import { goto } from "$app/navigation";
@@ -20,12 +21,11 @@
   let errors = $state({} as Record<string, { message: string }>);
   let item = $state({ ...data.item });
 
-  type Branch = { id: string; name: string };
-  let branches = $state([] as Branch[]);
+  let branches = $state([] as BranchesResponse[]);
 
   // Claims management state
   let allClaims = $state([] as ClaimsResponse[]);
-  let originalUserClaims = $state([] as UserClaimsResponse<{ cid: ClaimsResponse }>[]);
+  let originalUserClaims = $state([] as UserClaimsResponse[]);
   let stagedClaimIds = $state([] as string[]);
   let selectedClaimId = $state("");
 
@@ -44,8 +44,8 @@
 
   async function reloadBranches() {
     try {
-      const list = await (pb as any).collection("branches").getFullList({ sort: "name" });
-      branches = list as Branch[];
+      const list = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
+      branches = list;
     } catch (e) {
       // noop
     }
@@ -54,12 +54,10 @@
   async function reloadUserClaims() {
     try {
       if (!item?.uid) return;
-      const list = await pb
-        .collection("user_claims")
-        .getFullList<UserClaimsResponse<{ cid: ClaimsResponse }>>({
-          filter: `uid="${item.uid}"`,
-          expand: "cid",
-        });
+      const list = await pb.collection("user_claims").getFullList<UserClaimsResponse>({
+        filter: `uid="${item.uid}"`,
+        expand: "cid",
+      });
       originalUserClaims = list;
       stagedClaimIds = list.map((uc) => uc.cid);
     } catch (e) {
@@ -154,7 +152,7 @@
 </svelte:head>
 
 <form class="flex w-full flex-col items-center gap-2 p-2" onsubmit={save}>
-  <div class="grid w-full grid-cols-1 gap-2 md:grid-cols-2">
+  <div class="w/full grid grid-cols-1 gap-2 md:grid-cols-2">
     <DsTextInput
       bind:value={item.work_week_hours as number}
       {errors}
@@ -288,13 +286,13 @@
     />
 
     <DsSelector
-      bind:value={(item as any).default_branch as string}
+      bind:value={item.default_branch as string}
       items={branches}
       {errors}
       fieldName="default_branch"
       uiName="Default Branch"
     >
-      {#snippet optionTemplate(item)}{(item as any).name ?? item.name}{/snippet}
+      {#snippet optionTemplate(item)}{item.name}{/snippet}
     </DsSelector>
   </div>
 

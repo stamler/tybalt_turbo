@@ -3,6 +3,7 @@ import type {
   AdminProfilesResponse,
   ClaimsResponse,
   UserClaimsResponse,
+  BranchesResponse,
 } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 
@@ -18,8 +19,8 @@ export const load: PageLoad = async ({ params }) => {
     try {
       const defaultBranchId = (item as any)?.default_branch as string | undefined;
       if (defaultBranchId) {
-        const b = await (pb as any).collection("branches").getOne(defaultBranchId);
-        if (b) defaultBranch = { id: b.id as string, name: (b as any).name as string };
+        const b = await pb.collection("branches").getOne<BranchesResponse>(defaultBranchId);
+        if (b) defaultBranch = { id: b.id, name: b.name };
       }
     } catch {
       // noop
@@ -29,12 +30,10 @@ export const load: PageLoad = async ({ params }) => {
     let claims: Array<{ id: string; name: string }> = [];
     if (item?.uid) {
       try {
-        const list = await pb
-          .collection("user_claims")
-          .getFullList<UserClaimsResponse<{ cid: ClaimsResponse }>>({
-            filter: `uid="${item.uid}"`,
-            expand: "cid",
-          });
+        const list = await pb.collection("user_claims").getFullList<UserClaimsResponse>({
+          filter: `uid="${item.uid}"`,
+          expand: "cid",
+        });
         claims = list
           .map((uc) => uc.expand?.cid)
           .filter((c): c is ClaimsResponse => !!c)
