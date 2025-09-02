@@ -4,11 +4,13 @@ package hooks
 
 import (
 	"encoding/json"
+	"fmt"
 	"log"
 	"regexp"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/list"
@@ -58,6 +60,18 @@ func cleanTimeEntry(app core.App, timeEntryRecord *core.Record) ([]string, error
 	// Certain fields are always allowed to be set. We add them to the list of
 	// allowed fields here.
 	allowedFields = append(allowedFields, "id", "uid", "created", "updated")
+
+	// Load the admin_profiles record and set branch from the user's default_branch
+	uid := timeEntryRecord.GetString("uid")
+	adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
+	if err != nil {
+		return nil, err
+	}
+	defaultBranchId := adminProfile.GetString("default_branch")
+	if defaultBranchId == "" {
+		return nil, fmt.Errorf("your admin_profiles record is missing a default_branch")
+	}
+	timeEntryRecord.Set("branch", defaultBranchId)
 
 	// remove any fields from the time_entry record that are not in allowedFields.
 	// I'm not sure if this is the best way to do this but let's try it.

@@ -68,6 +68,55 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	approver := profile.Get("manager")
 	expenseRecord.Set("approver", approver)
 
+	// Set branch from job if provided; otherwise from user's default branch
+	jobId := expenseRecord.GetString("job")
+	if jobId != "" {
+		jobRecord, err := app.FindRecordById("jobs", jobId)
+		if err != nil || jobRecord == nil {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning expense",
+				Data: map[string]errs.CodeError{
+					"job": {Code: "not_found", Message: "referenced job not found"},
+				},
+			}
+		}
+		branchId := jobRecord.GetString("branch")
+		if branchId == "" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning expense",
+				Data: map[string]errs.CodeError{
+					"job": {Code: "missing_branch", Message: "referenced job is missing a branch"},
+				},
+			}
+		}
+		expenseRecord.Set("branch", branchId)
+	} else {
+		uid := expenseRecord.GetString("uid")
+		adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
+		if err != nil || adminProfile == nil {
+			return &errs.HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "hook error when cleaning expense",
+				Data: map[string]errs.CodeError{
+					"uid": {Code: "profile_lookup_error", Message: "error looking up admin profile"},
+				},
+			}
+		}
+		defaultBranchId := adminProfile.GetString("default_branch")
+		if defaultBranchId == "" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning expense",
+				Data: map[string]errs.CodeError{
+					"uid": {Code: "missing_default_branch", Message: "your admin_profiles record is missing a default_branch"},
+				},
+			}
+		}
+		expenseRecord.Set("branch", defaultBranchId)
+	}
+
 	// if the expense record has a payment_type of Mileage or Allowance, we
 	// need to fetch the appropriate expense rate from the expense_rates
 	// collection and set the rate and total fields on the expense record

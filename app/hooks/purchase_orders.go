@@ -81,6 +81,55 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	purchaseOrderRecord.Set("rejection_reason", "")
 	purchaseOrderRecord.Set("rejector", "")
 
+	// Set branch from job if provided; otherwise from user's default branch
+	jobId := purchaseOrderRecord.GetString("job")
+	if jobId != "" {
+		jobRecord, err := app.FindRecordById("jobs", jobId)
+		if err != nil || jobRecord == nil {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning purchase order",
+				Data: map[string]errs.CodeError{
+					"job": {Code: "not_found", Message: "referenced job not found"},
+				},
+			}
+		}
+		branchId := jobRecord.GetString("branch")
+		if branchId == "" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning purchase order",
+				Data: map[string]errs.CodeError{
+					"job": {Code: "missing_branch", Message: "referenced job is missing a branch"},
+				},
+			}
+		}
+		purchaseOrderRecord.Set("branch", branchId)
+	} else {
+		uid := purchaseOrderRecord.GetString("uid")
+		adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
+		if err != nil || adminProfile == nil {
+			return &errs.HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "hook error when cleaning purchase order",
+				Data: map[string]errs.CodeError{
+					"uid": {Code: "profile_lookup_error", Message: "error looking up admin profile"},
+				},
+			}
+		}
+		defaultBranchId := adminProfile.GetString("default_branch")
+		if defaultBranchId == "" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning purchase order",
+				Data: map[string]errs.CodeError{
+					"uid": {Code: "missing_default_branch", Message: "your admin_profiles record is missing a default_branch"},
+				},
+			}
+		}
+		purchaseOrderRecord.Set("branch", defaultBranchId)
+	}
+
 	return nil
 }
 
