@@ -257,3 +257,65 @@ func TestTimeAmendmentsRoutes(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+func TestTimeAmendmentsBranchRequired(t *testing.T) {
+	creatorToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "create succeeds when branch is provided",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_amendments/records",
+			Body: strings.NewReader(`{
+                "creator": "f2j5a8vk006baub",
+                "time_type": "sdyfl3q7j7ap849",
+                "uid": "rzr98oadsp9qc11",
+                "date": "2024-09-02",
+                "division": "vccd5fo56ctbigh",
+                "branch": "80875lm27v8wgi4",
+                "description": "branch present",
+                "hours": 1,
+                "skip_tsid_check": true
+            }`),
+			Headers:        map[string]string{"Authorization": creatorToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"branch":"80875lm27v8wgi4"`,
+				`"week_ending":"2024-09-07"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "create fails when branch is missing",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_amendments/records",
+			Body: strings.NewReader(`{
+                "creator": "f2j5a8vk006baub",
+                "time_type": "sdyfl3q7j7ap849",
+                "uid": "rzr98oadsp9qc11",
+                "date": "2024-09-02",
+                "division": "vccd5fo56ctbigh",
+                "description": "branch missing",
+                "branch": "",
+                "hours": 1,
+                "skip_tsid_check": true
+            }`),
+			Headers:        map[string]string{"Authorization": creatorToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"branch":{"code":"validation_required"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
