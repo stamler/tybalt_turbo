@@ -6,12 +6,11 @@ export const load: PageLoad = async () => {
   let items: TimeAmendmentsAugmentedResponse[];
 
   try {
-    // load required data
     items = await pb
       .collection("time_amendments_augmented")
       .getFullList<TimeAmendmentsAugmentedResponse>({
         sort: "-date",
-        filter: "committed_week_ending != ''",
+        filter: "committed_week_ending = ''",
       });
     return {
       items,

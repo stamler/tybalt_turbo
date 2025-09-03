@@ -8,7 +8,7 @@ export interface NavButton {
 export interface NavItem {
   label: string;
   href: string;
-  button?: NavButton;
+  buttons: NavButton[];
 }
 
 export interface NavSection {
@@ -23,28 +23,38 @@ export const navSections: NavSection[] = [
       {
         label: "Entries",
         href: "/time/entries/list",
-        button: {
-          action: "/time/entries/add",
-          icon: "feather:plus-circle",
-          title: "New Entry",
-          color: "green",
-        },
+        buttons: [
+          {
+            action: "/time/entries/add",
+            icon: "feather:plus-circle",
+            title: "New Entry",
+            color: "green",
+          },
+        ],
       },
-      { label: "Sheets", href: "/time/sheets/list" },
-      { label: "Pending My Approval", href: "/time/sheets/pending" },
-      { label: "Approved By Me", href: "/time/sheets/approved" },
-      { label: "Shared with Me", href: "/time/sheets/shared" },
+      { label: "Sheets", href: "/time/sheets/list", buttons: [] },
+      { label: "Pending My Approval", href: "/time/sheets/pending", buttons: [] },
+      { label: "Approved By Me", href: "/time/sheets/approved", buttons: [] },
+      { label: "Shared with Me", href: "/time/sheets/shared", buttons: [] },
       {
         label: "Amendments",
         href: "/time/amendments/list",
-        button: {
-          action: "/time/amendments/add",
-          icon: "feather:plus-circle",
-          title: "New Amendment",
-          color: "green",
-        },
+        buttons: [
+          {
+            action: "/time/amendments/pending",
+            icon: "feather:list",
+            title: "Pending Amendments",
+            color: "purple",
+          },
+          {
+            action: "/time/amendments/add",
+            icon: "feather:plus-circle",
+            title: "New Amendment",
+            color: "green",
+          },
+        ],
       },
-      { label: "Time Off", href: "/time/off" },
+      { label: "Time Off", href: "/time/off", buttons: [] },
     ],
   },
   {
@@ -53,16 +63,18 @@ export const navSections: NavSection[] = [
       {
         label: "My Purchase Orders",
         href: "/pos/list",
-        button: {
-          action: "/pos/add",
-          icon: "feather:plus-circle",
-          title: "New PO",
-          color: "green",
-        },
+        buttons: [
+          {
+            action: "/pos/add",
+            icon: "feather:plus-circle",
+            title: "New PO",
+            color: "green",
+          },
+        ],
       },
-      { label: "Pending My Approval", href: "/pos/pending" },
-      { label: "All Active", href: "/pos/active" },
-      { label: "Stale", href: "/pos/stale" },
+      { label: "Pending My Approval", href: "/pos/pending", buttons: [] },
+      { label: "All Active", href: "/pos/active", buttons: [] },
+      { label: "Stale", href: "/pos/stale", buttons: [] },
     ],
   },
   {
@@ -71,15 +83,17 @@ export const navSections: NavSection[] = [
       {
         label: "My Expenses",
         href: "/expenses/list",
-        button: {
-          action: "/expenses/add",
-          icon: "feather:plus-circle",
-          title: "New Expense",
-          color: "green",
-        },
+        buttons: [
+          {
+            action: "/expenses/add",
+            icon: "feather:plus-circle",
+            title: "New Expense",
+            color: "green",
+          },
+        ],
       },
-      { label: "Pending My Approval", href: "/expenses/pending" },
-      { label: "Approved By Me", href: "/expenses/approved" },
+      { label: "Pending My Approval", href: "/expenses/pending", buttons: [] },
+      { label: "Approved By Me", href: "/expenses/approved", buttons: [] },
     ],
   },
   {
@@ -88,48 +102,54 @@ export const navSections: NavSection[] = [
       {
         label: "Jobs",
         href: "/jobs/list",
-        button: {
-          action: "/jobs/add",
-          icon: "feather:plus-circle",
-          title: "New Job",
-          color: "green",
-        },
+        buttons: [
+          {
+            action: "/jobs/add",
+            icon: "feather:plus-circle",
+            title: "New Job",
+            color: "green",
+          },
+        ],
       },
       {
         label: "Clients",
         href: "/clients/list",
-        button: {
-          action: "/clients/add",
-          icon: "feather:plus-circle",
-          title: "New Client",
-          color: "green",
-        },
+        buttons: [
+          {
+            action: "/clients/add",
+            icon: "feather:plus-circle",
+            title: "New Client",
+            color: "green",
+          },
+        ],
       },
       {
         label: "Vendors",
         href: "/vendors/list",
-        button: {
-          action: "/vendors/add",
-          icon: "feather:plus-circle",
-          title: "New Vendor",
-          color: "green",
-        },
+        buttons: [
+          {
+            action: "/vendors/add",
+            icon: "feather:plus-circle",
+            title: "New Vendor",
+            color: "green",
+          },
+        ],
       },
-      { label: "Admin Profiles", href: "/admin_profiles/list" },
+      { label: "Admin Profiles", href: "/admin_profiles/list", buttons: [] },
     ],
   },
   {
     title: "Reports",
     items: [
-      { label: "Payroll", href: "/reports/payroll" },
-      { label: "Weekly", href: "/reports/weekly" },
+      { label: "Payroll", href: "/reports/payroll", buttons: [] },
+      { label: "Weekly", href: "/reports/weekly", buttons: [] },
     ],
   },
   {
     title: "Settings",
     items: [
-      { label: "Time Types", href: "/timetypes" },
-      { label: "Divisions", href: "/divisions" },
+      { label: "Time Types", href: "/timetypes", buttons: [] },
+      { label: "Divisions", href: "/divisions", buttons: [] },
     ],
   },
 ];

@@ -134,22 +134,26 @@
               {#each section.items as item}
                 <div
                   class="flex h-12 items-center pr-4 lg:h-8 lg:pr-2"
-                  class:justify-between={item.button}
+                  class:justify-between={item.buttons}
                 >
                   <a
                     href={item.href}
                     class="ml-4 flex h-full flex-grow items-center rounded pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
                     >{item.label}</a
                   >
-                  {#if item.button}
-                    <div class="[&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6">
-                      <DsActionButton
-                        action={item.button.action}
-                        icon={item.button.icon}
-                        title={item.button.title}
-                        color={item.button.color}
-                        transparentBackground
-                      />
+                  {#if item.buttons}
+                    <div
+                      class="flex items-center gap-1 [&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6"
+                    >
+                      {#each item.buttons as btn}
+                        <DsActionButton
+                          action={btn.action}
+                          icon={btn.icon}
+                          title={btn.title}
+                          color={btn.color}
+                          transparentBackground
+                        />
+                      {/each}
                     </div>
                   {:else}
                     <div class="w-8"></div>

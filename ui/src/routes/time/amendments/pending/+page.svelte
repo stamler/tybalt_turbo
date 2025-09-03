@@ -1,6 +1,9 @@
 <script lang="ts">
+  import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import { goto } from "$app/navigation";
   import type { PageData } from "./$types";
   import type { TimeAmendmentsAugmentedResponse } from "$lib/pocketbase-types";
 
@@ -12,6 +15,27 @@
     if (item.hours) hoursArray.push(item.hours + " hrs");
     if (item.meals_hours) hoursArray.push(item.meals_hours + " hrs meals");
     return hoursArray.join(" + ");
+  }
+
+  async function del(id: string): Promise<void> {
+    if (!Array.isArray(items)) return;
+    try {
+      await pb.collection("time_amendments").delete(id);
+      items = items.filter((item) => item.id !== id);
+    } catch (error: any) {
+      alert(error.data.message);
+    }
+  }
+
+  async function commit(id: string): Promise<void> {
+    try {
+      await pb.send(`/api/time_amendments/${id}/commit`, {
+        method: "POST",
+      });
+      goto("/time/amendments/pending");
+    } catch (error: any) {
+      alert(error?.response?.error ?? error?.data?.message ?? "Error committing record");
+    }
   }
 </script>
 
@@ -66,22 +90,22 @@
   <span class="opacity-50">{description}</span>
 {/snippet}
 
-{#snippet actions({ committed }: TimeAmendmentsAugmentedResponse)}
-  {#if committed}
-    <DsLabel color="green">Committed</DsLabel>
-  {/if}
-{/snippet}
-
-{#snippet groupHeader(field: string)}
-  Week Ending {field}
+{#snippet actions({ id }: TimeAmendmentsAugmentedResponse)}
+  <DsActionButton
+    action={`/time/amendments/${id}/edit`}
+    icon="mdi:edit-outline"
+    title="Edit"
+    color="blue"
+  />
+  <DsActionButton action={() => commit(id)} icon="mdi:check-all" title="Commit" color="green" />
+  <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}
 
 <DsList
   items={items as TimeAmendmentsAugmentedResponse[]}
   search={true}
-  inListHeader="Time Amendments"
-  groupField="committed_week_ending"
-  {groupHeader}
+  inListHeader="Pending Time Amendments"
+  groupField="uid_name"
   {anchor}
   {headline}
   {byline}

@@ -19,6 +19,7 @@
     DivisionsRecord,
     CategoriesResponse,
     ProfilesResponse,
+    BranchesResponse,
   } from "$lib/pocketbase-types";
 
   // initialize the stores, noop if already initialized
@@ -41,6 +42,16 @@
       storeFields: ["uid", "given_name", "surname"],
     });
     profilesIndex.addAll(profiles as ProfilesResponse[]);
+    try {
+      const list = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
+      branches = list;
+      // If branch is required and not yet set, default to the first branch
+      if (((item as any).branch === undefined || (item as any).branch === "") && list.length > 0) {
+        (item as any).branch = list[0].id;
+      }
+    } catch (e) {
+      // noop
+    }
   });
 
   const trainingTokensInDescriptionWhileRegularHours = $derived.by(() => {
@@ -87,6 +98,7 @@
   }
 
   let categories = $state([] as CategoriesResponse[]);
+  let branches = $state([] as BranchesResponse[]);
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
@@ -127,8 +139,8 @@
       // submission was successful, clear the errors
       errors = {};
 
-      // redirect to the list page
-      goto("/time/amendments/list");
+      // redirect to the pending page
+      goto("/time/amendments/pending");
     } catch (error: any) {
       errors = error.data.data;
     }
@@ -176,6 +188,15 @@
     fieldName="time_type"
     uiName="Time Type"
   />
+  <DsSelector
+    bind:value={(item as any).branch as string}
+    items={branches}
+    {errors}
+    fieldName="branch"
+    uiName="Branch"
+  >
+    {#snippet optionTemplate(item: BranchesResponse)}{item.name}{/snippet}
+  </DsSelector>
   {#if trainingTokensInDescriptionWhileRegularHours}
     <span class="flex w-full gap-2 bg-red-200 text-red-600">
       ^Should you choose training instead?
@@ -304,7 +325,7 @@
       {#if !jobNumbersInDescription}
         <DsActionButton action={save}>Save</DsActionButton>
       {/if}
-      <DsActionButton action="/time/amendments/list">Cancel</DsActionButton>
+      <DsActionButton action="/time/amendments/pending">Cancel</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

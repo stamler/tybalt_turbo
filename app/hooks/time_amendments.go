@@ -59,7 +59,7 @@ func cleanTimeAmendment(app core.App, timeAmendmentRecord *core.Record) ([]strin
 
 	// Certain fields are always allowed to be set. We add them to the list of
 	// allowed fields here.
-	allowedFields = append(allowedFields, "id", "uid", "created", "creator", "updated", "skip_tsid_check")
+	allowedFields = append(allowedFields, "id", "uid", "created", "creator", "updated", "skip_tsid_check", "branch")
 
 	// remove any fields from the time_amendment record that are not in
 	// allowedFields. I'm not sure if this is the best way to do this but let's
