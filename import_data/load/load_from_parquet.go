@@ -209,8 +209,16 @@ type MileageResetDate struct {
 }
 
 type PurchaseOrder struct {
-	Id       string `parquet:"id"`
-	PoNumber string `parquet:"number"`
+	Id          string  `parquet:"id"`
+	PoNumber    string  `parquet:"number"`
+	Approver    string  `parquet:"approver"`
+	Date        string  `parquet:"date"`
+	Vendor      string  `parquet:"vendor"`
+	Uid         string  `parquet:"uid"`
+	Total       float64 `parquet:"total"`
+	PaymentType string  `parquet:"payment_type"`
+	Job         string  `parquet:"job"`
+	Division    string  `parquet:"division"`
 }
 
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.

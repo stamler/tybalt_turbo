@@ -198,10 +198,8 @@ func ToParquet(sourceSQLiteDb string) {
 	jobsToClientsAndContacts()
 
 	// Normalize the Expenses.parquet data by creating Vendors.parquet and
-	// purchase_orders.parquet and updating Expenses.parquet to reference
-	// vendors and purchase_orders via foreign keys.
+	// updating Expenses.parquet to reference vendors via foreign keys.
 	expensesToVendors()
-	expensesToPurchaseOrders()
 
 	// Dump the pre-populated tables from the sqlite test database.
 	sqliteTableDumps(sourceSQLiteDb, "divisions")
@@ -227,6 +225,10 @@ func ToParquet(sourceSQLiteDb string) {
 
 	// Augment Expenses.parquet data
 	augmentExpenses()
+
+	// Now that Expenses.parquet is augmented with pocketbase_* and *_id fields,
+	// create purchase_orders.parquet and wire expenses to purchase_orders
+	expensesToPurchaseOrders()
 
 	// Extract the UserClaims.parquet file from the Profiles.parquet file.
 	profilesToUserClaims()
