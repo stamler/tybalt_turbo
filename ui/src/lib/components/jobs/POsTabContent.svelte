@@ -26,6 +26,9 @@
 
 <div class="px-4">
   <div class="space-y-1">
+    <span class="text-sm text-gray-500">
+      Purchase orders referencing a job belong to the branch of the job they reference.
+    </span>
     <div><span class="font-semibold">Total:</span> {summary.total_amount ?? 0}</div>
     {#if summary.earliest_po}
       <div>
@@ -39,7 +42,7 @@
 {#if listLoading && items.length === 0}
   <div class="px-4">Loading…</div>
 {:else if items.length === 0}
-  <div class="px-4">No purchase orders found.</div>
+  <div class="px-4">No <i>Active</i> purchase orders found.</div>
 {:else}
   <div class="w-full overflow-hidden">
     <DsList {items} search={false} inListHeader="Purchase Orders">
