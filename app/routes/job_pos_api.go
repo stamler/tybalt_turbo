@@ -23,6 +23,7 @@ type JobPOEntry struct {
 	Date         string  `db:"date" json:"date"`
 	Total        float64 `db:"total" json:"total"`
 	Type         string  `db:"type" json:"type"`
+	BranchCode   string  `db:"branch_code" json:"branch_code"`
 	DivisionCode string  `db:"division_code" json:"division_code"`
 	Surname      string  `db:"surname" json:"surname"`
 	GivenName    string  `db:"given_name" json:"given_name"`
@@ -51,6 +52,7 @@ func createGetJobPOsHandler(app core.App) func(e *core.RequestEvent) error {
 
 		q := e.Request.URL.Query()
 		division := q.Get("division")
+		branch := q.Get("branch")
 		poType := q.Get("type")
 		uid := q.Get("uid")
 
@@ -73,6 +75,7 @@ func createGetJobPOsHandler(app core.App) func(e *core.RequestEvent) error {
 
 		params := dbx.Params{
 			"id":       id,
+			"branch":   branch,
 			"division": division,
 			"type":     poType,
 			"uid":      uid,

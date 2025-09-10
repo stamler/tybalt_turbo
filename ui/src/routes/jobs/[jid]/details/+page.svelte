@@ -37,7 +37,7 @@
   let tabs: TabItem[] = $derived([
     { label: "Time", href: "#time", active: activeTab === "time" },
     { label: "Expenses", href: "#expenses", active: activeTab === "expenses" },
-    { label: "Purchase Orders", href: "#pos", active: activeTab === "pos" },
+    { label: "Active POs", href: "#pos", active: activeTab === "pos" },
   ]);
 
   // Secondary tabs under Time
@@ -212,6 +212,7 @@
       color: "green",
     },
     staffFilter,
+    branchFilter,
   ];
 </script>
 

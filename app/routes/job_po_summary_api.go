@@ -18,6 +18,7 @@ type poSummaryRow struct {
 	TotalAmount sql.NullString `db:"total_amount"`
 	EarliestPO  sql.NullString `db:"earliest_po"`
 	LatestPO    sql.NullString `db:"latest_po"`
+	Branches    sql.NullString `db:"branches"`
 	Divisions   sql.NullString `db:"divisions"`
 	Types       sql.NullString `db:"types"`
 	Names       sql.NullString `db:"names"`
@@ -37,12 +38,14 @@ func createGetJobPOSummaryHandler(app core.App) func(e *core.RequestEvent) error
 
 		q := e.Request.URL.Query()
 		division := q.Get("division")
+		branch := q.Get("branch")
 		poType := q.Get("type")
 		uid := q.Get("uid")
 
 		var row poSummaryRow
 		if err := app.DB().NewQuery(jobPOSummaryQuery).Bind(dbx.Params{
 			"id":       id,
+			"branch":   branch,
 			"division": division,
 			"type":     poType,
 			"uid":      uid,
@@ -71,6 +74,7 @@ func createGetJobPOSummaryHandler(app core.App) func(e *core.RequestEvent) error
 			"total_amount": total,
 			"earliest_po":  ns(row.EarliestPO),
 			"latest_po":    ns(row.LatestPO),
+			"branches":     ns(row.Branches),
 			"divisions":    ns(row.Divisions),
 			"types":        ns(row.Types),
 			"names":        ns(row.Names),
