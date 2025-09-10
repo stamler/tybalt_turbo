@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"database/sql"
 	"encoding/json"
 	"flag"
@@ -8,7 +9,9 @@ import (
 	"imports/attachments"
 	"imports/extract"
 	"imports/load"
+	"io"
 	"log"
+	"os"
 	"path"
 	"strings"
 
@@ -36,11 +39,41 @@ func main() {
 	importFlag := flag.Bool("import", false, "Import data from Parquet files")
 	attachmentsFlag := flag.Bool("attachments", false, "Import attachments from GCS to S3")
 	cleanupFlag := flag.Bool("cleanup", false, "Clean up deleted records after import")
+	initFlag := flag.Bool("init", false, "Initialize app database by copying the test database (overwrites existing)")
 	dbFlag := flag.String("db", "../app/test_pb_data/data.db", "Path to the target database")
 	flag.Parse()
 
 	// Use the database path from the flag
 	targetDatabase = *dbFlag
+
+	if *initFlag {
+		fmt.Println("This will overwrite any existing data in app/pb_data/data.db.")
+		fmt.Print("Proceed? [y/N]: ")
+		reader := bufio.NewReader(os.Stdin)
+		response, _ := reader.ReadString('\n')
+		response = strings.TrimSpace(strings.ToLower(response))
+		if response != "y" && response != "yes" {
+			fmt.Println("Aborted.")
+			return
+		}
+
+		src := "../app/test_pb_data/data.db"
+		dst := "../app/pb_data/data.db"
+
+		if err := os.MkdirAll(path.Dir(dst), 0755); err != nil {
+			log.Fatalf("Failed to ensure destination directory: %v", err)
+		}
+
+		if err := copyFile(src, dst); err != nil {
+			log.Fatalf("Failed to initialize database: %v", err)
+		}
+
+		if err := cleanupFreshDatabase(dst); err != nil {
+			log.Fatalf("Failed to clean initialized database: %v", err)
+		}
+
+		return
+	}
 
 	if *exportFlag {
 		fmt.Println("Exporting data to Parquet files...")
@@ -964,4 +997,90 @@ func getUserClaimPairsFromParquet(parquetFile string) (map[userClaimPair]bool, e
 	}
 
 	return pairs, nil
+}
+
+// copyFile copies the contents and file mode from src to dst, overwriting dst if it exists
+func copyFile(src string, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+
+	_, copyErr := io.Copy(out, in)
+	if syncErr := out.Sync(); syncErr != nil && copyErr == nil {
+		copyErr = syncErr
+	}
+	if closeErr := out.Close(); closeErr != nil && copyErr == nil {
+		copyErr = closeErr
+	}
+
+	if copyErr != nil {
+		return copyErr
+	}
+
+	if info, statErr := os.Stat(src); statErr == nil {
+		_ = os.Chmod(dst, info.Mode())
+	}
+
+	return nil
+}
+
+// cleanupFreshDatabase removes test data from the freshly copied app database
+func cleanupFreshDatabase(dbPath string) error {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	// Disable foreign keys during bulk delete
+	_, _ = db.Exec("PRAGMA foreign_keys = OFF")
+	defer db.Exec("PRAGMA foreign_keys = ON")
+
+	tx, err := db.Begin()
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+
+	tables := []string{
+		"users",
+		"admin_profiles",
+		"categories",
+		"client_contacts",
+		"clients",
+		"expenses",
+		"jobs",
+		"notifications",
+		"po_approver_props",
+		"profiles",
+		"purchase_orders",
+		"time_amendments",
+		"time_entries",
+		"time_sheets",
+		"user_claims",
+		"vendors",
+	}
+
+	for _, tbl := range tables {
+		if _, err := tx.Exec("DELETE FROM " + tbl); err != nil {
+			// If a table doesn't exist in this schema, skip it
+			if strings.Contains(strings.ToLower(err.Error()), "no such table") {
+				continue
+			}
+			_ = tx.Rollback()
+			return fmt.Errorf("delete from %s: %w", tbl, err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+
+	return nil
 }
