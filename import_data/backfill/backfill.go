@@ -46,6 +46,26 @@ FROM jobs AS j
 WHERE e.job <> ''
   AND e.branch = ''
   AND j.id = e.job;`,
+
+		// -- Backfill the branch column in the purchase_orders table to the default branch from the corresponding user's admin_profiles record
+		// -- This only updates purchase_orders with job = '' (and branch empty).
+		// -- TODO: use historical branch membership data to backfill branches for purchase_orders at earlier dates
+		`UPDATE purchase_orders AS po
+SET branch = ap.default_branch
+FROM admin_profiles AS ap
+WHERE ap.uid = po.uid
+  AND po.job = ''
+  AND po.branch = '';`,
+
+		// -- Backfill the branch column in the purchase_orders table to the branch from the corresponding jobs record
+		// -- This only updates purchase_orders with job <> '' (and branch empty).
+		// -- TODO: use historical branch membership data to backfill branches for purchase_orders at earlier dates
+		`UPDATE purchase_orders AS po
+SET branch = j.branch
+FROM jobs AS j
+WHERE po.job <> ''
+  AND po.branch = ''
+  AND j.id = po.job;`,
 	}
 
 	for _, stmt := range statements {
