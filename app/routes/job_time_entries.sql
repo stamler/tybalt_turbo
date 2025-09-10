@@ -8,12 +8,14 @@ SELECT te.description,
 	te.date,
 	te.week_ending,
 	te.tsid,
+	b.code AS branch_code,
 	d.code AS division_code,
 	tt.code AS time_type_code,
 	p.surname AS surname,
 	p.given_name AS given_name,
 	COALESCE(c.name, 'No Category') AS category_name
 FROM time_entries te
+LEFT JOIN branches b ON te.branch = b.id
 LEFT JOIN divisions d ON te.division = d.id
 LEFT JOIN time_types tt ON te.time_type = tt.id
 LEFT JOIN profiles p ON te.uid = p.uid
@@ -22,6 +24,7 @@ LEFT JOIN time_sheets ts ON te.tsid = ts.id
 WHERE ts.committed != '' 
 AND te.hours > 0
 AND te.job = {:id}
+AND ({:branch} IS NULL OR {:branch} = '' OR te.branch = {:branch})
 AND ({:division} IS NULL OR {:division} = '' OR te.division = {:division})
 AND ({:time_type} IS NULL OR {:time_type} = '' OR te.time_type = {:time_type})
 AND ({:uid} IS NULL OR {:uid} = '' OR te.uid = {:uid})

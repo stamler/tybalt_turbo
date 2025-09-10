@@ -5,6 +5,7 @@ LEFT   JOIN time_sheets ts ON te.tsid = ts.id
 WHERE  ts.committed != ''
   AND  te.hours > 0
   AND  te.job = {:id}
+  AND  ({:branch}    IS NULL OR {:branch}    = '' OR te.branch    = {:branch})
   AND  ({:division}  IS NULL OR {:division}  = '' OR te.division  = {:division})
   AND  ({:time_type} IS NULL OR {:time_type} = '' OR te.time_type = {:time_type})
   AND  ({:uid}       IS NULL OR {:uid}       = '' OR te.uid       = {:uid})

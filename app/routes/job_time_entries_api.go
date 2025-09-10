@@ -28,6 +28,7 @@ type JobTimeEntry struct {
 	Date         string  `db:"date" json:"date"`
 	WeekEnding   string  `db:"week_ending" json:"week_ending"`
 	TSID         string  `db:"tsid" json:"tsid"`
+	BranchCode   string  `db:"branch_code" json:"branch_code"`
 	DivisionCode string  `db:"division_code" json:"division_code"`
 	TimeTypeCode string  `db:"time_type_code" json:"time_type_code"`
 	Surname      string  `db:"surname" json:"surname"`
@@ -61,6 +62,7 @@ func createGetJobTimeEntriesHandler(app core.App) func(e *core.RequestEvent) err
 
 		q := e.Request.URL.Query()
 		division := q.Get("division")
+		branch := q.Get("branch")
 		timeType := q.Get("time_type")
 		uid := q.Get("uid")
 		category := q.Get("category")
@@ -87,6 +89,7 @@ func createGetJobTimeEntriesHandler(app core.App) func(e *core.RequestEvent) err
 
 		params := dbx.Params{
 			"id":        id,
+			"branch":    branch,
 			"division":  division,
 			"time_type": timeType,
 			"uid":       uid,

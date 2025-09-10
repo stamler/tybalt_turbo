@@ -8,6 +8,9 @@ SELECT
   MIN(te.date) earliest_entry,
   MAX(te.date) latest_entry,
   json_group_array(
+    DISTINCT json_object('id', b.id, 'code', b.code)
+  ) branches,
+  json_group_array(
     DISTINCT json_object('id', d.id, 'code', d.code)
   ) divisions,
   json_group_array(
@@ -24,10 +27,12 @@ LEFT JOIN divisions   d  ON te.division  = d.id
 LEFT JOIN time_types  tt ON te.time_type = tt.id
 LEFT JOIN profiles    p  ON te.uid       = p.uid
 LEFT JOIN categories  c  ON te.category  = c.id
+LEFT JOIN branches    b  ON te.branch    = b.id
 LEFT JOIN time_sheets ts ON te.tsid      = ts.id
 WHERE ts.committed != ''
   AND te.hours > 0
   AND te.job = {:id}
+  AND ({:branch} IS NULL OR {:branch} = '' OR te.branch = {:branch})
   AND ({:division} IS NULL OR {:division} = '' OR te.division = {:division})
   AND ({:time_type} IS NULL OR {:time_type} = '' OR te.time_type = {:time_type})
   AND ({:uid} IS NULL OR {:uid} = '' OR te.uid = {:uid})

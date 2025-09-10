@@ -162,6 +162,15 @@
     color: "teal",
   };
 
+  const branchFilter: FilterDef = {
+    type: "branch",
+    label: "Branches",
+    summaryProperty: "branches",
+    valueProperty: "id",
+    displayProperty: "code",
+    color: "gray",
+  };
+
   const timeFilterDefs: FilterDef[] = [
     divisionFilter,
     {
@@ -174,6 +183,7 @@
     },
     staffFilter,
     categoryFilter,
+    branchFilter,
   ];
 
   const expenseFilterDefs: FilterDef[] = [
