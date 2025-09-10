@@ -534,7 +534,7 @@ func main() {
 				{:date},
 				{:vendor},
 				{:uid},
-				CAST({:total} AS REAL) / 100,
+				{:total},
 				{:payment_type},
 				{:job},
 				{:division},
