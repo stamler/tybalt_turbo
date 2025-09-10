@@ -18,6 +18,7 @@ type expenseSummaryRow struct {
 	TotalAmount     sql.NullString `db:"total_amount"`
 	EarliestExpense sql.NullString `db:"earliest_expense"`
 	LatestExpense   sql.NullString `db:"latest_expense"`
+	Branches        sql.NullString `db:"branches"`
 	Divisions       sql.NullString `db:"divisions"`
 	PaymentTypes    sql.NullString `db:"payment_types"`
 	Names           sql.NullString `db:"names"`
@@ -40,6 +41,7 @@ func createGetJobExpenseSummaryHandler(app core.App) func(e *core.RequestEvent) 
 
 		q := e.Request.URL.Query()
 		division := q.Get("division")
+		branch := q.Get("branch")
 		paymentType := q.Get("payment_type")
 		uid := q.Get("uid")
 		category := q.Get("category")
@@ -47,6 +49,7 @@ func createGetJobExpenseSummaryHandler(app core.App) func(e *core.RequestEvent) 
 		var row expenseSummaryRow
 		if err := app.DB().NewQuery(jobExpenseSummaryQuery).Bind(dbx.Params{
 			"id":           id,
+			"branch":       branch,
 			"division":     division,
 			"payment_type": paymentType,
 			"uid":          uid,
@@ -78,6 +81,7 @@ func createGetJobExpenseSummaryHandler(app core.App) func(e *core.RequestEvent) 
 			"total_amount":     total,
 			"earliest_expense": ns(row.EarliestExpense),
 			"latest_expense":   ns(row.LatestExpense),
+			"branches":         ns(row.Branches),
 			"divisions":        ns(row.Divisions),
 			"payment_types":    ns(row.PaymentTypes),
 			"names":            ns(row.Names),

@@ -22,6 +22,7 @@ type JobExpenseEntry struct {
 	ID                  string  `db:"id" json:"id"`
 	Date                string  `db:"date" json:"date"`
 	CommittedWeekEnding string  `db:"committed_week_ending" json:"committed_week_ending"`
+	BranchCode          string  `db:"branch_code" json:"branch_code"`
 	DivisionCode        string  `db:"division_code" json:"division_code"`
 	PaymentType         string  `db:"payment_type" json:"payment_type"`
 	Surname             string  `db:"surname" json:"surname"`
@@ -56,6 +57,7 @@ func createGetJobExpensesHandler(app core.App) func(e *core.RequestEvent) error 
 
 		q := e.Request.URL.Query()
 		division := q.Get("division")
+		branch := q.Get("branch")
 		paymentType := q.Get("payment_type")
 		uid := q.Get("uid")
 		category := q.Get("category")
@@ -82,6 +84,7 @@ func createGetJobExpensesHandler(app core.App) func(e *core.RequestEvent) error 
 
 		params := dbx.Params{
 			"id":           id,
+			"branch":       branch,
 			"division":     division,
 			"payment_type": paymentType,
 			"uid":          uid,

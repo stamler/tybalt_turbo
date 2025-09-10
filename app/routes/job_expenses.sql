@@ -5,18 +5,21 @@ SELECT e.description,
        e.id,
        e.date,
        e.committed_week_ending,
+       b.code AS branch_code,
        d.code AS division_code,
        e.payment_type AS payment_type,
        p.surname AS surname,
        p.given_name AS given_name,
        COALESCE(c.name, 'No Category') AS category_name
 FROM   expenses e
+LEFT   JOIN branches  b ON e.branch  = b.id
 LEFT   JOIN divisions  d ON e.division = d.id
 LEFT   JOIN profiles   p ON e.uid      = p.uid
 LEFT   JOIN categories c ON e.category = c.id
 WHERE  e.committed != ''
   AND  e.total > 0
   AND  e.job = {:id}
+  AND  ({:branch}      IS NULL OR {:branch}      = '' OR e.branch      = {:branch})
   AND  ({:division}     IS NULL OR {:division}     = '' OR e.division     = {:division})
   AND  ({:payment_type} IS NULL OR {:payment_type} = '' OR e.payment_type = {:payment_type})
   AND  ({:uid}          IS NULL OR {:uid}          = '' OR e.uid          = {:uid})

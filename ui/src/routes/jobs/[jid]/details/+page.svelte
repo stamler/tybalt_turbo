@@ -198,6 +198,7 @@
     },
     staffFilter,
     categoryFilter,
+    branchFilter,
   ];
 
   const poFilterDefs: FilterDef[] = [
