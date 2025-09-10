@@ -15,6 +15,8 @@ import (
 	"path"
 	"strings"
 
+	"imports/backfill"
+
 	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	_ "github.com/marcboeker/go-duckdb" // DuckDB driver (blank import for side-effect registration)
@@ -754,6 +756,11 @@ func main() {
 		if *cleanupFlag {
 			fmt.Println("Cleaning up deleted records...")
 			cleanupDeletedRecords()
+		}
+
+		// Backfill branches after import completes
+		if err := backfill.BackfillBranches(targetDatabase); err != nil {
+			log.Fatalf("Failed to backfill branches: %v", err)
 		}
 	}
 
