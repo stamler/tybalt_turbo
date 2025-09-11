@@ -1,5 +1,5 @@
 app = "tybalt"
-primary_region = "yul"
+primary_region = "yyz"
 
 [build]
   [build.args]
