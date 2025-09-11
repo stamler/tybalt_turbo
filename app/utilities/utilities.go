@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -192,16 +193,62 @@ func CalculateMileageTotal(app core.App, expenseRecord *core.Record, expenseRate
 		return 0, errors.New("distance must be an integer for mileage expenses")
 	}
 
-	startDate, err := GetAnnualPayrollPeriodStartDate(app, expenseRecord.GetString("date"))
-	if err != nil {
-		return 0, err
+	// Determine reset period start. Historically we used payroll_year_end_dates to
+	// bound the annual period. To align with reporting/backfill SQL, we now use
+	// mileage_reset_dates and select the last reset date on or before the expense
+	// date. This mirrors the partitioning used in reports (per user, per reset).
+	expenseDate := expenseRecord.GetString("date")
+	type DateResult struct {
+		Date string `db:"date"`
 	}
+	reset := DateResult{}
+	// Use COALESCE to avoid NULL scan issues when there are no reset rows <= date.
+	// We intentionally coalesce to the empty string and handle the fallback below
+	// to keep the behavior explicit in code.
+	if err := app.DB().NewQuery(`SELECT COALESCE(MAX(date), '') AS date FROM mileage_reset_dates WHERE date <= {:expenseDate}`).
+		Bind(dbx.Params{"expenseDate": expenseDate}).One(&reset); err != nil {
+		return 0, fmt.Errorf("fetch mileage reset date: %w", err)
+	}
+	resetDate := reset.Date
+	if resetDate == "" {
+		// If no reset date exists, start from a very early date
+		resetDate = "0001-01-01"
+	}
+
+	// Compute cumulative mileage prior to this expense for the same user and within
+	// the reset period. We include same-day rows but break ties deterministically
+	// by id (rows with smaller id are considered earlier), matching the SQL logic
+	// used by reports/backfill.
+	uid := expenseRecord.GetString("uid")
+	type SumResult struct {
+		TotalMileage float64 `db:"total_mileage"`
+	}
+	res := SumResult{}
+	if err := app.DB().NewQuery(`
+		SELECT COALESCE(SUM(distance), 0) AS total_mileage
+		FROM expenses
+		WHERE payment_type = 'Mileage'
+		  AND committed != ''
+		  AND uid = {:uid}
+		  AND date >= {:resetDate}
+		  AND (
+		        date < {:expenseDate}
+		     OR (date = {:expenseDate} AND id < {:expenseId})
+		  )`).
+		Bind(dbx.Params{
+			"uid":         uid,
+			"resetDate":   resetDate,
+			"expenseDate": expenseDate,
+			"expenseId":   expenseRecord.Id,
+		}).One(&res); err != nil {
+		return 0, fmt.Errorf("sum prior mileage: %w", err)
+	}
+	priorMileage := int(res.TotalMileage)
 
 	// the mileage property on the expense_rate record is a JSON object with
 	// keys that represent the lower bound of the distance band and a value
 	// that represents the rate for that distance band. We extract the mileage
-	// property JSON string into a map[string]interface{} and then set the
-	// total field on the expense record.
+	// property JSON string into a map[string]float64 for quick lookups.
 	var mileageRates map[string]float64
 	mileageRatesRaw := expenseRateRecord.Get("mileage")
 
@@ -213,14 +260,8 @@ func CalculateMileageTotal(app core.App, expenseRecord *core.Record, expenseRate
 		return 0, fmt.Errorf("mileage data is not of type types.JSONRaw")
 	}
 
-	// Mileage rates are stored in a map[string]interface{} with the keys
-	// representing the lower bound of the distance band and the value
-	// representing the rate for that distance band. We need to find the
-	// rate for the distance band that the expense record's distance
-	// property falls into. The keys are strings representing the lower
-	// bound in kilometres.
-
-	// extract all the keys and turn them into an ordered slice of ints
+	// extract all the keys (lower bounds in kilometres) and turn them into an
+	// ordered slice of ints so that we can reason about the contiguous bands.
 	var distanceBands []int
 	for distanceBand := range mileageRates {
 		distanceBandInt, err := strconv.Atoi(distanceBand)
@@ -237,43 +278,10 @@ func CalculateMileageTotal(app core.App, expenseRecord *core.Record, expenseRate
 	// sort the distance bands
 	sort.Ints(distanceBands)
 
-	// TODO: determine which distance band applies to the expense record by
-	// figuring out the total cumulative mileage already used in the annual period
-	// and use the appropriate rate. This expense could end up spanning multiple
-	// distance bands if the employee has already accumulated enough mileage in
-	// the current annual period. In this case we need to break the distance
-	// into two parts: the part that applies to the first distance band and the
-	// part that applies to the second distance band. We then multiply each part
-	// by the appropriate rate and sum the results.
-
-	// First we query the SUM of all mileage expenses that between startDate
-	// inclusive and expenseDate exclusive. We exclude the expenseDate because
-	// the mileage expense hasn't yet been updated in the database prior to
-	// the above query.
-	// TODO: Restrict expenses to one Mileage entry per day similar to OR entries in validate_time_entries.go?
-	type SumResult struct {
-		TotalMileage float64 `db:"total_mileage"`
-	}
-	results := []SumResult{}
-	app.DB().NewQuery("SELECT COALESCE(SUM(distance), 0) AS total_mileage FROM expenses WHERE payment_type = {:paymentType} AND date >= {:startDate} AND date < {:expenseDate}").Bind(dbx.Params{
-		"paymentType": "Mileage",
-		"startDate":   startDate,
-		"expenseDate": expenseRecord.GetString("date"),
-	}).All(&results)
-
-	// total mileage is the sum of all mileage expenses in the annual period
-	// prior to the date of this expense.
-	totalMileage := int(results[0].TotalMileage)
-
-	// totalMileage represents the total mileage already used in the annual
-	// period. Now we need to determine which distance band(s) apply to the
-	// expense record by finding the largest distance band that is less than
-	// the total mileage already used in the annual period. If the distance
-	// is greater than the next distance band minus the total mileage already
-	// used in the annual period, we need to break the distance into two parts:
-	// the part that applies to the first distance band and the part that
-	// applies to the second distance band. We then multiply each part by the
-	// appropriate rate and sum the results.
+	// Compute the start and end cumulative distances for this expense:
+	//   start = priorMileage; end = priorMileage + distance.
+	// Then split [start, end) across tier intervals and sum overlap × rate.
+	totalMileage := priorMileage
 
 	// Find the bounding distance bands that the expense record's distance
 	// property falls into. The lower distance band is the largest distance band
@@ -301,9 +309,9 @@ func CalculateMileageTotal(app core.App, expenseRecord *core.Record, expenseRate
 	// the rate.
 	if lowerDistanceBand == upperDistanceBand {
 		expenseRate := mileageRates[strconv.Itoa(lowerDistanceBand)]
-		// perform the conversion to float64 at the last possible moment to avoid
-		// potential issues with float64 arithmetic.
-		return float64(int(distance)*int(expenseRate*1000)) / 1000, nil
+		amount := float64(int(distance)) * expenseRate
+		// Round to 2 decimals for currency: multiply to cents, round, divide back
+		return math.Round(amount*100) / 100, nil
 	} else {
 		// If the lower and upper distance bands are different, There are two possible scenarios:
 		// 1. The expense record's distance property spans two distance bands.
@@ -324,9 +332,9 @@ func CalculateMileageTotal(app core.App, expenseRecord *core.Record, expenseRate
 					lowerDistanceBandMileage := upperDistanceBand - totalMileage
 					upperDistanceBandMileage := int(distance) - lowerDistanceBandMileage
 
-					// perform the arithmetic in integers to avoid issues with float64
-					// arithmetic then convert to float64 at the last possible moment
-					return float64(lowerDistanceBandMileage*lowerDistanceBandRateX1000+upperDistanceBandMileage*upperDistanceBandRateX1000) / 1000, nil
+					amount := float64(lowerDistanceBandMileage*lowerDistanceBandRateX1000+upperDistanceBandMileage*upperDistanceBandRateX1000) / 1000
+					// Round to 2 decimals for currency: multiply to cents, round, divide back
+					return math.Round(amount*100) / 100, nil
 
 				} else {
 					// Scenario 2: The expense record's distance property spans three or
@@ -372,7 +380,8 @@ func CalculateMileageTotal(app core.App, expenseRecord *core.Record, expenseRate
 					highestBandRateX1000 := int(mileageRates[strconv.Itoa(upperDistanceBand)] * 1000)
 					totalExpense += remainingDistance * highestBandRateX1000
 
-					return float64(totalExpense) / 1000, nil
+					// Round to 2 decimals for currency: multiply to cents, round, divide back
+					return math.Round((float64(totalExpense)/1000)*100) / 100, nil
 				}
 			}
 		}

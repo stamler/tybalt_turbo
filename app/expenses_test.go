@@ -1453,16 +1453,17 @@ func TestCalculateMileageTotal(t *testing.T) {
 		}
 	})
 
-	// Case 3: Prior mileage near boundary using 2023 fixtures and rates 0.61/0.55.
-	// Prior mileage 4900 (m2023p4900 on 2023-01-08), new distance 200 on 2023-01-10
+	// Case 3: Prior committed pushes boundary using 2023 fixtures and rates 0.61/0.55.
+	// Prior committed mileage 4900 (m2023p4900 on 2023-01-08 set committed), new distance 200 on 2023-01-10
 	// => 100 @ 0.61 + 100 @ 0.55 = 116.0
-	t.Run("prior mileage pushes across tier boundary (fixture 2023)", func(t *testing.T) {
+	t.Run("prior committed pushes across tier boundary (fixture 2023)", func(t *testing.T) {
 		app := testutils.SetupTestApp(t)
 		defer app.Cleanup()
 
 		expensesCollection := core.NewCollection("expenses", "expenses")
 		record := core.NewRecord(expensesCollection)
 		record.Load(map[string]any{
+			"uid":          "uid_mileage_2023_test",
 			"date":         "2023-01-10",
 			"payment_type": "Mileage",
 			"distance":     200.0,
@@ -1481,9 +1482,9 @@ func TestCalculateMileageTotal(t *testing.T) {
 		}
 	})
 
-	// Case 4: Prior committed and uncommitted both included (fixtures m2025u1000, m2025c1000)
-	// Prior total 2000, new distance 3500: 3000 @ 0.70 + 500 @ 0.64 = 2420.0
-	t.Run("prior committed and non-committed both included (fixtures 2025)", func(t *testing.T) {
+	// Case 4: Prior committed-only included (fixtures m2025u1000, m2025c1000)
+	// Prior committed total 1000, new distance 3500: 3500 @ 0.70 = 2450.0
+	t.Run("prior committed-only included (fixtures 2025)", func(t *testing.T) {
 		app := testutils.SetupTestApp(t)
 		defer app.Cleanup()
 
@@ -1503,8 +1504,8 @@ func TestCalculateMileageTotal(t *testing.T) {
 		if err != nil {
 			t.Fatalf("unexpected error calculating mileage total: %v", err)
 		}
-		if total != 2420.0 {
-			t.Fatalf("expected total 2420.0, got %v", total)
+		if total != 2450.0 {
+			t.Fatalf("expected total 2450.0, got %v", total)
 		}
 	})
 }
