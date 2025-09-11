@@ -25,7 +25,6 @@ LEFT   JOIN divisions  d ON e.division = d.id
 LEFT   JOIN profiles   p ON e.uid      = p.uid
 LEFT   JOIN categories c ON e.category = c.id
 WHERE  e.committed != ''
-  AND  e.total > 0
   AND  e.job = {:id}
   AND  ({:branch}      IS NULL OR {:branch}      = '' OR e.branch      = {:branch})
   AND  ({:division}     IS NULL OR {:division}     = '' OR e.division     = {:division})
