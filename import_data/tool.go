@@ -714,6 +714,11 @@ func main() {
 			true,             // Enable upsert for idempotency
 		)
 
+		// After importing expenses, compute Allowance/Meals totals using expense_rates
+		if err := backfillAllowanceTotals(targetDatabase); err != nil {
+			log.Fatalf("Failed to backfill allowance totals: %v", err)
+		}
+
 		// --- Load User Claims ---
 		// Define the specific SQL for the user_claims table
 		userClaimInsertSQL := `INSERT INTO user_claims (uid, cid, _imported) VALUES ({:uid}, {:cid}, true)`
@@ -772,6 +777,42 @@ func main() {
 	if *attachmentsFlag {
 		attachments.MigrateAttachments("./parquet/Expenses.parquet", "attachment", "destination_attachment", expenseCollectionId)
 	}
+}
+
+// backfillAllowanceTotals calculates and writes totals for Allowance/Meals
+// expenses where total is missing or zero, using the effective rates at the
+// expense date from the expense_rates table. This mirrors the logic used in
+// reporting queries, but persists the computed value for downstream simplicity.
+func backfillAllowanceTotals(dbPath string) error {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	updateSQL := `
+        UPDATE expenses AS e
+        SET total = COALESCE((
+            SELECT
+                (CASE WHEN e.allowance_types LIKE '%"Breakfast"%' THEN r.breakfast ELSE 0 END)
+              + (CASE WHEN e.allowance_types LIKE '%"Lunch"%'     THEN r.lunch     ELSE 0 END)
+              + (CASE WHEN e.allowance_types LIKE '%"Dinner"%'    THEN r.dinner    ELSE 0 END)
+              + (CASE WHEN e.allowance_types LIKE '%"Lodging"%'   THEN r.lodging   ELSE 0 END)
+            FROM expense_rates r
+            WHERE r.effective_date = (
+                SELECT MAX(i.effective_date)
+                FROM expense_rates i
+                WHERE i.effective_date <= e.date
+            )
+        ), e.total)
+        WHERE e.payment_type IN ('Allowance','Meals')
+          AND (e.total IS NULL OR e.total = 0);
+    `
+
+	if _, err := db.Exec(updateSQL); err != nil {
+		return fmt.Errorf("update allowance totals: %w", err)
+	}
+	return nil
 }
 
 // cleanupDeletedRecords removes imported records that no longer exist in the current MySQL export
