@@ -719,6 +719,11 @@ func main() {
 			log.Fatalf("Failed to backfill allowance totals: %v", err)
 		}
 
+		// After importing expenses, compute Mileage totals using tiered mileage rates
+		if err := backfillMileageTotals(targetDatabase); err != nil {
+			log.Fatalf("Failed to backfill mileage totals: %v", err)
+		}
+
 		// --- Load User Claims ---
 		// Define the specific SQL for the user_claims table
 		userClaimInsertSQL := `INSERT INTO user_claims (uid, cid, _imported) VALUES ({:uid}, {:cid}, true)`
@@ -811,6 +816,118 @@ func backfillAllowanceTotals(dbPath string) error {
 
 	if _, err := db.Exec(updateSQL); err != nil {
 		return fmt.Errorf("update allowance totals: %w", err)
+	}
+	return nil
+}
+
+// backfillMileageTotals calculates and writes totals for Mileage expenses where
+// total is missing or zero, using tiered mileage rates from expense_rates at the
+// effective date of each expense, and the appropriate annual period defined by
+// mileage_reset_dates. This mirrors the SQL used in reporting to ensure the same
+// piecewise tiered calculation.
+func backfillMileageTotals(dbPath string) error {
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return fmt.Errorf("open db: %w", err)
+	}
+	defer db.Close()
+
+	updateSQL := `
+        WITH rates_expanded AS (
+            SELECT
+                m.effective_date,
+                CAST(t.key AS INTEGER) AS tier_lower,
+                LEAD(CAST(t.key AS INTEGER)) OVER (
+                    PARTITION BY m.effective_date
+                    ORDER BY CAST(t.key AS INTEGER)
+                ) AS tier_upper,
+                CAST(t.value AS REAL) AS tier_rate
+            FROM expense_rates m
+            CROSS JOIN json_each(m.mileage) AS t
+        ),
+        CumulativeMileage AS (
+            SELECT
+                e.id,
+                e.uid,
+                e.date,
+                e.distance,
+                (
+                    SELECT MAX(r.date)
+                    FROM mileage_reset_dates r
+                    WHERE r.date <= e.date
+                ) AS reset_mileage_date,
+                SUM(e.distance) OVER (
+                    PARTITION BY e.uid, (
+                        SELECT MAX(r.date)
+                        FROM mileage_reset_dates r
+                        WHERE r.date <= e.date
+                    )
+                    ORDER BY e.date, e.id
+                ) AS end_distance,
+                (
+                    SELECT MAX(m.effective_date)
+                    FROM expense_rates m
+                    WHERE m.effective_date <= e.date
+                ) AS effective_date
+            FROM expenses e
+            WHERE e.payment_type = 'Mileage'
+              AND e.committed != ''
+        ),
+        base AS (
+            SELECT
+                cm.id,
+                cm.uid,
+                cm.date,
+                cm.reset_mileage_date,
+                cm.distance,
+                cm.end_distance,
+                cm.effective_date
+            FROM CumulativeMileage cm
+        ),
+        overlaps AS (
+            SELECT
+                b.id,
+                b.end_distance - b.distance AS start_distance,
+                b.end_distance,
+                r.tier_lower,
+                COALESCE(r.tier_upper, 1e9) AS tier_upper,
+                r.tier_rate
+            FROM base b
+            JOIN rates_expanded r
+              ON r.effective_date = b.effective_date
+            WHERE b.end_distance > r.tier_lower
+              AND (r.tier_upper IS NULL OR (b.end_distance - b.distance) < r.tier_upper)
+        ),
+        tier_calcs AS (
+            SELECT
+                id,
+                MAX(0,
+                    MIN(end_distance, tier_upper)
+                    - MAX(start_distance, tier_lower)
+                ) AS overlap_km,
+                tier_rate
+            FROM overlaps
+        ),
+        mileage_totals AS (
+            SELECT
+                b.id,
+                ROUND(COALESCE(
+                    (SELECT SUM(overlap_km * tier_rate)
+                     FROM tier_calcs tc
+                     WHERE tc.id = b.id),
+                    0
+                ), 2) AS mileage_total
+            FROM base b
+        )
+        UPDATE expenses AS e
+        SET total = (SELECT mt.mileage_total FROM mileage_totals mt WHERE mt.id = e.id)
+        WHERE e.payment_type = 'Mileage'
+          AND (e.total IS NULL OR e.total = 0)
+          AND e.committed != '';
+    `
+
+	if _, err := db.Exec(updateSQL); err != nil {
+		return fmt.Errorf("update mileage totals: %w", err)
 	}
 	return nil
 }
