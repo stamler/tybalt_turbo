@@ -10,6 +10,7 @@
   import POsTabContent from "$lib/components/jobs/POsTabContent.svelte";
   import StaffSummaryContent from "$lib/components/jobs/StaffSummaryContent.svelte";
   import DivisionsSummaryContent from "$lib/components/jobs/DivisionsSummaryContent.svelte";
+  import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
   import { pb } from "$lib/pocketbase";
   import type { FilterDef } from "$lib/components/jobs/types";
 
@@ -313,6 +314,21 @@
             ? ", "
             : ""}
         {/each}
+      </div>
+    {/if}
+
+    {#if data.job.location && data.job.location !== ""}
+      <div class="mt-2">
+        <span class="font-semibold">Location:</span>
+        <div class="mt-1">
+          <DSLocationPicker
+            value={data.job.location}
+            errors={{}}
+            fieldName="location"
+            disabled={true}
+            readonly={true}
+          />
+        </div>
       </div>
     {/if}
   </div>

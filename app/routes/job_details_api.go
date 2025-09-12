@@ -31,6 +31,7 @@ type jobDetailsRow struct {
 	Number                    string         `db:"number"`
 	Description               string         `db:"description"`
 	Status                    sql.NullString `db:"status"`
+	Location                  sql.NullString `db:"location"`
 	ClientID                  string         `db:"client_id"`
 	ClientName                string         `db:"client_name"`
 	ContactID                 sql.NullString `db:"contact_id"`
@@ -70,6 +71,7 @@ type JobDetails struct {
 	Number                    string     `json:"number"`
 	Description               string     `json:"description"`
 	Status                    string     `json:"status"`
+	Location                  string     `json:"location"`
 	Client                    ClientInfo `json:"client"`
 	Contact                   Person     `json:"contact"`
 	Manager                   Person     `json:"manager"`
@@ -117,6 +119,7 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			Number:                    r.Number,
 			Description:               r.Description,
 			Status:                    ns(r.Status),
+			Location:                  ns(r.Location),
 			Client:                    ClientInfo{ID: r.ClientID, Name: r.ClientName},
 			Contact:                   Person{ID: ns(r.ContactID), GivenName: ns(r.ContactGivenName), Surname: ns(r.ContactSurname)},
 			Manager:                   Person{ID: ns(r.ManagerID), GivenName: ns(r.ManagerGivenName), Surname: ns(r.ManagerSurname)},

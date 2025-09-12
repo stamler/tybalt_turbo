@@ -426,6 +426,7 @@ export type JobsRecord = {
   fn_agreement: boolean;
   id: string;
   job_owner: RecordIdString;
+  location: string;
   manager: RecordIdString;
   number: string;
   project_award_date: string;

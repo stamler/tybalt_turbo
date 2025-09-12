@@ -5,6 +5,7 @@ SELECT
   j.number,
   j.description,
   j.status,
+  j.location         AS location,
   j.client           AS client_id,
   cli.name           AS client_name,
   j.contact          AS contact_id,

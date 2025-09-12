@@ -7,6 +7,7 @@
   import { goto } from "$app/navigation";
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
+  import DSLocationPicker from "./DSLocationPicker.svelte";
   import { managers } from "$lib/stores/managers";
   import { clients } from "$lib/stores/clients";
   import type { ClientContactsResponse } from "$lib/pocketbase-types";
@@ -17,7 +18,8 @@
   managers.init();
 
   let errors = $state({} as any);
-  let item = $state(data.item);
+  // Allow extra field `location` introduced by migration to be present on item
+  let item = $state(data.item as any);
   let categories = $state(data.categories);
   let client_contacts = $state([] as ClientContactsResponse[]);
 
@@ -153,6 +155,11 @@
       <span class="text-red-600">{errors.proposal_submission_due_date.message}</span>
     {/if}
   </span>
+
+  <div class="flex w-full flex-col gap-1 {errors.location !== undefined ? 'bg-red-200' : ''}">
+    <label for="location">Location</label>
+    <DSLocationPicker bind:value={item.location as string} {errors} fieldName="location" />
+  </div>
 
   <!-- <DsSelector
     // TODO: Implement multiple division selection for jobs
