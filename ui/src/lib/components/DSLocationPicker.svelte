@@ -152,6 +152,7 @@
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: "&copy; OpenStreetMap contributors",
       maxZoom: 19,
+      detectRetina: true,
     }).addTo(map);
     // Ensure map sizes correctly after mount
     setTimeout(() => map && map.invalidateSize(), 0);
