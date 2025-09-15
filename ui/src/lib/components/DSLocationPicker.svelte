@@ -27,6 +27,13 @@
   // Local type shims for open-location-code if types are not present
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   type OLCEncode = (lat: number, lon: number, codeLength?: number) => string;
+  // Bridge the runtime (instance methods) with the @types (static methods)
+  type OLCInstance = {
+    encode: (lat: number, lon: number, codeLength?: number) => string;
+    decode: (code: string) => { latitudeCenter: number; longitudeCenter: number };
+    isValid: (code: string) => boolean;
+    isFull: (code: string) => boolean;
+  };
 
   // get an id for this instance from the counter in the module context then
   // increment it so the next instance gets a different id
@@ -49,7 +56,7 @@
 
   let loading = $state(false);
   let code = $state(value ?? "");
-  const olcInstance = new OpenLocationCode();
+  const olcInstance: OLCInstance = new (OpenLocationCode as unknown as { new (): OLCInstance })();
   let copied = $state(false);
 
   const PLUS_CODE_REGEX = /^[23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2,3}$/; // matches PocketBase validation
