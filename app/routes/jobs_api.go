@@ -31,6 +31,7 @@ type Job struct {
 	ID          string `db:"id" json:"id"`
 	Number      string `db:"number" json:"number"`
 	Description string `db:"description" json:"description"`
+	Location    string `db:"location" json:"location"`
 	ClientID    string `db:"client_id" json:"client_id"`
 	Client      string `db:"client" json:"client"`
 }
