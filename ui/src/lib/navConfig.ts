@@ -104,6 +104,12 @@ export const navSections: NavSection[] = [
         href: "/jobs/list",
         buttons: [
           {
+            action: "/jobs/map",
+            icon: "feather:map",
+            title: "Jobs Map",
+            color: "blue",
+          },
+          {
             action: "/jobs/add",
             icon: "feather:plus-circle",
             title: "New Job",

@@ -103,7 +103,7 @@
     <aside
       class={`fixed inset-y-0 left-0 w-screen transform bg-neutral-700 text-white transition-transform duration-300 ease-in-out lg:static lg:w-64 ${
         isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      } z-30`}
+      } z-[1100]`}
     >
       <div class="h-full overflow-y-auto overflow-x-hidden">
         <!-- Desktop brand header -->
@@ -197,7 +197,7 @@
           class="absolute left-0 right-0 top-0 z-50 hidden h-[4px] animate-pulse bg-purple-500 lg:block"
         ></div>
       {/if}
-      <div>
+      <div class="h-full">
         {@render children()}
       </div>
     </div>
@@ -205,7 +205,7 @@
     <!-- Overlay for mobile -->
     {#if isSidebarOpen}
       <div
-        class="fixed inset-0 z-20 bg-black bg-opacity-50 lg:hidden"
+        class="fixed inset-0 z-[1000] bg-black bg-opacity-50 lg:hidden"
         onclick={toggleSidebar}
         aria-hidden="true"
       ></div>
