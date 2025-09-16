@@ -58,6 +58,8 @@
   let code = $state(value ?? "");
   const olcInstance: OLCInstance = new (OpenLocationCode as unknown as { new (): OLCInstance })();
   let copied = $state(false);
+  let searchQuery = $state("");
+  let searchError: string | null = $state(null);
 
   const PLUS_CODE_REGEX = /^[23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2,3}$/; // matches PocketBase validation
 
@@ -118,6 +120,72 @@
       copied = true;
       setTimeout(() => (copied = false), 1500);
     } catch {}
+  }
+
+  function parseCoordinates(input: string): { lat: number; lon: number } | null {
+    const trimmed = input.trim();
+    // Match "lat, lon" or "lat lon"
+    const match = trimmed.match(/^[\s]*(-?\d+(?:\.\d+)?)[\s,]+(-?\d+(?:\.\d+)?)[\s]*$/);
+    if (!match) return null;
+    const lat = parseFloat(match[1]);
+    const lon = parseFloat(match[2]);
+    if (!isFinite(lat) || !isFinite(lon)) return null;
+    if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+    return { lat, lon };
+  }
+
+  async function submitSearch() {
+    if (disabled || readonly) return;
+    searchError = null;
+    const q = (searchQuery ?? "").trim();
+    if (!q) return;
+
+    // 1) Plus Code path
+    const normalized = q.toUpperCase().replace(/\s+/g, "");
+    if (normalized.includes("+")) {
+      if (PLUS_CODE_REGEX.test(normalized)) {
+        try {
+          const area = olcInstance.decode(normalized);
+          setMarker(area.latitudeCenter, area.longitudeCenter);
+          applyCode(normalized, false);
+          return;
+        } catch {
+          // fallthrough to error
+        }
+      }
+      searchError = "Invalid Plus Code";
+      return;
+    }
+
+    // 2) Coordinates path
+    const coords = parseCoordinates(q);
+    if (coords) {
+      setMarker(coords.lat, coords.lon);
+      applyCode(olcInstance.encode(coords.lat, coords.lon), false);
+      return;
+    }
+
+    // 3) Nominatim search path
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(q)}&limit=1`;
+      const res = await fetch(url, { headers: { Accept: "application/json" } });
+      if (!res.ok) throw new Error("Search failed");
+      const results: Array<{ lat: string; lon: string }> = await res.json();
+      if (!results || results.length === 0) {
+        searchError = "No results found";
+        return;
+      }
+      const lat = parseFloat(results[0].lat);
+      const lon = parseFloat(results[0].lon);
+      if (!isFinite(lat) || !isFinite(lon)) {
+        searchError = "Search produced invalid coordinates";
+        return;
+      }
+      setMarker(lat, lon);
+      applyCode(olcInstance.encode(lat, lon), false);
+    } catch {
+      searchError = "Search failed";
+    }
   }
 
   // --- Map setup ---
@@ -209,25 +277,14 @@
     <input
       id={`location-input-${thisId}`}
       name={fieldName}
-      class="flex-1 rounded border border-neutral-300 px-1 {disabled ? 'opacity-50' : ''} {disabled
-        ? 'cursor-not-allowed'
-        : ''}"
+      class="h-8 flex-1 cursor-not-allowed rounded border border-neutral-300 px-1 opacity-50"
       type="text"
       placeholder="8-char + 2-3-char Plus Code (e.g. 849VCWC8+R9)"
       bind:value={code}
       oninput={(e) => ((e.target as HTMLInputElement).value = code)}
       readonly
-      {disabled}
+      disabled
     />
-    {#if !readonly}
-      <DsActionButton
-        action={useCurrentLocation}
-        icon="mdi:crosshairs-gps"
-        color="blue"
-        title="Use current location"
-        {loading}
-      />
-    {/if}
     <DsActionButton
       action={copyToClipboard}
       icon="mdi:content-copy"
@@ -235,6 +292,40 @@
       title={copied ? "Copied" : "Copy"}
     />
   </span>
+  {#if !readonly}
+    <!-- Search / Paste input -->
+    <span class="flex w-full gap-2">
+      <form
+        role="search"
+        class="flex-1"
+        onsubmit={(e) => {
+          e.preventDefault();
+          submitSearch();
+        }}
+      >
+        <input
+          class="h-8 w-full rounded border border-neutral-300 px-1 outline-none focus:border-neutral-400 focus:ring-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+          type="search"
+          inputmode="search"
+          enterkeyhint="search"
+          placeholder="Search address, coordinates, or paste Plus Code"
+          aria-label="Search address, coordinates, or Plus Code"
+          bind:value={searchQuery}
+          {disabled}
+        />
+      </form>
+      <DsActionButton
+        action={useCurrentLocation}
+        icon="mdi:crosshairs-gps"
+        color="blue"
+        title="Use current location"
+        {loading}
+      />
+    </span>
+    {#if searchError}
+      <span class="text-red-600">{searchError}</span>
+    {/if}
+  {/if}
   {#if errors[fieldName] !== undefined}
     <span class="text-red-600">{errors[fieldName].message}</span>
   {/if}
