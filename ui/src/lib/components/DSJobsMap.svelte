@@ -1,6 +1,7 @@
 <script lang="ts">
   import DSItemsMap from "./DSItemsMap.svelte";
   import { jobs } from "$lib/stores/jobs";
+  import type { JobApiResponse } from "$lib/stores/jobs";
   import { OpenLocationCode } from "open-location-code";
   import { get } from "svelte/store";
 
@@ -28,13 +29,13 @@
     return lat <= b.north && lat >= b.south && lon <= b.east && lon >= b.west;
   }
 
-  let filtered: Array<Record<string, unknown>> = $state([]);
+  let filtered: JobApiResponse[] = $state([]);
   let lastBounds: ViewBounds | null = $state(null);
   let tileEls: Array<HTMLDivElement | null> = $state([]);
 
   function applyFilter(bounds: ViewBounds | null) {
     const state = get(jobs);
-    const items = state.items as Array<{ location?: string }>;
+    const items = state.items as JobApiResponse[];
     if (!bounds) {
       filtered = items.filter((i) => typeof i.location === "string" && i.location);
       return;
@@ -71,7 +72,9 @@
   <DSItemsMap items={filtered} onViewportChange={handleViewportChange} showZoomControls={true}>
     {#snippet tile(item)}
       <div class="text-sm">
-        <div class="font-semibold">{item.number ?? "Job"}</div>
+        <a href={`/jobs/${item.id}/details`} class="font-semibold hover:underline">
+          {item.number ?? "Job"}
+        </a>
         <div class="text-neutral-600">{item.description ?? ""}</div>
         <div class="mt-1 text-xs">{item.client ?? ""}</div>
       </div>

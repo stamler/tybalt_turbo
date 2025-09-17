@@ -36,7 +36,10 @@
     onViewportChange,
     showZoomControls = true,
   }: {
-    items: Array<Record<string, unknown>>;
+    // Accept any item shape; consumers provide a tile snippet and we only
+    // require that items may have a `location` string used for marker placement.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    items: any[];
     tile: Snippet<[any]>;
     onViewportChange?: (v: {
       bounds: { north: number; south: number; east: number; west: number };
