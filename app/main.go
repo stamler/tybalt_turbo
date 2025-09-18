@@ -18,7 +18,14 @@ import (
 	"github.com/pocketbase/pocketbase/plugins/migratecmd"
 )
 
-//go:embed pb_public/**
+// Go’s plain embed ignores files starting with an underscore, something that is
+// required by the build system of the frontend in v1.52 and beyond due to
+// dependencies. Specifically after this tag, the build emits _commonjsHelpers.*.js; it wasn’t
+// embedded, so chunks 404ed and routes crashed.
+// https://github.com/golang/go/issues/43854
+
+//go:embed all:pb_public/**
+
 var staticFiles embed.FS
 
 func main() {
