@@ -6,6 +6,7 @@ export const load: PageLoad = async ({ params, url }) => {
   const tab = url.searchParams.get("tab") ?? "projects";
   const projectsPageParam = Number(url.searchParams.get("projectsPage") ?? "1");
   const proposalsPageParam = Number(url.searchParams.get("proposalsPage") ?? "1");
+  const ownerPageParam = Number(url.searchParams.get("ownerPage") ?? "1");
   const perPage = 10;
 
   // fetch core data
@@ -18,9 +19,12 @@ export const load: PageLoad = async ({ params, url }) => {
   // Server-side pagination for jobs (projects vs proposals)
   const proposalsFilter = `client='${clientId}' && number ~ 'P%'`;
   const projectsFilter = `client='${clientId}' && number !~ 'P%'`;
+  const ownerFilter = `job_owner='${clientId}'`;
 
-  const activePage = tab === "proposals" ? proposalsPageParam : projectsPageParam;
-  const activeFilter = tab === "proposals" ? proposalsFilter : projectsFilter;
+  const activePage =
+    tab === "proposals" ? proposalsPageParam : tab === "owner" ? ownerPageParam : projectsPageParam;
+  const activeFilter =
+    tab === "proposals" ? proposalsFilter : tab === "owner" ? ownerFilter : projectsFilter;
 
   // fetch the current page for the active tab
   const activeList = await pb.collection("jobs").getList(activePage, perPage, {
@@ -29,9 +33,15 @@ export const load: PageLoad = async ({ params, url }) => {
   });
 
   // fetch a minimal list to obtain the total count for the other tab
-  const otherFilter = tab === "proposals" ? projectsFilter : proposalsFilter;
-  const otherList = await pb.collection("jobs").getList(1, 1, {
-    filter: otherFilter,
+  // fetch minimal lists to obtain total counts for the other tabs
+  const otherProjectsList = await pb.collection("jobs").getList(1, 1, {
+    filter: projectsFilter,
+  });
+  const otherProposalsList = await pb.collection("jobs").getList(1, 1, {
+    filter: proposalsFilter,
+  });
+  const otherOwnerList = await pb.collection("jobs").getList(1, 1, {
+    filter: ownerFilter,
   });
 
   const totalPages = Math.max(1, Math.ceil(activeList.totalItems / perPage));
@@ -45,9 +55,11 @@ export const load: PageLoad = async ({ params, url }) => {
     totalPages,
     projectsPage: tab === "projects" ? activePage : projectsPageParam,
     proposalsPage: tab === "proposals" ? activePage : proposalsPageParam,
+    ownerPage: tab === "owner" ? activePage : ownerPageParam,
     counts: {
-      projects: tab === "projects" ? activeList.totalItems : otherList.totalItems,
-      proposals: tab === "proposals" ? activeList.totalItems : otherList.totalItems,
+      projects: tab === "projects" ? activeList.totalItems : otherProjectsList.totalItems,
+      proposals: tab === "proposals" ? activeList.totalItems : otherProposalsList.totalItems,
+      owner: tab === "owner" ? activeList.totalItems : otherOwnerList.totalItems,
     },
   };
 };

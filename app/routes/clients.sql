@@ -23,7 +23,11 @@ LEFT JOIN (
   SELECT 
     client,
     COUNT(*) AS referencing_jobs_count
-  FROM jobs
+  FROM (
+    SELECT id AS job_id, client AS client FROM jobs WHERE client IS NOT NULL AND client != ''
+    UNION
+    SELECT id AS job_id, job_owner AS client FROM jobs WHERE job_owner IS NOT NULL AND job_owner != ''
+  ) j
   GROUP BY client
 ) j_count ON j_count.client = c.id
 WHERE ({:id} IS NULL OR {:id} = '' OR c.id = {:id})

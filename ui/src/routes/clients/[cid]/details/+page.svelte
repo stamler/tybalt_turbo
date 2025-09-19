@@ -6,6 +6,7 @@
   import { shortDate } from "$lib/utilities";
 
   export let data: PageData;
+  const d = data as any; // widen for newly added fields (owner tab)
 </script>
 
 <div class="mx-auto space-y-6 p-4">
@@ -27,13 +28,18 @@
       tabs={[
         {
           label: `Projects (${data.counts.projects})`,
-          href: `?tab=projects&projectsPage=${data.projectsPage}&proposalsPage=${data.proposalsPage}`,
+          href: `?tab=projects&projectsPage=${data.projectsPage}&proposalsPage=${data.proposalsPage}&ownerPage=${d.ownerPage}`,
           active: data.tab === "projects",
         },
         {
           label: `Proposals (${data.counts.proposals})`,
-          href: `?tab=proposals&projectsPage=${data.projectsPage}&proposalsPage=${data.proposalsPage}`,
+          href: `?tab=proposals&projectsPage=${data.projectsPage}&proposalsPage=${data.proposalsPage}&ownerPage=${d.ownerPage}`,
           active: data.tab === "proposals",
+        },
+        {
+          label: `Jobs as Owner (${d.counts.owner})`,
+          href: `?tab=owner&projectsPage=${data.projectsPage}&proposalsPage=${data.proposalsPage}&ownerPage=${d.ownerPage}`,
+          active: data.tab === "owner",
         },
       ]}
     />
@@ -43,7 +49,7 @@
       <div class="flex gap-2">
         {#if data.page > 1}
           <a
-            href={`?tab=${data.tab}&projectsPage=${data.tab === "projects" ? data.page - 1 : data.projectsPage}&proposalsPage=${data.tab === "proposals" ? data.page - 1 : data.proposalsPage}`}
+            href={`?tab=${data.tab}&projectsPage=${data.tab === "projects" ? data.page - 1 : data.projectsPage}&proposalsPage=${data.tab === "proposals" ? data.page - 1 : data.proposalsPage}&ownerPage=${data.tab === "owner" ? data.page - 1 : d.ownerPage}`}
             class="rounded bg-neutral-200 px-2 py-1 hover:bg-neutral-300"
           >
             &larr; Prev
@@ -51,7 +57,7 @@
         {/if}
         {#if data.page < data.totalPages}
           <a
-            href={`?tab=${data.tab}&projectsPage=${data.tab === "projects" ? data.page + 1 : data.projectsPage}&proposalsPage=${data.tab === "proposals" ? data.page + 1 : data.proposalsPage}`}
+            href={`?tab=${data.tab}&projectsPage=${data.tab === "projects" ? data.page + 1 : data.projectsPage}&proposalsPage=${data.tab === "proposals" ? data.page + 1 : data.proposalsPage}&ownerPage=${data.tab === "owner" ? data.page + 1 : d.ownerPage}`}
             class="rounded bg-neutral-200 px-2 py-1 hover:bg-neutral-300"
           >
             Next &rarr;
