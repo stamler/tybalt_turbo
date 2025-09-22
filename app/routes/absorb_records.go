@@ -381,10 +381,16 @@ type RefConfig struct {
 	Column string
 }
 
-// Add parent constraint configuration
+// ParentConstraint enforces data integrity during record absorption by ensuring
+// that records being absorbed together must share the same parent relationship.
+// This prevents merging records that don't logically belong together.
+//
+// For example, when absorbing client_contacts, all records must belong to the same
+// client. The constraint specifies which collection and field must match across
+// all records being absorbed into the target record.
 type ParentConstraint struct {
-	Collection string // The collection that must match (e.g., "clients")
-	Field      string // The field that must match (e.g., "client")
+	Collection string // The parent collection that must match (e.g., "clients")
+	Field      string // The field that must have matching values (e.g., "client")
 }
 
 func GetConfigsAndTable(collectionName string) ([]RefConfig, *ParentConstraint, error) {
