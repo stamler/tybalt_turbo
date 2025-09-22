@@ -81,8 +81,9 @@ func TestAbsorbRecords(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// These variables track the state before absorption
-			var initialCount int64                     // Total records in the collection
-			initialRefCounts := make(map[string]int64) // References in related tables
+			var initialCount int64 // Total records in the collection
+			// Track reference counts per table+column
+			initialRefCounts := make(map[string]int64) // key: "table.column" -> count
 
 			// For successful test cases, we need to verify the initial state
 			// Error cases skip this as they'll fail before any state changes
@@ -140,7 +141,7 @@ func TestAbsorbRecords(t *testing.T) {
 					if err != nil {
 						t.Fatalf("failed to get reference count for %s: %v", ref.Table, err)
 					}
-					initialRefCounts[ref.Table] = result.Count
+					initialRefCounts[ref.Table+"."+ref.Column] = result.Count
 				}
 			}
 
@@ -229,8 +230,9 @@ func TestAbsorbRecords(t *testing.T) {
 					if err != nil {
 						t.Fatalf("failed to check target references: %v", err)
 					}
-					if targetResult.Count != initialRefCounts[ref.Table] {
-						t.Errorf("expected %d references in %s, got %d", initialRefCounts[ref.Table], ref.Table, targetResult.Count)
+					key := ref.Table + "." + ref.Column
+					if targetResult.Count != initialRefCounts[key] {
+						t.Errorf("expected %d references in %s, got %d", initialRefCounts[key], key, targetResult.Count)
 					}
 				}
 			}
@@ -566,6 +568,7 @@ func TestUndoAbsorb(t *testing.T) {
 
 	// Store initial state
 	initialState := make(map[string]map[string]interface{})
+	// Track reference counts per table+column
 	initialRefCounts := make(map[string]int64)
 
 	// Get reference configs for the collection
@@ -600,7 +603,7 @@ func TestUndoAbsorb(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to get reference count for %s: %v", ref.Table, err)
 		}
-		initialRefCounts[ref.Table] = result.Count
+		initialRefCounts[ref.Table+"."+ref.Column] = result.Count
 	}
 
 	// Perform the absorption
@@ -634,7 +637,8 @@ func TestUndoAbsorb(t *testing.T) {
 			return err
 		}
 
-		var updatedRefs map[string]map[string]string
+		// updatedRefs is nested as table -> column -> recordId -> oldValue
+		var updatedRefs map[string]map[string]map[string]string
 		if err := json.Unmarshal([]byte(record.GetString("updated_references")), &updatedRefs); err != nil {
 			return err
 		}
@@ -656,15 +660,17 @@ func TestUndoAbsorb(t *testing.T) {
 		}
 
 		// Restore references
-		for table, updates := range updatedRefs {
-			for recordID, oldValue := range updates {
-				updateQuery := fmt.Sprintf("UPDATE %s SET %s = {:old_value} WHERE id = {:record_id}", table, refConfigs[0].Column)
-				_, err = txApp.NonconcurrentDB().NewQuery(updateQuery).Bind(dbx.Params{
-					"old_value": oldValue,
-					"record_id": recordID,
-				}).Execute()
-				if err != nil {
-					return err
+		for table, columns := range updatedRefs {
+			for column, updates := range columns {
+				for recordID, oldValue := range updates {
+					updateQuery := fmt.Sprintf("UPDATE %s SET %s = {:old_value} WHERE id = {:record_id}", table, column)
+					_, err = txApp.NonconcurrentDB().NewQuery(updateQuery).Bind(dbx.Params{
+						"old_value": oldValue,
+						"record_id": recordID,
+					}).Execute()
+					if err != nil {
+						return err
+					}
 				}
 			}
 		}
@@ -719,8 +725,9 @@ func TestUndoAbsorb(t *testing.T) {
 			t.Errorf("failed to get reference count for %s: %v", ref.Table, err)
 			continue
 		}
-		if result.Count != initialRefCounts[ref.Table] {
-			t.Errorf("reference count for %s is %d, want %d", ref.Table, result.Count, initialRefCounts[ref.Table])
+		key := ref.Table + "." + ref.Column
+		if result.Count != initialRefCounts[key] {
+			t.Errorf("reference count for %s is %d, want %d", key, result.Count, initialRefCounts[key])
 		}
 	}
 

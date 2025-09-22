@@ -182,7 +182,7 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 				if err := rows.Scan(&id, &oldValue); err != nil {
 					return fmt.Errorf("scanning reference row: %w", err)
 				}
-				refTracker.trackUpdate(ref.Table, id, oldValue)
+				refTracker.trackUpdate(ref.Table, ref.Column, id, oldValue)
 			}
 
 			// Now update the references
@@ -292,7 +292,8 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 			return apis.NewApiError(http.StatusInternalServerError, "Failed to parse absorbed records", err)
 		}
 
-		var updatedRefs map[string]map[string]string
+		// updatedRefs is serialized as updates[table][column][recordId] = oldValue
+		var updatedRefs map[string]map[string]map[string]string
 		if err := json.Unmarshal(action.UpdatedReferences, &updatedRefs); err != nil {
 			return apis.NewApiError(http.StatusInternalServerError, "Failed to parse updated references", err)
 		}
@@ -323,36 +324,23 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 			// Step 4b: Restore References
 			// For each table where references were updated, restore the original
 			// references that pointed to the absorbed records
-			refConfigs, _, err := GetConfigsAndTable(collectionName)
-			if err != nil {
-				return fmt.Errorf("error getting reference configs: %w", err)
-			}
 
-			// Create a map for quick lookup of column names by table
-			columnsByTable := make(map[string]string)
-			for _, ref := range refConfigs {
-				columnsByTable[ref.Table] = ref.Column
-			}
+			for table, columns := range updatedRefs {
+				for column, updates := range columns {
+					for recordId, oldValue := range updates {
+						query := fmt.Sprintf(`
+                            UPDATE %s 
+                            SET %s = {:old_value}
+                            WHERE id = {:record_id}
+                        `, table, column)
 
-			for table, updates := range updatedRefs {
-				column, ok := columnsByTable[table]
-				if !ok {
-					return fmt.Errorf("no column configuration found for table %s", table)
-				}
-
-				for recordId, oldValue := range updates {
-					query := fmt.Sprintf(`
-						UPDATE %s 
-						SET %s = {:old_value}
-						WHERE id = {:record_id}
-					`, table, column)
-
-					_, err = txApp.NonconcurrentDB().NewQuery(query).Bind(dbx.Params{
-						"old_value": oldValue,
-						"record_id": recordId,
-					}).Execute()
-					if err != nil {
-						return fmt.Errorf("error restoring reference in %s: %w", table, err)
+						_, err = txApp.NonconcurrentDB().NewQuery(query).Bind(dbx.Params{
+							"old_value": oldValue,
+							"record_id": recordId,
+						}).Execute()
+						if err != nil {
+							return fmt.Errorf("error restoring reference in %s.%s: %w", table, column, err)
+						}
 					}
 				}
 			}
@@ -408,6 +396,7 @@ func GetConfigsAndTable(collectionName string) ([]RefConfig, *ParentConstraint, 
 		return []RefConfig{
 			{"client_contacts", "client"},
 			{"jobs", "client"},
+			{"jobs", "job_owner"},
 		}, nil, nil
 
 	case "client_contacts":
@@ -547,20 +536,24 @@ func broadcastAbsorbCompletedEvent(app core.App, collectionName string) error {
 
 // trackReferences tracks reference updates during absorption
 type referenceTracker struct {
-	updates map[string]map[string]string // collection -> recordId -> oldValue
+	// updates[table][column][recordId] = oldValue
+	updates map[string]map[string]map[string]string
 }
 
 func newReferenceTracker() *referenceTracker {
 	return &referenceTracker{
-		updates: make(map[string]map[string]string),
+		updates: make(map[string]map[string]map[string]string),
 	}
 }
 
-func (rt *referenceTracker) trackUpdate(collection, recordId, oldValue string) {
-	if rt.updates[collection] == nil {
-		rt.updates[collection] = make(map[string]string)
+func (rt *referenceTracker) trackUpdate(table, column, recordId, oldValue string) {
+	if rt.updates[table] == nil {
+		rt.updates[table] = make(map[string]map[string]string)
 	}
-	rt.updates[collection][recordId] = oldValue
+	if rt.updates[table][column] == nil {
+		rt.updates[table][column] = make(map[string]string)
+	}
+	rt.updates[table][column][recordId] = oldValue
 }
 
 func (rt *referenceTracker) serialize() ([]byte, error) {

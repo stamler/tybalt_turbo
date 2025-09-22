@@ -9,6 +9,7 @@
   import type { Snippet } from "svelte";
   import type { BaseSystemFields } from "$lib/pocketbase-types";
   import type MiniSearch from "minisearch";
+  import AbsorbList from "./AbsorbList.svelte";
 
   let {
     collectionName,
@@ -28,8 +29,6 @@
   let recordsToAbsorb = $state<string[]>([]);
   let selectedRecord = $state<string>("");
   let existingAbsorbAction = $state<AbsorbActionsResponse | null>(null);
-  let showUndoConfirm = $state(false);
-  let showCommitConfirm = $state(false);
   let items = $state<T[]>([]);
   let targetRecord = $state<T | null>(null);
 
@@ -77,34 +76,7 @@
     }
   }
 
-  async function handleUndo() {
-    try {
-      await pb.send(`/api/${collectionName}/undo_absorb`, {
-        method: "POST",
-      });
-      redirectBack();
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        errors = { global: { message: error.message } };
-      } else {
-        errors = { global: { message: "An unknown error occurred" } };
-      }
-    }
-  }
-
-  async function handleCommit() {
-    if (existingAbsorbAction === null) return;
-    try {
-      await pb.collection("absorb_actions").delete(existingAbsorbAction.id);
-      redirectBack();
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        errors = { global: { message: error.message } };
-      } else {
-        errors = { global: { message: "An unknown error occurred" } };
-      }
-    }
-  }
+  // Undo/commit handling is managed by AbsorbList
 
   $effect(() => {
     // Don't add the target record, a blank record, or a record that is already
@@ -155,44 +127,7 @@
 
 <div class="flex w-full flex-col gap-4 p-4">
   {#if existingAbsorbAction}
-    <div class="rounded-lg border-2 border-yellow-500 bg-yellow-50 p-4">
-      <h2 class="mb-2 text-lg font-bold text-yellow-800">Pending Absorb Action</h2>
-      <p class="mb-4 text-yellow-700">
-        There is a pending absorb action for this collection. You must either undo the previous
-        absorption or commit it before performing a new absorb operation.
-      </p>
-      <div class="flex gap-2">
-        {#if showUndoConfirm}
-          <div class="flex flex-col gap-2">
-            <p class="font-bold text-red-600">
-              Are you sure you want to undo the previous absorption? This action cannot be reversed.
-            </p>
-            <div class="flex gap-2">
-              <DsActionButton action={handleUndo} color="red">Confirm Undo</DsActionButton>
-              <DsActionButton action={() => (showUndoConfirm = false)}>Cancel</DsActionButton>
-            </div>
-          </div>
-        {:else if showCommitConfirm}
-          <div class="flex flex-col gap-2">
-            <p class="font-bold text-red-600">
-              Are you sure you want to commit the previous absorption? This action cannot be
-              reversed.
-            </p>
-            <div class="flex gap-2">
-              <DsActionButton action={handleCommit} color="red">Confirm Commit</DsActionButton>
-              <DsActionButton action={() => (showCommitConfirm = false)}>Cancel</DsActionButton>
-            </div>
-          </div>
-        {:else}
-          <DsActionButton action={() => (showUndoConfirm = true)} color="yellow"
-            >Undo Previous Absorb</DsActionButton
-          >
-          <DsActionButton action={() => (showCommitConfirm = true)} color="green"
-            >Commit Previous Absorb</DsActionButton
-          >
-        {/if}
-      </div>
-    </div>
+    <AbsorbList {collectionName} afterAction={redirectBack} />
   {:else}
     <div class="flex flex-col gap-2">
       <h2 class="text-xl font-bold">Target Record</h2>
