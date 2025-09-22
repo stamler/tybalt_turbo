@@ -137,6 +137,19 @@
       return String(value);
     }
   }
+
+  // Track expanded/collapsed state per item per table (collapsed by default)
+  let expandedTables = $state<Record<string, Record<string, boolean>>>({});
+  function isTableExpanded(itemId: string, tableName: string): boolean {
+    return !!expandedTables[itemId]?.[tableName];
+  }
+  function setTableExpanded(itemId: string, tableName: string, value: boolean) {
+    const current = expandedTables[itemId] ?? {};
+    expandedTables = { ...expandedTables, [itemId]: { ...current, [tableName]: value } };
+  }
+  function toggleTable(itemId: string, tableName: string) {
+    setTableExpanded(itemId, tableName, !isTableExpanded(itemId, tableName));
+  }
 </script>
 
 <div class="flex w-full flex-col gap-4 p-4">
@@ -184,40 +197,47 @@
                   <div class="mt-1 flex flex-col gap-3">
                     {#each entriesOf(item.updated_references) as [tableName, columns]}
                       <div class="rounded border border-yellow-200">
-                        <div class="bg-yellow-200/60 px-2 py-1 text-xs font-semibold">
-                          {tableName}
-                        </div>
-                        <div class="p-2">
-                          {#each entriesOf(columns) as [columnName, rows]}
-                            <div class="mb-3">
-                              <div class="text-xs font-semibold">{columnName}</div>
-                              <table class="mt-1 w-full table-auto border-collapse text-xs">
-                                <thead>
-                                  <tr>
-                                    <th class="border-b border-yellow-300 px-2 py-1 text-left"
-                                      >row id</th
-                                    >
-                                    <th class="border-b border-yellow-300 px-2 py-1 text-left"
-                                      >previous value</th
-                                    >
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {#each entriesOf(rows) as [rowId, prevValue]}
+                        <button
+                          class="flex w-full items-center justify-between bg-yellow-200/60 px-2 py-1 text-left text-xs font-semibold"
+                          onclick={() => toggleTable(item.id, tableName as string)}
+                          aria-expanded={isTableExpanded(item.id, tableName as string)}
+                        >
+                          <span>{tableName}</span>
+                          <span>{isTableExpanded(item.id, tableName as string) ? "▾" : "▸"}</span>
+                        </button>
+                        {#if isTableExpanded(item.id, tableName as string)}
+                          <div class="p-2">
+                            {#each entriesOf(columns) as [columnName, rows]}
+                              <div class="mb-3">
+                                <div class="text-xs font-semibold">{columnName}</div>
+                                <table class="mt-1 w-full table-auto border-collapse text-xs">
+                                  <thead>
                                     <tr>
-                                      <td class="border-b border-yellow-100 px-2 py-1 font-mono"
-                                        >{rowId}</td
+                                      <th class="border-b border-yellow-300 px-2 py-1 text-left"
+                                        >row id</th
                                       >
-                                      <td class="break-all border-b border-yellow-100 px-2 py-1"
-                                        >{formatPrevValue(prevValue)}</td
+                                      <th class="border-b border-yellow-300 px-2 py-1 text-left"
+                                        >previous value</th
                                       >
                                     </tr>
-                                  {/each}
-                                </tbody>
-                              </table>
-                            </div>
-                          {/each}
-                        </div>
+                                  </thead>
+                                  <tbody>
+                                    {#each entriesOf(rows) as [rowId, prevValue]}
+                                      <tr>
+                                        <td class="border-b border-yellow-100 px-2 py-1 font-mono"
+                                          >{rowId}</td
+                                        >
+                                        <td class="break-all border-b border-yellow-100 px-2 py-1"
+                                          >{formatPrevValue(prevValue)}</td
+                                        >
+                                      </tr>
+                                    {/each}
+                                  </tbody>
+                                </table>
+                              </div>
+                            {/each}
+                          </div>
+                        {/if}
                       </div>
                     {/each}
                   </div>
