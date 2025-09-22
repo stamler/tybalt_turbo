@@ -64,6 +64,14 @@
     }
   }
 
+  function goBack() {
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      window.history.back();
+    } else {
+      redirectBack();
+    }
+  }
+
   async function checkExistingAbsorbAction() {
     try {
       const result = await pb
@@ -127,7 +135,19 @@
 
 <div class="flex w-full flex-col gap-4 p-4">
   {#if existingAbsorbAction}
-    <AbsorbList {collectionName} afterAction={redirectBack} />
+    <div class="rounded border-2 border-yellow-500 bg-yellow-50 p-4">
+      <div class="mb-2 text-yellow-900">
+        <p class="font-semibold">There is a pending absorb action for this collection.</p>
+        <p class="text-sm">
+          You must either undo the previous absorption or commit it before performing a new absorb
+          operation.
+        </p>
+      </div>
+      <div class="mb-3">
+        <DsActionButton action={goBack} color="neutral">Back</DsActionButton>
+      </div>
+      <AbsorbList {collectionName} afterAction={redirectBack} />
+    </div>
   {:else}
     <div class="flex flex-col gap-2">
       <h2 class="text-xl font-bold">Target Record</h2>

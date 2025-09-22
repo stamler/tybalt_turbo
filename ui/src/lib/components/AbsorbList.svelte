@@ -54,8 +54,12 @@
   async function undoAbsorb(item: AbsorbActionsResponse) {
     try {
       await pb.send(`/api/${item.collection_name}/undo_absorb`, { method: "POST" });
-      // Redirect to the corresponding collection list after successful undo
-      goto(`/${item.collection_name}/list`);
+      // After successful undo, prefer callback if provided, otherwise redirect
+      if (afterAction) {
+        afterAction();
+      } else {
+        goto(`/${item.collection_name}/list`);
+      }
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };
@@ -70,8 +74,12 @@
   async function commitAbsorb(item: AbsorbActionsResponse) {
     try {
       await pb.collection("absorb_actions").delete(item.id);
-      // Redirect to the corresponding collection list after successful commit
-      goto(`/${item.collection_name}/list`);
+      // After successful commit, prefer callback if provided, otherwise redirect
+      if (afterAction) {
+        afterAction();
+      } else {
+        goto(`/${item.collection_name}/list`);
+      }
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };
