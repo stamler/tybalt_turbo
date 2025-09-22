@@ -41,6 +41,7 @@
 
   let results = $state([] as SearchResult[]);
   let selectedIndex = $state(-1);
+  let searchQuery = $state("");
 
   // reference to the internal input element so we can expose a focus helper
   // svelte-ignore non_reactive_update
@@ -51,10 +52,11 @@
   }
 
   function updateResults(event: Event) {
-    const query = (event.target as HTMLInputElement).value;
+    const typedQuery = (event.target as HTMLInputElement).value;
+    searchQuery = typedQuery;
     // Search then filter out any excluded ids
     results = index
-      .search(query, { prefix: true })
+      .search(typedQuery, { prefix: true })
       .filter((r) => !excludeIds.includes(r[idField] as unknown as string | number));
   }
 
@@ -97,6 +99,7 @@
         selectedIndex = -1;
         // Clear the current input value so user can start a fresh search
         if (inputElement) inputElement.value = "";
+        searchQuery = "";
       }
     }
 
@@ -143,6 +146,16 @@
     value = "";
   }
 
+  function clearInput() {
+    searchQuery = "";
+    results = [];
+    selectedIndex = -1;
+    if (inputElement) {
+      inputElement.value = "";
+      inputElement.focus();
+    }
+  }
+
   const item = $derived.by(() => getDocumentById(index, value));
 
   function commitChoice(chosen: string | number) {
@@ -183,6 +196,9 @@
           {disabled}
           bind:this={inputElement}
         />
+        {#if !disabled && (searchQuery !== "" || results.length > 0)}
+          <DsActionButton action={clearInput} title="Clear">Clear</DsActionButton>
+        {/if}
       {/if}
     </span>
 
