@@ -102,8 +102,8 @@
         },
       });
 
-      // Redirect back to the list view after successful absorption
-      redirectBack();
+      // Redirect to absorb actions page after successful absorption
+      goto("/absorb/actions");
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };

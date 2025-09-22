@@ -2,6 +2,7 @@
   import { pb } from "$lib/pocketbase";
   import DsActionButton from "./DSActionButton.svelte";
   import type { AbsorbActionsResponse } from "$lib/pocketbase-types";
+  import { goto } from "$app/navigation";
 
   let {
     collectionName = undefined,
@@ -53,9 +54,8 @@
   async function undoAbsorb(item: AbsorbActionsResponse) {
     try {
       await pb.send(`/api/${item.collection_name}/undo_absorb`, { method: "POST" });
-      // Refresh list after action
-      await loadItems();
-      if (afterAction) afterAction();
+      // Redirect to the corresponding collection list after successful undo
+      goto(`/${item.collection_name}/list`);
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };
@@ -70,9 +70,8 @@
   async function commitAbsorb(item: AbsorbActionsResponse) {
     try {
       await pb.collection("absorb_actions").delete(item.id);
-      // Refresh list after action
-      await loadItems();
-      if (afterAction) afterAction();
+      // Redirect to the corresponding collection list after successful commit
+      goto(`/${item.collection_name}/list`);
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };
