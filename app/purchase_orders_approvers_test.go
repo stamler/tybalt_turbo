@@ -210,8 +210,8 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 
 // po_approver_props.divisions: prevent including inactive divisions on update
 func TestPoApproverPropsUpdate_InactiveDivisionFails(t *testing.T) {
-	// Use approver with props id 1zj39f66eq5qxc4 owned by author@soup.com
-	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	// Use superuser token to bypass admin-only restriction
+	recordToken, err := testutils.GenerateAdminToken("test@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}

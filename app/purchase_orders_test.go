@@ -156,7 +156,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	            "payment_type": "Expense",
 	            "total": 1234.56,
 	            "vendor": "2zqxtsmymf670ha",
-	            "approver": "etysnrlup2f6bak",
+	            "approver": "wegviunlyr2jjjv",
 	            "status": "Unapproved",
 	            "type": "Normal"
 	        }`)
