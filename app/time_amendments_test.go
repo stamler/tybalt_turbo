@@ -45,6 +45,32 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "time_amendment allows inactive division (retroactive)",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_amendments/records",
+			Body: strings.NewReader(`{
+				"creator": "f2j5a8vk006baub",
+				"time_type": "sdyfl3q7j7ap849",
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-02",
+				"division": "apkev2ow1zjtm7w",
+				"branch": "80875lm27v8wgi4",
+				"description": "inactive division allowed",
+				"hours": 1,
+				"skip_tsid_check": true
+				}`),
+			Headers:        map[string]string{"Authorization": creatorToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"division":"apkev2ow1zjtm7w"`,
+				`"week_ending":"2024-09-07"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "otherwise valid time_amendment fails creation when a corresponding time_sheets record cannot be found and skip_tsid_check is false",
 			Method: http.MethodPost,
 			URL:    "/api/collections/time_amendments/records",

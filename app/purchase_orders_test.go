@@ -117,7 +117,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		b, ct, err := makeMultipart(`{
             "uid": "rzr98oadsp9qc11",
             "date": "2024-09-01",
-            "division": "vccd5fo56ctbigh",
+	          "division": "vccd5fo56ctbigh",
             "description": "test purchase order",
             "payment_type": "Expense",
             "total": 1234.56,
@@ -142,6 +142,36 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+	// otherwise valid PO with Inactive division fails
+	{
+		b, ct, err := makeMultipart(`{
+	            "uid": "rzr98oadsp9qc11",
+	            "date": "2024-09-01",
+	            "division": "apkev2ow1zjtm7w",
+	            "description": "po with inactive division",
+	            "payment_type": "Expense",
+	            "total": 1234.56,
+	            "vendor": "2zqxtsmymf670ha",
+	            "approver": "etysnrlup2f6bak",
+	            "status": "Unapproved",
+	            "type": "Normal"
+	        }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "otherwise valid purchase order with Inactive division fails",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"division":{"code":"not_active"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		})

@@ -82,6 +82,33 @@ func TestExpensesCreate(t *testing.T) {
 			}
 		}(),
 		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "apkev2ow1zjtm7w",
+				"description": "inactive division should fail",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "otherwise valid expense with Inactive division fails",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"data":{"division":{"code":"not_active"`,
+				},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
 			// Using 2025-01-10 so the effective allowance rate row is 2025-01-05
 			// Breakfast=20, Lunch=25, Dinner=30, Lodging=50 on that date.
 			// With allowance_types ["Breakfast","Dinner"], total should be 20+30=50.

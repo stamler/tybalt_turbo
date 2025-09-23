@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"tybalt/internal/testutils"
 
@@ -197,6 +198,39 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"code":"invalid_amount"`,
 				`"message":"Amount must be a valid number"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// po_approver_props.divisions: prevent including inactive divisions on update
+func TestPoApproverPropsUpdate_InactiveDivisionFails(t *testing.T) {
+	// Use approver with props id 1zj39f66eq5qxc4 owned by author@soup.com
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "updating po_approver_props divisions to include inactive fails",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/po_approver_props/records/1zj39f66eq5qxc4",
+			Body: strings.NewReader(`{
+                "divisions": ["hcd86z57zjty6jo", "apkev2ow1zjtm7w"]
+            }`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"divisions":{"code":"not_active"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
