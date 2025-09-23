@@ -67,13 +67,13 @@ func AddHooks(app core.App) {
 	// hooks for time_entries model
 	app.OnRecordCreateRequest("time_entries").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessTimeEntry(app, e); err != nil {
-			return err
+			return AnnotateHookError(app, e, err)
 		}
 		return e.Next()
 	})
 	app.OnRecordUpdateRequest("time_entries").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessTimeEntry(app, e); err != nil {
-			return err
+			return AnnotateHookError(app, e, err)
 		}
 		return e.Next()
 	})
@@ -99,6 +99,45 @@ func AddHooks(app core.App) {
 	})
 	app.OnRecordUpdateRequest("purchase_orders").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessPurchaseOrder(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	// hooks for jobs model
+	app.OnRecordCreateRequest("jobs").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessJob(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	app.OnRecordUpdateRequest("jobs").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessJob(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	// hooks for profiles model
+	app.OnRecordCreateRequest("profiles").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessProfile(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	app.OnRecordUpdateRequest("profiles").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessProfile(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	// hooks for po_approver_props model
+	app.OnRecordCreateRequest("po_approver_props").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessPOApproverProps(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	app.OnRecordUpdateRequest("po_approver_props").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessPOApproverProps(app, e); err != nil {
 			return AnnotateHookError(app, e, err)
 		}
 		return e.Next()

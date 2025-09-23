@@ -14,6 +14,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -444,6 +445,13 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	cleanErr := cleanPurchaseOrder(app, record)
 	if cleanErr != nil {
 		return cleanErr
+	}
+
+	if err := ensureActiveDivision(app, record.GetString("division"), "division"); err != nil {
+		if ve, ok := err.(validation.Errors); ok {
+			return apis.NewBadRequestError("Validation error", ve)
+		}
+		return err
 	}
 
 	// validate the purchase_order record

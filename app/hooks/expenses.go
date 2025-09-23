@@ -332,6 +332,11 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		return err
 	}
 
+	// ensure the referenced division is active
+	if err := ensureActiveDivision(app, expenseRecord.GetString("division"), "division"); err != nil {
+		return err
+	}
+
 	// write the pay_period_ending property to the record. This is derived
 	// exclusively from the date property.
 	payPeriodEnding, ppEndErr := utilities.GeneratePayPeriodEnding(expenseRecord.GetString("date"))
