@@ -26,11 +26,19 @@ SELECT
   j.project_award_date AS project_award_date,
   j.proposal_opening_date AS proposal_opening_date,
   j.proposal_submission_due_date AS proposal_submission_due_date,
+  j.branch           AS branch_id,
+  br.code            AS branch_code,
+  br.name            AS branch_name,
   (
     SELECT COALESCE(json_group_array(json_object('id', pj.id, 'number', pj.number)), '[]')
     FROM jobs pj
     WHERE pj.proposal = j.id
   ) AS projects_json,
+  (
+    SELECT COALESCE(json_group_array(json_object('id', c.id, 'name', c.name)), '[]')
+    FROM categories c
+    WHERE c.job = j.id
+  ) AS categories_json,
   COALESCE(
     (
       SELECT json_group_array(
@@ -52,4 +60,5 @@ LEFT JOIN client_contacts cc   ON cc.id  = j.contact
 LEFT JOIN managers m           ON m.id   = j.manager
 LEFT JOIN managers am          ON am.id  = j.alternate_manager
 LEFT JOIN managers jo          ON jo.id  = j.job_owner
+LEFT JOIN branches br          ON br.id  = j.branch
 WHERE j.id = {:id}; 

@@ -233,6 +233,22 @@
       <div><span class="font-semibold">Status:</span> {data.job.status}</div>
     {/if}
 
+    {#if data.job.branch_name || data.job.branch_code || data.job.branch_id}
+      <div>
+        <span class="font-semibold">Branch:</span>
+        {#if data.job.branch_name}
+          {data.job.branch_name}
+          {#if data.job.branch_code}
+            ({data.job.branch_code})
+          {/if}
+        {:else if data.job.branch_code}
+          {data.job.branch_code}
+        {:else}
+          {data.job.branch_id}
+        {/if}
+      </div>
+    {/if}
+
     {#if data.job.client}
       <div>
         <span class="font-semibold">Client:</span>
@@ -274,6 +290,17 @@
       <span class="font-semibold">FN Agreement:</span>
       {data.job.fn_agreement ? "Yes" : "No"}
     </div>
+
+    {#if data.job.categories && data.job.categories.length > 0}
+      <div class="flex items-start gap-2">
+        <span class="pt-1 font-semibold">Categories:</span>
+        <div class="flex flex-wrap gap-1">
+          {#each data.job.categories as category}
+            <DsLabel color="blue">{category.name}</DsLabel>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     {#if data.job.project_award_date}
       <div>

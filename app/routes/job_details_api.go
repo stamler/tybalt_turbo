@@ -48,12 +48,16 @@ type jobDetailsRow struct {
 	JobOwnerSurname           sql.NullString `db:"job_owner_surname"`
 	ProposalID                sql.NullString `db:"proposal_id"`
 	ProposalNumber            sql.NullString `db:"proposal_number"`
+	BranchID                  sql.NullString `db:"branch_id"`
+	BranchCode                sql.NullString `db:"branch_code"`
+	BranchName                sql.NullString `db:"branch_name"`
 	FnAgreement               bool           `db:"fn_agreement"`
 	ProjectAwardDate          sql.NullString `db:"project_award_date"`
 	ProposalOpeningDate       sql.NullString `db:"proposal_opening_date"`
 	ProposalSubmissionDueDate sql.NullString `db:"proposal_submission_due_date"`
 	DivisionsJSON             string         `db:"divisions_json"`
 	ProjectsJSON              string         `db:"projects_json"`
+	CategoriesJSON            string         `db:"categories_json"`
 }
 
 type ClientInfo struct {
@@ -79,12 +83,21 @@ type JobDetails struct {
 	JobOwner                  Person     `json:"job_owner"`
 	ProposalID                string     `json:"proposal_id"`
 	ProposalNumber            string     `json:"proposal_number"`
+	BranchID                  string     `json:"branch_id"`
+	BranchCode                string     `json:"branch_code"`
+	BranchName                string     `json:"branch_name"`
 	FnAgreement               bool       `json:"fn_agreement"`
 	ProjectAwardDate          string     `json:"project_award_date"`
 	ProposalOpeningDate       string     `json:"proposal_opening_date"`
 	ProposalSubmissionDueDate string     `json:"proposal_submission_due_date"`
 	Divisions                 []Division `json:"divisions"`
 	Projects                  []JobRef   `json:"projects"`
+	Categories                []Category `json:"categories"`
+}
+
+type Category struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
@@ -105,6 +118,9 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 		_ = json.Unmarshal([]byte(r.DivisionsJSON), &divisions)
 		var projects []JobRef
 		_ = json.Unmarshal([]byte(r.ProjectsJSON), &projects)
+
+		var categories []Category
+		_ = json.Unmarshal([]byte(r.CategoriesJSON), &categories)
 
 		// helper to convert NullString to string
 		ns := func(n sql.NullString) string {
@@ -127,12 +143,16 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			JobOwner:                  Person{ID: ns(r.JobOwnerID), GivenName: ns(r.JobOwnerGivenName), Surname: ns(r.JobOwnerSurname)},
 			ProposalID:                ns(r.ProposalID),
 			ProposalNumber:            ns(r.ProposalNumber),
+			BranchID:                  ns(r.BranchID),
+			BranchCode:                ns(r.BranchCode),
+			BranchName:                ns(r.BranchName),
 			FnAgreement:               r.FnAgreement,
 			ProjectAwardDate:          ns(r.ProjectAwardDate),
 			ProposalOpeningDate:       ns(r.ProposalOpeningDate),
 			ProposalSubmissionDueDate: ns(r.ProposalSubmissionDueDate),
 			Divisions:                 divisions,
 			Projects:                  projects,
+			Categories:                categories,
 		}
 
 		return e.JSON(http.StatusOK, jd)
