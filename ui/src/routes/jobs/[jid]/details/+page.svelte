@@ -218,7 +218,15 @@
 </script>
 
 <div class="mx-auto space-y-4 p-4">
-  <h1 class="text-2xl font-bold">Job Details</h1>
+  <div class="flex items-center justify-between gap-2">
+    <h1 class="text-2xl font-bold">Job Details</h1>
+    <DsActionButton
+      action={`/jobs/${data.job.id}/edit`}
+      icon="mdi:pencil"
+      title="Edit Job"
+      color="blue"
+    />
+  </div>
 
   <div class="space-y-2 rounded bg-neutral-100 p-4">
     <div class="flex items-center gap-2">
@@ -233,140 +241,137 @@
       <div><span class="font-semibold">Status:</span> {data.job.status}</div>
     {/if}
 
-    {#if data.job.branch_name || data.job.branch_code || data.job.branch_id}
-      <div>
-        <span class="font-semibold">Branch:</span>
-        {#if data.job.branch_name}
-          {data.job.branch_name}
-          {#if data.job.branch_code}
-            ({data.job.branch_code})
-          {/if}
-        {:else if data.job.branch_code}
-          {data.job.branch_code}
-        {:else}
-          {data.job.branch_id}
+    <details class="space-y-2">
+      <summary class="cursor-pointer font-semibold text-neutral-700">Additional Details</summary>
+      <div class="space-y-2">
+        {#if data.job.branch_name || data.job.branch_code || data.job.branch_id}
+          <div>
+            <span class="font-semibold">Branch:</span>
+            {#if data.job.branch_name}
+              {data.job.branch_name}
+              {#if data.job.branch_code}
+                ({data.job.branch_code})
+              {/if}
+            {:else if data.job.branch_code}
+              {data.job.branch_code}
+            {:else}
+              {data.job.branch_id}
+            {/if}
+          </div>
+        {/if}
+
+        {#if data.job.client}
+          <div>
+            <span class="font-semibold">Client:</span>
+            <a
+              href={`/clients/${data.job.client.id}/details`}
+              class="text-blue-600 hover:underline"
+            >
+              {data.job.client.name}
+            </a>
+          </div>
+        {/if}
+
+        {#if data.job.contact && (data.job.contact.given_name || data.job.contact.surname)}
+          <div><span class="font-semibold">Contact:</span> {personName(data.job.contact)}</div>
+        {/if}
+
+        {#if data.job.manager && (data.job.manager.given_name || data.job.manager.surname)}
+          <div><span class="font-semibold">Manager:</span> {personName(data.job.manager)}</div>
+        {/if}
+
+        {#if data.job.alternate_manager && (data.job.alternate_manager.given_name || data.job.alternate_manager.surname)}
+          <div>
+            <span class="font-semibold">Alternate Manager:</span>
+            {personName(data.job.alternate_manager)}
+          </div>
+        {/if}
+
+        {#if data.job.job_owner && (data.job.job_owner.given_name || data.job.job_owner.surname)}
+          <div><span class="font-semibold">Job Owner:</span> {personName(data.job.job_owner)}</div>
+        {/if}
+
+        {#if data.job.proposal_id}
+          <div>
+            <span class="font-semibold">Proposal:</span>
+            <a href={`/jobs/${data.job.proposal_id}/details`} class="text-blue-600 hover:underline">
+              {data.job.proposal_number || data.job.proposal_id}
+            </a>
+          </div>
+        {/if}
+
+        <div>
+          <span class="font-semibold">FN Agreement:</span>
+          {data.job.fn_agreement ? "Yes" : "No"}
+        </div>
+
+        {#if data.job.categories && data.job.categories.length > 0}
+          <div class="flex items-start gap-2">
+            <span class="pt-1 font-semibold">Categories:</span>
+            <div class="flex flex-wrap gap-1">
+              {#each data.job.categories as category}
+                <DsLabel color="blue">{category.name}</DsLabel>
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        {#if data.job.project_award_date}
+          <div>
+            <span class="font-semibold">Project Award Date:</span>
+            {data.job.project_award_date}
+          </div>
+        {/if}
+
+        {#if data.job.proposal_opening_date}
+          <div>
+            <span class="font-semibold">Proposal Opening Date:</span>
+            {data.job.proposal_opening_date}
+          </div>
+        {/if}
+
+        {#if data.job.proposal_submission_due_date}
+          <div>
+            <span class="font-semibold">Proposal Submission Due:</span>
+            {data.job.proposal_submission_due_date}
+          </div>
+        {/if}
+
+        {#if data.job.divisions && Array.isArray(data.job.divisions)}
+          <div>
+            <span class="font-semibold">Divisions:</span>
+            {#each data.job.divisions as division, idx}
+              {division.name} ({division.code}){idx < data.job.divisions.length - 1 ? ", " : ""}
+            {/each}
+          </div>
+        {/if}
+
+        {#if data.job.projects && data.job.projects.length > 0}
+          <div>
+            <span class="font-semibold">Projects:</span>
+            {#each data.job.projects as p, i}
+              <a href={`/jobs/${p.id}/details`} class="text-blue-600 hover:underline">{p.number}</a
+              >{i < data.job.projects.length - 1 ? ", " : ""}
+            {/each}
+          </div>
+        {/if}
+
+        {#if data.job.location && data.job.location !== ""}
+          <div class="mt-2">
+            <span class="font-semibold">Location:</span>
+            <div class="mt-1">
+              <DSLocationPicker
+                value={data.job.location}
+                errors={{}}
+                fieldName="location"
+                disabled={true}
+                readonly={true}
+              />
+            </div>
+          </div>
         {/if}
       </div>
-    {/if}
-
-    {#if data.job.client}
-      <div>
-        <span class="font-semibold">Client:</span>
-        <a href={`/clients/${data.job.client.id}/details`} class="text-blue-600 hover:underline">
-          {data.job.client.name}
-        </a>
-      </div>
-    {/if}
-
-    {#if data.job.contact && (data.job.contact.given_name || data.job.contact.surname)}
-      <div><span class="font-semibold">Contact:</span> {personName(data.job.contact)}</div>
-    {/if}
-
-    {#if data.job.manager && (data.job.manager.given_name || data.job.manager.surname)}
-      <div><span class="font-semibold">Manager:</span> {personName(data.job.manager)}</div>
-    {/if}
-
-    {#if data.job.alternate_manager && (data.job.alternate_manager.given_name || data.job.alternate_manager.surname)}
-      <div>
-        <span class="font-semibold">Alternate Manager:</span>
-        {personName(data.job.alternate_manager)}
-      </div>
-    {/if}
-
-    {#if data.job.job_owner && (data.job.job_owner.given_name || data.job.job_owner.surname)}
-      <div><span class="font-semibold">Job Owner:</span> {personName(data.job.job_owner)}</div>
-    {/if}
-
-    {#if data.job.proposal_id}
-      <div>
-        <span class="font-semibold">Proposal:</span>
-        <a href={`/jobs/${data.job.proposal_id}/details`} class="text-blue-600 hover:underline">
-          {data.job.proposal_number || data.job.proposal_id}
-        </a>
-      </div>
-    {/if}
-
-    <div>
-      <span class="font-semibold">FN Agreement:</span>
-      {data.job.fn_agreement ? "Yes" : "No"}
-    </div>
-
-    {#if data.job.categories && data.job.categories.length > 0}
-      <div class="flex items-start gap-2">
-        <span class="pt-1 font-semibold">Categories:</span>
-        <div class="flex flex-wrap gap-1">
-          {#each data.job.categories as category}
-            <DsLabel color="blue">{category.name}</DsLabel>
-          {/each}
-        </div>
-      </div>
-    {/if}
-
-    {#if data.job.project_award_date}
-      <div>
-        <span class="font-semibold">Project Award Date:</span>
-        {data.job.project_award_date}
-      </div>
-    {/if}
-
-    {#if data.job.proposal_opening_date}
-      <div>
-        <span class="font-semibold">Proposal Opening Date:</span>
-        {data.job.proposal_opening_date}
-      </div>
-    {/if}
-
-    {#if data.job.proposal_submission_due_date}
-      <div>
-        <span class="font-semibold">Proposal Submission Due:</span>
-        {data.job.proposal_submission_due_date}
-      </div>
-    {/if}
-
-    {#if data.job.divisions && Array.isArray(data.job.divisions)}
-      <div>
-        <span class="font-semibold">Divisions:</span>
-        {#each data.job.divisions as division, idx}
-          {division.name} ({division.code}){idx < data.job.divisions.length - 1 ? ", " : ""}
-        {/each}
-      </div>
-    {/if}
-
-    {#if data.job.projects && data.job.projects.length > 0}
-      <div>
-        <span class="font-semibold">Projects:</span>
-        {#each data.job.projects as p, i}
-          <a href={`/jobs/${p.id}/details`} class="text-blue-600 hover:underline">{p.number}</a>{i <
-          data.job.projects.length - 1
-            ? ", "
-            : ""}
-        {/each}
-      </div>
-    {/if}
-
-    {#if data.job.location && data.job.location !== ""}
-      <div class="mt-2">
-        <span class="font-semibold">Location:</span>
-        <div class="mt-1">
-          <DSLocationPicker
-            value={data.job.location}
-            errors={{}}
-            fieldName="location"
-            disabled={true}
-            readonly={true}
-          />
-        </div>
-      </div>
-    {/if}
-  </div>
-
-  <div class="flex gap-2">
-    <DsActionButton
-      action={`/jobs/${data.job.id}/edit`}
-      icon="mdi:pencil"
-      title="Edit Job"
-      color="blue"
-    />
+    </details>
   </div>
 
   <!-- Tab Bar -->
