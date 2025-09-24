@@ -327,6 +327,7 @@ export type ExpensesRecord = {
   approver: RecordIdString;
   attachment: string;
   attachment_hash: string;
+  branch: RecordIdString;
   category: RecordIdString;
   cc_last_4_digits: string;
   committed: IsoDateString;
@@ -566,6 +567,7 @@ export type PurchaseOrdersRecord = {
   approved: IsoDateString;
   approver: RecordIdString;
   attachment: string;
+  branch: RecordIdString;
   cancelled: IsoDateString;
   canceller: RecordIdString;
   category: RecordIdString;
@@ -677,6 +679,7 @@ export type PurchaseOrdersAugmentedRecord = {
 
 export type TimeAmendmentsRecord = {
   _imported: boolean;
+  branch: RecordIdString;
   category: RecordIdString;
   committed: IsoDateString;
   committed_week_ending: string;
@@ -734,6 +737,7 @@ export type TimeAmendmentsAugmentedRecord = {
 
 export type TimeEntriesRecord = {
   _imported: boolean;
+  branch: RecordIdString;
   category: RecordIdString;
   created: IsoDateString;
   date: string;
