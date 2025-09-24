@@ -399,7 +399,13 @@
     {/if}
    -->
 
-  <DsTextInput bind:value={item.number as string} {errors} fieldName="number" uiName="Number" />
+  <DsTextInput
+    bind:value={item.number as string}
+    {errors}
+    fieldName="number"
+    uiName="Number"
+    disabled={data.editing}
+  />
 
   <DsTextInput
     bind:value={item.description as string}
