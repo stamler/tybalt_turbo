@@ -242,6 +242,7 @@ export type ClientsRecord = {
 };
 
 export type DivisionsRecord = {
+  active: boolean;
   code: string;
   created: IsoDateString;
   id: string;
