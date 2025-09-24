@@ -36,6 +36,7 @@
   let item = $state(data.item as JobsRecord | (JobsRecord & Record<string, unknown>));
   let categories = $state(data.categories);
   let client_contacts = $state([] as ClientContactsResponse[]);
+  let clientContactsRequestId = 0;
 
   if (!Array.isArray(item.divisions)) {
     item.divisions = [] as unknown as JobsRecord["divisions"];
@@ -46,6 +47,9 @@
   if (item.fn_agreement === undefined) {
     item.fn_agreement = false;
   }
+  item.description = item.description ?? "";
+  item.client = item.client ?? "";
+  item.contact = item.contact ?? "";
   item.alternate_manager = item.alternate_manager ?? "";
   item.proposal = item.proposal ?? "";
   item.job_owner = item.job_owner ?? "";
@@ -157,11 +161,48 @@
     }
   });
 
+  function formatContactName(contact: ClientContactsResponse) {
+    const surname = contact.surname?.trim();
+    const given = contact.given_name?.trim();
+    if (surname && given) return `${surname}, ${given}`;
+    if (surname) return surname;
+    if (given) return given;
+    return contact.email ?? contact.id;
+  }
+
   // Watch for changes to the client and fetch contacts accordingly
+  // When the client changes, fetch its contacts. The requestId guard ensures that
+  // only the latest fetch updates the state, so rapid client switches don't apply
+  // stale contact lists.
   $effect(() => {
-    if (item.client) {
-      fetchClientContacts(item.client).then((c) => (client_contacts = c));
+    const clientId = item.client;
+    const requestId = ++clientContactsRequestId;
+
+    if (!clientId) {
+      client_contacts = [];
+      if (item.contact) {
+        item.contact = "";
+      }
+      return;
     }
+
+    fetchClientContacts(clientId)
+      .then((contacts) => {
+        if (requestId !== clientContactsRequestId) return;
+        client_contacts = contacts;
+        const hasSelectedContact = contacts.some((contact) => contact.id === item.contact);
+        if (!hasSelectedContact) {
+          item.contact = "";
+        }
+      })
+      .catch((error) => {
+        console.error("Failed to load client contacts", error);
+        if (requestId !== clientContactsRequestId) return;
+        client_contacts = [];
+        if (item.contact) {
+          item.contact = "";
+        }
+      });
   });
 
   $effect(() => {
@@ -359,6 +400,47 @@
    -->
 
   <DsTextInput bind:value={item.number as string} {errors} fieldName="number" uiName="Number" />
+
+  <DsTextInput
+    bind:value={item.description as string}
+    {errors}
+    fieldName="description"
+    uiName="Description"
+  />
+
+  {#if $clients.index !== null}
+    <DsAutoComplete
+      bind:value={item.client as string}
+      index={$clients.index}
+      {errors}
+      fieldName="client"
+      uiName="Client"
+    >
+      {#snippet resultTemplate(client)}{client.name}{/snippet}
+    </DsAutoComplete>
+  {/if}
+
+  <div class="flex w-full gap-2 {errors.contact !== undefined ? 'bg-red-200' : ''}">
+    <span class="flex w-full gap-2">
+      <label for="contact">Client Contact</label>
+      <select
+        id="contact"
+        name="contact"
+        bind:value={item.contact}
+        class="flex-1 rounded border border-neutral-300 px-1"
+        disabled={item.client === "" || client_contacts.length === 0}
+      >
+        <option value="">{item.client === "" ? "Select a client first" : "Select a contact"}</option
+        >
+        {#each client_contacts as contact}
+          <option value={contact.id}>{formatContactName(contact)}</option>
+        {/each}
+      </select>
+    </span>
+    {#if errors.contact !== undefined}
+      <span class="text-red-600">{errors.contact.message}</span>
+    {/if}
+  </div>
 
   {#if $managers.index !== null}
     <DsAutoComplete
