@@ -45,7 +45,7 @@ func validateClient(app core.App, clientRecord *core.Record) error {
 		return nil
 	}
 
-	hasRequiredClaim, err := utilities.HasClaimByUserID(app, leadID, "tapr")
+	hasRequiredClaim, err := utilities.HasClaimByUserID(app, leadID, "busdev")
 	if err != nil {
 		return &errs.HookError{
 			Status:  http.StatusInternalServerError,
@@ -66,7 +66,7 @@ func validateClient(app core.App, clientRecord *core.Record) error {
 			Data: map[string]errs.CodeError{
 				"business_development_lead": {
 					Code:    "missing_claim",
-					Message: "business development lead must have tapr claim",
+					Message: "business development lead must have busdev claim",
 				},
 			},
 		}
