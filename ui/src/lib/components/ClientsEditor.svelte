@@ -9,7 +9,7 @@
   import { clients } from "$lib/stores/clients";
   import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { profiles } from "$lib/stores/profiles";
-  import type { ProfilesResponse } from "$lib/pocketbase-types";
+  import type { SearchResult } from "minisearch";
 
   let { data }: { data: ClientsPageData } = $props();
 
@@ -48,11 +48,27 @@
   let newContacts = $state([] as ClientContactWithTempId[]);
   let clientContactsToDelete = $state([] as (ClientContactsResponse | ClientContactWithTempId)[]);
 
-  const formatLead = (lead: ProfilesResponse | undefined) =>
-    lead ? `${lead.surname}, ${lead.given_name}` : "Not assigned";
+  const formatLead = (lead: SearchResult | undefined) => {
+    const surname = (lead?.surname as string | undefined)?.trim();
+    const given = (lead?.given_name as string | undefined)?.trim();
+    if (surname && given) return `${surname}, ${given}`;
+    if (surname) return surname;
+    if (given) return given;
+    return "Not assigned";
+  };
 
   async function save(event: Event) {
     event.preventDefault();
+
+    // UI validation: business development lead is required
+    errors = {};
+    if ((item.business_development_lead ?? "").trim() === "") {
+      errors = {
+        ...errors,
+        business_development_lead: { message: "Business development lead is required." },
+      } as any;
+      return;
+    }
 
     try {
       let clientId = data.id;
@@ -162,7 +178,7 @@
       uiName="Business Development Lead"
       idField="uid"
     >
-      {#snippet resultTemplate(option: ProfilesResponse)}
+      {#snippet resultTemplate(option)}
         {formatLead(option)}
       {/snippet}
     </DSAutoComplete>
