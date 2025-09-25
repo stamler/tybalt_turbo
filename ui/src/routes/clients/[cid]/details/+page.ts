@@ -9,12 +9,8 @@ export const load: PageLoad = async ({ params, url }) => {
   const ownerPageParam = Number(url.searchParams.get("ownerPage") ?? "1");
   const perPage = 10;
 
-  // fetch core data
-  const client = await pb.collection("clients").getOne(clientId);
-  const contacts = await pb.collection("client_contacts").getFullList({
-    filter: `client='${clientId}'`,
-    sort: "surname,given_name",
-  });
+  // fetch core data via API to avoid PocketBase expands
+  const client = await pb.send(`/api/clients/${clientId}`, { method: "GET" });
 
   // Server-side pagination for jobs (projects vs proposals)
   const proposalsFilter = `client='${clientId}' && number ~ 'P%'`;
@@ -48,7 +44,7 @@ export const load: PageLoad = async ({ params, url }) => {
 
   return {
     client,
-    contacts,
+    referencingJobsCount: client.referencing_jobs_count,
     jobs: activeList.items,
     tab,
     page: activePage,

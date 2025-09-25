@@ -15,6 +15,9 @@ import (
 //go:embed clients.sql
 var clientsQuery string
 
+//go:embed client_details.sql
+var clientDetailsQuery string
+
 // Contact is a minimal subset of fields we need on the client list page.
 type Contact struct {
 	ID        string `json:"id"`
@@ -37,6 +40,31 @@ type Client struct {
 	ReferencingJobsCount int       `json:"referencing_jobs_count"`
 }
 
+type clientDetailsRow struct {
+	ID                     string  `db:"id"`
+	Name                   string  `db:"name"`
+	BusinessDevelopmentUID string  `db:"business_development_lead"`
+	OutstandingBalance     float64 `db:"outstanding_balance"`
+	OutstandingBalanceDate string  `db:"outstanding_balance_date"`
+	LeadGivenName          string  `db:"lead_given_name"`
+	LeadSurname            string  `db:"lead_surname"`
+	LeadEmail              string  `db:"lead_email"`
+	ReferencingJobsCount   int     `db:"referencing_jobs_count"`
+}
+
+type ClientDetails struct {
+	ID                     string    `json:"id"`
+	Name                   string    `json:"name"`
+	BusinessDevelopmentUID string    `json:"business_development_lead"`
+	LeadGivenName          string    `json:"lead_given_name"`
+	LeadSurname            string    `json:"lead_surname"`
+	LeadEmail              string    `json:"lead_email"`
+	OutstandingBalance     float64   `json:"outstanding_balance"`
+	OutstandingBalanceDate string    `json:"outstanding_balance_date"`
+	Contacts               []Contact `json:"contacts"`
+	ReferencingJobsCount   int       `json:"referencing_jobs_count"`
+}
+
 func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		id := e.Request.PathValue("id")
@@ -56,7 +84,11 @@ func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 			if len(rows) == 0 {
 				return e.Error(http.StatusNotFound, "client not found", nil)
 			}
-			return e.JSON(http.StatusOK, toClient(rows[0]))
+			details, err := queryClientDetails(app, id)
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to load client details", err)
+			}
+			return e.JSON(http.StatusOK, details)
 		}
 
 		resp := make([]Client, len(rows))
@@ -65,4 +97,40 @@ func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 		}
 		return e.JSON(http.StatusOK, resp)
 	}
+}
+
+func queryClientDetails(app core.App, id string) (*ClientDetails, error) {
+	var row struct {
+		clientDetailsRow
+		ContactsJSON string `db:"contacts_json"`
+	}
+
+	if err := app.DB().NewQuery(clientDetailsQuery).Bind(dbx.Params{"id": id}).One(&row); err != nil {
+		return nil, err
+	}
+
+	var contacts []Contact
+	if row.ContactsJSON != "" {
+		if err := json.Unmarshal([]byte(row.ContactsJSON), &contacts); err != nil {
+			return nil, err
+		}
+	}
+
+	// When no contacts exist we still want an empty slice in the JSON response, not null.
+	if contacts == nil {
+		contacts = []Contact{}
+	}
+
+	return &ClientDetails{
+		ID:                     row.ID,
+		Name:                   row.Name,
+		BusinessDevelopmentUID: row.BusinessDevelopmentUID,
+		LeadGivenName:          row.LeadGivenName,
+		LeadSurname:            row.LeadSurname,
+		LeadEmail:              row.LeadEmail,
+		OutstandingBalance:     row.OutstandingBalance,
+		OutstandingBalanceDate: row.OutstandingBalanceDate,
+		Contacts:               contacts,
+		ReferencingJobsCount:   row.ReferencingJobsCount,
+	}, nil
 }

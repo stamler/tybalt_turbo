@@ -214,6 +214,18 @@ export const formatDollars = function <T>(value: T) {
   return "$" + nFormatter(value, 1);
 };
 
+export const formatCurrency = (value: number | null | undefined) => {
+  if (value === undefined || value === null || Number.isNaN(value)) {
+    return "$0.00";
+  }
+  return new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+};
+
 export const formatPercent = function <T>(value: T) {
   if (typeof value !== "number") {
     return value;

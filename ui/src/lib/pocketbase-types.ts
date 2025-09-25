@@ -238,6 +238,9 @@ export type ClientsRecord = {
   created: IsoDateString;
   id: string;
   name: string;
+  business_development_lead: RecordIdString;
+  outstanding_balance: number;
+  outstanding_balance_date: string;
   updated: IsoDateString;
 };
 
@@ -1231,4 +1234,22 @@ export type PoApproversResponse = {
   id: string;
   given_name: string;
   surname: string;
+};
+
+export type ClientDetails = {
+  id: string;
+  name: string;
+  business_development_lead: string;
+  lead_given_name: string;
+  lead_surname: string;
+  lead_email: string;
+  outstanding_balance: number;
+  outstanding_balance_date: string;
+  contacts: {
+    id: string;
+    given_name: string;
+    surname: string;
+    email: string;
+  }[];
+  referencing_jobs_count: number;
 };

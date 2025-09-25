@@ -3,10 +3,15 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsList from "$lib/components/DSList.svelte";
   import DSTabBar from "$lib/components/DSTabBar.svelte";
-  import { shortDate } from "$lib/utilities";
+  import { shortDate, formatCurrency } from "$lib/utilities";
 
-  export let data: PageData;
+  const { data } = $props<{ data: PageData }>();
   const d = data as any; // widen for newly added fields (owner tab)
+
+  const leadName =
+    data.client.lead_surname && data.client.lead_given_name
+      ? `${data.client.lead_surname}, ${data.client.lead_given_name}`
+      : "Not assigned";
 </script>
 
 <div class="mx-auto space-y-6 p-4">
@@ -20,6 +25,30 @@
       color="blue"
     />
   </div>
+
+  <!-- Summary section -->
+  <section class="rounded bg-neutral-100 p-2">
+    <h2 class="mb-2 font-semibold">Summary</h2>
+    <div class="grid gap-2 sm:grid-cols-2">
+      <div>
+        <h3 class="text-sm font-semibold text-neutral-600">Outstanding Balance</h3>
+        <p class="text-lg font-medium">
+          {formatCurrency(data.client.outstanding_balance ?? 0)}
+        </p>
+        {#if data.client.outstanding_balance_date}
+          <p class="text-xs text-neutral-500">
+            As of {shortDate(data.client.outstanding_balance_date, true)}
+          </p>
+        {/if}
+      </div>
+      <div>
+        <h3 class="text-sm font-semibold text-neutral-600">Business Development Lead</h3>
+        <p class="text-lg font-medium">
+          {leadName}
+        </p>
+      </div>
+    </div>
+  </section>
 
   <!-- Jobs list section -->
   <section class="space-y-2">
@@ -84,9 +113,9 @@
   <!-- Contacts section -->
   <section class="rounded bg-neutral-100 p-2">
     <h2 class="mb-2 font-semibold">Contacts</h2>
-    {#if data.contacts.length > 0}
+    {#if data.client.contacts.length > 0}
       <div class="flex flex-wrap gap-1">
-        {#each data.contacts as c}
+        {#each data.client.contacts as c}
           <a
             href={`mailto:${c.email}`}
             class="rounded-md px-1 hover:cursor-pointer hover:bg-neutral-300"

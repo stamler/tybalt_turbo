@@ -7,12 +7,21 @@
   import type { ClientContactsRecord, ClientContactsResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { clients } from "$lib/stores/clients";
+  import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
+  import { profiles } from "$lib/stores/profiles";
+  import type { ProfilesResponse } from "$lib/pocketbase-types";
 
   let { data }: { data: ClientsPageData } = $props();
 
   let errors = $state({} as any);
   let item = $state(data.item);
   let client_contacts = $state(data.client_contacts || []);
+
+  item.business_development_lead = item.business_development_lead ?? "";
+  item.outstanding_balance = item.outstanding_balance ?? 0;
+  item.outstanding_balance_date = item.outstanding_balance_date ?? "";
+
+  profiles.init();
 
   interface ClientContactWithTempId extends ClientContactsRecord {
     tempId: string;
@@ -38,6 +47,9 @@
   });
   let newContacts = $state([] as ClientContactWithTempId[]);
   let clientContactsToDelete = $state([] as (ClientContactsResponse | ClientContactWithTempId)[]);
+
+  const formatLead = (lead: ProfilesResponse | undefined) =>
+    lead ? `${lead.surname}, ${lead.given_name}` : "Not assigned";
 
   async function save(event: Event) {
     event.preventDefault();
@@ -140,6 +152,45 @@
   onsubmit={save}
 >
   <DsTextInput bind:value={item.name as string} {errors} fieldName="name" uiName="Name" />
+
+  {#if $profiles.index !== null}
+    <DSAutoComplete
+      bind:value={item.business_development_lead as string}
+      index={$profiles.index}
+      {errors}
+      fieldName="business_development_lead"
+      uiName="Business Development Lead"
+      idField="uid"
+    >
+      {#snippet resultTemplate(option: ProfilesResponse)}
+        {formatLead(option)}
+      {/snippet}
+    </DSAutoComplete>
+  {/if}
+
+  <div
+    class="flex w-full flex-col gap-1"
+    class:bg-red-200={errors.outstanding_balance !== undefined}
+  >
+    <label class="text-sm font-semibold" for="outstanding_balance">Outstanding Balance</label>
+    <input
+      id="outstanding_balance"
+      name="outstanding_balance"
+      type="number"
+      class="rounded border border-neutral-300 px-2 py-1"
+      bind:value={item.outstanding_balance as number}
+      min={0}
+      step={0.01}
+    />
+    {#if errors.outstanding_balance !== undefined}
+      <span class="text-sm text-red-600">{errors.outstanding_balance.message}</span>
+    {/if}
+  </div>
+  {#if item.outstanding_balance_date}
+    <p class="self-start text-sm text-neutral-600">
+      Last updated: {item.outstanding_balance_date}
+    </p>
+  {/if}
 
   <div
     class="flex w-full flex-col gap-2 {errors.client_contacts !== undefined ? 'bg-red-200' : ''}"
