@@ -54,6 +54,8 @@
   item.proposal = item.proposal ?? "";
   item.job_owner = item.job_owner ?? "";
   item.branch = item.branch ?? "";
+  item.outstanding_balance = item.outstanding_balance ?? 0;
+  item.outstanding_balance_date = item.outstanding_balance_date ?? "";
 
   let newCategory = $state("");
   let newCategories = $state([] as string[]);
@@ -492,6 +494,30 @@
   >
     {#snippet optionTemplate(item)}{item.name}{/snippet}
   </DsSelector>
+
+  <div
+    class="flex w-full flex-col gap-1"
+    class:bg-red-200={errors.outstanding_balance !== undefined}
+  >
+    <label class="text-sm font-semibold" for="outstanding_balance">Outstanding Balance</label>
+    <input
+      id="outstanding_balance"
+      name="outstanding_balance"
+      type="number"
+      class="rounded border border-neutral-300 px-2 py-1"
+      bind:value={item.outstanding_balance as number}
+      min={0}
+      step={0.01}
+    />
+    {#if errors.outstanding_balance !== undefined}
+      <span class="text-sm text-red-600">{errors.outstanding_balance.message}</span>
+    {/if}
+  </div>
+  {#if item.outstanding_balance_date}
+    <p class="self-start text-sm text-neutral-600">
+      Last updated: {item.outstanding_balance_date}
+    </p>
+  {/if}
 
   {#if proposalsIndex !== null}
     <DsAutoComplete

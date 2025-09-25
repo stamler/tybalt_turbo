@@ -8,7 +8,9 @@ SELECT
   j.description,
   j.location AS location,
   j.client AS client_id,
-  c.name AS client
+  c.name AS client,
+  COALESCE(j.outstanding_balance, 0) AS outstanding_balance,
+  COALESCE(j.outstanding_balance_date, '') AS outstanding_balance_date
 FROM jobs j
 LEFT JOIN clients c ON c.id = j.client
 WHERE ({:id} IS NULL OR {:id} = '' OR j.id = {:id})

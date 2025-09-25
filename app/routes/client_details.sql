@@ -2,8 +2,8 @@ SELECT
   c.id,
   c.name,
   COALESCE(c.business_development_lead, '')        AS business_development_lead,
-  COALESCE(c.outstanding_balance, 0)               AS outstanding_balance,
-  COALESCE(c.outstanding_balance_date, '')         AS outstanding_balance_date,
+  COALESCE(j_sum.total_outstanding_balance, 0)     AS outstanding_balance,
+  COALESCE(j_sum.latest_outstanding_balance_date, '') AS outstanding_balance_date,
   COALESCE(p.given_name, '')                       AS lead_given_name,
   COALESCE(p.surname, '')                          AS lead_surname,
   COALESCE(lead.email, '')                         AS lead_email,
@@ -37,5 +37,14 @@ LEFT JOIN (
   ) j
   GROUP BY client
 ) j_count ON j_count.client = c.id
+LEFT JOIN (
+  SELECT
+    client,
+    SUM(outstanding_balance) AS total_outstanding_balance,
+    MAX(outstanding_balance_date) AS latest_outstanding_balance_date
+  FROM jobs
+  WHERE client IS NOT NULL AND client != ''
+  GROUP BY client
+) j_sum ON j_sum.client = c.id
 WHERE c.id = {:id};
 

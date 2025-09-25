@@ -6,6 +6,8 @@ export interface JobApiResponse {
   location: string;
   client_id: string;
   client: string; // client name
+  outstanding_balance: number;
+  outstanding_balance_date: string;
 }
 
 import { createCollectionStore } from "./collectionStore";
@@ -25,7 +27,15 @@ export const jobs = createCollectionStore<any>(
   {},
   {
     fields: ["id", "number", "description", "location", "client"],
-    storeFields: ["id", "number", "description", "location", "client"],
+    storeFields: [
+      "id",
+      "number",
+      "description",
+      "location",
+      "client",
+      "outstanding_balance",
+      "outstanding_balance_date",
+    ],
     extractField: (document, fieldName) =>
       (document as Record<string, unknown>)[fieldName] as string,
   },

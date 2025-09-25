@@ -3,7 +3,8 @@ SELECT
   c.id,
   c.name,
   COALESCE(cc_agg.contacts_json, '[]') AS contacts_json,
-  COALESCE(j_count.referencing_jobs_count, 0) AS referencing_jobs_count
+  COALESCE(j_count.referencing_jobs_count, 0) AS referencing_jobs_count,
+  COALESCE(j_sum.total_outstanding_balance, 0) AS outstanding_balance
 FROM clients c
 LEFT JOIN (
   SELECT 
@@ -30,5 +31,13 @@ LEFT JOIN (
   ) j
   GROUP BY client
 ) j_count ON j_count.client = c.id
+LEFT JOIN (
+  SELECT
+    client,
+    SUM(outstanding_balance) AS total_outstanding_balance
+  FROM jobs
+  WHERE client IS NOT NULL AND client != ''
+  GROUP BY client
+) j_sum ON j_sum.client = c.id
 WHERE ({:id} IS NULL OR {:id} = '' OR c.id = {:id})
 ORDER BY c.name; 

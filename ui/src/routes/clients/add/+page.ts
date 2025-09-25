@@ -6,8 +6,6 @@ export const load: PageLoad<ClientsPageData> = async () => {
   const defaultItem = {
     name: "",
     business_development_lead: "",
-    outstanding_balance: 0,
-    outstanding_balance_date: "",
   };
 
   const defaultContacts = [] as ClientContactsResponse[];

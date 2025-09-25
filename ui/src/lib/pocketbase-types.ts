@@ -239,8 +239,6 @@ export type ClientsRecord = {
   id: string;
   name: string;
   business_development_lead: RecordIdString;
-  outstanding_balance: number;
-  outstanding_balance_date: string;
   updated: IsoDateString;
 };
 
@@ -434,6 +432,8 @@ export type JobsRecord = {
   location: string;
   manager: RecordIdString;
   number: string;
+  outstanding_balance: number;
+  outstanding_balance_date: string;
   project_award_date: string;
   proposal: RecordIdString;
   proposal_opening_date: string;
