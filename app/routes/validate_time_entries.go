@@ -61,7 +61,8 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 		timeTypeCode := timeType.GetString("code")
 		entryHours := entry.GetFloat("hours")
 
-		if timeTypeCode == "OR" {
+		switch timeTypeCode {
+		case "OR":
 			// Return an error immediately if the entry is of type OR (off rotation) and
 			// the date of the entry is already in the offRotationDateSet. If it is not
 			// in the set, add the date to the set.
@@ -72,7 +73,7 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 				}
 			}
 			offRotationDateSet[entry.GetString("date")] = true
-		} else if timeTypeCode == "OW" {
+		case "OW":
 			// prevent salaried employees from claiming full week off (OW)
 			if salary {
 				return &CodeError{
@@ -98,7 +99,7 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 					Message: "only one off-rotation week entry can exist on a timesheet",
 				}
 			}
-		} else if timeTypeCode == "OTO" {
+		case "OTO":
 			// If the entry is of type OTO (Request Overtime Payout), the user must
 			// not be a salaried staff member.
 			if salary {
@@ -116,7 +117,7 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 					Message: "only one payout request entry can exist on a timesheet",
 				}
 			}
-		} else if timeTypeCode == "RB" {
+		case "RB":
 			// If the entry is of type RB (Add Overtime to Bank), the user must
 			// not be a salaried staff member.
 			if salary {
@@ -135,7 +136,7 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 				}
 			}
 			bankedHours += entryHours
-		} else if timeTypeCode == "R" || timeTypeCode == "RT" {
+		case "R", "RT":
 			// If the entry is of type R (regular) or RT (regular time), add the hours
 			// to the jobHours variable if the job field is not empty.
 			if jobId := entry.GetString("job"); jobId != "" {
@@ -143,7 +144,7 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 			} else {
 				nonJobHours += entryHours
 			}
-		} else {
+		default:
 			if entryHours == 0 {
 				return &CodeError{
 					Code:    "time_entry_missing_hours",
