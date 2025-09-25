@@ -1,7 +1,11 @@
 package hooks
 
 import (
+	"net/http"
 	"time"
+
+	"tybalt/errs"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -36,7 +40,38 @@ func cleanClient(app core.App, clientRecord *core.Record) error {
 
 // validateClient performs cross-field validation for the client record.
 func validateClient(app core.App, clientRecord *core.Record) error {
-	// TODO: if the business_development_lead must have a particular claim, include that validation here
+	leadID := clientRecord.GetString("business_development_lead")
+	if leadID == "" {
+		return nil
+	}
+
+	hasRequiredClaim, err := utilities.HasClaimByUserID(app, leadID, "tapr")
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "error validating business development lead claim",
+			Data: map[string]errs.CodeError{
+				"business_development_lead": {
+					Code:    "claim_check_failed",
+					Message: "unable to verify business development lead claim",
+				},
+			},
+		}
+	}
+
+	if !hasRequiredClaim {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "invalid business development lead",
+			Data: map[string]errs.CodeError{
+				"business_development_lead": {
+					Code:    "missing_claim",
+					Message: "business development lead must have tapr claim",
+				},
+			},
+		}
+	}
+
 	return nil
 }
 

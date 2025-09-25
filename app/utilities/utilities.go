@@ -425,6 +425,14 @@ func HasClaim(app core.App, auth *core.Record, name string) (bool, error) {
 	if auth == nil {
 		return false, nil
 	}
+	return HasClaimByUserID(app, auth.Id, name)
+}
+
+// HasClaimByUserID returns true if the user with the specified uid has the claim name.
+func HasClaimByUserID(app core.App, uid string, name string) (bool, error) {
+	if uid == "" {
+		return false, nil
+	}
 	userClaims, err := app.FindRecordsByFilter(
 		"user_claims",
 		"uid={:uid} && cid.name={:name}",
@@ -432,7 +440,7 @@ func HasClaim(app core.App, auth *core.Record, name string) (bool, error) {
 		1,
 		0,
 		dbx.Params{
-			"uid":  auth.Id,
+			"uid":  uid,
 			"name": name,
 		},
 	)

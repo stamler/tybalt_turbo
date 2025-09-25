@@ -81,7 +81,13 @@
           clientId = createdClient.id;
         }
       } catch (error: any) {
+        const hookErrors = error?.data?.data;
+        if (hookErrors !== undefined) {
+          errors = hookErrors;
+          return;
+        }
         globalStore.addError(`error saving client: ${error}`);
+        return;
       }
 
       // Add new client_contacts
