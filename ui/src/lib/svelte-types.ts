@@ -14,6 +14,7 @@ import type {
   AdminProfilesRecord,
   AdminProfilesAugmentedResponse,
   ClientDetails,
+  ClientNotesResponse,
 } from "$lib/pocketbase-types";
 
 export interface PageData<T> {
@@ -35,6 +36,8 @@ export type ClientsPageData = PageData<ClientsRecord> & {
 export type ClientDetailsPageData = {
   client: ClientDetails;
   jobs: any[];
+  notes: ClientNotesResponse[];
+  noteJobs: JobsRecord[];
   tab: string;
   page: number;
   totalPages: number;

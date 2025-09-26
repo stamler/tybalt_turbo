@@ -118,6 +118,7 @@ func AddRoutes(app core.App) {
 		clientsGroup.Bind(apis.RequireAuth("users"))
 		clientsGroup.GET("", createGetClientsHandler(app))
 		clientsGroup.GET("/{id}", createGetClientsHandler(app))
+		clientsGroup.GET("/{id}/notes", createGetClientNotesHandler(app))
 		clientsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "clients"))
 		clientsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "clients"))
 
@@ -138,6 +139,7 @@ func AddRoutes(app core.App) {
 		jobsGroup := se.Router.Group("/api/jobs")
 		jobsGroup.Bind(apis.RequireAuth("users"))
 		jobsGroup.GET("/{id}/details", createGetJobDetailsHandler(app))
+		jobsGroup.GET("/{id}/notes", createGetJobNotesHandler(app))
 		// Query parameters for the following two routes will be used to filter
 		// the results. The caller can filter by one or more of division,
 		// time_type, user, or category.

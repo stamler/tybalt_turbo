@@ -4,9 +4,25 @@
   import DsList from "$lib/components/DSList.svelte";
   import DSTabBar from "$lib/components/DSTabBar.svelte";
   import { shortDate, formatCurrency } from "$lib/utilities";
+  import DSCollapsible from "$lib/components/DSCollapsible.svelte";
+  import NoteForm from "$lib/components/NoteForm.svelte";
+  import ClientNoteItem from "$lib/components/ClientNoteItem.svelte";
+  import type { ClientNote } from "./+page";
+  import type { JobApiResponse } from "$lib/stores/jobs";
+
+  type ClientJob = JobApiResponse & { created?: string };
 
   const { data } = $props<{ data: PageData }>();
   const d = data as any; // widen for newly added fields (owner tab)
+  let notes = $state<ClientNote[]>(data.notes ?? []);
+  let showNoteForm = $state(false);
+
+  function handleNoteCreated(note: ClientNote) {
+    notes = [note, ...notes];
+    showNoteForm = false;
+  }
+
+  const jobs = data.jobs as ClientJob[];
 
   const leadName =
     data.client.lead_surname && data.client.lead_given_name
@@ -48,6 +64,47 @@
         </p>
       </div>
     </div>
+
+    <DSCollapsible title="Notes" collapsed>
+      {#snippet headerActions(isCollapsed)}
+        {#if !isCollapsed}
+          <DsActionButton
+            icon={showNoteForm ? "mdi:minus" : "mdi:plus"}
+            title={showNoteForm ? "Hide note form" : "Add note"}
+            color="green"
+            transparentBackground={true}
+            action={() => (showNoteForm = !showNoteForm)}
+          />
+        {/if}
+      {/snippet}
+
+      {#snippet children()}
+        <div class="mt-2 space-y-4">
+          {#if showNoteForm}
+            <NoteForm
+              clientId={data.client.id}
+              jobs={data.noteJobs}
+              onCreated={handleNoteCreated}
+            />
+          {/if}
+
+          {#if notes.length === 0}
+            <p class="text-sm italic text-neutral-600">No notes yet.</p>
+          {:else}
+            <ul class="space-y-3">
+              {#each notes as note (note.id)}
+                <ClientNoteItem
+                  created={note.created}
+                  message={note.note}
+                  author={note.author}
+                  job={note.job}
+                />
+              {/each}
+            </ul>
+          {/if}
+        </div>
+      {/snippet}
+    </DSCollapsible>
   </section>
 
   <!-- Jobs list section -->
@@ -78,7 +135,11 @@
       <div class="flex gap-2">
         {#if data.page > 1}
           <a
-            href={`?tab=${data.tab}&projectsPage=${data.tab === "projects" ? data.page - 1 : data.projectsPage}&proposalsPage=${data.tab === "proposals" ? data.page - 1 : data.proposalsPage}&ownerPage=${data.tab === "owner" ? data.page - 1 : d.ownerPage}`}
+            href={`?tab=${data.tab}&projectsPage=${
+              data.tab === "projects" ? data.page - 1 : data.projectsPage
+            }&proposalsPage=${
+              data.tab === "proposals" ? data.page - 1 : data.proposalsPage
+            }&ownerPage=${data.tab === "owner" ? data.page - 1 : d.ownerPage}`}
             class="rounded bg-neutral-200 px-2 py-1 hover:bg-neutral-300"
           >
             &larr; Prev
@@ -86,7 +147,11 @@
         {/if}
         {#if data.page < data.totalPages}
           <a
-            href={`?tab=${data.tab}&projectsPage=${data.tab === "projects" ? data.page + 1 : data.projectsPage}&proposalsPage=${data.tab === "proposals" ? data.page + 1 : data.proposalsPage}&ownerPage=${data.tab === "owner" ? data.page + 1 : d.ownerPage}`}
+            href={`?tab=${data.tab}&projectsPage=${
+              data.tab === "projects" ? data.page + 1 : data.projectsPage
+            }&proposalsPage=${
+              data.tab === "proposals" ? data.page + 1 : data.proposalsPage
+            }&ownerPage=${data.tab === "owner" ? data.page + 1 : d.ownerPage}`}
             class="rounded bg-neutral-200 px-2 py-1 hover:bg-neutral-300"
           >
             Next &rarr;
@@ -95,7 +160,7 @@
       </div>
     </div>
 
-    <DsList items={data.jobs} search={false}>
+    <DsList items={jobs} search={false}>
       {#snippet anchor(job)}
         <a href={`/jobs/${job.id}/details`} class="text-blue-600 hover:underline">
           {job.number}
@@ -105,7 +170,7 @@
         {job.description}
       {/snippet}
       {#snippet byline(job)}
-        <span class="opacity-60">{shortDate(job.created)}</span>
+        <span class="opacity-60">{job.created ? shortDate(job.created) : ""}</span>
       {/snippet}
     </DsList>
   </section>

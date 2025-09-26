@@ -13,6 +13,7 @@
     children,
     loading = false,
     type = "button",
+    disabled = false,
   }: {
     icon?: string;
     title?: string;
@@ -22,6 +23,7 @@
     children?: Snippet<[]>;
     loading?: boolean;
     type?: "button" | "submit" | "reset";
+    disabled?: boolean;
   } = $props();
 
   const normalizedAction = typeof action === "string" ? () => goto(action) : action;
@@ -34,7 +36,7 @@
   onclick={normalizedAction}
   {type}
   {title}
-  disabled={loading}
+  disabled={loading || disabled}
   class="flex items-center rounded-sm {transparentBackground
     ? ''
     : 'bg-' + normalizedColor + '-200'} px-1 {isIconContent ? 'py-1' : 'py-0'} {isIconContent

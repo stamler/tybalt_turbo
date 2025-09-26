@@ -145,6 +145,19 @@ export function shortDate(dateString: string, includeYear = false) {
   const day = parseInt(dateParts[2], 10);
   return `${month} ${day}${includeYear ? `, ${dateParts[0]}` : ""}`;
 }
+
+export function formatDateTime(value: string) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  const datePart = date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  });
+  const timePart = date.toLocaleTimeString();
+  return `${datePart} ${timePart}`;
+}
 /*
 export const hoursWorked = function (item: TimeSheetTally) {
   let workedHours = 0;

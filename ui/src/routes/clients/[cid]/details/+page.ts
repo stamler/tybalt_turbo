@@ -1,5 +1,23 @@
 import type { PageLoad } from "./$types";
 import { pb } from "$lib/pocketbase";
+import type { JobsRecord } from "$lib/pocketbase-types";
+
+export type ClientNote = {
+  id: string;
+  created: string;
+  note: string;
+  job: null | {
+    id: string;
+    number: string;
+    description: string;
+  };
+  author: {
+    id: string;
+    email: string;
+    given_name: string;
+    surname: string;
+  };
+};
 
 export const load: PageLoad = async ({ params, url }) => {
   const clientId = params.cid;
@@ -11,6 +29,17 @@ export const load: PageLoad = async ({ params, url }) => {
 
   // fetch core data via API to avoid PocketBase expands
   const client = await pb.send(`/api/clients/${clientId}`, { method: "GET" });
+
+  // Load client notes with author/job expands
+  const notes = (await pb.send(`/api/clients/${clientId}/notes`, {
+    method: "GET",
+  })) as ClientNote[];
+
+  const noteJobs = await pb.collection("jobs").getFullList<JobsRecord>(200, {
+    filter: `client="${clientId}" || job_owner="${clientId}"`,
+    sort: "-created",
+    fields: "id,number,description",
+  });
 
   // Server-side pagination for jobs (projects vs proposals)
   const proposalsFilter = `client='${clientId}' && number ~ 'P%'`;
@@ -46,6 +75,8 @@ export const load: PageLoad = async ({ params, url }) => {
     client,
     referencingJobsCount: client.referencing_jobs_count,
     jobs: activeList.items,
+    notes,
+    noteJobs,
     tab,
     page: activePage,
     totalPages,

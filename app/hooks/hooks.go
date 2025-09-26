@@ -142,6 +142,13 @@ func AddHooks(app core.App) {
 		}
 		return e.Next()
 	})
+	// hooks for client_notes model
+	app.OnRecordCreateRequest("client_notes").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessClientNote(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
 	// hooks for po_approver_props model
 	app.OnRecordCreateRequest("po_approver_props").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessPOApproverProps(app, e); err != nil {
