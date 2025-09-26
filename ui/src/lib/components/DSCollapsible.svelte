@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import Icon from "@iconify/svelte";
 
   let {
     title,
@@ -21,21 +22,27 @@
 </script>
 
 <section>
-  <div class="flex items-center justify-between">
+  <div class="flex items-center justify-between gap-2">
     <button
       type="button"
-      class="inline-flex items-center gap-2 text-left font-semibold"
+      class="inline-flex min-h-9 items-center gap-2 text-left font-semibold"
       aria-expanded={!isCollapsed}
       onclick={toggle}
     >
-      <span>{title}</span>
-      <span class="text-sm font-normal text-neutral-500">
-        {isCollapsed ? "Show" : "Hide"}
-      </span>
+      <span class="leading-none">{title}</span>
+      <Icon
+        icon="mdi:chevron-right"
+        aria-hidden="true"
+        class="h-5 w-5 text-neutral-500 transition-transform {isCollapsed ? '' : 'rotate-90'}"
+      />
     </button>
-    {@render headerActions?.(isCollapsed)}
+    <div class="flex min-h-9 items-center">
+      {@render headerActions?.(isCollapsed)}
+    </div>
   </div>
   {#if !isCollapsed}
-    {@render children?.()}
+    <div class="pt-2">
+      {@render children?.()}
+    </div>
   {/if}
 </section>

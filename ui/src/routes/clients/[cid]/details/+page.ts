@@ -1,23 +1,7 @@
 import type { PageLoad } from "./$types";
 import { pb } from "$lib/pocketbase";
 import type { JobsRecord } from "$lib/pocketbase-types";
-
-export type ClientNote = {
-  id: string;
-  created: string;
-  note: string;
-  job: null | {
-    id: string;
-    number: string;
-    description: string;
-  };
-  author: {
-    id: string;
-    email: string;
-    given_name: string;
-    surname: string;
-  };
-};
+import type { ClientNote } from "$lib/types/notes";
 
 export const load: PageLoad = async ({ params, url }) => {
   const clientId = params.cid;

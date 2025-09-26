@@ -2,32 +2,73 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
-  import DsSelector from "$lib/components/DSSelector.svelte";
-  import type { ClientNote } from "../../routes/clients/[cid]/details/+page";
-
-  type NoteJobOption = {
-    id: string;
-    number: string;
-    description: string;
-  };
+  import DsAutocomplete from "$lib/components/DSAutoComplete.svelte";
+  import type { ClientNote, NoteJobOption } from "$lib/types/notes";
+  import MiniSearch from "minisearch";
 
   let {
     clientId,
     jobs = [] as NoteJobOption[],
+    preselectedJobId = "",
     onCreated,
   }: {
     clientId: string;
     jobs?: NoteJobOption[];
+    preselectedJobId?: string;
     onCreated?: (note: ClientNote) => void;
   } = $props();
 
   let note = $state("");
-  let selectedJob = $state("");
+  let selectedJob = $state(preselectedJobId);
   let jobNotApplicable = $state(false);
   let errors = $state({} as Record<string, { message: string }>);
   let saving = $state(false);
 
-  const jobOptions = $derived([{ id: "", number: "", description: "-- Select job --" }, ...jobs]);
+  function buildJobIndex(items: NoteJobOption[]) {
+    const index = new MiniSearch<NoteJobOption>({
+      fields: ["id", "number", "description"],
+      storeFields: ["id", "number", "description"],
+      searchOptions: {
+        prefix: true,
+      },
+    });
+
+    if (items.length > 0) {
+      index.addAll(items);
+    }
+
+    return index;
+  }
+
+  let noteJobIndex = $state(buildJobIndex(jobs));
+
+  $effect(() => {
+    noteJobIndex = buildJobIndex(jobs);
+    if (selectedJob && !jobs.some((job) => job.id === selectedJob)) {
+      selectedJob = "";
+    }
+  });
+
+  $effect(() => {
+    if (preselectedJobId) {
+      selectedJob = preselectedJobId;
+    }
+    jobNotApplicable = false;
+  });
+
+  const resolveJob = (job: Partial<NoteJobOption> | undefined) => {
+    if (!job) return undefined;
+    if (job.number || job.description) {
+      return job as NoteJobOption;
+    }
+    return jobs.find((candidate) => candidate.id === job.id);
+  };
+
+  const jobLabel = (job: Partial<NoteJobOption> | undefined) => {
+    const resolved = resolveJob(job);
+    if (!resolved) return "";
+    return resolved.number ? `${resolved.number} — ${resolved.description}` : resolved.description;
+  };
 
   function resetForm() {
     note = "";
@@ -93,7 +134,6 @@
 
 <form class="flex flex-col gap-3" onsubmit={submit}>
   <label class="flex flex-col gap-1">
-    <span class="text-sm font-semibold">Note</span>
     <textarea
       bind:value={note}
       maxlength={1000}
@@ -107,34 +147,37 @@
   </label>
 
   <div class="space-y-2">
-    <DsSelector
-      bind:value={selectedJob}
-      items={jobOptions}
-      {errors}
-      fieldName="job"
-      uiName="Related Job"
-      disabled={jobNotApplicable}
-    >
-      {#snippet optionTemplate(option)}
-        {option.number ? `${option.number} — ${option.description}` : option.description}
-      {/snippet}
-    </DsSelector>
+    {#if !preselectedJobId}
+      <DsAutocomplete
+        bind:value={selectedJob}
+        index={noteJobIndex}
+        {errors}
+        fieldName="job"
+        uiName="Related Job"
+        disabled={jobNotApplicable || jobs.length === 0}
+        idField="id"
+      >
+        {#snippet resultTemplate(result)}
+          {jobLabel(result as Partial<NoteJobOption>)}
+        {/snippet}
+      </DsAutocomplete>
 
-    <label class="flex items-center gap-2 text-sm">
-      <input
-        type="checkbox"
-        bind:checked={jobNotApplicable}
-        onchange={() => {
-          if (jobNotApplicable) selectedJob = "";
-        }}
-      />
-      Not tied to a specific job
-    </label>
-    {#if errors.job_not_applicable}
-      <span class="text-sm text-red-600">{errors.job_not_applicable.message}</span>
-    {/if}
-    {#if errors.job}
-      <span class="text-sm text-red-600">{errors.job.message}</span>
+      <label class="flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          bind:checked={jobNotApplicable}
+          onchange={() => {
+            if (jobNotApplicable) selectedJob = "";
+          }}
+        />
+        Not tied to a specific job
+      </label>
+      {#if errors.job_not_applicable}
+        <span class="text-sm text-red-600">{errors.job_not_applicable.message}</span>
+      {/if}
+      {#if errors.job}
+        <span class="text-sm text-red-600">{errors.job.message}</span>
+      {/if}
     {/if}
   </div>
 

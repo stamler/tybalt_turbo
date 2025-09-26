@@ -4,24 +4,13 @@
   import DsList from "$lib/components/DSList.svelte";
   import DSTabBar from "$lib/components/DSTabBar.svelte";
   import { shortDate, formatCurrency } from "$lib/utilities";
-  import DSCollapsible from "$lib/components/DSCollapsible.svelte";
-  import NoteForm from "$lib/components/NoteForm.svelte";
-  import ClientNoteItem from "$lib/components/ClientNoteItem.svelte";
-  import type { ClientNote } from "./+page";
+  import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
   import type { JobApiResponse } from "$lib/stores/jobs";
 
   type ClientJob = JobApiResponse & { created?: string };
 
   const { data } = $props<{ data: PageData }>();
   const d = data as any; // widen for newly added fields (owner tab)
-  let notes = $state<ClientNote[]>(data.notes ?? []);
-  let showNoteForm = $state(false);
-
-  function handleNoteCreated(note: ClientNote) {
-    notes = [note, ...notes];
-    showNoteForm = false;
-  }
-
   const jobs = data.jobs as ClientJob[];
 
   const leadName =
@@ -65,46 +54,12 @@
       </div>
     </div>
 
-    <DSCollapsible title="Notes" collapsed>
-      {#snippet headerActions(isCollapsed)}
-        {#if !isCollapsed}
-          <DsActionButton
-            icon={showNoteForm ? "mdi:minus" : "mdi:plus"}
-            title={showNoteForm ? "Hide note form" : "Add note"}
-            color="green"
-            transparentBackground={true}
-            action={() => (showNoteForm = !showNoteForm)}
-          />
-        {/if}
-      {/snippet}
-
-      {#snippet children()}
-        <div class="mt-2 space-y-4">
-          {#if showNoteForm}
-            <NoteForm
-              clientId={data.client.id}
-              jobs={data.noteJobs}
-              onCreated={handleNoteCreated}
-            />
-          {/if}
-
-          {#if notes.length === 0}
-            <p class="text-sm italic text-neutral-600">No notes yet.</p>
-          {:else}
-            <ul class="space-y-3">
-              {#each notes as note (note.id)}
-                <ClientNoteItem
-                  created={note.created}
-                  message={note.note}
-                  author={note.author}
-                  job={note.job}
-                />
-              {/each}
-            </ul>
-          {/if}
-        </div>
-      {/snippet}
-    </DSCollapsible>
+    <ClientNotesSection
+      clientId={data.client.id}
+      notes={data.notes}
+      jobOptions={data.noteJobs}
+      notesEndpoint={`/api/clients/${data.client.id}/notes`}
+    />
   </section>
 
   <!-- Jobs list section -->

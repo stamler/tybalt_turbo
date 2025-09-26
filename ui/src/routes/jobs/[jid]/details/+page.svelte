@@ -14,8 +14,7 @@
   import { pb } from "$lib/pocketbase";
   import type { FilterDef } from "$lib/components/jobs/types";
   import { formatDateTime } from "$lib/utilities";
-  import ClientNoteItem from "$lib/components/ClientNoteItem.svelte";
-  import type { JobNote } from "./+page";
+  import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
 
   type TabContentProps = {
     summary: Record<string, any>;
@@ -522,16 +521,14 @@
     {/key}
   </div>
 
-  {#if data.notes?.length > 0}
-    <section class="rounded bg-neutral-100 p-2">
-      <h2 class="mb-2 font-semibold">Client Notes</h2>
-      <ul class="space-y-3">
-        {#each data.notes as JobNote[] as note (note.id)}
-          <ClientNoteItem created={note.created} message={note.note} author={note.author} />
-        {/each}
-      </ul>
-    </section>
-  {/if}
+  <ClientNotesSection
+    clientId={data.job.client?.id ?? ""}
+    notes={data.notes}
+    jobOptions={[]}
+    preselectedJobId={data.job.id}
+    heading="Notes"
+    notesEndpoint={`/api/jobs/${data.job.id}/notes`}
+  />
 
   <!-- Jobs list section -->
 </div>
