@@ -1,6 +1,5 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
-  import Icon from "@iconify/svelte";
 
   let {
     title,
@@ -14,35 +13,24 @@
     headerActions?: Snippet<[boolean]>;
   } = $props();
 
-  let isCollapsed = $state(collapsed);
+  let isOpen = $state(!collapsed);
+  let isCollapsed = $derived(!isOpen);
 
-  function toggle() {
-    isCollapsed = !isCollapsed;
-  }
+  $effect(() => {
+    isOpen = !collapsed;
+  });
 </script>
 
-<section>
-  <div class="flex items-center justify-between gap-2">
-    <button
-      type="button"
-      class="inline-flex min-h-9 items-center gap-2 text-left font-semibold"
-      aria-expanded={!isCollapsed}
-      onclick={toggle}
-    >
-      <span class="leading-none">{title}</span>
-      <Icon
-        icon="mdi:chevron-right"
-        aria-hidden="true"
-        class="h-5 w-5 text-neutral-500 transition-transform {isCollapsed ? '' : 'rotate-90'}"
-      />
-    </button>
-    <div class="flex min-h-9 items-center">
-      {@render headerActions?.(isCollapsed)}
-    </div>
-  </div>
+<details bind:open={isOpen} class="space-y-2">
+  <summary class="cursor-pointer font-semibold text-neutral-700">{title}</summary>
   {#if !isCollapsed}
-    <div class="pt-2">
+    {#if headerActions}
+      <div class="flex min-h-9 items-center justify-end">
+        {@render headerActions?.(isCollapsed)}
+      </div>
+    {/if}
+    <div class="space-y-2">
       {@render children?.()}
     </div>
   {/if}
-</section>
+</details>

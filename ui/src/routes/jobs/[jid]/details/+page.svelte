@@ -374,6 +374,15 @@
         {/if}
       </div>
     </details>
+
+    <ClientNotesSection
+      clientId={data.job.client?.id ?? ""}
+      notes={data.notes}
+      jobOptions={[]}
+      preselectedJobId={data.job.id}
+      heading="Notes"
+      notesEndpoint={`/api/jobs/${data.job.id}/notes`}
+    />
   </div>
 
   <!-- Tab Bar -->
@@ -520,15 +529,5 @@
       </JobDetailTab>
     {/key}
   </div>
-
-  <ClientNotesSection
-    clientId={data.job.client?.id ?? ""}
-    notes={data.notes}
-    jobOptions={[]}
-    preselectedJobId={data.job.id}
-    heading="Notes"
-    notesEndpoint={`/api/jobs/${data.job.id}/notes`}
-  />
-
   <!-- Jobs list section -->
 </div>
