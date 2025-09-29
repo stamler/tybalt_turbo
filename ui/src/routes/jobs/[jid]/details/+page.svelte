@@ -13,7 +13,7 @@
   import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
   import { pb } from "$lib/pocketbase";
   import type { FilterDef } from "$lib/components/jobs/types";
-  import { formatDateTime } from "$lib/utilities";
+  import { formatDateTime, formatCurrency, shortDate } from "$lib/utilities";
   import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
 
   type TabContentProps = {
@@ -305,6 +305,16 @@
         <div>
           <span class="font-semibold">FN Agreement:</span>
           {data.job.fn_agreement ? "Yes" : "No"}
+        </div>
+
+        <div>
+          <span class="font-semibold">Outstanding Balance:</span>
+          {formatCurrency(data.job.outstanding_balance ?? 0)}
+          {#if data.job.outstanding_balance_date}
+            <span class="text-sm text-neutral-500">
+              (As of {shortDate(data.job.outstanding_balance_date, true)})
+            </span>
+          {/if}
         </div>
 
         {#if data.job.categories && data.job.categories.length > 0}

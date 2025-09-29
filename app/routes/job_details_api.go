@@ -27,37 +27,39 @@ type Person struct {
 }
 
 type jobDetailsRow struct {
-	ID                        string         `db:"id"`
-	Number                    string         `db:"number"`
-	Description               string         `db:"description"`
-	Status                    sql.NullString `db:"status"`
-	Location                  sql.NullString `db:"location"`
-	ClientID                  string         `db:"client_id"`
-	ClientName                string         `db:"client_name"`
-	ContactID                 sql.NullString `db:"contact_id"`
-	ContactGivenName          sql.NullString `db:"contact_given_name"`
-	ContactSurname            sql.NullString `db:"contact_surname"`
-	ManagerID                 sql.NullString `db:"manager_id"`
-	ManagerGivenName          sql.NullString `db:"manager_given_name"`
-	ManagerSurname            sql.NullString `db:"manager_surname"`
-	AlternateManagerID        sql.NullString `db:"alternate_manager_id"`
-	AlternateManagerGivenName sql.NullString `db:"alternate_manager_given_name"`
-	AlternateManagerSurname   sql.NullString `db:"alternate_manager_surname"`
-	JobOwnerID                sql.NullString `db:"job_owner_id"`
-	JobOwnerGivenName         sql.NullString `db:"job_owner_given_name"`
-	JobOwnerSurname           sql.NullString `db:"job_owner_surname"`
-	ProposalID                sql.NullString `db:"proposal_id"`
-	ProposalNumber            sql.NullString `db:"proposal_number"`
-	BranchID                  sql.NullString `db:"branch_id"`
-	BranchCode                sql.NullString `db:"branch_code"`
-	BranchName                sql.NullString `db:"branch_name"`
-	FnAgreement               bool           `db:"fn_agreement"`
-	ProjectAwardDate          sql.NullString `db:"project_award_date"`
-	ProposalOpeningDate       sql.NullString `db:"proposal_opening_date"`
-	ProposalSubmissionDueDate sql.NullString `db:"proposal_submission_due_date"`
-	DivisionsJSON             string         `db:"divisions_json"`
-	ProjectsJSON              string         `db:"projects_json"`
-	CategoriesJSON            string         `db:"categories_json"`
+	ID                        string          `db:"id"`
+	Number                    string          `db:"number"`
+	Description               string          `db:"description"`
+	Status                    sql.NullString  `db:"status"`
+	Location                  sql.NullString  `db:"location"`
+	ClientID                  string          `db:"client_id"`
+	ClientName                string          `db:"client_name"`
+	ContactID                 sql.NullString  `db:"contact_id"`
+	ContactGivenName          sql.NullString  `db:"contact_given_name"`
+	ContactSurname            sql.NullString  `db:"contact_surname"`
+	ManagerID                 sql.NullString  `db:"manager_id"`
+	ManagerGivenName          sql.NullString  `db:"manager_given_name"`
+	ManagerSurname            sql.NullString  `db:"manager_surname"`
+	AlternateManagerID        sql.NullString  `db:"alternate_manager_id"`
+	AlternateManagerGivenName sql.NullString  `db:"alternate_manager_given_name"`
+	AlternateManagerSurname   sql.NullString  `db:"alternate_manager_surname"`
+	JobOwnerID                sql.NullString  `db:"job_owner_id"`
+	JobOwnerGivenName         sql.NullString  `db:"job_owner_given_name"`
+	JobOwnerSurname           sql.NullString  `db:"job_owner_surname"`
+	ProposalID                sql.NullString  `db:"proposal_id"`
+	ProposalNumber            sql.NullString  `db:"proposal_number"`
+	BranchID                  sql.NullString  `db:"branch_id"`
+	BranchCode                sql.NullString  `db:"branch_code"`
+	BranchName                sql.NullString  `db:"branch_name"`
+	FnAgreement               bool            `db:"fn_agreement"`
+	ProjectAwardDate          sql.NullString  `db:"project_award_date"`
+	ProposalOpeningDate       sql.NullString  `db:"proposal_opening_date"`
+	ProposalSubmissionDueDate sql.NullString  `db:"proposal_submission_due_date"`
+	OutstandingBalance        sql.NullFloat64 `db:"outstanding_balance"`
+	OutstandingBalanceDate    sql.NullString  `db:"outstanding_balance_date"`
+	DivisionsJSON             string          `db:"divisions_json"`
+	ProjectsJSON              string          `db:"projects_json"`
+	CategoriesJSON            string          `db:"categories_json"`
 }
 
 type ClientInfo struct {
@@ -90,6 +92,8 @@ type JobDetails struct {
 	ProjectAwardDate          string     `json:"project_award_date"`
 	ProposalOpeningDate       string     `json:"proposal_opening_date"`
 	ProposalSubmissionDueDate string     `json:"proposal_submission_due_date"`
+	OutstandingBalance        float64    `json:"outstanding_balance"`
+	OutstandingBalanceDate    string     `json:"outstanding_balance_date"`
 	Divisions                 []Division `json:"divisions"`
 	Projects                  []JobRef   `json:"projects"`
 	Categories                []Category `json:"categories"`
@@ -150,6 +154,8 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			ProjectAwardDate:          ns(r.ProjectAwardDate),
 			ProposalOpeningDate:       ns(r.ProposalOpeningDate),
 			ProposalSubmissionDueDate: ns(r.ProposalSubmissionDueDate),
+			OutstandingBalance:        r.OutstandingBalance.Float64,
+			OutstandingBalanceDate:    ns(r.OutstandingBalanceDate),
 			Divisions:                 divisions,
 			Projects:                  projects,
 			Categories:                categories,
