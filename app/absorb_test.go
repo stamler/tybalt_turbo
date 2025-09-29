@@ -84,6 +84,8 @@ func TestAbsorbRecords(t *testing.T) {
 			var initialCount int64 // Total records in the collection
 			// Track reference counts per table+column
 			initialRefCounts := make(map[string]int64) // key: "table.column" -> count
+			// Track client note IDs per absorbed client so we can verify they moved
+			absorbedClientNoteIDs := make(map[string][]string)
 
 			// For successful test cases, we need to verify the initial state
 			// Error cases skip this as they'll fail before any state changes
@@ -142,6 +144,20 @@ func TestAbsorbRecords(t *testing.T) {
 						t.Fatalf("failed to get reference count for %s: %v", ref.Table, err)
 					}
 					initialRefCounts[ref.Table+"."+ref.Column] = result.Count
+				}
+
+				// Track client note IDs for clients to be absorbed so we can assert they switch to the target client
+				for _, id := range tt.idsToAbsorb {
+					var noteRows []struct {
+						ID string `db:"id"`
+					}
+					query := `SELECT id FROM client_notes WHERE client = {:client}`
+					if err := app.DB().NewQuery(query).Bind(dbx.Params{"client": id}).All(&noteRows); err != nil {
+						t.Fatalf("failed to get client notes for %s: %v", id, err)
+					}
+					for _, row := range noteRows {
+						absorbedClientNoteIDs[id] = append(absorbedClientNoteIDs[id], row.ID)
+					}
 				}
 			}
 
@@ -233,6 +249,22 @@ func TestAbsorbRecords(t *testing.T) {
 					key := ref.Table + "." + ref.Column
 					if targetResult.Count != initialRefCounts[key] {
 						t.Errorf("expected %d references in %s, got %d", initialRefCounts[key], key, targetResult.Count)
+					}
+				}
+
+				// Step 6e: Verify each client note from absorbed clients now points to the target client
+				for sourceClient, noteIDs := range absorbedClientNoteIDs {
+					for _, noteID := range noteIDs {
+						var note struct {
+							Client string `db:"client"`
+						}
+						query := `SELECT client FROM client_notes WHERE id = {:id}`
+						if err := app.DB().NewQuery(query).Bind(dbx.Params{"id": noteID}).One(&note); err != nil {
+							t.Fatalf("failed to load client note %s: %v", noteID, err)
+						}
+						if note.Client != tt.targetID {
+							t.Errorf("client note %s from %s still references %s instead of %s", noteID, sourceClient, note.Client, tt.targetID)
+						}
 					}
 				}
 			}

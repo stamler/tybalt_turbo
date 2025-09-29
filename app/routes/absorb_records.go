@@ -401,6 +401,7 @@ func GetConfigsAndTable(collectionName string) ([]RefConfig, *ParentConstraint, 
 	case "clients":
 		return []RefConfig{
 			{"client_contacts", "client"},
+			{"client_notes", "client"},
 			{"jobs", "client"},
 			{"jobs", "job_owner"},
 		}, nil, nil
