@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	_ "github.com/marcboeker/go-duckdb" // Import DuckDB driver
@@ -101,6 +102,40 @@ func ToParquet(sourceSQLiteDb string) {
 	_, err = db.Exec(attachQuery)
 	if err != nil {
 		log.Fatalf("Failed to attach MySQL database: %v", err)
+	}
+
+	// Validate that Profiles.defaultBranch is present for all rows before exporting.
+	// We fail fast and list the offending records to prevent generating a bad export.
+	validateQuery := `
+		SELECT 
+			COALESCE(NULLIF(p.pocketbase_uid, ''), CAST(p.id AS VARCHAR)) AS ident,
+			COALESCE(p.email, '') AS email
+		FROM mysql_db.Profiles p
+		WHERE p.defaultBranch IS NULL OR TRIM(p.defaultBranch) = ''
+	`
+	rows, err := db.Query(validateQuery)
+	if err != nil {
+		log.Fatalf("Failed to validate Profiles.defaultBranch: %v", err)
+	}
+	defer rows.Close()
+
+	offenders := []string{}
+	for rows.Next() {
+		var ident, email string
+		if err := rows.Scan(&ident, &email); err != nil {
+			log.Fatalf("Failed to scan validation row: %v", err)
+		}
+		label := ident
+		if email != "" {
+			label = fmt.Sprintf("%s <%s>", ident, email)
+		}
+		offenders = append(offenders, label)
+	}
+	if err := rows.Err(); err != nil {
+		log.Fatalf("Validation iteration error: %v", err)
+	}
+	if len(offenders) > 0 {
+		log.Fatalf("Export aborted: found %d Profiles with empty/NULL defaultBranch: %s", len(offenders), strings.Join(offenders, ", "))
 	}
 
 	for _, table := range tablesToDump {
