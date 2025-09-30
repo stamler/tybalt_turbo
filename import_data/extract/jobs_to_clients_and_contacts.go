@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"database/sql"
 	"log"
 
 	_ "github.com/marcboeker/go-duckdb" // Import DuckDB driver
@@ -13,7 +12,7 @@ import (
 // 3. Updating Jobs.parquet to reference clients and contacts via PocketBase formatted ids instead of names
 func jobsToClientsAndContacts() {
 
-	db, err := sql.Open("duckdb", "")
+	db, err := openDuckDB()
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}

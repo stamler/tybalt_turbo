@@ -1,12 +1,11 @@
 package extract
 
 import (
-	"database/sql"
 	"log"
 )
 
 func augmentJobs() {
-	db, err := sql.Open("duckdb", "")
+	db, err := openDuckDB()
 	if err != nil {
 		log.Fatal(err)
 	}

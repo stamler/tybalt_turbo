@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 	"path/filepath" // For creating paths
@@ -23,7 +22,7 @@ func sqliteTableDumps(sqliteDBPath string, sqliteTableName string) {
 
 	// 1. Connect to DuckDB (in-memory is sufficient for this task)
 	// The DSN is empty because we don't need to persist the DuckDB instance itself.
-	db, err := sql.Open("duckdb", "")
+	db, err := openDuckDB()
 	if err != nil {
 		log.Fatalf("Failed to connect to DuckDB: %v", err)
 	}

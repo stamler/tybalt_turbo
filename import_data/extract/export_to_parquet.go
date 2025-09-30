@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -90,7 +89,7 @@ func ToParquet(sourceSQLiteDb string) {
 	// Continue with your DuckDB attachment and export logic...
 
 	// Example continuation (simplified):
-	db, err := sql.Open("duckdb", "")
+	db, err := openDuckDB()
 	if err != nil {
 		log.Fatal("Failed to connect to DuckDB:", err)
 	}

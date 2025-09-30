@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"database/sql"
 	"log"
 )
 
@@ -17,7 +16,7 @@ import (
 // for more details)
 func augmentProfiles() {
 	// open a connection to the duckdb database
-	db, err := sql.Open("duckdb", "")
+	db, err := openDuckDB()
 	if err != nil {
 		log.Fatal(err)
 	}

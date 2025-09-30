@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"database/sql"
 	"log"
 
 	_ "github.com/marcboeker/go-duckdb" // Import DuckDB driver
@@ -12,7 +11,7 @@ import (
 // 2. Updating Expenses.parquet to reference vendors via foreign keys instead of names
 func expensesToPurchaseOrders() {
 
-	db, err := sql.Open("duckdb", "")
+	db, err := openDuckDB()
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}

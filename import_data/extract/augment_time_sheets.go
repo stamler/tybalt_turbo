@@ -1,13 +1,12 @@
 package extract
 
 import (
-	"database/sql"
 	"fmt"
 	"log"
 )
 
 func augmentTimeSheets() {
-	db, err := sql.Open("duckdb", "")
+	db, err := openDuckDB()
 	if err != nil {
 		log.Fatal(err)
 	}

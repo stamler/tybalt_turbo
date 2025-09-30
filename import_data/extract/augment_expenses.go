@@ -1,7 +1,6 @@
 package extract
 
 import (
-	"database/sql"
 	"log"
 )
 
@@ -11,7 +10,7 @@ import (
 // create timetype_id column that references the id column in time_types.parquet by joining on code
 // create division_id column that references the id column in divisions.parquet by joining on code
 func augmentExpenses() {
-	db, err := sql.Open("duckdb", "")
+	db, err := openDuckDB()
 	if err != nil {
 		log.Fatal(err)
 	}
