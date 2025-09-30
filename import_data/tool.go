@@ -14,6 +14,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"imports/backfill"
 
@@ -175,7 +176,7 @@ func main() {
 		//   - Local modifications to imported jobs get overwritten with MySQL data
 		//   - Related records (time entries, etc.) work correctly since they also get updated IDs
 		//
-		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal, divisions, job_owner, branch, _imported) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal}, {:divisions}, {:job_owner}, (SELECT id FROM branches WHERE code = {:branch}), true)"
+		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal, divisions, job_owner, branch, outstanding_balance, outstanding_balance_date, _imported) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal}, {:divisions}, {:job_owner}, (SELECT id FROM branches WHERE code = {:branch}), {:outstanding_balance}, {:outstanding_balance_date}, true)"
 
 		// Define the binder function for the Job type
 		jobBinder := func(item load.Job) dbx.Params {
@@ -196,6 +197,8 @@ func main() {
 				"divisions":                    item.DivisionsIds,
 				"job_owner":                    item.JobOwnerId,
 				"branch":                       item.Branch,
+				"outstanding_balance":          0,
+				"outstanding_balance_date":     time.Now().Format("2006-01-02"),
 			}
 		}
 
