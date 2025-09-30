@@ -119,6 +119,7 @@ func AddRoutes(app core.App) {
 		clientsGroup.GET("", createGetClientsHandler(app))
 		clientsGroup.GET("/{id}", createGetClientsHandler(app))
 		clientsGroup.GET("/{id}/notes", createGetClientNotesHandler(app))
+		clientsGroup.GET("/devleads", createGetBusdevLeadsHandler(app))
 		clientsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "clients"))
 		clientsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "clients"))
 

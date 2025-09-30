@@ -8,7 +8,9 @@
   import { globalStore } from "$lib/stores/global";
   import { clients } from "$lib/stores/clients";
   import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
-  import { profiles } from "$lib/stores/profiles";
+  import DsSelector from "$lib/components/DSSelector.svelte";
+  import MiniSearch from "minisearch";
+  import { onMount } from "svelte";
   import type { SearchResult } from "minisearch";
 
   let { data }: { data: ClientsPageData } = $props();
@@ -19,7 +21,46 @@
 
   item.business_development_lead = item.business_development_lead ?? "";
 
-  profiles.init();
+  let busdevLeads: Array<{ id: string; given_name: string; surname: string; email: string }> =
+    $state([]);
+  let busdevLeadsIndex: MiniSearch<any> | null = $state(null);
+  let loadingLeads = $state(false);
+
+  async function loadBusdevLeads() {
+    try {
+      loadingLeads = true;
+      const list = (await pb.send("/api/clients/devleads", { method: "GET" })) as Array<{
+        id: string;
+        given_name: string;
+        surname: string;
+        email: string;
+      }>;
+      busdevLeads = list;
+    } catch (error: unknown) {
+      globalStore.addError(`error loading business development leads: ${String(error)}`);
+    } finally {
+      loadingLeads = false;
+    }
+  }
+
+  // Load once on mount
+  onMount(() => {
+    loadBusdevLeads();
+  });
+
+  // Build a local MiniSearch index for large lists
+  $effect(() => {
+    if (busdevLeads.length > 10) {
+      const idx = new MiniSearch({
+        fields: ["surname", "given_name", "id"],
+        storeFields: ["surname", "given_name", "id"],
+      });
+      idx.addAll(busdevLeads as any);
+      busdevLeadsIndex = idx;
+    } else {
+      busdevLeadsIndex = null;
+    }
+  });
 
   interface ClientContactWithTempId extends ClientContactsRecord {
     tempId: string;
@@ -173,19 +214,41 @@
 >
   <DsTextInput bind:value={item.name as string} {errors} fieldName="name" uiName="Name" />
 
-  {#if $profiles.index !== null}
-    <DSAutoComplete
-      bind:value={item.business_development_lead as string}
-      index={$profiles.index}
-      {errors}
-      fieldName="business_development_lead"
-      uiName="Business Development Lead"
-      idField="uid"
-    >
-      {#snippet resultTemplate(option)}
-        {formatLead(option)}
-      {/snippet}
-    </DSAutoComplete>
+  {#if busdevLeads.length > 0}
+    {#if busdevLeads.length <= 10}
+      <DsSelector
+        bind:value={item.business_development_lead as string}
+        items={[{ id: "", given_name: "", surname: "" }, ...busdevLeads]}
+        {errors}
+        fieldName="business_development_lead"
+        uiName="Business Development Lead"
+      >
+        {#snippet optionTemplate(option)}
+          {#if option.id === ""}
+            -- select --
+          {:else}
+            {option.surname}{option.given_name ? `, ${option.given_name}` : ""}
+          {/if}
+        {/snippet}
+      </DsSelector>
+    {:else if busdevLeadsIndex !== null}
+      <DSAutoComplete
+        bind:value={item.business_development_lead as string}
+        index={busdevLeadsIndex}
+        {errors}
+        fieldName="business_development_lead"
+        uiName="Business Development Lead"
+        idField="id"
+      >
+        {#snippet resultTemplate(option)}
+          {option.surname}{option.given_name ? `, ${option.given_name}` : ""}
+        {/snippet}
+      </DSAutoComplete>
+    {/if}
+  {:else if loadingLeads}
+    <span class="text-sm text-neutral-500">Loading business development leads…</span>
+  {:else}
+    <span class="text-sm text-neutral-500">No eligible Business Development Leads found.</span>
   {/if}
 
   <div

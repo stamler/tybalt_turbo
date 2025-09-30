@@ -11,7 +11,7 @@
 
   const { data } = $props<{ data: PageData }>();
   const d = data as any; // widen for newly added fields (owner tab)
-  const jobs = data.jobs as ClientJob[];
+  let jobs = $derived(data.jobs as ClientJob[]);
 
   const leadName =
     data.client.lead_surname && data.client.lead_given_name

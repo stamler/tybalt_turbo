@@ -18,6 +18,9 @@ var clientsQuery string
 //go:embed client_details.sql
 var clientDetailsQuery string
 
+//go:embed busdev_leads.sql
+var busdevLeadsQuery string
+
 // Contact is a minimal subset of fields we need on the client list page.
 type Contact struct {
 	ID        string `json:"id"`
@@ -65,6 +68,23 @@ type ClientDetails struct {
 	OutstandingBalanceDate string    `json:"outstanding_balance_date"`
 	Contacts               []Contact `json:"contacts"`
 	ReferencingJobsCount   int       `json:"referencing_jobs_count"`
+}
+
+type BusdevLead struct {
+	ID        string `json:"id"`
+	GivenName string `json:"given_name"`
+	Surname   string `json:"surname"`
+	Email     string `json:"email"`
+}
+
+func createGetBusdevLeadsHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		var rows []BusdevLead
+		if err := app.DB().NewQuery(busdevLeadsQuery).All(&rows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
+		}
+		return e.JSON(http.StatusOK, rows)
+	}
 }
 
 func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
