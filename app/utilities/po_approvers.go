@@ -22,14 +22,13 @@ type Approver struct {
 // and second-level approvers for purchase orders, based on the
 // po_approver_props record's divisions property and the max_amount property.
 //
-// How it works:
-// First the function checks if the authenticated user has the right to approve
-// the purchase order based on the po_approver_props record's divisions property
-// and the max_amount property at the requested approval level (first or second).
-// If the authenticated user has the right to approve, the function returns an
-// right to approve, the function returns an empty list, indicating that the
-// user is an approver. It also returns true in the second return value to
-// indicate that the user is an approver.
+// How it works: First the function checks if the authenticated user has the
+// right to approve the purchase order based on the po_approver_props record's
+// divisions property and the max_amount property at the requested approval
+// level (first or second). If the authenticated user has the right to approve,
+// the function returns an empty list, indicating that the user is an approver.
+// It also returns true in the second return value to indicate that the user is
+// an approver.
 //
 // If forSecondApproval is true, it returns users who have the
 // constants.PO_APPROVER_CLAIM_ID claim with a po_approver_props record that has
@@ -168,6 +167,14 @@ func GetPOApprovers(
 		if amount <= thresholds[0] {
 			return []Approver{}, false, nil
 		}
+
+		// Note: The resulting list of second approvers may also be empty if there are
+		// no users whose po_approver_props record falls within the computed tier window
+		// (max_amount >= amount AND max_amount <= ceiling) AND whose divisions property
+		// is either empty (all divisions) or explicitly includes the provided division.
+		// In that case, there are simply no eligible second approvers for the given PO.
+		// This means that it is important to ensure an adequate number of approvers are
+		// populated in the po_approver_props record for each tier.
 
 		err = app.DB().NewQuery(approversQueryString + `
 			AND p.max_amount >= {:amount}

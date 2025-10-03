@@ -106,6 +106,7 @@ func AddRoutes(app core.App) {
 
 		poGroup := se.Router.Group("/api/purchase_orders")
 		poGroup.Bind(apis.RequireAuth("users"))
+		poGroup.GET("/pending", createGetPendingPurchaseOrdersHandler(app))
 		poGroup.POST("/{id}/approve", createApprovePurchaseOrderHandler(app))
 		poGroup.POST("/{id}/reject", createRejectPurchaseOrderHandler(app))
 		poGroup.POST("/{id}/cancel", createCancelPurchaseOrderHandler(app))

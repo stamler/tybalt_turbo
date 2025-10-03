@@ -3,14 +3,9 @@ import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 export const load: PageLoad = async () => {
   try {
-    const result = await pb
-      .collection("purchase_orders_augmented")
-      .getFullList<PurchaseOrdersAugmentedResponse>({
-        sort: "-date",
-        // The rules should prevent visibility of Unapproved records by a user
-        // who is not permitted to approve them.
-        filter: pb.filter("status='Unapproved'"),
-      });
+    const result = (await pb.send("/api/purchase_orders/pending", {
+      method: "GET",
+    })) as PurchaseOrdersAugmentedResponse[];
     return {
       items: result,
       // createdItemIsVisible: (record: PurchaseOrdersResponse) => {

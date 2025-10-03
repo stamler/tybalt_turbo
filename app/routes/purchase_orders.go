@@ -2,16 +2,21 @@ package routes
 
 import (
 	"database/sql"
+	_ "embed" // Needed for //go:embed
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+	"tybalt/constants"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
+
+//go:embed pending_pos.sql
+var pendingPOsQuery string
 
 func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -255,6 +260,30 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 
 		// return the updated purchase order as a JSON response
 		return e.JSON(http.StatusOK, updatedPO)
+	}
+}
+
+// createGetPendingPurchaseOrdersHandler returns purchase orders the caller can approve now.
+// It covers three cases:
+// 1) First approval: status=Unapproved AND approved=” AND caller is eligible first approver for division
+// 2) Priority second approver: status=Unapproved AND approved!=” AND second_approval=” AND caller == priority_second_approver
+// 3) General second approver after 24h: status=Unapproved AND approved!=” AND second_approval=” AND updated < @yesterday AND caller is eligible second approver for division and amount
+func createGetPendingPurchaseOrdersHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+
+		rows := []map[string]any{}
+		if err := app.DB().NewQuery(pendingPOsQuery).Bind(dbx.Params{
+			"userId":          auth.Id,
+			"poApproverClaim": constants.PO_APPROVER_CLAIM_ID,
+		}).All(&rows); err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_pending_pos",
+				"message": fmt.Sprintf("error fetching pending purchase orders: %v", err),
+			})
+		}
+
+		return e.JSON(http.StatusOK, rows)
 	}
 }
 
