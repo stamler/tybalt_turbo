@@ -749,6 +749,11 @@ func main() {
 			true,               // Enable upsert for idempotency
 		)
 
+		// After loading user_claims, synthesize po_approver claim and props from Profiles
+		if err := synthesizePoApproverProps(targetDatabase); err != nil {
+			log.Fatalf("Failed to synthesize po_approver props: %v", err)
+		}
+
 		// --- Load MileageResetDates ---
 		// Define the specific SQL for the mileage_reset_dates table
 		load.FromParquet(
@@ -785,6 +790,153 @@ func main() {
 	if *attachmentsFlag {
 		attachments.MigrateAttachments("./parquet/Expenses.parquet", "attachment", "destination_attachment", expenseCollectionId)
 	}
+}
+
+// synthesizePoApproverProps ensures that:
+// 1) Any user whose Profiles.customClaims contains 'tapr', 'vp', or 'smg' has a user_claims row for the 'po_approver' claim.
+// 2) A po_approver_props row exists per such user_claim with max_amount and divisions based on the presence of tapr/vp/smg and default division.
+//
+// Mapping per _ISSUES.md:
+// - tapr (and not vp or smg): max_amount = 500; divisions = [profile.default_division]
+// - vp (and not smg): max_amount = 2500; divisions = [profile.default_division]
+// - smg: max_amount = 250000; divisions = []
+func synthesizePoApproverProps(dbPath string) error {
+	// Read Profiles.parquet via DuckDB, then upsert into SQLite
+	duck, err := sql.Open("duckdb", "")
+	if err != nil {
+		return fmt.Errorf("open duckdb: %w", err)
+	}
+	defer duck.Close()
+
+	rows, err := duck.Query(`
+		SELECT
+			pocketbase_uid AS uid,
+			LOWER(COALESCE(customClaims, '')) AS claims,
+			pocketbase_defaultDivision AS default_division
+		FROM read_parquet('./parquet/Profiles.parquet')
+	`)
+	if err != nil {
+		return fmt.Errorf("read Profiles.parquet: %w", err)
+	}
+	defer rows.Close()
+
+	type rowData struct {
+		uid             string
+		defaultDivision string
+		maxAmount       float64
+		divisionsJSON   string
+	}
+
+	var toUpsert []rowData
+	for rows.Next() {
+		var uid, claims, defaultDivision string
+		if err := rows.Scan(&uid, &claims, &defaultDivision); err != nil {
+			return fmt.Errorf("scan profile: %w", err)
+		}
+
+		hasTapr := strings.Contains(claims, "tapr")
+		hasVp := strings.Contains(claims, "vp")
+		hasSmg := strings.Contains(claims, "smg")
+
+		var maxAmount float64
+		var divisionsJSON string
+		switch {
+		case hasSmg:
+			maxAmount = 250000
+			divisionsJSON = "[]"
+		case hasVp && !hasSmg:
+			maxAmount = 2500
+		case hasTapr && !hasVp && !hasSmg:
+			maxAmount = 500
+		default:
+			// not a candidate
+		}
+
+		if maxAmount == 0 {
+			continue
+		}
+
+		if divisionsJSON == "" {
+			b, _ := json.Marshal([]string{defaultDivision})
+			divisionsJSON = string(b)
+		}
+
+		toUpsert = append(toUpsert, rowData{
+			uid:             uid,
+			defaultDivision: defaultDivision,
+			maxAmount:       maxAmount,
+			divisionsJSON:   divisionsJSON,
+		})
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate profiles: %w", err)
+	}
+
+	if len(toUpsert) == 0 {
+		return nil
+	}
+
+	sqliteDB, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return fmt.Errorf("open sqlite: %w", err)
+	}
+	defer sqliteDB.Close()
+
+	var poApproverClaimId string
+	if err := sqliteDB.QueryRow(`SELECT id FROM claims WHERE name = 'po_approver'`).Scan(&poApproverClaimId); err != nil {
+		return fmt.Errorf("fetch po_approver claim id: %w", err)
+	}
+
+	tx, err := sqliteDB.Begin()
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	ensureClaimStmt, err := tx.Prepare(`INSERT OR IGNORE INTO user_claims (uid, cid, _imported) VALUES (?, ?, 1)`)
+	if err != nil {
+		return fmt.Errorf("prepare ensureClaim: %w", err)
+	}
+	defer ensureClaimStmt.Close()
+
+	getUserClaimIdStmt, err := tx.Prepare(`SELECT id FROM user_claims WHERE uid = ? AND cid = ?`)
+	if err != nil {
+		return fmt.Errorf("prepare getUserClaimId: %w", err)
+	}
+	defer getUserClaimIdStmt.Close()
+
+	deletePropsStmt, err := tx.Prepare(`DELETE FROM po_approver_props WHERE user_claim = ?`)
+	if err != nil {
+		return fmt.Errorf("prepare deleteProps: %w", err)
+	}
+	defer deletePropsStmt.Close()
+
+	insertPropsStmt, err := tx.Prepare(`INSERT INTO po_approver_props (user_claim, max_amount, divisions) VALUES (?, ?, ?)`)
+	if err != nil {
+		return fmt.Errorf("prepare insertProps: %w", err)
+	}
+	defer insertPropsStmt.Close()
+
+	for _, r := range toUpsert {
+		if _, err := ensureClaimStmt.Exec(r.uid, poApproverClaimId); err != nil {
+			return fmt.Errorf("ensure user_claim: %w", err)
+		}
+		var userClaimId string
+		if err := getUserClaimIdStmt.QueryRow(r.uid, poApproverClaimId).Scan(&userClaimId); err != nil {
+			return fmt.Errorf("fetch user_claim id: %w", err)
+		}
+		if _, err := deletePropsStmt.Exec(userClaimId); err != nil {
+			return fmt.Errorf("delete old props: %w", err)
+		}
+		if _, err := insertPropsStmt.Exec(userClaimId, r.maxAmount, r.divisionsJSON); err != nil {
+			return fmt.Errorf("insert po_approver_props: %w", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+	return nil
 }
 
 // backfillAllowanceTotals calculates and writes totals for Allowance/Meals

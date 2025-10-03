@@ -14,8 +14,9 @@ import (
 // to reduce peak memory usage and direct temporary spill files to a
 // configurable directory. You can override defaults via environment vars:
 // - DUCKDB_TMP_DIRECTORY: path to use for temp files (default: $TMPDIR/duckdb_tmp)
-// - DUCKDB_MEMORY_LIMIT: memory cap, e.g. "1GB" (default: "1GB")
+// - DUCKDB_MEMORY_LIMIT: memory cap, e.g. "4GB" (default: "4GB")
 // - DUCKDB_THREADS: number of threads (default: "2")
+// - DUCKDB_MAX_TEMP_DIRECTORY_SIZE: max spill size, e.g. "40GB" (default: "40GB")
 func openDuckDB() (*sql.DB, error) {
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
@@ -33,12 +34,17 @@ func openDuckDB() (*sql.DB, error) {
 
 	mem := os.Getenv("DUCKDB_MEMORY_LIMIT")
 	if mem == "" {
-		mem = "1GB"
+		mem = "4GB"
 	}
 
 	threads := os.Getenv("DUCKDB_THREADS")
 	if threads == "" {
 		threads = "2"
+	}
+
+	maxTempDirSize := os.Getenv("DUCKDB_MAX_TEMP_DIRECTORY_SIZE")
+	if maxTempDirSize == "" {
+		maxTempDirSize = "40GB"
 	}
 
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA temp_directory='%s';", tmpDir)); err != nil {
@@ -49,6 +55,9 @@ func openDuckDB() (*sql.DB, error) {
 	}
 	if _, err := db.Exec(fmt.Sprintf("PRAGMA threads=%s;", threads)); err != nil {
 		log.Printf("warning: failed to set DuckDB threads: %v", err)
+	}
+	if _, err := db.Exec(fmt.Sprintf("PRAGMA max_temp_directory_size='%s';", maxTempDirSize)); err != nil {
+		log.Printf("warning: failed to set DuckDB max_temp_directory_size: %v", err)
 	}
 
 	return db, nil
