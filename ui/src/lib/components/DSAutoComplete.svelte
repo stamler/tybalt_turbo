@@ -57,7 +57,9 @@
     // Search then filter out any excluded ids
     results = index
       .search(typedQuery, { prefix: true })
-      .filter((r) => !excludeIds.includes(r[idField] as unknown as string | number));
+      .filter(
+        (r) => !excludeIds.includes(r[idField] as unknown as string | number),
+      ) as SearchResult[];
   }
 
   function keydown(event: KeyboardEvent) {
@@ -124,22 +126,22 @@
     }
   }
 
-  function getDocumentById(index: MiniSearch<T>, id: string) {
+  function getDocumentById(index: MiniSearch<T>, id: string): SearchResult {
     // Ensure we don't return a document that has been excluded
     const results = index.search(id.toString(), {
       fields: [idField],
       prefix: true,
       combineWith: "AND",
-    });
-    const filtered = results.filter(
+    }) as unknown as SearchResult[];
+    const filtered = (results as SearchResult[]).filter(
       (r) => !excludeIds.includes(r[idField] as unknown as string | number),
-    );
+    ) as SearchResult[];
     if (filtered.length === 0) {
       // Return a minimal stub so the component can render without error.
       const stub: any = { [idField]: id };
       return stub as unknown as SearchResult;
     }
-    return filtered[0];
+    return filtered[0] as SearchResult;
   }
 
   function clearValue() {

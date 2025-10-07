@@ -1,4 +1,4 @@
-import { writable } from "svelte/store";
+import { writable, get } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import type { AuthModel } from "pocketbase";
 import { AUTH_TIMEOUTS } from "$lib/config";
@@ -35,7 +35,8 @@ interface AuthState {
 }
 
 // Create the store with a clear interface
-const { subscribe, set } = writable<AuthState | null>(null);
+const baseStore = writable<AuthState | null>(null);
+const { subscribe, set } = baseStore;
 
 // Timer for periodic token refresh (runs every 45 minutes by default)
 let refreshTimer: number | null = null;
@@ -249,6 +250,7 @@ export const authStore = {
 
   // Svelte store interface
   subscribe,
+  get: () => get(baseStore),
 
   // Auth actions
   loginWithMicrosoft,

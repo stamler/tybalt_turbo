@@ -1,7 +1,22 @@
 <script lang="ts">
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+
   let { data } = $props();
+
+  const currency = new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
+    minimumFractionDigits: 2,
+  });
+
+  function divisionLabel(id: string): string {
+    const division = data.poApproverDivisions?.get?.(id);
+    if (!division) return id;
+    const code = division.code?.trim();
+    const name = division.name?.trim() ?? id;
+    return code ? `${code} — ${name}` : name;
+  }
 </script>
 
 {#if data.item}
@@ -96,7 +111,19 @@
         <ul class="flex flex-row flex-wrap gap-2">
           {#each data.claims as claim (claim.id)}
             <li>
-              <DsLabel color="cyan">{claim.name}</DsLabel>
+              <DsLabel color={claim.name === "po_approver" ? "purple" : "cyan"}
+                >{claim.name === "po_approver"
+                  ? data.poApproverProps
+                    ? `po_approver • ${currency.format(data.poApproverProps.max_amount ?? 0)} • ${
+                        (data.poApproverProps.divisions ?? []).length === 0
+                          ? "All divisions"
+                          : `${(data.poApproverProps.divisions ?? []).length} division${
+                              (data.poApproverProps.divisions ?? []).length === 1 ? "" : "s"
+                            }`
+                      }`
+                    : "po_approver"
+                  : claim.name}</DsLabel
+              >
             </li>
           {/each}
         </ul>

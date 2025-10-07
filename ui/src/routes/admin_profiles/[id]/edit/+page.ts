@@ -1,9 +1,15 @@
 import type { PageLoad } from "./$types";
-import type { AdminProfilesAugmentedResponse, AdminProfilesRecord } from "$lib/pocketbase-types";
+import type {
+  AdminProfilesAugmentedResponse,
+  AdminProfilesRecord,
+  DivisionsResponse,
+} from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { AdminProfilesPageData } from "$lib/svelte-types";
 
-export const load: PageLoad<AdminProfilesPageData> = async ({ params }) => {
+export const load: PageLoad<AdminProfilesPageData & { divisions: DivisionsResponse[] }> = async ({
+  params,
+}) => {
   const defaultItem = {
     uid: "",
     work_week_hours: 40,
@@ -25,13 +31,14 @@ export const load: PageLoad<AdminProfilesPageData> = async ({ params }) => {
   } as unknown as AdminProfilesRecord;
 
   try {
-    // Load from augmented view for display fields (e.g., names)
-    const item = await pb
-      .collection("admin_profiles_augmented")
-      .getOne<AdminProfilesAugmentedResponse>(params.id);
-    return { item, editing: true, id: params.id };
+    const [item, divisions] = await Promise.all([
+      pb.collection("admin_profiles_augmented").getOne<AdminProfilesAugmentedResponse>(params.id),
+      pb.collection("divisions").getFullList<DivisionsResponse>({ sort: "code" }),
+    ]);
+
+    return { item, editing: true, id: params.id, divisions };
   } catch (error) {
     console.error(`error loading admin_profile, returning default item: ${error}`);
-    return { item: { ...defaultItem }, editing: false, id: null };
+    return { item: { ...defaultItem }, editing: false, id: null, divisions: [] };
   }
 };

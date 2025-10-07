@@ -1,6 +1,7 @@
 <script lang="ts">
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
+  import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
@@ -11,33 +12,97 @@
     ClaimsResponse,
     UserClaimsResponse,
     BranchesResponse,
+    DivisionsResponse,
+    PoApproverPropsResponse,
   } from "$lib/pocketbase-types";
   import type { AdminProfilesPageData } from "$lib/svelte-types";
   import { goto } from "$app/navigation";
   import { onMount } from "svelte";
+  import type { SearchResult } from "minisearch";
+  import { divisions as divisionsStore } from "$lib/stores/divisions";
 
-  let { data }: { data: AdminProfilesPageData } = $props();
+  const PO_APPROVER_CLAIM_NAME = "po_approver";
+
+  let { data }: { data: AdminProfilesPageData & { divisions?: DivisionsResponse[] } } = $props();
 
   let errors = $state({} as Record<string, { message: string }>);
   let item = $state({ ...data.item });
 
   let branches = $state([] as BranchesResponse[]);
 
-  // Claims management state
+  // Use shared divisions store for items and index
+  const divisions = $derived.by(() => $divisionsStore.items as DivisionsResponse[]);
+  const divisionsIndex = $derived.by(() => $divisionsStore.index);
+
   let allClaims = $state([] as ClaimsResponse[]);
   let originalUserClaims = $state([] as UserClaimsResponse[]);
   let stagedClaimIds = $state([] as string[]);
   let selectedClaimId = $state("");
+  let poApproverUserClaimId = $state<string | null>(null);
+  let claimsLoaded = $state(false);
+
+  const initialPoApproverMaxAmount = normalizeNumber((data.item as any)?.po_approver_max_amount);
+  const initialPoApproverDivisions = normalizeDivisions((data.item as any)?.po_approver_divisions);
+  const initialPoApproverPropsId = ((data.item as any)?.po_approver_props_id as string) ?? null;
+
+  let poApproverPropsId = $state(initialPoApproverPropsId);
+  let poApproverMaxAmount = $state(initialPoApproverMaxAmount);
+  let originalApproverMaxAmount = $state(initialPoApproverMaxAmount);
+  let poApproverDivisions = $state(initialPoApproverDivisions);
+  let originalApproverDivisions = $state([...initialPoApproverDivisions]);
+  let poApproverDivisionsSearch = $state("");
+
+  const poApproverDivisionsError = $derived.by(
+    () => errors.divisions ?? errors.po_approver_divisions ?? null,
+  );
+  const hasPoApproverClaim = $derived.by(() => {
+    const claimId = getPoApproverClaimId();
+    return claimId !== "" && stagedClaimIds.includes(claimId);
+  });
+
+  const currency = new Intl.NumberFormat("en-CA", {
+    style: "currency",
+    currency: "CAD",
+    minimumFractionDigits: 2,
+  });
 
   onMount(async () => {
     await Promise.all([reloadAllClaims(), reloadUserClaims(), reloadBranches()]);
   });
 
+  function normalizeNumber(value: unknown): number {
+    if (typeof value === "number") {
+      return Number.isFinite(value) ? value : 0;
+    }
+    if (typeof value === "string") {
+      const parsed = Number(value);
+      return Number.isFinite(parsed) ? parsed : 0;
+    }
+    return 0;
+  }
+
+  function normalizeDivisions(value: unknown): string[] {
+    if (Array.isArray(value)) {
+      return value.filter((id): id is string => typeof id === "string");
+    }
+    if (typeof value === "string" && value.trim().startsWith("[")) {
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((id): id is string => typeof id === "string");
+        }
+      } catch {
+        // noop
+      }
+    }
+    return [];
+  }
+
   async function reloadAllClaims() {
     try {
       const list = await pb.collection("claims").getFullList<ClaimsResponse>({ sort: "name" });
       allClaims = list;
-    } catch (e) {
+    } catch {
       // noop
     }
   }
@@ -46,23 +111,65 @@
     try {
       const list = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
       branches = list;
-    } catch (e) {
+    } catch {
       // noop
     }
   }
 
+  // divisions are loaded and indexed via the shared store
+
   async function reloadUserClaims() {
+    if (!item?.uid) {
+      originalUserClaims = [];
+      stagedClaimIds = [];
+      poApproverUserClaimId = null;
+      claimsLoaded = true;
+      return;
+    }
+
     try {
-      if (!item?.uid) return;
       const list = await pb.collection("user_claims").getFullList<UserClaimsResponse>({
-        filter: `uid="${item.uid}"`,
+        filter: `uid='${item.uid}'`,
         expand: "cid",
       });
       originalUserClaims = list;
       stagedClaimIds = list.map((uc) => uc.cid);
-    } catch (e) {
-      // noop
+      const poEntry = list.find((uc) => uc.expand?.cid?.name === PO_APPROVER_CLAIM_NAME);
+      poApproverUserClaimId = poEntry?.id ?? poApproverUserClaimId;
+    } catch {
+      originalUserClaims = [];
+      stagedClaimIds = [];
+      poApproverUserClaimId = null;
+    } finally {
+      claimsLoaded = true;
     }
+  }
+
+  // index building handled by the shared store
+
+  function divisionDisplay(
+    division: SearchResult | { id: string; code?: string | null; name?: string },
+  ): string {
+    const code = "code" in division ? division.code?.trim() : undefined;
+    const name = "name" in division ? (division.name?.trim() ?? division.id) : division.id;
+    return code && code.length > 0 ? `${code} — ${name}` : name;
+  }
+
+  function divisionLabel(divisionId: string): string {
+    const division = divisions.find((d) => d.id === divisionId);
+    if (!division) return divisionId;
+    return divisionDisplay(division);
+  }
+
+  function getPoApproverClaimId(): string {
+    const claim = allClaims.find((c) => c.name === PO_APPROVER_CLAIM_NAME);
+    return claim?.id ?? "";
+  }
+
+  function syncPoApproverUserClaimId(claims = originalUserClaims) {
+    const claimId = getPoApproverClaimId();
+    const entry = claimId !== "" ? (claims.find((uc) => uc.cid === claimId) ?? null) : null;
+    poApproverUserClaimId = entry?.id ?? null;
   }
 
   function availableClaims(): ClaimsResponse[] {
@@ -75,17 +182,39 @@
     if (!stagedClaimIds.includes(cid)) {
       stagedClaimIds = [...stagedClaimIds, cid];
     }
+    if (cid === getPoApproverClaimId()) {
+      clearFieldError("po_approver_divisions");
+    }
     selectedClaimId = "";
   }
 
   async function removeUserClaim(cid: string) {
     stagedClaimIds = stagedClaimIds.filter((id) => id !== cid);
+    if (cid === getPoApproverClaimId()) {
+      clearFieldError("po_approver_divisions");
+      poApproverUserClaimId = null;
+      resetPoApproverPropsState();
+    }
+    originalUserClaims = originalUserClaims.filter((uc) => uc.cid !== cid);
   }
 
-  // When a claim is selected from the dropdown, add it immediately
   $effect(() => {
     if (selectedClaimId !== "") {
       addClaimById(selectedClaimId);
+    }
+  });
+
+  $effect(() => {
+    if (!claimsLoaded) {
+      return;
+    }
+    if (!hasPoApproverClaim) {
+      resetPoApproverPropsState();
+      return;
+    }
+
+    if (!poApproverUserClaimId) {
+      syncPoApproverUserClaimId(originalUserClaims);
     }
   });
 
@@ -94,6 +223,134 @@
     if (inAll) return inAll.name;
     const inOriginal = originalUserClaims.find((uc) => uc.cid === cid)?.expand?.cid?.name;
     return inOriginal ?? cid;
+  }
+
+  function addDivisionById(id: string | number) {
+    const divisionId = id.toString();
+    if (poApproverDivisions.includes(divisionId)) {
+      poApproverDivisionsSearch = "";
+      return;
+    }
+
+    const division = divisions.find((d) => d.id === divisionId);
+    if (!division) {
+      setFieldError("po_approver_divisions", "Unable to add selected division.");
+      return;
+    }
+    if (division.active === false) {
+      setFieldError("po_approver_divisions", "Only active divisions can be selected.");
+      return;
+    }
+
+    poApproverDivisions = [...poApproverDivisions, divisionId];
+    poApproverDivisionsSearch = "";
+    clearFieldError("po_approver_divisions");
+  }
+
+  function removeDivision(divisionId: string) {
+    poApproverDivisions = poApproverDivisions.filter((id) => id !== divisionId);
+    if (poApproverDivisions.length === 0) {
+      clearFieldError("po_approver_divisions");
+    }
+  }
+
+  function setFieldError(fieldName: string, message: string) {
+    errors = {
+      ...errors,
+      [fieldName]: { message },
+    };
+  }
+
+  function clearFieldError(fieldName: string) {
+    if (errors[fieldName] === undefined) return;
+    const nextErrors = { ...errors };
+    delete nextErrors[fieldName];
+    errors = nextErrors;
+  }
+
+  function resetPoApproverPropsState() {
+    poApproverMaxAmount = 0;
+    originalApproverMaxAmount = 0;
+    poApproverDivisions = [];
+    originalApproverDivisions = [];
+    poApproverDivisionsSearch = "";
+    poApproverPropsId = "";
+  }
+
+  function poApproverClaimLabel(): string {
+    if (!hasPoApproverClaim) return "po_approver";
+    const amount = Number.isFinite(poApproverMaxAmount) ? poApproverMaxAmount : 0;
+    const formatted = currency.format(amount);
+    if (poApproverDivisions.length === 0) {
+      return `po_approver • ${formatted} • All divisions`;
+    }
+    const divisionsLabel =
+      poApproverDivisions.length === 1
+        ? `${poApproverDivisions.length} division`
+        : `${poApproverDivisions.length} divisions`;
+    return `po_approver • ${formatted} • ${divisionsLabel}`;
+  }
+
+  async function persistPoApproverProps() {
+    const claimId = getPoApproverClaimId();
+    const hasClaim = claimId !== "" && stagedClaimIds.includes(claimId);
+
+    if (!hasClaim) {
+      if (poApproverPropsId) {
+        try {
+          await pb.collection("po_approver_props").delete(poApproverPropsId);
+        } catch {
+          // noop
+        }
+        resetPoApproverPropsState();
+      }
+      return;
+    }
+
+    let userClaimId = poApproverUserClaimId;
+    if (!userClaimId) {
+      const createdClaim = await pb
+        .collection("user_claims")
+        .create<UserClaimsResponse>({ uid: item.uid, cid: claimId });
+      userClaimId = createdClaim.id;
+      poApproverUserClaimId = createdClaim.id;
+      originalUserClaims = [...originalUserClaims, createdClaim];
+      stagedClaimIds = [...new Set([...stagedClaimIds, claimId])];
+    }
+
+    const payload = {
+      user_claim: userClaimId,
+      max_amount: Number.isFinite(poApproverMaxAmount) ? poApproverMaxAmount : 0,
+      divisions: poApproverDivisions,
+    };
+
+    if (poApproverPropsId) {
+      const divisionsChanged =
+        JSON.stringify([...poApproverDivisions].sort()) !==
+        JSON.stringify([...originalApproverDivisions].sort());
+      const maxChanged = poApproverMaxAmount !== originalApproverMaxAmount;
+
+      if (divisionsChanged || maxChanged) {
+        const updated = await pb
+          .collection("po_approver_props")
+          .update<PoApproverPropsResponse>(poApproverPropsId, payload);
+        poApproverMaxAmount = updated.max_amount ?? 0;
+        originalApproverMaxAmount = poApproverMaxAmount;
+        poApproverDivisions = Array.isArray(updated.divisions) ? [...updated.divisions] : [];
+        originalApproverDivisions = [...poApproverDivisions];
+      }
+    } else {
+      const createdProps = await pb
+        .collection("po_approver_props")
+        .create<PoApproverPropsResponse>(payload);
+      poApproverPropsId = createdProps.id;
+      poApproverMaxAmount = createdProps.max_amount ?? 0;
+      originalApproverMaxAmount = poApproverMaxAmount;
+      poApproverDivisions = Array.isArray(createdProps.divisions)
+        ? [...createdProps.divisions]
+        : [];
+      originalApproverDivisions = [...poApproverDivisions];
+    }
   }
 
   async function save(event: Event) {
@@ -113,23 +370,30 @@
       const toAdd = [...stagedIds].filter((cid) => !originalIds.has(cid));
       const toRemove = [...originalIds].filter((cid) => !stagedIds.has(cid));
 
-      if (toAdd.length > 0 || toRemove.length > 0) {
-        // Map claim id -> existing user_claim record id for deletes
-        const claimIdToRecordId = new Map(originalUserClaims.map((uc) => [uc.cid, uc.id] as const));
+      const claimIdToRecordId = new Map(originalUserClaims.map((uc) => [uc.cid, uc.id] as const));
+      const createdClaims: UserClaimsResponse[] = [];
 
-        // Create new links
-        await Promise.all(
-          toAdd.map((cid) => pb.collection("user_claims").create({ uid: item.uid, cid })),
-        );
-
-        // Delete removed links
-        await Promise.all(
-          toRemove
-            .map((cid) => claimIdToRecordId.get(cid))
-            .filter((id): id is string => typeof id === "string" && id.length > 0)
-            .map((id) => pb.collection("user_claims").delete(id)),
-        );
+      for (const cid of toAdd) {
+        const created = await pb
+          .collection("user_claims")
+          .create<UserClaimsResponse>({ uid: item.uid, cid });
+        createdClaims.push(created);
       }
+
+      if (toRemove.length > 0) {
+        const toDeleteIds = toRemove
+          .map((cid) => claimIdToRecordId.get(cid))
+          .filter((id): id is string => typeof id === "string" && id.length > 0);
+        await Promise.all(toDeleteIds.map((id) => pb.collection("user_claims").delete(id)));
+      }
+
+      if (createdClaims.length > 0 || toRemove.length > 0) {
+        const surviving = originalUserClaims.filter((uc) => !toRemove.includes(uc.cid));
+        originalUserClaims = [...surviving, ...createdClaims];
+        syncPoApproverUserClaimId(originalUserClaims);
+      }
+
+      await persistPoApproverProps();
 
       errors = {};
       goto("/admin_profiles/list");
@@ -297,39 +561,101 @@
   </div>
 
   <!-- Claims section -->
-  <div class="mt-4 w-full space-y-2">
-    <h2 class="text-lg font-semibold">Claims</h2>
-    <div class="flex flex-row flex-wrap gap-2">
-      {#each stagedClaimIds as cid}
-        {#key cid}
-          <span class="flex items-center gap-1">
-            <DsLabel color="cyan"
-              >{claimNameFor(cid)}
-              <DsActionButton
-                transparentBackground={true}
-                title="Remove claim"
-                color="red"
-                action={() => removeUserClaim(cid)}>x</DsActionButton
-              >
-            </DsLabel>
-          </span>
-        {/key}
-      {/each}
-      {#if stagedClaimIds.length === 0}
-        <span class="text-sm text-neutral-500">No claims assigned.</span>
-      {/if}
+  <div class="mt-4 w-full space-y-4">
+    <div class="space-y-2">
+      <h2 class="text-lg font-semibold">Claims</h2>
+      <div class="flex flex-row flex-wrap gap-2">
+        {#each stagedClaimIds as cid}
+          {#key cid}
+            <span class="flex items-center gap-1">
+              <DsLabel color={cid === getPoApproverClaimId() ? "purple" : "cyan"}
+                >{cid === getPoApproverClaimId() ? poApproverClaimLabel() : claimNameFor(cid)}
+                <DsActionButton
+                  transparentBackground={true}
+                  title="Remove claim"
+                  color="red"
+                  action={() => removeUserClaim(cid)}>x</DsActionButton
+                >
+              </DsLabel>
+            </span>
+          {/key}
+        {/each}
+        {#if stagedClaimIds.length === 0}
+          <span class="text-sm text-neutral-500">No claims assigned.</span>
+        {/if}
+      </div>
+
+      <DsSelector
+        bind:value={selectedClaimId}
+        items={[{ id: "", name: "-- add claim --" }, ...availableClaims()]}
+        {errors}
+        fieldName="claim_to_add"
+        uiName="Add Claim"
+        disabled={availableClaims().length === 0}
+      >
+        {#snippet optionTemplate(item)}{(item as any).name ?? item.name}{/snippet}
+      </DsSelector>
     </div>
 
-    <DsSelector
-      bind:value={selectedClaimId}
-      items={[{ id: "", name: "-- add claim --" }, ...availableClaims()]}
-      {errors}
-      fieldName="claim_to_add"
-      uiName="Add Claim"
-      disabled={availableClaims().length === 0}
-    >
-      {#snippet optionTemplate(item)}{(item as any).name ?? item.name}{/snippet}
-    </DsSelector>
+    {#if hasPoApproverClaim}
+      <section class="space-y-3 rounded border border-neutral-200 bg-neutral-50 p-3">
+        <h3 class="text-base font-semibold">PO Approver Settings</h3>
+
+        <DsTextInput
+          bind:value={poApproverMaxAmount as number}
+          {errors}
+          fieldName="po_approver_max_amount"
+          uiName="Max PO Approval Amount"
+          type="number"
+          min={0}
+          step={0.01}
+        />
+
+        <div class="space-y-2">
+          <p class="font-semibold">Divisions for PO approval</p>
+          <div class="flex flex-wrap gap-2">
+            {#each poApproverDivisions as divisionId}
+              <DsLabel color="purple">
+                {divisionLabel(divisionId)}
+                <DsActionButton
+                  transparentBackground={true}
+                  title="Remove division"
+                  color="red"
+                  action={() => removeDivision(divisionId)}
+                >
+                  x
+                </DsActionButton>
+              </DsLabel>
+            {/each}
+            {#if poApproverDivisions.length === 0}
+              <span class="text-sm text-neutral-500">All divisions</span>
+            {/if}
+          </div>
+
+          {#if divisionsIndex}
+            <DsAutoComplete
+              bind:value={poApproverDivisionsSearch}
+              index={divisionsIndex}
+              {errors}
+              fieldName="po_approver_division"
+              uiName="Add Division"
+              multi={true}
+              choose={addDivisionById}
+            >
+              {#snippet resultTemplate(option)}
+                {divisionDisplay(option)}
+              {/snippet}
+            </DsAutoComplete>
+          {:else}
+            <span class="text-sm text-neutral-500">Loading divisions…</span>
+          {/if}
+
+          {#if poApproverDivisionsError}
+            <span class="text-sm text-red-600">{poApproverDivisionsError.message}</span>
+          {/if}
+        </div>
+      </section>
+    {/if}
   </div>
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
