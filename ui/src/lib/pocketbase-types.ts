@@ -189,6 +189,9 @@ export type AdminProfilesAugmentedRecord = {
   opening_ov: number;
   payroll_id: string;
   personal_vehicle_insurance_expiry: string;
+  po_approver_divisions: null | string[];
+  po_approver_max_amount: null | number;
+  po_approver_props_id: null | string;
   salary: boolean;
   skip_min_time_check: AdminProfilesAugmentedSkipMinTimeCheckOptions;
   surname: string;
