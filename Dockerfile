@@ -33,7 +33,7 @@ ENV PUBLIC_POCKETBASE_URL=${PUBLIC_POCKETBASE_URL}
 RUN npm run build
 
 # Stage 2: Build the Go application
-FROM golang:1.23-alpine AS go-builder
+FROM golang:1.25-alpine AS go-builder
 
 # Install git, jq and other build dependencies
 RUN apk add --no-cache git ca-certificates jq

@@ -62,7 +62,7 @@ flyctl deploy
 
 ### Prerequisites
 
-- Go 1.23+
+- Go 1.24+
 - Node.js 20+
 - npm
 - [Fly.io CLI](https://fly.io/docs/hands-on/install-flyctl/)
@@ -78,7 +78,7 @@ cd tybalt_turbo
 # Backend dependencies
 cd app && go mod download
 
-# Frontend dependencies  
+# Frontend dependencies
 cd ../ui && npm install
 ```
 
@@ -123,7 +123,7 @@ flyctl secrets set \
   LITESTREAM_BUCKET=your-bucket-name \
   LITESTREAM_REGION=us-east-1
 
-# For AWS S3  
+# For AWS S3
 flyctl secrets set \
   LITESTREAM_ACCESS_KEY_ID=your-aws-key \
   LITESTREAM_SECRET_ACCESS_KEY=your-aws-secret \
