@@ -440,6 +440,59 @@ func init() {
 						"required": false,
 						"system": false,
 						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pbc_2536409462",
+						"hidden": false,
+						"id": "relation3146128159",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "branch",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1587448267",
+						"max": 0,
+						"min": 0,
+						"name": "location",
+						"pattern": "^[23456789CFGHJMPQRVWX]{8}\\+[23456789CFGHJMPQRVWX]{2,3}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "number486793109",
+						"max": null,
+						"min": null,
+						"name": "outstanding_balance",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1832948875",
+						"max": 0,
+						"min": 0,
+						"name": "outstanding_balance_date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
 					}
 				],
 				"id": "yovqzrnnomp0lkx",
@@ -450,7 +503,7 @@ func init() {
 				"name": "jobs",
 				"system": false,
 				"type": "base",
-				"updateRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'job' &&\n\n// the contact belongs to the client\n@request.body.contact.client = @request.body.client",
+				"updateRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'job' &&\n\n// the contact belongs to the client\n@request.body.contact.client = @request.body.client &&\n\n// the job number cannot be changed once created\n(@request.body.number:isset = false || @request.body.number = number)",
 				"viewRule": "@request.auth.id != \"\""
 			},
 			{
@@ -775,6 +828,15 @@ func init() {
 					},
 					{
 						"hidden": false,
+						"id": "bool1260321794",
+						"name": "active",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
 						"id": "autodate2990389176",
 						"name": "created",
 						"onCreate": true,
@@ -1021,11 +1083,25 @@ func init() {
 						"required": false,
 						"system": false,
 						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pbc_2536409462",
+						"hidden": false,
+						"id": "relation3146128159",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "branch",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
 					}
 				],
 				"id": "ranctx5xgih6n3a",
 				"indexes": [
-					"CREATE INDEX ` + "`" + `idx_jgvQezNmMn` + "`" + ` ON ` + "`" + `time_entries` + "`" + ` (` + "`" + `uid` + "`" + `)"
+					"CREATE INDEX ` + "`" + `idx_jgvQezNmMn` + "`" + ` ON ` + "`" + `time_entries` + "`" + ` (` + "`" + `uid` + "`" + `)",
+					"CREATE INDEX ` + "`" + `idx_ljFGUYCrIB` + "`" + ` ON ` + "`" + `time_entries` + "`" + ` (\n  ` + "`" + `branch` + "`" + `,\n  ` + "`" + `job` + "`" + `\n)"
 				],
 				"listRule": "@request.auth.id = uid ||\n(tsid.submitted = true && @request.auth.id = tsid.approver) ||\n(tsid.submitted = true && @request.auth.id ?= tsid.time_sheet_reviewers_via_time_sheet.reviewer) ||\n(tsid.committed != '' && @request.auth.user_claims_via_uid.cid.name ?= 'report')",
 				"name": "time_entries",
@@ -1113,8 +1189,8 @@ func init() {
 				"viewRule": "@request.auth.id != \"\""
 			},
 			{
-				"createRule": null,
-				"deleteRule": null,
+				"createRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'admin'",
+				"deleteRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'admin'",
 				"fields": [
 					{
 						"autogeneratePattern": "[a-z0-9]{15}",
@@ -1190,12 +1266,12 @@ func init() {
 				"indexes": [
 					"CREATE UNIQUE INDEX ` + "`" + `idx_6dSZCrb` + "`" + ` ON ` + "`" + `user_claims` + "`" + ` (\n  ` + "`" + `uid` + "`" + `,\n  ` + "`" + `cid` + "`" + `\n)"
 				],
-				"listRule": "@request.auth.id = uid",
+				"listRule": "@request.auth.id = uid ||\n(\n  @request.auth.id != \"\" &&\n  @request.auth.user_claims_via_uid.cid.name ?= 'admin'\n)",
 				"name": "user_claims",
 				"system": false,
 				"type": "base",
-				"updateRule": null,
-				"viewRule": "@request.auth.id = uid"
+				"updateRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'admin'",
+				"viewRule": "@request.auth.id = uid ||\n(\n  @request.auth.id != \"\" &&\n  @request.auth.user_claims_via_uid.cid.name ?= 'admin'\n)"
 			},
 			{
 				"createRule": null,
@@ -1218,7 +1294,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_DhDb",
+						"id": "_clone_HqHJ",
 						"max": 48,
 						"min": 2,
 						"name": "surname",
@@ -1232,7 +1308,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_zVc0",
+						"id": "_clone_dWQZ",
 						"max": 48,
 						"min": 2,
 						"name": "given_name",
@@ -1707,6 +1783,19 @@ func init() {
 						"required": false,
 						"system": false,
 						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pbc_2536409462",
+						"hidden": false,
+						"id": "relation1557598284",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "default_branch",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
 					}
 				],
 				"id": "zc850lb2wclrr87",
@@ -1718,7 +1807,7 @@ func init() {
 				"name": "admin_profiles",
 				"system": false,
 				"type": "base",
-				"updateRule": null,
+				"updateRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'admin'",
 				"viewRule": null
 			},
 			{
@@ -1906,7 +1995,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_VqOQ",
+						"id": "_clone_DYGN",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "manager_uid",
@@ -1932,7 +2021,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_AzNd",
+						"id": "_clone_A15k",
 						"max": 0,
 						"min": 0,
 						"name": "opening_date",
@@ -1945,7 +2034,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_KmqD",
+						"id": "_clone_CU4s",
 						"max": 200,
 						"min": 0,
 						"name": "opening_ov",
@@ -1957,7 +2046,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_peZE",
+						"id": "_clone_UBvU",
 						"max": 332,
 						"min": 0,
 						"name": "opening_op",
@@ -2055,7 +2144,7 @@ func init() {
 				"viewRule": "@request.auth.id = id ||\n@request.auth.id = manager_uid"
 			},
 			{
-				"createRule": "// the caller is authenticated\n@request.auth.id != \"\" &&\n\n// no po_number is submitted\n(@request.body.po_number:isset = false || @request.body.po_number = \"\") &&\n\n// status is Unapproved\n@request.body.status = \"Unapproved\" &&\n\n// the uid is missing or is equal to the authenticated user's id\n(@request.body.uid:isset = false || @request.body.uid = @request.auth.id) &&\n\n// no rejection properties are submitted\n@request.body.rejector:isset = false &&\n@request.body.rejected:isset = false &&\n@request.body.rejection_reason:isset = false &&\n\n// approved isn't set. We check that the approver has the appropriate claim and divisions in payload in hooks, commenting out the previous check for po_approver here. \n@request.body.approved:isset = false &&\n//@request.body.approver.user_claims_via_uid.cid.name ?= 'po_approver' &&\n\n// no second approver properties are submitted\n@request.body.second_approver:isset = false &&\n@request.body.second_approval:isset = false &&\n\n// no cancellation properties are submitted\n@request.body.cancelled:isset = false &&\n@request.body.canceller:isset = false &&\n\n// no closed properties are submitted\n@request.body.closed:isset = false &&\n@request.body.closer:isset = false &&\n@request.body.closed_by_system:isset = false &&\n\n// vendor is active\n@request.body.vendor.status = \"Active\" &&\n\n// if present, the category belongs to the job, otherwise is blank\n(\n  // compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
+				"createRule": "// the caller is authenticated\n@request.auth.id != \"\" &&\n\n// no po_number is submitted\n(@request.body.po_number:isset = false || @request.body.po_number = \"\") &&\n\n// status is Unapproved\n@request.body.status = \"Unapproved\" &&\n\n// the uid is missing or is equal to the authenticated user's id\n(@request.body.uid:isset = false || @request.body.uid = @request.auth.id) &&\n\n// no rejection properties are submitted\n@request.body.rejector:isset = false &&\n@request.body.rejected:isset = false &&\n@request.body.rejection_reason:isset = false &&\n\n// approved isn't set. We check that the approver has the appropriate claim and divisions in payload in hooks, commenting out the previous check for po_approver here. \n@request.body.approved:isset = false &&\n//@request.body.approver.user_claims_via_uid.cid.name ?= 'po_approver' &&\n\n// no second approver properties are submitted\n@request.body.second_approver:isset = false &&\n@request.body.second_approval:isset = false &&\n\n// no cancellation properties are submitted\n@request.body.cancelled:isset = false &&\n@request.body.canceller:isset = false &&\n\n// no closed properties are submitted\n@request.body.closed:isset = false &&\n@request.body.closer:isset = false &&\n@request.body.closed_by_system:isset = false &&\n\n// vendor is active (disabled, perform this in the hook for better error messages)\n// @request.body.vendor.status = \"Active\" &&\n\n// if present, the category belongs to the job, otherwise is blank\n(\n  // compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
 				"deleteRule": "@request.auth.id = uid && status = 'Unapproved'",
 				"fields": [
 					{
@@ -2208,7 +2297,7 @@ func init() {
 						"name": "total",
 						"onlyInt": false,
 						"presentable": false,
-						"required": true,
+						"required": false,
 						"system": false,
 						"type": "number"
 					},
@@ -2391,7 +2480,7 @@ func init() {
 						"minSelect": 0,
 						"name": "vendor",
 						"presentable": false,
-						"required": true,
+						"required": false,
 						"system": false,
 						"type": "relation"
 					},
@@ -2494,6 +2583,19 @@ func init() {
 						"required": false,
 						"system": false,
 						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pbc_2536409462",
+						"hidden": false,
+						"id": "relation3146128159",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "branch",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
 					}
 				],
 				"id": "m19q72syy0e3lvm",
@@ -2504,7 +2606,7 @@ func init() {
 				"name": "purchase_orders",
 				"system": false,
 				"type": "base",
-				"updateRule": "// only the creator can update the record\nuid = @request.auth.id &&\n\n// status is Unapproved and no approvals have been performed\nstatus = 'Unapproved' &&\napproved = \"\" &&\nsecond_approval = \"\"\n\n// no po_number is submitted\n(@request.body.po_number:isset = false || po_number = @request.body.po_number) &&\n\n// no rejection properties are submitted\n(@request.body.rejector:isset = false || rejector = @request.body.rejector) &&\n(@request.body.rejected:isset = false || rejected = @request.body.rejected) &&\n(@request.body.rejection_reason:isset = false || rejection_reason = @request.body.rejection_reason) &&\n\n// approved is unchanged\n(@request.body.approved:isset = false || approved = @request.body.approved) &&\n\n// no second approver properties are submitted\n(@request.body.second_approver:isset = false || second_approver = @request.body.second_approver) &&\n(@request.body.second_approval:isset = false || second_approval = @request.body.second_approval) &&\n\n// no cancellation properties are submitted\n(@request.body.cancelled:isset = false || cancelled = @request.body.cancelled) &&\n(@request.body.canceller:isset = false || canceller = @request.body.canceller) &&\n\n// no closed properties are submitted\n(@request.body.closed:isset = false || closed = @request.body.closed) &&\n(@request.body.closer:isset = false || closer = @request.body.closer) &&\n(@request.body.closed_by_system:isset = false || closed_by_system = @request.body.closed_by_system) &&\n\n// vendor is active\n@request.body.vendor.status = \"Active\" &&\n\n// if present, the category belongs to the job, otherwise is blank\n(\n  // the job is unchanged, compare the new category to job\n  ( @request.body.job:isset = false && @request.body.category.job = job ) ||\n  // the job has changed, compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
+				"updateRule": "// only the creator can update the record\nuid = @request.auth.id &&\n\n// status is Unapproved and no approvals have been performed\nstatus = 'Unapproved' &&\napproved = \"\" &&\nsecond_approval = \"\"\n\n// no po_number is submitted\n(@request.body.po_number:isset = false || po_number = @request.body.po_number) &&\n\n// no rejection properties are submitted\n(@request.body.rejector:isset = false || rejector = @request.body.rejector) &&\n(@request.body.rejected:isset = false || rejected = @request.body.rejected) &&\n(@request.body.rejection_reason:isset = false || rejection_reason = @request.body.rejection_reason) &&\n\n// approved is unchanged\n(@request.body.approved:isset = false || approved = @request.body.approved) &&\n\n// no second approver properties are submitted\n(@request.body.second_approver:isset = false || second_approver = @request.body.second_approver) &&\n(@request.body.second_approval:isset = false || second_approval = @request.body.second_approval) &&\n\n// no cancellation properties are submitted\n(@request.body.cancelled:isset = false || cancelled = @request.body.cancelled) &&\n(@request.body.canceller:isset = false || canceller = @request.body.canceller) &&\n\n// no closed properties are submitted\n(@request.body.closed:isset = false || closed = @request.body.closed) &&\n(@request.body.closer:isset = false || closer = @request.body.closer) &&\n(@request.body.closed_by_system:isset = false || closed_by_system = @request.body.closed_by_system) &&\n\n// vendor is active (disabled, perform this in the hook for better error messages)\n// @request.body.vendor.status = \"Active\" &&\n\n// if present, the category belongs to the job, otherwise is blank\n(\n  // the job is unchanged, compare the new category to job\n  ( @request.body.job:isset = false && @request.body.category.job = job ) ||\n  // the job has changed, compare the new category to the new job\n  ( @request.body.job:isset = true && @request.body.category.job = @request.body.job ) ||\n  @request.body.category = \"\"\n)",
 				"viewRule": "// Active purchase_orders can be viewed by any authenticated user\n(status = \"Active\" && @request.auth.id != \"\") ||\n\n// Cancelled and Closed purchase_orders can be viewed by uid, approver, second_approver, and 'report' claim holder\n(\n  (status = \"Cancelled\" || status = \"Closed\") &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = second_approver || \n    @request.auth.user_claims_via_uid.cid.name ?= 'report'\n  )\n) ||\n\n// TODO: We may also later allow Closed purchase_orders to be viewed by uid, approver, and committer of corresponding expenses, if any, in a rule here\n\n// Unapproved purchase_orders can be viewed by uid, approver, priority_second_approver and, if updated is more than 24 hours ago, any holder of the po_approver claim whose po_approver_props.max_amount >= approval_amount and <= the upper_threshold of the tier.\n(\n  status = \"Unapproved\" &&\n  (\n    @request.auth.id = uid || \n    @request.auth.id = approver || \n    @request.auth.id = priority_second_approver \n  ) || \n  (\n    // updated more than 24 hours ago\n    updated < @yesterday && \n    \n    // caller has the po_approver claim\n    @request.auth.user_claims_via_uid.cid.name ?= \"po_approver\" &&\n\n    // caller max_amount for the po_approver claim >= approval_total\n    @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n\n    // caller user_claims.payload.divisions = null OR includes division\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:length = 0 ||\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.divisions:each ?= division\n    ) &&\n    (\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount >= approval_total &&\n      @collection.purchase_orders_augmented.id ?= id &&\n      @request.auth.user_claims_via_uid.po_approver_props_via_user_claim.max_amount ?<= @collection.purchase_orders_augmented.upper_threshold\n    )\n  )\n)"
 			},
 			{
@@ -2974,13 +3076,27 @@ func init() {
 						"required": false,
 						"system": false,
 						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pbc_2536409462",
+						"hidden": false,
+						"id": "relation3146128159",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "branch",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
 					}
 				],
 				"id": "o1vpz1mm7qsfoyy",
 				"indexes": [
 					"CREATE UNIQUE INDEX ` + "`" + `idx_KqwTULTh3p` + "`" + ` ON ` + "`" + `expenses` + "`" + ` (` + "`" + `attachment_hash` + "`" + `) WHERE ` + "`" + `attachment_hash` + "`" + ` != ''",
 					"CREATE INDEX ` + "`" + `idx_8LRpecUoxd` + "`" + ` ON ` + "`" + `expenses` + "`" + ` (\n  ` + "`" + `purchase_order` + "`" + `,\n  ` + "`" + `committed` + "`" + `\n)",
-					"CREATE INDEX ` + "`" + `idx_slBmqtw6SZ` + "`" + ` ON ` + "`" + `expenses` + "`" + ` (` + "`" + `date` + "`" + `)"
+					"CREATE INDEX ` + "`" + `idx_slBmqtw6SZ` + "`" + ` ON ` + "`" + `expenses` + "`" + ` (` + "`" + `date` + "`" + `)",
+					"CREATE INDEX ` + "`" + `idx_3TRP1AbuJv` + "`" + ` ON ` + "`" + `expenses` + "`" + ` (\n  ` + "`" + `branch` + "`" + `,\n  ` + "`" + `job` + "`" + `\n)"
 				],
 				"listRule": "uid = @request.auth.id ||\n(approver = @request.auth.id && submitted = true) ||\n(approved != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'commit') ||\n(committed != \"\" && @request.auth.user_claims_via_uid.cid.name ?= 'report')",
 				"name": "expenses",
@@ -3169,6 +3285,19 @@ func init() {
 						"required": false,
 						"system": false,
 						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "relation695204517",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "business_development_lead",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
 					}
 				],
 				"id": "1v6i9rrpniuatcx",
@@ -3570,6 +3699,19 @@ func init() {
 						"required": false,
 						"system": false,
 						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pbc_2536409462",
+						"hidden": false,
+						"id": "relation3146128159",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "branch",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
 					}
 				],
 				"id": "5z24r2v5jgh8qft",
@@ -4426,7 +4568,7 @@ func init() {
 				"viewRule": null
 			},
 			{
-				"createRule": null,
+				"createRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'admin'",
 				"deleteRule": null,
 				"fields": [
 					{
@@ -4508,7 +4650,7 @@ func init() {
 				"name": "po_approver_props",
 				"system": false,
 				"type": "base",
-				"updateRule": null,
+				"updateRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'admin'",
 				"viewRule": null
 			},
 			{
@@ -4532,7 +4674,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_Mc1a",
+						"id": "_clone_IWD1",
 						"max": 0,
 						"min": 0,
 						"name": "po_number",
@@ -4545,7 +4687,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_me6E",
+						"id": "_clone_usJJ",
 						"maxSelect": 1,
 						"name": "status",
 						"presentable": false,
@@ -4563,7 +4705,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_hryG",
+						"id": "_clone_gKI2",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "uid",
@@ -4574,7 +4716,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_EvbL",
+						"id": "_clone_FN6m",
 						"maxSelect": 1,
 						"name": "type",
 						"presentable": false,
@@ -4590,7 +4732,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_zQB6",
+						"id": "_clone_3Ld1",
 						"max": 0,
 						"min": 0,
 						"name": "date",
@@ -4604,7 +4746,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_MeMa",
+						"id": "_clone_vaoP",
 						"max": 0,
 						"min": 0,
 						"name": "end_date",
@@ -4617,7 +4759,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_NOYW",
+						"id": "_clone_SgXQ",
 						"maxSelect": 1,
 						"name": "frequency",
 						"presentable": false,
@@ -4634,7 +4776,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "3esdddggow6dykr",
 						"hidden": false,
-						"id": "_clone_l0q3",
+						"id": "_clone_xxqj",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "division",
@@ -4646,7 +4788,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_ks4I",
+						"id": "_clone_qbYy",
 						"max": 0,
 						"min": 5,
 						"name": "description",
@@ -4659,19 +4801,19 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_XuOT",
+						"id": "_clone_4dWm",
 						"max": null,
 						"min": 0,
 						"name": "total",
 						"onlyInt": false,
 						"presentable": false,
-						"required": true,
+						"required": false,
 						"system": false,
 						"type": "number"
 					},
 					{
 						"hidden": false,
-						"id": "_clone_kspy",
+						"id": "_clone_PXtp",
 						"maxSelect": 1,
 						"name": "payment_type",
 						"presentable": false,
@@ -4686,7 +4828,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_jbAG",
+						"id": "_clone_wNmb",
 						"maxSelect": 1,
 						"maxSize": 5242880,
 						"mimeTypes": [
@@ -4707,7 +4849,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_pVvq",
+						"id": "_clone_Lo7g",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "rejector",
@@ -4718,7 +4860,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_9z3M",
+						"id": "_clone_pqHw",
 						"max": "",
 						"min": "",
 						"name": "rejected",
@@ -4730,7 +4872,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_4BfG",
+						"id": "_clone_doMZ",
 						"max": 0,
 						"min": 5,
 						"name": "rejection_reason",
@@ -4745,7 +4887,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_UTL3",
+						"id": "_clone_LB0Z",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "approver",
@@ -4756,7 +4898,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_MjGZ",
+						"id": "_clone_GWcw",
 						"max": "",
 						"min": "",
 						"name": "approved",
@@ -4769,7 +4911,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_Tk2a",
+						"id": "_clone_dee3",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "second_approver",
@@ -4780,7 +4922,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_YjpO",
+						"id": "_clone_U2H5",
 						"max": "",
 						"min": "",
 						"name": "second_approval",
@@ -4793,7 +4935,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_6age",
+						"id": "_clone_Rkdb",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "canceller",
@@ -4804,7 +4946,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_b9O5",
+						"id": "_clone_z1tA",
 						"max": "",
 						"min": "",
 						"name": "cancelled",
@@ -4817,7 +4959,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "yovqzrnnomp0lkx",
 						"hidden": false,
-						"id": "_clone_NeQl",
+						"id": "_clone_PzDk",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "job",
@@ -4830,7 +4972,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "nrwhbwowokwu6cr",
 						"hidden": false,
-						"id": "_clone_U2CB",
+						"id": "_clone_6PcM",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "category",
@@ -4843,12 +4985,12 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "y0xvnesailac971",
 						"hidden": false,
-						"id": "_clone_ZaYl",
+						"id": "_clone_J1L1",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "vendor",
 						"presentable": false,
-						"required": true,
+						"required": false,
 						"system": false,
 						"type": "relation"
 					},
@@ -4856,7 +4998,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "m19q72syy0e3lvm",
 						"hidden": false,
-						"id": "_clone_77cZ",
+						"id": "_clone_IH2G",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "parent_po",
@@ -4867,7 +5009,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_a8QB",
+						"id": "_clone_rFyi",
 						"name": "created",
 						"onCreate": true,
 						"onUpdate": false,
@@ -4877,7 +5019,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_wMJf",
+						"id": "_clone_YXKq",
 						"name": "updated",
 						"onCreate": true,
 						"onUpdate": true,
@@ -4889,7 +5031,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_wlmF",
+						"id": "_clone_9ZJE",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "closer",
@@ -4900,7 +5042,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_MFzW",
+						"id": "_clone_8d2Z",
 						"max": "",
 						"min": "",
 						"name": "closed",
@@ -4911,7 +5053,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_5ibI",
+						"id": "_clone_E7NP",
 						"name": "closed_by_system",
 						"presentable": false,
 						"required": false,
@@ -4922,7 +5064,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_whiC",
+						"id": "_clone_1GFV",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "priority_second_approver",
@@ -4933,7 +5075,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_1biW",
+						"id": "_clone_cwTK",
 						"max": null,
 						"min": null,
 						"name": "approval_total",
@@ -5026,7 +5168,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_WGSx",
+						"id": "_clone_mbzC",
 						"max": 0,
 						"min": 0,
 						"name": "parent_po_number",
@@ -5040,7 +5182,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_UsRo",
+						"id": "_clone_UKQN",
 						"max": 0,
 						"min": 3,
 						"name": "vendor_name",
@@ -5054,7 +5196,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_slBo",
+						"id": "_clone_uqMD",
 						"max": 0,
 						"min": 3,
 						"name": "vendor_alias",
@@ -5068,7 +5210,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_sF75",
+						"id": "_clone_YfSy",
 						"max": 0,
 						"min": 0,
 						"name": "job_number",
@@ -5082,7 +5224,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_xobI",
+						"id": "_clone_XPGI",
 						"max": 0,
 						"min": 2,
 						"name": "client_name",
@@ -5109,7 +5251,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_CwH6",
+						"id": "_clone_vfcX",
 						"max": 0,
 						"min": 3,
 						"name": "job_description",
@@ -5123,7 +5265,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_lgZg",
+						"id": "_clone_BT7n",
 						"max": 0,
 						"min": 1,
 						"name": "division_code",
@@ -5137,7 +5279,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_Dl7r",
+						"id": "_clone_Qzp3",
 						"max": 0,
 						"min": 2,
 						"name": "division_name",
@@ -5151,7 +5293,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_fkjQ",
+						"id": "_clone_qG6r",
 						"max": 0,
 						"min": 3,
 						"name": "category_name",
@@ -5581,7 +5723,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_sbpV",
+						"id": "_clone_kBF0",
 						"max": 0,
 						"min": 0,
 						"name": "week_ending",
@@ -5624,7 +5766,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_JXVx",
+						"id": "_clone_LUV3",
 						"max": 0,
 						"min": 0,
 						"name": "week_ending",
@@ -5668,7 +5810,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "3esdddggow6dykr",
 						"hidden": false,
-						"id": "_clone_vor1",
+						"id": "_clone_BHmF",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "division",
@@ -5681,7 +5823,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_PSt3",
+						"id": "_clone_6jXT",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "uid",
@@ -5692,7 +5834,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_C8wU",
+						"id": "_clone_9PmV",
 						"max": 18,
 						"min": -18,
 						"name": "hours",
@@ -5705,7 +5847,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_FEGB",
+						"id": "_clone_HXRo",
 						"max": 0,
 						"min": 0,
 						"name": "description",
@@ -5720,7 +5862,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "cnqv0wm8hly7r3n",
 						"hidden": false,
-						"id": "_clone_Pulu",
+						"id": "_clone_cyt7",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "time_type",
@@ -5731,7 +5873,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_Ay3a",
+						"id": "_clone_mnfd",
 						"max": 3,
 						"min": 0,
 						"name": "meals_hours",
@@ -5745,7 +5887,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "yovqzrnnomp0lkx",
 						"hidden": false,
-						"id": "_clone_kYGH",
+						"id": "_clone_uqiG",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "job",
@@ -5757,7 +5899,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_xRjI",
+						"id": "_clone_FvI0",
 						"max": 0,
 						"min": 0,
 						"name": "work_record",
@@ -5770,7 +5912,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_jfFy",
+						"id": "_clone_NFZy",
 						"max": null,
 						"min": null,
 						"name": "payout_request_amount",
@@ -5783,7 +5925,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_RKPL",
+						"id": "_clone_QZlL",
 						"max": 0,
 						"min": 0,
 						"name": "date",
@@ -5797,7 +5939,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_KCxg",
+						"id": "_clone_QWye",
 						"max": 0,
 						"min": 0,
 						"name": "week_ending",
@@ -5812,7 +5954,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "fpri53nrr2xgoov",
 						"hidden": false,
-						"id": "_clone_snuf",
+						"id": "_clone_rkaS",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "tsid",
@@ -5825,7 +5967,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "nrwhbwowokwu6cr",
 						"hidden": false,
-						"id": "_clone_dn82",
+						"id": "_clone_7dtB",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "category",
@@ -5838,7 +5980,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_o4P2",
+						"id": "_clone_pWU6",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "creator",
@@ -5849,7 +5991,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_Gg6D",
+						"id": "_clone_fnic",
 						"max": "",
 						"min": "",
 						"name": "committed",
@@ -5862,7 +6004,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_fZSL",
+						"id": "_clone_34qb",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "committer",
@@ -5874,7 +6016,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_fxkG",
+						"id": "_clone_tRCG",
 						"max": 0,
 						"min": 0,
 						"name": "committed_week_ending",
@@ -5887,7 +6029,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_QRlt",
+						"id": "_clone_GP1v",
 						"name": "skip_tsid_check",
 						"presentable": false,
 						"required": false,
@@ -5927,7 +6069,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_2Q3G",
+						"id": "_clone_eSib",
 						"max": 0,
 						"min": 1,
 						"name": "time_type_code",
@@ -5941,7 +6083,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_WDgW",
+						"id": "_clone_yHue",
 						"max": 0,
 						"min": 2,
 						"name": "time_type_name",
@@ -5955,7 +6097,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_XAhg",
+						"id": "_clone_68M8",
 						"max": 0,
 						"min": 0,
 						"name": "job_number",
@@ -5969,7 +6111,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_fmak",
+						"id": "_clone_yAfY",
 						"max": 0,
 						"min": 3,
 						"name": "job_description",
@@ -5983,7 +6125,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_aujY",
+						"id": "_clone_oRRN",
 						"max": 0,
 						"min": 3,
 						"name": "category_name",
@@ -5997,7 +6139,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_6NLX",
+						"id": "_clone_Mkss",
 						"max": 0,
 						"min": 1,
 						"name": "division_code",
@@ -6011,7 +6153,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_OXeo",
+						"id": "_clone_RkPw",
 						"max": 0,
 						"min": 2,
 						"name": "division_name",
@@ -6055,7 +6197,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_CzNQ",
+						"id": "_clone_KIkj",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "uid",
@@ -6067,7 +6209,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_WcUq",
+						"id": "_clone_kvZv",
 						"max": 0,
 						"min": 0,
 						"name": "date",
@@ -6082,7 +6224,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "3esdddggow6dykr",
 						"hidden": false,
-						"id": "_clone_JnYY",
+						"id": "_clone_yiAV",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "division",
@@ -6094,7 +6236,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_SzDu",
+						"id": "_clone_oVEh",
 						"max": 0,
 						"min": 0,
 						"name": "description",
@@ -6107,7 +6249,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_Qiq5",
+						"id": "_clone_RiJg",
 						"max": null,
 						"min": 0,
 						"name": "total",
@@ -6119,7 +6261,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_rSs1",
+						"id": "_clone_aoJi",
 						"maxSelect": 1,
 						"name": "payment_type",
 						"presentable": false,
@@ -6138,7 +6280,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_TsrX",
+						"id": "_clone_RHAI",
 						"maxSelect": 1,
 						"maxSize": 5242880,
 						"mimeTypes": [
@@ -6159,7 +6301,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_yE99",
+						"id": "_clone_ggNN",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "rejector",
@@ -6170,7 +6312,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_tckS",
+						"id": "_clone_hoDH",
 						"max": "",
 						"min": "",
 						"name": "rejected",
@@ -6182,7 +6324,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_SBdS",
+						"id": "_clone_Nenz",
 						"max": 0,
 						"min": 5,
 						"name": "rejection_reason",
@@ -6197,7 +6339,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_TLN2",
+						"id": "_clone_lpU6",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "approver",
@@ -6208,7 +6350,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_Ny4M",
+						"id": "_clone_p7dz",
 						"max": "",
 						"min": "",
 						"name": "approved",
@@ -6221,7 +6363,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "yovqzrnnomp0lkx",
 						"hidden": false,
-						"id": "_clone_j8Tz",
+						"id": "_clone_KgiE",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "job",
@@ -6234,7 +6376,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "nrwhbwowokwu6cr",
 						"hidden": false,
-						"id": "_clone_trSA",
+						"id": "_clone_PnId",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "category",
@@ -6246,7 +6388,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_zacW",
+						"id": "_clone_49Vq",
 						"max": 0,
 						"min": 0,
 						"name": "pay_period_ending",
@@ -6259,7 +6401,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_DRC7",
+						"id": "_clone_sv1M",
 						"maxSelect": 4,
 						"name": "allowance_types",
 						"presentable": false,
@@ -6275,7 +6417,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_s7vl",
+						"id": "_clone_I772",
 						"name": "submitted",
 						"presentable": false,
 						"required": false,
@@ -6286,7 +6428,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "_pb_users_auth_",
 						"hidden": false,
-						"id": "_clone_a4pc",
+						"id": "_clone_eGgx",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "committer",
@@ -6297,7 +6439,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_P9a5",
+						"id": "_clone_9DNN",
 						"max": "",
 						"min": "",
 						"name": "committed",
@@ -6309,7 +6451,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_WO0d",
+						"id": "_clone_HTm1",
 						"max": 0,
 						"min": 0,
 						"name": "committed_week_ending",
@@ -6322,7 +6464,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_geb8",
+						"id": "_clone_y6Lg",
 						"max": null,
 						"min": 0,
 						"name": "distance",
@@ -6335,7 +6477,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_VtLH",
+						"id": "_clone_VmpS",
 						"max": 0,
 						"min": 0,
 						"name": "cc_last_4_digits",
@@ -6350,7 +6492,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "m19q72syy0e3lvm",
 						"hidden": false,
-						"id": "_clone_gyIw",
+						"id": "_clone_Aof2",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "purchase_order",
@@ -6363,7 +6505,7 @@ func init() {
 						"cascadeDelete": false,
 						"collectionId": "y0xvnesailac971",
 						"hidden": false,
-						"id": "_clone_Pq97",
+						"id": "_clone_KX9S",
 						"maxSelect": 1,
 						"minSelect": 0,
 						"name": "vendor",
@@ -6375,7 +6517,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_wOQp",
+						"id": "_clone_gVOd",
 						"max": 0,
 						"min": 0,
 						"name": "purchase_order_number",
@@ -6389,7 +6531,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_yony",
+						"id": "_clone_6p3k",
 						"max": 0,
 						"min": 2,
 						"name": "client_name",
@@ -6403,7 +6545,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_sKn9",
+						"id": "_clone_IIC2",
 						"max": 0,
 						"min": 3,
 						"name": "category_name",
@@ -6417,7 +6559,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_KFiu",
+						"id": "_clone_CeDI",
 						"max": 0,
 						"min": 0,
 						"name": "job_number",
@@ -6431,7 +6573,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_Gycm",
+						"id": "_clone_b4vn",
 						"max": 0,
 						"min": 3,
 						"name": "job_description",
@@ -6445,7 +6587,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_hCI1",
+						"id": "_clone_uA61",
 						"max": 0,
 						"min": 2,
 						"name": "division_name",
@@ -6459,7 +6601,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_2NZW",
+						"id": "_clone_GsH4",
 						"max": 0,
 						"min": 1,
 						"name": "division_code",
@@ -6473,7 +6615,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_qECx",
+						"id": "_clone_K2ny",
 						"max": 0,
 						"min": 3,
 						"name": "vendor_name",
@@ -6487,7 +6629,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_7SYv",
+						"id": "_clone_BJce",
 						"max": 0,
 						"min": 3,
 						"name": "vendor_alias",
@@ -6633,7 +6775,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_jitS",
+						"id": "_clone_BOOT",
 						"max": 0,
 						"min": 0,
 						"name": "date",
@@ -6647,7 +6789,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_kgn1",
+						"id": "_clone_tEk6",
 						"max": 0,
 						"min": 0,
 						"name": "allowance_rates_effective_date",
@@ -6660,7 +6802,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_rWnH",
+						"id": "_clone_EFeA",
 						"maxSelect": 1,
 						"name": "payment_type",
 						"presentable": false,
@@ -6679,7 +6821,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_Elnr",
+						"id": "_clone_fU4S",
 						"maxSelect": 4,
 						"name": "allowance_types",
 						"presentable": false,
@@ -6695,7 +6837,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_7uef",
+						"id": "_clone_XTcs",
 						"max": null,
 						"min": 0,
 						"name": "breakfast_rate",
@@ -6707,7 +6849,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_ORPg",
+						"id": "_clone_cBKV",
 						"max": null,
 						"min": 0,
 						"name": "lunch_rate",
@@ -6719,7 +6861,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_QBmw",
+						"id": "_clone_ElAW",
 						"max": null,
 						"min": 0,
 						"name": "dinner_rate",
@@ -6731,7 +6873,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_yD4z",
+						"id": "_clone_16vi",
 						"max": null,
 						"min": 0,
 						"name": "lodging_rate",
@@ -6743,7 +6885,7 @@ func init() {
 					},
 					{
 						"hidden": false,
-						"id": "_clone_1leS",
+						"id": "_clone_QDi9",
 						"maxSize": 2000000,
 						"name": "mileage",
 						"presentable": false,
@@ -7012,7 +7154,7 @@ func init() {
 					{
 						"autogeneratePattern": "",
 						"hidden": false,
-						"id": "_clone_WtML",
+						"id": "_clone_iCyl",
 						"max": 0,
 						"min": 0,
 						"name": "week_ending",
@@ -7063,10 +7205,490 @@ func init() {
 				"updateRule": null,
 				"viewQuery": "SELECT\n  MIN(id) id,\n  week_ending,\n  SUM(CASE WHEN committed != '' THEN 1 ELSE 0 END) committed_count,\n  SUM(CASE WHEN approved != '' AND committed = '' AND rejected = '' THEN 1 ELSE 0 END) approved_count,\n  SUM(CASE WHEN submitted = 1 AND approved = '' AND committed = '' AND rejected = '' THEN 1 ELSE 0 END) submitted_count\nFROM time_sheets\nGROUP BY week_ending\nORDER BY week_ending DESC; ",
 				"viewRule": "@request.auth.user_claims_via_uid.cid.name ?= 'report'"
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1997877400",
+						"max": 0,
+						"min": 2,
+						"name": "code",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text1579384326",
+						"max": 0,
+						"min": 2,
+						"name": "name",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_2536409462",
+				"indexes": [
+					"CREATE UNIQUE INDEX ` + "`" + `idx_bSZOfMgI86` + "`" + ` ON ` + "`" + `branches` + "`" + ` (` + "`" + `code` + "`" + `)",
+					"CREATE UNIQUE INDEX ` + "`" + `idx_69eeQm7PYh` + "`" + ` ON ` + "`" + `branches` + "`" + ` (` + "`" + `name` + "`" + `)"
+				],
+				"listRule": "@request.auth.id != \"\"",
+				"name": "branches",
+				"system": false,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": "@request.auth.id != \"\""
+			},
+			{
+				"createRule": null,
+				"deleteRule": null,
+				"fields": [
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 0,
+						"min": 0,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "_clone_bEiY",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "uid",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_qdPa",
+						"max": 40,
+						"min": 8,
+						"name": "work_week_hours",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_JQZF",
+						"name": "salary",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_04wv",
+						"max": 1000,
+						"min": 50,
+						"name": "default_charge_out_rate",
+						"onlyInt": false,
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_pJn9",
+						"name": "off_rotation_permitted",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_S5WE",
+						"maxSelect": 1,
+						"name": "skip_min_time_check",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "select",
+						"values": [
+							"no",
+							"on_next_bundle",
+							"yes"
+						]
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_YUDg",
+						"max": 0,
+						"min": 0,
+						"name": "opening_date",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_Gnks",
+						"max": 332,
+						"min": 0,
+						"name": "opening_op",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_ezmh",
+						"max": 200,
+						"min": 0,
+						"name": "opening_ov",
+						"onlyInt": false,
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "number"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_eYoG",
+						"max": 0,
+						"min": 0,
+						"name": "payroll_id",
+						"pattern": "^(?:[1-9]\\d*|CMS[0-9]{1,2})$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_MaXD",
+						"name": "untracked_time_off",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_kUJw",
+						"name": "time_sheet_expected",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"hidden": false,
+						"id": "_clone_FpoS",
+						"name": "allow_personal_reimbursement",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_Gp0j",
+						"max": 0,
+						"min": 0,
+						"name": "mobile_phone",
+						"pattern": "^\\+1 \\(\\d{3}\\) \\d{3}-\\d{4}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_V4E8",
+						"max": 0,
+						"min": 0,
+						"name": "job_title",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_ZH3B",
+						"max": 0,
+						"min": 0,
+						"name": "personal_vehicle_insurance_expiry",
+						"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": false,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "pbc_2536409462",
+						"hidden": false,
+						"id": "_clone_u2PN",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "default_branch",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_ayTa",
+						"max": 48,
+						"min": 2,
+						"name": "given_name",
+						"pattern": "^[a-zA-Z]+(?:-[a-zA-Z]+)*$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "_clone_gZOk",
+						"max": 48,
+						"min": 2,
+						"name": "surname",
+						"pattern": "^[a-zA-Z]+(?:-[a-zA-Z]+)*$",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"hidden": false,
+						"id": "json122688194",
+						"maxSize": 1,
+						"name": "po_approver_props_id",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json1113389409",
+						"maxSize": 1,
+						"name": "po_approver_max_amount",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					},
+					{
+						"hidden": false,
+						"id": "json1126415246",
+						"maxSize": 1,
+						"name": "po_approver_divisions",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "json"
+					}
+				],
+				"id": "pbc_697077494",
+				"indexes": [],
+				"listRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'admin'",
+				"name": "admin_profiles_augmented",
+				"system": false,
+				"type": "view",
+				"updateRule": null,
+				"viewQuery": "SELECT ap.id,\n  ap.uid,\n  ap.work_week_hours,\n  ap.salary,\n  ap.default_charge_out_rate,\n  ap.off_rotation_permitted,\n  ap.skip_min_time_check,\n  ap.opening_date,\n  ap.opening_op,\n  ap.opening_ov,\n  ap.payroll_id,\n  ap.untracked_time_off,\n  ap.time_sheet_expected,\n  ap.allow_personal_reimbursement,\n  ap.mobile_phone,\n  ap.job_title,\n  ap.personal_vehicle_insurance_expiry,\n  ap.default_branch,\n  p.given_name,\n  p.surname,\n  po.po_approver_props_id,\n  po.po_approver_max_amount,\n  COALESCE(po.po_approver_divisions, '[]') AS po_approver_divisions\nFROM admin_profiles ap\nLEFT JOIN users u ON u.id = ap.uid\nLEFT JOIN profiles p ON u.id = p.uid\nLEFT JOIN (\n  SELECT\n    uc.uid,\n    pap.id AS po_approver_props_id,\n    pap.max_amount AS po_approver_max_amount,\n    pap.divisions AS po_approver_divisions\n  FROM user_claims uc\n  INNER JOIN claims c ON c.id = uc.cid AND c.name = 'po_approver'\n  LEFT JOIN po_approver_props pap ON pap.user_claim = uc.id\n) po ON po.uid = ap.uid;",
+				"viewRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'admin'"
+			},
+			{
+				"createRule": "@request.auth.id != ''",
+				"deleteRule": "@request.auth.id != \"\" &&\n@request.auth.user_claims_via_uid.cid.name ?= 'admin'",
+				"fields": [
+					{
+						"autogeneratePattern": "[a-z0-9]{15}",
+						"hidden": false,
+						"id": "text3208210256",
+						"max": 15,
+						"min": 15,
+						"name": "id",
+						"pattern": "^[a-z0-9]+$",
+						"presentable": false,
+						"primaryKey": true,
+						"required": true,
+						"system": true,
+						"type": "text"
+					},
+					{
+						"autogeneratePattern": "",
+						"hidden": false,
+						"id": "text3485334036",
+						"max": 1000,
+						"min": 10,
+						"name": "note",
+						"pattern": "",
+						"presentable": false,
+						"primaryKey": false,
+						"required": true,
+						"system": false,
+						"type": "text"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "1v6i9rrpniuatcx",
+						"hidden": false,
+						"id": "relation3343123541",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "client",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "yovqzrnnomp0lkx",
+						"hidden": false,
+						"id": "relation4225294584",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "job",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "bool50141544",
+						"name": "job_not_applicable",
+						"presentable": false,
+						"required": false,
+						"system": false,
+						"type": "bool"
+					},
+					{
+						"cascadeDelete": false,
+						"collectionId": "_pb_users_auth_",
+						"hidden": false,
+						"id": "relation1402668550",
+						"maxSelect": 1,
+						"minSelect": 0,
+						"name": "uid",
+						"presentable": false,
+						"required": true,
+						"system": false,
+						"type": "relation"
+					},
+					{
+						"hidden": false,
+						"id": "autodate2990389176",
+						"name": "created",
+						"onCreate": true,
+						"onUpdate": false,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					},
+					{
+						"hidden": false,
+						"id": "autodate3332085495",
+						"name": "updated",
+						"onCreate": true,
+						"onUpdate": true,
+						"presentable": false,
+						"system": false,
+						"type": "autodate"
+					}
+				],
+				"id": "pbc_4126047805",
+				"indexes": [],
+				"listRule": "@request.auth.id != ''",
+				"name": "client_notes",
+				"system": false,
+				"type": "base",
+				"updateRule": null,
+				"viewRule": "@request.auth.id != ''"
 			}
 		]`
 
-		return app.ImportCollectionsByMarshaledJSON([]byte(jsonData), true)
+		return app.ImportCollectionsByMarshaledJSON([]byte(jsonData), false)
 	}, func(app core.App) error {
 		return nil
 	})
