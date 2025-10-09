@@ -5,6 +5,8 @@ import (
 	"io/fs"
 	"log"
 	"os"
+	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"tybalt/cron"
@@ -28,12 +30,30 @@ import (
 
 var staticFiles embed.FS
 
+func isGoRun() bool {
+	// Step 1: It must be a file-list build (go run or `go build main.go`).
+	info, ok := debug.ReadBuildInfo()
+	if !ok || info.Path != "command-line-arguments" {
+		return false
+	}
+
+	// Step 2: Distinguish `go run` from `go build main.go` by executable location.
+	// `go run` executes from the Go build cache; path contains a `go-build` segment.
+	exePath, err := os.Executable()
+	if err != nil {
+		return false
+	}
+	exePath = filepath.Clean(exePath)
+	cacheMarker := string(os.PathSeparator) + "go-build" + string(os.PathSeparator)
+	return strings.Contains(exePath, cacheMarker)
+}
+
 func main() {
 	app := pocketbase.New()
 
 	// enable/disable automatic migration creation
-	// loosely check if it was executed using "go run"
-	isGoRun := strings.HasPrefix(os.Args[0], os.TempDir())
+	// check if it was executed using "go run"
+	isGoRun := isGoRun()
 
 	migrationsDir := "./migrations"
 
