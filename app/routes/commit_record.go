@@ -47,6 +47,15 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 				}
 			}
 
+			// Disallow committing an already committed record
+			if !record.GetDateTime("committed").IsZero() {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_already_committed",
+					Message: "this record is already committed",
+				}
+			}
+
 			// Verify the caller has the commit claim by querying the user_claims
 			// collection for a record with uid that matches the caller's ID and cid
 			// who's name in the claims collection is "commit". If the record exists,
@@ -235,6 +244,12 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 		})
 
 		if err != nil {
+			if codeError, ok := err.(*CodeError); ok {
+				return e.JSON(httpResponseStatusCode, map[string]any{
+					"error": codeError.Message,
+					"code":  codeError.Code,
+				})
+			}
 			return e.JSON(httpResponseStatusCode, map[string]string{"error": err.Error()})
 		}
 

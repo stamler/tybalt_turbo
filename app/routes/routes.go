@@ -80,12 +80,17 @@ func AddRoutes(app core.App) {
 		tsGroup.POST("/{id}/unbundle", createUnbundleTimesheetHandler(app))
 		tsGroup.POST("/{id}/approve", createApproveRecordHandler(app, "time_sheets"))
 		tsGroup.POST("/{id}/reject", createRejectRecordHandler(app, "time_sheets"))
+		// Allow committers to commit time_sheets
+		tsGroup.POST("/{id}/commit", createCommitRecordHandler(app, "time_sheets"))
 		tsGroup.GET("/{id}/reviewers", createGetReviewersHandler(app))
 		tsGroup.GET("/{id}/approver", createTimesheetApproverHandler(app))
 		tsGroup.GET("/tallies", createTimesheetTalliesHandler(app, "uid", 0, 0))
 		tsGroup.GET("/tallies/pending", createTimesheetTalliesHandler(app, "approver", 1, 0))
 		tsGroup.GET("/tallies/approved", createTimesheetTalliesHandler(app, "approver", 0, 1))
 		tsGroup.GET("/tallies/shared", createTimesheetTalliesHandler(app, "reviewer", 0, 0))
+		// TimeTracking endpoints for committers
+		tsGroup.GET("/tracking_counts", createTimesheetTrackingCountsHandler(app))
+		tsGroup.GET("/tracking/weeks/{weekEnding}", createTimesheetTrackingListHandler(app))
 
 		expensesGroup := se.Router.Group("/api/expenses")
 		expensesGroup.Bind(apis.RequireAuth("users"))

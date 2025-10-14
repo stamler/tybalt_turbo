@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -49,9 +50,17 @@ func createRejectRecordHandler(app core.App, collectionName string) func(e *core
 				}
 			}
 
-			// Check if the user is the approver
-			// TODO: others should be able to reject besides the approver
-			if record.GetString("approver") != userId {
+			// Check if the user is authorized to reject: approver OR user with commit claim
+			isApprover := record.GetString("approver") == userId
+			hasCommitClaim, err := utilities.HasClaim(txApp, authRecord, "commit")
+			if err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_fetching_user_claims",
+					Message: fmt.Sprintf("error fetching user claims: %v", err),
+				}
+			}
+			if !isApprover && !hasCommitClaim {
 				httpResponseStatusCode = http.StatusUnauthorized
 				return &CodeError{
 					Code:    "rejection_unauthorized",
