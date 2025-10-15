@@ -49,7 +49,7 @@
 
 <DsList items={rows} inListHeader="Time Tracking">
   {#snippet anchor({ id, week_ending }: Row)}
-    <a class="font-bold hover:underline" href={`/time/sheets/${id}/details`}
+    <a class="font-bold hover:underline" href={`/time/tracking/${id}`}
       >{shortDate(week_ending, true)}</a
     >
   {/snippet}
