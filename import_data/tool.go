@@ -343,7 +343,7 @@ func main() {
 				"submitted":       fixedTimestamp,
 				"approved":        fixedTimestamp,
 				"committed":       fixedTimestamp,
-				"committer":       "wegviunlyr2jjjv", // a temporary value that works for the test database
+				"committer":       item.ApproverUid, // set committer to approver uid since we don't have this data in the parquet file
 			}
 		}
 
