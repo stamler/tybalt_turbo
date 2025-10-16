@@ -99,6 +99,10 @@ func AddRoutes(app core.App) {
 		expensesGroup.POST("/{id}/approve", createApproveRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/reject", createRejectRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/commit", createCommitRecordHandler(app, "expenses"))
+		// Expense tracking endpoints for committers
+		expensesGroup.GET("/tracking_counts", createExpenseTrackingCountsHandler(app))
+		expensesGroup.GET("/tracking", createExpenseTrackingAllHandler(app))
+		expensesGroup.GET("/tracking/{payPeriodEnding}", createExpenseTrackingListHandler(app))
 
 		timeAmendmentsGroup := se.Router.Group("/api/time_amendments")
 		timeAmendmentsGroup.Bind(apis.RequireAuth("users"))

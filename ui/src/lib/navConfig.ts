@@ -95,6 +95,7 @@ export const navSections: NavSection[] = [
       },
       { label: "Pending My Approval", href: "/expenses/pending", buttons: [] },
       { label: "Approved By Me", href: "/expenses/approved", buttons: [] },
+      { label: "Tracking", href: "/expenses/tracking", buttons: [] },
     ],
   },
   {
