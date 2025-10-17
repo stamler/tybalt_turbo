@@ -6,7 +6,6 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
-  import type { PageData } from "./$types";
   import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { shortDate } from "$lib/utilities";
@@ -18,7 +17,10 @@
 
   const collectionId = "expenses";
 
-  let { inListHeader, data }: { inListHeader?: string; data: PageData } = $props();
+  let {
+    inListHeader,
+    data,
+  }: { inListHeader?: string; data: { items: any; createdItemIsVisible?: any } } = $props();
   let items = $state(data.items);
   let createdItemIsVisible = $state(data.createdItemIsVisible);
 
@@ -134,10 +136,10 @@
     vendor_alias,
     cc_last_4_digits,
   }: ExpensesAugmentedResponse)}
-    <span class="flex items-center gap-2">
+    <span class="flex items-center gap-2 text-sm">
       {#if rejected !== ""}
         <DsLabel color="red" title={`${shortDate(rejected)}: ${rejection_reason}`}>
-          <Icon icon="mdi:cancel" width="24px" class="inline-block" />
+          <Icon icon="mdi:cancel" width="20px" class="inline-block" />
           {rejector_name}
         </DsLabel>
       {/if}
@@ -149,16 +151,16 @@
       {/if}
       {#if vendor}
         <span class="flex items-center gap-0">
-          <Icon icon="mdi:store" width="24px" class="inline-block" />
+          <Icon icon="mdi:store" width="20px" class="inline-block" />
           {vendor_name}
           {#if vendor_alias}
-            <span class="text-sm text-gray-500">({vendor_alias})</span>
+            <span class="text-xs text-gray-500">({vendor_alias})</span>
           {/if}
         </span>
       {/if}
       {#if payment_type === "CorporateCreditCard"}
         <DsLabel color="cyan">
-          <Icon icon="mdi:credit-card-outline" width="24px" class="inline-block" />
+          <Icon icon="mdi:credit-card-outline" width="20px" class="inline-block" />
           **** {cc_last_4_digits}
         </DsLabel>
       {/if}
@@ -189,9 +191,9 @@
     {/if}
   {/snippet}
   {#snippet line3({ approved, approver_name, attachment, id }: ExpensesAugmentedResponse)}
-    <span class="flex items-center gap-1">
+    <span class="flex items-center gap-1 text-sm">
       {#if approved !== ""}
-        <Icon icon="material-symbols:order-approve-outline" width="24px" class="inline-block" />
+        <Icon icon="material-symbols:order-approve-outline" width="20px" class="inline-block" />
         {approver_name}
         ({shortDate(approved)})
       {/if}
