@@ -237,6 +237,9 @@
       {#if data.job.number?.startsWith("P")}
         <DsLabel color="yellow">proposal</DsLabel>
       {/if}
+      {#if data.job.number && !data.job.number.startsWith("P") && /^\d{2}-\d{4}$/.test(data.job.number)}
+        <a href={`/jobs/add/${data.job.id}`} class="ml-2 text-blue-600 underline">Create Sub-Job</a>
+      {/if}
     </div>
     <div><span class="font-semibold">Description:</span> {data.job.description}</div>
     {#if data.job.status}
@@ -325,6 +328,28 @@
                 <DsLabel color="blue">{category.name}</DsLabel>
               {/each}
             </div>
+          </div>
+        {/if}
+
+        {#if data.job.children && data.job.children.length > 0}
+          <div>
+            <span class="font-semibold">Children:</span>
+            <span>
+              {#each data.job.children as c, i}
+                <a href={`/jobs/${c.id}/details`} class="text-blue-600 hover:underline"
+                  >{c.number}</a
+                >{i < data.job.children.length - 1 ? ", " : ""}
+              {/each}
+            </span>
+          </div>
+        {/if}
+
+        {#if data.job.parent_id}
+          <div>
+            <span class="font-semibold">Parent Job:</span>
+            <a href={`/jobs/${data.job.parent_id}/details`} class="text-blue-600 hover:underline">
+              {data.job.parent_number || data.job.parent_id}
+            </a>
           </div>
         {/if}
 

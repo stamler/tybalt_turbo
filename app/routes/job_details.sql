@@ -5,6 +5,8 @@ SELECT
   j.number,
   j.description,
   j.status,
+  j.parent          AS parent_id,
+  pa.number         AS parent_number,
   j.location         AS location,
   j.client           AS client_id,
   cli.name           AS client_name,
@@ -37,6 +39,11 @@ SELECT
     WHERE pj.proposal = j.id
   ) AS projects_json,
   (
+    SELECT COALESCE(json_group_array(json_object('id', cj.id, 'number', cj.number)), '[]')
+    FROM jobs cj
+    WHERE cj.parent = j.id
+  ) AS children_json,
+  (
     SELECT COALESCE(json_group_array(json_object('id', c.id, 'name', c.name)), '[]')
     FROM categories c
     WHERE c.job = j.id
@@ -57,6 +64,7 @@ SELECT
   ) AS divisions_json
 FROM jobs j
 LEFT JOIN jobs pr           ON pr.id = j.proposal
+LEFT JOIN jobs pa           ON pa.id = j.parent
 LEFT JOIN clients cli          ON cli.id = j.client
 LEFT JOIN client_contacts cc   ON cc.id  = j.contact
 LEFT JOIN managers m           ON m.id   = j.manager

@@ -41,3 +41,72 @@ func TestJobsUpdate_InactiveDivisionFails(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+// jobs.number: prevent changing the job number after creation (collection updateRule)
+func TestJobsUpdate_NumberChangeBlockedByUpdateRule(t *testing.T) {
+	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "attempting to change job number is blocked with 404",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
+			Body: strings.NewReader(`{
+				"number": "99-9999"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				// updateRule blocks the request before reaching hooks
+				"OnRecordUpdateRequest": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// jobs: allow updating fields when number is unchanged (control test)
+func TestJobsUpdate_NumberUnchanged_AllowsOtherFieldUpdates(t *testing.T) {
+	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	newDescription := "Updated description control"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "updating description succeeds when number is not provided",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
+			Body: strings.NewReader(`{
+				"description": "` + newDescription + `"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"description":"` + newDescription + `"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}

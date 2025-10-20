@@ -41,7 +41,7 @@
   if (!Array.isArray(item.divisions)) {
     item.divisions = [] as unknown as JobsRecord["divisions"];
   }
-  if (item.status === undefined || item.status === "") {
+  if (item.status === undefined) {
     item.status = JobsStatusOptions.Active;
   }
   if (item.fn_agreement === undefined) {
@@ -290,8 +290,56 @@
       errors = {};
       goto("/jobs/list");
     } catch (error: unknown) {
-      const data = (error as { data?: { data?: Record<string, { message: string }> } })?.data?.data;
-      errors = data ?? {};
+      // Handle special case where backend requires setting proposal to Awarded first
+      const pocket = error as {
+        data?: {
+          data?: Record<string, { message: string; code?: string; data?: Record<string, string> }>;
+        };
+      };
+      const hookErrors = pocket?.data?.data;
+      const proposalErr = hookErrors?.proposal;
+      const proposalId = proposalErr?.data?.proposal_id;
+      if (proposalErr?.code === "proposal_not_awarded" && typeof proposalId === "string") {
+        const proceed =
+          typeof window !== "undefined" &&
+          window.confirm("The referenced proposal is Active. Set it to Awarded and continue?");
+        if (proceed) {
+          try {
+            await pb.collection("jobs").update(proposalId, { status: JobsStatusOptions.Awarded });
+            // retry create/update once
+            let retryJobId = (data as JobsPageData).id;
+            if ((data as JobsPageData).editing && retryJobId !== null) {
+              await pb.collection("jobs").update(retryJobId, item);
+            } else {
+              const createdJob = await pb.collection("jobs").create(item);
+              retryJobId = createdJob.id;
+            }
+            // continue categories changes as usual
+            for (const categoryName of newCategories) {
+              await pb
+                .collection("categories")
+                .create({ job: retryJobId!, name: categoryName.trim() }, { returnRecord: true });
+            }
+            for (const categoryId of categoriesToDelete) {
+              await pb.collection("categories").delete(categoryId);
+            }
+            errors = {};
+            goto("/jobs/list");
+            return;
+          } catch (retryErr) {
+            // fall through to display errors from retry
+            const retryData = (
+              retryErr as {
+                data?: { data?: Record<string, { message: string }> };
+              }
+            )?.data?.data;
+            errors = retryData ?? {};
+            return;
+          }
+        }
+      }
+      const backendErrors = pocket?.data?.data as Record<string, { message: string }> | undefined;
+      errors = backendErrors ?? {};
     }
   }
 
@@ -406,8 +454,9 @@
     {errors}
     fieldName="number"
     uiName="Number"
-    disabled={data.editing}
+    disabled={true}
   />
+  <p class="self-start text-xs text-neutral-600">Number is auto-assigned on creation.</p>
 
   <DsTextInput
     bind:value={item.description as string}
@@ -423,6 +472,9 @@
       {errors}
       fieldName="client"
       uiName="Client"
+      disabled={(data as JobsPageData).editing === false &&
+        (item as any).parent &&
+        (item as any).parent !== ""}
     >
       {#snippet resultTemplate(client)}{client.name}{/snippet}
     </DsAutoComplete>
@@ -527,7 +579,9 @@
       fieldName="proposal"
       uiName="Proposal"
     >
-      {#snippet resultTemplate(job)}{jobLabel(job)}{/snippet}
+      {#snippet resultTemplate(job)}{jobLabel(
+          job as unknown as Pick<JobApiResponse, "id" | "number" | "description">,
+        )}{/snippet}
     </DsAutoComplete>
   {/if}
 

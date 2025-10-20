@@ -31,6 +31,8 @@ type jobDetailsRow struct {
 	Number                    string          `db:"number"`
 	Description               string          `db:"description"`
 	Status                    sql.NullString  `db:"status"`
+	ParentID                  sql.NullString  `db:"parent_id"`
+	ParentNumber              sql.NullString  `db:"parent_number"`
 	Location                  sql.NullString  `db:"location"`
 	ClientID                  string          `db:"client_id"`
 	ClientName                string          `db:"client_name"`
@@ -59,6 +61,7 @@ type jobDetailsRow struct {
 	OutstandingBalanceDate    sql.NullString  `db:"outstanding_balance_date"`
 	DivisionsJSON             string          `db:"divisions_json"`
 	ProjectsJSON              string          `db:"projects_json"`
+	ChildrenJSON              string          `db:"children_json"`
 	CategoriesJSON            string          `db:"categories_json"`
 }
 
@@ -77,6 +80,8 @@ type JobDetails struct {
 	Number                    string     `json:"number"`
 	Description               string     `json:"description"`
 	Status                    string     `json:"status"`
+	ParentID                  string     `json:"parent_id"`
+	ParentNumber              string     `json:"parent_number"`
 	Location                  string     `json:"location"`
 	Client                    ClientInfo `json:"client"`
 	Contact                   Person     `json:"contact"`
@@ -96,6 +101,7 @@ type JobDetails struct {
 	OutstandingBalanceDate    string     `json:"outstanding_balance_date"`
 	Divisions                 []Division `json:"divisions"`
 	Projects                  []JobRef   `json:"projects"`
+	Children                  []JobRef   `json:"children"`
 	Categories                []Category `json:"categories"`
 }
 
@@ -122,6 +128,8 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 		_ = json.Unmarshal([]byte(r.DivisionsJSON), &divisions)
 		var projects []JobRef
 		_ = json.Unmarshal([]byte(r.ProjectsJSON), &projects)
+		var children []JobRef
+		_ = json.Unmarshal([]byte(r.ChildrenJSON), &children)
 
 		var categories []Category
 		_ = json.Unmarshal([]byte(r.CategoriesJSON), &categories)
@@ -139,6 +147,8 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			Number:                    r.Number,
 			Description:               r.Description,
 			Status:                    ns(r.Status),
+			ParentID:                  ns(r.ParentID),
+			ParentNumber:              ns(r.ParentNumber),
 			Location:                  ns(r.Location),
 			Client:                    ClientInfo{ID: r.ClientID, Name: r.ClientName},
 			Contact:                   Person{ID: ns(r.ContactID), GivenName: ns(r.ContactGivenName), Surname: ns(r.ContactSurname)},
@@ -158,6 +168,7 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			OutstandingBalanceDate:    ns(r.OutstandingBalanceDate),
 			Divisions:                 divisions,
 			Projects:                  projects,
+			Children:                  children,
 			Categories:                categories,
 		}
 
