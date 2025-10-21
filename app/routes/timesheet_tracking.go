@@ -151,6 +151,7 @@ func createTimesheetTrackingListHandler(app core.App) func(e *core.RequestEvent)
                     SUM(CASE WHEN tt.code = 'OTO' THEN IFNULL(te.payout_request_amount,0) ELSE 0 END) AS total_ot_payout_request
                 FROM time_entries te
                 LEFT JOIN time_types tt ON te.time_type = tt.id
+								WHERE te.week_ending = {:week_ending}
                 GROUP BY te.tsid
             ) agg ON agg.tsid = ts.id
             WHERE ts.week_ending = {:week_ending}
