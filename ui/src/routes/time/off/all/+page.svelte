@@ -4,4 +4,4 @@
   let { data }: { data: PageData } = $props();
 </script>
 
-<TimeOffList items={data.items || []} header="Time Off" />
+<TimeOffList items={data.items || []} header="All Time Off" />

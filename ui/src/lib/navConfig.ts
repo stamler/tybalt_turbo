@@ -152,6 +152,7 @@ export const navSections: NavSection[] = [
     items: [
       { label: "Payroll", href: "/reports/payroll", buttons: [] },
       { label: "Weekly", href: "/reports/weekly", buttons: [] },
+      { label: "Time Off", href: "/time/off/all", buttons: [] },
     ],
   },
   {
