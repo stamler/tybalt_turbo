@@ -20,8 +20,7 @@ SELECT
   am.given_name      AS alternate_manager_given_name,
   am.surname         AS alternate_manager_surname,
   j.job_owner        AS job_owner_id,
-  jo.given_name      AS job_owner_given_name,
-  jo.surname         AS job_owner_surname,
+  jo.name            AS job_owner_name,
   j.proposal         AS proposal_id,
   pr.number          AS proposal_number,
   j.fn_agreement     AS fn_agreement,
@@ -69,6 +68,6 @@ LEFT JOIN clients cli          ON cli.id = j.client
 LEFT JOIN client_contacts cc   ON cc.id  = j.contact
 LEFT JOIN managers m           ON m.id   = j.manager
 LEFT JOIN managers am          ON am.id  = j.alternate_manager
-LEFT JOIN managers jo          ON jo.id  = j.job_owner
+LEFT JOIN clients jo           ON jo.id  = j.job_owner
 LEFT JOIN branches br          ON br.id  = j.branch
 WHERE j.id = {:id}; 

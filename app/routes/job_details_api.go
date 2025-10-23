@@ -46,8 +46,7 @@ type jobDetailsRow struct {
 	AlternateManagerGivenName sql.NullString  `db:"alternate_manager_given_name"`
 	AlternateManagerSurname   sql.NullString  `db:"alternate_manager_surname"`
 	JobOwnerID                sql.NullString  `db:"job_owner_id"`
-	JobOwnerGivenName         sql.NullString  `db:"job_owner_given_name"`
-	JobOwnerSurname           sql.NullString  `db:"job_owner_surname"`
+	JobOwnerName              sql.NullString  `db:"job_owner_name"`
 	ProposalID                sql.NullString  `db:"proposal_id"`
 	ProposalNumber            sql.NullString  `db:"proposal_number"`
 	BranchID                  sql.NullString  `db:"branch_id"`
@@ -87,7 +86,7 @@ type JobDetails struct {
 	Contact                   Person     `json:"contact"`
 	Manager                   Person     `json:"manager"`
 	AlternateManager          Person     `json:"alternate_manager"`
-	JobOwner                  Person     `json:"job_owner"`
+	JobOwner                  ClientInfo `json:"job_owner"`
 	ProposalID                string     `json:"proposal_id"`
 	ProposalNumber            string     `json:"proposal_number"`
 	BranchID                  string     `json:"branch_id"`
@@ -154,7 +153,7 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			Contact:                   Person{ID: ns(r.ContactID), GivenName: ns(r.ContactGivenName), Surname: ns(r.ContactSurname)},
 			Manager:                   Person{ID: ns(r.ManagerID), GivenName: ns(r.ManagerGivenName), Surname: ns(r.ManagerSurname)},
 			AlternateManager:          Person{ID: ns(r.AlternateManagerID), GivenName: ns(r.AlternateManagerGivenName), Surname: ns(r.AlternateManagerSurname)},
-			JobOwner:                  Person{ID: ns(r.JobOwnerID), GivenName: ns(r.JobOwnerGivenName), Surname: ns(r.JobOwnerSurname)},
+			JobOwner:                  ClientInfo{ID: ns(r.JobOwnerID), Name: ns(r.JobOwnerName)},
 			ProposalID:                ns(r.ProposalID),
 			ProposalNumber:            ns(r.ProposalNumber),
 			BranchID:                  ns(r.BranchID),

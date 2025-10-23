@@ -292,8 +292,16 @@
           </div>
         {/if}
 
-        {#if data.job.job_owner && (data.job.job_owner.given_name || data.job.job_owner.surname)}
-          <div><span class="font-semibold">Job Owner:</span> {personName(data.job.job_owner)}</div>
+        {#if data.job.job_owner && data.job.job_owner.id}
+          <div>
+            <span class="font-semibold">Job Owner:</span>
+            <a
+              href={`/clients/${data.job.job_owner.id}/details`}
+              class="text-blue-600 hover:underline"
+            >
+              {data.job.job_owner.name}
+            </a>
+          </div>
         {/if}
 
         {#if data.job.proposal_id}
