@@ -17,16 +17,16 @@ type expenseTrackingCountRow struct {
 	RejectedCount   int    `db:"rejected_count" json:"rejected_count"`
 }
 
-// createExpenseTrackingCountsHandler returns pay-period grouped submitted/approved/committed counts for committers
+// createExpenseTrackingCountsHandler returns pay-period grouped submitted/approved/committed counts for report holders
 func createExpenseTrackingCountsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		hasCommit, err := utilities.HasClaim(app, auth, "commit")
+		isAuthorized, err := utilities.HasClaim(app, auth, "report")
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "error checking claims", err)
 		}
-		if !hasCommit {
-			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking", nil)
+		if !isAuthorized {
+			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking counts", nil)
 		}
 
 		query := `
@@ -91,16 +91,16 @@ type expenseTrackingListRow struct {
 	Total           float64 `db:"total" json:"total"`
 }
 
-// createExpenseTrackingListHandler returns org-wide expenses for a given pay period ending
+// createExpenseTrackingListHandler returns org-wide expenses for a given pay period ending for report holders
 func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		hasCommit, err := utilities.HasClaim(app, auth, "commit")
+		isAuthorized, err := utilities.HasClaim(app, auth, "report")
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "error checking claims", err)
 		}
-		if !hasCommit {
-			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking", nil)
+		if !isAuthorized {
+			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking list", nil)
 		}
 
 		payPeriodEnding := e.Request.PathValue("payPeriodEnding")
@@ -189,15 +189,15 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
 	}
 }
 
-// createExpenseTrackingAllHandler returns all submitted + uncommitted expenses (org-wide)
+// createExpenseTrackingAllHandler returns all submitted + uncommitted expenses (org-wide) for report holders
 func createExpenseTrackingAllHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		hasCommit, err := utilities.HasClaim(app, auth, "commit")
+		isAuthorized, err := utilities.HasClaim(app, auth, "report")
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "error checking claims", err)
 		}
-		if !hasCommit {
+		if !isAuthorized {
 			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking", nil)
 		}
 

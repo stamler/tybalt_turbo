@@ -88,7 +88,7 @@ func AddRoutes(app core.App) {
 		tsGroup.GET("/tallies/pending", createTimesheetTalliesHandler(app, "approver", 1, 0))
 		tsGroup.GET("/tallies/approved", createTimesheetTalliesHandler(app, "approver", 0, 1))
 		tsGroup.GET("/tallies/shared", createTimesheetTalliesHandler(app, "reviewer", 0, 0))
-		// TimeTracking endpoints for committers
+		// TimeTracking endpoints for report holders
 		tsGroup.GET("/tracking_counts", createTimesheetTrackingCountsHandler(app))
 		tsGroup.GET("/tracking/weeks/{weekEnding}", createTimesheetTrackingListHandler(app))
 
@@ -99,7 +99,7 @@ func AddRoutes(app core.App) {
 		expensesGroup.POST("/{id}/approve", createApproveRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/reject", createRejectRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/commit", createCommitRecordHandler(app, "expenses"))
-		// Expense tracking endpoints for committers
+		// Expense tracking endpoints for report holders
 		expensesGroup.GET("/tracking_counts", createExpenseTrackingCountsHandler(app))
 		expensesGroup.GET("/tracking", createExpenseTrackingAllHandler(app))
 		expensesGroup.GET("/tracking/{payPeriodEnding}", createExpenseTrackingListHandler(app))

@@ -21,11 +21,11 @@ type trackingCountRow struct {
 func createTimesheetTrackingCountsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		hasCommit, err := utilities.HasClaim(app, auth, "commit")
+		isAuthorized, err := utilities.HasClaim(app, auth, "report")
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "error checking claims", err)
 		}
-		if !hasCommit {
+		if !isAuthorized {
 			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
 		}
 
@@ -86,11 +86,11 @@ type trackingListRow struct {
 func createTimesheetTrackingListHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		hasCommit, err := utilities.HasClaim(app, auth, "commit")
+		isAuthorized, err := utilities.HasClaim(app, auth, "report")
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "error checking claims", err)
 		}
-		if !hasCommit {
+		if !isAuthorized {
 			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
 		}
 
