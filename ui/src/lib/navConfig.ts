@@ -39,12 +39,12 @@ export const navSections: NavSection[] = [
       { label: "Tracking", href: "/time/tracking", buttons: [] },
       {
         label: "Amendments",
-        href: "/time/amendments/list",
+        href: "/time/amendments/pending",
         buttons: [
           {
-            action: "/time/amendments/pending",
+            action: "/time/amendments/list",
             icon: "feather:list",
-            title: "Pending Amendments",
+            title: "List All Amendments",
             color: "purple",
           },
           {
@@ -96,6 +96,7 @@ export const navSections: NavSection[] = [
       { label: "Pending My Approval", href: "/expenses/pending", buttons: [] },
       { label: "Approved By Me", href: "/expenses/approved", buttons: [] },
       { label: "Tracking", href: "/expenses/tracking", buttons: [] },
+      { label: "Commit Queue", href: "/reports/expense/queue", buttons: [] },
     ],
   },
   {
