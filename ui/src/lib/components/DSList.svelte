@@ -9,6 +9,7 @@
     inListHeader,
     groupHeader,
     groupField, // if groupField is set, group the items by this field
+    groupSort, // optional sorting order for group keys: 'ASC' | 'DESC'
     groupFooter,
     processorFn,
     anchor,
@@ -24,6 +25,7 @@
     inListHeader?: string;
     groupHeader?: Snippet<[string]>;
     groupField?: string;
+    groupSort?: "ASC" | "DESC";
     groupFooter?: Snippet<[string, T[]]>; // New group footer snippet that receives the group key and group items
     processorFn?: Function;
     anchor?: Snippet<[T]>;
@@ -81,6 +83,41 @@
     return items
       .slice() // shallow copy https://github.com/vuejs/vuefire/issues/244
       .filter((p) => searchString(p).indexOf(searchTerm.toLowerCase()) >= 0);
+  });
+
+  // groupKeys
+  // Computes the ordered list of group headers to render when `groupField` is set.
+  //
+  // Behavior:
+  // - If `groupSort` is undefined, preserve the natural key enumeration order
+  //   from `Object.keys(processedItems)`, which corresponds to insertion order
+  //   of the first occurrence of each group produced by lodash `groupBy`.
+  // - If `groupSort` is provided ('ASC' | 'DESC'), sort group keys using a
+  //   numeric-aware comparator:
+  //     * If both keys can be parsed as finite numbers, compare numerically
+  //       (e.g., "2" < "10").
+  //     * Otherwise, fall back to case-insensitive `localeCompare` with
+  //       `{ numeric: true }` so mixed strings like "A2" < "A10" sort as
+  //       expected.
+  //   The final order is reversed when `groupSort === 'DESC'`.
+  //
+  // Notes:
+  // - Group keys originate from `groupBy(filteredItems, groupField)` and are
+  //   strings; the comparator handles numeric-like strings gracefully.
+  // - This only affects the order of group headers. The items within each
+  //   group retain their original order from the input collection.
+  const groupKeys = $derived.by(() => {
+    if (groupField === undefined) return [] as string[];
+    const keys = Object.keys(processedItems as Record<string, T[]>);
+    if (groupSort === undefined) return keys;
+    const cmp = (a: string, b: string) => {
+      const an = Number(a);
+      const bn = Number(b);
+      if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
+      return a.localeCompare(b, undefined, { numeric: true, sensitivity: "base" });
+    };
+    const sorted = keys.slice().sort(cmp);
+    return groupSort === "DESC" ? sorted.reverse() : sorted;
   });
 </script>
 
@@ -147,7 +184,7 @@
   {/snippet}
 
   {#if groupField !== undefined}
-    {#each Object.keys(processedItems) as group}
+    {#each groupKeys as group}
       {#if groupHeader !== undefined}
         <DSInListHeader value={group} snippet={groupHeader} />
       {:else}

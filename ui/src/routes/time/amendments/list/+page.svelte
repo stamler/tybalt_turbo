@@ -81,6 +81,7 @@
   search={true}
   inListHeader="Time Amendments"
   groupField="committed_week_ending"
+  groupSort="DESC"
   {groupHeader}
   {anchor}
   {headline}
