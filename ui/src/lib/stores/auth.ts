@@ -227,35 +227,6 @@ async function loginWithMicrosoft() {
 }
 
 /**
- * AUTH ACTION: Attempt automatic Microsoft login on app load/navigation
- * Tries to authenticate with Microsoft without user interaction to spare a manual step
- * - Returns true if authentication completed successfully
- * - Returns false quickly if popup is blocked, interaction required, or timeout reached
- */
-async function attemptAutoMicrosoftLogin(timeoutMs = 3500): Promise<boolean> {
-  // If we already have a valid token/model, consider authenticated
-  if (pb.authStore.token && pb.authStore.model) {
-    return true;
-  }
-
-  try {
-    const loginPromise = pb
-      .collection("users")
-      .authWithOAuth2({ provider: "microsoft" })
-      .then(() => true);
-
-    const timeoutPromise = new Promise<boolean>((_, reject) => {
-      setTimeout(() => reject(new Error("auto login timeout")), timeoutMs);
-    });
-
-    return await Promise.race([loginPromise, timeoutPromise]).catch(() => false);
-  } catch {
-    // Popup blocked or other non-fatal issue – fall back to manual login
-    return false;
-  }
-}
-
-/**
  * AUTH ACTION: Logout and cleanup
  * Clears the refresh timer and PocketBase auth state
  * The onChange callback will update the Svelte store to null
@@ -283,7 +254,6 @@ export const authStore = {
 
   // Auth actions
   loginWithMicrosoft,
-  attemptAutoMicrosoftLogin,
   logout,
 
   // Core auth system methods

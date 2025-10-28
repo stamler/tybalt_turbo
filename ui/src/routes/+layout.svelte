@@ -43,13 +43,7 @@
   // route guards
   $effect(() => {
     if (browser && !$authStore?.isValid && $page.url.pathname !== "/login") {
-      // On first guard trigger without valid auth, try a quick silent Microsoft login
-      // If it succeeds, onChange handler will set auth and routing below will handle redirect
-      authStore.attemptAutoMicrosoftLogin().then((success) => {
-        if (!success && !$authStore?.isValid) {
-          goto(`/login?redirect=${encodeURIComponent($page.url.pathname + $page.url.search)}`);
-        }
-      });
+      goto(`/login?redirect=${encodeURIComponent($page.url.pathname + $page.url.search)}`);
     } else if (browser && $authStore?.isValid && $page.url.pathname === "/login") {
       const redirectUrl = sessionStorage.getItem("redirectUrl");
       if (redirectUrl) {
