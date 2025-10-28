@@ -8,7 +8,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     uid: "",
     // date in YYYY-MM-DD format
     date: new Date().toISOString().split("T")[0],
-    division: "vccd5fo56ctbigh",
+    division: "",
     description: "",
     payment_type: "OnAccount",
     purchase_order: "",

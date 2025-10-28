@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flatpickrAction, fetchCategories } from "$lib/utilities";
+  import { flatpickrAction, fetchCategories, applyDefaultDivisionOnce } from "$lib/utilities";
   import { jobs } from "$lib/stores/jobs";
   import { vendors } from "$lib/stores/vendors";
   import { divisions } from "$lib/stores/divisions";
@@ -40,6 +40,9 @@
       fetchCategories(item.job).then((c) => (categories = c));
     }
   });
+
+  // Default division from caller's profile if creating and empty
+  $effect(() => applyDefaultDivisionOnce(item, data.editing));
 
   // Watch for changes to division, amount, or type to fetch approvers
   $effect(() => {

@@ -8,6 +8,8 @@ import type {
 import { type UnsubscribeFunc } from "pocketbase";
 import { pb } from "$lib/pocketbase";
 import flatpickr from "flatpickr";
+import { get } from "svelte/store";
+import { globalStore } from "$lib/stores/global";
 
 export interface TimeSheetTallyQueryRow {
   id: string;
@@ -411,6 +413,48 @@ export async function downloadZip(endpoint: string, fileName: string) {
   } catch (error) {
     console.error("Error fetching zip:", error);
     throw error; // Re-throw the error so it can be caught by the caller
+  }
+}
+
+// --- Defaults helpers ---
+const appliedDivisionOnce = new WeakSet<object>();
+const lastUidAppliedForItem = new WeakMap<object, string>();
+export function applyDefaultDivisionOnce(
+  item: { division?: string } | null | undefined,
+  editing: boolean,
+  uid?: string,
+) {
+  if (!item || editing) return;
+
+  // When a subject uid is provided (e.g., Time Amendments), allow re-applying
+  // for different users, but avoid duplicate fetches for the same uid.
+  if (uid && uid !== "") {
+    if (item.division && item.division !== "") return;
+    const lastUid = lastUidAppliedForItem.get(item as object);
+    if (lastUid === uid) return;
+    lastUidAppliedForItem.set(item as object, uid);
+    (async () => {
+      try {
+        const prof = await pb
+          .collection("profiles")
+          .getFirstListItem(pb.filter("uid={:uid}", { uid }));
+        const dd = (prof as any)?.default_division ?? "";
+        if ((!item.division || item.division === "") && dd) {
+          item.division = dd as string;
+        }
+      } catch {
+        // noop
+      }
+    })();
+    return;
+  }
+
+  // Caller default division: apply only once per item instance
+  if (appliedDivisionOnce.has(item as object)) return;
+  const dd = (get(globalStore) as any)?.profile?.default_division ?? "";
+  if ((!item.division || item.division === "") && dd) {
+    item.division = dd as string;
+    appliedDivisionOnce.add(item as object);
   }
 }
 

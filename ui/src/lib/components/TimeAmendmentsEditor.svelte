@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flatpickrAction, fetchCategories } from "$lib/utilities";
+  import { flatpickrAction, fetchCategories, applyDefaultDivisionOnce } from "$lib/utilities";
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
   import { timeTypes } from "$lib/stores/time_types";
@@ -82,6 +82,13 @@
 
   let errors = $state({} as any);
   let item = $state(data.item);
+
+  // When subject user changes, default division to their profile default (if empty)
+  $effect(() => {
+    if (item.uid && item.uid !== "") {
+      applyDefaultDivisionOnce(item, data.editing, item.uid);
+    }
+  });
 
   // given a list of time type codes, return true if the item's time type is in
   // the list

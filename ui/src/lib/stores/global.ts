@@ -3,7 +3,7 @@
  * app.
  */
 
-import type { UserPoPermissionDataResponse } from "$lib/pocketbase-types";
+import type { UserPoPermissionDataResponse, ProfilesResponse } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { authStore } from "$lib/stores/auth";
@@ -28,6 +28,13 @@ interface StoreState {
     maxAge: number;
     lastRefresh: Date;
   };
+  profile: {
+    id: string;
+    default_division: string;
+    maxAge: number;
+    lastRefresh: Date;
+    unsubscribe?: () => void;
+  };
   error: ClientResponseError | null;
   errorMessages: ErrorMessage[];
 }
@@ -44,6 +51,13 @@ const createStore = () => {
       claims: [],
       maxAge: 3600 * 1000,
       lastRefresh: new Date(0),
+    },
+    profile: {
+      id: "",
+      default_division: "",
+      maxAge: 3600 * 1000,
+      lastRefresh: new Date(0),
+      unsubscribe: undefined,
     },
     error: null,
     errorMessages: [],
@@ -81,10 +95,102 @@ const createStore = () => {
     }
   };
 
+  const loadUserProfile = async () => {
+    try {
+      const userId = get(authStore)?.model?.id || "";
+      if (!userId) return;
+
+      const profile = (await pb
+        .collection("profiles")
+        .getFirstListItem<ProfilesResponse>(
+          pb.filter("uid={:uid}", { uid: userId }),
+        )) as ProfilesResponse;
+
+      // update state and (re)subscribe to realtime changes
+      update((state) => {
+        // clean up previous subscription if switching users
+        if (state.profile.unsubscribe) {
+          try {
+            state.profile.unsubscribe();
+          } catch {
+            // noop
+          }
+        }
+
+        // subscribe to this profile record for realtime changes
+        let unsubPromise: Promise<() => void> | undefined = undefined;
+        try {
+          unsubPromise = pb.collection("profiles").subscribe(profile.id, (e) => {
+            const newDefaultDivision =
+              (e?.record as unknown as ProfilesResponse)?.default_division ??
+              state.profile.default_division;
+            update((s) => ({
+              ...s,
+              profile: {
+                ...s.profile,
+                default_division: newDefaultDivision,
+              },
+            }));
+          });
+        } catch {
+          // noop
+        }
+        const unsubscribe = () => {
+          if (!unsubPromise) return;
+          unsubPromise
+            .then((fn) => {
+              try {
+                fn();
+              } catch {
+                // noop
+              }
+            })
+            .catch(() => {
+              // noop
+            });
+        };
+
+        return {
+          ...state,
+          profile: {
+            id: profile.id,
+            default_division: profile.default_division ?? "",
+            maxAge: state.profile.maxAge,
+            lastRefresh: new Date(),
+            unsubscribe,
+          },
+        };
+      });
+    } catch (error: unknown) {
+      const typedErr = error as ClientResponseError;
+      console.error("Error loading user profile:", typedErr);
+    }
+  };
+
   const refresh = async () => {
     // refresh() should no-op if the user is not logged in
     if (!get(authStore)?.isValid) {
       console.log("User is not logged in, skipping refresh");
+      // also clear profile subscription if any
+      update((state) => {
+        if (state.profile.unsubscribe) {
+          try {
+            state.profile.unsubscribe();
+          } catch {
+            // noop
+          }
+        }
+        return {
+          ...state,
+          profile: {
+            id: "",
+            default_division: "",
+            maxAge: state.profile.maxAge,
+            lastRefresh: new Date(0),
+            unsubscribe: undefined,
+          },
+        };
+      });
       return;
     }
 
@@ -97,6 +203,10 @@ const createStore = () => {
         state.user_po_permission_data.maxAge
       ) {
         loadUserPoPermissionData();
+      }
+
+      if (now.getTime() - state.profile.lastRefresh.getTime() >= state.profile.maxAge) {
+        loadUserProfile();
       }
 
       return newState;

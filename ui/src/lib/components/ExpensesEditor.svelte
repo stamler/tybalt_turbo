@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { flatpickrAction, fetchCategories } from "$lib/utilities";
+  import { flatpickrAction, fetchCategories, applyDefaultDivisionOnce } from "$lib/utilities";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
@@ -43,6 +43,9 @@
       fetchCategories(item.job).then((c) => (categories = c));
     }
   });
+
+  // Default division from caller's profile if creating and empty
+  $effect(() => applyDefaultDivisionOnce(item, data.editing));
 
   async function save(event: Event) {
     event.preventDefault();

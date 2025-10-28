@@ -6,6 +6,7 @@ import { vendors } from "$lib/stores/vendors";
 import { clients } from "$lib/stores/clients";
 import { divisions } from "$lib/stores/divisions";
 import { timeTypes } from "$lib/stores/time_types";
+import { globalStore } from "$lib/stores/global";
 
 const allStores = [jobs, vendors, clients, divisions, timeTypes];
 
@@ -56,6 +57,8 @@ if (pb.authStore.token && pb.authStore.model) {
       // Token refresh succeeded - start the periodic refresh system
       // This will keep the user logged in as long as they remain active
       authStore.setupTokenRefresh();
+      // load global user-scoped data (profile, permissions)
+      globalStore.refresh();
     }
     // If refresh failed, the authStore.refreshAuth() function already cleared
     // the invalid auth state, so user will see login screen
@@ -115,6 +118,8 @@ pb.authStore.onChange(() => {
      * similar UX affordance.
      */
     allStores.forEach((store) => store.init());
+    // refresh global store (profile, permissions)
+    globalStore.refresh();
   } else {
     // clear the stores
     allStores.forEach((store) => store.unsubscribe());

@@ -9,7 +9,7 @@ export const load: PageLoad<TimeEntriesPageData> = async ({ params }) => {
     // date in YYYY-MM-DD format
     date: new Date().toISOString().split("T")[0],
     time_type: "sdyfl3q7j7ap849",
-    division: "vccd5fo56ctbigh",
+    division: "",
     description: "",
     job: "",
     work_record: "",
