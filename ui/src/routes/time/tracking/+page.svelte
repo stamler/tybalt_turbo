@@ -1,6 +1,7 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
+  import { authStore } from "$lib/stores/auth";
   import DsList from "$lib/components/DSList.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { shortDate, downloadCSV } from "$lib/utilities";
@@ -18,6 +19,11 @@
   let rows: Row[] = [];
 
   async function init() {
+    // Only attempt to load data if user is authenticated
+    if (!$authStore?.isValid) {
+      return;
+    }
+
     try {
       const res: Omit<Row, "id">[] = await pb.send("/api/time_sheets/tracking_counts", {
         method: "GET",

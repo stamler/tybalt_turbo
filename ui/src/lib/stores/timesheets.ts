@@ -82,6 +82,9 @@ export const timesheets = {
 
   // Initialize the store and subscription (call this when the store is first used)
   init: async () => {
+    // Check authentication before proceeding - noop if not authenticated
+    if (!pb.authStore.token || !pb.authStore.model) return;
+
     if (initializationPromise) {
       return initializationPromise; // Return existing promise if already initializing
     }

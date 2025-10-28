@@ -6,6 +6,7 @@
   import DsActionButton from "./DSActionButton.svelte";
   import type { ClientContactsRecord, ClientContactsResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
+  import { authStore } from "$lib/stores/auth";
   import { clients } from "$lib/stores/clients";
   import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
@@ -27,6 +28,11 @@
   let loadingLeads = $state(false);
 
   async function loadBusdevLeads() {
+    // Only attempt to load data if user is authenticated
+    if (!$authStore?.isValid) {
+      return;
+    }
+
     try {
       loadingLeads = true;
       const list = (await pb.send("/api/clients/devleads", { method: "GET" })) as Array<{
