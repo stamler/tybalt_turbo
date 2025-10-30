@@ -5,7 +5,28 @@
   import Icon from "@iconify/svelte";
   import { shortDate } from "$lib/utilities";
   import DsList from "$lib/components/DSList.svelte";
+  import { globalStore } from "$lib/stores/global";
+  import { pb } from "$lib/pocketbase";
+  import { goto } from "$app/navigation";
   export let data: PageData;
+
+  async function cancelPo() {
+    try {
+      await pb.send(`/api/purchase_orders/${data.po.id}/cancel`, { method: "POST" });
+      goto("/pos/list");
+    } catch (e: any) {
+      globalStore.addError(e);
+    }
+  }
+
+  async function closePo() {
+    try {
+      await pb.send(`/api/purchase_orders/${data.po.id}/close`, { method: "POST" });
+      goto("/pos/list");
+    } catch (e: any) {
+      globalStore.addError(e);
+    }
+  }
 </script>
 
 <div class="mx-auto space-y-4 p-4">
@@ -208,6 +229,21 @@
       color="blue"
     />
   </div>
+
+  {#if $globalStore.showAllUi || $globalStore.claims.includes("payables_admin")}
+    <div class="mt-4 rounded border border-red-400 bg-red-50 p-4">
+      <h3 class="font-bold text-red-800">Admin Actions</h3>
+      <div class="mt-2 flex gap-2">
+        <DsActionButton
+          action={cancelPo}
+          icon="mdi:cancel"
+          title="Cancel Purchase Order"
+          color="red"
+        />
+        <DsActionButton action={closePo} icon="mdi:lock" title="Close Purchase Order" color="gray" />
+      </div>
+    </div>
+  {/if}
 
   <!-- Expenses referencing this PO -->
   <section class="mt-6 space-y-2">

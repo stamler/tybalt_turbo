@@ -18,6 +18,8 @@ interface ErrorMessage {
 
 interface StoreState {
   isLoading: boolean;
+  claims: string[];
+  showAllUi: boolean;
   user_po_permission_data: {
     id: string;
     max_amount: number;
@@ -40,8 +42,19 @@ interface StoreState {
 }
 
 const createStore = () => {
+  const initialShowAll = (() => {
+    try {
+      const v = localStorage.getItem("tybalt_showAllUi");
+      return v === "true";
+    } catch {
+      return false;
+    }
+  })();
+
   const { subscribe, update } = writable<StoreState>({
     isLoading: false,
+    claims: [],
+    showAllUi: initialShowAll,
     user_po_permission_data: {
       id: "",
       max_amount: 0,
@@ -230,11 +243,24 @@ const createStore = () => {
     }));
   };
 
+  const toggleShowAllUi = () => {
+    update((state) => {
+      const next = !state.showAllUi;
+      try {
+        localStorage.setItem("tybalt_showAllUi", String(next));
+      } catch {
+        // noop
+      }
+      return { ...state, showAllUi: next };
+    });
+  };
+
   return {
     subscribe,
     refresh,
     addError,
     dismissError,
+    toggleShowAllUi,
   };
 };
 
@@ -255,6 +281,7 @@ const wrappedStore: Readable<StoreState> & {
   refresh: typeof _globalStore.refresh;
   addError: typeof _globalStore.addError;
   dismissError: typeof _globalStore.dismissError;
+  toggleShowAllUi: typeof _globalStore.toggleShowAllUi;
 } = {
   subscribe: (run: Subscriber<StoreState>, invalidate?: () => void) => {
     return _globalStore.subscribe(
@@ -265,6 +292,7 @@ const wrappedStore: Readable<StoreState> & {
   refresh: _globalStore.refresh,
   addError: _globalStore.addError,
   dismissError: _globalStore.dismissError,
+  toggleShowAllUi: _globalStore.toggleShowAllUi,
 };
 
 export const globalStore = wrappedStore;

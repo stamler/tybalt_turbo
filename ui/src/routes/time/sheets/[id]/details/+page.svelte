@@ -189,12 +189,14 @@
           />
         {:else if timeSheet.approved !== "" && timeSheet.committed === ""}
           <!-- Approved (not committed yet): commit, reject -->
-          <DsActionButton
-            action={() => commit(timeSheet.id)}
-            icon="mdi:check-all"
-            title="Commit"
-            color="green"
-          />
+          {#if $globalStore.showAllUi || $globalStore.claims.includes("commit")}
+            <DsActionButton
+              action={() => commit(timeSheet.id)}
+              icon="mdi:check-all"
+              title="Commit"
+              color="green"
+            />
+          {/if}
           <DsActionButton
             action={() => openRejectModal(timeSheet.id)}
             icon="mdi:cancel"

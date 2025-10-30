@@ -195,7 +195,6 @@
       poApproverUserClaimId = null;
       resetPoApproverPropsState();
     }
-    originalUserClaims = originalUserClaims.filter((uc) => uc.cid !== cid);
   }
 
   $effect(() => {

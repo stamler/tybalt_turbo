@@ -11,7 +11,7 @@
   import VersionInfo from "$lib/components/VersionInfo.svelte";
   import { navigating } from "$app/stores";
   import { tasks } from "$lib/stores/tasks";
-  import { navSections } from "$lib/navConfig";
+  import { navSections as allNavSections } from "$lib/navConfig";
 
   // children is a function that we will call to render the current route
   // https://svelte-5-preview.vercel.app/docs/snippets#passing-snippets-to-components
@@ -19,6 +19,49 @@
   // implicitly becomes part of the children snippet
   let { children } = $props();
   let isSidebarOpen = $state(false);
+
+  let navSections = $derived(
+    $globalStore.showAllUi
+      ? allNavSections
+      : allNavSections
+          .map((section) => {
+            // Filter items within each section
+            const filteredItems = section.items.filter((item) => {
+              if (
+                item.href.startsWith("/time/tracking") ||
+                item.href.startsWith("/expenses/tracking")
+              ) {
+                return $globalStore.claims.includes("report");
+              }
+              if (item.href.startsWith("/absorb/actions")) {
+                return $globalStore.claims.includes("absorb");
+              }
+              if (item.href.startsWith("/reports/expense/queue")) {
+                return $globalStore.claims.includes("commit");
+              }
+              if (item.href.startsWith("/time/amendments")) {
+                return (
+                  $globalStore.claims.includes("tame") || $globalStore.claims.includes("report")
+                );
+              }
+              if (item.href.startsWith("/admin_profiles")) {
+                return $globalStore.claims.includes("admin");
+              }
+              return true; // Keep item if no specific claim is required
+            });
+
+            // Return the section with filtered items
+            return { ...section, items: filteredItems };
+          })
+          .filter((section) => {
+            // Hide the entire "Reports" section if the user lacks the 'report' claim
+            if (section.title === "Reports") {
+              return $globalStore.claims.includes("report");
+            }
+            // Hide sections that become empty after filtering
+            return section.items.length > 0;
+          }),
+  );
 
   // Helper store that reflects whether any task is running
   const tasksLoading = { subscribe: tasks.showTasks };
@@ -172,7 +215,16 @@
                 >
                   {$authStore?.model?.email}
                 </a>
-                <div class="[&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6">
+                <div
+                  class="flex items-center gap-1 [&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6"
+                >
+                  <DsActionButton
+                    action={() => globalStore.toggleShowAllUi()}
+                    icon={$globalStore.showAllUi ? "mdi:eye-off-outline" : "mdi:eye-outline"}
+                    title={$globalStore.showAllUi ? "Hide All UI" : "Show All UI"}
+                    color={$globalStore.showAllUi ? "gray" : "blue"}
+                    transparentBackground
+                  />
                   <DsActionButton
                     action={authStore.logout}
                     icon="feather:log-out"
