@@ -33,6 +33,15 @@
               ) {
                 return $globalStore.claims.includes("report");
               }
+              if (
+                item.href.startsWith("/time/sheets/pending") ||
+                item.href.startsWith("/time/sheets/approved") ||
+                item.href.startsWith("/expenses/pending") ||
+                item.href.startsWith("/expenses/approved") ||
+                item.href.startsWith("/pos/pending")
+              ) {
+                return $globalStore.claims.includes("tapr");
+              }
               if (item.href.startsWith("/absorb/actions")) {
                 return $globalStore.claims.includes("absorb");
               }
@@ -44,10 +53,11 @@
                   $globalStore.claims.includes("tame") || $globalStore.claims.includes("report")
                 );
               }
-              if (item.href.startsWith("/admin_profiles")) {
-                return $globalStore.claims.includes("admin");
-              }
-              if (item.href.startsWith("/timetypes") || item.href.startsWith("/divisions")) {
+              if (
+                item.href.startsWith("/admin_profiles") ||
+                item.href.startsWith("/timetypes") ||
+                item.href.startsWith("/divisions")
+              ) {
                 return $globalStore.claims.includes("admin");
               }
               return true; // Keep item if no specific claim is required
