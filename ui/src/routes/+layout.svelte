@@ -47,10 +47,7 @@
               if (item.href.startsWith("/admin_profiles")) {
                 return $globalStore.claims.includes("admin");
               }
-              if (
-                item.href.startsWith("/timetypes") ||
-                item.href.startsWith("/divisions")
-              ) {
+              if (item.href.startsWith("/timetypes") || item.href.startsWith("/divisions")) {
                 return $globalStore.claims.includes("admin");
               }
               return true; // Keep item if no specific claim is required
