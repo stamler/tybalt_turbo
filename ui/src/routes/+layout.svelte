@@ -26,42 +26,55 @@
       : allNavSections
           .map((section) => {
             // Filter items within each section
-            const filteredItems = section.items.filter((item) => {
-              if (
-                item.href.startsWith("/time/tracking") ||
-                item.href.startsWith("/expenses/tracking")
-              ) {
-                return $globalStore.claims.includes("report");
-              }
-              if (
-                item.href.startsWith("/time/sheets/pending") ||
-                item.href.startsWith("/time/sheets/approved") ||
-                item.href.startsWith("/expenses/pending") ||
-                item.href.startsWith("/expenses/approved") ||
-                item.href.startsWith("/pos/pending")
-              ) {
-                return $globalStore.claims.includes("tapr");
-              }
-              if (item.href.startsWith("/absorb/actions")) {
-                return $globalStore.claims.includes("absorb");
-              }
-              if (item.href.startsWith("/reports/expense/queue")) {
-                return $globalStore.claims.includes("commit");
-              }
-              if (item.href.startsWith("/time/amendments")) {
-                return (
-                  $globalStore.claims.includes("tame") || $globalStore.claims.includes("report")
-                );
-              }
-              if (
-                item.href.startsWith("/admin_profiles") ||
-                item.href.startsWith("/timetypes") ||
-                item.href.startsWith("/divisions")
-              ) {
-                return $globalStore.claims.includes("admin");
-              }
-              return true; // Keep item if no specific claim is required
-            });
+            const filteredItems = section.items
+              .filter((item) => {
+                if (
+                  item.href.startsWith("/time/tracking") ||
+                  item.href.startsWith("/expenses/tracking")
+                ) {
+                  return $globalStore.claims.includes("report");
+                }
+                if (
+                  item.href.startsWith("/time/sheets/pending") ||
+                  item.href.startsWith("/time/sheets/approved") ||
+                  item.href.startsWith("/expenses/pending") ||
+                  item.href.startsWith("/expenses/approved") ||
+                  item.href.startsWith("/pos/pending")
+                ) {
+                  return $globalStore.claims.includes("tapr");
+                }
+                if (item.href.startsWith("/absorb/actions")) {
+                  return $globalStore.claims.includes("absorb");
+                }
+                if (item.href.startsWith("/reports/expense/queue")) {
+                  return $globalStore.claims.includes("commit");
+                }
+                if (item.href.startsWith("/time/amendments")) {
+                  return (
+                    $globalStore.claims.includes("tame") || $globalStore.claims.includes("report")
+                  );
+                }
+                if (
+                  item.href.startsWith("/admin_profiles") ||
+                  item.href.startsWith("/timetypes") ||
+                  item.href.startsWith("/divisions")
+                ) {
+                  return $globalStore.claims.includes("admin");
+                }
+                return true; // Keep item if no specific claim is required
+              })
+              .map((item) => {
+                const gatedButtons = (item.buttons || []).filter((btn) => {
+                  if (btn.action === "/jobs/add" || btn.action === "/clients/add") {
+                    return $globalStore.claims.includes("job");
+                  }
+                  if (btn.action === "/vendors/add") {
+                    return $globalStore.claims.includes("payables_admin");
+                  }
+                  return true;
+                });
+                return { ...item, buttons: gatedButtons };
+              });
 
             // Return the section with filtered items
             return { ...section, items: filteredItems };
