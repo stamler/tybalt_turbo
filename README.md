@@ -1,4 +1,4 @@
-# Tybalt Turbo
+# Tybalt 𝕋𝕌ℝ𝔹𝕆
 
 A PocketBase-powered application with Svelte frontend, deployed on fly.io with litestream backups.
 

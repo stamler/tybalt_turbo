@@ -144,7 +144,7 @@
         />
       </svg>
     </button>
-    <span class="absolute left-1/2 -translate-x-1/2 transform text-lg font-semibold">Tybalt</span>
+    <span class="absolute left-1/2 -translate-x-1/2 transform text-lg font-semibold">𝕋𝕌ℝ𝔹𝕆</span>
     <div class="ml-auto flex items-center gap-2">
       <VersionInfo />
       {#if $authStore?.isValid}
@@ -177,12 +177,12 @@
       <div class="h-full overflow-y-auto overflow-x-hidden">
         <!-- Desktop brand header -->
         <div class="hidden h-10 items-center justify-between px-4 text-lg font-semibold lg:flex">
-          <a href="/" class="text-white">Tybalt</a>
+          <a href="/" class="text-white">𝕋𝕌ℝ𝔹𝕆</a>
           <VersionInfo />
         </div>
         <!-- Mobile close/header -->
         <div class="flex h-12 items-center justify-between px-4 lg:hidden">
-          <span class="text-xl font-semibold">Tybalt</span>
+          <span class="text-xl font-semibold">𝕋𝕌ℝ𝔹𝕆</span>
           <button onclick={toggleSidebar} aria-label="Close Menu">
             <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path

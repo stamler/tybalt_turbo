@@ -69,7 +69,7 @@ EOF
     echo "${FULL_VERSION} (${GIT_COMMIT_SHORT})"
     ;;
   *)
-    echo "Tybalt Turbo v${FULL_VERSION}"
+    echo "Tybalt 𝕋𝕌ℝ𝔹𝕆 v${FULL_VERSION}"
     echo "Build: ${BUILD}"
     echo "Git: ${GIT_COMMIT_SHORT} (${GIT_BRANCH})"
     echo "Built: ${BUILD_TIME}"
