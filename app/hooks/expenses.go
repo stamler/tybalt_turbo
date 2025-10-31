@@ -65,8 +65,28 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 			},
 		}
 	}
-	approver := profile.Get("manager")
-	expenseRecord.Set("approver", approver)
+	approverUID := profile.GetString("manager")
+	// Ensure the approver (manager) has the `tapr` claim
+	hasTapr, taprErr := utilities.HasClaimByUserID(app, approverUID, "tapr")
+	if taprErr != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"approver": {Code: "error_checking_claim", Message: "error checking approver claim"},
+			},
+		}
+	}
+	if !hasTapr {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"approver": {Code: "unqualified_approver", Message: "the approver must have the tapr claim"},
+			},
+		}
+	}
+	expenseRecord.Set("approver", approverUID)
 
 	// Set branch from job if provided; otherwise from user's default branch
 	jobId := expenseRecord.GetString("job")

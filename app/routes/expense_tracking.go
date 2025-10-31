@@ -21,13 +21,22 @@ type expenseTrackingCountRow struct {
 func createExpenseTrackingCountsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		isAuthorized, err := utilities.HasClaim(app, auth, "report")
-		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		if !isAuthorized {
-			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking counts", nil)
-		}
+        // Allow either report holders or committers to view expense tracking counts
+        isReportHolder, err := utilities.HasClaim(app, auth, "report")
+        if err != nil {
+            return e.Error(http.StatusInternalServerError, "error checking claims", err)
+        }
+        isCommitter := false
+        if !isReportHolder {
+            var err2 error
+            isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
+            if err2 != nil {
+                return e.Error(http.StatusInternalServerError, "error checking claims", err2)
+            }
+        }
+        if !(isReportHolder || isCommitter) {
+            return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking counts", nil)
+        }
 
 		query := `
 			SELECT
@@ -95,13 +104,22 @@ type expenseTrackingListRow struct {
 func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		isAuthorized, err := utilities.HasClaim(app, auth, "report")
-		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		if !isAuthorized {
-			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking list", nil)
-		}
+        // Allow either report holders or committers to view expense tracking list
+        isReportHolder, err := utilities.HasClaim(app, auth, "report")
+        if err != nil {
+            return e.Error(http.StatusInternalServerError, "error checking claims", err)
+        }
+        isCommitter := false
+        if !isReportHolder {
+            var err2 error
+            isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
+            if err2 != nil {
+                return e.Error(http.StatusInternalServerError, "error checking claims", err2)
+            }
+        }
+        if !(isReportHolder || isCommitter) {
+            return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking list", nil)
+        }
 
 		payPeriodEnding := e.Request.PathValue("payPeriodEnding")
 		if payPeriodEnding == "" {
@@ -193,13 +211,22 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
 func createExpenseTrackingAllHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		isAuthorized, err := utilities.HasClaim(app, auth, "report")
-		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		if !isAuthorized {
-			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking", nil)
-		}
+        // Allow either report holders or committers to view expense tracking
+        isReportHolder, err := utilities.HasClaim(app, auth, "report")
+        if err != nil {
+            return e.Error(http.StatusInternalServerError, "error checking claims", err)
+        }
+        isCommitter := false
+        if !isReportHolder {
+            var err2 error
+            isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
+            if err2 != nil {
+                return e.Error(http.StatusInternalServerError, "error checking claims", err2)
+            }
+        }
+        if !(isReportHolder || isCommitter) {
+            return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking", nil)
+        }
 
 		query := `
             SELECT

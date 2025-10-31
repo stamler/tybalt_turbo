@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	"tybalt/utilities"
+
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -137,8 +139,23 @@ func createBundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error
 			}
 
 			// manager is mandatory on the profiles collection in pocketbase
-			// rules so there is no need to check if it exists.
-			approver := profile.Get("manager")
+			// rules so there is no need to check if it exists. Verify that the
+			// manager has the `tapr` claim (server-side enforcement mirrors UI).
+			approverUID := profile.GetString("manager")
+			hasTapr, claimErr := utilities.HasClaimByUserID(txApp, approverUID, "tapr")
+			if claimErr != nil {
+				return fmt.Errorf("error checking manager tapr claim: %v", claimErr)
+			}
+			if !hasTapr {
+				transactionError = &CodeError{
+					Code:    "unqualified_approver",
+					Message: "the approver must have the tapr claim",
+				}
+				httpResponseStatusCode = http.StatusBadRequest
+				return transactionError
+			}
+
+			approver := approverUID
 
 			// Create new time sheet
 			newTimeSheet := core.NewRecord(time_sheets_collection)

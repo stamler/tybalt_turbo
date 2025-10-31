@@ -21,11 +21,20 @@ type trackingCountRow struct {
 func createTimesheetTrackingCountsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		isAuthorized, err := utilities.HasClaim(app, auth, "report")
+		// Allow either report holders or committers to view tracking
+		isReportHolder, err := utilities.HasClaim(app, auth, "report")
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "error checking claims", err)
 		}
-		if !isAuthorized {
+		isCommitter := false
+		if !isReportHolder { // only check commit if needed
+			var err2 error
+			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
+			if err2 != nil {
+				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
+			}
+		}
+		if !(isReportHolder || isCommitter) {
 			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
 		}
 
@@ -86,11 +95,20 @@ type trackingListRow struct {
 func createTimesheetTrackingListHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-		isAuthorized, err := utilities.HasClaim(app, auth, "report")
+		// Allow either report holders or committers to view tracking
+		isReportHolder, err := utilities.HasClaim(app, auth, "report")
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "error checking claims", err)
 		}
-		if !isAuthorized {
+		isCommitter := false
+		if !isReportHolder { // only check commit if needed
+			var err2 error
+			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
+			if err2 != nil {
+				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
+			}
+		}
+		if !(isReportHolder || isCommitter) {
 			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
 		}
 
