@@ -9,7 +9,7 @@
 
   <!-- Welcome message card -->
   <div class="w-full max-w-md rounded-lg bg-neutral-100 p-4 text-center shadow">
-    <h1 class="mb-2 text-2xl font-semibold text-neutral-800">Welcome to Tybalt 𝕋𝕌ℝ𝔹𝕆</h1>
+    <h1 class="mb-2 text-2xl font-semibold text-neutral-800">Welcome to 𝕋𝕌ℝ𝔹𝕆</h1>
     <p class="text-neutral-600">
       Use the navigation menu to get started managing time sheets, purchase orders, expenses and
       more.
