@@ -51,7 +51,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	tier1, tier2 := testutils.GetApprovalTiers(app)
 
-	// Helper to convert a JSON body string into multipart/form-data with a tiny PNG attachment
+    // Helper to convert a JSON body string into multipart/form-data with a tiny PNG attachment
 	makeMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
 		m := map[string]any{}
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
@@ -80,6 +80,41 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	}
 
 	var scenarios []tests.ApiScenario
+    // otherwise valid purchase order fails when job is Closed
+    {
+        b, ct, err := makeMultipart(fmt.Sprintf(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "vccd5fo56ctbigh",
+            "description": "test purchase order",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "Normal",
+            "job": "%s"
+        }`, "zke3cs3yipplwtu"))
+        if err != nil {
+            t.Fatal(err)
+        }
+        scenarios = append(scenarios, tests.ApiScenario{
+            Name:           "fails when job is Closed",
+            Method:         http.MethodPost,
+            URL:            "/api/collections/purchase_orders/records",
+            Body:           b,
+            Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+            ExpectedStatus: 400,
+            ExpectedContent: []string{
+                `"job":{"code":"not_active"`,
+            },
+            ExpectedEvents: map[string]int{
+                "OnRecordCreateRequest": 1,
+            },
+            TestAppFactory: testutils.SetupTestApp,
+        })
+    }
+
 
 	// fails when attachment is missing
 	{

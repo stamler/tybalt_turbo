@@ -237,7 +237,7 @@
       {#if data.job.number?.startsWith("P")}
         <DsLabel color="yellow">proposal</DsLabel>
       {/if}
-      {#if data.job.number && !data.job.number.startsWith("P") && /^\d{2}-\d{4}$/.test(data.job.number)}
+      {#if data.job.number && !data.job.number.startsWith("P") && /^\d{2}-\d{3,4}$/.test(data.job.number)}
         <a href={`/jobs/add/${data.job.id}`} class="ml-2 text-blue-600 underline">Create Sub-Job</a>
       {/if}
     </div>

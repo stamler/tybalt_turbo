@@ -411,9 +411,19 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		"approver":    validation.Validate(purchaseOrderRecord.GetString("approver"), validation.By(utilities.PoApproverPropsHasDivisionPermission(app, constants.PO_APPROVER_CLAIM_ID, purchaseOrderRecord.GetString("division")))),
 		"total":       validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.Max(constants.MAX_APPROVAL_TOTAL)),
 		"type":        validation.Validate(purchaseOrderRecord.GetString("type"), validation.When(isChild, validation.In("Normal").Error("child POs must be of type Normal"))),
-	}.Filter()
+	}
 
-	return validationsErrors
+	// If a job is present, verify the referenced job exists and has Active status
+	if jobID := purchaseOrderRecord.GetString("job"); jobID != "" {
+		jobRecord, err := app.FindRecordById("jobs", jobID)
+		if err != nil || jobRecord == nil {
+			validationsErrors["job"] = validation.NewError("invalid_reference", "invalid job reference")
+		} else if jobRecord.GetString("status") != "Active" {
+			validationsErrors["job"] = validation.NewError("not_active", "Job status must be Active")
+		}
+	}
+
+	return validationsErrors.Filter()
 }
 
 // The ProcessPurchaseOrder function is used to validate the purchase_order

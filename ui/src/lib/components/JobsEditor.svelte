@@ -434,21 +434,7 @@
     <DSLocationPicker bind:value={item.location as string} {errors} fieldName="location" />
   </div>
 
-  <!-- <DsSelector
-    // TODO: Implement multiple division selection for jobs
-    {#if $divisions.index !== null}
-      <DsAutoComplete
-        bind:value={item.division as string}
-        index={$divisions.index}
-        {errors}
-        fieldName="division"
-        uiName="Division"
-      >
-        {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
-      </DsAutoComplete>
-    {/if}
-   -->
-
+  <!---
   <DsTextInput
     bind:value={item.number as string}
     {errors}
@@ -457,7 +443,7 @@
     disabled={true}
   />
   <p class="self-start text-xs text-neutral-600">Number is auto-assigned on creation.</p>
-
+-->
   <DsTextInput
     bind:value={item.description as string}
     {errors}
@@ -546,6 +532,12 @@
   >
     {#snippet optionTemplate(item)}{item.name}{/snippet}
   </DsSelector>
+  <p
+    class="cursor-help self-start text-sm text-neutral-600"
+    title="Use the status Closed if the purpose of this job is to act as a reporting container for many sub jobs. These “Parent” jobs can be billed to if their status is set to “Active”, however they are created as “Closed” by default. For example MTO retainers are usually created as Closed."
+  >
+    Creating a parent job? Use Closed.
+  </p>
 
   <div
     class="flex w-full flex-col gap-1"

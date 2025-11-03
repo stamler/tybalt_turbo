@@ -92,8 +92,8 @@ func cleanTimeEntry(app core.App, timeEntryRecord *core.Record) ([]string, error
 // the record prior to validation. The requiredFields slice is used to validate
 // the presence of required fields. The function returns an error if the record
 // is invalid, otherwise it returns nil.
-func validateTimeEntry(timeEntryRecord *core.Record, requiredFields []string) error {
-	jobIsPresent := timeEntryRecord.Get("job") != ""
+func validateTimeEntry(app core.App, timeEntryRecord *core.Record, requiredFields []string) error {
+	jobIsPresent := timeEntryRecord.GetString("job") != ""
 	totalHours := timeEntryRecord.GetFloat("hours") + timeEntryRecord.GetFloat("meals_hours")
 
 	// validation is performed in two passes. The first pass is to validate the
@@ -117,12 +117,23 @@ func validateTimeEntry(timeEntryRecord *core.Record, requiredFields []string) er
 		"date":                  validation.Validate(timeEntryRecord.Get("date"), validation.By(utilities.IsValidDate)),
 		"global":                validation.Validate(totalHours, validation.Max(18.0).Error("Total hours must not exceed 18")),
 		"meals_hours":           validation.Validate(timeEntryRecord.Get("meals_hours"), validation.Max(3.0).Error("Meals Hours must not exceed 3")),
-		"description":           validation.Validate(timeEntryRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
+		"description":           validation.Validate(timeEntryRecord.GetString("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
 		"work_record":           validation.Validate(timeEntryRecord.Get("work_record"), validation.When(jobIsPresent, validation.Match(regexp.MustCompile("^[FKQ][0-9]{2}-[0-9]{3,4}(-[0-9]+)?$")).Error("must be in the correct format")).Else(validation.In("").Error("Work Record must be empty when job is not provided"))),
 		"payout_request_amount": validation.Validate(timeEntryRecord.Get("payout_request_amount"), validation.Min(0.0).Exclusive().Error("Amount must be greater than 0"), validation.By(utilities.IsPositiveMultipleOfPointZeroOne())),
-	}.Filter()
+	}
 
-	return otherValidationsErrors
+	// If a job is present, verify the referenced job exists and has Active status
+	if jobIsPresent {
+		jobID := timeEntryRecord.GetString("job")
+		jobRecord, err := app.FindRecordById("jobs", jobID)
+		if err != nil || jobRecord == nil {
+			otherValidationsErrors["job"] = validation.Validate(jobID, validation.Required.Error("invalid job reference"))
+		} else if jobRecord.GetString("status") != "Active" {
+			otherValidationsErrors["job"] = validation.Validate(jobRecord.GetString("status"), validation.In("Active").Error("Job status must be Active"))
+		}
+	}
+
+	return otherValidationsErrors.Filter()
 }
 
 // The ProcessTimeEntry function is used to validate the time_entry record
@@ -165,7 +176,7 @@ func ProcessTimeEntry(app core.App, e *core.RecordRequestEvent) error {
 
 	// perform the validation for the time_entry record. In this step we also
 	// write the uid property to the record so that we can validate it against the
-	if validationErr := validateTimeEntry(record, requiredFields); validationErr != nil {
+	if validationErr := validateTimeEntry(app, record, requiredFields); validationErr != nil {
 		return apis.NewBadRequestError("Validation error", validationErr)
 	}
 

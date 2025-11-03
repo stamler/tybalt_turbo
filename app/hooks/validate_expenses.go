@@ -15,7 +15,7 @@ import (
 // The validateExpense function is used to validate the expense record. It is
 // called by ProcessExpense to ensure that the record is in a valid state before
 // it is created or updated.
-func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existingExpensesTotal float64, byPassTotalLimit bool) error {
+func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Record, existingExpensesTotal float64, byPassTotalLimit bool) error {
 
 	var (
 		poType           string = "Normal"
@@ -104,8 +104,8 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 		}
 	}
 
-	hasJob := expenseRecord.Get("job") != ""
-	hasPurchaseOrder := expenseRecord.Get("purchase_order") != ""
+	hasJob := expenseRecord.GetString("job") != ""
+	hasPurchaseOrder := expenseRecord.GetString("purchase_order") != ""
 	paymentType := expenseRecord.GetString("payment_type")
 	isAllowance := paymentType == "Allowance"
 	isPersonalReimbursement := paymentType == "PersonalReimbursement"
@@ -218,8 +218,19 @@ func validateExpense(expenseRecord *core.Record, poRecord *core.Record, existing
 				validation.Required.Error("required for allowance expenses"),
 			),
 		),
-	}.Filter()
+	}
 
-	return validationsErrors
+	// If a job is present, verify the referenced job exists and has Active status
+	if hasJob {
+		jobID := expenseRecord.GetString("job")
+		jobRecord, err := app.FindRecordById("jobs", jobID)
+		if err != nil || jobRecord == nil {
+			validationsErrors["job"] = validation.NewError("invalid_reference", "invalid job reference")
+		} else if jobRecord.GetString("status") != "Active" {
+			validationsErrors["job"] = validation.NewError("not_active", "Job status must be Active")
+		}
+	}
+
+	return validationsErrors.Filter()
 
 }

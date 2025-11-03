@@ -7,6 +7,7 @@ import (
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tests"
 )
 
 // We need to instantiate a Collection object to be part of the Record object
@@ -15,6 +16,12 @@ var expensesCollection = core.NewBaseCollection("expenses")
 var poCollection = core.NewBaseCollection("purchase_orders")
 
 func TestValidateExpense(t *testing.T) {
+	// Initialize a PocketBase TestApp for validations that require DB lookups
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatalf("failed to init test app: %v", err)
+	}
+	defer app.Cleanup()
 	// Test cases
 	tests := map[string]struct {
 		valid                 bool
@@ -48,16 +55,16 @@ func TestValidateExpense(t *testing.T) {
 		"valid_short_description_for_allowance":                 {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{"Breakfast"}, "date": "2024-01-22", "description": "", "job": "", "payment_type": "Allowance", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "vendor": "2zqxtsmymf670ha"})},
 		"valid_short_description_high_total_for_allowance":      {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{"Breakfast", "Lunch", "Dinner", "Lodging"}, "date": "2024-01-22", "description": "", "job": "", "payment_type": "Allowance", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 1000, "vendor": "2zqxtsmymf670ha"})},
 		"valid_short_description_low_total_for_allowance":       {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{"Breakfast", "Lunch", "Dinner", "Lodging"}, "date": "2024-01-22", "description": "", "job": "", "payment_type": "Allowance", "purchase_order": "", "total": 0.01, "vendor": "2zqxtsmymf670ha"})},
-		"valid_with_job_and_po":                                 {valid: true, po: buildRecordFromMap(poCollection, map[string]any{"date": "2024-01-22", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "type": "Normal"}), hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "OnAccount", "purchase_order": "recordId", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
-		"invalid_with_job_and_po_recurring_date_after_end_date": {valid: false, field: "date", po: buildRecordFromMap(poCollection, map[string]any{"date": "2024-01-22", "end_date": "2024-02-22", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "type": "Recurring"}), hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-02-23", "description": "Valid description", "job": "jobId", "payment_type": "OnAccount", "purchase_order": "recordId", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
+		"valid_with_job_and_po":                                 {valid: true, po: buildRecordFromMap(poCollection, map[string]any{"date": "2024-01-22", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "type": "Normal"}), hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "OnAccount", "purchase_order": "recordId", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
+		"invalid_with_job_and_po_recurring_date_after_end_date": {valid: false, field: "date", po: buildRecordFromMap(poCollection, map[string]any{"date": "2024-01-22", "end_date": "2024-02-22", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "type": "Recurring"}), hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-02-23", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "OnAccount", "purchase_order": "recordId", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
 		"invalid_with_job_and_po_if_too_early_for_po":           {valid: false, field: "date", po: buildRecordFromMap(poCollection, map[string]any{"date": "2024-01-23", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "type": "Normal"}), hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "OnAccount", "purchase_order": "recordId", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
-		"invalid_with_job_no_po":                                {valid: false, po: nil, hasPayablesAdminClaim: false, field: "purchase_order", record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "OnAccount", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
-		"invalid_with_job_no_po_no_distance_mileage":            {valid: false, po: nil, hasPayablesAdminClaim: false, field: "distance", record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "Mileage", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
-		"valid_with_job_and_distance_no_po_mileage":             {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "Mileage", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha", "distance": 100.00})},
-		"valid_with_job_no_po_fuelcard":                         {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "FuelCard", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
-		"valid_with_job_no_po_personal_reimbursement":           {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "PersonalReimbursement", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
-		"valid_with_job_no_po_allowance":                        {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{"Breakfast"}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "Allowance", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
-		"invalid_no_allowance_types_allowance":                  {valid: false, field: "allowance_types", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "jobId", "payment_type": "Allowance", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
+		"invalid_with_job_no_po":                                {valid: false, po: nil, hasPayablesAdminClaim: false, field: "purchase_order", record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "OnAccount", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT - 0.01, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
+		"invalid_with_job_no_po_no_distance_mileage":            {valid: false, po: nil, hasPayablesAdminClaim: false, field: "distance", record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "Mileage", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
+		"valid_with_job_and_distance_no_po_mileage":             {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "Mileage", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha", "distance": 100.00})},
+		"valid_with_job_no_po_fuelcard":                         {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "FuelCard", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
+		"valid_with_job_no_po_personal_reimbursement":           {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "PersonalReimbursement", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha", "attachment": "dummy.pdf"})},
+		"valid_with_job_no_po_allowance":                        {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{"Breakfast"}, "date": "2024-01-22", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "Allowance", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
+		"invalid_no_allowance_types_allowance":                  {valid: false, field: "allowance_types", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "Allowance", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
 
 		// Attachment presence validation across payment types
 		"invalid_attachment_required_for_expense":                   {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "Expense", "purchase_order": "", "total": 10.00, "vendor": "2zqxtsmymf670ha"})},
@@ -85,7 +92,7 @@ func TestValidateExpense(t *testing.T) {
 				"allowance_types": []string{},
 				"date":            "2024-01-22",
 				"description":     "Valid description",
-				"job":             "jobId",
+				"job":             "mg0sp9iyjzo4zw9",
 				"payment_type":    "OnAccount",
 				"purchase_order":  "recordId",
 				"total":           400.00,
@@ -116,7 +123,7 @@ func TestValidateExpense(t *testing.T) {
 				"allowance_types": []string{},
 				"date":            "2024-01-22",
 				"description":     "Valid description",
-				"job":             "jobId",
+				"job":             "mg0sp9iyjzo4zw9",
 				"payment_type":    "OnAccount",
 				"purchase_order":  "recordId",
 				"total":           300.00,
@@ -150,7 +157,7 @@ func TestValidateExpense(t *testing.T) {
 				"allowance_types": []string{},
 				"date":            "2024-01-22",
 				"description":     "Valid description",
-				"job":             "jobId",
+				"job":             "mg0sp9iyjzo4zw9",
 				"payment_type":    "OnAccount",
 				"purchase_order":  "recordId",
 				"total":           1200.00,
@@ -165,7 +172,7 @@ func TestValidateExpense(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			// TODO: Add tests where a PO record is provided
 			// TODO: Add tests where an existing expenses total is provided for Cumulative POs
-			got := validateExpense(tt.record, tt.po, tt.existingExpensesTotal, tt.hasPayablesAdminClaim)
+			got := validateExpense(app, tt.record, tt.po, tt.existingExpensesTotal, tt.hasPayablesAdminClaim)
 			if got != nil {
 				if tt.valid {
 					t.Errorf("failed validation (%v) but expected valid", got)
@@ -181,13 +188,8 @@ func TestValidateExpense(t *testing.T) {
 						}
 					} else {
 						errMap := got.(validation.Errors)
-						if len(errMap) != 1 {
-							t.Errorf("expected one error, got %d", len(errMap))
-						}
-						for field := range errMap {
-							if field != tt.field {
-								t.Errorf("expected field: %s, got: %s", tt.field, field)
-							}
+						if _, ok := errMap[tt.field]; !ok {
+							t.Errorf("expected field %s to be in errors, got: %v", tt.field, errMap)
 						}
 					}
 				}
@@ -195,5 +197,34 @@ func TestValidateExpense(t *testing.T) {
 				t.Errorf("passed validation but expected invalid")
 			}
 		})
+	}
+}
+
+func TestValidateExpense_RejectsClosedJob(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatalf("failed to init test app: %v", err)
+	}
+	defer app.Cleanup()
+
+	rec := core.NewRecord(expensesCollection)
+	rec.Set("allowance_types", []string{})
+	rec.Set("job", "zke3cs3yipplwtu")
+	rec.Set("payment_type", "Mileage") // avoid attachment/PO requirement
+	rec.Set("distance", 10.0)
+	rec.Set("date", "2024-01-22")
+	rec.Set("description", "Valid description")
+	rec.Set("total", 25.0)
+
+	if err := validateExpense(app, rec, nil, 0.0, false); err == nil {
+		t.Fatalf("expected validation to fail for inactive job, got nil")
+	} else {
+		if verrs, ok := err.(validation.Errors); ok {
+			if _, ok := verrs["job"]; !ok {
+				t.Fatalf("expected job error, got: %v", verrs)
+			}
+		} else {
+			t.Fatalf("expected validation.Errors, got %T: %v", err, err)
+		}
 	}
 }

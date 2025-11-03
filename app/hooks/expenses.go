@@ -452,8 +452,8 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
-	// validate the expense record
-	if err := validateExpense(expenseRecord, poRecord, existingExpensesTotal, hasPayablesAdminClaim); err != nil {
+    // validate the expense record
+    if err := validateExpense(app, expenseRecord, poRecord, existingExpensesTotal, hasPayablesAdminClaim); err != nil {
 		return err
 	}
 	return nil
