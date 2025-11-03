@@ -90,6 +90,36 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
+	// Enforce authorizing_document/client_po rules
+	authorizingDocument := jobRecord.GetString("authorizing_document")
+	trimmedClientPO := strings.TrimSpace(jobRecord.GetString("client_po"))
+	if authorizingDocument == "PO" {
+		// Persist the trimmed value before further processing
+		jobRecord.Set("client_po", trimmedClientPO)
+		if len(trimmedClientPO) <= 2 {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "client PO must be at least 3 characters when authorizing document is PO",
+				Data: map[string]errs.CodeError{
+					"client_po": {Code: "client_po_min_length", Message: "client_po must be at least 3 characters when authorizing_document is PO"},
+				},
+			}
+		}
+	} else if authorizingDocument == "" {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "authorizing document is required",
+			Data: map[string]errs.CodeError{
+				"authorizing_document": {Code: "required", Message: "authorizing_document is required"},
+			},
+		}
+	} else {
+		// If not PO, clear any provided client_po instead of erroring
+		if trimmedClientPO != "" {
+			jobRecord.Set("client_po", "")
+		}
+	}
+
 	// On create, derive the type of job while validating the job then generate a number
 	if jobRecord.IsNew() {
 		// First derive type while validating the job

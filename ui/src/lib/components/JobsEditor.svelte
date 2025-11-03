@@ -56,6 +56,9 @@
   item.branch = item.branch ?? "";
   item.outstanding_balance = item.outstanding_balance ?? 0;
   item.outstanding_balance_date = item.outstanding_balance_date ?? "";
+  item.authorizing_document = item.authorizing_document ?? "";
+  item.client_po = item.client_po ?? "";
+  item.client_reference_number = item.client_reference_number ?? "";
 
   let newCategory = $state("");
   let newCategories = $state([] as string[]);
@@ -71,6 +74,12 @@
     id: status,
     name: status,
   }));
+
+  const authorizingDocumentOptions = [
+    { id: "Unauthorized", name: "Unauthorized" },
+    { id: "PO", name: "PO" },
+    { id: "PA", name: "PA" },
+  ];
 
   const activeDivisions = $derived.by(() =>
     ($divisions.items ?? []).filter((division) => (division as DivisionsResponse).active),
@@ -238,6 +247,14 @@
       setFieldError("divisions", divisionsMustBeActiveMessage);
     } else if (errors.divisions?.message === divisionsMustBeActiveMessage) {
       clearFieldError("divisions");
+    }
+  });
+
+  // Mirror backend behavior: when not PO, clear any provided client_po
+  $effect(() => {
+    if (item.authorizing_document !== "PO" && item.client_po) {
+      item.client_po = "";
+      if (errors.client_po) clearFieldError("client_po");
     }
   });
 
@@ -538,6 +555,25 @@
   >
     Creating a parent job? Use Closed.
   </p>
+
+  <DsSelector
+    bind:value={item.authorizing_document}
+    items={authorizingDocumentOptions}
+    {errors}
+    fieldName="authorizing_document"
+    uiName="Authorizing Document"
+  >
+    {#snippet optionTemplate(item)}{item.name}{/snippet}
+  </DsSelector>
+  {#if item.authorizing_document === "PO"}
+    <DsTextInput bind:value={item.client_po} {errors} fieldName="client_po" uiName="Client PO" />
+  {/if}
+  <DsTextInput
+    bind:value={item.client_reference_number}
+    {errors}
+    fieldName="client_reference_number"
+    uiName="Client Reference Number"
+  />
 
   <div
     class="flex w-full flex-col gap-1"

@@ -34,6 +34,9 @@ type jobDetailsRow struct {
 	ParentID                  sql.NullString  `db:"parent_id"`
 	ParentNumber              sql.NullString  `db:"parent_number"`
 	Location                  sql.NullString  `db:"location"`
+	AuthorizingDocument       sql.NullString  `db:"authorizing_document"`
+	ClientPO                  sql.NullString  `db:"client_po"`
+	ClientReferenceNumber     sql.NullString  `db:"client_reference_number"`
 	ClientID                  string          `db:"client_id"`
 	ClientName                string          `db:"client_name"`
 	ContactID                 sql.NullString  `db:"contact_id"`
@@ -82,6 +85,9 @@ type JobDetails struct {
 	ParentID                  string     `json:"parent_id"`
 	ParentNumber              string     `json:"parent_number"`
 	Location                  string     `json:"location"`
+	AuthorizingDocument       string     `json:"authorizing_document"`
+	ClientPO                  string     `json:"client_po"`
+	ClientReferenceNumber     string     `json:"client_reference_number"`
 	Client                    ClientInfo `json:"client"`
 	Contact                   Person     `json:"contact"`
 	Manager                   Person     `json:"manager"`
@@ -149,6 +155,9 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			ParentID:                  ns(r.ParentID),
 			ParentNumber:              ns(r.ParentNumber),
 			Location:                  ns(r.Location),
+			AuthorizingDocument:       ns(r.AuthorizingDocument),
+			ClientPO:                  ns(r.ClientPO),
+			ClientReferenceNumber:     ns(r.ClientReferenceNumber),
 			Client:                    ClientInfo{ID: r.ClientID, Name: r.ClientName},
 			Contact:                   Person{ID: ns(r.ContactID), GivenName: ns(r.ContactGivenName), Surname: ns(r.ContactSurname)},
 			Manager:                   Person{ID: ns(r.ManagerID), GivenName: ns(r.ManagerGivenName), Surname: ns(r.ManagerSurname)},

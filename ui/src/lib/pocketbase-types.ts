@@ -435,8 +435,11 @@ export enum JobsStatusOptions {
 export type JobsRecord = {
   _imported: boolean;
   alternate_manager: RecordIdString;
+  authorizing_document: string;
   branch: RecordIdString;
   client: RecordIdString;
+  client_po: string;
+  client_reference_number: string;
   contact: RecordIdString;
   created: IsoDateString;
   description: string;

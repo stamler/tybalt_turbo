@@ -318,6 +318,25 @@
           {data.job.fn_agreement ? "Yes" : "No"}
         </div>
 
+        {#if data.job.authorizing_document}
+          <div>
+            <span class="font-semibold">Authorizing Document:</span>
+            {data.job.authorizing_document}
+          </div>
+        {/if}
+        {#if data.job.authorizing_document === "PO" && data.job.client_po}
+          <div>
+            <span class="font-semibold">Client PO:</span>
+            {data.job.client_po}
+          </div>
+        {/if}
+        {#if data.job.client_reference_number}
+          <div>
+            <span class="font-semibold">Client Reference Number:</span>
+            {data.job.client_reference_number}
+          </div>
+        {/if}
+
         <div>
           <span class="font-semibold">Outstanding Balance:</span>
           {formatCurrency(data.job.outstanding_balance ?? 0)}
