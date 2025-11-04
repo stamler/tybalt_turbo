@@ -26,7 +26,7 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 		return err
 	}
 
-	if err := cleanJobOutstandingBalance(app, e); err != nil {
+	if err := cleanJobOutstandingBalance(e); err != nil {
 		return err
 	}
 
@@ -93,7 +93,8 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 	// Enforce authorizing_document/client_po rules
 	authorizingDocument := jobRecord.GetString("authorizing_document")
 	trimmedClientPO := strings.TrimSpace(jobRecord.GetString("client_po"))
-	if authorizingDocument == "PO" {
+	switch authorizingDocument {
+	case "PO":
 		// Persist the trimmed value before further processing
 		jobRecord.Set("client_po", trimmedClientPO)
 		if len(trimmedClientPO) <= 2 {
@@ -105,7 +106,7 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 				},
 			}
 		}
-	} else if authorizingDocument == "" {
+	case "":
 		return &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "authorizing document is required",
@@ -113,7 +114,7 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 				"authorizing_document": {Code: "required", Message: "authorizing_document is required"},
 			},
 		}
-	} else {
+	default:
 		// If not PO, clear any provided client_po instead of erroring
 		if trimmedClientPO != "" {
 			jobRecord.Set("client_po", "")
@@ -186,7 +187,7 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 	return nil
 }
 
-func cleanJobOutstandingBalance(app core.App, e *core.RecordRequestEvent) error {
+func cleanJobOutstandingBalance(e *core.RecordRequestEvent) error {
 	jobRecord := e.Record
 	outstandingBalance := jobRecord.GetFloat("outstanding_balance")
 

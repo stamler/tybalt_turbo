@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { ExpensesPageData } from "$lib/svelte-types";
+  import type { ExpensesListData } from "$lib/svelte-types";
   import ExpensesList from "$lib/components/ExpensesList.svelte";
-  let { data }: { data: ExpensesPageData } = $props();
+  let { data }: { data: ExpensesListData } = $props();
 </script>
 
-<ExpensesList inListHeader="Expenses Approved by Me" {data} />
+<ExpensesList inListHeader="Expenses Approved by Me" {data} endpoint="/api/expenses/approved" />

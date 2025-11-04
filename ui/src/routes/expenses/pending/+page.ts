@@ -1,30 +1,17 @@
-import type { ExpensesAugmentedResponse } from "$lib/pocketbase-types";
+import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
-import { authStore } from "$lib/stores/auth";
-import { get } from "svelte/store";
 export const load: PageLoad = async () => {
   try {
-    // load all of the pending expenses for the caller
-    const userId = get(authStore)?.model?.id || "";
-
-    const result = await pb
-      .collection("expenses_augmented")
-      .getFullList<ExpensesAugmentedResponse>({
-        sort: "-date",
-        filter: pb.filter("approver={:approver} && approved='' && submitted=true", {
-          approver: userId,
-        }),
-      });
+    const result: { data: ExpensesAugmentedResponse[]; total_pages?: number; limit?: number } = await pb.send(`/api/expenses/pending`, {
+      method: "GET",
+    });
     return {
-      items: result,
-      // createdItemIsVisible: (record: ExpensesResponse) => {
-      // only show items where the caller is the approver. It should be
-      // unnecessary to check whether the record is submitted because listRule
-      // should prevent visibility of unsubmitted records by a user other than
-      // the creator.
-      // return record.approver === userId;
-      // },
+      items: result?.data ?? [],
+      totalPages: result?.total_pages ?? 0,
+      limit: result?.limit ?? 20,
+      createdItemIsVisible: (record: ExpensesResponse) =>
+        record.submitted === true && record.approved === "",
     };
   } catch (error) {
     console.error(`loading data: ${error}`);

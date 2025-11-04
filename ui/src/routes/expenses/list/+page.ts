@@ -1,21 +1,16 @@
 import type { ExpensesAugmentedResponse } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
-import { authStore } from "$lib/stores/auth";
-import { get } from "svelte/store";
 export const load: PageLoad = async () => {
   try {
-    // load all of the caller's own expenses
-    const userId = get(authStore)?.model?.id || "";
-
-    const result = await pb
-      .collection("expenses_augmented")
-      .getFullList<ExpensesAugmentedResponse>({
-        sort: "-date",
-        filter: pb.filter("uid={:userId}", { userId }),
-      });
+    const result: { data: ExpensesAugmentedResponse[]; total_pages?: number; limit?: number } = await pb.send(
+      `/api/expenses/list`,
+      { method: "GET" },
+    );
     return {
-      items: result,
+      items: result?.data ?? [],
+      totalPages: result?.total_pages ?? 0,
+      limit: result?.limit ?? 20,
       // createdItemIsVisible: (record: ExpensesResponse) => {
       //   return record.uid === userId;
       // },

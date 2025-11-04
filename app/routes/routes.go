@@ -99,6 +99,10 @@ func AddRoutes(app core.App) {
 		expensesGroup.POST("/{id}/approve", createApproveRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/reject", createRejectRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/commit", createCommitRecordHandler(app, "expenses"))
+		expensesGroup.GET("/list", createGetExpensesListHandler(app))
+		expensesGroup.GET("/details/{id}", createGetExpenseDetailsHandler(app))
+		expensesGroup.GET("/pending", createGetPendingExpensesHandler(app))
+		expensesGroup.GET("/approved", createGetApprovedExpensesHandler(app))
 		// Expense tracking endpoints for report holders
 		expensesGroup.GET("/tracking_counts", createExpenseTrackingCountsHandler(app))
 		expensesGroup.GET("/tracking", createExpenseTrackingAllHandler(app))

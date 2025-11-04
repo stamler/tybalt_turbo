@@ -10,7 +10,7 @@ import (
 
 // ProcessClientNote enforces business rules for client note creation.
 func ProcessClientNote(app core.App, e *core.RecordRequestEvent) error {
-	if err := cleanClientNote(app, e); err != nil {
+	if err := cleanClientNote(e); err != nil {
 		return err
 	}
 
@@ -21,7 +21,7 @@ func ProcessClientNote(app core.App, e *core.RecordRequestEvent) error {
 	return nil
 }
 
-func cleanClientNote(app core.App, e *core.RecordRequestEvent) error {
+func cleanClientNote(e *core.RecordRequestEvent) error {
 	if e.Auth == nil {
 		return &errs.HookError{
 			Status:  http.StatusForbidden,

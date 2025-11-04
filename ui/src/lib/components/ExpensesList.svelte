@@ -11,7 +11,7 @@
   import { shortDate } from "$lib/utilities";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { onMount, onDestroy } from "svelte";
-  import { augmentedProxySubscription } from "$lib/utilities";
+  import { proxySubscriptionWithLoader } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
   let rejectModal: RejectModal;
 
@@ -20,21 +20,32 @@
   let {
     inListHeader,
     data,
-  }: { inListHeader?: string; data: { items: any; createdItemIsVisible?: any } } = $props();
+    endpoint,
+  }: {
+    inListHeader?: string;
+    data: { items: any; createdItemIsVisible?: any; totalPages?: number; limit?: number };
+    endpoint: string;
+  } = $props();
   let items = $state(data.items);
   let createdItemIsVisible = $state(data.createdItemIsVisible);
+  let page = $state(1);
+  let listLoading = $state(false);
+  let hasMore = $state((data.totalPages ?? 0) > 1);
+  const serverLimit = data.limit ?? 20;
 
-  // Subscribe to the base collection but update the items from the augmented
-  // view
+  // Subscribe to the base collection but update items using the details API
   let unsubscribeFunc: UnsubscribeFunc;
   onMount(async () => {
     if (items === undefined) {
       return;
     }
-    unsubscribeFunc = await augmentedProxySubscription<ExpensesResponse, ExpensesAugmentedResponse>(
+    unsubscribeFunc = await proxySubscriptionWithLoader<
+      ExpensesResponse,
+      ExpensesAugmentedResponse
+    >(
       items,
       "expenses",
-      "expenses_augmented",
+      async (id: string) => await pb.send(`/api/expenses/details/${id}`, { method: "GET" }),
       (newItems) => {
         items = newItems;
       },
@@ -44,6 +55,28 @@
   onDestroy(async () => {
     unsubscribeFunc();
   });
+
+  async function loadMore() {
+    if (listLoading || !hasMore) return;
+    listLoading = true;
+    try {
+      const nextPage = page + 1;
+      const res: { data: ExpensesAugmentedResponse[]; total_pages?: number; limit?: number } =
+        await pb.send(`${endpoint}?page=${nextPage}&limit=20`, { method: "GET" });
+      const newItems = res?.data ?? [];
+      // Append and advance
+      items = [...items, ...newItems];
+      page = nextPage;
+      const limit = res?.limit ?? serverLimit;
+      const nextTotalPages = res?.total_pages;
+      hasMore =
+        nextTotalPages !== undefined ? nextPage < nextTotalPages : newItems.length === limit;
+    } catch (e) {
+      // noop, leave hasMore as-is
+    } finally {
+      listLoading = false;
+    }
+  }
 
   async function del(id: string): Promise<void> {
     // return immediately if items is not an array
@@ -246,3 +279,14 @@
     {/if}
   {/snippet}
 </DsList>
+{#if hasMore}
+  <div class="mt-4 text-center">
+    <button
+      class="mb-4 rounded bg-blue-600 px-4 py-2 text-white"
+      onclick={loadMore}
+      disabled={listLoading}
+    >
+      {listLoading ? "Loading…" : "Load More"}
+    </button>
+  </div>
+{/if}

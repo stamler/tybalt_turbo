@@ -15,6 +15,7 @@ import type {
   AdminProfilesAugmentedResponse,
   ClientDetails,
   ClientNotesResponse,
+  ExpensesAugmentedResponse,
 } from "$lib/pocketbase-types";
 
 export interface PageData<T> {
@@ -52,3 +53,11 @@ export type ClientDetailsPageData = {
 };
 export type VendorsPageData = PageData<VendorsRecord | VendorsResponse>;
 export type AdminProfilesPageData = PageData<AdminProfilesRecord | AdminProfilesAugmentedResponse>;
+
+// Expenses list pages use API endpoints returning augmented rows plus pagination metadata
+export type ExpensesListData = {
+  items: ExpensesAugmentedResponse[];
+  createdItemIsVisible?: (record: ExpensesResponse) => boolean;
+  totalPages?: number;
+  limit?: number;
+};

@@ -502,6 +502,48 @@ export function augmentedProxySubscription<
   });
 }
 
+// Like augmentedProxySubscription but uses a loader callback instead of a view name,
+// so callers can source augmented rows from a custom API endpoint.
+export function proxySubscriptionWithLoader<
+  CollectionResponse extends BaseSystemFields,
+  ViewResponse extends { id: string },
+>(
+  localArray: ViewResponse[],
+  collectionName: string,
+  loadAugmented: (id: string) => Promise<ViewResponse>,
+  updateCallback: (newArray: ViewResponse[]) => void,
+  createdItemIsVisible: undefined | ((record: CollectionResponse) => boolean) = undefined,
+): Promise<UnsubscribeFunc> {
+  return pb.collection(collectionName).subscribe<CollectionResponse>("*", async (e) => {
+    if (!Array.isArray(localArray)) return;
+    const id = e.record.id;
+    let augmentedRecord: ViewResponse;
+    switch (e.action) {
+      case "create":
+        if (createdItemIsVisible !== undefined && !createdItemIsVisible(e.record)) {
+          return;
+        }
+        augmentedRecord = await loadAugmented(id);
+        localArray = [augmentedRecord, ...localArray];
+        break;
+      case "update":
+        // If the updated record no longer matches the page's visibility predicate,
+        // remove it from the local array instead of keeping it.
+        if (createdItemIsVisible !== undefined && !createdItemIsVisible(e.record)) {
+          localArray = localArray.filter((item) => item.id !== e.record.id);
+          break;
+        }
+        augmentedRecord = await loadAugmented(id);
+        localArray = localArray.map((item) => (item.id === e.record.id ? augmentedRecord : item));
+        break;
+      case "delete":
+        localArray = localArray.filter((item) => item.id !== e.record.id);
+        break;
+    }
+    updateCallback(localArray);
+  });
+}
+
 export function poActiveDate(record: PurchaseOrdersAugmentedResponse): string {
   // return the first 10 characters the second_approval (if not undefined) or of
   // the approved.
