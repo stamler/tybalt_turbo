@@ -511,25 +511,6 @@ func validateJob(app core.App, e *core.RecordRequestEvent) (jobType, error) {
 			}
 		}
 
-		// enforce single-project-per-proposal
-		currentID := ""
-		if original != nil {
-			currentID = original.Id
-		}
-		existing, err := app.FindRecordsByFilter("jobs", "proposal = {:pid}", "-created", 2, 0, dbx.Params{"pid": proposalRef})
-		if err == nil {
-			for _, rec := range existing {
-				if rec.Id != currentID {
-					return 0, &errs.HookError{
-						Status:  http.StatusBadRequest,
-						Message: "proposal already referenced by another project",
-						Data: map[string]errs.CodeError{
-							"proposal": {Code: "proposal_already_referenced", Message: "only one project may reference a proposal"},
-						},
-					}
-				}
-			}
-		}
 	}
 
 	// Sub-job parent constraints: if parent is set, parent must exist and must be a project (not a proposal)
