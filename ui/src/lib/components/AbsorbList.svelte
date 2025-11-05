@@ -3,13 +3,12 @@
   import DsActionButton from "./DSActionButton.svelte";
   import type { AbsorbActionsResponse } from "$lib/pocketbase-types";
   import { goto } from "$app/navigation";
+  import { getAbsorbRedirectUrl } from "$lib/utilities";
 
   let {
     collectionName = undefined,
-    afterAction = undefined,
   }: {
     collectionName?: string;
-    afterAction?: () => void;
   } = $props();
 
   let errors = $state<Record<string, { message: string }>>({});
@@ -54,12 +53,9 @@
   async function undoAbsorb(item: AbsorbActionsResponse) {
     try {
       await pb.send(`/api/${item.collection_name}/undo_absorb`, { method: "POST" });
-      // After successful undo, prefer callback if provided, otherwise redirect
-      if (afterAction) {
-        afterAction();
-      } else {
-        goto(`/${item.collection_name}/list`);
-      }
+      // After successful undo, redirect to appropriate page
+      const url = await getAbsorbRedirectUrl(item.collection_name, item.target_id);
+      goto(url);
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };
@@ -74,12 +70,9 @@
   async function commitAbsorb(item: AbsorbActionsResponse) {
     try {
       await pb.collection("absorb_actions").delete(item.id);
-      // After successful commit, prefer callback if provided, otherwise redirect
-      if (afterAction) {
-        afterAction();
-      } else {
-        goto(`/${item.collection_name}/list`);
-      }
+      // After successful commit, redirect to appropriate page
+      const url = await getAbsorbRedirectUrl(item.collection_name, item.target_id);
+      goto(url);
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };

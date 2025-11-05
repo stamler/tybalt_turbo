@@ -10,6 +10,7 @@
   import type { BaseSystemFields } from "$lib/pocketbase-types";
   import type MiniSearch from "minisearch";
   import AbsorbList from "./AbsorbList.svelte";
+  import { getAbsorbRedirectUrl } from "$lib/utilities";
 
   let {
     collectionName,
@@ -56,19 +57,11 @@
     }
   });
 
-  function redirectBack() {
-    if (collectionName === "client_contacts") {
-      goto(`/clients/${$page.params.cid}/edit`);
-    } else {
-      goto(`/${collectionName}/list`);
-    }
-  }
-
   function goBack() {
     if (typeof window !== "undefined" && window.history.length > 1) {
       window.history.back();
     } else {
-      redirectBack();
+      getAbsorbRedirectUrl(collectionName, targetRecordId, $page.params.cid).then(goto);
     }
   }
 
@@ -146,7 +139,7 @@
       <div class="mb-3">
         <DsActionButton action={goBack} color="neutral">Back</DsActionButton>
       </div>
-      <AbsorbList {collectionName} afterAction={redirectBack} />
+      <AbsorbList {collectionName} />
     </div>
   {:else}
     <div class="flex flex-col gap-2">
@@ -213,7 +206,11 @@
 
     <div class="flex gap-2">
       <DsActionButton action={handleAbsorb}>Absorb</DsActionButton>
-      <DsActionButton action={redirectBack}>Cancel</DsActionButton>
+      <DsActionButton
+        action={() =>
+          getAbsorbRedirectUrl(collectionName, targetRecordId, $page.params.cid).then(goto)}
+        >Cancel</DsActionButton
+      >
     </div>
 
     {#if errors.global}

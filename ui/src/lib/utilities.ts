@@ -4,6 +4,7 @@ import type {
   ClientContactsResponse,
   BaseSystemFields,
   PurchaseOrdersAugmentedResponse,
+  ProfilesResponse,
 } from "$lib/pocketbase-types";
 import { type UnsubscribeFunc } from "pocketbase";
 import { pb } from "$lib/pocketbase";
@@ -437,8 +438,8 @@ export function applyDefaultDivisionOnce(
       try {
         const prof = await pb
           .collection("profiles")
-          .getFirstListItem(pb.filter("uid={:uid}", { uid }));
-        const dd = (prof as any)?.default_division ?? "";
+          .getFirstListItem<ProfilesResponse>(pb.filter("uid={:uid}", { uid }));
+        const dd = prof?.default_division ?? "";
         if ((!item.division || item.division === "") && dd) {
           item.division = dd as string;
         }
@@ -451,7 +452,7 @@ export function applyDefaultDivisionOnce(
 
   // Caller default division: apply only once per item instance
   if (appliedDivisionOnce.has(item as object)) return;
-  const dd = (get(globalStore) as any)?.profile?.default_division ?? "";
+  const dd = get(globalStore)?.profile?.default_division ?? "";
   if ((!item.division || item.division === "") && dd) {
     item.division = dd as string;
     appliedDivisionOnce.add(item as object);
@@ -551,4 +552,24 @@ export function poActiveDate(record: PurchaseOrdersAugmentedResponse): string {
     return record.second_approval.substring(0, 10);
   }
   return record.approved.substring(0, 10);
+}
+
+// Get the appropriate redirect URL after absorb operations
+export async function getAbsorbRedirectUrl(
+  collectionName: string,
+  targetRecordId?: string,
+  clientId?: string,
+): Promise<string> {
+  if (collectionName === "client_contacts") {
+    // For client_contacts, use provided clientId or fetch from contact record
+    let finalClientId = clientId;
+    if (!finalClientId && targetRecordId) {
+      const contact = await pb.collection("client_contacts").getOne(targetRecordId);
+      finalClientId = contact.client;
+    }
+    return `/clients/${finalClientId}/edit`;
+  } else {
+    // For other collections, redirect to the list page
+    return `/${collectionName}/list`;
+  }
 }
