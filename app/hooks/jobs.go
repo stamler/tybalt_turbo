@@ -141,7 +141,7 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 					Status:  http.StatusInternalServerError,
 					Message: "error generating sub-job number",
 					Data: map[string]errs.CodeError{
-						"number": {Code: "error_generating_job_number", Message: genErr.Error()},
+						"global": {Code: "error_generating_job_number", Message: genErr.Error()},
 					},
 				}
 			}
@@ -154,7 +154,7 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 					Status:  http.StatusInternalServerError,
 					Message: "error generating job number",
 					Data: map[string]errs.CodeError{
-						"number": {Code: "error_generating_job_number", Message: genErr.Error()},
+						"global": {Code: "error_generating_job_number", Message: genErr.Error()},
 					},
 				}
 			}
@@ -164,20 +164,9 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 	} else {
 		// We are updating an existing job
 		// Validate job fields, cross-record constraints and derive type
-		derivedType, err := validateJob(app, e)
+		_, err := validateJob(app, e)
 		if err != nil {
 			return err
-		}
-		// On update, ensure existing number implies a type that matches the payload
-		impliedType := typeFromNumber(jobRecord.GetString("number"))
-		if impliedType != derivedType {
-			return &errs.HookError{
-				Status:  http.StatusBadRequest,
-				Message: "job number type conflict",
-				Data: map[string]errs.CodeError{
-					"number": {Code: "job_number_type_conflict", Message: "existing number implies a different job type"},
-				},
-			}
 		}
 	}
 
@@ -591,15 +580,15 @@ func validateJob(app core.App, e *core.RecordRequestEvent) (jobType, error) {
 		record.Set("client", parentClient)
 	}
 
-	// Update-time number/type consistency: if updating, implied type from number must match derived
-	if original != nil {
+	// Update-time number/type consistency: only enforce on update
+	if !isCreate {
 		implied := typeFromNumber(original.GetString("number"))
 		if implied != derived {
 			return 0, &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "job number type conflict",
 				Data: map[string]errs.CodeError{
-					"number": {Code: "job_number_type_conflict", Message: "existing number implies a different job type"},
+					"global": {Code: "job_number_type_conflict", Message: "existing number implies a different job type"},
 				},
 			}
 		}
