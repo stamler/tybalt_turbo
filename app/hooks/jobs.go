@@ -26,6 +26,12 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 		return err
 	}
 
+	// Caveat: cleanJob runs before validateJob. If cleanJob normalizes fields
+	// (e.g., clears authorizing_document/client_po/client_reference_number on proposals
+	// or updates outstanding_balance_date), a request intending to change only "status"
+	// may appear to have other changes. If this causes status-only updates to be treated
+	// as full updates, either exclude such normalized fields from the change detection
+	// in validateJob or move the status-only check earlier in this function.
 	// Normalize fields that depend on the job type (project vs proposal)
 	if err := cleanJob(app, e); err != nil {
 		return err
@@ -307,8 +313,9 @@ func (t jobType) String() string {
 }
 
 var (
-	baseNumberRegex  = regexp.MustCompile(`^(?:P)?\d{2}-\d{4}$`)
-	childNumberRegex = regexp.MustCompile(`^(?:P)?\d{2}-\d{4}-\d{2}$`)
+	baseNumberRegex       = regexp.MustCompile(`^(?:P)?\d{2}-\d{4}$`)
+	childNumberRegex      = regexp.MustCompile(`^(?:P)?\d{2}-\d{4}-\d{2}$`)
+	locationPlusCodeRegex = regexp.MustCompile(`^[23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2,3}$`)
 )
 
 func isBaseNumber(s string) bool {
@@ -365,6 +372,50 @@ func validateJob(app core.App, e *core.RecordRequestEvent) (jobType, error) {
 		}
 	} else {
 		derived = typeFromNumber(original.GetString("number"))
+	}
+
+	// Allow status-only updates to pass without tripping other validations.
+	// This compensates for relaxed update rules while preserving status constraints.
+	if !isCreate {
+		changedOtherField := false
+		// Check if any field other than "status", "updated", or "created" changed; if none did, treat as status-only update.
+		for _, fieldName := range record.Collection().Fields.FieldNames() {
+			if fieldName == "status" || fieldName == "updated" || fieldName == "created" {
+				continue // Skip the status field itself and auto-date fields
+			}
+			if fmt.Sprintf("%v", record.Get(fieldName)) != fmt.Sprintf("%v", original.Get(fieldName)) {
+				changedOtherField = true
+				break
+			}
+		}
+		if !changedOtherField {
+			newStatus := status
+			oldStatus := original.GetString("status")
+			if newStatus != "" && newStatus != oldStatus {
+				if derived == jobTypeProject {
+					if newStatus == "Awarded" || newStatus == "Not Awarded" {
+						return 0, &errs.HookError{
+							Status:  http.StatusBadRequest,
+							Message: "invalid status for project",
+							Data: map[string]errs.CodeError{
+								"status": {Code: "invalid_status_for_type", Message: "projects may be Active, Closed or Cancelled"},
+							},
+						}
+					}
+				} else { // proposal
+					if newStatus == "Closed" {
+						return 0, &errs.HookError{
+							Status:  http.StatusBadRequest,
+							Message: "invalid status for proposal",
+							Data: map[string]errs.CodeError{
+								"status": {Code: "invalid_status_for_type", Message: "proposals may be Active, Awarded, Not Awarded or Cancelled"},
+							},
+						}
+					}
+				}
+			}
+			return derived, nil
+		}
 	}
 
 	// Enforce mutually exclusive date rules
@@ -448,6 +499,17 @@ func validateJob(app core.App, e *core.RecordRequestEvent) (jobType, error) {
 	// Enforce authorizing_document/client_po rules for projects (validation only).
 	// Normalization is handled in cleanJob earlier.
 	if derived == jobTypeProject {
+		// Projects must have a valid location (schema rules may be relaxed, enforce here)
+		loc := record.GetString("location")
+		if loc == "" || !locationPlusCodeRegex.MatchString(loc) {
+			return 0, &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "invalid or missing location",
+				Data: map[string]errs.CodeError{
+					"location": {Code: "invalid_or_missing", Message: "location (Plus Code) is required for projects"},
+				},
+			}
+		}
 		authorizingDocument := record.GetString("authorizing_document")
 		if authorizingDocument == "" {
 			return 0, &errs.HookError{
@@ -598,6 +660,40 @@ func validateJob(app core.App, e *core.RecordRequestEvent) (jobType, error) {
 		}
 		// write the parent's client to the record to guarantee consistency
 		record.Set("client", parentClient)
+	}
+
+	// Client/contact consistency (moved from rules into hooks): if contact is set, it must belong to client
+	contactRef := record.GetString("contact")
+	if contactRef != "" {
+		clientRef := record.GetString("client")
+		if clientRef == "" {
+			return 0, &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "contact requires a client",
+				Data: map[string]errs.CodeError{
+					"client": {Code: "required_with_contact", Message: "client is required when contact is set"},
+				},
+			}
+		}
+		contactRec, err := app.FindRecordById("client_contacts", contactRef)
+		if err != nil || contactRec == nil {
+			return 0, &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "invalid contact",
+				Data: map[string]errs.CodeError{
+					"contact": {Code: "invalid_reference", Message: "specified contact not found"},
+				},
+			}
+		}
+		if contactRec.GetString("client") != clientRef {
+			return 0, &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "contact does not belong to client",
+				Data: map[string]errs.CodeError{
+					"contact": {Code: "contact_client_mismatch", Message: "contact must belong to the selected client"},
+				},
+			}
+		}
 	}
 
 	// Update-time number/type consistency: only enforce on update
