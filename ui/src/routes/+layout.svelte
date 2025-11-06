@@ -65,7 +65,11 @@
               })
               .map((item) => {
                 const gatedButtons = (item.buttons || []).filter((btn) => {
-                  if (btn.action === "/jobs/add" || btn.action === "/clients/add") {
+                  if (
+                    btn.action === "/jobs/add" ||
+                    btn.action === "/jobs/latest" ||
+                    btn.action === "/clients/add"
+                  ) {
                     return $globalStore.claims.includes("job");
                   }
                   if (btn.action === "/vendors/add") {

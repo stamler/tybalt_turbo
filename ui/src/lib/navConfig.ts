@@ -107,6 +107,12 @@ export const navSections: NavSection[] = [
         href: "/jobs/list",
         buttons: [
           {
+            action: "/jobs/latest",
+            icon: "mdi:timeline-text-outline",
+            title: "Latest Jobs",
+            color: "blue",
+          },
+          {
             action: "/jobs/map",
             icon: "feather:map",
             title: "Jobs Map",

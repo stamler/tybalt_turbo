@@ -155,6 +155,7 @@ func AddRoutes(app core.App) {
 		jobsGroup.Bind(apis.RequireAuth("users"))
 		jobsGroup.GET("/{id}/details", createGetJobDetailsHandler(app))
 		jobsGroup.GET("/{id}/notes", createGetJobNotesHandler(app))
+		jobsGroup.GET("/latest", createGetLatestJobsHandler(app))
 		// Query parameters for the following two routes will be used to filter
 		// the results. The caller can filter by one or more of division,
 		// time_type, user, or category.
