@@ -305,7 +305,12 @@
       }
 
       errors = {};
-      goto("/jobs/list");
+      // Redirect to job details for new jobs, jobs list for edits
+      if (data.editing && data.id !== null) {
+        goto("/jobs/list");
+      } else {
+        goto(`/jobs/${jobId}/details`);
+      }
     } catch (error: unknown) {
       // Handle special case where backend requires setting proposal to Awarded first
       const pocket = error as {
@@ -341,7 +346,12 @@
               await pb.collection("categories").delete(categoryId);
             }
             errors = {};
-            goto("/jobs/list");
+            // Redirect to job details for new jobs, jobs list for edits
+            if ((data as JobsPageData).editing && (data as JobsPageData).id !== null) {
+              goto("/jobs/list");
+            } else {
+              goto(`/jobs/${retryJobId}/details`);
+            }
             return;
           } catch (retryErr) {
             // fall through to display errors from retry
