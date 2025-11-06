@@ -496,20 +496,21 @@ func validateJob(app core.App, e *core.RecordRequestEvent) (jobType, error) {
 		}
 	}
 
+	// All jobs must have a valid location (schema rules may be relaxed, enforce here)
+	loc := record.GetString("location")
+	if loc == "" || !locationPlusCodeRegex.MatchString(loc) {
+		return 0, &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "invalid or missing location",
+			Data: map[string]errs.CodeError{
+				"location": {Code: "invalid_or_missing", Message: "location (Plus Code) is required"},
+			},
+		}
+	}
+
 	// Enforce authorizing_document/client_po rules for projects (validation only).
 	// Normalization is handled in cleanJob earlier.
 	if derived == jobTypeProject {
-		// Projects must have a valid location (schema rules may be relaxed, enforce here)
-		loc := record.GetString("location")
-		if loc == "" || !locationPlusCodeRegex.MatchString(loc) {
-			return 0, &errs.HookError{
-				Status:  http.StatusBadRequest,
-				Message: "invalid or missing location",
-				Data: map[string]errs.CodeError{
-					"location": {Code: "invalid_or_missing", Message: "location (Plus Code) is required for projects"},
-				},
-			}
-		}
 		authorizingDocument := record.GetString("authorizing_document")
 		if authorizingDocument == "" {
 			return 0, &errs.HookError{
