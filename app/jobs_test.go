@@ -181,3 +181,45 @@ func TestJobsUpdate_AuthorizingDocumentPO_Validations(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+// jobs: proposal reference validation - Active proposals should trigger "proposal_not_awarded" error
+func TestJobsCreate_ProposalReferenceValidation(t *testing.T) {
+	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "creating job with Active proposal reference fails with proposal_not_awarded",
+			Method: http.MethodPost,
+			URL:    "/api/collections/jobs/records",
+			Body: strings.NewReader(`{
+				"description": "Test job with active proposal",
+				"client": "ee3xvodl583b61o",
+				"contact": "235g6k01xx3sdjk",
+				"manager": "f2j5a8vk006baub",
+				"authorizing_document": "Unauthorized",
+				"branch": "80875lm27v8wgi4",
+				"location": "87Q8H976+2M",
+				"project_award_date": "2025-02-01",
+				"proposal": "pactprop0000001"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"proposal_not_awarded"`,
+				`"message":"proposal must be set to Awarded"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}

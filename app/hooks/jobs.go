@@ -26,7 +26,8 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 		return err
 	}
 
-	if err := cleanJobOutstandingBalance(e); err != nil {
+	// Normalize fields that depend on the job type (project vs proposal)
+	if err := cleanJob(app, e); err != nil {
 		return err
 	}
 
@@ -90,37 +91,6 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
-	// Enforce authorizing_document/client_po rules
-	authorizingDocument := jobRecord.GetString("authorizing_document")
-	trimmedClientPO := strings.TrimSpace(jobRecord.GetString("client_po"))
-	switch authorizingDocument {
-	case "PO":
-		// Persist the trimmed value before further processing
-		jobRecord.Set("client_po", trimmedClientPO)
-		if len(trimmedClientPO) <= 2 {
-			return &errs.HookError{
-				Status:  http.StatusBadRequest,
-				Message: "client PO must be at least 3 characters when authorizing document is PO",
-				Data: map[string]errs.CodeError{
-					"client_po": {Code: "client_po_min_length", Message: "client_po must be at least 3 characters when authorizing_document is PO"},
-				},
-			}
-		}
-	case "":
-		return &errs.HookError{
-			Status:  http.StatusBadRequest,
-			Message: "authorizing document is required",
-			Data: map[string]errs.CodeError{
-				"authorizing_document": {Code: "required", Message: "authorizing_document is required"},
-			},
-		}
-	default:
-		// If not PO, clear any provided client_po instead of erroring
-		if trimmedClientPO != "" {
-			jobRecord.Set("client_po", "")
-		}
-	}
-
 	// On create, derive the type of job while validating the job then generate a number
 	if jobRecord.IsNew() {
 		// First derive type while validating the job
@@ -181,23 +151,19 @@ func cleanJobOutstandingBalance(e *core.RecordRequestEvent) error {
 	outstandingBalance := jobRecord.GetFloat("outstanding_balance")
 
 	originalRecord := jobRecord.Original()
-	previousOutstandingBalance := 0.0
-	hasOriginal := originalRecord != nil
-	if hasOriginal {
-		previousOutstandingBalance = originalRecord.GetFloat("outstanding_balance")
-	}
+	isCreate := jobRecord.IsNew()
+	previousOutstandingBalance := originalRecord.GetFloat("outstanding_balance")
 
-	outstandingChanged := false
-	switch {
-	case !hasOriginal:
+	var outstandingChanged bool
+	if isCreate {
 		outstandingChanged = outstandingBalance != 0
-	default:
+	} else {
 		outstandingChanged = outstandingBalance != previousOutstandingBalance
 	}
 
 	if outstandingChanged {
 		jobRecord.Set("outstanding_balance_date", time.Now().Format("2006-01-02"))
-	} else if hasOriginal {
+	} else if !isCreate {
 		jobRecord.Set("outstanding_balance_date", originalRecord.Get("outstanding_balance_date"))
 	}
 
@@ -206,10 +172,10 @@ func cleanJobOutstandingBalance(e *core.RecordRequestEvent) error {
 
 func ensureOutstandingBalancePermission(app core.App, e *core.RecordRequestEvent) error {
 	jobRecord := e.Record
-	originalRecord := jobRecord.Original()
-	if originalRecord == nil {
+	if jobRecord.IsNew() {
 		return nil
 	}
+	originalRecord := jobRecord.Original()
 
 	newOutstanding := jobRecord.GetFloat("outstanding_balance")
 	oldOutstanding := originalRecord.GetFloat("outstanding_balance")
@@ -276,6 +242,52 @@ func ensureOutstandingBalancePermission(app core.App, e *core.RecordRequestEvent
 			},
 		},
 	}
+}
+
+// isProposalRecord determines if the current record should be treated as a
+// proposal for cleaning/validation purposes at this stage of processing.
+//
+//   - On update, the job type is inferred from the immutable job number.
+//   - On create, we infer proposal when the proposal date pair is provided and
+//     project_award_date is empty (mirrors validateJob create-time derivation).
+func isProposalRecord(e *core.RecordRequestEvent) bool {
+	record := e.Record
+	if !record.IsNew() {
+		return typeFromNumber(record.Original().GetString("number")) == jobTypeProposal
+	}
+	// Create-time inference (aligns with validateJob create-time logic for proposals)
+	projectAwardDate := record.GetString("project_award_date")
+	proposalOpeningDate := record.GetString("proposal_opening_date")
+	proposalSubmissionDueDate := record.GetString("proposal_submission_due_date")
+	return projectAwardDate == "" && proposalOpeningDate != "" && proposalSubmissionDueDate != ""
+}
+
+// cleanJob removes or normalizes fields that are not applicable based on the
+// job type. In particular, proposals must not carry authorizing_document,
+// client_po, or client_reference_number.
+func cleanJob(app core.App, e *core.RecordRequestEvent) error {
+	record := e.Record
+	// Centralize outstanding balance normalization as part of cleaning
+	if err := cleanJobOutstandingBalance(e); err != nil {
+		return err
+	}
+	// Normalize client_po by trimming whitespace
+	trimmedClientPO := strings.TrimSpace(record.GetString("client_po"))
+	if record.GetString("client_po") != trimmedClientPO {
+		record.Set("client_po", trimmedClientPO)
+	}
+	// If this is a project and authorizing_document != PO, clear any provided client_po
+	if !isProposalRecord(e) {
+		if record.GetString("authorizing_document") != "PO" && record.GetString("client_po") != "" {
+			record.Set("client_po", "")
+		}
+	} else {
+		// Proposals should NOT have these fields
+		record.Set("authorizing_document", "")
+		record.Set("client_po", "")
+		record.Set("client_reference_number", "")
+	}
+	return nil
 }
 
 // --- Helper logic for jobs validation and numbering ---------------------------------
@@ -428,6 +440,33 @@ func validateJob(app core.App, e *core.RecordRequestEvent) (jobType, error) {
 							"proposal_submission_due_date": {Code: "required_for_proposal", Message: "proposal_submission_due_date is required"},
 						},
 					}
+				}
+			}
+		}
+	}
+
+	// Enforce authorizing_document/client_po rules for projects (validation only).
+	// Normalization is handled in cleanJob earlier.
+	if derived == jobTypeProject {
+		authorizingDocument := record.GetString("authorizing_document")
+		if authorizingDocument == "" {
+			return 0, &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "authorizing document is required",
+				Data: map[string]errs.CodeError{
+					"authorizing_document": {Code: "required", Message: "authorizing_document is required"},
+				},
+			}
+		}
+		if authorizingDocument == "PO" {
+			clientPO := record.GetString("client_po")
+			if len(clientPO) <= 2 {
+				return 0, &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: "client PO must be at least 3 characters when authorizing document is PO",
+					Data: map[string]errs.CodeError{
+						"client_po": {Code: "client_po_min_length", Message: "client_po must be at least 3 characters when authorizing_document is PO"},
+					},
 				}
 			}
 		}
