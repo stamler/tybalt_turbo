@@ -11,11 +11,20 @@
 
   const weekEnding = $derived.by(() => $page.params.weekEnding);
   let rows = $state([] as any[]);
+  let missing = $state([] as any[]);
+  let notExpected = $state([] as any[]);
   let rejectModal: SvelteComponent;
 
   async function init() {
     try {
-      rows = await pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}`, { method: "GET" });
+      const [listRes, missingRes, notExpectedRes] = await Promise.all([
+        pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}`, { method: "GET" }),
+        pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}/missing`, { method: "GET" }),
+        pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}/not_expected`, { method: "GET" }),
+      ]);
+      rows = listRes;
+      missing = missingRes;
+      notExpected = notExpectedRes;
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Failed to load timesheets");
     }
@@ -43,6 +52,44 @@
 </script>
 
 <RejectModal collectionName="time_sheets" bind:this={rejectModal} on:refresh={() => init()} />
+
+<details class="mb-4">
+  <summary class="cursor-pointer font-semibold text-neutral-700">Missing</summary>
+  <div class="mt-2">
+    {#if missing.length === 0}
+      <div class="text-sm text-neutral-500">None</div>
+    {:else}
+      <ul class="list-disc pl-5">
+        {#each missing as m}
+          <li>
+            <a href={`mailto:${m.email}`} class="text-blue-600 hover:underline">
+              {m.surname || m.given_name ? `${m.surname}, ${m.given_name}` : m.email}
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+</details>
+
+<details class="mb-4">
+  <summary class="cursor-pointer font-semibold text-neutral-700">Not Expected</summary>
+  <div class="mt-2">
+    {#if notExpected.length === 0}
+      <div class="text-sm text-neutral-500">None</div>
+    {:else}
+      <ul class="list-disc pl-5">
+        {#each notExpected as n}
+          <li>
+            <a href={`mailto:${n.email}`} class="text-blue-600 hover:underline">
+              {n.surname || n.given_name ? `${n.surname}, ${n.given_name}` : n.email}
+            </a>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+</details>
 
 <DsList items={rows} groupField="phase" inListHeader={`Time Tracking for ${weekEnding}`}>
   {#snippet groupHeader(label)}

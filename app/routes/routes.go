@@ -91,6 +91,8 @@ func AddRoutes(app core.App) {
 		// TimeTracking endpoints for report holders
 		tsGroup.GET("/tracking_counts", createTimesheetTrackingCountsHandler(app))
 		tsGroup.GET("/tracking/weeks/{weekEnding}", createTimesheetTrackingListHandler(app))
+		tsGroup.GET("/tracking/weeks/{weekEnding}/missing", createTimesheetMissingHandler(app))
+		tsGroup.GET("/tracking/weeks/{weekEnding}/not_expected", createTimesheetNotExpectedHandler(app))
 
 		expensesGroup := se.Router.Group("/api/expenses")
 		expensesGroup.Bind(apis.RequireAuth("users"))

@@ -193,3 +193,119 @@ func createTimesheetTrackingListHandler(app core.App) func(e *core.RequestEvent)
 		return e.JSON(http.StatusOK, rows)
 	}
 }
+
+// trackingBasicUserRow is a minimal user row for Missing/Not Expected lists
+type trackingBasicUserRow struct {
+	ID        string `db:"id" json:"id"`
+	GivenName string `db:"given_name" json:"given_name"`
+	Surname   string `db:"surname" json:"surname"`
+	Email     string `db:"email" json:"email"`
+}
+
+// createTimesheetMissingHandler returns users expected to have a timesheet but missing for the week
+func createTimesheetMissingHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+		isReportHolder, err := utilities.HasClaim(app, auth, "report")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "error checking claims", err)
+		}
+		isCommitter := false
+		if !isReportHolder {
+			var err2 error
+			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
+			if err2 != nil {
+				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
+			}
+		}
+		if !(isReportHolder || isCommitter) {
+			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
+		}
+
+		weekEnding := e.Request.PathValue("weekEnding")
+		if weekEnding == "" {
+			return e.Error(http.StatusBadRequest, "weekEnding is required", nil)
+		}
+		if _, err := time.Parse("2006-01-02", weekEnding); err != nil {
+			return e.Error(http.StatusBadRequest, "invalid date format (YYYY-MM-DD)", nil)
+		}
+
+		query := `
+            SELECT
+                u.id AS id,
+                COALESCE(p.given_name, '') AS given_name,
+                COALESCE(p.surname, '') AS surname,
+                COALESCE(u.email, '') AS email
+            FROM users u
+            LEFT JOIN time_sheets ts ON ts.uid = u.id AND ts.week_ending = {:week_ending}
+            LEFT JOIN profiles p ON p.uid = u.id
+            LEFT JOIN admin_profiles ap ON ap.uid = u.id
+            WHERE ts.id IS NULL
+              AND COALESCE(ap.time_sheet_expected, 0) = 1
+            ORDER BY p.surname, p.given_name
+        `
+
+		var rows []trackingBasicUserRow
+		if err := app.DB().NewQuery(query).Bind(dbx.Params{
+			"week_ending": weekEnding,
+		}).All(&rows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query", err)
+		}
+
+		return e.JSON(http.StatusOK, rows)
+	}
+}
+
+// createTimesheetNotExpectedHandler returns users not expected to have a timesheet and missing for the week
+func createTimesheetNotExpectedHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+		isReportHolder, err := utilities.HasClaim(app, auth, "report")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "error checking claims", err)
+		}
+		isCommitter := false
+		if !isReportHolder {
+			var err2 error
+			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
+			if err2 != nil {
+				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
+			}
+		}
+		if !(isReportHolder || isCommitter) {
+			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
+		}
+
+		weekEnding := e.Request.PathValue("weekEnding")
+		if weekEnding == "" {
+			return e.Error(http.StatusBadRequest, "weekEnding is required", nil)
+		}
+		if _, err := time.Parse("2006-01-02", weekEnding); err != nil {
+			return e.Error(http.StatusBadRequest, "invalid date format (YYYY-MM-DD)", nil)
+		}
+
+		query := `
+            SELECT
+                u.id AS id,
+                COALESCE(p.given_name, '') AS given_name,
+                COALESCE(p.surname, '') AS surname,
+                COALESCE(u.email, '') AS email
+            FROM users u
+            LEFT JOIN time_sheets ts ON ts.uid = u.id AND ts.week_ending = {:week_ending}
+            LEFT JOIN profiles p ON p.uid = u.id
+            LEFT JOIN admin_profiles ap ON ap.uid = u.id
+            WHERE ts.id IS NULL
+              AND COALESCE(ap.time_sheet_expected, 0) = 0
+            ORDER BY p.surname, p.given_name
+        `
+
+		var rows []trackingBasicUserRow
+		if err := app.DB().NewQuery(query).Bind(dbx.Params{
+			"week_ending": weekEnding,
+		}).All(&rows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query", err)
+		}
+
+		return e.JSON(http.StatusOK, rows)
+	}
+}

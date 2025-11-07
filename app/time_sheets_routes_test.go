@@ -49,6 +49,32 @@ func TestTimeSheetsRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "committer can view missing list for a week",
+			Method: http.MethodGet,
+			URL:    "/api/time_sheets/tracking/weeks/2024-06-29/missing",
+			Headers: map[string]string{
+				"Authorization": committerToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				"[",
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "committer can view not expected list for a week",
+			Method: http.MethodGet,
+			URL:    "/api/time_sheets/tracking/weeks/2024-06-29/not_expected",
+			Headers: map[string]string{
+				"Authorization": committerToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				"[",
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "committer can reject a submitted timesheet",
 			Method: http.MethodPost,
 			URL:    "/api/time_sheets/" + tsToReject + "/reject",
