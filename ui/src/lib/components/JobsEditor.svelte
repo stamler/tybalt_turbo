@@ -110,6 +110,12 @@
     return index;
   });
 
+  // Hide proposal-only fields when creating a project from the dedicated route.
+  // The loader for /jobs/add/from/[proposal] sets _prefilled_from_proposal on item.
+  const hideProposalDates = $derived.by(
+    () => Boolean((item as unknown as Record<string, unknown>)._prefilled_from_proposal),
+  );
+
   function setFieldError(fieldName: string, message: string) {
     if (errors[fieldName]?.message === message) {
       return;
@@ -422,39 +428,41 @@
     {/if}
   </span>
 
-  <span class="flex w-full gap-2 {errors.proposal_opening_date !== undefined ? 'bg-red-200' : ''}">
-    <label for="proposal_opening_date">Proposal Opening Date</label>
-    <input
-      class="flex-1"
-      type="text"
-      name="proposal_opening_date"
-      placeholder="Proposal Opening Date"
-      use:flatpickrAction
-      bind:value={item.proposal_opening_date}
-    />
-    {#if errors.proposal_opening_date !== undefined}
-      <span class="text-red-600">{errors.proposal_opening_date.message}</span>
-    {/if}
-  </span>
+  {#if !hideProposalDates}
+    <span class="flex w-full gap-2 {errors.proposal_opening_date !== undefined ? 'bg-red-200' : ''}">
+      <label for="proposal_opening_date">Proposal Opening Date</label>
+      <input
+        class="flex-1"
+        type="text"
+        name="proposal_opening_date"
+        placeholder="Proposal Opening Date"
+        use:flatpickrAction
+        bind:value={item.proposal_opening_date}
+      />
+      {#if errors.proposal_opening_date !== undefined}
+        <span class="text-red-600">{errors.proposal_opening_date.message}</span>
+      {/if}
+    </span>
 
-  <span
-    class="flex w-full gap-2 {errors.proposal_submission_due_date !== undefined
-      ? 'bg-red-200'
-      : ''}"
-  >
-    <label for="proposal_submission_due_date">Proposal Submission Due Date</label>
-    <input
-      class="flex-1"
-      type="text"
-      name="proposal_submission_due_date"
-      placeholder="Proposal Submission Due Date"
-      use:flatpickrAction
-      bind:value={item.proposal_submission_due_date}
-    />
-    {#if errors.proposal_submission_due_date !== undefined}
-      <span class="text-red-600">{errors.proposal_submission_due_date.message}</span>
-    {/if}
-  </span>
+    <span
+      class="flex w-full gap-2 {errors.proposal_submission_due_date !== undefined
+        ? 'bg-red-200'
+        : ''}"
+    >
+      <label for="proposal_submission_due_date">Proposal Submission Due Date</label>
+      <input
+        class="flex-1"
+        type="text"
+        name="proposal_submission_due_date"
+        placeholder="Proposal Submission Due Date"
+        use:flatpickrAction
+        bind:value={item.proposal_submission_due_date}
+      />
+      {#if errors.proposal_submission_due_date !== undefined}
+        <span class="text-red-600">{errors.proposal_submission_due_date.message}</span>
+      {/if}
+    </span>
+  {/if}
 
   <div class="flex w-full flex-col gap-1 {errors.location !== undefined ? 'bg-red-200' : ''}">
     <label for="location">Location</label>

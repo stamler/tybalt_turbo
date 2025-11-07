@@ -12,9 +12,12 @@
   import DivisionsSummaryContent from "$lib/components/jobs/DivisionsSummaryContent.svelte";
   import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
   import { pb } from "$lib/pocketbase";
+  import { invalidateAll } from "$app/navigation";
   import type { FilterDef } from "$lib/components/jobs/types";
-  import { formatDateTime, formatCurrency, shortDate } from "$lib/utilities";
+  import { formatCurrency, shortDate } from "$lib/utilities";
   import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
+  import { JobsStatusOptions } from "$lib/pocketbase-types";
+  let awarding = $state(false);
 
   type TabContentProps = {
     summary: Record<string, any>;
@@ -222,12 +225,49 @@
 <div class="mx-auto space-y-4 p-4">
   <div class="flex items-center justify-between gap-2">
     <h1 class="text-2xl font-bold">Job Details</h1>
-    <DsActionButton
-      action={`/jobs/${data.job.id}/edit`}
-      icon="mdi:pencil"
-      title="Edit Job"
-      color="blue"
-    />
+    <div class="flex items-center gap-2">
+      {#if data.job.number?.startsWith("P") && data.job.status === "Awarded"}
+        <DsActionButton
+          action={`/jobs/add/from/${data.job.id}`}
+          icon="mdi:plus"
+          title="Create Project from Proposal"
+          color="green"
+        />
+      {:else if data.job.number?.startsWith("P") && data.job.status === "Active"}
+        {#key data.job.id}
+          <DsActionButton
+            action={async () => {
+              try {
+                awarding = true;
+                await pb
+                  .collection("jobs")
+                  .update(data.job.id, { status: JobsStatusOptions.Awarded });
+                // Re-run this page's load so `/api/jobs/{id}/details` fetches fresh data and the
+                // "Create Project from Proposal" button appears without a full page reload.
+                // Prefer invalidateAll() over window.location.reload() to preserve UX where possible.
+                await invalidateAll();
+              } catch (e) {
+                console.error("Failed to award proposal", e);
+                typeof window !== "undefined" &&
+                  window.alert("Failed to award proposal. Please try again.");
+              } finally {
+                awarding = false;
+              }
+            }}
+            icon="mdi:trophy"
+            title="Award proposal"
+            color="yellow"
+            loading={awarding}
+          />
+        {/key}
+      {/if}
+      <DsActionButton
+        action={`/jobs/${data.job.id}/edit`}
+        icon="mdi:pencil"
+        title="Edit Job"
+        color="blue"
+      />
+    </div>
   </div>
 
   <div class="space-y-2 rounded bg-neutral-100 p-4">
