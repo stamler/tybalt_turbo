@@ -54,16 +54,17 @@ SELECT
     (
       SELECT json_group_array(
         json_object(
-          'id', d.id,
-          'code', d.code,
-          'name', d.name
+          'id', jta.id,
+          'division', json_object('id', d.id, 'code', d.code, 'name', d.name),
+          'hours', COALESCE(jta.hours, 0)
         )
       )
-      FROM divisions d
-      WHERE d.id IN (SELECT value FROM json_each(j.divisions))
+      FROM job_time_allocations jta
+      JOIN divisions d ON d.id = jta.division
+      WHERE jta.job = j.id
     ),
     '[]'
-  ) AS divisions_json
+  ) AS allocations_json
 FROM jobs j
 LEFT JOIN jobs pr           ON pr.id = j.proposal
 LEFT JOIN jobs pa           ON pa.id = j.parent

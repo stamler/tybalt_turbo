@@ -9,31 +9,43 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
-// jobs.divisions: prevent including inactive divisions on update
-func TestJobsUpdate_InactiveDivisionFails(t *testing.T) {
+func TestJobAllocations_PutTransactionalUpdate(t *testing.T) {
 	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
 	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	const jobID = "cjf0kt0defhq480"
+	const divisionID = "fy4i9poneukvq9u"
+
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "updating job divisions to include an inactive division fails",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
+			Name:   "update allocations for a job succeeds",
+			Method: http.MethodPut,
+			URL:    "/api/jobs/" + jobID,
 			Body: strings.NewReader(`{
-				"divisions": ["fy4i9poneukvq9u", "apkev2ow1zjtm7w"]
+				"job": {
+					"description": "Allocation update test"
+				},
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
 			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"divisions":{"code":"not_active"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdateRequest": 1,
-			},
-			TestAppFactory: testutils.SetupTestApp,
+			Headers:         map[string]string{"Authorization": recordToken},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`{"id":"` + jobID + `"}`},
+			ExpectedEvents:  map[string]int{},
+			TestAppFactory:  testutils.SetupTestApp,
+		},
+		{
+			Name:            "job details includes allocations",
+			Method:          http.MethodGet,
+			URL:             "/api/jobs/" + jobID + "/details",
+			Headers:         map[string]string{"Authorization": recordToken},
+			ExpectedStatus:  200,
+			ExpectedContent: []string{`"allocations":[`, `"hours":10`},
+			TestAppFactory:  testutils.SetupTestApp,
 		},
 	}
 

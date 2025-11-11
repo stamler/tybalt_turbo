@@ -2,7 +2,6 @@ package hooks
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"regexp"
@@ -15,7 +14,6 @@ import (
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tools/types"
 )
 
 // ProcessJob enforces business rules for job creation and updates.
@@ -35,66 +33,6 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 	// Normalize fields that depend on the job type (project vs proposal)
 	if err := cleanJob(app, e); err != nil {
 		return err
-	}
-
-	divisionsRaw := jobRecord.Get("divisions")
-
-	var divisions []string
-	switch v := divisionsRaw.(type) {
-	case types.JSONRaw:
-		if len(v) > 0 {
-			if err := json.Unmarshal(v, &divisions); err != nil {
-				return &errs.HookError{
-					Status:  http.StatusBadRequest,
-					Message: "division validation error",
-					Data: map[string]errs.CodeError{
-						"divisions": {
-							Code:    "invalid_json",
-							Message: "divisions must be an array of strings",
-						},
-					},
-				}
-			}
-		}
-	case []string:
-		divisions = v
-	case []any:
-		divisions = make([]string, 0, len(v))
-		for _, item := range v {
-			str, ok := item.(string)
-			if !ok {
-				return &errs.HookError{
-					Status:  http.StatusBadRequest,
-					Message: "division validation error",
-					Data: map[string]errs.CodeError{
-						"divisions": {
-							Code:    "invalid_json",
-							Message: "divisions must be an array of strings",
-						},
-					},
-				}
-			}
-			divisions = append(divisions, str)
-		}
-	case nil:
-		// nothing provided
-	default:
-		return &errs.HookError{
-			Status:  http.StatusBadRequest,
-			Message: "job divisions must be a JSON array",
-			Data: map[string]errs.CodeError{
-				"divisions": {
-					Code:    "invalid_type",
-					Message: "divisions must be a JSON array",
-				},
-			},
-		}
-	}
-
-	for _, divisionID := range divisions {
-		if err := ensureActiveDivision(app, divisionID, "divisions"); err != nil {
-			return err
-		}
 	}
 
 	// On create, derive the type of job while validating the job then generate a number

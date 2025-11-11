@@ -176,7 +176,7 @@ func main() {
 		//   - Local modifications to imported jobs get overwritten with MySQL data
 		//   - Related records (time entries, etc.) work correctly since they also get updated IDs
 		//
-		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal, divisions, job_owner, branch, outstanding_balance, outstanding_balance_date, _imported) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal}, {:divisions}, {:job_owner}, (SELECT id FROM branches WHERE code = {:branch}), {:outstanding_balance}, {:outstanding_balance_date}, true)"
+		jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal, job_owner, branch, outstanding_balance, outstanding_balance_date, _imported) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal}, {:job_owner}, (SELECT id FROM branches WHERE code = {:branch}), {:outstanding_balance}, {:outstanding_balance_date}, true)"
 
 		// Define the binder function for the Job type
 		jobBinder := func(item load.Job) dbx.Params {
@@ -194,7 +194,6 @@ func main() {
 				"proposal_opening_date":        item.ProposalOpeningDate,
 				"proposal_submission_due_date": item.ProposalSubmissionDueDate,
 				"proposal":                     item.ProposalId,
-				"divisions":                    item.DivisionsIds,
 				"job_owner":                    item.JobOwnerId,
 				"branch":                       item.Branch,
 				"outstanding_balance":          0,
@@ -210,6 +209,26 @@ func main() {
 			jobInsertSQL, // The specific INSERT SQL
 			jobBinder,    // The specific binder function
 			true,         // Enable upsert for idempotency
+		)
+
+		// --- Load Job Time Allocations ---
+		// Default hours may be 0 initially; upsert keyed by (job, division)
+		jobTimeAllocInsertSQL := "INSERT INTO job_time_allocations (id, job, division, hours) VALUES ({:id}, {:job}, {:division}, {:hours})"
+		jobTimeAllocBinder := func(item load.JobTimeAllocation) dbx.Params {
+			return dbx.Params{
+				"id":       item.Id,
+				"job":      item.Job,
+				"division": item.Division,
+				"hours":    item.Hours,
+			}
+		}
+		load.FromParquet(
+			"./parquet/JobTimeAllocations.parquet",
+			targetDatabase,
+			"job_time_allocations",
+			jobTimeAllocInsertSQL,
+			jobTimeAllocBinder,
+			true, // upsert
 		)
 
 		// --- Load Categories ---

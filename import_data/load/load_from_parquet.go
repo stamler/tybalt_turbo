@@ -221,6 +221,14 @@ type PurchaseOrder struct {
 	Division    string  `parquet:"division"`
 }
 
+// JobTimeAllocation represents a single division-hours allocation for a job.
+type JobTimeAllocation struct {
+	Id       string  `parquet:"id"`
+	Job      string  `parquet:"job"`
+	Division string  `parquet:"division"`
+	Hours    float64 `parquet:"hours"`
+}
+
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
 // T: The struct type corresponding to the Parquet file schema.
 // parquetFilePath: Path to the input Parquet file.

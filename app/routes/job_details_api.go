@@ -13,11 +13,17 @@ import (
 //go:embed job_details.sql
 var jobDetailsQuery string
 
-// division struct returned in divisions_json
+// division struct returned in allocations_json
 type Division struct {
 	ID   string `json:"id"`
 	Code string `json:"code"`
 	Name string `json:"name"`
+}
+
+type Allocation struct {
+	ID       string   `json:"id"`
+	Division Division `json:"division"`
+	Hours    float64  `json:"hours"`
 }
 
 type Person struct {
@@ -61,7 +67,7 @@ type jobDetailsRow struct {
 	ProposalSubmissionDueDate sql.NullString  `db:"proposal_submission_due_date"`
 	OutstandingBalance        sql.NullFloat64 `db:"outstanding_balance"`
 	OutstandingBalanceDate    sql.NullString  `db:"outstanding_balance_date"`
-	DivisionsJSON             string          `db:"divisions_json"`
+	AllocationsJSON           string          `db:"allocations_json"`
 	ProjectsJSON              string          `db:"projects_json"`
 	ChildrenJSON              string          `db:"children_json"`
 	CategoriesJSON            string          `db:"categories_json"`
@@ -104,7 +110,7 @@ type JobDetails struct {
 	ProposalSubmissionDueDate string     `json:"proposal_submission_due_date"`
 	OutstandingBalance        float64    `json:"outstanding_balance"`
 	OutstandingBalanceDate    string     `json:"outstanding_balance_date"`
-	Divisions                 []Division `json:"divisions"`
+	Allocations               []Allocation `json:"allocations"`
 	Projects                  []JobRef   `json:"projects"`
 	Children                  []JobRef   `json:"children"`
 	Categories                []Category `json:"categories"`
@@ -128,9 +134,9 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 		}
 		r := rows[0]
 
-		// parse divisions json
-		var divisions []Division
-		_ = json.Unmarshal([]byte(r.DivisionsJSON), &divisions)
+		// parse allocations json
+		var allocations []Allocation
+		_ = json.Unmarshal([]byte(r.AllocationsJSON), &allocations)
 		var projects []JobRef
 		_ = json.Unmarshal([]byte(r.ProjectsJSON), &projects)
 		var children []JobRef
@@ -174,7 +180,7 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			ProposalSubmissionDueDate: ns(r.ProposalSubmissionDueDate),
 			OutstandingBalance:        r.OutstandingBalance.Float64,
 			OutstandingBalanceDate:    ns(r.OutstandingBalanceDate),
-			Divisions:                 divisions,
+			Allocations:               allocations,
 			Projects:                  projects,
 			Children:                  children,
 			Categories:                categories,

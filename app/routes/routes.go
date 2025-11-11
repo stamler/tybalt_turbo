@@ -155,6 +155,8 @@ func AddRoutes(app core.App) {
 		// Jobs endpoints – provide aggregated data in a single query to avoid PocketBase's N+1 expand problem
 		jobsGroup := se.Router.Group("/api/jobs")
 		jobsGroup.Bind(apis.RequireAuth("users"))
+		jobsGroup.POST("", createCreateJobHandler(app))
+		jobsGroup.PUT("/{id}", createUpsertJobHandler(app))
 		jobsGroup.GET("/{id}/details", createGetJobDetailsHandler(app))
 		jobsGroup.GET("/{id}/notes", createGetJobNotesHandler(app))
 		jobsGroup.GET("/latest", createGetLatestJobsHandler(app))

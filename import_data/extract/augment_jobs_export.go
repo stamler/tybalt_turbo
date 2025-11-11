@@ -136,4 +136,30 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 	if err != nil {
 		log.Fatalf("Failed to copy categories_export to Parquet: %v", err)
 	}
+
+	// --- Create JobTimeAllocations Parquet ---
+	// Unnest job division codes and join to divisions to fetch division ids,
+	// using pocketbase_id for the job id. Default hours to 0.
+	_, err = db.Exec(`
+	CREATE TEMP TABLE job_time_allocations_export AS
+	SELECT
+	  make_pocketbase_id(CONCAT(jobsC.pocketbase_id, '|', d.id), 15) AS id,
+	  jobsC.pocketbase_id AS job,
+	  d.id AS division,
+	  0 AS hours
+	FROM jobsC
+	JOIN unnest(str_split(jobsC.divisions, ',')) AS t(code)
+	  ON jobsC.divisions IS NOT NULL AND jobsC.divisions != ''
+	JOIN divisions d
+	  ON trim(t.code) = d.code
+	ORDER BY job, division;
+	`)
+	if err != nil {
+		log.Fatalf("Failed to create job_time_allocations_export: %v", err)
+	}
+
+	_, err = db.Exec("COPY job_time_allocations_export TO 'parquet/JobTimeAllocations.parquet' (FORMAT PARQUET)")
+	if err != nil {
+		log.Fatalf("Failed to copy job_time_allocations_export to Parquet: %v", err)
+	}
 }

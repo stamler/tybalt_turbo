@@ -38,9 +38,6 @@
   let client_contacts = $state([] as ClientContactsResponse[]);
   let clientContactsRequestId = 0;
 
-  if (!Array.isArray(item.divisions)) {
-    item.divisions = [] as unknown as JobsRecord["divisions"];
-  }
   if (item.status === undefined) {
     item.status = JobsStatusOptions.Active;
   }
@@ -65,10 +62,11 @@
   let categoriesToDelete = $state([] as string[]);
 
   let branches = $state([] as BranchesResponse[]);
-  let divisionsSearchValue = $state("");
+  // Allocations editor state
+  type AllocationRow = { division: string; hours: number };
+  let allocations = $state([] as AllocationRow[]);
 
   const alternateManagerErrorMessage = "Alternate manager must be different from manager.";
-  const divisionsMustBeActiveMessage = "Only active divisions can be selected.";
 
   const statusOptionsList = Object.values(JobsStatusOptions).map((status) => ({
     id: status,
@@ -80,10 +78,6 @@
     { id: "PO", name: "PO" },
     { id: "PA", name: "PA" },
   ];
-
-  const activeDivisions = $derived.by(() =>
-    ($divisions.items ?? []).filter((division) => (division as DivisionsResponse).active),
-  );
 
   function jobLabel(job: Pick<JobApiResponse, "id" | "number" | "description">) {
     const numberPart = job.number?.trim();
@@ -112,8 +106,8 @@
 
   // Hide proposal-only fields when creating a project from the dedicated route.
   // The loader for /jobs/add/from/[proposal] sets _prefilled_from_proposal on item.
-  const hideProposalDates = $derived.by(
-    () => Boolean((item as unknown as Record<string, unknown>)._prefilled_from_proposal),
+  const hideProposalDates = $derived.by(() =>
+    Boolean((item as unknown as Record<string, unknown>)._prefilled_from_proposal),
   );
 
   function setFieldError(fieldName: string, message: string) {
@@ -133,46 +127,33 @@
     errors = nextErrors;
   }
 
-  function findDivisionById(id: string) {
-    return (
-      ($divisions.items as DivisionsResponse[] | undefined)?.find(
-        (division) => division.id === id,
-      ) ?? null
-    );
+  function addAllocationRow() {
+    allocations = [...allocations, { division: "", hours: 0 }];
   }
-
-  function addDivisionById(id: string | number) {
-    const divisionId = id.toString();
-    if (item.divisions?.includes(divisionId)) {
-      divisionsSearchValue = "";
-      return;
-    }
-    const division = findDivisionById(divisionId);
-    if (!division) {
-      setFieldError("divisions", "Unable to add selected division.");
-      return;
-    }
-    if (!division.active) {
-      setFieldError("divisions", divisionsMustBeActiveMessage);
-      return;
-    }
-    clearFieldError("divisions");
-    item.divisions = [...(item.divisions ?? []), divisionId] as unknown as JobsRecord["divisions"];
-    divisionsSearchValue = "";
+  function removeAllocationRow(index: number) {
+    allocations = allocations.filter((_, i) => i !== index);
   }
-
-  function removeDivision(divisionId: string) {
-    item.divisions = (item.divisions ?? []).filter(
-      (id) => id !== divisionId,
-    ) as unknown as JobsRecord["divisions"];
-    if (errors.divisions?.message === divisionsMustBeActiveMessage) {
-      clearFieldError("divisions");
+  function setAllocationDivision(index: number, value: string | number) {
+    const id = value.toString();
+    // prevent duplicate divisions
+    if (allocations.some((a, i) => i !== index && a.division === id)) {
+      return;
     }
+    allocations = allocations.map((row, i) => (i === index ? { ...row, division: id } : row));
   }
 
   onMount(async () => {
     try {
       branches = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
+      // Load allocations when editing
+      if ((data as JobsPageData).editing && (data as JobsPageData).id) {
+        const list = await pb
+          .collection("job_time_allocations")
+          .getFullList<{ id: string; job: string; division: string; hours: number }>({
+            filter: `job="${(data as JobsPageData).id}"`,
+          });
+        allocations = list.map((r) => ({ division: r.division, hours: r.hours ?? 0 }));
+      }
     } catch (error) {
       console.error("Failed to load branches", error);
     }
@@ -236,26 +217,6 @@
     }
   });
 
-  $effect(() => {
-    const selected = item.divisions ?? [];
-    if (selected.length === 0) {
-      if (errors.divisions?.message === divisionsMustBeActiveMessage) {
-        clearFieldError("divisions");
-      }
-      return;
-    }
-    if (activeDivisions.length === 0) {
-      return;
-    }
-    const activeIds = new Set(activeDivisions.map((division) => division.id));
-    const hasInactive = selected.some((divisionId) => !activeIds.has(divisionId));
-    if (hasInactive) {
-      setFieldError("divisions", divisionsMustBeActiveMessage);
-    } else if (errors.divisions?.message === divisionsMustBeActiveMessage) {
-      clearFieldError("divisions");
-    }
-  });
-
   // Mirror backend behavior: when not PO, clear any provided client_po
   $effect(() => {
     if (item.authorizing_document !== "PO" && item.client_po) {
@@ -273,25 +234,20 @@
       return;
     }
 
-    const activeDivisionIds = new Set(activeDivisions.map((division) => division.id));
-    if ((item.divisions?.length ?? 0) > 0 && activeDivisionIds.size > 0) {
-      const invalidDivisions = (item.divisions ?? []).filter(
-        (divisionId) => !activeDivisionIds.has(divisionId),
-      );
-      if (invalidDivisions.length > 0) {
-        setFieldError("divisions", divisionsMustBeActiveMessage);
-        return;
-      }
-    }
-
     try {
       let jobId = data.id;
 
       if (data.editing && jobId !== null) {
-        await pb.collection("jobs").update(jobId, item);
+        await pb.send(`/api/jobs/${jobId}`, {
+          method: "PUT",
+          body: { job: item, allocations },
+        });
       } else {
-        const createdJob = await pb.collection("jobs").create(item);
-        jobId = createdJob.id;
+        const resp = (await pb.send(`/api/jobs`, {
+          method: "POST",
+          body: { job: item, allocations },
+        })) as { id: string };
+        jobId = resp.id;
       }
 
       // Add new categories
@@ -429,7 +385,9 @@
   </span>
 
   {#if !hideProposalDates}
-    <span class="flex w-full gap-2 {errors.proposal_opening_date !== undefined ? 'bg-red-200' : ''}">
+    <span
+      class="flex w-full gap-2 {errors.proposal_opening_date !== undefined ? 'bg-red-200' : ''}"
+    >
       <label for="proposal_opening_date">Proposal Opening Date</label>
       <input
         class="flex-1"
@@ -632,47 +590,51 @@
   {/if}
 
   {#if $divisions.index !== null}
-    <div
-      class="flex w-full flex-col gap-2 {errors.divisions !== undefined ? 'bg-red-200' : ''}"
-      role="group"
-      aria-labelledby="divisions-label"
-    >
-      <span id="divisions-label" class="font-semibold">Divisions</span>
-      <DsAutoComplete
-        bind:value={divisionsSearchValue}
-        index={$divisions.index}
-        fieldName="divisions_search"
-        uiName="Add Division"
-        {errors}
-        multi={true}
-        choose={addDivisionById}
-        excludeIds={item.divisions ?? []}
-      >
-        {#snippet resultTemplate(division)}{division.code} - {division.name}{/snippet}
-      </DsAutoComplete>
-      <div class="flex flex-wrap gap-1">
-        {#each item.divisions ?? [] as divisionId}
-          {@const division = findDivisionById(divisionId)}
-          <span class="flex items-center gap-1 rounded-full bg-neutral-200 px-2">
-            <span>
-              {#if division}
-                {division.code} - {division.name}
-              {:else}
-                {divisionId}
-              {/if}
-            </span>
+    <div class="flex w-full flex-col gap-2">
+      <span class="font-semibold">Divisions</span>
+      <div class="flex flex-col gap-2">
+        {#each allocations as row, idx}
+          <div class="flex items-center gap-2">
+            <div class="min-w-[280px] flex-1">
+              <DsAutoComplete
+                bind:value={row.division}
+                index={$divisions.index}
+                {errors}
+                fieldName={"allocation_division_" + idx}
+                uiName="Division"
+                choose={(id) => setAllocationDivision(idx, id)}
+              >
+                {#snippet resultTemplate(item: DivisionsResponse)}{item.code} - {item.name}{/snippet}
+              </DsAutoComplete>
+            </div>
+            <input
+              class="w-28 rounded border border-neutral-300 px-2 py-1"
+              type="number"
+              min={0}
+              step={0.5}
+              bind:value={row.hours}
+              oninput={(e) => {
+                const v = parseFloat((e.target as HTMLInputElement).value || "0");
+                allocations = allocations.map((r, i) =>
+                  i === idx ? { ...r, hours: isNaN(v) ? 0 : v } : r,
+                );
+              }}
+            />
             <button
-              class="text-neutral-500"
-              onclick={preventDefault(() => removeDivision(divisionId))}
+              class="text-neutral-600"
+              onclick={preventDefault(() => removeAllocationRow(idx))}
+              title="Remove"
             >
               &times;
             </button>
-          </span>
+          </div>
         {/each}
       </div>
-      {#if errors.divisions !== undefined}
-        <span class="text-red-600">{errors.divisions.message}</span>
-      {/if}
+      <div>
+        <DsActionButton action={addAllocationRow} icon="feather:plus-circle" color="green"
+          >Add division</DsActionButton
+        >
+      </div>
     </div>
   {/if}
 

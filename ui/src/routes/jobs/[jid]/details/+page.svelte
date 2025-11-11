@@ -441,12 +441,17 @@
           </div>
         {/if}
 
-        {#if data.job.divisions && Array.isArray(data.job.divisions)}
+        {#if data.job.allocations && Array.isArray(data.job.allocations) && data.job.allocations.length > 0}
           <div>
             <span class="font-semibold">Divisions:</span>
-            {#each data.job.divisions as division, idx}
-              {division.name} ({division.code}){idx < data.job.divisions.length - 1 ? ", " : ""}
-            {/each}
+            <div class="mt-1 flex flex-col gap-1">
+              {#each data.job.allocations as a}
+                <div class="flex items-center gap-2">
+                  <span>{a.division?.name} ({a.division?.code})</span>
+                  <span class="text-neutral-600">— {a.hours} h</span>
+                </div>
+              {/each}
+            </div>
           </div>
         {/if}
 
