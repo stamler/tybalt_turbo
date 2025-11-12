@@ -2,7 +2,11 @@ package routes
 
 import (
 	_ "embed" // Needed for //go:embed
+	"fmt"
 	"net/http"
+	"strconv"
+	"strings"
+	"time"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -20,6 +24,12 @@ var jobsQuery string
 
 //go:embed jobs_latest.sql
 var jobsLatestQuery string
+
+//go:embed jobs_unused.sql
+var jobsUnusedQuery string
+
+//go:embed jobs_stale.sql
+var jobsStaleQuery string
 
 // JobWithRelations models the JSON returned by /api/jobs
 // The Categories field is unmarshalled from the JSON returned by SQLite.
@@ -49,6 +59,13 @@ const latestJobsLimit = 20
 type LatestJob struct {
 	Job
 	GroupName string `db:"group_name" json:"group_name"`
+}
+
+// StaleJob augments Job with last_reference date for the stale endpoint
+type StaleJob struct {
+	Job
+	LastReference string `db:"last_reference" json:"last_reference"`
+	LastRefType   string `db:"last_reference_type" json:"last_reference_type"`
 }
 
 func createGetJobsHandler(app core.App) func(e *core.RequestEvent) error {
@@ -98,6 +115,81 @@ func createGetLatestJobsHandler(app core.App) func(e *core.RequestEvent) error {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 
+		return e.JSON(http.StatusOK, rows)
+	}
+}
+
+// createGetUnusedJobsHandler returns zero-use jobs matching a job number prefix
+func createGetUnusedJobsHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		// Prefer query param ?prefix=..., fallback to optional path value if present
+		prefix := strings.TrimSpace(e.Request.URL.Query().Get("prefix"))
+		if prefix == "" {
+			prefix = strings.TrimSpace(e.Request.PathValue("prefix"))
+		}
+		if prefix == "" {
+			// Default to current year's proposal prefix e.g. P25-
+			yy := time.Now().UTC().Year() % 100
+			prefix = fmt.Sprintf("P%02d", yy)
+		}
+
+		limit := 50
+		if q := e.Request.URL.Query().Get("limit"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 {
+				limit = v
+			}
+		}
+
+		// Reuse the stale query with age=0 to return unused jobs (no references)
+		var rows []StaleJob
+		if err := app.DB().NewQuery(jobsStaleQuery).Bind(dbx.Params{
+			"prefix": prefix,
+			"age":    0,
+			"limit":  limit,
+		}).All(&rows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
+		}
+		return e.JSON(http.StatusOK, rows)
+	}
+}
+
+// createGetStaleJobsHandler returns stale jobs matching a job number prefix and age (days)
+func createGetStaleJobsHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		// prefix default to current PYY if not provided
+		prefix := strings.TrimSpace(e.Request.URL.Query().Get("prefix"))
+		if prefix == "" {
+			prefix = strings.TrimSpace(e.Request.PathValue("prefix"))
+		}
+		if prefix == "" {
+			yy := time.Now().UTC().Year() % 100
+			prefix = fmt.Sprintf("P%02d", yy)
+		}
+
+		// age in days, default 180
+		age := 180
+		if q := e.Request.URL.Query().Get("age"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 {
+				age = v
+			}
+		}
+
+		limit := 50
+		if q := e.Request.URL.Query().Get("limit"); q != "" {
+			if v, err := strconv.Atoi(q); err == nil && v > 0 {
+				limit = v
+			}
+		}
+
+		// Execute
+		var rows []StaleJob
+		if err := app.DB().NewQuery(jobsStaleQuery).Bind(dbx.Params{
+			"prefix": prefix,
+			"age":    age,
+			"limit":  limit,
+		}).All(&rows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
+		}
 		return e.JSON(http.StatusOK, rows)
 	}
 }

@@ -174,6 +174,8 @@ func AddRoutes(app core.App) {
 		jobsGroup.GET("/{id}/pos/list", createGetJobPOsHandler(app))
 		jobsGroup.GET("/{id}", createGetJobsHandler(app))
 		jobsGroup.GET("", createGetJobsHandler(app))
+		jobsGroup.GET("/unused", createGetUnusedJobsHandler(app))
+		jobsGroup.GET("/stale", createGetStaleJobsHandler(app))
 
 		reportsGroup := se.Router.Group("/api/reports")
 		reportsGroup.Bind(apis.RequireAuth("users"))

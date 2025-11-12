@@ -67,6 +67,8 @@
                 const gatedButtons = (item.buttons || []).filter((btn) => {
                   if (
                     btn.action === "/jobs/add" ||
+                    btn.action === "/jobs/unused" ||
+                    btn.action === "/jobs/stale" ||
                     btn.action === "/jobs/latest" ||
                     btn.action === "/clients/add"
                   ) {

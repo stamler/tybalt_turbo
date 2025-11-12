@@ -107,6 +107,18 @@ export const navSections: NavSection[] = [
         href: "/jobs/list",
         buttons: [
           {
+            action: "/jobs/unused",
+            icon: "mdi:cancel",
+            title: "Unused Active Jobs",
+            color: "blue",
+          },
+          {
+            action: "/jobs/stale",
+            icon: "mdi:timeline-clock-outline",
+            title: "Stale Jobs",
+            color: "blue",
+          },
+          {
             action: "/jobs/latest",
             icon: "mdi:timeline-text-outline",
             title: "Latest Jobs",
