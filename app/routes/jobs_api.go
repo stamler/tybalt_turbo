@@ -25,9 +25,6 @@ var jobsQuery string
 //go:embed jobs_latest.sql
 var jobsLatestQuery string
 
-//go:embed jobs_unused.sql
-var jobsUnusedQuery string
-
 //go:embed jobs_stale.sql
 var jobsStaleQuery string
 
@@ -61,8 +58,8 @@ type LatestJob struct {
 	GroupName string `db:"group_name" json:"group_name"`
 }
 
-// StaleJob augments Job with last_reference date for the stale endpoint
-type StaleJob struct {
+// JobWithLastRef augments Job with last_reference fields (used by both stale and unused endpoints)
+type JobWithLastRef struct {
 	Job
 	LastReference string `db:"last_reference" json:"last_reference"`
 	LastRefType   string `db:"last_reference_type" json:"last_reference_type"`
@@ -141,7 +138,7 @@ func createGetUnusedJobsHandler(app core.App) func(e *core.RequestEvent) error {
 		}
 
 		// Reuse the stale query with age=0 to return unused jobs (no references)
-		var rows []StaleJob
+		var rows []JobWithLastRef
 		if err := app.DB().NewQuery(jobsStaleQuery).Bind(dbx.Params{
 			"prefix": prefix,
 			"age":    0,
@@ -182,7 +179,7 @@ func createGetStaleJobsHandler(app core.App) func(e *core.RequestEvent) error {
 		}
 
 		// Execute
-		var rows []StaleJob
+		var rows []JobWithLastRef
 		if err := app.DB().NewQuery(jobsStaleQuery).Bind(dbx.Params{
 			"prefix": prefix,
 			"age":    age,

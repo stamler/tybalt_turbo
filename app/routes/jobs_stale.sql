@@ -1,10 +1,10 @@
--- Return stale jobs whose numbers start with the provided prefix.
--- A stale job has at least one reference and the most recent reference
--- (across time_entries, time_amendments, expenses, purchase_orders)
--- is older than the provided :age in days.
+-- Unified query for both "stale" and "unused" jobs whose numbers start with the provided prefix.
+-- - When :age > 0 → returns stale jobs: last reference (across time_entries, time_amendments,
+--   expenses, purchase_orders) is older than :age days.
+-- - When :age <= 0 → returns unused jobs: no references across the above tables.
 -- Parameters:
 --   - prefix: arbitrary string, matched as j.number LIKE :prefix || '%'
---   - age: integer number of days; last reference must be <= now - age days
+--   - age: integer number of days; behavior depends on :age as described above
 --   - limit: integer limit for number of rows returned
 WITH refs AS (
   SELECT te.job AS job_id, te.date AS ref_date, 'time_entry' AS ref_type FROM time_entries te
