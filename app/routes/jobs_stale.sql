@@ -1,4 +1,4 @@
--- Unified query for both "stale" and "unused" jobs whose numbers start with the provided prefix.
+-- Highly optimized query for both "stale" and "unused" jobs whose numbers start with the provided prefix.
 -- - When :age > 0 → returns stale jobs: last reference (across time_entries, time_amendments,
 --   expenses, purchase_orders) is older than :age days.
 -- - When :age <= 0 → returns unused jobs: no references across the above tables.
@@ -6,37 +6,45 @@
 --   - prefix: arbitrary string, matched as j.number LIKE :prefix || '%'
 --   - age: integer number of days; behavior depends on :age as described above
 --   - limit: integer limit for number of rows returned
-WITH refs AS (
-  SELECT te.job AS job_id, te.date AS ref_date, 'time_entry' AS ref_type FROM time_entries te
-  UNION ALL
-  SELECT ta.job, ta.date, 'time_amendment' FROM time_amendments ta
-  UNION ALL
-  SELECT e.job, e.date, 'expense' FROM expenses e
-  UNION ALL
-  SELECT po.job, po.date, 'purchase_order' FROM purchase_orders po
+WITH matching_jobs AS (
+  SELECT j.id, j.number, j.description, j.location, j.client,
+         j.outstanding_balance, j.outstanding_balance_date
+  FROM jobs j
+  WHERE j.status = 'Active'
+    AND j.number LIKE {:prefix} || '%'
+),
+job_refs AS (
+  SELECT job_id, ref_date, ref_type, type_rank
+  FROM (
+    SELECT te.job AS job_id, te.date AS ref_date, 'time_entry' AS ref_type, 1 AS type_rank
+    FROM time_entries te
+    INNER JOIN matching_jobs mj ON mj.id = te.job
+    UNION ALL
+    SELECT ta.job, ta.date, 'time_amendment', 2
+    FROM time_amendments ta
+    INNER JOIN matching_jobs mj ON mj.id = ta.job
+    UNION ALL
+    SELECT e.job, e.date, 'expense', 3
+    FROM expenses e
+    INNER JOIN matching_jobs mj ON mj.id = e.job
+    UNION ALL
+    SELECT po.job, po.date, 'purchase_order', 4
+    FROM purchase_orders po
+    INNER JOIN matching_jobs mj ON mj.id = po.job
+  ) refs
+),
+ranked_refs AS (
+  SELECT
+    job_id,
+    ref_date,
+    ref_type,
+    ROW_NUMBER() OVER (PARTITION BY job_id ORDER BY ref_date DESC, type_rank ASC) AS rn
+  FROM job_refs
 ),
 last_refs AS (
-  SELECT job_id, MAX(ref_date) AS last_reference
-  FROM refs
-  WHERE job_id != ''
-  GROUP BY job_id
-),
-typed_last AS (
-  SELECT
-    lr.job_id,
-    lr.last_reference,
-    MIN(
-      CASE r.ref_type
-        WHEN 'time_entry' THEN 1
-        WHEN 'time_amendment' THEN 2
-        WHEN 'expense' THEN 3
-        WHEN 'purchase_order' THEN 4
-        ELSE 99
-      END
-    ) AS type_rank
-  FROM last_refs lr
-  JOIN refs r ON r.job_id = lr.job_id AND r.ref_date = lr.last_reference
-  GROUP BY lr.job_id, lr.last_reference
+  SELECT job_id, ref_date AS last_reference, ref_type AS last_reference_type
+  FROM ranked_refs
+  WHERE rn = 1
 )
 SELECT
   j.id,
@@ -48,24 +56,12 @@ SELECT
   COALESCE(j.outstanding_balance, 0) AS outstanding_balance,
   COALESCE(j.outstanding_balance_date, '') AS outstanding_balance_date,
   COALESCE(lr.last_reference, '') AS last_reference,
-  CASE typed.type_rank
-    WHEN 1 THEN 'time_entry'
-    WHEN 2 THEN 'time_amendment'
-    WHEN 3 THEN 'expense'
-    WHEN 4 THEN 'purchase_order'
-    ELSE ''
-  END AS last_reference_type
-FROM jobs j
+  COALESCE(lr.last_reference_type, '') AS last_reference_type
+FROM matching_jobs j
 LEFT JOIN clients c ON c.id = j.client
 LEFT JOIN last_refs lr ON lr.job_id = j.id
-LEFT JOIN typed_last typed ON typed.job_id = j.id AND typed.last_reference = lr.last_reference
-WHERE j.status = 'Active'
-  AND j.number LIKE {:prefix} || '%'
-  AND (
-    ({:age} <= 0 AND lr.last_reference IS NULL)
-    OR
-    ({:age} > 0 AND lr.last_reference <= date('now', printf('-%d days', {:age})))
-  )
+WHERE ({:age} <= 0 AND lr.last_reference IS NULL)
+   OR ({:age} > 0 AND lr.last_reference IS NOT NULL AND lr.last_reference <= date('now', printf('-%d days', {:age})))
 ORDER BY (CASE WHEN {:age} > 0 THEN lr.last_reference END) ASC, j.number ASC
 LIMIT {:limit};
 
