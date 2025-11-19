@@ -1,4 +1,10 @@
 #!/usr/bin/env -S uv run --with requests
+
+# NOTE: Prompt caching typically requires a minimum of 1024 tokens (approx. 4000
+# chars) for the static prefix. The current prompt is too short (~300 tokens) to
+# trigger caching with most providers, so is not implemented.
+
+# TODO: MULTITHREADING TO SPEED UP THE PROCESS, SENDING MULTIPLE REQUESTS IN PARALLEL
 """
 Work History Categorizer, which processes the results of the following MySQL query:
 
@@ -39,6 +45,7 @@ import sys
 import time
 from pathlib import Path
 from typing import List, Dict, Any, Optional
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 
@@ -54,6 +61,13 @@ OPENROUTER_MODEL: str = "x-ai/grok-4-fast"
 
 # Optional: set a small delay between requests to be gentle on the API (in seconds).
 REQUEST_DELAY_SECONDS: float = 0.2
+
+# Maximum number of data rows to classify when running in --test mode.
+TEST_MODE_MAX_ROWS: int = 128
+
+# Number of concurrent worker threads to use for API requests.
+# Set to 1 to force sequential processing.
+NUM_REQUEST_THREADS: int = 32
 
 # =========================================
 
@@ -153,6 +167,19 @@ def normalize_category(raw: str) -> str:
     raise ValueError(f"Could not map model output to a valid category: {raw!r}")
 
 
+def classify_description(desc: str) -> str:
+    """
+    Classify a single work description and return one of
+    exactly: "Tybalt", "Partial", or "IT".
+    """
+    prompt = build_prompt(desc)
+    raw_response = call_openrouter(prompt)
+    category = normalize_category(raw_response)
+    if REQUEST_DELAY_SECONDS > 0:
+        time.sleep(REQUEST_DELAY_SECONDS)
+    return category
+
+
 def read_csv(path: Path) -> (List[Dict[str, Any]], List[str]):
     """Read the CSV into a list of dicts and return (rows, fieldnames)."""
     with path.open("r", newline="", encoding="utf-8") as f:
@@ -171,6 +198,8 @@ def write_csv(path: Path, rows: List[Dict[str, Any]], fieldnames: List[str]) -> 
 
 
 def main(argv: List[str]) -> int:
+    start_time = time.monotonic()
+
     if len(argv) not in (2, 3):
         print("Usage: work_history.py [--test] workHistory.csv", file=sys.stderr)
         return 1
@@ -208,11 +237,17 @@ def main(argv: List[str]) -> int:
     print(f"Found {total} rows.")
 
     if test_mode:
-        print("Test mode enabled: only the first 10 data rows will be classified.")
+        print(
+            f"Test mode enabled: only the first {TEST_MODE_MAX_ROWS} data "
+            "rows will be classified."
+        )
+
+    # Collect rows that actually need classification.
+    to_classify = []  # list of (idx, row, desc)
 
     for idx, row in enumerate(rows, start=1):
-        # In test mode, stop completely after examining the first 10 rows.
-        if test_mode and idx > 10:
+        # In test mode, stop completely after examining the first N rows.
+        if test_mode and idx > TEST_MODE_MAX_ROWS:
             break
 
         desc = (row.get("workDescription") or "").strip()
@@ -228,25 +263,37 @@ def main(argv: List[str]) -> int:
             row["category"] = "IT"
             continue
 
-        print(f"[{idx}/{total}] Classifying description...")
-        prompt = build_prompt(desc)
+        print(f"[{idx}/{total}] Queuing description for classification...")
+        to_classify.append((idx, row, desc))
 
-        try:
-            raw_response = call_openrouter(prompt)
-            category = normalize_category(raw_response)
-            row["category"] = category
-            print(f"    -> {category}")
-        except Exception as e:
-            # Log the error but do NOT overwrite category; leave it blank or whatever it was.
-            print(f"    ERROR while classifying row {idx}: {e}", file=sys.stderr)
+    if to_classify:
+        max_workers = max(1, NUM_REQUEST_THREADS)
+        print(f"Dispatching {len(to_classify)} classification request(s) with {max_workers} worker thread(s).")
 
-        if REQUEST_DELAY_SECONDS > 0:
-            time.sleep(REQUEST_DELAY_SECONDS)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_meta = {
+                executor.submit(classify_description, desc): (idx, row)
+                for idx, row, desc in to_classify
+            }
+
+            for future in as_completed(future_to_meta):
+                idx, row = future_to_meta[future]
+                try:
+                    category = future.result()
+                    row["category"] = category
+                    print(f"[{idx}/{total}] -> {category}")
+                except Exception as e:
+                    # Log the error but do NOT overwrite category; leave it blank or whatever it was.
+                    print(f"    ERROR while classifying row {idx}: {e}", file=sys.stderr)
 
     output_path = input_path.with_name(f"{input_path.stem}_output{input_path.suffix}")
     print(f"Writing updated CSV to: {output_path}")
     write_csv(output_path, rows, fieldnames)
     print("Done.")
+
+    elapsed = time.monotonic() - start_time
+    print(f"Total runtime: {elapsed:.2f} seconds.")
+
     return 0
 
 
