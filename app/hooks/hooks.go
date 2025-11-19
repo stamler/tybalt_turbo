@@ -191,4 +191,42 @@ func AddHooks(app core.App) {
 		}
 		return e.Next()
 	})
+
+	// Hook for time_sheet_reviewers: when a new reviewer is added, send notification
+	// Note: core.RecordEvent doesn't provide auth context, so we can't get the creator
+	// directly from the event. We load the timesheet to get the approver (who is the only
+	// one who can share), and we also need the timesheet for notification data (week_ending,
+	// employee name, etc.) anyway.
+	app.OnRecordCreate("time_sheet_reviewers").BindFunc(func(e *core.RecordEvent) error {
+		timesheetId := e.Record.GetString("time_sheet")
+		reviewerUID := e.Record.GetString("reviewer")
+
+		// Get the timesheet record (needed for approver and notification data)
+		timesheet, err := app.FindRecordById("time_sheets", timesheetId)
+		if err != nil {
+			app.Logger().Error(
+				"error finding timesheet for reviewer notification",
+				"timesheet_id", timesheetId,
+				"error", err,
+			)
+			// Don't fail the request if notification fails
+			return e.Next()
+		}
+
+		// Get the approver from the timesheet (only the approver can share, so this is accurate)
+		sharerUID := timesheet.GetString("approver")
+
+		// Queue notification for the new reviewer
+		if notifErr := notifications.QueueTimesheetSharedNotifications(app, timesheet, sharerUID, []string{reviewerUID}); notifErr != nil {
+			app.Logger().Error(
+				"error queueing timesheet shared notification",
+				"timesheet_id", timesheetId,
+				"reviewer_uid", reviewerUID,
+				"error", notifErr,
+			)
+			// Don't fail the request if notification fails
+		}
+
+		return e.Next()
+	})
 }

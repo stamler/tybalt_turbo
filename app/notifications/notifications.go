@@ -9,6 +9,7 @@ import (
 	"net/mail"
 	"text/template"
 	"time"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -244,6 +245,64 @@ func SendNotifications(app core.App) (int64, error) {
 	return sentCount, nil
 }
 
+// CreateNotification creates a notification record with the given template code, recipient, and optional data
+func CreateNotification(app core.App, templateCode string, recipientUID string, data map[string]any, system bool) error {
+	notificationCollection, err := app.FindCollectionByNameOrId("notifications")
+	if err != nil {
+		app.Logger().Error(
+			"error finding notifications collection",
+			"error", err,
+		)
+		return fmt.Errorf("error finding notifications collection: %v", err)
+	}
+
+	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+		"code": templateCode,
+	})
+	if err != nil {
+		app.Logger().Error(
+			"error finding notification template",
+			"template_code", templateCode,
+			"error", err,
+		)
+		return fmt.Errorf("error finding notification template %s: %v", templateCode, err)
+	}
+
+	notificationRecord := core.NewRecord(notificationCollection)
+	notificationRecord.Set("recipient", recipientUID)
+	notificationRecord.Set("template", notificationTemplate.Get("id"))
+	notificationRecord.Set("subject", notificationTemplate.Get("subject"))
+	notificationRecord.Set("text_email", notificationTemplate.Get("text_email"))
+	notificationRecord.Set("status", "pending")
+	notificationRecord.Set("system_notification", system)
+
+	// If data is provided, marshal it to JSON and store it
+	if len(data) > 0 {
+		dataJSON, err := json.Marshal(data)
+		if err != nil {
+			app.Logger().Error(
+				"error marshaling notification data",
+				"error", err,
+			)
+			return fmt.Errorf("error marshaling notification data: %v", err)
+		}
+		notificationRecord.Set("data", string(dataJSON))
+	}
+
+	err = app.Save(notificationRecord)
+	if err != nil {
+		app.Logger().Error(
+			"error saving notification",
+			"template_code", templateCode,
+			"recipient_uid", recipientUID,
+			"error", err,
+		)
+		return fmt.Errorf("error saving notification: %v", err)
+	}
+
+	return nil
+}
+
 // QueueSecondApproverNotifications will create a notification for each user (id
 // column) in `pending_items_for_qualified_po_second_approvers` who has a
 // `num_pos_qualified` > 0.
@@ -264,41 +323,14 @@ func QueuePoSecondApproverNotifications(app core.App, send bool) error {
 		return fmt.Errorf("error querying pending_items_for_qualified_po_second_approvers: %v", err)
 	}
 
-	notificationCollection, err := app.FindCollectionByNameOrId("notifications")
-	if err != nil {
-		app.Logger().Error(
-			"error finding notifications collection",
-			"error", err,
-		)
-		return fmt.Errorf("error finding notifications collection: %v", err)
-	}
-
-	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
-		"code": "po_second_approval_required",
-	})
-	if err != nil {
-		app.Logger().Error(
-			"error finding notification template",
-			"error", err,
-		)
-		return fmt.Errorf("error finding notification template: %v", err)
-	}
-
 	// create a notification for each user
 	for _, record := range records {
-		notificationRecord := core.NewRecord(notificationCollection)
-		notificationRecord.Set("recipient", record.Get("id"))
-		notificationRecord.Set("template", notificationTemplate.Get("id"))
-		notificationRecord.Set("subject", notificationTemplate.Get("subject"))
-		notificationRecord.Set("text_email", notificationTemplate.Get("text_email"))
-		notificationRecord.Set("status", "pending")
-		notificationRecord.Set("system_notification", true)
-		err = app.Save(notificationRecord)
-		if err != nil {
+		recipientID := record.GetString("id")
+		if err := CreateNotification(app, "po_second_approval_required", recipientID, nil, true); err != nil {
 			app.Logger().Error(
-				"error saving second approval notification",
+				"error creating second approval notification",
 				"error", err,
-				"recipient_id", record.Get("id"),
+				"recipient_id", recipientID,
 			)
 			return fmt.Errorf("error saving second approval notification: %v", err)
 		}
@@ -315,5 +347,575 @@ func QueuePoSecondApproverNotifications(app core.App, send bool) error {
 			"sent_count", sentCount,
 		)
 	}
+	return nil
+}
+
+// QueueTimesheetSubmissionReminders creates notifications for users who haven't submitted
+// their timesheet for the previous week. The previous week ending is calculated as the
+// Saturday that was 7 days before today's week ending.
+func QueueTimesheetSubmissionReminders(app core.App, send bool) error {
+	// Calculate the previous week ending (7 days before today's week ending)
+	today := time.Now()
+	todayStr := today.Format(time.DateOnly)
+	weekEnding, err := utilities.GenerateWeekEnding(todayStr)
+	if err != nil {
+		return fmt.Errorf("error calculating week ending: %v", err)
+	}
+
+	weekEndingTime, err := time.Parse(time.DateOnly, weekEnding)
+	if err != nil {
+		return fmt.Errorf("error parsing week ending: %v", err)
+	}
+
+	previousWeekEnding := weekEndingTime.AddDate(0, 0, -7).Format(time.DateOnly)
+
+	return QueueTimesheetSubmissionRemindersForWeek(app, previousWeekEnding, send)
+}
+
+// QueueTimesheetSubmissionRemindersForWeek creates notifications for users who haven't submitted
+// their timesheet for the specified week ending.
+func QueueTimesheetSubmissionRemindersForWeek(app core.App, weekEnding string, send bool) error {
+	// Find users who should have submitted a timesheet but haven't
+	// This query is based on the createTimesheetMissingHandler logic
+	query := `
+		SELECT DISTINCT
+			u.id AS uid
+		FROM users u
+		LEFT JOIN time_sheets ts ON ts.uid = u.id AND ts.week_ending = {:week_ending} AND ts.submitted = 1
+		LEFT JOIN admin_profiles ap ON ap.uid = u.id
+		WHERE ts.id IS NULL
+		  AND COALESCE(ap.time_sheet_expected, 0) = 1
+	`
+
+	type UserRow struct {
+		UID string `db:"uid"`
+	}
+
+	var users []UserRow
+	err := app.DB().NewQuery(query).Bind(dbx.Params{
+		"week_ending": weekEnding,
+	}).All(&users)
+	if err != nil {
+		app.Logger().Error(
+			"error querying users missing timesheets",
+			"week_ending", weekEnding,
+			"error", err,
+		)
+		return fmt.Errorf("error querying users missing timesheets: %v", err)
+	}
+
+	// Check for existing notifications to avoid duplicates
+	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+		"code": "timesheet_submission_reminder",
+	})
+	if err != nil {
+		return fmt.Errorf("error finding notification template: %v", err)
+	}
+
+	createdCount := 0
+	for _, user := range users {
+		// Check if a notification already exists for this recipient, template, and week ending
+		existingQuery := `
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			WHERE n.recipient = {:recipient}
+			  AND n.template = {:template}
+			  AND n.status IN ('pending', 'inflight')
+			  AND json_extract(n.data, '$.WeekEnding') = {:week_ending}
+		`
+
+		type CountResult struct {
+			Count int `db:"count"`
+		}
+		var countResult CountResult
+		err = app.DB().NewQuery(existingQuery).Bind(dbx.Params{
+			"recipient":   user.UID,
+			"template":    notificationTemplate.Get("id"),
+			"week_ending": weekEnding,
+		}).One(&countResult)
+		if err != nil {
+			app.Logger().Error(
+				"error checking for existing notification",
+				"recipient", user.UID,
+				"error", err,
+			)
+			continue
+		}
+
+		if countResult.Count > 0 {
+			// Skip if notification already exists
+			continue
+		}
+
+		// Create notification with week ending in data
+		data := map[string]any{
+			"WeekEnding": weekEnding,
+		}
+		err = CreateNotification(app, "timesheet_submission_reminder", user.UID, data, true)
+		if err != nil {
+			app.Logger().Error(
+				"error creating timesheet submission reminder",
+				"recipient", user.UID,
+				"error", err,
+			)
+			// Continue with other users even if one fails
+			continue
+		}
+		createdCount++
+	}
+
+	app.Logger().Info(
+		"queued timesheet submission reminders",
+		"week_ending", weekEnding,
+		"created_count", createdCount,
+	)
+
+	// Send the notifications if the send flag is true
+	if send {
+		sentCount, err := SendNotifications(app)
+		if err != nil {
+			return fmt.Errorf("error sending notifications: %v", err)
+		}
+		app.Logger().Info(
+			"sent timesheet submission reminder notifications",
+			"sent_count", sentCount,
+		)
+	}
+	return nil
+}
+
+// QueueTimesheetApprovalReminders creates notifications for managers who have pending
+// timesheets awaiting approval.
+func QueueTimesheetApprovalReminders(app core.App, send bool) error {
+	// Find managers with pending timesheets
+	query := `
+		SELECT DISTINCT
+			ts.approver AS manager_uid
+		FROM time_sheets ts
+		WHERE ts.submitted = 1
+		  AND ts.approved = ''
+		  AND ts.committed = ''
+		  AND ts.rejected = ''
+		  AND ts.approver != ''
+	`
+
+	type ManagerRow struct {
+		ManagerUID string `db:"manager_uid"`
+	}
+
+	var managers []ManagerRow
+	err := app.DB().NewQuery(query).All(&managers)
+	if err != nil {
+		app.Logger().Error(
+			"error querying managers with pending timesheets",
+			"error", err,
+		)
+		return fmt.Errorf("error querying managers with pending timesheets: %v", err)
+	}
+
+	// Check for existing notifications to avoid duplicates (within last 24 hours)
+	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+		"code": "timesheet_approval_reminder",
+	})
+	if err != nil {
+		return fmt.Errorf("error finding notification template: %v", err)
+	}
+
+	createdCount := 0
+	for _, manager := range managers {
+		// Check if a notification already exists for this manager today
+		existingQuery := `
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			WHERE n.recipient = {:recipient}
+			  AND n.template = {:template}
+			  AND n.status IN ('pending', 'inflight')
+			  AND datetime(n.created) > datetime('now', '-1 day')
+		`
+
+		type CountResult struct {
+			Count int `db:"count"`
+		}
+		var countResult CountResult
+		err = app.DB().NewQuery(existingQuery).Bind(dbx.Params{
+			"recipient": manager.ManagerUID,
+			"template":  notificationTemplate.Get("id"),
+		}).One(&countResult)
+		if err != nil {
+			app.Logger().Error(
+				"error checking for existing notification",
+				"recipient", manager.ManagerUID,
+				"error", err,
+			)
+			continue
+		}
+
+		if countResult.Count > 0 {
+			// Skip if notification already exists within last 24 hours
+			continue
+		}
+
+		// Create notification (no extra data needed for approval reminders)
+		err = CreateNotification(app, "timesheet_approval_reminder", manager.ManagerUID, nil, true)
+		if err != nil {
+			app.Logger().Error(
+				"error creating timesheet approval reminder",
+				"recipient", manager.ManagerUID,
+				"error", err,
+			)
+			// Continue with other managers even if one fails
+			continue
+		}
+		createdCount++
+	}
+
+	app.Logger().Info(
+		"queued timesheet approval reminders",
+		"created_count", createdCount,
+	)
+
+	// Send the notifications if the send flag is true
+	if send {
+		sentCount, err := SendNotifications(app)
+		if err != nil {
+			return fmt.Errorf("error sending notifications: %v", err)
+		}
+		app.Logger().Info(
+			"sent timesheet approval reminder notifications",
+			"sent_count", sentCount,
+		)
+	}
+	return nil
+}
+
+// QueueExpenseApprovalReminders creates notifications for managers who have pending
+// expenses awaiting approval.
+func QueueExpenseApprovalReminders(app core.App, send bool) error {
+	// Find managers with pending expenses
+	query := `
+		SELECT DISTINCT
+			e.approver AS manager_uid
+		FROM expenses e
+		WHERE e.submitted = 1
+		  AND e.approved = ''
+		  AND e.committed = ''
+		  AND e.rejected = ''
+		  AND e.approver != ''
+	`
+
+	type ManagerRow struct {
+		ManagerUID string `db:"manager_uid"`
+	}
+
+	var managers []ManagerRow
+	err := app.DB().NewQuery(query).All(&managers)
+	if err != nil {
+		app.Logger().Error(
+			"error querying managers with pending expenses",
+			"error", err,
+		)
+		return fmt.Errorf("error querying managers with pending expenses: %v", err)
+	}
+
+	// Check for existing notifications to avoid duplicates (within last 24 hours)
+	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+		"code": "expense_approval_reminder",
+	})
+	if err != nil {
+		return fmt.Errorf("error finding notification template: %v", err)
+	}
+
+	createdCount := 0
+	for _, manager := range managers {
+		// Check if a notification already exists for this manager today
+		existingQuery := `
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			WHERE n.recipient = {:recipient}
+			  AND n.template = {:template}
+			  AND n.status IN ('pending', 'inflight')
+			  AND datetime(n.created) > datetime('now', '-1 day')
+		`
+
+		type CountResult struct {
+			Count int `db:"count"`
+		}
+		var countResult CountResult
+		err = app.DB().NewQuery(existingQuery).Bind(dbx.Params{
+			"recipient": manager.ManagerUID,
+			"template":  notificationTemplate.Get("id"),
+		}).One(&countResult)
+		if err != nil {
+			app.Logger().Error(
+				"error checking for existing notification",
+				"recipient", manager.ManagerUID,
+				"error", err,
+			)
+			continue
+		}
+
+		if countResult.Count > 0 {
+			// Skip if notification already exists within last 24 hours
+			continue
+		}
+
+		// Create notification (no extra data needed for approval reminders)
+		err = CreateNotification(app, "expense_approval_reminder", manager.ManagerUID, nil, true)
+		if err != nil {
+			app.Logger().Error(
+				"error creating expense approval reminder",
+				"recipient", manager.ManagerUID,
+				"error", err,
+			)
+			// Continue with other managers even if one fails
+			continue
+		}
+		createdCount++
+	}
+
+	app.Logger().Info(
+		"queued expense approval reminders",
+		"created_count", createdCount,
+	)
+
+	// Send the notifications if the send flag is true
+	if send {
+		sentCount, err := SendNotifications(app)
+		if err != nil {
+			return fmt.Errorf("error sending notifications: %v", err)
+		}
+		app.Logger().Info(
+			"sent expense approval reminder notifications",
+			"sent_count", sentCount,
+		)
+	}
+	return nil
+}
+
+// QueueTimesheetRejectedNotifications creates notifications for timesheet rejection.
+// Recipients include: the employee, the rejector, and the employee's manager (if different from rejector).
+func QueueTimesheetRejectedNotifications(app core.App, timesheet *core.Record, rejectorUID, reason string) error {
+	employeeUID := timesheet.GetString("uid")
+	weekEnding := timesheet.GetString("week_ending")
+
+	// Load employee profile
+	employeeProfile, err := app.FindFirstRecordByFilter("profiles", "uid = {:uid}", dbx.Params{
+		"uid": employeeUID,
+	})
+	if err != nil {
+		app.Logger().Error(
+			"error finding employee profile",
+			"employee_uid", employeeUID,
+			"error", err,
+		)
+		return fmt.Errorf("error finding employee profile: %v", err)
+	}
+	employeeName := employeeProfile.GetString("given_name") + " " + employeeProfile.GetString("surname")
+
+	// Load rejector profile
+	rejectorProfile, err := app.FindFirstRecordByFilter("profiles", "uid = {:uid}", dbx.Params{
+		"uid": rejectorUID,
+	})
+	if err != nil {
+		app.Logger().Error(
+			"error finding rejector profile",
+			"rejector_uid", rejectorUID,
+			"error", err,
+		)
+		return fmt.Errorf("error finding rejector profile: %v", err)
+	}
+	rejectorName := rejectorProfile.GetString("given_name") + " " + rejectorProfile.GetString("surname")
+
+	// Load employee's manager
+	managerUID := employeeProfile.GetString("manager")
+
+	// Build notification data
+	data := map[string]any{
+		"EmployeeName":    employeeName,
+		"WeekEnding":      weekEnding,
+		"RejectorName":    rejectorName,
+		"RejectionReason": reason,
+	}
+
+	// Determine recipients: employee, rejector, and manager (if different from rejector)
+	recipients := []string{employeeUID}
+	if rejectorUID != employeeUID {
+		recipients = append(recipients, rejectorUID)
+	}
+	if managerUID != "" && managerUID != rejectorUID && managerUID != employeeUID {
+		recipients = append(recipients, managerUID)
+	}
+
+	// Create notifications for each recipient
+	for _, recipientUID := range recipients {
+		err = CreateNotification(app, "timesheet_rejected", recipientUID, data, true)
+		if err != nil {
+			app.Logger().Error(
+				"error creating timesheet rejection notification",
+				"recipient", recipientUID,
+				"error", err,
+			)
+			// Continue with other recipients even if one fails
+			continue
+		}
+	}
+
+	app.Logger().Info(
+		"queued timesheet rejection notifications",
+		"timesheet_id", timesheet.Id,
+		"recipient_count", len(recipients),
+	)
+
+	return nil
+}
+
+// QueueExpenseRejectedNotifications creates notifications for expense rejection.
+// Recipients include: the employee, the rejector, and the employee's manager (if different from rejector).
+func QueueExpenseRejectedNotifications(app core.App, expense *core.Record, rejectorUID, reason string) error {
+	employeeUID := expense.GetString("uid")
+	expenseDate := expense.GetString("date")
+	expenseTotal := expense.GetFloat("total")
+
+	// Format expense amount as currency string (2 decimal places)
+	expenseAmount := fmt.Sprintf("$%.2f", expenseTotal)
+
+	// Load employee profile
+	employeeProfile, err := app.FindFirstRecordByFilter("profiles", "uid = {:uid}", dbx.Params{
+		"uid": employeeUID,
+	})
+	if err != nil {
+		app.Logger().Error(
+			"error finding employee profile",
+			"employee_uid", employeeUID,
+			"error", err,
+		)
+		return fmt.Errorf("error finding employee profile: %v", err)
+	}
+	employeeName := employeeProfile.GetString("given_name") + " " + employeeProfile.GetString("surname")
+
+	// Load rejector profile
+	rejectorProfile, err := app.FindFirstRecordByFilter("profiles", "uid = {:uid}", dbx.Params{
+		"uid": rejectorUID,
+	})
+	if err != nil {
+		app.Logger().Error(
+			"error finding rejector profile",
+			"rejector_uid", rejectorUID,
+			"error", err,
+		)
+		return fmt.Errorf("error finding rejector profile: %v", err)
+	}
+	rejectorName := rejectorProfile.GetString("given_name") + " " + rejectorProfile.GetString("surname")
+
+	// Load employee's manager
+	managerUID := employeeProfile.GetString("manager")
+
+	// Build notification data
+	data := map[string]any{
+		"EmployeeName":    employeeName,
+		"ExpenseDate":     expenseDate,
+		"ExpenseAmount":   expenseAmount,
+		"RejectorName":    rejectorName,
+		"RejectionReason": reason,
+	}
+
+	// Determine recipients: employee, rejector, and manager (if different from rejector)
+	recipients := []string{employeeUID}
+	if rejectorUID != employeeUID {
+		recipients = append(recipients, rejectorUID)
+	}
+	if managerUID != "" && managerUID != rejectorUID && managerUID != employeeUID {
+		recipients = append(recipients, managerUID)
+	}
+
+	// Create notifications for each recipient
+	for _, recipientUID := range recipients {
+		err = CreateNotification(app, "expense_rejected", recipientUID, data, true)
+		if err != nil {
+			app.Logger().Error(
+				"error creating expense rejection notification",
+				"recipient", recipientUID,
+				"error", err,
+			)
+			// Continue with other recipients even if one fails
+			continue
+		}
+	}
+
+	app.Logger().Info(
+		"queued expense rejection notifications",
+		"expense_id", expense.Id,
+		"recipient_count", len(recipients),
+	)
+
+	return nil
+}
+
+// QueueTimesheetSharedNotifications creates notifications for newly added timesheet reviewers.
+func QueueTimesheetSharedNotifications(app core.App, timesheet *core.Record, sharerUID string, newViewerUIDs []string) error {
+	if len(newViewerUIDs) == 0 {
+		return nil
+	}
+
+	employeeUID := timesheet.GetString("uid")
+	weekEnding := timesheet.GetString("week_ending")
+
+	// Load sharer profile
+	sharerProfile, err := app.FindFirstRecordByFilter("profiles", "uid = {:uid}", dbx.Params{
+		"uid": sharerUID,
+	})
+	if err != nil {
+		app.Logger().Error(
+			"error finding sharer profile",
+			"sharer_uid", sharerUID,
+			"error", err,
+		)
+		return fmt.Errorf("error finding sharer profile: %v", err)
+	}
+	sharerName := sharerProfile.GetString("given_name") + " " + sharerProfile.GetString("surname")
+
+	// Load employee profile
+	employeeProfile, err := app.FindFirstRecordByFilter("profiles", "uid = {:uid}", dbx.Params{
+		"uid": employeeUID,
+	})
+	if err != nil {
+		app.Logger().Error(
+			"error finding employee profile",
+			"employee_uid", employeeUID,
+			"error", err,
+		)
+		return fmt.Errorf("error finding employee profile: %v", err)
+	}
+	employeeName := employeeProfile.GetString("given_name") + " " + employeeProfile.GetString("surname")
+
+	// Build notification data
+	data := map[string]any{
+		"UserName":     sharerName,
+		"EmployeeName": employeeName,
+		"WeekEnding":   weekEnding,
+	}
+
+	// Create notifications for each new viewer
+	createdCount := 0
+	for _, viewerUID := range newViewerUIDs {
+		err = CreateNotification(app, "timesheet_shared", viewerUID, data, true)
+		if err != nil {
+			app.Logger().Error(
+				"error creating timesheet shared notification",
+				"viewer_uid", viewerUID,
+				"error", err,
+			)
+			// Continue with other viewers even if one fails
+			continue
+		}
+		createdCount++
+	}
+
+	app.Logger().Info(
+		"queued timesheet shared notifications",
+		"timesheet_id", timesheet.Id,
+		"created_count", createdCount,
+	)
+
 	return nil
 }

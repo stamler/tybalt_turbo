@@ -12,6 +12,7 @@ import (
 	"tybalt/internal/testutils"
 	"tybalt/utilities"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
@@ -706,6 +707,78 @@ func TestExpensesCreate(t *testing.T) {
 	for _, scenario := range scenarios {
 		scenario.Test(t)
 	}
+}
+
+// TestRejectExpense_QueuesNotifications verifies that rejecting an expense via the route
+// queues one or more expense_rejected notifications.
+func TestRejectExpense_QueuesNotifications(t *testing.T) {
+	// Choose an expense that is submitted, not committed, and not yet rejected.
+	const expenseToReject = "eqhozipupteogp8"
+
+	// Use the same committer user as in other route tests (has commit claim).
+	committerToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var beforeCount int64
+
+	scenario := tests.ApiScenario{
+		Name:   "reject expense queues notifications",
+		Method: http.MethodPost,
+		URL:    "/api/expenses/" + expenseToReject + "/reject",
+		Body:   strings.NewReader(`{"rejection_reason": "Route-level expense rejection test"}`),
+		Headers: map[string]string{
+			"Authorization": committerToken,
+		},
+		ExpectedStatus: http.StatusOK,
+		ExpectedContent: []string{
+			`"message":"record rejected successfully"`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	// Count notifications before the request is executed.
+	scenario.BeforeTestFunc = func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": "expense_rejected",
+		}).One(&result)
+		if err != nil {
+			tb.Fatalf("failed to count notifications for expense_rejected before request: %v", err)
+		}
+		beforeCount = result.Count
+	}
+
+	// After the request, ensure that at least one new expense_rejected notification was created.
+	scenario.AfterTestFunc = func(tb testing.TB, app *tests.TestApp, res *http.Response) {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": "expense_rejected",
+		}).One(&result)
+		if err != nil {
+			tb.Fatalf("failed to count notifications for expense_rejected after request: %v", err)
+		}
+		if result.Count <= beforeCount {
+			tb.Fatalf("expected expense_rejected notifications to be created by reject route, before=%d after=%d", beforeCount, result.Count)
+		}
+	}
+
+	scenario.Test(t)
 }
 
 func TestExpensesUpdate(t *testing.T) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+	"tybalt/notifications"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -129,6 +130,33 @@ func createRejectRecordHandler(app core.App, collectionName string) func(e *core
 				})
 			}
 			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+		}
+
+		// After successful rejection, send notifications (outside transaction to avoid blocking)
+		// Reload the record to get the updated values
+		rejectedRecord, err := app.FindRecordById(collectionName, id)
+		if err == nil {
+			// Queue notifications based on collection type
+			switch collectionName {
+			case "time_sheets":
+				// Log error but don't fail the request if notification fails
+				if notifErr := notifications.QueueTimesheetRejectedNotifications(app, rejectedRecord, userId, req.RejectionReason); notifErr != nil {
+					app.Logger().Error(
+						"error queueing timesheet rejection notifications",
+						"timesheet_id", id,
+						"error", notifErr,
+					)
+				}
+			case "expenses":
+				// Log error but don't fail the request if notification fails
+				if notifErr := notifications.QueueExpenseRejectedNotifications(app, rejectedRecord, userId, req.RejectionReason); notifErr != nil {
+					app.Logger().Error(
+						"error queueing expense rejection notifications",
+						"expense_id", id,
+						"error", notifErr,
+					)
+				}
+			}
 		}
 
 		return e.JSON(http.StatusOK, map[string]string{"message": "record rejected successfully"})

@@ -17,4 +17,22 @@ func AddCronJobs(app core.App) {
 		// at regular intervals.
 		notifications.QueuePoSecondApproverNotifications(app, true)
 	})
+
+	// send timesheet_submission_reminder notifications at 8am UTC on Tuesday, Wednesday, and Thursday.
+	// These notifications remind users who haven't submitted their timesheet for the previous week.
+	app.Cron().MustAdd("timesheet_submission_reminders", "0 8 * * 2-4", func() {
+		notifications.QueueTimesheetSubmissionReminders(app, true)
+	})
+
+	// send expense_approval_reminder notifications at 9am UTC on Thursday and Friday.
+	// These notifications remind managers to approve submitted expenses from their staff.
+	app.Cron().MustAdd("expense_approval_reminders", "0 9 * * 4-5", func() {
+		notifications.QueueExpenseApprovalReminders(app, true)
+	})
+
+	// send timesheet_approval_reminder notifications at 12pm UTC on Tuesday, Wednesday, and Thursday.
+	// These notifications remind managers to approve submitted timesheets from their staff.
+	app.Cron().MustAdd("timesheet_approval_reminders", "0 12 * * 2-4", func() {
+		notifications.QueueTimesheetApprovalReminders(app, true)
+	})
 }

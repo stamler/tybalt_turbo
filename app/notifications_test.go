@@ -6,8 +6,11 @@ import (
 	"strings"
 	"testing"
 	"time"
+
 	"tybalt/internal/testutils"
 	"tybalt/notifications"
+
+	"github.com/pocketbase/dbx"
 )
 
 // This is the test file for the notifications package.
@@ -261,5 +264,447 @@ func TestSendNotifications_ErrorHandling(t *testing.T) {
 	messageCount := len(app.TestMailer.Messages())
 	if sentCount != int64(messageCount) {
 		t.Errorf("Expected sentCount to be %d, got %d", messageCount, sentCount)
+	}
+}
+
+// QueueTimesheetSubmissionReminders()
+//
+//  1. creates one or more notifications with the timesheet_submission_reminder template
+//     for users who are missing a timesheet for the previous week.
+//
+// NOTE: This test is currently skipped because the test database (test_pb_data/data.db)
+// does not contain any users who are expected to submit a timesheet but haven't
+// for any given week. To enable this test, seed such data in data.db.
+func TestQueueTimesheetSubmissionReminders_CreatesNotifications(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Find a week_ending value that has at least one user who is expected to have
+	// a timesheet but is missing it. This mirrors the logic in
+	// QueueTimesheetSubmissionRemindersForWeek.
+	var weeks []struct {
+		WeekEnding string `db:"week_ending"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT DISTINCT week_ending
+		FROM time_sheets
+		WHERE week_ending != ''
+	`).All(&weeks); err != nil {
+		t.Fatalf("failed to load distinct week_endings: %v", err)
+	}
+
+	var targetWeek string
+	for _, w := range weeks {
+		var res struct {
+			Count int `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT
+				COUNT(*) AS count
+			FROM users u
+			LEFT JOIN time_sheets ts ON ts.uid = u.id AND ts.week_ending = {:week_ending} AND ts.submitted = 1
+			LEFT JOIN admin_profiles ap ON ap.uid = u.id
+			WHERE ts.id IS NULL
+			  AND COALESCE(ap.time_sheet_expected, 0) = 1
+		`).Bind(dbx.Params{
+			"week_ending": w.WeekEnding,
+		}).One(&res)
+		if err != nil {
+			t.Fatalf("failed to check missing timesheets for week %s: %v", w.WeekEnding, err)
+		}
+		if res.Count > 0 {
+			targetWeek = w.WeekEnding
+			break
+		}
+	}
+
+	if targetWeek == "" {
+		t.Skip("no week in test data where expected users are missing timesheets")
+	}
+
+	// Helper to count notifications for a given template code
+	countForTemplate := func(code string) int64 {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": code,
+		}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to count notifications for code %s: %v", code, err)
+		}
+		return result.Count
+	}
+
+	beforeCount := countForTemplate("timesheet_submission_reminder")
+
+	// Call the queue function without sending emails for the specific target week
+	if err := notifications.QueueTimesheetSubmissionRemindersForWeek(app, targetWeek, false); err != nil {
+		t.Fatalf("expected no error from QueueTimesheetSubmissionReminders, got %v", err)
+	}
+
+	afterCount := countForTemplate("timesheet_submission_reminder")
+
+	if afterCount <= beforeCount {
+		t.Fatalf("expected timesheet_submission_reminder notifications to be created, before=%d after=%d", beforeCount, afterCount)
+	}
+}
+
+// QueueTimesheetApprovalReminders()
+//
+//  1. creates one or more notifications with the timesheet_approval_reminder template
+//     for managers who have pending timesheets awaiting approval.
+func TestQueueTimesheetApprovalReminders_CreatesNotifications(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// First, ensure there is at least one manager with pending timesheets in the test data.
+	var managers []struct {
+		ManagerUID string `db:"manager_uid"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT DISTINCT
+			ts.approver AS manager_uid
+		FROM time_sheets ts
+		WHERE ts.submitted = 1
+		  AND ts.approved = ''
+		  AND ts.committed = ''
+		  AND ts.rejected = ''
+		  AND ts.approver != ''
+	`).All(&managers); err != nil {
+		t.Fatalf("failed to query managers with pending timesheets: %v", err)
+	}
+	if len(managers) == 0 {
+		t.Skip("no managers with pending timesheets in test data")
+	}
+
+	// Helper to count notifications for a given template code
+	countForTemplate := func(code string) int64 {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": code,
+		}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to count notifications for code %s: %v", code, err)
+		}
+		return result.Count
+	}
+
+	beforeCount := countForTemplate("timesheet_approval_reminder")
+
+	// Call the queue function without sending emails
+	if err := notifications.QueueTimesheetApprovalReminders(app, false); err != nil {
+		t.Fatalf("expected no error from QueueTimesheetApprovalReminders, got %v", err)
+	}
+
+	afterCount := countForTemplate("timesheet_approval_reminder")
+
+	if afterCount <= beforeCount {
+		t.Fatalf("expected timesheet_approval_reminder notifications to be created, before=%d after=%d", beforeCount, afterCount)
+	}
+}
+
+// QueueExpenseApprovalReminders()
+//
+//  1. creates one or more notifications with the expense_approval_reminder template
+//     for managers who have pending expenses awaiting approval.
+//
+// NOTE: This test is currently skipped because the test database (test_pb_data/data.db)
+// does not contain any managers with pending expenses (submitted=1, approved=”,
+// committed=”, rejected=”). To enable this test, seed such data in data.db.
+func TestQueueExpenseApprovalReminders_CreatesNotifications(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// First, ensure there is at least one manager with pending expenses in the test data.
+	var managers []struct {
+		ManagerUID string `db:"manager_uid"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT DISTINCT
+			e.approver AS manager_uid
+		FROM expenses e
+		WHERE e.submitted = 1
+		  AND e.approved = ''
+		  AND e.committed = ''
+		  AND e.rejected = ''
+		  AND e.approver != ''
+	`).All(&managers); err != nil {
+		t.Fatalf("failed to query managers with pending expenses: %v", err)
+	}
+	if len(managers) == 0 {
+		t.Skip("no managers with pending expenses in test data")
+	}
+
+	// Helper to count notifications for a given template code
+	countForTemplate := func(code string) int64 {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": code,
+		}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to count notifications for code %s: %v", code, err)
+		}
+		return result.Count
+	}
+
+	beforeCount := countForTemplate("expense_approval_reminder")
+
+	// Call the queue function without sending emails
+	if err := notifications.QueueExpenseApprovalReminders(app, false); err != nil {
+		t.Fatalf("expected no error from QueueExpenseApprovalReminders, got %v", err)
+	}
+
+	afterCount := countForTemplate("expense_approval_reminder")
+
+	if afterCount <= beforeCount {
+		t.Fatalf("expected expense_approval_reminder notifications to be created, before=%d after=%d", beforeCount, afterCount)
+	}
+}
+
+// QueueTimesheetRejectedNotifications()
+//
+//  1. creates notifications with the timesheet_rejected template for the employee and
+//     the rejector (and manager when different), using data from the timesheet and profiles.
+func TestQueueTimesheetRejectedNotifications_CreatesNotifications(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Find a timesheet whose employee has a manager so we exercise the manager path.
+	var tsRow struct {
+		TimesheetID string `db:"tsid"`
+		EmployeeUID string `db:"employee_uid"`
+		ManagerUID  string `db:"manager_uid"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT
+			ts.id           AS tsid,
+			ts.uid          AS employee_uid,
+			p.manager       AS manager_uid
+		FROM time_sheets ts
+		JOIN profiles p ON p.uid = ts.uid
+		WHERE COALESCE(p.manager, '') != ''
+		LIMIT 1
+	`).One(&tsRow); err != nil {
+		t.Skipf("no suitable time_sheets record with manager in test data: %v", err)
+	}
+
+	// Use the manager as the rejector for this happy-path test.
+	rejectorUID := tsRow.ManagerUID
+
+	// Load the timesheet record to pass to the helper.
+	timesheet, err := app.FindRecordById("time_sheets", tsRow.TimesheetID)
+	if err != nil {
+		t.Fatalf("failed to load timesheet %s: %v", tsRow.TimesheetID, err)
+	}
+
+	// Helper to count notifications for a given template code
+	countForTemplate := func(code string) int64 {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": code,
+		}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to count notifications for code %s: %v", code, err)
+		}
+		return result.Count
+	}
+
+	beforeCount := countForTemplate("timesheet_rejected")
+
+	const rejectionReason = "Test rejection reason from unit test"
+
+	// Call the helper to queue notifications
+	if err := notifications.QueueTimesheetRejectedNotifications(app, timesheet, rejectorUID, rejectionReason); err != nil {
+		t.Fatalf("expected no error from QueueTimesheetRejectedNotifications, got %v", err)
+	}
+
+	afterCount := countForTemplate("timesheet_rejected")
+
+	if afterCount <= beforeCount {
+		t.Fatalf("expected timesheet_rejected notifications to be created, before=%d after=%d", beforeCount, afterCount)
+	}
+}
+
+// QueueExpenseRejectedNotifications()
+//
+//  1. creates notifications with the expense_rejected template for the employee and
+//     the rejector (and manager when different), using data from the expense and profiles.
+func TestQueueExpenseRejectedNotifications_CreatesNotifications(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Find an expense whose employee has a manager so we exercise the manager path.
+	var expRow struct {
+		ExpenseID   string `db:"eid"`
+		EmployeeUID string `db:"employee_uid"`
+		ManagerUID  string `db:"manager_uid"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT
+			e.id      AS eid,
+			e.uid     AS employee_uid,
+			p.manager AS manager_uid
+		FROM expenses e
+		JOIN profiles p ON p.uid = e.uid
+		WHERE COALESCE(p.manager, '') != ''
+		LIMIT 1
+	`).One(&expRow); err != nil {
+		t.Skipf("no suitable expenses record with manager in test data: %v", err)
+	}
+
+	// Use the manager as the rejector for this happy-path test.
+	rejectorUID := expRow.ManagerUID
+
+	// Load the expense record to pass to the helper.
+	expense, err := app.FindRecordById("expenses", expRow.ExpenseID)
+	if err != nil {
+		t.Fatalf("failed to load expense %s: %v", expRow.ExpenseID, err)
+	}
+
+	// Helper to count notifications for a given template code
+	countForTemplate := func(code string) int64 {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": code,
+		}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to count notifications for code %s: %v", code, err)
+		}
+		return result.Count
+	}
+
+	beforeCount := countForTemplate("expense_rejected")
+
+	const rejectionReason = "Test expense rejection reason from unit test"
+
+	// Call the helper to queue notifications
+	if err := notifications.QueueExpenseRejectedNotifications(app, expense, rejectorUID, rejectionReason); err != nil {
+		t.Fatalf("expected no error from QueueExpenseRejectedNotifications, got %v", err)
+	}
+
+	afterCount := countForTemplate("expense_rejected")
+
+	if afterCount <= beforeCount {
+		t.Fatalf("expected expense_rejected notifications to be created, before=%d after=%d", beforeCount, afterCount)
+	}
+}
+
+// QueueTimesheetSharedNotifications()
+//
+//  1. creates notifications with the timesheet_shared template for newly added viewers,
+//     using data from the timesheet and profiles.
+func TestQueueTimesheetSharedNotifications_CreatesNotifications(t *testing.T) {
+	// Set up test app
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Find a timesheet with a non-empty approver so we can use them as the sharer.
+	var tsRow struct {
+		TimesheetID string `db:"tsid"`
+		ApproverUID string `db:"approver_uid"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT
+			ts.id        AS tsid,
+			ts.approver  AS approver_uid
+		FROM time_sheets ts
+		WHERE COALESCE(ts.approver, '') != ''
+		LIMIT 1
+	`).One(&tsRow); err != nil {
+		t.Skipf("no suitable time_sheets record with approver in test data: %v", err)
+	}
+
+	// Load the timesheet record to pass to the helper.
+	timesheet, err := app.FindRecordById("time_sheets", tsRow.TimesheetID)
+	if err != nil {
+		t.Fatalf("failed to load timesheet %s: %v", tsRow.TimesheetID, err)
+	}
+
+	sharerUID := tsRow.ApproverUID
+
+	// Find a viewer UID that is different from the sharer (and ideally exists as a user).
+	var viewerRow struct {
+		ViewerUID string `db:"viewer_uid"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT id AS viewer_uid
+		FROM users
+		WHERE id != {:sharer}
+		LIMIT 1
+	`).Bind(dbx.Params{
+		"sharer": sharerUID,
+	}).One(&viewerRow); err != nil {
+		t.Skipf("no suitable viewer user found in test data: %v", err)
+	}
+
+	// Helper to count notifications for a given template code
+	countForTemplate := func(code string) int64 {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": code,
+		}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to count notifications for code %s: %v", code, err)
+		}
+		return result.Count
+	}
+
+	beforeCount := countForTemplate("timesheet_shared")
+
+	// Call the helper to queue notifications for a single new viewer
+	if err := notifications.QueueTimesheetSharedNotifications(app, timesheet, sharerUID, []string{viewerRow.ViewerUID}); err != nil {
+		t.Fatalf("expected no error from QueueTimesheetSharedNotifications, got %v", err)
+	}
+
+	afterCount := countForTemplate("timesheet_shared")
+
+	if afterCount <= beforeCount {
+		t.Fatalf("expected timesheet_shared notifications to be created, before=%d after=%d", beforeCount, afterCount)
 	}
 }
