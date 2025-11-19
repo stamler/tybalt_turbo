@@ -12,7 +12,7 @@ ORDER BY date DESC
 This script reads a CSV work history file (e.g. "workHistory.csv"), sends each row's
 "workDescription" text to an OpenRouter LLM with a classification prompt, and writes
 the model's response into a new "category" column for that row. The category is one
-of exactly three values: "Programming", "Partial", or "IT". The script writes results
+of exactly three values: "Tybalt", "Partial", or "IT". The script writes results
 to a new CSV file named "<input_stem>_output.csv" (for example, "workHistory_output.csv"),
 preserving the original file. It supports an optional "--test" flag to classify only
 the first 10 data rows (useful for smoke‑testing prompt/model behavior).
@@ -46,11 +46,11 @@ import requests
 # ========= CONFIGURE THESE VALUES =========
 
 # Put your OpenRouter API key here.
-OPENROUTER_API_KEY: str = "YOUR_OPENROUTER_API_KEY_HERE"
+OPENROUTER_API_KEY: str = "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"
 
 # Choose your model here (see OpenRouter docs for available models).
 # Examples: "openai/gpt-4.1-mini", "anthropic/claude-3.5-sonnet", etc.
-OPENROUTER_MODEL: str = "openai/gpt-4.1-mini"
+OPENROUTER_MODEL: str = "x-ai/grok-4-fast"
 
 # Optional: set a small delay between requests to be gentle on the API (in seconds).
 REQUEST_DELAY_SECONDS: float = 0.2
@@ -59,24 +59,25 @@ REQUEST_DELAY_SECONDS: float = 0.2
 
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-PROMPT_TEMPLATE = """You are a data preparation analyst assisting with the creation of a grant application where we estimate the number of hours that were put into programming the tybalt app.
+PROMPT_TEMPLATE = """You are a data preparation analyst assisting with the creation of a grant application where we estimate the number of hours that were put into creating the tybalt app, including programming.
 
-Your task is to categorize work descriptions into one of three categories: "Programming", "Partial", and "IT".
+Your task is to categorize work descriptions into one of three categories: "Tybalt", "Partial", and "IT".
 You must only return one of these 3 values and nothing else.
 
 You will work according to the following framework:
 
-- Return "Programming" if the work description is exclusively related to programming tybalt.
+- Return "Tybalt" if the work description is exclusively related to programming tybalt or working on the tybalt app.
   This can include references to tybalt, backend or frontend work, refactoring, component names
-  (especially components starting with "DS"), or any other clearly programming-related task.
+  (especially components starting with "DS"), or any other clearly programming-related task. If the work
+  seems like it is not programming but it mentions tybalt, then still return "Tybalt".
 
 - Return "IT" if the description contains nothing about programming tybalt. In this dataset,
-  all non-programming work is IT work.
+  all non-programming work is IT work unless it mentions tybalt.
 
 - Return "Partial" if some of the description is related to programming tybalt but not all of it.
   For example, if "end user support" is included but the rest is programming-related, use "Partial".
 
-Remember: only return exactly one of "Programming", "Partial", or "IT" with no extra text.
+Remember: only return exactly one of "Tybalt", "Partial", or "IT" with no extra text.
 
 HERE IS THE WORK DESCRIPTION:
 
@@ -124,7 +125,7 @@ def call_openrouter(prompt: str) -> str:
 
 def normalize_category(raw: str) -> str:
     """
-    Normalize the model output to exactly "Programming", "Partial", or "IT".
+    Normalize the model output to exactly "Tybalt", "Partial", or "IT".
 
     This function is defensive: it trims whitespace/quotes and attempts a simple
     mapping based on keywords. If the output can't be mapped, it raises.
@@ -133,16 +134,16 @@ def normalize_category(raw: str) -> str:
 
     # Exact matches (case-insensitive)
     lowered = text.lower()
-    if lowered == "programming":
-        return "Programming"
+    if lowered == "tybalt":
+        return "Tybalt"
     if lowered == "partial":
         return "Partial"
     if lowered == "it":
         return "IT"
 
     # Fuzzy mapping based on contained words
-    if "programming" in lowered:
-        return "Programming"
+    if "tybalt" in lowered:
+        return "Tybalt"
     if "partial" in lowered:
         return "Partial"
     if lowered in {"support", "it work", "it"}:
@@ -218,7 +219,7 @@ def main(argv: List[str]) -> int:
         existing_category: Optional[str] = (row.get("category") or "").strip()
 
         # Optional: skip rows that already have a valid category
-        if existing_category in {"Programming", "Partial", "IT"}:
+        if existing_category in {"Tybalt", "Partial", "IT"}:
             print(f"[{idx}/{total}] Skipping (already categorized as {existing_category}).")
             continue
 
