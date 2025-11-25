@@ -235,3 +235,153 @@ func TestJobsCreate_ProposalReferenceValidation(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+// TestJobsCreateViaAPI_NumberAssigned verifies that creating a job via /api/jobs POST
+// assigns a job number correctly (this was the bug we're fixing)
+func TestJobsCreateViaAPI_NumberAssigned(t *testing.T) {
+	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const divisionID = "fy4i9poneukvq9u"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "creating job via /api/jobs POST assigns a job number",
+			Method: http.MethodPost,
+			URL:    "/api/jobs",
+			Body: strings.NewReader(`{
+				"job": {
+					"description": "Test job via API",
+					"client": "ee3xvodl583b61o",
+					"contact": "235g6k01xx3sdjk",
+					"manager": "f2j5a8vk006baub",
+					"authorizing_document": "Unauthorized",
+					"branch": "80875lm27v8wgi4",
+					"location": "87Q8H976+2M",
+					"project_award_date": "2025-02-01"
+				},
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"id":`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// TestJobsCreateViaAPI_ValidationErrors verifies that validation errors from
+// ProcessJobCore are properly returned when creating via /api/jobs POST
+func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
+	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "creating job without location fails validation",
+			Method: http.MethodPost,
+			URL:    "/api/jobs",
+			Body: strings.NewReader(`{
+				"job": {
+					"description": "Test job without location",
+					"client": "ee3xvodl583b61o",
+					"contact": "235g6k01xx3sdjk",
+					"manager": "f2j5a8vk006baub",
+					"authorizing_document": "Unauthorized",
+					"branch": "80875lm27v8wgi4",
+					"location": "",
+					"project_award_date": "2025-02-01"
+				},
+				"allocations": []
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"location":{"code":"invalid_or_missing"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "creating job with invalid date configuration fails",
+			Method: http.MethodPost,
+			URL:    "/api/jobs",
+			Body: strings.NewReader(`{
+				"job": {
+					"description": "Test job with invalid dates",
+					"client": "ee3xvodl583b61o",
+					"contact": "235g6k01xx3sdjk",
+					"manager": "f2j5a8vk006baub",
+					"authorizing_document": "Unauthorized",
+					"branch": "80875lm27v8wgi4",
+					"location": "87Q8H976+2M",
+					"project_award_date": "2025-02-01",
+					"proposal_opening_date": "2025-02-01"
+				},
+				"allocations": []
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"project_award_date":{"code":"invalid_date_configuration"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// TestJobsUpdateViaAPI_ValidationErrors verifies that validation errors from
+// ProcessJobCore are properly returned when updating via /api/jobs/{id} PUT
+func TestJobsUpdateViaAPI_ValidationErrors(t *testing.T) {
+	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const jobID = "cjf0kt0defhq480"
+	const divisionID = "fy4i9poneukvq9u"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "updating job to invalid status fails validation",
+			Method: http.MethodPut,
+			URL:    "/api/jobs/" + jobID,
+			Body: strings.NewReader(`{
+				"job": {
+					"status": "Awarded"
+				},
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"status":{"code":"invalid_status_for_type"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}

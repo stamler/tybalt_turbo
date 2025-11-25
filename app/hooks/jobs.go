@@ -16,11 +16,16 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// ProcessJob enforces business rules for job creation and updates.
 func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
-	jobRecord := e.Record
 
-	if err := ensureOutstandingBalancePermission(app, e); err != nil {
+	return ProcessJobCore(app, e.Record, e.Auth)
+}
+
+// ProcessJobCore enforces business rules for job creation and updates.
+// It operates on plain records rather than RecordRequestEvent, making it reusable
+// from both PocketBase hooks and custom API endpoints.
+func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Record) error {
+	if err := ensureOutstandingBalancePermission(app, jobRecord, authRecord); err != nil {
 		return err
 	}
 
@@ -31,14 +36,14 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 	// as full updates, either exclude such normalized fields from the change detection
 	// in validateJob or move the status-only check earlier in this function.
 	// Normalize fields that depend on the job type (project vs proposal)
-	if err := cleanJob(app, e); err != nil {
+	if err := cleanJob(app, jobRecord); err != nil {
 		return err
 	}
 
 	// On create, derive the type of job while validating the job then generate a number
 	if jobRecord.IsNew() {
 		// First derive type while validating the job
-		derivedType, derr := validateJob(app, e)
+		derivedType, derr := validateJob(app, jobRecord)
 		if derr != nil {
 			return derr
 		}
@@ -78,7 +83,7 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 	} else {
 		// We are updating an existing job
 		// Validate job fields, cross-record constraints and derive type
-		_, err := validateJob(app, e)
+		_, err := validateJob(app, jobRecord)
 		if err != nil {
 			return err
 		}
@@ -90,8 +95,7 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 	return nil
 }
 
-func cleanJobOutstandingBalance(e *core.RecordRequestEvent) error {
-	jobRecord := e.Record
+func cleanJobOutstandingBalance(jobRecord *core.Record) error {
 	outstandingBalance := jobRecord.GetFloat("outstanding_balance")
 
 	originalRecord := jobRecord.Original()
@@ -114,8 +118,8 @@ func cleanJobOutstandingBalance(e *core.RecordRequestEvent) error {
 	return nil
 }
 
-func ensureOutstandingBalancePermission(app core.App, e *core.RecordRequestEvent) error {
-	jobRecord := e.Record
+func ensureOutstandingBalancePermission(app core.App, jobRecord *core.Record, authRecord *core.Record) error {
+	// Detect creates based on the record state, not on the external "original" pointer.
 	if jobRecord.IsNew() {
 		return nil
 	}
@@ -127,7 +131,7 @@ func ensureOutstandingBalancePermission(app core.App, e *core.RecordRequestEvent
 		return nil
 	}
 
-	if e.Auth == nil {
+	if authRecord == nil {
 		return &errs.HookError{
 			Status:  http.StatusForbidden,
 			Message: "authentication required to edit outstanding balance",
@@ -140,7 +144,7 @@ func ensureOutstandingBalancePermission(app core.App, e *core.RecordRequestEvent
 		}
 	}
 
-	hasJobClaim, err := utilities.HasClaim(app, e.Auth, "job")
+	hasJobClaim, err := utilities.HasClaim(app, authRecord, "job")
 	if err != nil {
 		return &errs.HookError{
 			Status:  http.StatusInternalServerError,
@@ -158,7 +162,7 @@ func ensureOutstandingBalancePermission(app core.App, e *core.RecordRequestEvent
 		return nil
 	}
 
-	hasPayablesClaim, err := utilities.HasClaim(app, e.Auth, "payables_admin")
+	hasPayablesClaim, err := utilities.HasClaim(app, authRecord, "payables_admin")
 	if err != nil {
 		return &errs.HookError{
 			Status:  http.StatusInternalServerError,
@@ -194,8 +198,7 @@ func ensureOutstandingBalancePermission(app core.App, e *core.RecordRequestEvent
 //   - On update, the job type is inferred from the immutable job number.
 //   - On create, we infer proposal when the proposal date pair is provided and
 //     project_award_date is empty (mirrors validateJob create-time derivation).
-func isProposalRecord(e *core.RecordRequestEvent) bool {
-	record := e.Record
+func isProposalRecord(record *core.Record) bool {
 	if !record.IsNew() {
 		return typeFromNumber(record.Original().GetString("number")) == jobTypeProposal
 	}
@@ -209,10 +212,9 @@ func isProposalRecord(e *core.RecordRequestEvent) bool {
 // cleanJob removes or normalizes fields that are not applicable based on the
 // job type. In particular, proposals must not carry authorizing_document,
 // client_po, or client_reference_number.
-func cleanJob(app core.App, e *core.RecordRequestEvent) error {
-	record := e.Record
+func cleanJob(app core.App, record *core.Record) error {
 	// Centralize outstanding balance normalization as part of cleaning
-	if err := cleanJobOutstandingBalance(e); err != nil {
+	if err := cleanJobOutstandingBalance(record); err != nil {
 		return err
 	}
 	// Normalize client_po by trimming whitespace
@@ -221,7 +223,7 @@ func cleanJob(app core.App, e *core.RecordRequestEvent) error {
 		record.Set("client_po", trimmedClientPO)
 	}
 	// If this is a project and authorizing_document != PO, clear any provided client_po
-	if !isProposalRecord(e) {
+	if !isProposalRecord(record) {
 		if record.GetString("authorizing_document") != "PO" && record.GetString("client_po") != "" {
 			record.Set("client_po", "")
 		}
@@ -274,9 +276,7 @@ func typeFromNumber(num string) jobType {
 	return jobTypeProject
 }
 
-// validateJob enforces date/status rules, cross-record constraints and returns a derived type
-func validateJob(app core.App, e *core.RecordRequestEvent) (jobType, error) {
-	record := e.Record
+func validateJob(app core.App, record *core.Record) (jobType, error) {
 	original := record.Original()
 	isCreate := record.IsNew()
 
@@ -442,6 +442,17 @@ func validateJob(app core.App, e *core.RecordRequestEvent) (jobType, error) {
 			Message: "invalid or missing location",
 			Data: map[string]errs.CodeError{
 				"location": {Code: "invalid_or_missing", Message: "location (Plus Code) is required"},
+			},
+		}
+	}
+
+	// All jobs must have a branch
+	if record.GetString("branch") == "" {
+		return 0, &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "branch is required",
+			Data: map[string]errs.CodeError{
+				"branch": {Code: "required", Message: "branch is required"},
 			},
 		}
 	}

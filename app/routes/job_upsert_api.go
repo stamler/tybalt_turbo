@@ -2,13 +2,17 @@ package routes
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+
+	"tybalt/errs"
+	"tybalt/hooks"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
-	"tybalt/utilities"
 )
 
 // JobUpsertRequest models the request body for creating/updating a job and its allocations.
@@ -94,6 +98,18 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 				}
 			}
 
+			// Run job validation and business rules (this will also handle number generation for creates)
+			if err := hooks.ProcessJobCore(txApp, jobRec, authRecord); err != nil {
+				// If it's a HookError, preserve the status code
+				var hookErr *errs.HookError
+				if errors.As(err, &hookErr) {
+					httpResponseStatusCode = hookErr.Status
+				} else {
+					httpResponseStatusCode = http.StatusBadRequest
+				}
+				return err
+			}
+
 			if err := txApp.Save(jobRec); err != nil {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
@@ -154,6 +170,12 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 		})
 
 		if err != nil {
+			// Check if it's a HookError and return it directly (same format as AnnotateHookError)
+			var hookErr *errs.HookError
+			if errors.As(err, &hookErr) {
+				return e.JSON(httpResponseStatusCode, hookErr)
+			}
+			// Otherwise handle as CodeError or generic error
 			if codeError, ok := err.(*CodeError); ok {
 				return e.JSON(httpResponseStatusCode, map[string]any{
 					"error": codeError.Message,
@@ -227,6 +249,19 @@ func createCreateJobHandler(app core.App) func(e *core.RequestEvent) error {
 					}
 				}
 			}
+
+			// Run job validation and business rules (this will generate the job number)
+			if err := hooks.ProcessJobCore(txApp, jobRec, authRecord); err != nil {
+				// If it's a HookError, preserve the status code
+				var hookErr *errs.HookError
+				if errors.As(err, &hookErr) {
+					httpResponseStatusCode = hookErr.Status
+				} else {
+					httpResponseStatusCode = http.StatusBadRequest
+				}
+				return err
+			}
+
 			if err := txApp.Save(jobRec); err != nil {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
@@ -275,6 +310,12 @@ func createCreateJobHandler(app core.App) func(e *core.RequestEvent) error {
 		})
 
 		if err != nil {
+			// Check if it's a HookError and return it directly (same format as AnnotateHookError)
+			var hookErr *errs.HookError
+			if errors.As(err, &hookErr) {
+				return e.JSON(httpResponseStatusCode, hookErr)
+			}
+			// Otherwise handle as CodeError or generic error
 			if codeError, ok := err.(*CodeError); ok {
 				return e.JSON(httpResponseStatusCode, map[string]any{
 					"error": codeError.Message,
@@ -287,5 +328,3 @@ func createCreateJobHandler(app core.App) func(e *core.RequestEvent) error {
 		return e.JSON(http.StatusOK, map[string]any{"id": newJobID})
 	}
 }
-
-
