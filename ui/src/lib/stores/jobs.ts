@@ -6,6 +6,7 @@ export interface JobApiResponse {
   location: string;
   client_id: string;
   client: string; // client name
+  branch: string; // branch code
   outstanding_balance: number;
   outstanding_balance_date: string;
 }

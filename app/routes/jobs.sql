@@ -9,9 +9,11 @@ SELECT
   j.location AS location,
   j.client AS client_id,
   c.name AS client,
+  COALESCE(b.code, '') AS branch,
   COALESCE(j.outstanding_balance, 0) AS outstanding_balance,
   COALESCE(j.outstanding_balance_date, '') AS outstanding_balance_date
 FROM jobs j
 LEFT JOIN clients c ON c.id = j.client
+LEFT JOIN branches b ON b.id = j.branch
 WHERE ({:id} IS NULL OR {:id} = '' OR j.id = {:id})
 ORDER BY j.number DESC; 

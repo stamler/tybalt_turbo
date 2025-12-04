@@ -1,6 +1,7 @@
 <script lang="ts">
   import DsList from "$lib/components/DSList.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DsLabel from "$lib/components/DsLabel.svelte";
   import type { JobApiResponse } from "$lib/stores/jobs";
   import { pb } from "$lib/pocketbase";
   import { onMount } from "svelte";
@@ -76,6 +77,7 @@
     {/snippet}
     {#snippet headline({ description }: JobApiResponse)}{description}{/snippet}
     {#snippet byline({ client }: JobApiResponse)}{client}{/snippet}
+    {#snippet line1({ branch }: JobApiResponse)}{#if branch}<DsLabel color="neutral">{branch}</DsLabel>{/if}{/snippet}
     {#snippet actions({ id, number }: JobApiResponse)}
       {#if number?.startsWith("P")}
         <DsActionButton

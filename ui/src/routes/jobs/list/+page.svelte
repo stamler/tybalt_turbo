@@ -5,6 +5,7 @@
   // index, but hobbles along for now
   import type { JobApiResponse } from "$lib/stores/jobs";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DsLabel from "$lib/components/DsLabel.svelte";
 
   // initialize the jobs store, noop if already initialized
   jobs.init();
@@ -17,6 +18,7 @@
     {/snippet}
     {#snippet headline({ description }: JobApiResponse)}{description}{/snippet}
     {#snippet byline({ client }: JobApiResponse)}{client}{/snippet}
+    {#snippet line1({ branch }: JobApiResponse)}{#if branch}<DsLabel color="neutral">{branch}</DsLabel>{/if}{/snippet}
     {#snippet actions({ id }: JobApiResponse)}
       <DsActionButton action="/jobs/{id}/edit" icon="mdi:pencil" title="Edit" color="blue" />
     {/snippet}

@@ -7,7 +7,7 @@
 --   - age: integer number of days; behavior depends on :age as described above
 --   - limit: integer limit for number of rows returned
 WITH matching_jobs AS (
-  SELECT j.id, j.number, j.description, j.location, j.client,
+  SELECT j.id, j.number, j.description, j.location, j.client, j.branch,
          j.outstanding_balance, j.outstanding_balance_date
   FROM jobs j
   WHERE j.status = 'Active'
@@ -53,12 +53,14 @@ SELECT
   j.location AS location,
   j.client AS client_id,
   c.name AS client,
+  COALESCE(b.code, '') AS branch,
   COALESCE(j.outstanding_balance, 0) AS outstanding_balance,
   COALESCE(j.outstanding_balance_date, '') AS outstanding_balance_date,
   COALESCE(lr.last_reference, '') AS last_reference,
   COALESCE(lr.last_reference_type, '') AS last_reference_type
 FROM matching_jobs j
 LEFT JOIN clients c ON c.id = j.client
+LEFT JOIN branches b ON b.id = j.branch
 LEFT JOIN last_refs lr ON lr.job_id = j.id
 WHERE ({:age} <= 0 AND lr.last_reference IS NULL)
    OR ({:age} > 0 AND lr.last_reference IS NOT NULL AND lr.last_reference <= date('now', printf('-%d days', {:age})))

@@ -45,6 +45,7 @@ type Job struct {
 	Location               string  `db:"location" json:"location"`
 	ClientID               string  `db:"client_id" json:"client_id"`
 	Client                 string  `db:"client" json:"client"`
+	Branch                 string  `db:"branch" json:"branch"`
 	OutstandingBalance     float64 `db:"outstanding_balance" json:"outstanding_balance"`
 	OutstandingBalanceDate string  `db:"outstanding_balance_date" json:"outstanding_balance_date"`
 }
