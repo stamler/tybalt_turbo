@@ -34,6 +34,7 @@ export const jobs = createCollectionStore<any>(
       "description",
       "location",
       "client",
+      "branch",
       "outstanding_balance",
       "outstanding_balance_date",
     ],
