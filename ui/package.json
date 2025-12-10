@@ -46,6 +46,6 @@
     "lodash": "^4.17.21",
     "minisearch": "^7.1.0",
     "open-location-code": "^1.0.3",
-    "pocketbase": "^0.21.3"
+    "pocketbase": "^0.26.5"
   }
 }

@@ -27,6 +27,6 @@ primary_region = "yyz"
     timeout = "10s"
 
 [[vm]]
-  memory = '4gb'
-  cpu_kind = 'shared'
-  cpus = 4 
+  memory = '2gb'
+  cpu_kind = 'performance'
+  cpus = 1 
