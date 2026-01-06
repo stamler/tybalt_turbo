@@ -15,7 +15,7 @@ type timeEntryExport struct {
 	JobDescription      string  `db:"job_description" json:"jobDescription,omitempty"`
 	Division            string  `db:"division" json:"division,omitempty"`
 	DivisionName        string  `db:"division_name" json:"divisionName,omitempty"`
-	TimeType            string  `db:"time_type" json:"timeType"`
+	TimeType            string  `db:"time_type" json:"timetype"`
 	TimeTypeName        string  `db:"time_type_name" json:"timetypeName"`
 	Date                string  `db:"date" json:"date"`
 	Hours               float64 `db:"hours" json:"-"` // exported conditionally in MarshalJSON
