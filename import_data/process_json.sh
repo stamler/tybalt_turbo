@@ -9,7 +9,7 @@
 # - Removes rejected, submitted, exported, locked, approved, rejectionReason, id from parent objects
 # - Converts payrollId to string in parent objects
 # - Sorts main object properties alphabetically
-# - Sorts jobNumbers and divisions arrays within each parent object
+# - Sorts jobNumbers, divisions, and timetypes arrays within each parent object
 # - Removes weekEnding and id properties from entry objects
 # - Sorts entry object properties alphabetically
 # - Sorts entries by timetype, job, client, division, workDescription, date
@@ -31,7 +31,7 @@ fi
 temp_file=$(mktemp)
 
 # Apply the sorting transformation
-jq 'sort_by(.uid) | map(del(.rejected, .submitted, .exported, .locked, .approved, .rejectionReason, .id) | .payrollId |= tostring | .entries |= (map(del(.weekEnding, .id) | to_entries | sort_by(.key) | from_entries) | sort_by(.timetype, .job, .client, .division, .workDescription, .date)) | .jobNumbers |= sort | .divisions |= sort | to_entries | sort_by(.key) | from_entries)' "$input_file" > "$temp_file"
+jq 'sort_by(.uid) | map(del(.rejected, .submitted, .exported, .locked, .approved, .rejectionReason, .id) | .payrollId |= tostring | .entries |= (map(del(.weekEnding, .id) | to_entries | sort_by(.key) | from_entries) | sort_by(.timetype, .job, .client, .division, .workDescription, .date)) | .jobNumbers |= sort | .divisions |= sort | .timetypes |= sort | to_entries | sort_by(.key) | from_entries)' "$input_file" > "$temp_file"
 
 # Check if jq succeeded
 if [ $? -eq 0 ]; then
