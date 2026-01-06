@@ -77,6 +77,7 @@ type Job struct {
 }
 
 type Profile struct {
+	Id                             string  `parquet:"id"`                             // legacy Firebase UID
 	Surname                        string  `parquet:"surname"`                        // profiles, users
 	GivenName                      string  `parquet:"givenName"`                      // profiles, users
 	OpeningDateTimeOff             string  `parquet:"openingDateTimeOff"`             // admin_profiles
