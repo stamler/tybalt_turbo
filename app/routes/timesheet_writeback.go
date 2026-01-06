@@ -23,7 +23,6 @@ type timeEntryExport struct {
 	WorkRecord     string  `db:"work_record" json:"workRecord,omitempty"`
 	Description    string  `db:"description" json:"workDescription,omitempty"`
 	Category       string  `db:"category_name" json:"category,omitempty"`
-	Branch         string  `db:"branch" json:"branch,omitempty"`
 	WeekEnding     string  `db:"week_ending" json:"weekEnding"`
 	ClientName     string  `db:"client_name" json:"client,omitempty"`
 }
@@ -122,14 +121,13 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 				       tt.code AS time_type,
 							 tt.name AS time_type_name,
 				       te.date, te.hours, te.meals_hours, 
-				       te.work_record, te.description, COALESCE(b.code, '') AS branch,
+				       te.work_record, te.description,
 							 te.week_ending,
 							 COALESCE(c.name, '') AS client_name,
 							 COALESCE(ca.name, '') AS category_name
 				FROM time_entries te
 				LEFT JOIN admin_profiles ap ON te.uid = ap.uid
 				LEFT JOIN time_types tt ON te.time_type = tt.id
-				LEFT JOIN branches b ON te.branch = b.id
 				LEFT JOIN divisions d ON te.division = d.id
 				LEFT JOIN jobs j ON te.job = j.id
 				LEFT JOIN clients c ON j.client = c.id
