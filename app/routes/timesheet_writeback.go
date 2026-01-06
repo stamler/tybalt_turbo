@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"encoding/json"
 	"net/http"
 
 	"github.com/pocketbase/dbx"
@@ -10,21 +11,47 @@ import (
 type timeEntryExport struct {
 	Id             string  `db:"id" json:"id"`
 	Uid            string  `db:"uid" json:"uid"`
-	Job            string  `db:"job" json:"job"`
-	JobDescription string  `db:"job_description" json:"jobDescription"`
-	Division       string  `db:"division" json:"division"`
-	DivisionName   string  `db:"division_name" json:"divisionName"`
+	Job            string  `db:"job" json:"job,omitempty"`
+	JobDescription string  `db:"job_description" json:"jobDescription,omitempty"`
+	Division       string  `db:"division" json:"division,omitempty"`
+	DivisionName   string  `db:"division_name" json:"divisionName,omitempty"`
 	TimeType       string  `db:"time_type" json:"timeType"`
 	TimeTypeName   string  `db:"time_type_name" json:"timetypeName"`
 	Date           string  `db:"date" json:"date"`
-	Hours          float64 `db:"hours" json:"hours"`
-	MealsHours     float64 `db:"meals_hours" json:"mealsHours"`
-	WorkRecord     string  `db:"work_record" json:"workRecord"`
-	Description    string  `db:"description" json:"workDescription"`
-	Category       string  `db:"category_name" json:"category"`
-	Branch         string  `db:"branch" json:"branch"`
+	Hours          float64 `db:"hours" json:"-"` // exported conditionally in MarshalJSON
+	MealsHours     float64 `db:"meals_hours" json:"mealsHours,omitempty"`
+	WorkRecord     string  `db:"work_record" json:"workRecord,omitempty"`
+	Description    string  `db:"description" json:"workDescription,omitempty"`
+	Category       string  `db:"category_name" json:"category,omitempty"`
+	Branch         string  `db:"branch" json:"branch,omitempty"`
 	WeekEnding     string  `db:"week_ending" json:"weekEnding"`
-	ClientName     string  `db:"client_name" json:"client"`
+	ClientName     string  `db:"client_name" json:"client,omitempty"`
+}
+
+// MarshalJSON implements json.Marshaler to conditionally rename the hours field.
+// When Job is not empty, hours is exported as "jobHours"; otherwise as "hours".
+// The Alias type prevents infinite recursion: calling json.Marshal(t) directly
+// would invoke this method again, but Alias doesn't inherit MarshalJSON.
+func (t timeEntryExport) MarshalJSON() ([]byte, error) {
+	type Alias timeEntryExport
+
+	if t.Job != "" {
+		return json.Marshal(struct {
+			Alias
+			JobHours float64 `json:"jobHours"`
+		}{
+			Alias:    Alias(t),
+			JobHours: t.Hours,
+		})
+	}
+
+	return json.Marshal(struct {
+		Alias
+		Hours float64 `json:"hours"`
+	}{
+		Alias: Alias(t),
+		Hours: t.Hours,
+	})
 }
 
 type timesheetExportRow struct {
