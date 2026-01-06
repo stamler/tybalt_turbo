@@ -54,24 +54,49 @@ func (t timeEntryExport) MarshalJSON() ([]byte, error) {
 	})
 }
 
+type workHoursTally struct {
+	JobHours    float64 `json:"jobHours"`
+	NoJobNumber float64 `json:"noJobNumber"`
+	Hours       float64 `json:"hours"`
+}
+
 type timesheetExportRow struct {
-	Id              string            `db:"id" json:"id"`
-	WorkWeekHours   float64           `db:"work_week_hours" json:"workWeekHours"`
-	Salary          bool              `db:"salary" json:"salary"`
-	Uid             string            `db:"uid" json:"uid"`
-	WeekEnding      string            `db:"week_ending" json:"weekEnding"`
-	GivenName       string            `db:"given_name" json:"givenName"`
-	Surname         string            `db:"surname" json:"surname"`
-	Manager         string            `db:"approver" json:"managerUid"`
-	ManagerName     string            `db:"manager_name" json:"managerName"`
-	DisplayName     string            `db:"display_name" json:"displayName"`
-	PayrollId       string            `db:"payroll_id" json:"payrollId"`
-	Locked          bool              `json:"locked"`
-	Approved        bool              `json:"approved"`
-	Rejected        bool              `json:"rejected"`
-	Submitted       bool              `json:"submitted"`
-	RejectionReason string            `json:"rejectionReason"`
-	Entries         []timeEntryExport `json:"entries"`
+	Id                   string             `db:"id" json:"id"`
+	WorkWeekHours        float64            `db:"work_week_hours" json:"workWeekHours"`
+	Salary               bool               `db:"salary" json:"salary"`
+	Uid                  string             `db:"uid" json:"uid"`
+	WeekEnding           string             `db:"week_ending" json:"weekEnding"`
+	GivenName            string             `db:"given_name" json:"givenName"`
+	Surname              string             `db:"surname" json:"surname"`
+	Manager              string             `db:"approver" json:"managerUid"`
+	ManagerName          string             `db:"manager_name" json:"managerName"`
+	DisplayName          string             `db:"display_name" json:"displayName"`
+	PayrollId            string             `db:"payroll_id" json:"payrollId"`
+	Locked               bool               `json:"locked"`
+	Approved             bool               `json:"approved"`
+	Rejected             bool               `json:"rejected"`
+	Submitted            bool               `json:"submitted"`
+	RejectionReason      string             `json:"rejectionReason"`
+	Entries              []timeEntryExport  `json:"entries"`
+	BankedHours          float64            `json:"bankedHours"`
+	MealsHoursTally      float64            `json:"mealsHoursTally"`
+	Divisions            []string           `json:"divisions"`
+	DivisionsTally       map[string]string  `json:"divisionsTally"`
+	JobNumbers           []string           `json:"jobNumbers"`
+	NonWorkHoursTally    map[string]float64 `json:"nonWorkHoursTally"`
+	OffRotationDaysTally int                `json:"offRotationDaysTally"`
+	OffWeekTally         int                `json:"offWeekTally"`
+	PayoutRequest        float64            `json:"payoutRequest"`
+	Timetypes            []string           `json:"timetypes"`
+	WorkHoursTally       workHoursTally     `json:"workHoursTally"`
+}
+
+func keys[K comparable, V any](m map[K]V) []K {
+	result := make([]K, 0, len(m))
+	for k := range m {
+		result = append(result, k)
+	}
+	return result
 }
 
 func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent) error {
@@ -142,20 +167,59 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 				return e.Error(http.StatusInternalServerError, "failed to query time entries: "+err.Error(), nil)
 			}
 			rows[i].Entries = entries
-		}
 
-		// TODO: populate entry tallies fields in each row:
-		// - mealsHoursTally (sum of meals_hours for all entries)
-		// - divisions (deduplicated list of division codes for all entries)
-		// - divisionsTally (object with division codes as keys and division names as values)
-		// - jobNumbers (deduplicated list of job numbers for all entries)
-		// - jobsTally (object with job numbers as keys and the complete job object as values) TODO: this data is currently missing from the entries query
-		// - nonWorkHoursTally
-		// - offRotationDaysTally (count of entries with time_type = OR)
-		// - offWeekTally (count of entries with time_type = OW)
-		// - payoutRequest (sum of payout_request_amount for all entries)
-		// - timetypes (deduplicated list of time_type codes for all entries)
-		// - workHoursTally (object with 3 keys: jobHours, noJobNumber, hours, which are sums of hours for the entries with and without job numbers respectively (hours is just the same as noJobNumber for now))
+			// Initialize tally structures
+			divSet := make(map[string]string)    // division code -> name
+			jobSet := make(map[string]struct{})  // job numbers
+			ttSet := make(map[string]struct{})   // time type codes
+			orDates := make(map[string]struct{}) // unique OR dates
+			owDates := make(map[string]struct{}) // unique OW dates
+			nonWork := make(map[string]float64)  // time type -> hours
+			var wht workHoursTally
+			var mealsTotal, payoutTotal, bankedTotal float64
+
+			for _, e := range entries {
+				ttSet[e.TimeType] = struct{}{}
+
+				switch e.TimeType {
+				case "OR":
+					orDates[e.Date] = struct{}{}
+				case "OW":
+					owDates[e.Date] = struct{}{}
+				case "OTO":
+					payoutTotal += e.PayoutRequestAmount
+				case "RB":
+					bankedTotal += e.Hours
+				case "R", "RT":
+					if e.Division != "" {
+						divSet[e.Division] = e.DivisionName
+					}
+					if e.Job != "" {
+						jobSet[e.Job] = struct{}{}
+						wht.JobHours += e.Hours
+					} else {
+						wht.NoJobNumber += e.Hours
+						wht.Hours += e.Hours
+					}
+					mealsTotal += e.MealsHours
+				default:
+					nonWork[e.TimeType] += e.Hours
+				}
+			}
+
+			// Convert sets to slices and assign
+			rows[i].DivisionsTally = divSet
+			rows[i].Divisions = keys(divSet)
+			rows[i].JobNumbers = keys(jobSet)
+			rows[i].Timetypes = keys(ttSet)
+			rows[i].OffRotationDaysTally = len(orDates)
+			rows[i].OffWeekTally = len(owDates)
+			rows[i].NonWorkHoursTally = nonWork
+			rows[i].BankedHours = bankedTotal
+			rows[i].MealsHoursTally = mealsTotal
+			rows[i].PayoutRequest = payoutTotal
+			rows[i].WorkHoursTally = wht
+		}
 
 		return e.JSON(http.StatusOK, rows)
 	}
