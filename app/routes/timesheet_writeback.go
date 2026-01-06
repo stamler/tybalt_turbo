@@ -21,7 +21,7 @@ type timeEntryExport struct {
 	Hours               float64 `db:"hours" json:"-"` // exported conditionally in MarshalJSON
 	MealsHours          float64 `db:"meals_hours" json:"mealsHours,omitempty"`
 	PayoutRequestAmount float64 `db:"payout_request_amount" json:"payoutRequestAmount,omitempty"`
-	WorkRecord          string  `db:"work_record" json:"workRecord,omitempty"`
+	WorkRecord          string  `db:"work_record" json:"workrecord,omitempty"`
 	Description         string  `db:"description" json:"workDescription,omitempty"`
 	Category            string  `db:"category_name" json:"category,omitempty"`
 	WeekEnding          string  `db:"week_ending" json:"weekEnding"`
