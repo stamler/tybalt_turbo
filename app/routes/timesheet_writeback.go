@@ -9,22 +9,23 @@ import (
 )
 
 type timeEntryExport struct {
-	Id             string  `db:"id" json:"id"`
-	Uid            string  `db:"uid" json:"uid"`
-	Job            string  `db:"job" json:"job,omitempty"`
-	JobDescription string  `db:"job_description" json:"jobDescription,omitempty"`
-	Division       string  `db:"division" json:"division,omitempty"`
-	DivisionName   string  `db:"division_name" json:"divisionName,omitempty"`
-	TimeType       string  `db:"time_type" json:"timeType"`
-	TimeTypeName   string  `db:"time_type_name" json:"timetypeName"`
-	Date           string  `db:"date" json:"date"`
-	Hours          float64 `db:"hours" json:"-"` // exported conditionally in MarshalJSON
-	MealsHours     float64 `db:"meals_hours" json:"mealsHours,omitempty"`
-	WorkRecord     string  `db:"work_record" json:"workRecord,omitempty"`
-	Description    string  `db:"description" json:"workDescription,omitempty"`
-	Category       string  `db:"category_name" json:"category,omitempty"`
-	WeekEnding     string  `db:"week_ending" json:"weekEnding"`
-	ClientName     string  `db:"client_name" json:"client,omitempty"`
+	Id                  string  `db:"id" json:"id"`
+	Uid                 string  `db:"uid" json:"uid"`
+	Job                 string  `db:"job" json:"job,omitempty"`
+	JobDescription      string  `db:"job_description" json:"jobDescription,omitempty"`
+	Division            string  `db:"division" json:"division,omitempty"`
+	DivisionName        string  `db:"division_name" json:"divisionName,omitempty"`
+	TimeType            string  `db:"time_type" json:"timeType"`
+	TimeTypeName        string  `db:"time_type_name" json:"timetypeName"`
+	Date                string  `db:"date" json:"date"`
+	Hours               float64 `db:"hours" json:"-"` // exported conditionally in MarshalJSON
+	MealsHours          float64 `db:"meals_hours" json:"mealsHours,omitempty"`
+	PayoutRequestAmount float64 `db:"payout_request_amount" json:"payoutRequestAmount,omitempty"`
+	WorkRecord          string  `db:"work_record" json:"workRecord,omitempty"`
+	Description         string  `db:"description" json:"workDescription,omitempty"`
+	Category            string  `db:"category_name" json:"category,omitempty"`
+	WeekEnding          string  `db:"week_ending" json:"weekEnding"`
+	ClientName          string  `db:"client_name" json:"client,omitempty"`
 }
 
 // MarshalJSON implements json.Marshaler to conditionally rename the hours field.
@@ -120,7 +121,8 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 							 COALESCE(d.name, '') AS division_name,
 				       tt.code AS time_type,
 							 tt.name AS time_type_name,
-				       te.date, te.hours, te.meals_hours, 
+				       te.date, te.hours, te.meals_hours,
+							 te.payout_request_amount,
 				       te.work_record, te.description,
 							 te.week_ending,
 							 COALESCE(c.name, '') AS client_name,
@@ -141,6 +143,19 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			}
 			rows[i].Entries = entries
 		}
+
+		// TODO: populate entry tallies fields in each row:
+		// - mealsHoursTally (sum of meals_hours for all entries)
+		// - divisions (deduplicated list of division codes for all entries)
+		// - divisionsTally (object with division codes as keys and division names as values)
+		// - jobNumbers (deduplicated list of job numbers for all entries)
+		// - jobsTally (object with job numbers as keys and the complete job object as values) TODO: this data is currently missing from the entries query
+		// - nonWorkHoursTally
+		// - offRotationDaysTally (count of entries with time_type = OR)
+		// - offWeekTally (count of entries with time_type = OW)
+		// - payoutRequest (sum of payout_request_amount for all entries)
+		// - timetypes (deduplicated list of time_type codes for all entries)
+		// - workHoursTally (object with 3 keys: jobHours, noJobNumber, hours, which are sums of hours for the entries with and without job numbers respectively (hours is just the same as noJobNumber for now))
 
 		return e.JSON(http.StatusOK, rows)
 	}
