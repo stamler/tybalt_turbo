@@ -34,7 +34,7 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 		}
 
 		query := `
-			SELECT ts.id, ts.uid, ts.week_ending, ts.work_week_hours, ts.salary, ts.approver,
+			SELECT ts.id, ap.legacy_uid AS uid, ts.week_ending, ts.work_week_hours, ts.salary, apm.legacy_uid AS approver,
 				m.given_name || ' ' || m.surname AS manager_name,
 				p.given_name, p.surname,
 				p.given_name || ' ' || p.surname AS display_name,
@@ -42,6 +42,7 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			FROM time_sheets ts 
 			LEFT JOIN profiles p ON ts.uid = p.uid
 			LEFT JOIN admin_profiles ap ON ts.uid = ap.uid
+			LEFT JOIN admin_profiles apm ON ts.approver = apm.uid
 			LEFT JOIN profiles m ON ts.approver = m.uid
 			WHERE ts.week_ending = {:weekEnding}
 			  AND ts.committed != ''
