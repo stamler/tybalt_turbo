@@ -213,17 +213,24 @@ function getCurrentAuthState(): AuthState | null {
  * AUTH ACTION: Login with Microsoft OAuth2
  * Uses PocketBase's OAuth2 flow to authenticate with Microsoft
  * On success, the onChange callback in hooks.client.ts will handle setup
+ *
+ * IMPORTANT: This function is intentionally NOT async!
+ * Safari and Chrome may block or delay the OAuth popup if window.open is called
+ * from within an async function, because it breaks the direct synchronous link
+ * between the user's click and the popup. Using .then()/.catch() keeps the
+ * initial authWithOAuth2 call in the synchronous click context.
+ * See: https://github.com/pocketbase/pocketbase/discussions/2429#discussioncomment-5943061
  */
-async function loginWithMicrosoft() {
-  try {
-    await pb.collection("users").authWithOAuth2({ provider: "microsoft" });
-    // PocketBase automatically updates pb.authStore on successful auth
-    // The onChange callback will handle updating our Svelte store and setting up refresh
-    return true;
-  } catch (error) {
-    console.error("Microsoft login failed:", error);
-    throw error;
-  }
+function loginWithMicrosoft() {
+  pb.collection("users")
+    .authWithOAuth2({ provider: "microsoft" })
+    .then(() => {
+      // PocketBase automatically updates pb.authStore on successful auth
+      // The onChange callback will handle updating our Svelte store and setting up refresh
+    })
+    .catch((error) => {
+      console.error("Microsoft login failed:", error);
+    });
 }
 
 /**
