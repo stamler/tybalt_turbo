@@ -13,6 +13,8 @@
 # - Removes weekEnding and id properties from entry objects
 # - Sorts entry object properties alphabetically
 # - Sorts entries by timetype, job, client, division, workDescription, date
+# - Converts weekEnding properties in parent objects to YYYY-MM-DD (America/Thunder_Bay timezone)
+# - Converts date properties in entry objects to YYYY-MM-DD (America/Thunder_Bay timezone)
 # Usage: ./process_json.sh input.json
 
 if [ $# -eq 0 ]; then
@@ -30,16 +32,67 @@ fi
 # Create a temporary file for the output
 temp_file=$(mktemp)
 
-# Apply the sorting transformation
+# Apply the sorting and filtering transformation
 jq 'sort_by(.uid) | map(del(.rejected, .submitted, .exported, .locked, .approved, .rejectionReason, .id) | .payrollId |= tostring | .entries |= (map(del(.weekEnding, .id) | to_entries | sort_by(.key) | from_entries) | sort_by(.timetype, .job, .client, .division, .workDescription, .date)) | .jobNumbers |= sort | .divisions |= sort | .timetypes |= sort | to_entries | sort_by(.key) | from_entries)' "$input_file" > "$temp_file"
 
-# Check if jq succeeded
+# Check if first jq command succeeded
+if [ $? -ne 0 ]; then
+    echo "Error: First jq command (sorting/filtering) failed"
+    rm "$temp_file"
+    exit 1
+fi
+
+# Apply the date/weekEnding timezone conversion using Python
+TEMP_FILE="$temp_file" python3 << 'PYTHON_SCRIPT'
+import json
+import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+def convert_date(value):
+    """Convert UTC datetime string to YYYY-MM-DD in America/Thunder_Bay timezone.
+    If already 10 chars, return as-is."""
+    if value is None or len(value) == 10:
+        return value
+    try:
+        # Parse as UTC datetime (format: YYYY-MM-DDTHH:MM:SS.SSSZ)
+        dt = datetime.fromisoformat(value.replace('Z', '+00:00'))
+        # Convert to America/Thunder_Bay timezone
+        local_dt = dt.astimezone(ZoneInfo('America/Thunder_Bay'))
+        # Return just the date portion
+        return local_dt.strftime('%Y-%m-%d')
+    except (ValueError, TypeError):
+        return value
+
+temp_file = os.environ['TEMP_FILE']
+
+# Read the JSON file
+with open(temp_file, 'r') as f:
+    data = json.load(f)
+
+# Process each parent object
+for obj in data:
+    # Convert weekEnding
+    if 'weekEnding' in obj:
+        obj['weekEnding'] = convert_date(obj['weekEnding'])
+    # Convert date in each entry
+    if 'entries' in obj:
+        for entry in obj['entries']:
+            if 'date' in entry:
+                entry['date'] = convert_date(entry['date'])
+
+# Write the result back
+with open(temp_file, 'w') as f:
+    json.dump(data, f, indent=2)
+PYTHON_SCRIPT
+
+# Check if Python command succeeded
 if [ $? -eq 0 ]; then
     # Move the temp file back to the original file
     mv "$temp_file" "$input_file"
-    echo "Successfully sorted '$input_file'"
+    echo "Successfully processed '$input_file'"
 else
-    echo "Error: jq command failed"
+    echo "Error: Python date conversion failed"
     rm "$temp_file"
     exit 1
 fi
