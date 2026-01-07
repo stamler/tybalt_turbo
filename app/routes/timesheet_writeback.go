@@ -26,6 +26,10 @@ type timeEntryExport struct {
 	Category            string  `db:"category_name" json:"category,omitempty"`
 	WeekEnding          string  `db:"week_ending" json:"weekEnding"`
 	ClientName          string  `db:"client_name" json:"client,omitempty"`
+	ClientContact       string  `db:"client_contact" json:"-"`
+	BranchCode          string  `db:"branch_code" json:"-"`
+	ProposalNumber      string  `db:"proposal_number" json:"-"`
+	JobStatus           string  `db:"job_status" json:"-"`
 }
 
 // MarshalJSON implements json.Marshaler to conditionally rename the hours field.
@@ -60,35 +64,45 @@ type workHoursTally struct {
 	Hours       float64 `json:"hours"`
 }
 
+type jobTallyEntry struct {
+	Branch        string `json:"branch"`
+	Client        string `json:"client"`
+	ClientContact string `json:"clientContact"`
+	Description   string `json:"description"`
+	Status        string `json:"status"`
+	Proposal      string `json:"proposal"`
+}
+
 type timesheetExportRow struct {
-	Id                   string             `db:"id" json:"id"`
-	WorkWeekHours        float64            `db:"work_week_hours" json:"workWeekHours"`
-	Salary               bool               `db:"salary" json:"salary"`
-	Uid                  string             `db:"uid" json:"uid"`
-	WeekEnding           string             `db:"week_ending" json:"weekEnding"`
-	GivenName            string             `db:"given_name" json:"givenName"`
-	Surname              string             `db:"surname" json:"surname"`
-	Manager              string             `db:"approver" json:"managerUid"`
-	ManagerName          string             `db:"manager_name" json:"managerName"`
-	DisplayName          string             `db:"display_name" json:"displayName"`
-	PayrollId            string             `db:"payroll_id" json:"payrollId"`
-	Locked               bool               `json:"locked"`
-	Approved             bool               `json:"approved"`
-	Rejected             bool               `json:"rejected"`
-	Submitted            bool               `json:"submitted"`
-	RejectionReason      string             `json:"rejectionReason"`
-	Entries              []timeEntryExport  `json:"entries"`
-	BankedHours          float64            `json:"bankedHours"`
-	MealsHoursTally      float64            `json:"mealsHoursTally"`
-	Divisions            []string           `json:"divisions"`
-	DivisionsTally       map[string]string  `json:"divisionsTally"`
-	JobNumbers           []string           `json:"jobNumbers"`
-	NonWorkHoursTally    map[string]float64 `json:"nonWorkHoursTally"`
-	OffRotationDaysTally int                `json:"offRotationDaysTally"`
-	OffWeekTally         int                `json:"offWeekTally"`
-	PayoutRequest        float64            `json:"payoutRequest"`
-	Timetypes            []string           `json:"timetypes"`
-	WorkHoursTally       workHoursTally     `json:"workHoursTally"`
+	Id                   string                   `db:"id" json:"id"`
+	WorkWeekHours        float64                  `db:"work_week_hours" json:"workWeekHours"`
+	Salary               bool                     `db:"salary" json:"salary"`
+	Uid                  string                   `db:"uid" json:"uid"`
+	WeekEnding           string                   `db:"week_ending" json:"weekEnding"`
+	GivenName            string                   `db:"given_name" json:"givenName"`
+	Surname              string                   `db:"surname" json:"surname"`
+	Manager              string                   `db:"approver" json:"managerUid"`
+	ManagerName          string                   `db:"manager_name" json:"managerName"`
+	DisplayName          string                   `db:"display_name" json:"displayName"`
+	PayrollId            string                   `db:"payroll_id" json:"payrollId"`
+	Locked               bool                     `json:"locked"`
+	Approved             bool                     `json:"approved"`
+	Rejected             bool                     `json:"rejected"`
+	Submitted            bool                     `json:"submitted"`
+	RejectionReason      string                   `json:"rejectionReason"`
+	Entries              []timeEntryExport        `json:"entries"`
+	BankedHours          float64                  `json:"bankedHours"`
+	MealsHoursTally      float64                  `json:"mealsHoursTally"`
+	Divisions            []string                 `json:"divisions"`
+	DivisionsTally       map[string]string        `json:"divisionsTally"`
+	JobNumbers           []string                 `json:"jobNumbers"`
+	JobsTally            map[string]jobTallyEntry `json:"jobsTally"`
+	NonWorkHoursTally    map[string]float64       `json:"nonWorkHoursTally"`
+	OffRotationDaysTally int                      `json:"offRotationDaysTally"`
+	OffWeekTally         int                      `json:"offWeekTally"`
+	PayoutRequest        float64                  `json:"payoutRequest"`
+	Timetypes            []string                 `json:"timetypes"`
+	WorkHoursTally       workHoursTally           `json:"workHoursTally"`
 }
 
 func keys[K comparable, V any](m map[K]V) []K {
@@ -141,6 +155,7 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			entriesQuery := `
 				SELECT te.id, ap.legacy_uid AS uid, 
 				       COALESCE(j.number, '') AS job,
+							 COALESCE(jp.number, '') AS proposal_number,
 							 COALESCE(j.description, '') AS job_description,
 				       COALESCE(d.code, '') AS division,
 							 COALESCE(d.name, '') AS division_name,
@@ -151,14 +166,20 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 				       te.work_record, te.description,
 							 te.week_ending,
 							 COALESCE(c.name, '') AS client_name,
-							 COALESCE(ca.name, '') AS category_name
+							 COALESCE(cc.given_name || ' ' || cc.surname, '') AS client_contact,
+							 COALESCE(ca.name, '') AS category_name,
+							 COALESCE(b.code, '') AS branch_code,
+							 COALESCE(j.status, '') AS job_status
 				FROM time_entries te
 				LEFT JOIN admin_profiles ap ON te.uid = ap.uid
 				LEFT JOIN time_types tt ON te.time_type = tt.id
 				LEFT JOIN divisions d ON te.division = d.id
 				LEFT JOIN jobs j ON te.job = j.id
+				LEFT JOIN jobs jp ON j.proposal = jp.id
 				LEFT JOIN clients c ON j.client = c.id
+				LEFT JOIN client_contacts cc ON j.contact = cc.id
 				LEFT JOIN categories ca ON te.category = ca.id
+				LEFT JOIN branches b ON te.branch = b.id
 				WHERE tsid = {:tsid}
 			`
 			if err := app.DB().NewQuery(entriesQuery).Bind(dbx.Params{
@@ -169,12 +190,12 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			rows[i].Entries = entries
 
 			// Initialize tally structures
-			divSet := make(map[string]string)    // division code -> name
-			jobSet := make(map[string]struct{})  // job numbers
-			ttSet := make(map[string]struct{})   // time type codes
-			orDates := make(map[string]struct{}) // unique OR dates
-			owDates := make(map[string]struct{}) // unique OW dates
-			nonWork := make(map[string]float64)  // time type -> hours
+			divSet := make(map[string]string)        // division code -> name
+			jobSet := make(map[string]jobTallyEntry) // job numbers -> job details
+			ttSet := make(map[string]struct{})       // time type codes
+			orDates := make(map[string]struct{})     // unique OR dates
+			owDates := make(map[string]struct{})     // unique OW dates
+			nonWork := make(map[string]float64)      // time type -> hours
 			var wht workHoursTally
 			var mealsTotal, payoutTotal, bankedTotal float64
 
@@ -195,7 +216,14 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 						divSet[e.Division] = e.DivisionName
 					}
 					if e.Job != "" {
-						jobSet[e.Job] = struct{}{}
+						jobSet[e.Job] = jobTallyEntry{
+							Branch:        e.BranchCode,
+							Client:        e.ClientName,
+							ClientContact: e.ClientContact,
+							Description:   e.JobDescription,
+							Status:        e.JobStatus,
+							Proposal:      e.ProposalNumber,
+						}
 						wht.JobHours += e.Hours
 					} else {
 						wht.NoJobNumber += e.Hours
@@ -211,6 +239,7 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			rows[i].DivisionsTally = divSet
 			rows[i].Divisions = keys(divSet)
 			rows[i].JobNumbers = keys(jobSet)
+			rows[i].JobsTally = jobSet
 			rows[i].Timetypes = keys(ttSet)
 			rows[i].OffRotationDaysTally = len(orDates)
 			rows[i].OffWeekTally = len(owDates)
