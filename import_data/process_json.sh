@@ -6,10 +6,11 @@
 
 # Script to process JSON files containing arrays of objects with uid and entries properties
 # - Sorts outer array by uid
-# - Removes rejected, submitted, exported, locked, approved, rejectionReason, id from parent objects
+# - Removes rejected, submitted, exported, locked, approved, rejectionReason, id, viewerIds, viewers from parent objects
 # - Converts payrollId to string in parent objects
 # - Sorts main object properties alphabetically
 # - Sorts jobNumbers, divisions, and timetypes arrays within each parent object
+# - Strips hasTimeEntries, hours, jobHours, lastTimeEntryDate, manager, managerDisplayName, managerUid, divisions, fnAgreement, projectAwardDate, alternateManagerDisplayName, alternateManagerUid, proposalOpeningDate, proposalSubmissionDueDate, categories from each job object within jobsTally
 # - Removes weekEnding and id properties from entry objects
 # - Sorts entry object properties alphabetically
 # - Sorts entries by timetype, job, client, division, workDescription, date
@@ -33,7 +34,7 @@ fi
 temp_file=$(mktemp)
 
 # Apply the sorting and filtering transformation
-jq 'sort_by(.uid) | map(del(.rejected, .submitted, .exported, .locked, .approved, .rejectionReason, .id) | .payrollId |= tostring | .entries |= (map(del(.weekEnding, .id) | to_entries | sort_by(.key) | from_entries) | sort_by(.timetype, .job, .client, .division, .workDescription, .date)) | .jobNumbers |= sort | .divisions |= sort | .timetypes |= sort | to_entries | sort_by(.key) | from_entries)' "$input_file" > "$temp_file"
+jq 'sort_by(.uid) | map(del(.rejected, .submitted, .exported, .locked, .approved, .rejectionReason, .id, .viewerIds, .viewers) | .payrollId |= tostring | .entries |= (map(del(.weekEnding, .id) | to_entries | sort_by(.key) | from_entries) | sort_by(.timetype, .job, .client, .division, .workDescription, .date)) | .jobsTally |= (if . then map_values(del(.hasTimeEntries, .hours, .jobHours, .lastTimeEntryDate, .manager, .managerDisplayName, .managerUid, .divisions, .fnAgreement, .projectAwardDate, .alternateManagerDisplayName, .alternateManagerUid, .proposalOpeningDate, .proposalSubmissionDueDate, .categories)) else . end) | .jobNumbers |= sort | .divisions |= sort | .timetypes |= sort | to_entries | sort_by(.key) | from_entries)' "$input_file" > "$temp_file"
 
 # Check if first jq command succeeded
 if [ $? -ne 0 ]; then
