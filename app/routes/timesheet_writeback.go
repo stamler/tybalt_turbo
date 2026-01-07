@@ -26,6 +26,7 @@ type timeEntryExport struct {
 	Category            string  `db:"category_name" json:"category,omitempty"`
 	WeekEnding          string  `db:"week_ending" json:"weekEnding"`
 	ClientName          string  `db:"client_name" json:"client,omitempty"`
+	JobOwnerName        string  `db:"job_owner_name" json:"-"`
 	ClientContact       string  `db:"client_contact" json:"-"`
 	BranchCode          string  `db:"branch_code" json:"-"`
 	ProposalNumber      string  `db:"proposal_number" json:"-"`
@@ -65,12 +66,13 @@ type workHoursTally struct {
 }
 
 type jobTallyEntry struct {
-	Branch        string `json:"branch"`
+	Branch        string `json:"branch,omitempty"`
 	Client        string `json:"client"`
-	ClientContact string `json:"clientContact"`
+	JobOwner      string `json:"jobOwner,omitempty"`
+	ClientContact string `json:"clientContact,omitempty"`
 	Description   string `json:"description"`
 	Status        string `json:"status"`
-	Proposal      string `json:"proposal"`
+	Proposal      string `json:"proposal,omitempty"`
 }
 
 type timesheetExportRow struct {
@@ -167,6 +169,7 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 							 te.week_ending,
 							 COALESCE(c.name, '') AS client_name,
 							 COALESCE(cc.given_name || ' ' || cc.surname, '') AS client_contact,
+							 COALESCE(jo.name, '') AS job_owner_name,
 							 COALESCE(ca.name, '') AS category_name,
 							 COALESCE(b.code, '') AS branch_code,
 							 COALESCE(j.status, '') AS job_status
@@ -177,6 +180,7 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 				LEFT JOIN jobs j ON te.job = j.id
 				LEFT JOIN jobs jp ON j.proposal = jp.id
 				LEFT JOIN clients c ON j.client = c.id
+				LEFT JOIN clients jo ON j.job_owner = jo.id
 				LEFT JOIN client_contacts cc ON j.contact = cc.id
 				LEFT JOIN categories ca ON te.category = ca.id
 				LEFT JOIN branches b ON te.branch = b.id
@@ -219,6 +223,7 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 						jobSet[e.Job] = jobTallyEntry{
 							Branch:        e.BranchCode,
 							Client:        e.ClientName,
+							JobOwner:      e.JobOwnerName,
 							ClientContact: e.ClientContact,
 							Description:   e.JobDescription,
 							Status:        e.JobStatus,
