@@ -10,6 +10,7 @@
   import { page } from "$app/stores";
   import DSTabBar, { type TabItem } from "$lib/components/DSTabBar.svelte";
   import { onMount } from "svelte";
+  import Icon from "@iconify/svelte";
 
   const weekEnding = $derived.by(() => $page.params.weekEnding);
   let rows = $state([] as any[]);
@@ -131,11 +132,37 @@
       // small UX touch; keep silent to avoid noise
     } catch {}
   }
+
+  async function downloadJson() {
+    try {
+      const data = await pb.send(`/api/time_sheets/${weekEnding}/export_legacy`, { method: "GET" });
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `time_sheets_${weekEnding}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error: any) {
+      globalStore.addError(error?.response?.error || "Failed to download JSON");
+    }
+  }
 </script>
 
 <RejectModal collectionName="time_sheets" bind:this={rejectModal} on:refresh={() => init()} />
 
-<DSTabBar {tabs} />
+<DSTabBar {tabs}>
+  {#snippet rightContent()}
+    <button
+      onclick={downloadJson}
+      class="flex items-center gap-1 rounded bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
+    >
+      <Icon icon="mdi:download" class="text-base" /> JSON
+    </button>
+  {/snippet}
+</DSTabBar>
 
 <!-- Sheets Tab -->
 <div class:hidden={activeTab !== "sheets"}>
