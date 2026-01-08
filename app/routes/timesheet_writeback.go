@@ -1,12 +1,17 @@
 package routes
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
+
+const MACHINE_SECRET_ID = "legacy_time_writeback"
 
 type timeEntryExport struct {
 	Id                  string  `db:"id" json:"id"`
@@ -117,6 +122,30 @@ func keys[K comparable, V any](m map[K]V) []K {
 
 func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
+		// Validate bearer token against machine_secrets
+		authHeader := e.Request.Header.Get("Authorization")
+		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
+			return e.Error(http.StatusUnauthorized, "missing or invalid Authorization header", nil)
+		}
+		token := strings.TrimPrefix(authHeader, "Bearer ")
+
+		record, err := app.FindRecordById("machine_secrets", MACHINE_SECRET_ID)
+		if err != nil {
+			return e.Error(http.StatusUnauthorized, "unauthorized", nil)
+		}
+
+		salt := record.GetString("salt")
+		storedHash := record.GetString("sha256_hash")
+
+		// Hash the provided token with the salt
+		h := sha256.New()
+		h.Write([]byte(salt + token))
+		computedHash := hex.EncodeToString(h.Sum(nil))
+
+		if computedHash != storedHash {
+			return e.Error(http.StatusUnauthorized, "unauthorized", nil)
+		}
+
 		weekEnding := e.Request.PathValue("weekEnding")
 		if weekEnding == "" {
 			return e.Error(http.StatusBadRequest, "weekEnding is required", nil)
