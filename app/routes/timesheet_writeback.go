@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -122,27 +123,30 @@ func keys[K comparable, V any](m map[K]V) []K {
 
 func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		// Validate bearer token against machine_secrets
+		// Try machine auth first (Bearer token)
+		authorized := false
 		authHeader := e.Request.Header.Get("Authorization")
-		if authHeader == "" || !strings.HasPrefix(authHeader, "Bearer ") {
-			return e.Error(http.StatusUnauthorized, "missing or invalid Authorization header", nil)
+		if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
+			token := strings.TrimPrefix(authHeader, "Bearer ")
+			if record, err := app.FindRecordById("machine_secrets", MACHINE_SECRET_ID); err == nil {
+				salt := record.GetString("salt")
+				storedHash := record.GetString("sha256_hash")
+				h := sha256.New()
+				h.Write([]byte(salt + token))
+				if hex.EncodeToString(h.Sum(nil)) == storedHash {
+					authorized = true
+				}
+			}
 		}
-		token := strings.TrimPrefix(authHeader, "Bearer ")
 
-		record, err := app.FindRecordById("machine_secrets", MACHINE_SECRET_ID)
-		if err != nil {
-			return e.Error(http.StatusUnauthorized, "unauthorized", nil)
+		// Fall back to user auth with report claim
+		if !authorized {
+			if hasReport, _ := utilities.HasClaim(app, e.Auth, "report"); hasReport {
+				authorized = true
+			}
 		}
 
-		salt := record.GetString("salt")
-		storedHash := record.GetString("sha256_hash")
-
-		// Hash the provided token with the salt
-		h := sha256.New()
-		h.Write([]byte(salt + token))
-		computedHash := hex.EncodeToString(h.Sum(nil))
-
-		if computedHash != storedHash {
+		if !authorized {
 			return e.Error(http.StatusUnauthorized, "unauthorized", nil)
 		}
 
