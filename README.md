@@ -43,10 +43,9 @@ flyctl deploy
 ├── ui/                     # Svelte frontend
 │   ├── src/                # Svelte source code
 │   └── build/              # Built UI assets
-├── scripts/                # Database rollback and management scripts
+├── scripts/                # Database management scripts
 │   ├── setup-env.sh        # Environment variable setup
-│   ├── list-generations.sh # List available database generations
-│   ├── rollback.sh         # Automated database rollback
+│   ├── deploy-local-db.sh  # Deploy local database to production
 │   └── README.md           # Scripts documentation
 ├── docs/                   # Documentation
 │   └── DEPLOYMENT.md       # Deployment guide
@@ -132,11 +131,23 @@ flyctl secrets set \
   LITESTREAM_ENDPOINT=https://s3.amazonaws.com
 ```
 
-4. **Deploy:**
+4. **Push initial database to S3:**
+
+The app requires a database backup in S3 to start. Push your local database:
+
+```bash
+source scripts/setup-env.sh
+litestream replicate -config litestream.local.yml
+# Wait 30-60 seconds, then Ctrl+C
+```
+
+5. **Deploy:**
 
 ```bash
 flyctl deploy
 ```
+
+See [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) for detailed deployment instructions.
 
 ### Updates
 
@@ -159,28 +170,13 @@ This project uses two litestream configuration files:
 - **`litestream.yml`** - Production config (absolute paths for Docker)
 - **`litestream.local.yml`** - Local development config (relative paths)
 
-### Automated Rollback System
-
-For robust deployment operations, use the automated rollback scripts:
-
-```bash
-# Set up environment (one-time)
-source scripts/setup-env.sh
-
-# List available generations
-./scripts/list-generations.sh
-
-# Rollback to specific generation
-./scripts/rollback.sh <generation_id>
-```
-
-See [`scripts/README.md`](scripts/README.md) for complete documentation.
+See [`scripts/README.md`](scripts/README.md) for complete litestream command documentation.
 
 ### Local Development
 
 ```bash
-# Check backup status locally
-litestream snapshots -config litestream.local.yml app/pb_data/data.db
+# Download production database locally
+litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/data.db
 ```
 
 ### Restore from backup

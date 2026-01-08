@@ -19,21 +19,13 @@ This creates `fly.toml` - update the app name and region as needed.
 
 ### 2. Set Up Storage for Backups
 
-#### Option A: Tigris (Fly.io's S3-compatible storage)**
+#### Option A: Tigris (Fly.io's S3-compatible storage)
 
 ```bash
 flyctl storage create
 ```
 
-Note the credentials provided.
-
-#### Option B: AWS S3**
-
-Create an S3 bucket manually and note your access keys.
-
-### 3. Configure Secrets
-
-**For Tigris:**
+Note the credentials provided, then configure secrets:
 
 ```bash
 flyctl secrets set \
@@ -43,7 +35,9 @@ flyctl secrets set \
   LITESTREAM_REGION=us-east-1
 ```
 
-**For AWS S3:**
+#### Option B: AWS S3
+
+Create an S3 bucket manually and configure secrets:
 
 ```bash
 flyctl secrets set \
@@ -54,7 +48,7 @@ flyctl secrets set \
   LITESTREAM_ENDPOINT=https://s3.amazonaws.com
 ```
 
-### 4. Deploy
+### 3. Deploy
 
 ```bash
 flyctl deploy
@@ -86,71 +80,96 @@ This project uses two litestream configuration files:
 For local development, use the local config file:
 
 ```bash
-# List available snapshots
-litestream snapshots -config litestream.local.yml app/pb_data/data.db
-
 # Download the latest production database
 litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/data.db
+
+# Restore to a specific point in time
+litestream restore -config litestream.local.yml -timestamp 2025-01-08T12:00:00Z -o ~/prod-backup.db app/pb_data/data.db
 
 # Replicate local database to S3
 litestream replicate -config litestream.local.yml
 ```
 
-### Deploying Local Database Changes to Production
+### Initial Database Deployment
 
-When you need to push local database changes (schema changes, seed data, etc.) to production:
+**⚠️ Important**: The production app will fail to start if no database backup exists in S3. This is intentional - it prevents the app from accidentally creating a blank database.
 
-#### Setup for Database Deployment
+Before your first deployment, you must push a database to S3:
 
-1. **Install Litestream locally:**
-
-   ```bash
-   brew install benbjohnson/litestream/litestream
-   ```
-
-2. **Get environment variables from your Fly app:**
+1. **Set up environment variables:**
 
    ```bash
-   flyctl machine exec --app your-app-name MACHINE_ID -- printenv | grep LITESTREAM
+   source scripts/setup-env.sh
    ```
 
-3. **Set environment variables locally:**
-
-   ```bash
-   export LITESTREAM_ACCESS_KEY_ID="your_access_key"
-   export LITESTREAM_SECRET_ACCESS_KEY="your_secret_key"  
-   export LITESTREAM_BUCKET="your_bucket_name"
-   export LITESTREAM_ENDPOINT="your_endpoint"
-   export LITESTREAM_REGION="your_region"
-   ```
-
-#### Push Local Database to Production
-
-1. **Push your local database to S3:**
+2. **Push your local database to S3:**
 
    ```bash
    litestream replicate -config litestream.local.yml
    ```
 
-   Let this run for 30-60 seconds to ensure the backup completes.
+   Let this run for 30-60 seconds to ensure the backup completes, then press Ctrl+C.
 
-2. **Restart the Fly app to pick up the new database:**
+3. **Deploy the app:**
 
    ```bash
-   flyctl apps restart your-app-name
+   flyctl deploy
    ```
+
+The app will restore the database from S3 on first startup.
+
+### Deploying Database Changes to Production
+
+When you need to push local database changes (schema changes, data fixes, etc.) to production:
+
+1. **Set up environment variables:**
+
+   ```bash
+   source scripts/setup-env.sh
+   ```
+
+2. **Stop the production app** (prevents conflicts):
+
+   ```bash
+   flyctl machine stop
+   ```
+
+3. **Push your local database to S3:**
+
+   ```bash
+   litestream replicate -config litestream.local.yml
+   ```
+
+   Let this run for 30-60 seconds, then press Ctrl+C.
+
+4. **Delete the production database volume** (forces restore from S3):
+
+   ```bash
+   flyctl ssh console -C "rm /app/pb_data/data.db"
+   ```
+
+5. **Start the production app:**
+
+   ```bash
+   flyctl machine start
+   ```
+
+Alternatively, use the script:
+
+```bash
+./scripts/deploy-local-db.sh
+```
 
 #### Use Cases
 
+- **Initial deployment** with seed data and superuser
 - **Fixing corrupted production data**
 - **Rolling back** to a known good state
-- **Initial seeding** (including superuser setup)
 
 #### ⚠️ Important Notes
 
 - This replaces the **entire production database** with your local one
 - Make sure your local database contains the state you want in production
-- Old backups are retained according to retention policy (72 hours by default)
 - Always test locally before deploying database changes
 
 ## Database Backups
@@ -163,8 +182,8 @@ Litestream continuously replicates your SQLite database to S3-compatible storage
 # SSH into your app
 flyctl ssh console
 
-# Check litestream status
-litestream snapshots -config /etc/litestream.yml /app/pb_data/data.db
+# List available backup files
+litestream ltx -config /etc/litestream.yml /app/pb_data/data.db
 ```
 
 ### Restore from Backup

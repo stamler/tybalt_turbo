@@ -51,10 +51,10 @@ source scripts/setup-env.sh
 
 After running `source scripts/setup-env.sh`, you can use these litestream commands directly:
 
-### List available snapshots
+### List available backups
 
 ```bash
-litestream snapshots -config litestream.local.yml app/pb_data/data.db
+litestream ltx -config litestream.local.yml app/pb_data/data.db
 ```
 
 ### Download the latest production database
@@ -81,13 +81,20 @@ litestream restore -config litestream.local.yml -timestamp 2025-01-08T12:00:00Z 
 source scripts/setup-env.sh
 ```
 
+### Initial deployment (first time only)
+
+The production app requires a database in S3 to start. Push your local database before deploying:
+
+```bash
+source scripts/setup-env.sh
+litestream replicate -config litestream.local.yml
+# Wait 30-60 seconds for sync, then Ctrl+C
+flyctl deploy
+```
+
 ### Download production database
 
 ```bash
-# List snapshots to see what's available
-litestream snapshots -config litestream.local.yml app/pb_data/data.db
-
-# Download latest to a separate file
 litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/data.db
 ```
 
@@ -99,6 +106,7 @@ litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/
 
 ## Safety Notes
 
+- **⚠️ Production requires S3 backup**: The app will fail to start if no database backup exists in S3
 - **⚠️ Destructive operation**: `deploy-local-db.sh` replaces your entire production database
 - **🔒 Environment required**: Must run `setup-env.sh` first
 

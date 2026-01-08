@@ -25,7 +25,7 @@ cd "$PROJECT_ROOT"
 # Check if local database exists
 if [ ! -f "$LOCAL_DB" ]; then
     echo "❌ No local database found at: $LOCAL_DB"
-    echo "💡 Tip: Restore a generation first with: ./scripts/restore-generation.sh <generation_id>"
+    echo "💡 Tip: Restore from backup first with: litestream restore -config litestream.local.yml app/pb_data/data.db"
     exit 1
 fi
 
