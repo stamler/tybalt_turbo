@@ -180,10 +180,7 @@ See [`scripts/README.md`](scripts/README.md) for complete documentation.
 
 ```bash
 # Check backup status locally
-litestream generations -config litestream.local.yml
-
-# Or query S3 directly
-litestream generations -replica s3://${LITESTREAM_BUCKET}/tybalt
+litestream snapshots -config litestream.local.yml app/pb_data/data.db
 ```
 
 ### Restore from backup

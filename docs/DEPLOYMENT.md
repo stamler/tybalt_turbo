@@ -86,24 +86,14 @@ This project uses two litestream configuration files:
 For local development, use the local config file:
 
 ```bash
-# Check database generations/snapshots
-litestream generations -config litestream.local.yml
+# List available snapshots
+litestream snapshots -config litestream.local.yml app/pb_data/data.db
 
-# Check what's backed up in S3
-litestream snapshots -config litestream.local.yml
+# Download the latest production database
+litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/data.db
 
 # Replicate local database to S3
 litestream replicate -config litestream.local.yml
-```
-
-**Alternative**: You can also query S3 directly (works regardless of config):
-
-```bash
-# Check generations directly from S3
-litestream generations -replica s3://${LITESTREAM_BUCKET}/tybalt
-
-# Check snapshots directly from S3  
-litestream snapshots -replica s3://${LITESTREAM_BUCKET}/tybalt
 ```
 
 ### Deploying Local Database Changes to Production
