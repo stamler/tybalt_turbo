@@ -306,16 +306,23 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 	// openingDate then check if the sum of the time entries for PPTO and Vacation
 	// is greater than corresponding opening values. If it is, return an
 	// error.
+	//
+	// IMPORTANT: We use week_ending > openingDate (not >=) because the opening
+	// balances represent the state at the START of the opening_date. Entries with
+	// week_ending equal to opening_date were created in the same payroll period as
+	// the opening balance was set and are already accounted for in that balance.
+	// This must match the time_off view query which also uses > to ensure the UI
+	// display of remaining balance is consistent with validation. See issue #93.
 
 	// usedVacation is sum of all hours for the time_entries records where
-	// time_type.code is "OV" and week_ending is greater than or equal to
+	// time_type.code is "OV" and week_ending is greater than
 	// openingDate and less than or equal to weekEnding for the uid of the
 	// admin_profile
 	type SumResult struct {
 		TotalHours float64 `db:"total_hours"`
 	}
 	results := []SumResult{}
-	queryError := txApp.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending >= {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
+	queryError := txApp.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending > {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
 		"uid":          admin_profile.Get("uid"),
 		"openingDate":  openingDate,
 		"weekEnding":   weekEnding,
@@ -333,10 +340,10 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 	}
 
 	// usedPpto is sum of all hours for the time_entries records where
-	// time_type.code is "OP" and week_ending is greater than or equal to
+	// time_type.code is "OP" and week_ending is greater than
 	// openingDate and less than or equal to weekEnding
 	results = []SumResult{}
-	queryError = txApp.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending >= {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
+	queryError = txApp.DB().NewQuery("SELECT COALESCE(SUM(hours), 0) AS total_hours FROM time_entries LEFT JOIN time_types ON time_entries.time_type = time_types.id WHERE uid = {:uid} AND week_ending > {:openingDate} AND week_ending <= {:weekEnding} AND time_types.code = {:timeTypeCode}").Bind(dbx.Params{
 		"uid":          admin_profile.Get("uid"),
 		"openingDate":  openingDate,
 		"weekEnding":   weekEnding,
