@@ -1,10 +1,6 @@
-# Database Rollback Scripts
+# Database Scripts
 
-This directory contains scripts for robust database rollback operations for the Tybalt application.
-
-## Overview
-
-These scripts provide a complete system for rolling back your production database to any previous generation stored in litestream backups. This is essential for deployment robustness and disaster recovery.
+This directory contains scripts for database operations for the Tybalt application.
 
 ## Scripts
 
@@ -32,100 +28,78 @@ source scripts/setup-env.sh
 
 ---
 
-### `list-generations.sh`
+### `deploy-local-db.sh`
 
-**Purpose**: Lists all available database generations with timestamps.
-
-**Usage**:
-
-```bash
-./scripts/list-generations.sh
-```
-
-**What it does**:
-
-- Shows all available database backups/generations
-- Displays generation IDs, timestamps, and lag times
-- Provides helpful usage tips
-
-**Output example**:
-
-```text
-🗂️  Available database generations:
-
-name  generation        lag       start                 end
-s3    f1f5e9fd95acf3b6  -395ms    2025-06-02T20:46:17Z  2025-06-02T20:46:17Z
-s3    aa46314586c7e98e  -22m17s   2025-06-02T21:07:33Z  2025-06-02T21:08:34Z
-
-💡 To rollback: ./scripts/rollback.sh <generation_id>
-```
-
----
-
-### `rollback.sh`
-
-**Purpose**: Complete automated rollback to a specific database generation.
+**Purpose**: Deploys your local database to production via S3 replication.
 
 **Usage**:
 
 ```bash
-./scripts/rollback.sh <generation_id>
-```
-
-**Example**:
-
-```bash
-./scripts/rollback.sh f1f5e9fd95acf3b6
+./scripts/deploy-local-db.sh
 ```
 
 **What it does**:
 
 1. Validates environment variables are set
-2. Backs up current local database (safety measure)
-3. Restores the specified generation locally
-4. Pushes the restored database to S3
-5. Restarts the production Fly.io app
-6. Provides confirmation and app URL
+2. Stops the production app
+3. Replicates local database to S3
+4. Restarts the production app
 
-**Safety features**:
+---
 
-- Environment variable validation
-- Local database backup before rollback
-- Error handling with `set -e`
-- Timeout protection for replication
-- Clear status messages throughout
+## Litestream Commands
+
+After running `source scripts/setup-env.sh`, you can use these litestream commands directly:
+
+### List available snapshots
+
+```bash
+litestream snapshots -config litestream.local.yml app/pb_data/data.db
+```
+
+### Download the latest production database
+
+```bash
+# Restore to a new file (preserves your local database)
+litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/data.db
+
+# Or restore directly to local database (overwrites it)
+litestream restore -config litestream.local.yml app/pb_data/data.db
+```
+
+### Restore to a specific point in time
+
+```bash
+litestream restore -config litestream.local.yml -timestamp 2025-01-08T12:00:00Z -o ~/prod-backup.db app/pb_data/data.db
+```
 
 ## Workflow
 
 ### First-time setup
 
 ```bash
-# 1. Set up environment variables
 source scripts/setup-env.sh
 ```
 
-### Regular rollback operations
+### Download production database
 
 ```bash
-# 2. List available generations
-./scripts/list-generations.sh
+# List snapshots to see what's available
+litestream snapshots -config litestream.local.yml app/pb_data/data.db
 
-# 3. Rollback to specific generation
-./scripts/rollback.sh <generation_id>
+# Download latest to a separate file
+litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/data.db
 ```
 
-## Use Cases
+### Deploy local database to production
 
-- **Deployment rollback**: Quickly revert after a bad deployment
-- **Data corruption recovery**: Restore to a known good state
-- **Superuser recovery**: Restore generation with admin credentials
-- **Testing**: Roll back to specific test data states
+```bash
+./scripts/deploy-local-db.sh
+```
 
 ## Safety Notes
 
-- **⚠️ Destructive operation**: Rollback replaces your entire production database
-- **📝 Always verify**: Check the generation timestamp before rolling back
-- **💾 Automatic backup**: Local database is backed up before rollback
+- **⚠️ Destructive operation**: `deploy-local-db.sh` replaces your entire production database
 - **🔒 Environment required**: Must run `setup-env.sh` first
 
 ## Troubleshooting
@@ -150,26 +124,3 @@ flyctl machine start
 # Solution: Ensure you're authenticated with flyctl
 flyctl auth login
 ```
-
-### Permission denied
-
-```bash
-# Solution: Make scripts executable
-chmod +x scripts/*.sh
-```
-
-## Architecture
-
-The rollback system works by:
-
-1. **Local restore**: Downloads the specific generation to local database
-2. **S3 replication**: Pushes the restored database back to S3 storage
-3. **Production restart**: Fly.io app restarts and picks up the "new" backup
-4. **Automatic sync**: Litestream resumes continuous replication
-
-This approach ensures:
-
-- ✅ Atomic operations (all-or-nothing)
-- ✅ Production consistency
-- ✅ Minimal downtime
-- ✅ Audit trail preservation
