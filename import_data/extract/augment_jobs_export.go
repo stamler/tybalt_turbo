@@ -96,10 +96,36 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 		log.Fatalf("Failed to create jobsD: %v", err)
 	}
 
-	// overwrite the jobs table with the final augmented table
-	_, err = db.Exec("COPY jobsD TO 'parquet/Jobs.parquet' (FORMAT PARQUET)") // Output to Jobs.parquet
+	// Derive parent job ID for sub-jobs.
+	// Sub-jobs have numbers like "16-105-3" or "P16-105-01" where the base job is "16-105" or "P16-105".
+	// Base jobs have exactly one hyphen (e.g., "25-0123" or "P25-0123").
+	// Sub-jobs have two or more hyphens. We only look for a parent when hyphen count > 1.
+	// We extract the base number by removing the last "-XX" suffix and join back to find the parent's pocketbase_id.
+	// COALESCE ensures empty string (not NULL) for PocketBase relation field compatibility.
+	_, err = db.Exec(`
+	CREATE TABLE jobsE AS
+	SELECT
+	    jobsD.*,
+	    COALESCE(
+	        CASE
+	            WHEN length(jobsD.id) - length(replace(jobsD.id, '-', '')) > 1
+	            THEN parent_job.pocketbase_id
+	            ELSE NULL
+	        END,
+	        ''
+	    ) AS parent_id
+	FROM jobsD
+	LEFT JOIN jobsD AS parent_job
+	    ON regexp_replace(jobsD.id, '-[0-9]+$', '') = parent_job.id;
+	`)
 	if err != nil {
-		log.Fatalf("Failed to copy jobsD to Parquet: %v", err)
+		log.Fatalf("Failed to create jobsE: %v", err)
+	}
+
+	// overwrite the jobs table with the final augmented table
+	_, err = db.Exec("COPY jobsE TO 'parquet/Jobs.parquet' (FORMAT PARQUET)") // Output to Jobs.parquet
+	if err != nil {
+		log.Fatalf("Failed to copy jobsE to Parquet: %v", err)
 	}
 
 	// --- Create Categories Parquet ---

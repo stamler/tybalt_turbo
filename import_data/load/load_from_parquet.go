@@ -74,6 +74,7 @@ type Job struct {
 	Manager                     string `parquet:"manager_id"`
 	AlternateManagerId          string `parquet:"alternate_manager_id"`
 	Branch                      string `parquet:"branch"`
+	Parent                      string `parquet:"parent_id"`
 }
 
 type Profile struct {
