@@ -689,8 +689,33 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 	return derived, nil
 }
 
+// generateTopLevelJobNumber generates the next available job number for a given job type.
+//
+// # Job Number Formats
+//
+// Job numbers exist in two formats:
+//   - Legacy 3-digit: "26-015" (regular) or "P26-015" (proposal)
+//   - Current 4-digit: "26-0015" (regular) or "P26-0015" (proposal)
+//
+// Starting in 2026, the legacy system was configured to only create 4-digit job numbers.
+// For years 2027 and beyond, the 3-digit pattern will match no new jobs.
+// Once all legacy 3-digit jobs are from prior years, the 3-digit pattern could be removed.
+//
+// # Implementation
+//
+// A single SQL query finds the maximum sequence number across both formats:
+//   - Uses LIKE with underscore wildcards: "26-___" (3-digit) OR "26-____" (4-digit)
+//   - Extracts the numeric suffix and finds MAX using CAST
+//
+// The underscore patterns naturally exclude sub-jobs like "26-015-01" since they
+// have more characters than either pattern matches.
 func generateTopLevelJobNumber(app core.App, t jobType) (string, error) {
-	yy := time.Now().Year() % 100
+	return generateTopLevelJobNumberForYear(app, t, time.Now().Year()%100)
+}
+
+// generateTopLevelJobNumberForYear is the internal implementation that accepts the
+// two-digit year as a parameter. This enables deterministic testing without mocking time.
+func generateTopLevelJobNumberForYear(app core.App, t jobType, yy int) (string, error) {
 	var prefix string
 	if t == jobTypeProposal {
 		prefix = fmt.Sprintf("P%02d-", yy)
@@ -698,26 +723,26 @@ func generateTopLevelJobNumber(app core.App, t jobType) (string, error) {
 		prefix = fmt.Sprintf("%02d-", yy)
 	}
 
-	// Fetch a batch of candidates ordered descending and find the highest base number
-	records, err := app.FindRecordsByFilter("jobs", `number ~ {:prefix}`, "-number", 50, 0, dbx.Params{"prefix": prefix + "%"})
+	// Find the maximum sequence number using a single SQL query.
+	// LIKE patterns use underscore (_) to match exactly one character:
+	//   - prefix + "___"  matches 3-digit legacy format (e.g., "26-015")
+	//   - prefix + "____" matches 4-digit current format (e.g., "26-0015")
+	// This naturally excludes sub-jobs like "26-015-01" which have more characters.
+	var lastNumber int
+	err := app.DB().NewQuery(`
+		SELECT COALESCE(MAX(CAST(SUBSTR(number, {:prefixLen} + 1) AS INTEGER)), 0)
+		FROM jobs
+		WHERE number LIKE {:pat3} OR number LIKE {:pat4}
+	`).Bind(dbx.Params{
+		"prefixLen": len(prefix),
+		"pat3":      prefix + "___",
+		"pat4":      prefix + "____",
+	}).Row(&lastNumber)
 	if err != nil && err != sql.ErrNoRows {
 		return "", err
 	}
-	lastNumber := 0
-	for _, r := range records {
-		n := r.GetString("number")
-		// consider only base numbers matching prefix + 4 digits
-		if strings.HasPrefix(n, prefix) && baseNumberRegex.MatchString(n) {
-			suf := strings.TrimPrefix(n, prefix)
-			if v, convErr := strconv.Atoi(suf); convErr == nil {
-				if v > lastNumber {
-					lastNumber = v
-				}
-			}
-		}
-	}
 
-	// Generate next unique number
+	// Generate next unique number (4-digit format going forward)
 	for i := lastNumber + 1; i <= 9999; i++ {
 		candidate := fmt.Sprintf("%s%04d", prefix, i)
 		existing, findErr := app.FindFirstRecordByFilter("jobs", "number = {:n}", dbx.Params{"n": candidate})
