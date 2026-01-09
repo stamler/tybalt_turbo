@@ -9,7 +9,7 @@ export const managers = createCollectionStore<ManagersResponse>(
     requestKey: "managers",
   },
   {
-    fields: ["id", "surname", "given_name"],
+    fields: ["surname", "given_name"],
     storeFields: ["id", "surname", "given_name"],
   },
   async (item) => {

@@ -20,7 +20,7 @@ export const vendors = createCollectionStore<any>(
     requestKey: "vendors",
   },
   {
-    fields: ["id", "name", "alias", "expenses_count", "purchase_orders_count"],
+    fields: ["name", "alias"],
     storeFields: ["id", "name", "alias", "expenses_count", "purchase_orders_count"],
   },
 

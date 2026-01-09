@@ -27,7 +27,7 @@ export const jobs = createCollectionStore<any>(
   "jobs",
   {},
   {
-    fields: ["id", "number", "description", "location", "client"],
+    fields: ["number", "description", "location", "client"],
     storeFields: [
       "id",
       "number",

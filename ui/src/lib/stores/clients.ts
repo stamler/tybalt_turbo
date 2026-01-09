@@ -26,7 +26,7 @@ export const clients = createCollectionStore<any>(
   "clients",
   {},
   {
-    fields: ["id", "name", "contacts", "referencing_jobs_count", "outstanding_balance"],
+    fields: ["name", "contacts"],
     storeFields: [
       "id",
       "name",

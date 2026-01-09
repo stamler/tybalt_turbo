@@ -9,7 +9,7 @@ export const divisions = createCollectionStore<DivisionsResponse>(
     requestKey: "divisions",
   },
   {
-    fields: ["id", "code", "name"],
+    fields: ["code", "name"],
     storeFields: ["id", "code", "name"],
   },
   async (item) => {

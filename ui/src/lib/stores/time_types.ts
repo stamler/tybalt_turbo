@@ -9,7 +9,7 @@ export const timeTypes = createCollectionStore<TimeTypesResponse>(
     requestKey: "tt",
   },
   {
-    fields: ["id", "name", "code", "description"],
+    fields: ["name", "code", "description"],
     storeFields: ["id", "name", "code", "description"],
   },
   async (item) => {
