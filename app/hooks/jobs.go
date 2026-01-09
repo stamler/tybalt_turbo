@@ -253,11 +253,37 @@ func (t jobType) String() string {
 }
 
 var (
-	baseNumberRegex       = regexp.MustCompile(`^(?:P)?\d{2}-\d{4}$`)
-	childNumberRegex      = regexp.MustCompile(`^(?:P)?\d{2}-\d{4}-\d{2}$`)
+	// baseNumberRegex matches top-level job numbers (not sub-jobs).
+	// Format: [P]YY-NNN or [P]YY-NNNN
+	//   - Optional "P" prefix for proposals
+	//   - 2-digit year (e.g., "25" for 2025)
+	//   - 3 or 4 digit job sequence number
+	// Legacy jobs use 3 digits (e.g., "25-123"), newer jobs use 4 digits (e.g., "25-0123").
+	// This regex is used by isBaseNumber() to determine if a job can have sub-jobs created under it.
+	// Sub-jobs (e.g., "25-123-01") will NOT match this pattern, which prevents nested sub-jobs.
+	baseNumberRegex = regexp.MustCompile(`^(?:P)?\d{2}-\d{3,4}$`)
+
+	// childNumberRegex matches first-level sub-job numbers.
+	// Format: [P]YY-NNN-SS or [P]YY-NNNN-SS
+	//   - Base job number (3-4 digits)
+	//   - 1 or 2 digit sub-job suffix
+	// Used by typeFromNumber() to strip the sub-job suffix when determining job type.
+	// Note: Nested sub-jobs (e.g., "25-123-01-1") exist in legacy data but are not matched here.
+	// This is intentional - typeFromNumber() still works correctly because it only needs to
+	// check if the number starts with "P" to determine the type, and that check works on any format.
+	childNumberRegex = regexp.MustCompile(`^(?:P)?\d{2}-\d{3,4}-\d{1,2}$`)
+
 	locationPlusCodeRegex = regexp.MustCompile(`^[23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2,3}$`)
 )
 
+// isBaseNumber returns true if s is a valid base (top-level) job number.
+// This is used to validate that a parent job can have sub-jobs created under it.
+// Only base jobs can be parents - sub-jobs cannot have their own sub-jobs.
+// Examples:
+//   - "25-123" → true (legacy 3-digit format)
+//   - "25-0123" → true (current 4-digit format)
+//   - "P25-0123" → true (proposal)
+//   - "25-0123-01" → false (sub-job, cannot be a parent)
 func isBaseNumber(s string) bool {
 	return baseNumberRegex.MatchString(s)
 }
