@@ -148,7 +148,7 @@ type jobExportOutput struct {
 	Updated                     string  `json:"updated"`
 
 	// Legacy-compatible array fields
-	Categories         []string           `json:"categories"`
+	Categories         []string           `json:"categories,omitempty"`
 	Divisions          []string           `json:"divisions"`
 	JobTimeAllocations map[string]float64 `json:"jobTimeAllocations"`
 
@@ -270,7 +270,6 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 				Status:                      r.Status,
 				Client:                      r.ClientName,
 				ClientContact:               clientContact,
-				Manager:                     managerDisplayName,
 				ManagerDisplayName:          managerDisplayName,
 				ManagerUid:                  r.ManagerUid,
 				Branch:                      r.BranchCode,
