@@ -672,3 +672,28 @@ func GetBoundClaimIdAndMaxAmount(app core.App, highest bool) (string, float64, e
 
 	return tiers[0].GetString("claim"), tiers[0].GetFloat("max_amount"), nil
 }
+
+// MarkImportedFalseIfChanged checks if any field (other than auto-managed fields)
+// has changed on an existing record, and if so sets _imported to false. This
+// ensures that records edited locally get written back to the legacy system.
+// This function should only be called for updates (not creates).
+func MarkImportedFalseIfChanged(record *core.Record) {
+	original := record.Original()
+
+	// Skip fields that are auto-managed or are the _imported field itself
+	skipFields := map[string]bool{
+		"updated":   true,
+		"created":   true,
+		"_imported": true,
+	}
+
+	for _, fieldName := range record.Collection().Fields.FieldNames() {
+		if skipFields[fieldName] {
+			continue
+		}
+		if fmt.Sprintf("%v", record.Get(fieldName)) != fmt.Sprintf("%v", original.Get(fieldName)) {
+			record.Set("_imported", false)
+			return
+		}
+	}
+}

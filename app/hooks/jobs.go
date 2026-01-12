@@ -92,6 +92,12 @@ func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Recor
 	// TODO: Follow up to confirm whether duplicate division ids can slip through here
 	// and if so decide whether they should be rejected or automatically de-duplicated.
 
+	// On update, if any field changed, mark the record as no longer imported.
+	// This ensures locally-modified jobs get written back to the legacy system.
+	if !jobRecord.IsNew() {
+		utilities.MarkImportedFalseIfChanged(jobRecord)
+	}
+
 	return nil
 }
 
