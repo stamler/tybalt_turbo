@@ -33,6 +33,7 @@
     fieldName,
     uiName,
     collectionName,
+    searchBarExtra,
   }: {
     index: MiniSearch<T>;
     inListHeader?: string;
@@ -46,6 +47,7 @@
     fieldName: string;
     uiName: string;
     collectionName?: string;
+    searchBarExtra?: Snippet;
   } = $props();
 
   let searchTerm = $state("");
@@ -91,6 +93,9 @@
       oninput={updateResults}
     />
     <span>{results.length} items</span>
+    {#if searchBarExtra}
+      {@render searchBarExtra()}
+    {/if}
   </li>
   {#if inListHeader !== undefined}
     <DSInListHeader value={inListHeader} />

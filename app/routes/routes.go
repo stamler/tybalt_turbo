@@ -94,8 +94,9 @@ func AddRoutes(app core.App) {
 		tsGroup.GET("/tracking/weeks/{weekEnding}/missing", createTimesheetMissingHandler(app))
 		tsGroup.GET("/tracking/weeks/{weekEnding}/not_expected", createTimesheetNotExpectedHandler(app))
 
-		// Legacy writeback endpoint (custom auth via machine_secrets)
-		se.Router.GET("/api/time_sheets/{weekEnding}/export_legacy", createTimesheetExportLegacyHandler(app))
+		// Legacy writeback endpoints (custom auth via machine_secrets)
+		se.Router.GET("/api/export_legacy/time_sheets/{weekEnding}", createTimesheetExportLegacyHandler(app))
+		se.Router.GET("/api/export_legacy/jobs/{updatedAfter}", createJobsExportLegacyHandler(app))
 
 		expensesGroup := se.Router.Group("/api/expenses")
 		expensesGroup.Bind(apis.RequireAuth("users"))

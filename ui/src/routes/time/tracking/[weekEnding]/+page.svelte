@@ -135,7 +135,7 @@
 
   async function downloadJson() {
     try {
-      const data = await pb.send(`/api/time_sheets/${weekEnding}/export_legacy`, { method: "GET" });
+      const data = await pb.send(`/api/export_legacy/time_sheets/${weekEnding}`, { method: "GET" });
       const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
