@@ -12,7 +12,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-const MACHINE_SECRET_ID = "legacy_time_writeback"
+const MACHINE_SECRET_ID = "machinekey00001"
 
 type timeEntryExport struct {
 	Id                  string  `db:"id" json:"id"`

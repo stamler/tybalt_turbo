@@ -10,7 +10,7 @@ import (
 
 func TestTimesheetExportLegacyAuth(t *testing.T) {
 	// The test database has a machine_secrets record with:
-	// id: legacy_time_writeback
+	// id: machinekey00001
 	// salt: testsalt
 	// secret: test-secret-123
 	// sha256_hash: SHA256("testsalt" + "test-secret-123")

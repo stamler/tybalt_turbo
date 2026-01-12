@@ -12,7 +12,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-const JOBS_MACHINE_SECRET_ID = "legacy_jobs_writeback"
+const JOBS_MACHINE_SECRET_ID = "machinekey00001"
 
 // formatDisplayName returns "Given Surname" or empty string if both are empty
 func formatDisplayName(givenName, surname string) string {
