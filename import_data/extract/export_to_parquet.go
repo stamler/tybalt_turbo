@@ -142,13 +142,15 @@ func ToParquet(sourceSQLiteDb string) {
 		// Read from MySQL and export to Parquet
 		var query string
 
-		if table == "Jobs" {
+		switch table {
+		case "Jobs":
 			// Specific query for Jobs table to format dates as strings (YYYY-MM-DD or empty)
-			// and add pocketbase_id. Use %% for literal % in fmt.Sprintf. pocketbase_id
-			// is already in the table derived from MD5 of the id.
+			// and use immutableID as pocketbase_id. Use %% for literal % in fmt.Sprintf.
+			// immutableID is the stable ID from Firestore that enables round-trip writebacks.
 			query = fmt.Sprintf(`
 				COPY (
-					SELECT * EXCLUDE (projectAwardDate, proposalOpeningDate, proposalSubmissionDueDate),
+					SELECT * EXCLUDE (projectAwardDate, proposalOpeningDate, proposalSubmissionDueDate, pocketbase_id),
+						immutableID AS pocketbase_id,
 						strftime(projectAwardDate, '%%Y-%%m-%%d') AS projectAwardDate,
 						strftime(proposalOpeningDate, '%%Y-%%m-%%d') AS proposalOpeningDate,
 						strftime(proposalSubmissionDueDate, '%%Y-%%m-%%d') AS proposalSubmissionDueDate,
@@ -156,7 +158,7 @@ func ToParquet(sourceSQLiteDb string) {
 				) TO 'parquet/Jobs.parquet' (FORMAT PARQUET)
 		 `)
 
-		} else if table == "Profiles" {
+		case "Profiles":
 			// Specific query for Profiles to add both pocketbase_id and pocketbase_uid
 			// Use different random seeds to avoid potential caching issues if needed.
 			// pocketbase_id is already in the table derived from LEFT 15 characters of ID
@@ -165,7 +167,7 @@ func ToParquet(sourceSQLiteDb string) {
 				COPY ( SELECT * FROM mysql_db.Profiles ) TO 'parquet/Profiles.parquet' (FORMAT PARQUET)
 			`
 
-		} else if table == "TimeSheets" {
+		case "TimeSheets":
 			// weekEnding should be a string in the format YYYY-MM-DD
 			query = `
 				COPY (
@@ -174,7 +176,7 @@ func ToParquet(sourceSQLiteDb string) {
 					FROM mysql_db.TimeSheets
 				) TO 'parquet/TimeSheets.parquet' (FORMAT PARQUET)
 			`
-		} else if table == "TimeEntries" {
+		case "TimeEntries":
 			// weekEnding should be a string in the format YYYY-MM-DD
 			// Generate deterministic pocketbase_id using MD5 hash of the existing id
 			query = `
@@ -185,7 +187,7 @@ func ToParquet(sourceSQLiteDb string) {
 					FROM mysql_db.TimeEntries
 				) TO 'parquet/TimeEntries.parquet' (FORMAT PARQUET)
 			`
-		} else if table == "TimeAmendments" {
+		case "TimeAmendments":
 			// weekEnding should be a string in the format YYYY-MM-DD
 			// pocketbase_id is already in the table derived from LEFT 15 characters of ID
 			query = `
@@ -197,17 +199,17 @@ func ToParquet(sourceSQLiteDb string) {
 					FROM mysql_db.TimeAmendments
 				) TO 'parquet/TimeAmendments.parquet' (FORMAT PARQUET)
 			`
-		} else if table == "Expenses" {
+		case "Expenses":
 			// pocketbase_id is already in the table
 			query = `
 				COPY ( SELECT * FROM mysql_db.Expenses ) TO 'parquet/Expenses.parquet' (FORMAT PARQUET)
 			`
-		} else if table == "MileageResetDates" {
+		case "MileageResetDates":
 			// pocketbase_id is already in the table
 			query = `
 				COPY ( SELECT pocketbase_id, CAST(date AS VARCHAR) AS date FROM mysql_db.MileageResetDates ) TO 'parquet/MileageResetDates.parquet' (FORMAT PARQUET)
 				`
-		} else {
+		default:
 			// Generic query for other tables, just adding pocketbase_id
 			// Generate deterministic pocketbase_id using MD5 hash of the existing id
 			query = fmt.Sprintf(`
