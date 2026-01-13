@@ -188,14 +188,17 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			// Now update the references
 			// If the table has an _imported column, also set it to false to ensure
 			// the change is written back to the legacy system (since this direct SQL
-			// update bypasses PocketBase hooks that normally handle this)
+			// update bypasses PocketBase hooks that normally handle this).
+			// We also update the `updated` field since direct SQL bypasses PocketBase's
+			// autodate hooks. This is important for writeback queries that filter by
+			// updated timestamp.
 			importedClause := ""
 			hasImported, err := utilities.TableHasImportedColumn(txApp, ref.Table)
 			if err != nil {
 				return fmt.Errorf("checking _imported column in %s: %w", ref.Table, err)
 			}
 			if hasImported {
-				importedClause = ", _imported = false"
+				importedClause = ", _imported = false, updated = strftime('%Y-%m-%d %H:%M:%fZ', 'now')"
 			}
 			updateQuery := fmt.Sprintf(`
 				UPDATE %[1]s 
