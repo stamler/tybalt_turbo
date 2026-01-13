@@ -48,76 +48,84 @@ func parseFloatMap(jsonStr string) map[string]float64 {
 	return result
 }
 
-// Nested structs for extra Turbo data in job export
-type jobExportClientRow struct {
-	Id                      string `json:"id"`
-	Name                    string `json:"name"`
-	BusinessDevelopmentLead string `json:"business_development_lead,omitempty"`
+// Wrapper response struct for structured jobs writeback
+type jobsWritebackResponse struct {
+	Jobs           []jobExportOutput     `json:"jobs"`
+	Clients        []clientExportOutput  `json:"clients"`
+	ClientContacts []contactExportOutput `json:"clientContacts"`
 }
 
-type jobExportContactRow struct {
+// Client export struct for separate clients array
+type clientExportOutput struct {
+	Id                      string `json:"id"`
+	Name                    string `json:"name"`
+	BusinessDevelopmentLead string `json:"businessDevelopmentLead,omitempty"` // legacy_uid of the user
+}
+
+// Client contact export struct for separate clientContacts array
+type contactExportOutput struct {
 	Id        string `json:"id"`
 	Surname   string `json:"surname"`
-	GivenName string `json:"given_name"`
+	GivenName string `json:"givenName"`
 	Email     string `json:"email,omitempty"`
+	ClientId  string `json:"clientId"`
 }
 
-type jobExportManagerRow struct {
-	Uid       string `json:"uid"`
-	GivenName string `json:"given_name"`
-	Surname   string `json:"surname"`
-}
-
-type jobExportJobOwnerRow struct {
-	Id                      string `json:"id"`
-	Name                    string `json:"name"`
-	BusinessDevelopmentLead string `json:"business_development_lead,omitempty"`
-}
-
-// Internal struct for DB scanning
+// Internal struct for DB scanning - simplified to only include ID references for relationships
 type jobExportDBRow struct {
-	Id                              string  `db:"id"`
-	Number                          string  `db:"number"`
-	Description                     string  `db:"description"`
-	Status                          string  `db:"status"`
-	Parent                          string  `db:"parent"`
-	ProposalNumber                  string  `db:"proposal_number"`
-	ProposalId                      string  `db:"proposal_id"`
-	FnAgreement                     bool    `db:"fn_agreement"`
-	ProjectAwardDate                string  `db:"project_award_date"`
-	ProposalOpeningDate             string  `db:"proposal_opening_date"`
-	ProposalSubmissionDueDate       string  `db:"proposal_submission_due_date"`
-	Location                        string  `db:"location"`
-	OutstandingBalance              float64 `db:"outstanding_balance"`
-	OutstandingBalanceDate          string  `db:"outstanding_balance_date"`
-	AuthorizingDocument             string  `db:"authorizing_document"`
-	ClientPo                        string  `db:"client_po"`
-	ClientReferenceNumber           string  `db:"client_reference_number"`
-	Created                         string  `db:"created"`
-	Updated                         string  `db:"updated"`
-	CategoriesJSON                  string  `db:"categories_json"`
-	DivisionsJSON                   string  `db:"divisions_json"`
-	TimeAllocationsJSON             string  `db:"time_allocations_json"`
-	ClientName                      string  `db:"client_name"`
-	ClientID                        string  `db:"client_id"`
-	ClientBusinessDevelopmentLead   string  `db:"client_business_development_lead"`
-	ContactSurname                  string  `db:"contact_surname"`
-	ContactGivenName                string  `db:"contact_given_name"`
-	ContactEmail                    string  `db:"contact_email"`
-	ContactID                       string  `db:"contact_id"`
-	ManagerUid                      string  `db:"manager_uid"`
-	ManagerGivenName                string  `db:"manager_given_name"`
-	ManagerSurname                  string  `db:"manager_surname"`
-	AlternateManagerUid             string  `db:"alternate_manager_uid"`
-	AlternateManagerGivenName       string  `db:"alternate_manager_given_name"`
-	AlternateManagerSurname         string  `db:"alternate_manager_surname"`
-	JobOwnerName                    string  `db:"job_owner_name"`
-	JobOwnerID                      string  `db:"job_owner_id"`
-	JobOwnerBusinessDevelopmentLead string  `db:"job_owner_business_development_lead"`
-	BranchCode                      string  `db:"branch_code"`
+	Id                        string  `db:"id"`
+	Number                    string  `db:"number"`
+	Description               string  `db:"description"`
+	Status                    string  `db:"status"`
+	Parent                    string  `db:"parent"`
+	ProposalNumber            string  `db:"proposal_number"`
+	ProposalId                string  `db:"proposal_id"`
+	FnAgreement               bool    `db:"fn_agreement"`
+	ProjectAwardDate          string  `db:"project_award_date"`
+	ProposalOpeningDate       string  `db:"proposal_opening_date"`
+	ProposalSubmissionDueDate string  `db:"proposal_submission_due_date"`
+	Location                  string  `db:"location"`
+	OutstandingBalance        float64 `db:"outstanding_balance"`
+	OutstandingBalanceDate    string  `db:"outstanding_balance_date"`
+	AuthorizingDocument       string  `db:"authorizing_document"`
+	ClientPo                  string  `db:"client_po"`
+	ClientReferenceNumber     string  `db:"client_reference_number"`
+	Created                   string  `db:"created"`
+	Updated                   string  `db:"updated"`
+	CategoriesJSON            string  `db:"categories_json"`
+	DivisionsJSON             string  `db:"divisions_json"`
+	TimeAllocationsJSON       string  `db:"time_allocations_json"`
+	// Simple ID references (full data is in separate clients/contacts arrays)
+	ClientID           string `db:"client_id"`
+	ClientName         string `db:"client_name"`
+	ContactID          string `db:"contact_id"`
+	ContactDisplayName string `db:"contact_display_name"`
+	ManagerUid         string `db:"manager_uid"`
+	ManagerDisplayName string `db:"manager_display_name"`
+	AltManagerUid      string `db:"alt_manager_uid"`
+	AltManagerDisplay  string `db:"alt_manager_display"`
+	JobOwnerID         string `db:"job_owner_id"`
+	JobOwnerName       string `db:"job_owner_name"`
+	BranchCode         string `db:"branch_code"`
 }
 
-// Output struct matching legacy Firestore format with _row objects for extra data
+// Internal struct for DB scanning - clients query
+type clientExportDBRow struct {
+	Id                      string `db:"id"`
+	Name                    string `db:"name"`
+	BusinessDevelopmentLead string `db:"business_development_lead"` // legacy_uid from admin_profiles
+}
+
+// Internal struct for DB scanning - contacts query
+type contactExportDBRow struct {
+	Id        string `db:"id"`
+	Surname   string `db:"surname"`
+	GivenName string `db:"given_name"`
+	Email     string `db:"email"`
+	ClientId  string `db:"client_id"`
+}
+
+// Output struct matching legacy Firestore format with ID references instead of _row objects
 type jobExportOutput struct {
 	// Legacy-compatible top-level fields
 	ImmutableID                 string  `json:"immutableID"`
@@ -126,7 +134,6 @@ type jobExportOutput struct {
 	Status                      string  `json:"status"`
 	Client                      string  `json:"client"`
 	ClientContact               string  `json:"clientContact"`
-	Manager                     string  `json:"manager"`
 	ManagerDisplayName          string  `json:"managerDisplayName"`
 	ManagerUid                  string  `json:"managerUid"`
 	Branch                      string  `json:"branch"`
@@ -152,14 +159,12 @@ type jobExportOutput struct {
 	Divisions          []string           `json:"divisions"`
 	JobTimeAllocations map[string]float64 `json:"jobTimeAllocations"`
 
-	// Extra Turbo data scoped in _row objects (for related collections)
-	ClientRow           *jobExportClientRow   `json:"client_row"`
-	ContactRow          *jobExportContactRow  `json:"contact_row,omitempty"`
-	ManagerRow          *jobExportManagerRow  `json:"manager_row,omitempty"`
-	AlternateManagerRow *jobExportManagerRow  `json:"alternate_manager_row,omitempty"`
-	JobOwnerRow         *jobExportJobOwnerRow `json:"job_owner_row,omitempty"`
-	ParentId            string                `json:"parent_id,omitempty"`
-	ProposalId          string                `json:"proposal_id,omitempty"`
+	// ID references to separate clients/contacts arrays (replaces _row objects)
+	ClientId        string `json:"clientId"`
+	JobOwnerId      string `json:"jobOwnerId,omitempty"`
+	ClientContactId string `json:"clientContactId,omitempty"`
+	ParentId        string `json:"parentId,omitempty"`
+	ProposalId      string `json:"proposalId,omitempty"`
 }
 
 func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) error {
@@ -196,7 +201,8 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 			return e.Error(http.StatusBadRequest, "updatedAfter is required", nil)
 		}
 
-		query := `
+		// Query 1: Jobs with simplified fields (ID references instead of denormalized data)
+		jobsQuery := `
 			SELECT j.id, 
 			  j.number, 
 			  j.description,
@@ -219,63 +225,91 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 			  COALESCE(j.parent, '') AS parent,
 			  COALESCE(jp.number, '') AS proposal_number,
 			  COALESCE(j.proposal, '') AS proposal_id,
-			  c.name AS client_name,
-			  c.id AS client_id,
-			  COALESCE(c.business_development_lead, '') AS client_business_development_lead,
-			  COALESCE(co.surname, '') AS contact_surname,
-			  COALESCE(co.given_name, '') AS contact_given_name,
-			  COALESCE(co.email, '') AS contact_email,
-			  COALESCE(co.id, '') AS contact_id,
-			  COALESCE(j.manager, '') AS manager_uid,
-			  COALESCE(p.given_name, '') AS manager_given_name,
-			  COALESCE(p.surname, '') AS manager_surname,
-			  COALESCE(j.alternate_manager, '') AS alternate_manager_uid,
-			  COALESCE(pa.given_name, '') AS alternate_manager_given_name,
-			  COALESCE(pa.surname, '') AS alternate_manager_surname,
+			  COALESCE(j.client, '') AS client_id,
+			  COALESCE(c.name, '') AS client_name,
+			  COALESCE(j.contact, '') AS contact_id,
+			  COALESCE(co.given_name || ' ' || co.surname, '') AS contact_display_name,
+			  COALESCE(apm.legacy_uid, '') AS manager_uid,
+			  COALESCE(p.given_name || ' ' || p.surname, '') AS manager_display_name,
+			  COALESCE(apam.legacy_uid, '') AS alt_manager_uid,
+			  COALESCE(pa.given_name || ' ' || pa.surname, '') AS alt_manager_display,
+			  COALESCE(j.job_owner, '') AS job_owner_id,
 			  COALESCE(jo.name, '') AS job_owner_name,
-			  COALESCE(jo.id, '') AS job_owner_id,
-			  COALESCE(jo.business_development_lead, '') AS job_owner_business_development_lead,
 			  b.code AS branch_code
 			FROM jobs j
 			LEFT JOIN clients c ON j.client = c.id
 			LEFT JOIN client_contacts co ON j.contact = co.id
 			LEFT JOIN profiles p ON j.manager = p.uid
+			LEFT JOIN admin_profiles apm ON j.manager = apm.uid
 			LEFT JOIN profiles pa ON j.alternate_manager = pa.uid
+			LEFT JOIN admin_profiles apam ON j.alternate_manager = apam.uid
 			LEFT JOIN clients jo ON j.job_owner = jo.id
 			LEFT JOIN branches b ON j.branch = b.id
 			LEFT JOIN jobs jp ON j.proposal = jp.id
 			WHERE j.updated >= {:updatedAfter} AND j._imported = 0
 		`
 
-		var dbRows []jobExportDBRow
-		if err := app.DB().NewQuery(query).Bind(dbx.Params{
+		var jobRows []jobExportDBRow
+		if err := app.DB().NewQuery(jobsQuery).Bind(dbx.Params{
 			"updatedAfter": updatedAfter,
-		}).All(&dbRows); err != nil {
+		}).All(&jobRows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to query jobs: "+err.Error(), nil)
 		}
 
-		// Convert DB rows to output format
-		output := make([]jobExportOutput, len(dbRows))
-		for i, r := range dbRows {
-			// Format display names
-			managerDisplayName := formatDisplayName(r.ManagerGivenName, r.ManagerSurname)
-			altManagerDisplayName := formatDisplayName(r.AlternateManagerGivenName, r.AlternateManagerSurname)
-			clientContact := formatDisplayName(r.ContactGivenName, r.ContactSurname)
+		// Query 2: Unique clients (union of client and job_owner from matched jobs)
+		// Convert business_development_lead to legacy_uid via admin_profiles join
+		clientsQuery := `
+			SELECT DISTINCT cl.id, cl.name, COALESCE(ap.legacy_uid, '') AS business_development_lead
+			FROM (
+				SELECT j.client AS client_id FROM jobs j 
+				WHERE j.updated >= {:updatedAfter} AND j._imported = 0 AND j.client IS NOT NULL AND j.client != ''
+				UNION
+				SELECT j.job_owner AS client_id FROM jobs j 
+				WHERE j.updated >= {:updatedAfter} AND j._imported = 0 AND j.job_owner IS NOT NULL AND j.job_owner != ''
+			) AS refs
+			JOIN clients cl ON refs.client_id = cl.id
+			LEFT JOIN admin_profiles ap ON cl.business_development_lead = ap.uid
+		`
 
-			output[i] = jobExportOutput{
+		var clientRows []clientExportDBRow
+		if err := app.DB().NewQuery(clientsQuery).Bind(dbx.Params{
+			"updatedAfter": updatedAfter,
+		}).All(&clientRows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to query clients: "+err.Error(), nil)
+		}
+
+		// Query 3: Unique client contacts referenced by matched jobs
+		contactsQuery := `
+			SELECT DISTINCT co.id, co.surname, co.given_name, COALESCE(co.email, '') AS email, COALESCE(co.client, '') AS client_id
+			FROM jobs j
+			JOIN client_contacts co ON j.contact = co.id
+			WHERE j.updated >= {:updatedAfter} AND j._imported = 0
+		`
+
+		var contactRows []contactExportDBRow
+		if err := app.DB().NewQuery(contactsQuery).Bind(dbx.Params{
+			"updatedAfter": updatedAfter,
+		}).All(&contactRows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to query contacts: "+err.Error(), nil)
+		}
+
+		// Convert job DB rows to output format
+		jobs := make([]jobExportOutput, len(jobRows))
+		for i, r := range jobRows {
+			jobs[i] = jobExportOutput{
 				// Legacy-compatible fields
 				ImmutableID:                 r.Id,
 				Number:                      r.Number,
 				Description:                 r.Description,
 				Status:                      r.Status,
 				Client:                      r.ClientName,
-				ClientContact:               clientContact,
-				ManagerDisplayName:          managerDisplayName,
+				ClientContact:               strings.TrimSpace(r.ContactDisplayName),
+				ManagerDisplayName:          strings.TrimSpace(r.ManagerDisplayName),
 				ManagerUid:                  r.ManagerUid,
 				Branch:                      r.BranchCode,
 				JobOwner:                    r.JobOwnerName,
-				AlternateManagerUid:         r.AlternateManagerUid,
-				AlternateManagerDisplayName: altManagerDisplayName,
+				AlternateManagerUid:         r.AltManagerUid,
+				AlternateManagerDisplayName: strings.TrimSpace(r.AltManagerDisplay),
 				Proposal:                    r.ProposalNumber,
 				FnAgreement:                 r.FnAgreement,
 				ProjectAwardDate:            r.ProjectAwardDate,
@@ -295,48 +329,42 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 				Divisions:          parseStringArray(r.DivisionsJSON),
 				JobTimeAllocations: parseFloatMap(r.TimeAllocationsJSON),
 
-				// Extra Turbo data in _row objects (for related collections)
-				ClientRow: &jobExportClientRow{
-					Id:                      r.ClientID,
-					Name:                    r.ClientName,
-					BusinessDevelopmentLead: r.ClientBusinessDevelopmentLead,
-				},
-				ParentId:   r.Parent,
-				ProposalId: r.ProposalId,
-			}
-
-			// Only include optional _row objects if they have data
-			if r.ContactID != "" {
-				output[i].ContactRow = &jobExportContactRow{
-					Id:        r.ContactID,
-					Surname:   r.ContactSurname,
-					GivenName: r.ContactGivenName,
-					Email:     r.ContactEmail,
-				}
-			}
-			if r.ManagerUid != "" {
-				output[i].ManagerRow = &jobExportManagerRow{
-					Uid:       r.ManagerUid,
-					GivenName: r.ManagerGivenName,
-					Surname:   r.ManagerSurname,
-				}
-			}
-			if r.AlternateManagerUid != "" {
-				output[i].AlternateManagerRow = &jobExportManagerRow{
-					Uid:       r.AlternateManagerUid,
-					GivenName: r.AlternateManagerGivenName,
-					Surname:   r.AlternateManagerSurname,
-				}
-			}
-			if r.JobOwnerID != "" {
-				output[i].JobOwnerRow = &jobExportJobOwnerRow{
-					Id:                      r.JobOwnerID,
-					Name:                    r.JobOwnerName,
-					BusinessDevelopmentLead: r.JobOwnerBusinessDevelopmentLead,
-				}
+				// ID references to separate arrays
+				ClientId:        r.ClientID,
+				JobOwnerId:      r.JobOwnerID,
+				ClientContactId: r.ContactID,
+				ParentId:        r.Parent,
+				ProposalId:      r.ProposalId,
 			}
 		}
 
-		return e.JSON(http.StatusOK, output)
+		// Convert client DB rows to output format
+		clients := make([]clientExportOutput, len(clientRows))
+		for i, r := range clientRows {
+			clients[i] = clientExportOutput{
+				Id:                      r.Id,
+				Name:                    r.Name,
+				BusinessDevelopmentLead: r.BusinessDevelopmentLead,
+			}
+		}
+
+		// Convert contact DB rows to output format
+		contacts := make([]contactExportOutput, len(contactRows))
+		for i, r := range contactRows {
+			contacts[i] = contactExportOutput{
+				Id:        r.Id,
+				Surname:   r.Surname,
+				GivenName: r.GivenName,
+				Email:     r.Email,
+				ClientId:  r.ClientId,
+			}
+		}
+
+		// Return structured response with all three arrays
+		return e.JSON(http.StatusOK, jobsWritebackResponse{
+			Jobs:           jobs,
+			Clients:        clients,
+			ClientContacts: contacts,
+		})
 	}
 }
