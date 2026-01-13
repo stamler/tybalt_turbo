@@ -186,15 +186,26 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			}
 
 			// Now update the references
+			// If the table has an _imported column, also set it to false to ensure
+			// the change is written back to the legacy system (since this direct SQL
+			// update bypasses PocketBase hooks that normally handle this)
+			importedClause := ""
+			hasImported, err := utilities.TableHasImportedColumn(txApp, ref.Table)
+			if err != nil {
+				return fmt.Errorf("checking _imported column in %s: %w", ref.Table, err)
+			}
+			if hasImported {
+				importedClause = ", _imported = false"
+			}
 			updateQuery := fmt.Sprintf(`
 				UPDATE %[1]s 
-				SET %[2]s = {:target_id} 
+				SET %[2]s = {:target_id}%[3]s 
 				WHERE EXISTS (
 					SELECT 1 
 					FROM ids_to_absorb 
 					WHERE ids_to_absorb.old_id = %[1]s.%[2]s
 				)
-			`, ref.Table, ref.Column)
+			`, ref.Table, ref.Column, importedClause)
 
 			_, err = txApp.NonconcurrentDB().NewQuery(updateQuery).Bind(dbx.Params{
 				"target_id": targetID,

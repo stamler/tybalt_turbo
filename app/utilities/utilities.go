@@ -697,3 +697,22 @@ func MarkImportedFalseIfChanged(record *core.Record) {
 		}
 	}
 }
+
+// TableHasImportedColumn checks if the given table has an _imported column.
+// This is used to determine whether to set _imported = false during operations
+// that use direct SQL updates (bypassing PocketBase hooks).
+func TableHasImportedColumn(app core.App, tableName string) (bool, error) {
+	var columns []struct {
+		Name string `db:"name"`
+	}
+	err := app.DB().NewQuery(fmt.Sprintf("PRAGMA table_info(%s)", tableName)).All(&columns)
+	if err != nil {
+		return false, fmt.Errorf("error checking table columns: %w", err)
+	}
+	for _, col := range columns {
+		if col.Name == "_imported" {
+			return true, nil
+		}
+	}
+	return false, nil
+}

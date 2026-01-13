@@ -272,6 +272,67 @@ func TestAbsorbRecords(t *testing.T) {
 	}
 }
 
+// TestAbsorbSetsImportedFalseOnJobs verifies that when absorbing clients,
+// any jobs that reference the absorbed clients have their _imported flag
+// set to false. This is necessary because absorb uses direct SQL updates
+// which bypass PocketBase hooks, so we need to explicitly flag these jobs
+// for writeback to the legacy system.
+func TestAbsorbSetsImportedFalseOnJobs(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// The test data has:
+	// - Job u09fwwcg07y03m7 with client pqpd90fqd5ohjcs
+	// - Job zke3cs3yipplwtu with client eldtxi3i4h00k8r
+	// We will absorb these clients into lb0fnenkeyitsny
+
+	targetID := "lb0fnenkeyitsny"
+	idsToAbsorb := []string{"eldtxi3i4h00k8r", "pqpd90fqd5ohjcs"}
+	jobsToCheck := []string{"u09fwwcg07y03m7", "zke3cs3yipplwtu"}
+
+	// First, set _imported = true on the jobs that will be affected
+	for _, jobID := range jobsToCheck {
+		_, err := app.NonconcurrentDB().NewQuery("UPDATE jobs SET _imported = true WHERE id = {:id}").Bind(dbx.Params{"id": jobID}).Execute()
+		if err != nil {
+			t.Fatalf("failed to set _imported = true on job %s: %v", jobID, err)
+		}
+	}
+
+	// Verify _imported is true before absorb
+	for _, jobID := range jobsToCheck {
+		var result struct {
+			Imported bool `db:"_imported"`
+		}
+		err := app.DB().NewQuery("SELECT _imported FROM jobs WHERE id = {:id}").Bind(dbx.Params{"id": jobID}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to check _imported on job %s: %v", jobID, err)
+		}
+		if !result.Imported {
+			t.Fatalf("_imported should be true before absorb for job %s", jobID)
+		}
+	}
+
+	// Perform the absorb
+	err := routes.AbsorbRecords(app, "clients", targetID, idsToAbsorb)
+	if err != nil {
+		t.Fatalf("failed to absorb: %v", err)
+	}
+
+	// Verify _imported is now false on the affected jobs
+	for _, jobID := range jobsToCheck {
+		var result struct {
+			Imported bool `db:"_imported"`
+		}
+		err := app.DB().NewQuery("SELECT _imported FROM jobs WHERE id = {:id}").Bind(dbx.Params{"id": jobID}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to check _imported on job %s after absorb: %v", jobID, err)
+		}
+		if result.Imported {
+			t.Errorf("_imported should be false after absorb for job %s, but it is still true", jobID)
+		}
+	}
+}
+
 // TestAbsorbRoutes tests the HTTP API endpoints for record absorption
 func TestAbsorbRoutes(t *testing.T) {
 	userToken, err := testutils.GenerateRecordToken("users", "time@test.com")
