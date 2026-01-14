@@ -15,7 +15,7 @@ import (
 
 // The tablesToDump variable is used to specify the tables that should be
 // exported to Parquet format.
-var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs"}
+var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts"}
 
 func ToParquet(sourceSQLiteDb string) {
 	err := godotenv.Load()
@@ -147,6 +147,7 @@ func ToParquet(sourceSQLiteDb string) {
 			// Specific query for Jobs table to format dates as strings (YYYY-MM-DD or empty)
 			// and use immutableID as pocketbase_id. Use %% for literal % in fmt.Sprintf.
 			// immutableID is the stable ID from Firestore that enables round-trip writebacks.
+			// Include clientId, clientContactId, jobOwnerId for hybrid ID resolution on import.
 			query = fmt.Sprintf(`
 				COPY (
 					SELECT * EXCLUDE (projectAwardDate, proposalOpeningDate, proposalSubmissionDueDate, pocketbase_id),
@@ -154,6 +155,9 @@ func ToParquet(sourceSQLiteDb string) {
 						strftime(projectAwardDate, '%%Y-%%m-%%d') AS projectAwardDate,
 						strftime(proposalOpeningDate, '%%Y-%%m-%%d') AS proposalOpeningDate,
 						strftime(proposalSubmissionDueDate, '%%Y-%%m-%%d') AS proposalSubmissionDueDate,
+						clientId,
+						clientContactId,
+						jobOwnerId
 					FROM mysql_db.Jobs
 				) TO 'parquet/Jobs.parquet' (FORMAT PARQUET)
 		 `)
@@ -209,6 +213,24 @@ func ToParquet(sourceSQLiteDb string) {
 			query = `
 				COPY ( SELECT pocketbase_id, CAST(date AS VARCHAR) AS date FROM mysql_db.MileageResetDates ) TO 'parquet/MileageResetDates.parquet' (FORMAT PARQUET)
 				`
+		case "TurboClients":
+			// Export TurboClients for hybrid ID resolution during import.
+			// These are clients that were written back from Turbo with preserved PocketBase IDs.
+			query = `
+				COPY (
+					SELECT id, name, businessDevelopmentLeadUid
+					FROM mysql_db.TurboClients
+				) TO 'parquet/TurboClients.parquet' (FORMAT PARQUET)
+			`
+		case "TurboClientContacts":
+			// Export TurboClientContacts for hybrid ID resolution during import.
+			// These are contacts that were written back from Turbo with preserved PocketBase IDs.
+			query = `
+				COPY (
+					SELECT id, surname, givenName, email, clientId
+					FROM mysql_db.TurboClientContacts
+				) TO 'parquet/TurboClientContacts.parquet' (FORMAT PARQUET)
+			`
 		default:
 			// Generic query for other tables, just adding pocketbase_id
 			// Generate deterministic pocketbase_id using MD5 hash of the existing id

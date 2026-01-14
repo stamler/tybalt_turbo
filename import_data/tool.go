@@ -87,14 +87,24 @@ func main() {
 		fmt.Println("Importing data from Parquet files...")
 
 		// --- Load Clients ---
-		// Define the specific SQL for the clients table
-		clientInsertSQL := "INSERT INTO clients (id, name, _imported) VALUES ({:id}, {:name}, true)"
+		// Define the specific SQL for the clients table.
+		// business_development_lead requires reverse conversion from legacy Firebase UID to PocketBase uid.
+		// The subquery looks up the PocketBase user ID from admin_profiles using the legacy_uid.
+		// If businessDevelopmentLeadUid is empty/NULL, business_development_lead will be NULL.
+		clientInsertSQL := `INSERT INTO clients (id, name, business_development_lead, _imported) 
+			VALUES (
+				{:id}, 
+				{:name}, 
+				(SELECT uid FROM admin_profiles WHERE legacy_uid = {:businessDevelopmentLeadUid} AND {:businessDevelopmentLeadUid} != ''),
+				true
+			)`
 
 		// Define the binder function for the Client type
 		clientBinder := func(item load.Client) dbx.Params {
 			return dbx.Params{
-				"id":   item.Id,
-				"name": item.Name,
+				"id":                         item.Id,
+				"name":                       item.Name,
+				"businessDevelopmentLeadUid": item.BusinessDevelopmentLeadUid,
 			}
 		}
 
@@ -109,8 +119,9 @@ func main() {
 		)
 
 		// --- Load Contacts ---
-		// Define the specific SQL for the contacts table
-		contactInsertSQL := "INSERT INTO client_contacts (id, surname, given_name, client, _imported) VALUES ({:id}, {:surname}, {:given_name}, {:client}, true)"
+		// Define the specific SQL for the contacts table.
+		// Now includes email field for contacts that were written back from Turbo.
+		contactInsertSQL := "INSERT INTO client_contacts (id, surname, given_name, email, client, _imported) VALUES ({:id}, {:surname}, {:given_name}, {:email}, {:client}, true)"
 
 		// Define the binder function for the Contact type
 		contactBinder := func(item load.ClientContact) dbx.Params {
@@ -118,6 +129,7 @@ func main() {
 				"id":         item.Id,
 				"surname":    item.Surname,
 				"given_name": item.GivenName,
+				"email":      item.Email,
 				"client":     item.Client,
 			}
 		}

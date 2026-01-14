@@ -30,14 +30,16 @@ import (
 // TODO: Move these definitions to a more shared location if used outside this package.
 
 type Client struct {
-	Id   string `parquet:"id"`
-	Name string `parquet:"name"`
+	Id                         string `parquet:"id"`
+	Name                       string `parquet:"name"`
+	BusinessDevelopmentLeadUid string `parquet:"businessDevelopmentLeadUid"` // Legacy Firebase UID, needs reverse conversion on import
 }
 
 type ClientContact struct {
 	Id        string `parquet:"id"`
 	Surname   string `parquet:"surname"`
 	GivenName string `parquet:"givenName"`
+	Email     string `parquet:"email"`
 	Client    string `parquet:"client_id"`
 }
 
