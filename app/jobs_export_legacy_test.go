@@ -81,6 +81,32 @@ func TestJobsExportLegacyAuth(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "valid Bearer token with trailing newline returns 200 (simulates secret manager)",
+			Method: http.MethodGet,
+			URL:    "/api/export_legacy/jobs/2000-01-01",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + validToken + "\n",
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				"[", // response is a JSON array
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "valid Bearer token with trailing spaces returns 200",
+			Method: http.MethodGet,
+			URL:    "/api/export_legacy/jobs/2000-01-01",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + validToken + "  ",
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				"[", // response is a JSON array
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "user with report claim returns 200",
 			Method: http.MethodGet,
 			URL:    "/api/export_legacy/jobs/2000-01-01",

@@ -1,6 +1,8 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -210,6 +212,70 @@ func TestCreateMachineSecretTokenValidation(t *testing.T) {
 	if capturedSecret == "" {
 		t.Error("expected to capture a secret from the response")
 	}
+}
+
+// TestCreateMachineSecretHashVerification creates a secret and explicitly verifies
+// that the hash stored in the database matches what we compute from salt + secret.
+// This catches any hash computation mismatches.
+func TestCreateMachineSecretHashVerification(t *testing.T) {
+	adminToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:   "verify created secret hash matches database",
+		Method: http.MethodPost,
+		URL:    "/api/machine_secrets/create",
+		Body:   strings.NewReader(`{"days": 30, "role": "legacy_writeback"}`),
+		Headers: map[string]string{
+			"Authorization": adminToken,
+		},
+		ExpectedStatus: http.StatusCreated,
+		ExpectedContent: []string{
+			`"secret":`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+		AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
+			// Parse the response
+			var response struct {
+				ID     string `json:"id"`
+				Secret string `json:"secret"`
+			}
+			if err := json.NewDecoder(res.Body).Decode(&response); err != nil {
+				t.Fatalf("failed to decode response: %v", err)
+			}
+			t.Logf("Created secret ID: %s", response.ID)
+			t.Logf("Created secret: %s (length: %d)", response.Secret, len(response.Secret))
+
+			// Fetch the record from the database to get the salt and stored hash
+			record, err := app.FindRecordById("machine_secrets", response.ID)
+			if err != nil {
+				t.Fatalf("failed to find created record: %v", err)
+			}
+
+			dbSalt := record.GetString("salt")
+			dbHash := record.GetString("sha256_hash")
+			t.Logf("DB salt: %s (length: %d)", dbSalt, len(dbSalt))
+			t.Logf("DB hash: %s", dbHash)
+
+			// Manually compute the hash the same way ValidateMachineToken does
+			h := sha256.New()
+			h.Write([]byte(dbSalt + response.Secret))
+			computedHash := hex.EncodeToString(h.Sum(nil))
+			t.Logf("Computed hash: %s", computedHash)
+
+			if computedHash != dbHash {
+				t.Errorf("hash mismatch!\n  computed: %s\n  stored:   %s", computedHash, dbHash)
+			}
+
+			// Also verify via ValidateMachineToken
+			if !utilities.ValidateMachineToken(app, response.Secret, "legacy_writeback") {
+				t.Error("ValidateMachineToken should return true for the created secret")
+			}
+		},
+	}
+	scenario.Test(t)
 }
 
 func TestListMachineSecretsAuth(t *testing.T) {

@@ -123,7 +123,8 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 		authorized := false
 		authHeader := e.Request.Header.Get("Authorization")
 		if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
-			token := strings.TrimPrefix(authHeader, "Bearer ")
+			// TrimSpace handles trailing newlines from secret managers
+			token := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
 			if utilities.ValidateMachineToken(app, token, "legacy_writeback") {
 				authorized = true
 			}
