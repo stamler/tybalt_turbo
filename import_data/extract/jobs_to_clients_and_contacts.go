@@ -345,7 +345,10 @@ func buildHybridQuery(turboClientsExists, turboContactsExists bool) string {
 
 		UPDATE jobs SET client_id = clients.id FROM clients WHERE jobs.t_client = clients.name;
 		UPDATE jobs SET job_owner_id = clients.id FROM clients WHERE jobs.t_jobOwner = clients.name;
-		UPDATE jobs SET contact_id = contacts.id FROM contacts WHERE jobs.t_clientContact = contacts.name;
+		-- Join on BOTH contact name AND client to avoid assigning wrong contact when
+		-- multiple contacts share the same name but belong to different clients
+		UPDATE jobs SET contact_id = contacts.id FROM contacts 
+		WHERE jobs.t_clientContact = contacts.name AND jobs.client_id = contacts.client_id;
 	`
 	}
 
