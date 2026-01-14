@@ -179,6 +179,7 @@ export const navSections: NavSection[] = [
     items: [
       { label: "Time Types", href: "/timetypes", buttons: [] },
       { label: "Divisions", href: "/divisions", buttons: [] },
+      { label: "Machine Secrets", href: "/machine_secrets", buttons: [] },
     ],
   },
 ];

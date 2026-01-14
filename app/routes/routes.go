@@ -190,6 +190,13 @@ func AddRoutes(app core.App) {
 		reportsGroup.GET("/weekly_expense/{date_column_value}", reports.CreateExpenseReportHandler(app, "committed_week_ending"))
 		reportsGroup.GET("/payroll_receipts/{date_column_value}", reports.CreateReceiptsReportHandler(app, "pay_period_ending"))
 		reportsGroup.GET("/weekly_receipts/{date_column_value}", reports.CreateReceiptsReportHandler(app, "committed_week_ending"))
+
+		// Machine secrets management (admin only)
+		machineSecretsGroup := se.Router.Group("/api/machine_secrets")
+		machineSecretsGroup.Bind(apis.RequireAuth("users"))
+		machineSecretsGroup.GET("/list", listMachineSecretsHandler(app))
+		machineSecretsGroup.POST("/create", createMachineSecretHandler(app))
+
 		return se.Next()
 	})
 

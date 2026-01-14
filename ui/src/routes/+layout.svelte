@@ -57,7 +57,8 @@
                 if (
                   item.href.startsWith("/admin_profiles") ||
                   item.href.startsWith("/timetypes") ||
-                  item.href.startsWith("/divisions")
+                  item.href.startsWith("/divisions") ||
+                  item.href.startsWith("/machine_secrets")
                 ) {
                   return $globalStore.claims.includes("admin");
                 }
