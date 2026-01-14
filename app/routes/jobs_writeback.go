@@ -1,8 +1,6 @@
 package routes
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -11,8 +9,6 @@ import (
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
-
-const JOBS_MACHINE_SECRET_ID = "machinekey00001"
 
 // formatDisplayName returns "Given Surname" or empty string if both are empty
 func formatDisplayName(givenName, surname string) string {
@@ -169,19 +165,13 @@ type jobExportOutput struct {
 
 func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		// Try machine auth first (Bearer token)
+		// Try machine auth first (Bearer token matching any unexpired legacy_writeback secret)
 		authorized := false
 		authHeader := e.Request.Header.Get("Authorization")
 		if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
 			token := strings.TrimPrefix(authHeader, "Bearer ")
-			if record, err := app.FindRecordById("machine_secrets", JOBS_MACHINE_SECRET_ID); err == nil {
-				salt := record.GetString("salt")
-				storedHash := record.GetString("sha256_hash")
-				h := sha256.New()
-				h.Write([]byte(salt + token))
-				if hex.EncodeToString(h.Sum(nil)) == storedHash {
-					authorized = true
-				}
+			if utilities.ValidateMachineToken(app, token, "legacy_writeback") {
+				authorized = true
 			}
 		}
 

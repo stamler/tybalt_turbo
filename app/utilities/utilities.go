@@ -3,6 +3,8 @@
 package utilities
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -715,4 +717,34 @@ func TableHasImportedColumn(app core.App, tableName string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+// ValidateMachineToken checks if a token matches any unexpired machine_secrets
+// record with the specified role. Returns true if the token is valid.
+func ValidateMachineToken(app core.App, token string, role string) bool {
+	records, err := app.FindRecordsByFilter(
+		"machine_secrets",
+		"role = {:role} && expiry > {:now}",
+		"", // sort
+		0,  // limit (0 = all)
+		0,  // offset
+		dbx.Params{
+			"role": role,
+			"now":  time.Now().UTC().Format("2006-01-02 15:04:05"),
+		},
+	)
+	if err != nil || len(records) == 0 {
+		return false
+	}
+
+	for _, record := range records {
+		salt := record.GetString("salt")
+		storedHash := record.GetString("sha256_hash")
+		h := sha256.New()
+		h.Write([]byte(salt + token))
+		if hex.EncodeToString(h.Sum(nil)) == storedHash {
+			return true
+		}
+	}
+	return false
 }
