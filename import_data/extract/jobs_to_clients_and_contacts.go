@@ -12,16 +12,31 @@ import (
 // to reference clients and contacts via IDs.
 //
 // HYBRID ID RESOLUTION:
-// This function implements hybrid ID resolution for clients and contacts:
-//  1. If a job has clientId/jobOwnerId/clientContactId populated (from Turbo writeback),
-//     use that preserved PocketBase ID and pull data from TurboClients/TurboClientContacts.
-//  2. If a job does NOT have these ID fields populated (legacy-only job),
-//     generate a deterministic ID using MD5 hash of the name.
+// This function implements hybrid ID resolution for clients, job owners, and contacts.
+//
+// For CLIENTS and JOB OWNERS (both resolve to the clients table):
+//  1. PRESERVED ID: If job has clientId/jobOwnerId populated (from Turbo writeback),
+//     use that preserved PocketBase ID.
+//  2. EXACT NAME MATCH: If no preserved ID, but exactly ONE TurboClient exists with
+//     the same name, use that TurboClient's ID. This links legacy-only jobs to
+//     existing Turbo clients without creating duplicates.
+//  3. GENERATED ID: Fallback to deterministic MD5-based ID from the name.
+//
+// For CONTACTS:
+//  1. PRESERVED ID: If job has clientContactId populated, use that ID.
+//  2. GENERATED ID: Otherwise, generate from contact_name + client_name.
+//     (Name matching is NOT used for contacts - they can be absorbed later)
+//
+// IMPORTANT: A contact's "client" field IS resolved using the same priority chain
+// as clients (preserved > name match > generated), ensuring newly created contacts
+// are linked to the correct client record.
 //
 // This ensures that:
 // - Turbo-created/edited jobs preserve their original PocketBase IDs
-// - Legacy-only jobs get consistent generated IDs
+// - Legacy-only jobs link to existing Turbo clients when names match exactly
+// - Legacy-only jobs get consistent generated IDs when no match exists
 // - Only clients/contacts referenced by jobs are imported (no orphans)
+// - Contacts always belong to the correctly-resolved client
 func jobsToClientsAndContacts() {
 
 	db, err := openDuckDB()
@@ -106,9 +121,36 @@ func buildHybridQuery(turboClientsExists, turboContactsExists bool) string {
 	// Build clients table with hybrid ID resolution
 	if turboClientsExists {
 		query += `
-		-- Build clients with hybrid ID resolution
-		-- Priority: Use preserved ID from TurboClients if job has clientId/jobOwnerId,
-		-- otherwise generate ID from client name
+		-- =============================================================================
+		-- CLIENT/JOB OWNER ID RESOLUTION
+		-- =============================================================================
+		-- This resolves client and job owner references from legacy jobs to PocketBase IDs.
+		-- Both "client" and "jobOwner" fields on jobs resolve to records in the clients table.
+		--
+		-- RESOLUTION PRIORITY (applied in order):
+		--   1. PRESERVED ID: If the job has clientId/jobOwnerId populated (from Turbo 
+		--      writeback), use that exact ID. This preserves IDs for jobs that were 
+		--      created or edited in Turbo.
+		--
+		--   2. EXACT NAME MATCH: If the job has no preserved ID, but exactly ONE 
+		--      TurboClient exists with the same name, use that TurboClient's ID.
+		--      This links legacy-only jobs to existing Turbo clients without creating
+		--      duplicates. The "exactly one" constraint prevents ambiguous matches.
+		--
+		--   3. GENERATED ID: Fallback to a deterministic MD5-based ID derived from
+		--      the client name. This ensures consistent IDs across repeated imports
+		--      for truly new clients that don't exist in Turbo yet.
+		--
+		-- IMPORTANT - CONTACTS:
+		-- Contact IDs do NOT use name matching (only preserved ID or generated ID).
+		-- This is intentional - contact name matching is ambiguous since contacts
+		-- are identified by name AND their parent client. Duplicate contacts may be
+		-- created for legacy jobs, but these can be manually merged ("absorbed") later.
+		--
+		-- However, a contact's "client" field IS resolved using the same priority chain
+		-- above, ensuring newly created contacts are linked to the correct client
+		-- (whether that client was preserved, name-matched, or generated).
+		-- =============================================================================
 		CREATE TABLE clients AS
 		WITH client_refs AS (
 			-- Get all client references from jobs (both client and jobOwner)
@@ -126,22 +168,30 @@ func buildHybridQuery(turboClientsExists, turboContactsExists bool) string {
 		),
 		resolved AS (
 			SELECT
-				-- If turbo_id is populated, use it; otherwise generate from name
+				-- Resolution priority: preserved ID > exact name match > generated ID
 				CASE
+					-- Priority 1: Use preserved ID from job if available
 					WHEN cr.turbo_id IS NOT NULL AND cr.turbo_id != ''
 					THEN cr.turbo_id
+					-- Priority 2: Exact name match against TurboClients (only if exactly 1 match)
+					WHEN (SELECT COUNT(*) FROM turbo_clients tc2 WHERE tc2.name = cr.name) = 1
+					THEN (SELECT tc2.id FROM turbo_clients tc2 WHERE tc2.name = cr.name)
+					-- Priority 3: Generate deterministic ID from name
 					ELSE make_pocketbase_id(cr.name, 15)
 				END AS id,
-				-- If turbo_id is populated, get name from TurboClients; otherwise use job's client name
+				-- Get client name: prefer TurboClients data when matched by ID
 				CASE
 					WHEN cr.turbo_id IS NOT NULL AND cr.turbo_id != ''
 					THEN COALESCE(tc.name, cr.name)
+					-- For name match and generated cases, use the job's client name
 					ELSE cr.name
 				END AS name,
-				-- businessDevelopmentLeadUid only available from TurboClients
+				-- businessDevelopmentLeadUid: pull from TurboClients when matched
 				CASE
 					WHEN cr.turbo_id IS NOT NULL AND cr.turbo_id != ''
 					THEN tc.businessDevelopmentLeadUid
+					WHEN (SELECT COUNT(*) FROM turbo_clients tc2 WHERE tc2.name = cr.name) = 1
+					THEN (SELECT tc2.businessDevelopmentLeadUid FROM turbo_clients tc2 WHERE tc2.name = cr.name)
 					ELSE NULL
 				END AS businessDevelopmentLeadUid
 			FROM client_refs cr
@@ -177,7 +227,21 @@ func buildHybridQuery(turboClientsExists, turboContactsExists bool) string {
 	// Build contacts table with hybrid ID resolution
 	if turboContactsExists {
 		query += `
-		-- Build contacts with hybrid ID resolution
+		-- =============================================================================
+		-- CONTACT ID RESOLUTION
+		-- =============================================================================
+		-- Contact IDs use a simpler resolution than clients:
+		--   1. PRESERVED ID: If job has clientContactId, use it
+		--   2. GENERATED ID: Otherwise, generate from contact_name + client_name
+		--
+		-- Name matching is NOT used for contacts because:
+		--   - Contacts are identified by name AND parent client (ambiguous matching)
+		--   - Duplicate contacts can be manually absorbed later
+		--
+		-- CRITICAL: The contact's "client" field uses the same resolution priority
+		-- as clients (preserved > name match > generated) to ensure contacts are
+		-- linked to the correct client record.
+		-- =============================================================================
 		CREATE TABLE contacts_resolved AS
 		WITH contact_refs AS (
 			-- Get all contact references from jobs
@@ -191,7 +255,7 @@ func buildHybridQuery(turboClientsExists, turboContactsExists bool) string {
 		),
 		resolved AS (
 			SELECT
-				-- If turbo_id is populated, use it; otherwise generate from contact+client name
+				-- Contact ID: preserved or generated (no name matching)
 				CASE
 					WHEN cr.turbo_id IS NOT NULL AND cr.turbo_id != ''
 					THEN cr.turbo_id
@@ -213,13 +277,18 @@ func buildHybridQuery(turboClientsExists, turboContactsExists bool) string {
 					THEN COALESCE(tc.email, '')
 					ELSE ''
 				END AS email,
-				-- Determine client_id: use TurboClientContacts.clientId if available,
-				-- else use job's clientId if available, else generate from client name
+				-- Client ID resolution: SAME PRIORITY as clients table
+				--   1. Use TurboClientContacts.clientId if contact has preserved ID
+				--   2. Use job's clientId if available
+				--   3. Exact name match against TurboClients (if exactly 1 match)
+				--   4. Generate from client name
 				CASE
 					WHEN cr.turbo_id IS NOT NULL AND cr.turbo_id != '' AND tc.clientId IS NOT NULL
 					THEN tc.clientId
 					WHEN cr.client_turbo_id IS NOT NULL AND cr.client_turbo_id != ''
 					THEN cr.client_turbo_id
+					WHEN (SELECT COUNT(*) FROM turbo_clients tc2 WHERE tc2.name = cr.client_name) = 1
+					THEN (SELECT tc2.id FROM turbo_clients tc2 WHERE tc2.name = cr.client_name)
 					ELSE make_pocketbase_id(cr.client_name, 15)
 				END AS client_id,
 				cr.contact_name AS name
@@ -310,8 +379,35 @@ func buildHybridQuery(turboClientsExists, turboContactsExists bool) string {
 		ALTER TABLE jobs ADD COLUMN client_id string;
 		ALTER TABLE jobs ADD COLUMN job_owner_id string;
 		ALTER TABLE jobs ADD COLUMN contact_id string;
+		`
 
+		// Only add name matching if turbo_clients table exists
+		if turboClientsExists {
+			query += `
+		-- Set client_id using resolution priority: preserved > name match > generated
+		UPDATE jobs SET client_id = 
+			CASE
+				WHEN clientId IS NOT NULL AND clientId != '' THEN clientId
+				WHEN (SELECT COUNT(*) FROM turbo_clients tc WHERE tc.name = t_client) = 1
+				THEN (SELECT tc.id FROM turbo_clients tc WHERE tc.name = t_client)
+				ELSE make_pocketbase_id(t_client, 15)
+			END
+		WHERE t_client IS NOT NULL AND t_client != '';
+
+		-- Set job_owner_id using resolution priority: preserved > name match > generated
+		UPDATE jobs SET job_owner_id = 
+			CASE
+				WHEN jobOwnerId IS NOT NULL AND jobOwnerId != '' THEN jobOwnerId
+				WHEN (SELECT COUNT(*) FROM turbo_clients tc WHERE tc.name = t_jobOwner) = 1
+				THEN (SELECT tc.id FROM turbo_clients tc WHERE tc.name = t_jobOwner)
+				ELSE make_pocketbase_id(t_jobOwner, 15)
+			END
+		WHERE t_jobOwner IS NOT NULL AND t_jobOwner != '';
+		`
+		} else {
+			query += `
 		-- Set client_id: use preserved ID if available, else generate from name
+		-- (No name matching - turbo_clients not available)
 		UPDATE jobs SET client_id = 
 			CASE
 				WHEN clientId IS NOT NULL AND clientId != '' THEN clientId
@@ -320,14 +416,19 @@ func buildHybridQuery(turboClientsExists, turboContactsExists bool) string {
 		WHERE t_client IS NOT NULL AND t_client != '';
 
 		-- Set job_owner_id: use preserved ID if available, else generate from name
+		-- (No name matching - turbo_clients not available)
 		UPDATE jobs SET job_owner_id = 
 			CASE
 				WHEN jobOwnerId IS NOT NULL AND jobOwnerId != '' THEN jobOwnerId
 				ELSE make_pocketbase_id(t_jobOwner, 15)
 			END
 		WHERE t_jobOwner IS NOT NULL AND t_jobOwner != '';
+		`
+		}
 
+		query += `
 		-- Set contact_id: use preserved ID if available, else generate from name+client
+		-- (No name matching for contacts - see comments in CONTACT ID RESOLUTION section)
 		UPDATE jobs SET contact_id = 
 			CASE
 				WHEN clientContactId IS NOT NULL AND clientContactId != '' THEN clientContactId
