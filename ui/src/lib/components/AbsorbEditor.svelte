@@ -11,6 +11,7 @@
   import type MiniSearch from "minisearch";
   import AbsorbList from "./AbsorbList.svelte";
   import { getAbsorbRedirectUrl } from "$lib/utilities";
+  import { appConfig, jobsEditingEnabled } from "$lib/stores/appConfig";
 
   let {
     collectionName,
@@ -25,6 +26,17 @@
     availableRecords: T[];
     autoCompleteIndex?: MiniSearch<T> | null;
   } = $props();
+
+  // Initialize config store
+  appConfig.init();
+
+  // Collections that affect jobs when absorbed
+  const collectionsAffectingJobs = ["clients", "client_contacts"];
+
+  // Derived: absorb is disabled if this collection affects jobs and job editing is disabled
+  const absorbDisabled = $derived(
+    collectionsAffectingJobs.includes(collectionName) && !$jobsEditingEnabled,
+  );
 
   let errors = $state<Record<string, { message: string }>>({});
   let recordsToAbsorb = $state<string[]>([]);
@@ -127,7 +139,18 @@
 </script>
 
 <div class="flex w-full flex-col gap-4 p-4">
-  {#if existingAbsorbAction}
+  {#if absorbDisabled}
+    <div class="disabled-notice">
+      <p>
+        Record absorption is temporarily disabled for <strong>{collectionName}</strong> during a system
+        transition.
+      </p>
+      <p>Absorbing these records would modify job data which is currently locked.</p>
+      <div class="mt-4">
+        <DsActionButton action={goBack} color="neutral">Go Back</DsActionButton>
+      </div>
+    </div>
+  {:else if existingAbsorbAction}
     <div class="rounded border-2 border-yellow-500 bg-yellow-50 p-4">
       <div class="mb-2 text-yellow-900">
         <p class="font-semibold">There is a pending absorb action for this collection.</p>
@@ -218,3 +241,18 @@
     {/if}
   {/if}
 </div>
+
+<style>
+  .disabled-notice {
+    padding: 1.5rem;
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 0.5rem;
+    max-width: 600px;
+  }
+
+  .disabled-notice p {
+    margin: 0.5rem 0;
+    color: #856404;
+  }
+</style>

@@ -13,6 +13,7 @@ export enum Collections {
   Superusers = "_superusers",
   AbsorbActions = "absorb_actions",
   AdminProfiles = "admin_profiles",
+  AppConfig = "app_config",
   AdminProfilesAugmented = "admin_profiles_augmented",
   Branches = "branches",
   Categories = "categories",
@@ -199,6 +200,15 @@ export type AdminProfilesAugmentedRecord = {
   uid: RecordIdString;
   untracked_time_off: boolean;
   work_week_hours: number;
+};
+
+export type AppConfigRecord<Tvalue = unknown> = {
+  created: IsoDateString;
+  description?: string;
+  id: string;
+  key: string;
+  updated: IsoDateString;
+  value: null | Tvalue;
 };
 
 export type BranchesRecord = {
@@ -985,6 +995,10 @@ export type AdminProfilesResponse<Texpand = unknown> = Required<AdminProfilesRec
   BaseSystemFields<Texpand>;
 export type AdminProfilesAugmentedResponse<Texpand = unknown> =
   Required<AdminProfilesAugmentedRecord> & BaseSystemFields<Texpand>;
+export type AppConfigResponse<Tvalue = unknown, Texpand = unknown> = Required<
+  AppConfigRecord<Tvalue>
+> &
+  BaseSystemFields<Texpand>;
 export type BranchesResponse<Texpand = unknown> = Required<BranchesRecord> &
   BaseSystemFields<Texpand>;
 export type CategoriesResponse<Texpand = unknown> = Required<CategoriesRecord> &
@@ -1078,6 +1092,7 @@ export type CollectionRecords = {
   absorb_actions: AbsorbActionsRecord;
   admin_profiles: AdminProfilesRecord;
   admin_profiles_augmented: AdminProfilesAugmentedRecord;
+  app_config: AppConfigRecord;
   branches: BranchesRecord;
   categories: CategoriesRecord;
   claims: ClaimsRecord;
@@ -1128,6 +1143,7 @@ export type CollectionResponses = {
   absorb_actions: AbsorbActionsResponse;
   admin_profiles: AdminProfilesResponse;
   admin_profiles_augmented: AdminProfilesAugmentedResponse;
+  app_config: AppConfigResponse;
   branches: BranchesResponse;
   categories: CategoriesResponse;
   claims: ClaimsResponse;
@@ -1181,6 +1197,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "absorb_actions"): RecordService<AbsorbActionsResponse>;
   collection(idOrName: "admin_profiles"): RecordService<AdminProfilesResponse>;
   collection(idOrName: "admin_profiles_augmented"): RecordService<AdminProfilesAugmentedResponse>;
+  collection(idOrName: "app_config"): RecordService<AppConfigResponse>;
   collection(idOrName: "branches"): RecordService<BranchesResponse>;
   collection(idOrName: "categories"): RecordService<CategoriesResponse>;
   collection(idOrName: "claims"): RecordService<ClaimsResponse>;

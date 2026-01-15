@@ -12,6 +12,7 @@
   import { clients } from "$lib/stores/clients";
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
+  import { appConfig, jobsEditingEnabled } from "$lib/stores/appConfig";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import MiniSearch from "minisearch";
   import { onMount } from "svelte";
@@ -30,6 +31,7 @@
   profiles.init();
   jobs.init();
   divisions.init();
+  appConfig.init();
 
   let errors = $state({} as Record<string, { message: string }>);
   // Allow extra field `location` introduced by migration to be present on item
@@ -364,11 +366,17 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 </svelte:head>
 
-<form
-  class="flex w-full flex-col items-center gap-2 p-2"
-  enctype="multipart/form-data"
-  onsubmit={save}
->
+{#if !$jobsEditingEnabled}
+  <div class="disabled-notice">
+    <p>Job creation and editing is temporarily disabled during a system transition.</p>
+    <p>Please check back later or contact an administrator if you need immediate assistance.</p>
+  </div>
+{:else}
+  <form
+    class="flex w-full flex-col items-center gap-2 p-2"
+    enctype="multipart/form-data"
+    onsubmit={save}
+  >
   <span class="flex w-full gap-2 {errors.project_award_date !== undefined ? 'bg-red-200' : ''}">
     <label for="project_award_date">Project Award Date</label>
     <input
@@ -728,4 +736,21 @@
       <span class="text-red-600">{errors.global.message}</span>
     {/if}
   </div>
-</form>
+  </form>
+{/if}
+
+<style>
+  .disabled-notice {
+    padding: 1.5rem;
+    background-color: #fff3cd;
+    border: 1px solid #ffc107;
+    border-radius: 0.5rem;
+    margin: 1rem;
+    max-width: 600px;
+  }
+
+  .disabled-notice p {
+    margin: 0.5rem 0;
+    color: #856404;
+  }
+</style>
