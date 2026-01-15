@@ -25,6 +25,15 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 // It operates on plain records rather than RecordRequestEvent, making it reusable
 // from both PocketBase hooks and custom API endpoints.
 func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Record) error {
+	// Check if job editing is enabled via app_config
+	enabled, err := utilities.IsJobsEditingEnabled(app)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return utilities.ErrJobsEditingDisabled
+	}
+
 	if err := ensureOutstandingBalancePermission(app, jobRecord, authRecord); err != nil {
 		return err
 	}

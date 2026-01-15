@@ -63,6 +63,17 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) func(e *cor
 			return apis.NewForbiddenError("User does not have permission to absorb records", nil)
 		}
 
+		// Check if job editing is enabled for collections that modify jobs
+		if collectionName == "clients" || collectionName == "client_contacts" {
+			enabled, err := utilities.IsJobsEditingEnabled(app)
+			if err != nil {
+				return apis.NewApiError(http.StatusInternalServerError, "Failed to check config", err)
+			}
+			if !enabled {
+				return apis.NewForbiddenError("Job editing is disabled; cannot absorb records that modify jobs", nil)
+			}
+		}
+
 		// Check if the collection is supported and get configs
 		_, parentConstraint, err := GetConfigsAndTable(collectionName)
 		if err != nil {
