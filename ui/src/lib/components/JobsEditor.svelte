@@ -8,7 +8,7 @@
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DSLocationPicker from "./DSLocationPicker.svelte";
-  import { managers } from "$lib/stores/managers";
+  import { profiles } from "$lib/stores/profiles";
   import { clients } from "$lib/stores/clients";
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
@@ -27,7 +27,7 @@
 
   // initialize the stores, noop if already initialized
   clients.init();
-  managers.init();
+  profiles.init();
   jobs.init();
   divisions.init();
 
@@ -481,10 +481,11 @@
     {/if}
   </div>
 
-  {#if $managers.index !== null}
+  {#if $profiles.index !== null}
     <DsAutoComplete
       bind:value={item.manager as string}
-      index={$managers.index}
+      index={$profiles.index}
+      idField="uid"
       {errors}
       fieldName="manager"
       uiName="Manager"
@@ -494,10 +495,11 @@
       {/snippet}
     </DsAutoComplete>
   {/if}
-  {#if $managers.index !== null}
+  {#if $profiles.index !== null}
     <DsAutoComplete
       bind:value={item.alternate_manager as string}
-      index={$managers.index}
+      index={$profiles.index}
+      idField="uid"
       {errors}
       fieldName="alternate_manager"
       uiName="Alternate Manager"

@@ -3,6 +3,7 @@
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
   import { timeTypes } from "$lib/stores/time_types";
+  import { profiles } from "$lib/stores/profiles";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
@@ -13,12 +14,10 @@
   import { goto } from "$app/navigation";
   import type { TimeAmendmentsPageData } from "$lib/svelte-types";
   import { onMount } from "svelte";
-  import MiniSearch from "minisearch";
   import type {
     TimeTypesRecord,
     DivisionsRecord,
     CategoriesResponse,
-    ProfilesResponse,
     BranchesResponse,
   } from "$lib/pocketbase-types";
 
@@ -26,22 +25,11 @@
   jobs.init();
   divisions.init();
   timeTypes.init();
+  profiles.init();
 
   let { data }: { data: TimeAmendmentsPageData } = $props();
 
-  // index all profiles for the autocomplete
-  let profilesIndex = $state(null as MiniSearch<ProfilesResponse> | null);
-
   onMount(async () => {
-    const profiles = await pb.collection("profiles").getFullList<ProfilesResponse>({
-      // filter: pb.filter('tsid=""'),
-      sort: "surname,given_name",
-    });
-    profilesIndex = new MiniSearch<ProfilesResponse>({
-      fields: ["uid", "given_name", "surname"],
-      storeFields: ["uid", "given_name", "surname"],
-    });
-    profilesIndex.addAll(profiles as ProfilesResponse[]);
     try {
       const list = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
       branches = list;
@@ -159,15 +147,15 @@
 </svelte:head>
 
 <form class="flex w-full flex-col items-center gap-2 p-2">
-  <!-- Input the user here with an autocomplete inpux-->
-  {#if profilesIndex !== null}
+  <!-- Input the user here with an autocomplete input-->
+  {#if $profiles.index !== null}
     <DsAutoComplete
       bind:value={item.uid as string}
-      index={profilesIndex}
+      index={$profiles.index}
+      idField="uid"
       {errors}
       fieldName="uid"
       uiName="Staff Member"
-      idField="uid"
     >
       {#snippet resultTemplate(item)}{item.given_name} {item.surname}{/snippet}
     </DsAutoComplete>
