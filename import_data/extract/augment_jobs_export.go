@@ -168,8 +168,13 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 	// The JSON is an object mapping division codes to hours, e.g. {"ES": 100, "NRG": 50}.
 	// We use json_each() to unnest the JSON object into key-value pairs,
 	// then join with divisions to get the division ID from the code.
+	//
+	// FALLBACK: Jobs created in legacy Firestore have a divisions field but no
+	// jobTimeAllocations property. For these jobs, we fall back to the divisions
+	// field and default hours to 0.
 	_, err = db.Exec(`
 	CREATE TEMP TABLE job_time_allocations_export AS
+	-- Jobs WITH jobTimeAllocations: parse JSON for actual hours
 	SELECT
 	  make_pocketbase_id(CONCAT(jobsC.pocketbase_id, '|', d.id), 15) AS id,
 	  jobsC.pocketbase_id AS job,
@@ -181,6 +186,20 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 	WHERE jobsC.jobTimeAllocations IS NOT NULL 
 	  AND jobsC.jobTimeAllocations != ''
 	  AND jobsC.jobTimeAllocations != 'null'
+	UNION ALL
+	-- Jobs WITHOUT jobTimeAllocations: fall back to divisions field with 0 hours
+	SELECT
+	  make_pocketbase_id(CONCAT(jobsC.pocketbase_id, '|', d.id), 15) AS id,
+	  jobsC.pocketbase_id AS job,
+	  d.id AS division,
+	  0 AS hours
+	FROM jobsC
+	JOIN unnest(str_split(jobsC.divisions, ',')) AS t(code)
+	  ON jobsC.divisions IS NOT NULL AND jobsC.divisions != ''
+	JOIN divisions d ON trim(t.code) = d.code
+	WHERE jobsC.jobTimeAllocations IS NULL 
+	  OR jobsC.jobTimeAllocations = ''
+	  OR jobsC.jobTimeAllocations = 'null'
 	ORDER BY job, division;
 	`)
 	if err != nil {

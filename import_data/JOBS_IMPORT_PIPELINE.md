@@ -119,7 +119,7 @@ Transforms legacy Firebase UIDs into PocketBase IDs and extracts normalized data
 **Additional Outputs:**
 
 - `Categories.parquet` - Extracted from comma-separated `categories` field
-- `JobTimeAllocations.parquet` - Parsed from `jobTimeAllocations` JSON field, contains `job`, `division`, `hours`
+- `JobTimeAllocations.parquet` - Contains `job`, `division`, `hours`. Parsed from `jobTimeAllocations` JSON field when present; falls back to `divisions` field with hours=0 for legacy jobs created in Firestore (which have no `jobTimeAllocations` property)
 
 ### Phase 4: Import to SQLite (`tool.go`)
 
