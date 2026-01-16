@@ -192,6 +192,11 @@ func main() {
 
 		// Define the binder function for the Job type
 		jobBinder := func(item load.Job) dbx.Params {
+			// Default outstanding_balance_date to today if not set in parquet
+			outstandingBalanceDate := item.OutstandingBalanceDate
+			if outstandingBalanceDate == "" {
+				outstandingBalanceDate = time.Now().Format("2006-01-02")
+			}
 			return dbx.Params{
 				"id":                           item.Id,
 				"number":                       item.Number,
@@ -208,8 +213,8 @@ func main() {
 				"proposal":                     item.ProposalId,
 				"job_owner":                    item.JobOwnerId,
 				"branch":                       item.Branch,
-				"outstanding_balance":          0,
-				"outstanding_balance_date":     time.Now().Format("2006-01-02"),
+				"outstanding_balance":          item.OutstandingBalance,
+				"outstanding_balance_date":     outstandingBalanceDate,
 				"parent":                       item.Parent,
 			}
 		}
