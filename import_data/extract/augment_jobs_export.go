@@ -164,20 +164,23 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 	}
 
 	// --- Create JobTimeAllocations Parquet ---
-	// Unnest job division codes and join to divisions to fetch division ids,
-	// using pocketbase_id for the job id. Default hours to 0.
+	// Parse the jobTimeAllocations JSON field from MySQL Jobs table.
+	// The JSON is an object mapping division codes to hours, e.g. {"ES": 100, "NRG": 50}.
+	// We use json_each() to unnest the JSON object into key-value pairs,
+	// then join with divisions to get the division ID from the code.
 	_, err = db.Exec(`
 	CREATE TEMP TABLE job_time_allocations_export AS
 	SELECT
 	  make_pocketbase_id(CONCAT(jobsC.pocketbase_id, '|', d.id), 15) AS id,
 	  jobsC.pocketbase_id AS job,
 	  d.id AS division,
-	  0 AS hours
-	FROM jobsC
-	JOIN unnest(str_split(jobsC.divisions, ',')) AS t(code)
-	  ON jobsC.divisions IS NOT NULL AND jobsC.divisions != ''
-	JOIN divisions d
-	  ON trim(t.code) = d.code
+	  COALESCE(CAST(jta.value AS DOUBLE), 0) AS hours
+	FROM jobsC,
+	LATERAL (SELECT * FROM json_each(jobsC.jobTimeAllocations)) AS jta
+	JOIN divisions d ON jta.key = d.code
+	WHERE jobsC.jobTimeAllocations IS NOT NULL 
+	  AND jobsC.jobTimeAllocations != ''
+	  AND jobsC.jobTimeAllocations != 'null'
 	ORDER BY job, division;
 	`)
 	if err != nil {
