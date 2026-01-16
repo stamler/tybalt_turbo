@@ -30,9 +30,9 @@ import (
 // TODO: Move these definitions to a more shared location if used outside this package.
 
 type Client struct {
-	Id                         string `parquet:"id"`
-	Name                       string `parquet:"name"`
-	BusinessDevelopmentLeadUid string `parquet:"businessDevelopmentLeadUid"` // Legacy Firebase UID, needs reverse conversion on import
+	Id                      string `parquet:"id"`
+	Name                    string `parquet:"name"`
+	BusinessDevelopmentLead string `parquet:"business_development_lead"` // Resolved PocketBase UID (from augment_clients_export)
 }
 
 type ClientContact struct {

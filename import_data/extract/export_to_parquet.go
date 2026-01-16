@@ -255,6 +255,10 @@ func ToParquet(sourceSQLiteDb string) {
 	// contacts via foreign keys.
 	jobsToClientsAndContacts()
 
+	// Augment Clients.parquet to resolve businessDevelopmentLeadUid (legacy Firebase UID)
+	// to PocketBase UID by joining with Profiles.parquet.
+	augmentClients()
+
 	// Normalize the Expenses.parquet data by creating Vendors.parquet and
 	// updating Expenses.parquet to reference vendors via foreign keys.
 	expensesToVendors()
