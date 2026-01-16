@@ -166,8 +166,8 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 	// --- Create JobTimeAllocations Parquet ---
 	// Parse the jobTimeAllocations JSON field from MySQL Jobs table.
 	// The JSON is an object mapping division codes to hours, e.g. {"ES": 100, "NRG": 50}.
-	// We use json_each() to unnest the JSON object into key-value pairs,
-	// then join with divisions to get the division ID from the code.
+	// We use json_keys() to get division codes, unnest() to expand into rows,
+	// and ->> operator to extract the hours value for each division.
 	//
 	// FALLBACK: Jobs created in legacy Firestore have a divisions field but no
 	// jobTimeAllocations property. For these jobs, we fall back to the divisions
@@ -179,10 +179,10 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 	  make_pocketbase_id(CONCAT(jobsC.pocketbase_id, '|', d.id), 15) AS id,
 	  jobsC.pocketbase_id AS job,
 	  d.id AS division,
-	  COALESCE(CAST(jta.value AS DOUBLE), 0) AS hours
+	  COALESCE(CAST(jobsC.jobTimeAllocations ->> division_code AS DOUBLE), 0) AS hours
 	FROM jobsC,
-	LATERAL (SELECT * FROM json_each(jobsC.jobTimeAllocations)) AS jta
-	JOIN divisions d ON jta.key = d.code
+	LATERAL unnest(json_keys(jobsC.jobTimeAllocations)) AS t(division_code)
+	JOIN divisions d ON t.division_code = d.code
 	WHERE jobsC.jobTimeAllocations IS NOT NULL 
 	  AND jobsC.jobTimeAllocations != ''
 	  AND jobsC.jobTimeAllocations != 'null'
