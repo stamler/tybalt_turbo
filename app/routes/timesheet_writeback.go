@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strings"
 	"tybalt/utilities"
 
@@ -109,11 +110,13 @@ type timesheetExportRow struct {
 	WorkHoursTally       workHoursTally           `json:"workHoursTally"`
 }
 
-func keys[K comparable, V any](m map[K]V) []K {
-	result := make([]K, 0, len(m))
+// sortedKeys returns sorted keys from a map with string keys for deterministic output
+func sortedKeys[V any](m map[string]V) []string {
+	result := make([]string, 0, len(m))
 	for k := range m {
 		result = append(result, k)
 	}
+	sort.Strings(result)
 	return result
 }
 
@@ -264,12 +267,12 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 				}
 			}
 
-			// Convert sets to slices and assign
+			// Convert sets to slices and assign (sorted for deterministic output)
 			rows[i].DivisionsTally = divSet
-			rows[i].Divisions = keys(divSet)
-			rows[i].JobNumbers = keys(jobSet)
+			rows[i].Divisions = sortedKeys(divSet)
+			rows[i].JobNumbers = sortedKeys(jobSet)
 			rows[i].JobsTally = jobSet
-			rows[i].Timetypes = keys(ttSet)
+			rows[i].Timetypes = sortedKeys(ttSet)
 			rows[i].OffRotationDaysTally = len(orDates)
 			rows[i].OffWeekTally = len(owDates)
 			rows[i].NonWorkHoursTally = nonWork
