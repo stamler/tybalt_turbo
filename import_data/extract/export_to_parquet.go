@@ -204,9 +204,14 @@ func ToParquet(sourceSQLiteDb string) {
 				) TO 'parquet/TimeAmendments.parquet' (FORMAT PARQUET)
 			`
 		case "Expenses":
-			// pocketbase_id is already in the table
+			// Use immutableID as pocketbase_id for stable round-trip writebacks (same pattern as Jobs).
+			// immutableID is the stable ID from Firestore that enables round-trip writebacks.
 			query = `
-				COPY ( SELECT * FROM mysql_db.Expenses ) TO 'parquet/Expenses.parquet' (FORMAT PARQUET)
+				COPY (
+					SELECT *,
+						immutableID AS pocketbase_id
+					FROM mysql_db.Expenses
+				) TO 'parquet/Expenses.parquet' (FORMAT PARQUET)
 			`
 		case "MileageResetDates":
 			// pocketbase_id is already in the table
