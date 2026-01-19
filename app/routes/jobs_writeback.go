@@ -10,20 +10,6 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// formatDisplayName returns "Given Surname" or empty string if both are empty
-func formatDisplayName(givenName, surname string) string {
-	if givenName == "" && surname == "" {
-		return ""
-	}
-	if givenName == "" {
-		return surname
-	}
-	if surname == "" {
-		return givenName
-	}
-	return givenName + " " + surname
-}
-
 // parseStringArray parses a JSON array string into a slice of strings
 func parseStringArray(jsonStr string) []string {
 	var result []string

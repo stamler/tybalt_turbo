@@ -97,6 +97,7 @@ func AddRoutes(app core.App) {
 		// Legacy writeback endpoints (custom auth via machine_secrets)
 		se.Router.GET("/api/export_legacy/time_sheets/{weekEnding}", createTimesheetExportLegacyHandler(app))
 		se.Router.GET("/api/export_legacy/jobs/{updatedAfter}", createJobsExportLegacyHandler(app))
+		se.Router.GET("/api/export_legacy/expenses/{updatedAfter}", createExpensesExportLegacyHandler(app))
 
 		expensesGroup := se.Router.Group("/api/expenses")
 		expensesGroup.Bind(apis.RequireAuth("users"))
