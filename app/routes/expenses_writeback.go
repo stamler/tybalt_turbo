@@ -252,7 +252,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  COALESCE(p_uid.surname, '') AS surname,
 			  COALESCE(p_uid.given_name, '') AS given_name,
 			  COALESCE(p_uid.given_name || ' ' || p_uid.surname, '') AS display_name,
-			  COALESCE(p_uid.payroll_id, '') AS payroll_id,
+			  COALESCE(ap_uid.payroll_id, '') AS payroll_id,
 			  -- Manager/approver info
 			  COALESCE(ap_approver.legacy_uid, '') AS manager_uid,
 			  COALESCE(p_approver.given_name || ' ' || p_approver.surname, '') AS manager_name,
