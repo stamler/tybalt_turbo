@@ -28,6 +28,11 @@ import (
 var expenseCollectionId = "o1vpz1mm7qsfoyy"
 var targetDatabase = "../app/test_pb_data/data.db"
 
+// expenseImportedFalseCount controls how many expenses are imported with _imported=false
+// (triggering writeback to Firebase) during --import --expenses. Set to 0 for production
+// (all _imported=true), or a positive number for testing writeback with a subset.
+const expenseImportedFalseCount = 0
+
 // This file is used to run either an export or an import.
 
 func main() {
@@ -817,7 +822,7 @@ func main() {
 			{:committer},
 			{:committed},
 			{:committed_week_ending},
-			true -- THIS SHOULD BE TRUE, BUT WE CAN TEMPORARILY SET IT TO FALSE TO TEST WRITEBACK
+			{:imported} -- _imported: TRUE skips writeback, FALSE triggers writeback to Firebase
 		)`
 
 			// allowance_types is a json array of strings that are the types of
@@ -845,8 +850,15 @@ func main() {
 				return string(jsonArray)
 			}
 
+			// Counter for testing writeback: uses expenseImportedFalseCount constant (top of file)
+			expenseCounter := 0
+
 			// Define the binder function for the Expense type
 			expenseBinder := func(item load.Expense) dbx.Params {
+				expenseCounter++
+				// _imported=false triggers writeback; controlled by expenseImportedFalseCount constant
+				imported := expenseCounter > expenseImportedFalseCount
+
 				return dbx.Params{
 					"id":                item.Id,
 					"purchase_order":    item.PurchaseOrderId,
@@ -874,6 +886,7 @@ func main() {
 					"committer":             item.Committer,
 					"committed":             item.Committed.Format("2006-01-02 15:04:05.000Z"),
 					"committed_week_ending": item.CommittedWeekEnding,
+					"imported":              imported,
 				}
 			}
 
