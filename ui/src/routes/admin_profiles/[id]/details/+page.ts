@@ -38,6 +38,7 @@ function normalizeDivisions(value: unknown): string[] {
 export const load: PageLoad = async ({ params }) => {
   try {
     type AdminProfilesAugmented = AdminProfilesResponse & {
+      active?: boolean;
       given_name: string;
       surname: string;
       po_approver_max_amount?: number | string | null;

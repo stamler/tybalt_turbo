@@ -149,6 +149,7 @@ export enum AdminProfilesSkipMinTimeCheckOptions {
 }
 export type AdminProfilesRecord = {
   _imported: boolean;
+  active: boolean;
   allow_personal_reimbursement: boolean;
   created: IsoDateString;
   default_branch: RecordIdString;
@@ -177,6 +178,7 @@ export enum AdminProfilesAugmentedSkipMinTimeCheckOptions {
   "yes" = "yes",
 }
 export type AdminProfilesAugmentedRecord = {
+  active?: boolean;
   allow_personal_reimbursement: boolean;
   default_branch: RecordIdString;
   default_charge_out_rate: number;

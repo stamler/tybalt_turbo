@@ -36,20 +36,28 @@
 
 <DsList {items} search={true} inListHeader="Staff">
   {#snippet anchor(item: AdminProfilesAugmentedResponse)}
-    <a href={`/admin_profiles/${item.id}/details`} class="text-blue-600 hover:underline">
-      {item.given_name}
-      {item.surname}
-    </a>
+    <div class="flex flex-col">
+      <a
+        href={`/admin_profiles/${item.id}/details`}
+        class={item.active === false ? "text-blue-400 hover:underline" : "text-blue-600 hover:underline"}
+      >
+        {item.given_name}
+        {item.surname}
+      </a>
+      {#if item.active === false}
+        <span class="self-center text-xs font-medium text-red-500">Inactive</span>
+      {/if}
+    </div>
   {/snippet}
 
   {#snippet headline(item: AdminProfilesAugmentedResponse)}
-    <span class="flex items-center gap-2">
+    <span class={`flex items-center gap-2 ${item.active === false ? "opacity-50" : ""}`}>
       {item.job_title || "-"}
     </span>
   {/snippet}
 
   {#snippet byline(item: AdminProfilesAugmentedResponse)}
-    <span class="opacity-60">
+    <span class={item.active === false ? "opacity-30" : "opacity-60"}>
       {#if item.mobile_phone && item.mobile_phone.trim() !== ""}
         Mobile: {item.mobile_phone}
         {#if item.payroll_id && item.payroll_id.trim() !== ""}
@@ -61,7 +69,7 @@
   {/snippet}
 
   {#snippet line1(item: AdminProfilesAugmentedResponse)}
-    <span class="flex items-center gap-2">
+    <span class={`flex items-center gap-2 ${item.active === false ? "opacity-50" : ""}`}>
       <span>{item.salary ? "Salary" : "Hourly"}</span>
       <span>Charge Out Rate: {item.default_charge_out_rate}</span>
       {#if poApproverLabel(item)}

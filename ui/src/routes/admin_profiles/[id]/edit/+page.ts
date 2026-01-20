@@ -12,6 +12,7 @@ export const load: PageLoad<AdminProfilesPageData & { divisions: DivisionsRespon
 }) => {
   const defaultItem = {
     uid: "",
+    active: true,
     work_week_hours: 40,
     salary: false,
     default_charge_out_rate: 0,

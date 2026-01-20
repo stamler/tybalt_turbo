@@ -29,6 +29,9 @@
           {data.item.job_title || "-"}
         {/if}
       </h1>
+      {#if data.item.active === false}
+        <DsLabel color="red">Inactive</DsLabel>
+      {/if}
       <DsActionButton
         action={`/admin_profiles/${data.item.id}/edit`}
         icon="mdi:pencil"
@@ -38,6 +41,10 @@
     </div>
 
     <section class="grid grid-cols-1 gap-2 md:grid-cols-2">
+      <div class="flex gap-2">
+        <span class="font-semibold">Active:</span>
+        {data.item.active === false ? "No" : "Yes"}
+      </div>
       <div class="flex gap-2">
         <span class="font-semibold">Payroll ID:</span>
         {data.item.payroll_id || "—"}
