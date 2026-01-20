@@ -817,7 +817,7 @@ func main() {
 			{:committer},
 			{:committed},
 			{:committed_week_ending},
-			true
+			true -- THIS SHOULD BE TRUE, BUT WE CAN TEMPORARILY SET IT TO FALSE TO TEST WRITEBACK
 		)`
 
 			// allowance_types is a json array of strings that are the types of
