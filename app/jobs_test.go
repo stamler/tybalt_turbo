@@ -385,3 +385,73 @@ func TestJobsUpdateViaAPI_ValidationErrors(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+// TestJobsCreate_InactiveManagerRejected verifies that setting a manager or
+// alternate_manager to an inactive user (admin_profiles.active=false) is rejected
+func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
+	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// u_inactive is a test user with admin_profiles.active=0
+	const inactiveUserID = "u_inactive"
+	const activeManagerID = "f2j5a8vk006baub"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "creating job with inactive manager fails",
+			Method: http.MethodPost,
+			URL:    "/api/jobs",
+			Body: strings.NewReader(`{
+				"job": {
+					"description": "Test job with inactive manager",
+					"client": "ee3xvodl583b61o",
+					"contact": "235g6k01xx3sdjk",
+					"manager": "` + inactiveUserID + `",
+					"authorizing_document": "Unauthorized",
+					"branch": "80875lm27v8wgi4",
+					"location": "87Q8H976+2M",
+					"project_award_date": "2025-02-01"
+				},
+				"allocations": []
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"manager":{"code":"manager_not_active"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "creating job with inactive alternate_manager fails",
+			Method: http.MethodPost,
+			URL:    "/api/jobs",
+			Body: strings.NewReader(`{
+				"job": {
+					"description": "Test job with inactive alternate manager",
+					"client": "ee3xvodl583b61o",
+					"contact": "235g6k01xx3sdjk",
+					"manager": "` + activeManagerID + `",
+					"alternate_manager": "` + inactiveUserID + `",
+					"authorizing_document": "Unauthorized",
+					"branch": "80875lm27v8wgi4",
+					"location": "87Q8H976+2M",
+					"project_award_date": "2025-02-01"
+				},
+				"allocations": []
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"alternate_manager":{"code":"alternate_manager_not_active"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
