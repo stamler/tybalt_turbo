@@ -16,6 +16,27 @@ func validateClient(app core.App, clientRecord *core.Record) error {
 		return nil
 	}
 
+	// Check that the business development lead is an active user
+	active, err := utilities.IsUserActive(app, leadID)
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "failed to check business development lead active status",
+		}
+	}
+	if !active {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "business development lead must be an active user",
+			Data: map[string]errs.CodeError{
+				"business_development_lead": {
+					Code:    "business_development_lead_not_active",
+					Message: "the selected business development lead is not an active user",
+				},
+			},
+		}
+	}
+
 	hasRequiredClaim, err := utilities.HasClaimByUserID(app, leadID, "busdev")
 	if err != nil {
 		return &errs.HookError{

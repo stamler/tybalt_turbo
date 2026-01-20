@@ -3,10 +3,12 @@ package hooks
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"tybalt/constants"
 	"tybalt/errs"
 	"tybalt/notifications"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
@@ -203,6 +205,30 @@ func AddHooks(app core.App) {
 	app.OnRecordUpdate("notifications").BindFunc(func(e *core.RecordEvent) error {
 		if err := notifications.WriteStatusUpdated(app, e); err != nil {
 			return err
+		}
+		return e.Next()
+	})
+
+	// Hook for time_sheet_reviewers: validate that reviewer is an active user
+	app.OnRecordCreateRequest("time_sheet_reviewers").BindFunc(func(e *core.RecordRequestEvent) error {
+		reviewerUID := e.Record.GetString("reviewer")
+		active, err := utilities.IsUserActive(e.App, reviewerUID)
+		if err != nil {
+			hookErr := &errs.HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "failed to check reviewer active status",
+			}
+			return AnnotateHookError(e.App, e, hookErr)
+		}
+		if !active {
+			hookErr := &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "reviewer must be an active user",
+				Data: map[string]errs.CodeError{
+					"reviewer": {Code: "reviewer_not_active", Message: "the selected reviewer is not an active user"},
+				},
+			}
+			return AnnotateHookError(e.App, e, hookErr)
 		}
 		return e.Next()
 	})

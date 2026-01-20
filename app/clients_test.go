@@ -73,3 +73,35 @@ func TestClientsCreate_BusDevLeadWithClaim_Succeeds(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+func TestClientsCreate_BusDevLeadInactive_Fails(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "client create fails when business_development_lead is inactive",
+			Method: http.MethodPost,
+			URL:    "/api/collections/clients/records",
+			Body: strings.NewReader(`{
+                "name": "Inactive Lead Corp",
+                "business_development_lead": "u_inactive"
+            }`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"business_development_lead":{"code":"business_development_lead_not_active"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}

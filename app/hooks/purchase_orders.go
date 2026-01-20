@@ -351,6 +351,18 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		return func(value any) error {
 			prioritySecondApproverId := purchaseOrderRecord.GetString("priority_second_approver")
 			if prioritySecondApproverId != "" {
+				// Check that priority_second_approver is an active user
+				active, err := utilities.IsUserActive(app, prioritySecondApproverId)
+				if err != nil {
+					return &errs.HookError{
+						Status:  http.StatusInternalServerError,
+						Message: "failed to check priority second approver active status",
+					}
+				}
+				if !active {
+					return validation.NewError("priority_second_approver_not_active", "The selected priority second approver is not an active user")
+				}
+
 				division := purchaseOrderRecord.GetString("division")
 
 				// Get list of eligible second approvers

@@ -17,11 +17,22 @@ func ProcessProfile(app core.App, e *core.RecordRequestEvent) error {
 		return err
 	}
 
-	// Validate that manager (and alternate_manager if provided) have the `tapr` claim.
-	// UI restricts choices to the `managers` view (users with `tapr`), but we
-	// enforce it here for correctness.
+	// Validate that manager (and alternate_manager if provided) have the `tapr` claim
+	// and are active users. UI restricts choices to the `managers` view (users with `tapr`),
+	// but we enforce it here for correctness.
 	managerUID := e.Record.GetString("manager")
 	if managerUID != "" {
+		// Check that manager is active
+		active, err := utilities.IsUserActive(app, managerUID)
+		if err != nil {
+			return err
+		}
+		if !active {
+			return validation.Errors{
+				"manager": validation.NewError("manager_not_active", "manager must be an active user"),
+			}
+		}
+
 		hasTapr, err := utilities.HasClaimByUserID(app, managerUID, "tapr")
 		if err != nil {
 			return err
@@ -35,6 +46,17 @@ func ProcessProfile(app core.App, e *core.RecordRequestEvent) error {
 
 	alternateManagerUID := e.Record.GetString("alternate_manager")
 	if alternateManagerUID != "" {
+		// Check that alternate manager is active
+		active, err := utilities.IsUserActive(app, alternateManagerUID)
+		if err != nil {
+			return err
+		}
+		if !active {
+			return validation.Errors{
+				"alternate_manager": validation.NewError("alternate_manager_not_active", "alternate manager must be an active user"),
+			}
+		}
+
 		hasTapr, err := utilities.HasClaimByUserID(app, alternateManagerUID, "tapr")
 		if err != nil {
 			return err

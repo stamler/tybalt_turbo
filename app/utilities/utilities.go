@@ -4,6 +4,7 @@ package utilities
 
 import (
 	"crypto/sha256"
+	"database/sql"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -20,6 +21,26 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
+
+// IsUserActive checks if a user has an admin_profiles record with active=true.
+// Returns (false, nil) if the user has no admin_profiles record or active=false.
+// Returns (false, err) if there's a database error (callers should handle as 500).
+// This is used to prevent inactive users from being assigned to manager/approver fields.
+func IsUserActive(app core.App, userID string) (bool, error) {
+	if userID == "" {
+		return false, nil
+	}
+	adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": userID})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// No admin_profiles record = treat as inactive
+			return false, nil
+		}
+		// Real DB error - propagate it
+		return false, err
+	}
+	return adminProfile.GetBool("active"), nil
+}
 
 func IsValidDate(value any) error {
 	s, _ := value.(string)

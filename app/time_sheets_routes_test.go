@@ -260,3 +260,39 @@ func TestAddTimesheetReviewer_QueuesSharedNotifications(t *testing.T) {
 
 	scenario.Test(t)
 }
+
+// TestAddTimesheetReviewer_InactiveReviewerFails verifies that adding an inactive
+// user as a reviewer is rejected.
+func TestAddTimesheetReviewer_InactiveReviewerFails(t *testing.T) {
+	// Use the same timesheet id as other tests.
+	const timesheetID = "aeyl94og4xmnpq4"
+
+	// Approver is the sharer for timesheet sharing.
+	approverToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// u_inactive is an inactive user (admin_profiles.active=false)
+	const inactiveUserID = "u_inactive"
+
+	body := fmt.Sprintf(`{"time_sheet": "%s", "reviewer": "%s"}`, timesheetID, inactiveUserID)
+
+	scenario := tests.ApiScenario{
+		Name:   "adding inactive user as timesheet reviewer fails",
+		Method: http.MethodPost,
+		URL:    "/api/collections/time_sheet_reviewers/records",
+		Body:   strings.NewReader(body),
+		Headers: map[string]string{
+			"Authorization": approverToken,
+			"Content-Type":  "application/json",
+		},
+		ExpectedStatus: http.StatusBadRequest,
+		ExpectedContent: []string{
+			`"reviewer":{"code":"reviewer_not_active"`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	scenario.Test(t)
+}

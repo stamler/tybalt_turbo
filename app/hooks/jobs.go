@@ -718,18 +718,14 @@ func validateManagersAreActive(app core.App, record *core.Record) error {
 
 	// Check manager (required field, so should always have a value)
 	if managerUID != "" {
-		adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": managerUID})
+		active, err := utilities.IsUserActive(app, managerUID)
 		if err != nil {
-			// If no admin_profiles record exists, treat as inactive
 			return &errs.HookError{
-				Status:  http.StatusBadRequest,
-				Message: "manager must be an active user",
-				Data: map[string]errs.CodeError{
-					"manager": {Code: "manager_not_active", Message: "the selected manager is not an active user"},
-				},
+				Status:  http.StatusInternalServerError,
+				Message: "failed to check manager active status",
 			}
 		}
-		if !adminProfile.GetBool("active") {
+		if !active {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "manager must be an active user",
@@ -742,18 +738,14 @@ func validateManagersAreActive(app core.App, record *core.Record) error {
 
 	// Check alternate_manager (optional field)
 	if altManagerUID != "" {
-		adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": altManagerUID})
+		active, err := utilities.IsUserActive(app, altManagerUID)
 		if err != nil {
-			// If no admin_profiles record exists, treat as inactive
 			return &errs.HookError{
-				Status:  http.StatusBadRequest,
-				Message: "alternate manager must be an active user",
-				Data: map[string]errs.CodeError{
-					"alternate_manager": {Code: "alternate_manager_not_active", Message: "the selected alternate manager is not an active user"},
-				},
+				Status:  http.StatusInternalServerError,
+				Message: "failed to check alternate manager active status",
 			}
 		}
-		if !adminProfile.GetBool("active") {
+		if !active {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "alternate manager must be an active user",
