@@ -66,6 +66,25 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		}
 	}
 	approverUID := profile.GetString("manager")
+
+	// Check that the approver (manager) is an active user
+	active, activeErr := utilities.IsUserActive(app, approverUID)
+	if activeErr != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "failed to check approver active status",
+		}
+	}
+	if !active {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "your manager must be an active user to create expenses",
+			Data: map[string]errs.CodeError{
+				"approver": {Code: "approver_not_active", Message: "the approver (your manager) is not an active user"},
+			},
+		}
+	}
+
 	// Ensure the approver (manager) has the `tapr` claim
 	hasTapr, taprErr := utilities.HasClaimByUserID(app, approverUID, "tapr")
 	if taprErr != nil {

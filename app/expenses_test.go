@@ -1609,3 +1609,72 @@ func TestCalculateMileageTotal(t *testing.T) {
 		}
 	})
 }
+
+// TestExpensesCreate_InactiveApproverFails verifies that creating an expense
+// fails when the user's manager (who becomes the approver) is inactive.
+func TestExpensesCreate_InactiveApproverFails(t *testing.T) {
+	// User has_inactive_mgr@test.com has a profile with manager = u_inactive
+	recordToken, err := testutils.GenerateRecordToken("users", "has_inactive_mgr@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// multipart builder for creates with attachment
+	makeMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "receipt.png")
+		if err != nil {
+			return nil, "", err
+		}
+		// Minimal PNG header so mime detection passes (image/png)
+		if _, err := fw.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}); err != nil {
+			return nil, "", err
+		}
+		contentType := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, contentType, nil
+	}
+
+	b, ct, err := makeMultipart(`{
+		"uid": "u_has_inactive_mgr",
+		"date": "2024-09-01",
+		"division": "vccd5fo56ctbigh",
+		"description": "test expense with inactive manager",
+		"payment_type": "Expense",
+		"total": 99,
+		"vendor": "2zqxtsmymf670ha"
+	}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:           "expense create fails when manager is inactive",
+		Method:         http.MethodPost,
+		URL:            "/api/collections/expenses/records",
+		Body:           b,
+		Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+		ExpectedStatus: 400,
+		ExpectedContent: []string{
+			`"approver":{"code":"approver_not_active"`,
+		},
+		ExpectedEvents: map[string]int{
+			"OnRecordCreateRequest": 1,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	scenario.Test(t)
+}

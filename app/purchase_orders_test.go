@@ -1124,6 +1124,39 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
+	// Test that approver must be an active user
+	{
+		b, ct, err := makeMultipart(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order with inactive approver",
+			"payment_type": "Expense",
+			"total": 99,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "u_inactive",
+			"status": "Unapproved",
+			"type": "Normal"
+		}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails when approver is inactive",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"approver":{"code":"approver_not_active"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
 
 	for _, scenario := range scenarios {
 		scenario.Test(t)

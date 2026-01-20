@@ -346,6 +346,27 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		}
 	}
 
+	// Validate that the approver is an active user
+	approverIsActive := func(app core.App) validation.RuleFunc {
+		return func(value any) error {
+			approverID, _ := value.(string)
+			if approverID == "" {
+				return nil // Let required validation handle empty
+			}
+			active, err := utilities.IsUserActive(app, approverID)
+			if err != nil {
+				return &errs.HookError{
+					Status:  http.StatusInternalServerError,
+					Message: "failed to check approver active status",
+				}
+			}
+			if !active {
+				return validation.NewError("approver_not_active", "the selected approver is not an active user")
+			}
+			return nil
+		}
+	}
+
 	// Validate priority_second_approver if set
 	prioritySecondApproverIsAuthorized := func(app core.App, purchaseOrderRecord *core.Record) validation.RuleFunc {
 		return func(value any) error {
@@ -420,7 +441,9 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 			).Else(
 				validation.In("").Error("frequency is not permitted for non-recurring purchase orders"))),
 		"description": validation.Validate(purchaseOrderRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
-		"approver":    validation.Validate(purchaseOrderRecord.GetString("approver"), validation.By(utilities.PoApproverPropsHasDivisionPermission(app, constants.PO_APPROVER_CLAIM_ID, purchaseOrderRecord.GetString("division")))),
+		"approver": validation.Validate(purchaseOrderRecord.GetString("approver"),
+			validation.By(approverIsActive(app)),
+			validation.By(utilities.PoApproverPropsHasDivisionPermission(app, constants.PO_APPROVER_CLAIM_ID, purchaseOrderRecord.GetString("division")))),
 		"total":       validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.Max(constants.MAX_APPROVAL_TOTAL)),
 		"type":        validation.Validate(purchaseOrderRecord.GetString("type"), validation.When(isChild, validation.In("Normal").Error("child POs must be of type Normal"))),
 	}

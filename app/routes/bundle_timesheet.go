@@ -142,6 +142,21 @@ func createBundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error
 			// rules so there is no need to check if it exists. Verify that the
 			// manager has the `tapr` claim (server-side enforcement mirrors UI).
 			approverUID := profile.GetString("manager")
+
+			// Check that the approver (manager) is an active user
+			active, activeErr := utilities.IsUserActive(txApp, approverUID)
+			if activeErr != nil {
+				return fmt.Errorf("error checking manager active status: %v", activeErr)
+			}
+			if !active {
+				transactionError = &CodeError{
+					Code:    "approver_not_active",
+					Message: "the approver (your manager) is not an active user",
+				}
+				httpResponseStatusCode = http.StatusBadRequest
+				return transactionError
+			}
+
 			hasTapr, claimErr := utilities.HasClaimByUserID(txApp, approverUID, "tapr")
 			if claimErr != nil {
 				return fmt.Errorf("error checking manager tapr claim: %v", claimErr)
