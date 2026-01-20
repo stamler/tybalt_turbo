@@ -299,7 +299,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			LEFT JOIN purchase_orders po ON e.purchase_order = po.id
 			-- Category join
 			LEFT JOIN categories cat ON e.category = cat.id
-			WHERE e.updated >= {:updatedAfter} AND e._imported = 0
+			WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.committed != ''
 		`
 
 		var expenseRows []expenseExportDBRow
@@ -318,7 +318,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  COALESCE(v.status, '') AS status
 			FROM expenses e
 			JOIN vendors v ON e.vendor = v.id
-			WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.vendor IS NOT NULL AND e.vendor != ''
+			WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.committed != '' AND e.vendor IS NOT NULL AND e.vendor != ''
 		`
 
 		var vendorRows []vendorExportDBRow
@@ -359,7 +359,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			LEFT JOIN admin_profiles ap_approver ON po.approver = ap_approver.uid
 			LEFT JOIN jobs j ON po.job = j.id
 			LEFT JOIN divisions d ON po.division = d.id
-			WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.purchase_order IS NOT NULL AND e.purchase_order != ''
+			WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.committed != '' AND e.purchase_order IS NOT NULL AND e.purchase_order != ''
 		`
 
 		var poRows []purchaseOrderExportDBRow
