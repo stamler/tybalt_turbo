@@ -9,6 +9,7 @@ import (
 	"tybalt/notifications"
 
 	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -28,22 +29,36 @@ func AnnotateHookError(app core.App, e *core.RecordRequestEvent, err error) erro
 // called before a record is created or updated in the time_entries collection.
 
 func AddHooks(app core.App) {
-	// ensure an admin_profiles record exists for each authenticated user
+	// OnRecordAuthRequest fires after successful credential verification but before
+	// returning the auth token to the client. We use it to:
+	// 1. Block inactive accounts from logging in
+	// 2. Auto-create admin_profiles for first-time users
+	//
+	// Control flow: returning an error aborts the auth flow and sends the error to
+	// the client (no token issued). Calling e.Next() continues the chain and
+	// completes the login (token issued).
 	app.OnRecordAuthRequest("users").BindFunc(func(e *core.RecordAuthRequestEvent) error {
 		uid := e.Record.Id
 
-		// if the admin_profiles record already exists, nothing to do
-		if _, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid}); err == nil {
+		// Try to find existing admin_profiles record
+		adminProfile, err := e.App.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
+		if err == nil {
+			// Record exists - check if active. Returning error here prevents login
+			// even though credentials were valid.
+			if !adminProfile.GetBool("active") {
+				return apis.NewForbiddenError("this account is inactive", nil)
+			}
 			return e.Next()
 		}
 
-		// create the admin_profiles record with sensible defaults
-		adminProfiles, err := app.FindCollectionByNameOrId("admin_profiles")
+		// No admin_profiles record exists - create one with sensible defaults
+		adminProfiles, err := e.App.FindCollectionByNameOrId("admin_profiles")
 		if err != nil {
 			return err
 		}
 		rec := core.NewRecord(adminProfiles)
 		rec.Set("uid", uid)
+		rec.Set("active", true) // New users are active by default
 		rec.Set("work_week_hours", constants.DEFAULT_WORK_WEEK_HOURS)
 		rec.Set("default_charge_out_rate", constants.DEFAULT_CHARGE_OUT_RATE)
 		rec.Set("skip_min_time_check", "no")
@@ -54,7 +69,7 @@ func AddHooks(app core.App) {
 		// payroll_id must match ^(?:[1-9]\d*|CMS[0-9]{1,2})$
 		rec.Set("payroll_id", "999999")
 
-		if err := app.Save(rec); err != nil {
+		if err := e.App.Save(rec); err != nil {
 			// ignore race where another process created it first
 			if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
 				return fmt.Errorf("failed to create admin_profile for %s: %w", uid, err)
