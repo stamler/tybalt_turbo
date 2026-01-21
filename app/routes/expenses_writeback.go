@@ -149,11 +149,11 @@ type expenseExportOutput struct {
 	PaymentType   string  `json:"paymentType"`
 	CcLast4Digits string  `json:"ccLast4digits,omitempty"`
 	Attachment    string  `json:"attachment,omitempty"`
-	// Allowance flags (derived from allowance_types array)
-	Breakfast bool `json:"breakfast"`
-	Lunch     bool `json:"lunch"`
-	Dinner    bool `json:"dinner"`
-	Lodging   bool `json:"lodging"`
+	// Allowance flags (derived from allowance_types array, only present if at least one is true)
+	Breakfast *bool `json:"breakfast,omitempty"`
+	Lunch     *bool `json:"lunch,omitempty"`
+	Dinner    *bool `json:"dinner,omitempty"`
+	Lodging   *bool `json:"lodging,omitempty"`
 	// Division info (denormalized)
 	Division     string `json:"division"` // division code
 	DivisionName string `json:"divisionName"`
@@ -389,11 +389,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 				PaymentType:   r.PaymentType,
 				CcLast4Digits: r.CcLast4Digits,
 				Attachment:    r.Attachment,
-				// Allowance flags (derived from allowance_types array)
-				Breakfast: containsAllowanceType(r.AllowanceTypesJSON, "Breakfast"),
-				Lunch:     containsAllowanceType(r.AllowanceTypesJSON, "Lunch"),
-				Dinner:    containsAllowanceType(r.AllowanceTypesJSON, "Dinner"),
-				Lodging:   containsAllowanceType(r.AllowanceTypesJSON, "Lodging"),
+				// Allowance flags are set below, only if at least one is true
 				// Division info
 				Division:     r.Division,
 				DivisionName: r.DivisionName,
@@ -426,6 +422,18 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 				// ID references
 				VendorId:        r.VendorId,
 				PurchaseOrderId: r.PurchaseOrderId,
+			}
+
+			// Only include allowance flags if at least one is true
+			breakfast := containsAllowanceType(r.AllowanceTypesJSON, "Breakfast")
+			lunch := containsAllowanceType(r.AllowanceTypesJSON, "Lunch")
+			dinner := containsAllowanceType(r.AllowanceTypesJSON, "Dinner")
+			lodging := containsAllowanceType(r.AllowanceTypesJSON, "Lodging")
+			if breakfast || lunch || dinner || lodging {
+				expenses[i].Breakfast = &breakfast
+				expenses[i].Lunch = &lunch
+				expenses[i].Dinner = &dinner
+				expenses[i].Lodging = &lodging
 			}
 		}
 
