@@ -144,7 +144,7 @@ type expenseExportOutput struct {
 	// Core expense data
 	Date          string  `json:"date"`
 	Description   string  `json:"description,omitempty"`
-	Total         float64 `json:"total,omitempty"`
+	Total         *float64 `json:"total,omitempty"`
 	Distance      float64 `json:"distance,omitempty"`
 	PaymentType   string  `json:"paymentType"`
 	CcLast4Digits string  `json:"ccLast4digits,omitempty"`
@@ -381,11 +381,10 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 				GivenName:   r.GivenName,
 				DisplayName: strings.TrimSpace(r.DisplayName),
 				PayrollId:   r.PayrollId,
-				// Core expense data
-				Date:          r.Date,
-				Description:   r.Description,
-				Total:         r.Total,
-				Distance:      r.Distance,
+				// Core expense data (Total is set below, conditionally)
+				Date:        r.Date,
+				Description: r.Description,
+				Distance:    r.Distance,
 				PaymentType:   r.PaymentType,
 				CcLast4Digits: r.CcLast4Digits,
 				Attachment:    r.Attachment,
@@ -434,6 +433,11 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 				expenses[i].Lunch = &lunch
 				expenses[i].Dinner = &dinner
 				expenses[i].Lodging = &lodging
+			}
+
+			// Only include total if payment type is not Allowance
+			if r.PaymentType != "Allowance" {
+				expenses[i].Total = &r.Total
 			}
 		}
 
