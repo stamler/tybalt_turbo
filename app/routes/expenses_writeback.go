@@ -150,10 +150,10 @@ type expenseExportOutput struct {
 	CcLast4Digits string  `json:"ccLast4digits,omitempty"`
 	Attachment    string  `json:"attachment,omitempty"`
 	// Allowance flags (derived from allowance_types array)
-	Breakfast bool `json:"breakfast,omitempty"`
-	Lunch     bool `json:"lunch,omitempty"`
-	Dinner    bool `json:"dinner,omitempty"`
-	Lodging   bool `json:"lodging,omitempty"`
+	Breakfast bool `json:"breakfast"`
+	Lunch     bool `json:"lunch"`
+	Dinner    bool `json:"dinner"`
+	Lodging   bool `json:"lodging"`
 	// Division info (denormalized)
 	Division     string `json:"division"` // division code
 	DivisionName string `json:"divisionName"`
