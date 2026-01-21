@@ -436,7 +436,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			}
 
 			// Only include total if payment type is not Allowance or Mileage
-			if r.PaymentType != "Allowance" && r.PaymentType != "Mileage" {
+			if r.PaymentType != "Allowance" && r.PaymentType != "Mileage" && r.PaymentType != "Meals" {
 				expenses[i].Total = &r.Total
 			}
 		}
