@@ -47,6 +47,7 @@ type purchaseOrderExportOutput struct {
 	Frequency      string  `json:"frequency,omitempty"`
 	Status         string  `json:"status,omitempty"`
 	Attachment     string  `json:"attachment,omitempty"`
+	AttachmentHash string  `json:"attachmentHash,omitempty"`
 }
 
 // Internal struct for DB scanning - expenses query
@@ -60,6 +61,7 @@ type expenseExportDBRow struct {
 	AllowanceTypesJSON  string  `db:"allowance_types_json"`
 	CcLast4Digits       string  `db:"cc_last_4_digits"`
 	Attachment          string  `db:"attachment"`
+	AttachmentHash      string  `db:"attachment_hash"`
 	Submitted           bool    `db:"submitted"`
 	Approved            string  `db:"approved"`
 	Committed           string  `db:"committed"`
@@ -129,6 +131,7 @@ type purchaseOrderExportDBRow struct {
 	Frequency      string  `db:"frequency"`
 	Status         string  `db:"status"`
 	Attachment     string  `db:"attachment"`
+	AttachmentHash string  `db:"attachment_hash"`
 }
 
 // Output struct matching legacy Tybalt Expenses Firestore format
@@ -142,13 +145,14 @@ type expenseExportOutput struct {
 	DisplayName string `json:"displayName"`
 	PayrollId   string `json:"payrollId"`
 	// Core expense data
-	Date          string   `json:"date"`
-	Description   string   `json:"description,omitempty"`
-	Total         *float64 `json:"total,omitempty"`
-	Distance      float64  `json:"distance,omitempty"`
-	PaymentType   string   `json:"paymentType"`
-	CcLast4Digits string   `json:"ccLast4digits,omitempty"`
-	Attachment    string   `json:"attachment,omitempty"`
+	Date           string   `json:"date"`
+	Description    string   `json:"description,omitempty"`
+	Total          *float64 `json:"total,omitempty"`
+	Distance       float64  `json:"distance,omitempty"`
+	PaymentType    string   `json:"paymentType"`
+	CcLast4Digits  string   `json:"ccLast4digits,omitempty"`
+	Attachment     string   `json:"attachment,omitempty"`
+	AttachmentHash string   `json:"attachmentHash,omitempty"`
 	// Allowance flags (derived from allowance_types array, only present if at least one is true)
 	Breakfast *bool `json:"breakfast,omitempty"`
 	Lunch     *bool `json:"lunch,omitempty"`
@@ -240,6 +244,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  COALESCE(e.allowance_types, '[]') AS allowance_types_json,
 			  COALESCE(e.cc_last_4_digits, '') AS cc_last_4_digits,
 			  COALESCE(e.attachment, '') AS attachment,
+			  COALESCE(e.attachment_hash, '') AS attachment_hash,
 			  COALESCE(e.submitted, 0) AS submitted,
 			  COALESCE(e.approved, '') AS approved,
 			  COALESCE(e.committed, '') AS committed,
@@ -351,7 +356,8 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  COALESCE(po.type, '') AS type,
 			  COALESCE(po.frequency, '') AS frequency,
 			  COALESCE(po.status, '') AS status,
-			  COALESCE(po.attachment, '') AS attachment
+			  COALESCE(po.attachment, '') AS attachment,
+			  COALESCE(po.attachment_hash, '') AS attachment_hash
 			FROM expenses e
 			JOIN purchase_orders po ON e.purchase_order = po.id
 			LEFT JOIN vendors v ON po.vendor = v.id
@@ -382,12 +388,13 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 				DisplayName: strings.TrimSpace(r.DisplayName),
 				PayrollId:   r.PayrollId,
 				// Core expense data (Total is set below, conditionally)
-				Date:          r.Date,
-				Description:   r.Description,
-				Distance:      r.Distance,
-				PaymentType:   r.PaymentType,
-				CcLast4Digits: r.CcLast4Digits,
-				Attachment:    r.Attachment,
+				Date:           r.Date,
+				Description:    r.Description,
+				Distance:       r.Distance,
+				PaymentType:    r.PaymentType,
+				CcLast4Digits:  r.CcLast4Digits,
+				Attachment:     r.Attachment,
+				AttachmentHash: r.AttachmentHash,
 				// Allowance flags are set below, only if at least one is true
 				// Division info
 				Division:     r.Division,
@@ -477,6 +484,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 				Frequency:      r.Frequency,
 				Status:         r.Status,
 				Attachment:     r.Attachment,
+				AttachmentHash: r.AttachmentHash,
 			}
 		}
 

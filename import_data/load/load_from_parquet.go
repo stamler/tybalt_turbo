@@ -195,6 +195,7 @@ type Expense struct {
 	Total               float64   `parquet:"total"`
 	PaymentType         string    `parquet:"paymentType"`
 	Attachment          string    `parquet:"destination_attachment"`
+	OriginalAttachment  string    `parquet:"attachment"` // Original Firebase Storage path: Expenses/{uid}/{hash}.{ext}
 	CCLast4Digits       string    `parquet:"ccLast4Digits_string"`
 	PurchaseOrderNumber string    `parquet:"po"`
 	PurchaseOrderId     string    `parquet:"purchase_order_id"`

@@ -789,6 +789,7 @@ func main() {
 			total,
 			payment_type,
 			attachment,
+			attachment_hash,
 			cc_last_4_digits,
 			allowance_types,
 			purchase_order,
@@ -813,6 +814,7 @@ func main() {
 			CAST({:total} AS REAL) / 100,
 			{:payment_type},
 			{:attachment},
+			{:attachment_hash},
 			{:cc_last_4_digits},
 			{:allowance_types},
 			{:purchase_order},
@@ -879,6 +881,14 @@ func main() {
 							return "" // otherwise path.Base will return "."
 						}
 						return path.Base(item.Attachment)
+					}(),
+					"attachment_hash": func() string {
+						// Extract hash from original Firebase Storage path: Expenses/{uid}/{hash}.{ext}
+						if item.OriginalAttachment == "" {
+							return ""
+						}
+						filename := path.Base(item.OriginalAttachment)          // e.g., "8f4e2d1a...b7.pdf"
+						return strings.TrimSuffix(filename, path.Ext(filename)) // Remove extension to get hash
 					}(),
 					"cc_last_4_digits":      item.CCLast4Digits,
 					"approver":              item.Approver,
