@@ -444,8 +444,8 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		"approver": validation.Validate(purchaseOrderRecord.GetString("approver"),
 			validation.By(approverIsActive(app)),
 			validation.By(utilities.PoApproverPropsHasDivisionPermission(app, constants.PO_APPROVER_CLAIM_ID, purchaseOrderRecord.GetString("division")))),
-		"total":       validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.Max(constants.MAX_APPROVAL_TOTAL)),
-		"type":        validation.Validate(purchaseOrderRecord.GetString("type"), validation.When(isChild, validation.In("Normal").Error("child POs must be of type Normal"))),
+		"total": validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.Max(constants.MAX_APPROVAL_TOTAL)),
+		"type":  validation.Validate(purchaseOrderRecord.GetString("type"), validation.When(isChild, validation.In("Normal").Error("child POs must be of type Normal"))),
 	}
 
 	// If a job is present, verify the referenced job exists and has Active status
@@ -491,6 +491,21 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	if cleanErr != nil {
 		return cleanErr
 	}
+
+	// if the purchase order has a new attachment, calculate the sha256 hash of the
+	// file and set the attachment_hash property on the record
+	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")
+	if hashErr != nil {
+		return hashErr
+	}
+	if attachmentHash != "" {
+		// New file uploaded - set computed hash
+		record.Set("attachment_hash", attachmentHash)
+	} else if record.GetString("attachment") == "" {
+		// Attachment was explicitly removed - clear the hash
+		record.Set("attachment_hash", "")
+	}
+	// Otherwise: no new file and attachment still exists - leave hash unchanged
 
 	if err := ensureActiveDivision(app, record.GetString("division"), "division"); err != nil {
 		if ve, ok := err.(validation.Errors); ok {

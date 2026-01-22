@@ -3,9 +3,6 @@
 package hooks
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"io"
 	"log"
 	"net/http"
 	"strings"
@@ -280,73 +277,6 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	return nil
 }
 
-func calculateFileFieldHash(e *core.RecordRequestEvent, field string) (string, error) {
-	// Get any files that have been uploaded for the field.
-	files := e.Record.GetUnsavedFiles(field)
-
-	// If the field is not present in the multipart form, or if it is present
-	// but no actual files were uploaded for it (e.g., an empty file list).
-	if len(files) == 0 {
-		// No new file for this field in the current request.
-		// Return empty string and no error, as there's nothing to hash.
-		return "", nil
-	}
-
-	// If more than one file was uploaded for the field, this is an error,
-	// as we expect only one file per field.
-	if len(files) > 1 {
-		return "", &errs.HookError{
-			Status:  http.StatusBadRequest,
-			Message: "hook error processing file for field: " + field,
-			Data: map[string]errs.CodeError{
-				field: {
-					Code:    "too_many_files",
-					Message: "too many files uploaded for field " + field,
-				},
-			},
-		}
-	}
-
-	// At this point, len(fileHeaders) == 1. Get the first (and only) file header.
-	fileReader := files[0].Reader
-
-	// open the file
-	file, err := fileReader.Open()
-	if err != nil {
-		return "", &errs.HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error opening file for field: " + field,
-			Data: map[string]errs.CodeError{
-				field: {
-					Code:    "error_opening_file",
-					Message: "error opening file for field " + field,
-				},
-			},
-		}
-	}
-	defer file.Close()
-
-	// calculate the hash of the file
-	log.Println("calculating hash for", field)
-
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil {
-		return "", &errs.HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when calculating expense attachment hash",
-			Data: map[string]errs.CodeError{
-				field: {
-					Code:    "error_calculating_hash",
-					Message: "error calculating hash",
-				},
-			},
-		}
-	}
-
-	// return the hash as a hex string
-	return hex.EncodeToString(hash.Sum(nil)), nil
-}
-
 // The processExpense function is used to process the expense record. It is
 // called by the hooks for the expenses collection to ensure that the record
 // is in a valid state before it is created or updated.
@@ -395,12 +325,19 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 
 	// if the expense record has an attachment, calculate the sha256 hash of the
 	// file and set the attachment_hash property on the record
-	attachmentHash, hashErr := calculateFileFieldHash(e, "attachment")
+	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")
 	if hashErr != nil {
 		return hashErr
 	}
-	log.Println("attachmentHash", attachmentHash)
-	expenseRecord.Set("attachment_hash", attachmentHash)
+	if attachmentHash != "" {
+		// New file uploaded - set computed hash
+		log.Println("attachmentHash", attachmentHash)
+		expenseRecord.Set("attachment_hash", attachmentHash)
+	} else if expenseRecord.GetString("attachment") == "" {
+		// Attachment was explicitly removed - clear the hash
+		expenseRecord.Set("attachment_hash", "")
+	}
+	// Otherwise: no new file and attachment still exists - leave hash unchanged
 
 	// if the expense record has a purchase_order, load it
 	var poRecord *core.Record = nil
@@ -471,8 +408,8 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
-    // validate the expense record
-    if err := validateExpense(app, expenseRecord, poRecord, existingExpensesTotal, hasPayablesAdminClaim); err != nil {
+	// validate the expense record
+	if err := validateExpense(app, expenseRecord, poRecord, existingExpensesTotal, hasPayablesAdminClaim); err != nil {
 		return err
 	}
 	return nil
