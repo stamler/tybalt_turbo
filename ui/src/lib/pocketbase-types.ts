@@ -249,6 +249,10 @@ export type ClientContactsRecord = {
   updated: IsoDateString;
 };
 
+export enum ClientNotesStatusChangeToOptions {
+  "No Bid" = "No Bid",
+  "Cancelled" = "Cancelled",
+}
 export type ClientNotesRecord = {
   client: RecordIdString;
   created: IsoDateString;
@@ -256,6 +260,7 @@ export type ClientNotesRecord = {
   job: RecordIdString;
   job_not_applicable: boolean;
   note: string;
+  status_change_to?: ClientNotesStatusChangeToOptions;
   uid: RecordIdString;
   updated: IsoDateString;
 };
