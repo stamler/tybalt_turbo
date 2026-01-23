@@ -56,6 +56,19 @@ func augmentExpenses() {
 		log.Fatalf("Failed to replace uids: %v", err)
 	}
 
+	// Normalize attachment paths by stripping the "Writeback/" prefix.
+	// This ensures attachments.go always receives paths in the standard format
+	// {Collection}/{uid}/{hash}.{ext} regardless of whether the expense was
+	// originally created in legacy Tybalt or written back from Turbo.
+	_, err = db.Exec(`
+		UPDATE expenses
+		SET attachment = SUBSTR(attachment, 11)
+		WHERE attachment LIKE 'Writeback/%'
+	`)
+	if err != nil {
+		log.Fatalf("Failed to normalize attachment paths: %v", err)
+	}
+
 	// add the ccLast4Digits_string column which is a blank string if ccLast4Digits is null
 	// and the value of ccLast4Digits left padded with zeros to 4 digits if it is not null
 	_, err = db.Exec(`

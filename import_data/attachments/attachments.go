@@ -3,11 +3,13 @@ package attachments
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"io"
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"cloud.google.com/go/storage"
 	"github.com/aws/aws-sdk-go/aws"
@@ -16,6 +18,40 @@ import (
 	"github.com/aws/aws-sdk-go/service/s3"
 	"google.golang.org/api/option"
 )
+
+// writebackPrefix is the legacy GCS namespace used for Turbo-originated files.
+// We keep this explicit so the importer can resolve both legacy and writeback
+// paths without needing to know which system created the attachment.
+const writebackPrefix = "Writeback/"
+
+func gcsSourceCandidates(attachmentPath string) []string {
+	// Build a prioritized list of GCS object paths to try for a given attachment.
+	// Why:
+	// - Historically, legacy expenses store attachments under "Expenses/{uid}/{hash}.{ext}".
+	// - Turbo writeback copies attachments into legacy GCS under "Writeback/Expenses/{uid}/{hash}.{ext}".
+	// - A clean export/augment normalizes parquet to the legacy path (no Writeback/),
+	//   so attachmentPath should be legacy-style after you regenerate parquet.
+	// - We still need to find the object regardless of where it actually lives in GCS
+	//   (legacy vs writeback prefix).
+	// Strategy:
+	// - If attachmentPath already includes Writeback/ (unexpected with fresh parquet),
+	//   try it first, then fall back to the trimmed legacy path.
+	// - If attachmentPath is legacy-style (expected), try it first, then fall back to
+	//   the Writeback/ prefixed variant.
+	// This keeps the read path resilient without changing how destination S3 keys
+	// are derived (those still come from destination_attachment).
+	if attachmentPath == "" {
+		return nil
+	}
+	if strings.HasPrefix(attachmentPath, writebackPrefix) {
+		trimmed := strings.TrimPrefix(attachmentPath, writebackPrefix)
+		if trimmed == "" {
+			return []string{attachmentPath}
+		}
+		return []string{attachmentPath, trimmed}
+	}
+	return []string{attachmentPath, writebackPrefix + attachmentPath}
+}
 
 func MigrateAttachments(parquetPath string, sourceColumn string, destinationColumn string, collectionId string) {
 	fmt.Println("Importing attachments from GCS to S3...")
@@ -30,7 +66,8 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 		log.Fatalf("Failed to create Google Cloud Storage client: %v", err)
 	}
 	defer gcsClient.Close()
-	_ = gcsClient.Bucket(os.Getenv("GCS_BUCKET_NAME"))
+	gcsBucketName := os.Getenv("GCS_BUCKET_NAME")
+	gcsBucket := gcsClient.Bucket(gcsBucketName)
 
 	// 2. setup the AWS S3 client
 	sess, err := session.NewSession(&aws.Config{
@@ -186,10 +223,40 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 		// Object does not exist in our pre-fetched list, proceed with download and upload.
 
 		//    1. download the attachment from Google Cloud Storage to the local file system
-		gcsObject := gcsClient.Bucket(os.Getenv("GCS_BUCKET_NAME")).Object(gcsObjectPath)
-		rc, err := gcsObject.NewReader(ctx)
-		if err != nil {
-			log.Printf("ERROR: Failed to create reader for GCS object gs://%s/%s: %v", os.Getenv("GCS_BUCKET_NAME"), gcsObjectPath, err)
+		// We now resolve attachments from either legacy or writeback namespaces:
+		// - First candidate: the path in parquet (normalized, legacy-style).
+		// - Second candidate: the same path under Writeback/.
+		// This enables round-trip fidelity when attachments were only ever copied
+		// into the Writeback/ prefix during Turbo writeback.
+		var rc *storage.Reader
+		var resolvedGcsPath string
+		var readerErr error
+		for _, candidate := range gcsSourceCandidates(gcsObjectPath) {
+			// Try each candidate path in order; stop on the first one that exists.
+			reader, err := gcsBucket.Object(candidate).NewReader(ctx)
+			if err != nil {
+				if errors.Is(err, storage.ErrObjectNotExist) {
+					// Keep trying the next candidate when the object doesn't exist at
+					// this prefix.
+					continue
+				}
+				// For any other error (permissions, network, etc), capture it and abort
+				// further attempts so we don't mask the underlying failure.
+				readerErr = err
+				log.Printf("ERROR: Failed to create reader for GCS object gs://%s/%s: %v", gcsBucketName, candidate, err)
+				break
+			}
+			rc = reader
+			resolvedGcsPath = candidate
+			break
+		}
+		if rc == nil {
+			if readerErr == nil {
+				// Both legacy and writeback prefixes were checked and no object exists.
+				// This is expected if the mirror hasn't synced yet, or if the attachment
+				// reference is stale. We log and skip to keep the migration resilient.
+				log.Printf("ERROR: GCS object not found at gs://%s/%s (also checked Writeback/ prefix)", gcsBucketName, gcsObjectPath)
+			}
 			continue
 		}
 
@@ -200,7 +267,9 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 			log.Printf("ERROR: Failed to create temporary directory %s: %v", tempDir, err)
 			continue
 		}
-		localTempFilePath := filepath.Join(tempDir, filepath.Base(gcsObjectPath))
+		// Use the resolved path's base name for the temp file; this preserves the
+		// correct extension when we had to fall back to Writeback/ prefixed objects.
+		localTempFilePath := filepath.Join(tempDir, filepath.Base(resolvedGcsPath))
 		localFile, err := os.Create(localTempFilePath)
 		if err != nil {
 			log.Printf("ERROR: Failed to create temporary file %s: %v", localTempFilePath, err)
@@ -209,7 +278,7 @@ func MigrateAttachments(parquetPath string, sourceColumn string, destinationColu
 		}
 
 		if _, err := io.Copy(localFile, rc); err != nil {
-			log.Printf("ERROR: Failed to download GCS object gs://%s/%s to %s: %v", os.Getenv("GCS_BUCKET_NAME"), gcsObjectPath, localTempFilePath, err)
+			log.Printf("ERROR: Failed to download GCS object gs://%s/%s to %s: %v", gcsBucketName, resolvedGcsPath, localTempFilePath, err)
 			rc.Close()
 			localFile.Close()
 			os.Remove(localTempFilePath) // Attempt to clean up temp file
