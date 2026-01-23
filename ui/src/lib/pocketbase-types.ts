@@ -443,6 +443,9 @@ export enum JobsStatusOptions {
   "Cancelled" = "Cancelled",
   "Awarded" = "Awarded",
   "Not Awarded" = "Not Awarded",
+  "Submitted" = "Submitted",
+  "In Progress" = "In Progress",
+  "No Bid" = "No Bid",
 }
 export type JobsRecord = {
   _imported: boolean;
@@ -468,7 +471,9 @@ export type JobsRecord = {
   proposal: RecordIdString;
   proposal_opening_date: string;
   proposal_submission_due_date: string;
+  proposal_value: number;
   status: JobsStatusOptions;
+  time_and_materials: boolean;
   updated: IsoDateString;
 };
 
