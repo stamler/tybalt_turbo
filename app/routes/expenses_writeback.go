@@ -26,28 +26,40 @@ type vendorExportOutput struct {
 
 // Purchase order export struct for separate purchaseOrders array
 type purchaseOrderExportOutput struct {
-	Id             string  `json:"id"`
-	PoNumber       string  `json:"poNumber"`
-	VendorId       string  `json:"vendorId,omitempty"`
-	VendorName     string  `json:"vendorName,omitempty"`
-	Uid            string  `json:"uid,omitempty"` // legacy_uid of creator
-	Job            string  `json:"job,omitempty"` // job number
-	JobDescription string  `json:"jobDescription,omitempty"`
-	Division       string  `json:"division,omitempty"` // division code
-	DivisionName   string  `json:"divisionName,omitempty"`
-	Total          float64 `json:"total"`
-	ApprovalTotal  float64 `json:"approvalTotal"`
-	Date           string  `json:"date,omitempty"`
-	Approved       string  `json:"approved,omitempty"`    // timestamp or empty
-	ApproverUid    string  `json:"approverUid,omitempty"` // legacy_uid
-	Cancelled      string  `json:"cancelled,omitempty"`   // timestamp or empty
-	Closed         string  `json:"closed,omitempty"`      // timestamp or empty
-	PaymentType    string  `json:"paymentType,omitempty"`
-	Type           string  `json:"type,omitempty"`
-	Frequency      string  `json:"frequency,omitempty"`
-	Status         string  `json:"status,omitempty"`
-	Attachment     string  `json:"attachment,omitempty"`
-	AttachmentHash string  `json:"attachmentHash,omitempty"`
+	Id                        string  `json:"id"`
+	PoNumber                  string  `json:"poNumber"`
+	VendorId                  string  `json:"vendorId,omitempty"`
+	VendorName                string  `json:"vendorName,omitempty"`
+	Uid                       string  `json:"uid,omitempty"` // legacy_uid of creator
+	Job                       string  `json:"job,omitempty"` // job number
+	JobDescription            string  `json:"jobDescription,omitempty"`
+	Division                  string  `json:"division,omitempty"` // division code
+	DivisionName              string  `json:"divisionName,omitempty"`
+	Total                     float64 `json:"total"`
+	ApprovalTotal             float64 `json:"approvalTotal"`
+	Date                      string  `json:"date,omitempty"`
+	EndDate                   string  `json:"endDate,omitempty"` // for recurring POs
+	Approved                  string  `json:"approved,omitempty"`    // timestamp or empty
+	ApproverUid               string  `json:"approverUid,omitempty"` // legacy_uid (first approver)
+	SecondApproval            string  `json:"secondApproval,omitempty"`            // timestamp or empty
+	SecondApproverUid         string  `json:"secondApproverUid,omitempty"`         // legacy_uid
+	PrioritySecondApproverUid string  `json:"prioritySecondApproverUid,omitempty"` // legacy_uid
+	Cancelled                 string  `json:"cancelled,omitempty"`                 // timestamp or empty
+	CancellerUid              string  `json:"cancellerUid,omitempty"`              // legacy_uid
+	Closed                    string  `json:"closed,omitempty"`                    // timestamp or empty
+	CloserUid                 string  `json:"closerUid,omitempty"`                 // legacy_uid
+	Rejected                  string  `json:"rejected,omitempty"`                  // timestamp or empty
+	RejectorUid               string  `json:"rejectorUid,omitempty"`               // legacy_uid
+	RejectionReason           string  `json:"rejectionReason,omitempty"`
+	PaymentType               string  `json:"paymentType,omitempty"`
+	Type                      string  `json:"type,omitempty"`
+	Frequency                 string  `json:"frequency,omitempty"`
+	Status                    string  `json:"status,omitempty"`
+	Category                  string  `json:"category,omitempty"`  // PocketBase category ID
+	ParentPo                  string  `json:"parentPo,omitempty"`  // PocketBase parent PO ID
+	Branch                    string  `json:"branch,omitempty"`    // PocketBase branch ID
+	Attachment                string  `json:"attachment,omitempty"`
+	AttachmentHash            string  `json:"attachmentHash,omitempty"`
 }
 
 // Internal struct for DB scanning - expenses query
@@ -110,28 +122,40 @@ type vendorExportDBRow struct {
 
 // Internal struct for DB scanning - purchase orders query
 type purchaseOrderExportDBRow struct {
-	Id             string  `db:"id"`
-	PoNumber       string  `db:"po_number"`
-	VendorId       string  `db:"vendor_id"`
-	VendorName     string  `db:"vendor_name"`
-	Uid            string  `db:"uid"` // legacy_uid
-	Job            string  `db:"job"` // job number
-	JobDescription string  `db:"job_description"`
-	Division       string  `db:"division"` // division code
-	DivisionName   string  `db:"division_name"`
-	Total          float64 `db:"total"`
-	ApprovalTotal  float64 `db:"approval_total"`
-	Date           string  `db:"date"`
-	Approved       string  `db:"approved"`
-	ApproverUid    string  `db:"approver_uid"` // legacy_uid
-	Cancelled      string  `db:"cancelled"`
-	Closed         string  `db:"closed"`
-	PaymentType    string  `db:"payment_type"`
-	Type           string  `db:"type"`
-	Frequency      string  `db:"frequency"`
-	Status         string  `db:"status"`
-	Attachment     string  `db:"attachment"`
-	AttachmentHash string  `db:"attachment_hash"`
+	Id                        string  `db:"id"`
+	PoNumber                  string  `db:"po_number"`
+	VendorId                  string  `db:"vendor_id"`
+	VendorName                string  `db:"vendor_name"`
+	Uid                       string  `db:"uid"` // legacy_uid
+	Job                       string  `db:"job"` // job number
+	JobDescription            string  `db:"job_description"`
+	Division                  string  `db:"division"` // division code
+	DivisionName              string  `db:"division_name"`
+	Total                     float64 `db:"total"`
+	ApprovalTotal             float64 `db:"approval_total"`
+	Date                      string  `db:"date"`
+	EndDate                   string  `db:"end_date"`
+	Approved                  string  `db:"approved"`
+	ApproverUid               string  `db:"approver_uid"` // legacy_uid (first approver)
+	SecondApproval            string  `db:"second_approval"`
+	SecondApproverUid         string  `db:"second_approver_uid"` // legacy_uid
+	PrioritySecondApproverUid string  `db:"priority_second_approver_uid"` // legacy_uid
+	Cancelled                 string  `db:"cancelled"`
+	CancellerUid              string  `db:"canceller_uid"` // legacy_uid
+	Closed                    string  `db:"closed"`
+	CloserUid                 string  `db:"closer_uid"` // legacy_uid
+	Rejected                  string  `db:"rejected"`
+	RejectorUid               string  `db:"rejector_uid"` // legacy_uid
+	RejectionReason           string  `db:"rejection_reason"`
+	PaymentType               string  `db:"payment_type"`
+	Type                      string  `db:"type"`
+	Frequency                 string  `db:"frequency"`
+	Status                    string  `db:"status"`
+	Category                  string  `db:"category"`  // PocketBase category ID
+	ParentPo                  string  `db:"parent_po"` // PocketBase parent PO ID
+	Branch                    string  `db:"branch"`    // PocketBase branch ID
+	Attachment                string  `db:"attachment"`
+	AttachmentHash            string  `db:"attachment_hash"`
 }
 
 // Output struct matching legacy Tybalt Expenses Firestore format
@@ -348,14 +372,26 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  COALESCE(po.total, 0) AS total,
 			  COALESCE(po.approval_total, 0) AS approval_total,
 			  COALESCE(po.date, '') AS date,
+			  COALESCE(po.end_date, '') AS end_date,
 			  COALESCE(po.approved, '') AS approved,
 			  COALESCE(ap_approver.legacy_uid, '') AS approver_uid,
+			  COALESCE(po.second_approval, '') AS second_approval,
+			  COALESCE(ap_second_approver.legacy_uid, '') AS second_approver_uid,
+			  COALESCE(ap_priority_second_approver.legacy_uid, '') AS priority_second_approver_uid,
 			  COALESCE(po.cancelled, '') AS cancelled,
+			  COALESCE(ap_canceller.legacy_uid, '') AS canceller_uid,
 			  COALESCE(po.closed, '') AS closed,
+			  COALESCE(ap_closer.legacy_uid, '') AS closer_uid,
+			  COALESCE(po.rejected, '') AS rejected,
+			  COALESCE(ap_rejector.legacy_uid, '') AS rejector_uid,
+			  COALESCE(po.rejection_reason, '') AS rejection_reason,
 			  COALESCE(po.payment_type, '') AS payment_type,
 			  COALESCE(po.type, '') AS type,
 			  COALESCE(po.frequency, '') AS frequency,
 			  COALESCE(po.status, '') AS status,
+			  COALESCE(po.category, '') AS category,
+			  COALESCE(po.parent_po, '') AS parent_po,
+			  COALESCE(po.branch, '') AS branch,
 			  COALESCE(po.attachment, '') AS attachment,
 			  COALESCE(po.attachment_hash, '') AS attachment_hash
 			FROM expenses e
@@ -363,6 +399,11 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			LEFT JOIN vendors v ON po.vendor = v.id
 			LEFT JOIN admin_profiles ap_uid ON po.uid = ap_uid.uid
 			LEFT JOIN admin_profiles ap_approver ON po.approver = ap_approver.uid
+			LEFT JOIN admin_profiles ap_second_approver ON po.second_approver = ap_second_approver.uid
+			LEFT JOIN admin_profiles ap_priority_second_approver ON po.priority_second_approver = ap_priority_second_approver.uid
+			LEFT JOIN admin_profiles ap_canceller ON po.canceller = ap_canceller.uid
+			LEFT JOIN admin_profiles ap_closer ON po.closer = ap_closer.uid
+			LEFT JOIN admin_profiles ap_rejector ON po.rejector = ap_rejector.uid
 			LEFT JOIN jobs j ON po.job = j.id
 			LEFT JOIN divisions d ON po.division = d.id
 			WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.committed != '' AND e.purchase_order IS NOT NULL AND e.purchase_order != ''
@@ -463,28 +504,40 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 		purchaseOrders := make([]purchaseOrderExportOutput, len(poRows))
 		for i, r := range poRows {
 			purchaseOrders[i] = purchaseOrderExportOutput{
-				Id:             r.Id,
-				PoNumber:       r.PoNumber,
-				VendorId:       r.VendorId,
-				VendorName:     r.VendorName,
-				Uid:            r.Uid,
-				Job:            r.Job,
-				JobDescription: r.JobDescription,
-				Division:       r.Division,
-				DivisionName:   r.DivisionName,
-				Total:          r.Total,
-				ApprovalTotal:  r.ApprovalTotal,
-				Date:           r.Date,
-				Approved:       r.Approved,
-				ApproverUid:    r.ApproverUid,
-				Cancelled:      r.Cancelled,
-				Closed:         r.Closed,
-				PaymentType:    r.PaymentType,
-				Type:           r.Type,
-				Frequency:      r.Frequency,
-				Status:         r.Status,
-				Attachment:     r.Attachment,
-				AttachmentHash: r.AttachmentHash,
+				Id:                        r.Id,
+				PoNumber:                  r.PoNumber,
+				VendorId:                  r.VendorId,
+				VendorName:                r.VendorName,
+				Uid:                       r.Uid,
+				Job:                       r.Job,
+				JobDescription:            r.JobDescription,
+				Division:                  r.Division,
+				DivisionName:              r.DivisionName,
+				Total:                     r.Total,
+				ApprovalTotal:             r.ApprovalTotal,
+				Date:                      r.Date,
+				EndDate:                   r.EndDate,
+				Approved:                  r.Approved,
+				ApproverUid:               r.ApproverUid,
+				SecondApproval:            r.SecondApproval,
+				SecondApproverUid:         r.SecondApproverUid,
+				PrioritySecondApproverUid: r.PrioritySecondApproverUid,
+				Cancelled:                 r.Cancelled,
+				CancellerUid:              r.CancellerUid,
+				Closed:                    r.Closed,
+				CloserUid:                 r.CloserUid,
+				Rejected:                  r.Rejected,
+				RejectorUid:               r.RejectorUid,
+				RejectionReason:           r.RejectionReason,
+				PaymentType:               r.PaymentType,
+				Type:                      r.Type,
+				Frequency:                 r.Frequency,
+				Status:                    r.Status,
+				Category:                  r.Category,
+				ParentPo:                  r.ParentPo,
+				Branch:                    r.Branch,
+				Attachment:                r.Attachment,
+				AttachmentHash:            r.AttachmentHash,
 			}
 		}
 
