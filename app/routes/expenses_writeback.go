@@ -31,8 +31,8 @@ type purchaseOrderExportOutput struct {
 	VendorId                  string  `json:"vendorId,omitempty"`
 	VendorName                string  `json:"vendorName,omitempty"`
 	Uid                       string  `json:"uid,omitempty"` // legacy_uid of creator
-	Job                       string  `json:"job,omitempty"` // job number
-	JobDescription            string  `json:"jobDescription,omitempty"`
+	Job                       string  `json:"job,omitempty"` // PocketBase job ID
+	Description               string  `json:"description,omitempty"` // PO's own description
 	Division                  string  `json:"division,omitempty"` // division code
 	DivisionName              string  `json:"divisionName,omitempty"`
 	Total                     float64 `json:"total"`
@@ -127,8 +127,8 @@ type purchaseOrderExportDBRow struct {
 	VendorId                  string  `db:"vendor_id"`
 	VendorName                string  `db:"vendor_name"`
 	Uid                       string  `db:"uid"` // legacy_uid
-	Job                       string  `db:"job"` // job number
-	JobDescription            string  `db:"job_description"`
+	Job                       string  `db:"job"` // PocketBase job ID
+	Description               string  `db:"description"` // PO's own description
 	Division                  string  `db:"division"` // division code
 	DivisionName              string  `db:"division_name"`
 	Total                     float64 `db:"total"`
@@ -365,8 +365,8 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  COALESCE(po.vendor, '') AS vendor_id,
 			  COALESCE(v.name, '') AS vendor_name,
 			  COALESCE(ap_uid.legacy_uid, '') AS uid,
-			  COALESCE(j.number, '') AS job,
-			  COALESCE(j.description, '') AS job_description,
+			  COALESCE(po.job, '') AS job,
+			  COALESCE(po.description, '') AS description,
 			  COALESCE(d.code, '') AS division,
 			  COALESCE(d.name, '') AS division_name,
 			  COALESCE(po.total, 0) AS total,
@@ -510,7 +510,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 				VendorName:                r.VendorName,
 				Uid:                       r.Uid,
 				Job:                       r.Job,
-				JobDescription:            r.JobDescription,
+				Description:               r.Description,
 				Division:                  r.Division,
 				DivisionName:              r.DivisionName,
 				Total:                     r.Total,

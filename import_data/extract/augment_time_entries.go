@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -82,6 +83,35 @@ func augmentTimeEntries() {
 	`)
 	if err != nil {
 		log.Fatalf("Failed to create time_entriesA: %v", err)
+	}
+
+	// Fail fast when time entries reference legacy UIDs that don't map to PocketBase.
+	rows, err := db.Query("SELECT DISTINCT pocketbase_id, uid FROM time_entriesA WHERE uid IS NOT NULL AND uid != '' AND pocketbase_uid IS NULL")
+	if err != nil {
+		log.Fatalf("Failed to query time_entriesA: %v", err)
+	}
+	defer rows.Close()
+
+	var missingUIDs []string
+	for rows.Next() {
+		var id, uid string
+		err = rows.Scan(&id, &uid)
+		if err != nil {
+			log.Fatalf("Failed to scan time_entriesA row: %v", err)
+		}
+		missingUIDs = append(missingUIDs, fmt.Sprintf("%s: %s", id, uid))
+	}
+
+	if err = rows.Err(); err != nil {
+		log.Fatalf("Error iterating time_entriesA rows: %v", err)
+	}
+
+	if len(missingUIDs) > 0 {
+		log.Println("Missing pocketbase_uid values for TimeEntries.parquet")
+		for _, missing := range missingUIDs {
+			log.Println(missing)
+		}
+		log.Fatal("Please update uid_replacements.csv with the missing pocketbase_uid values and rerun this script.")
 	}
 
 	// augment time_entriesA with category_id

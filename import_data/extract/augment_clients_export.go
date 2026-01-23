@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -39,5 +40,40 @@ func augmentClients() {
 	`)
 	if err != nil {
 		log.Fatalf("Failed to augment clients: %v", err)
+	}
+
+	// Fail fast when business development lead UIDs cannot map to PocketBase.
+	rows, err := db.Query(`
+		SELECT c.id, c.businessDevelopmentLeadUid
+		FROM clients_raw c
+		LEFT JOIN profiles p ON c.businessDevelopmentLeadUid = p.id
+		WHERE c.businessDevelopmentLeadUid IS NOT NULL
+		  AND c.businessDevelopmentLeadUid != ''
+		  AND p.pocketbase_uid IS NULL
+	`)
+	if err != nil {
+		log.Fatalf("Failed to query clients_raw: %v", err)
+	}
+	defer rows.Close()
+
+	var missingUIDs []string
+	for rows.Next() {
+		var id, legacyUid string
+		if err := rows.Scan(&id, &legacyUid); err != nil {
+			log.Fatalf("Failed to scan clients_raw row: %v", err)
+		}
+		missingUIDs = append(missingUIDs, fmt.Sprintf("%s: %s", id, legacyUid))
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Fatalf("Error iterating clients_raw rows: %v", err)
+	}
+
+	if len(missingUIDs) > 0 {
+		log.Println("Missing PocketBase UID mappings for Clients.parquet (businessDevelopmentLeadUid)")
+		for _, missing := range missingUIDs {
+			log.Println(missing)
+		}
+		log.Fatal("Please update uid_replacements.csv with the missing PocketBase UID mappings and rerun this script.")
 	}
 }

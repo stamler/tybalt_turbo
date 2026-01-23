@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -44,6 +45,43 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 	_, err = db.Exec("CREATE TABLE jobsB AS SELECT jobsA.*, profiles.pocketbase_uid AS alternate_manager_id FROM jobsA LEFT JOIN profiles ON jobsA.alternateManagerUid = profiles.id")
 	if err != nil {
 		log.Fatalf("Failed to create jobsB: %v", err)
+	}
+
+	// Fail fast when jobs reference legacy UIDs that don't map to PocketBase.
+	rows, err := db.Query(`
+		SELECT pocketbase_id, 'managerUid' AS field, managerUid AS legacy_uid
+		FROM jobsB
+		WHERE managerUid IS NOT NULL AND managerUid != '' AND manager_id IS NULL
+		UNION ALL
+		SELECT pocketbase_id, 'alternateManagerUid' AS field, alternateManagerUid AS legacy_uid
+		FROM jobsB
+		WHERE alternateManagerUid IS NOT NULL AND alternateManagerUid != '' AND alternate_manager_id IS NULL
+	`)
+	if err != nil {
+		log.Fatalf("Failed to query jobsB: %v", err)
+	}
+	defer rows.Close()
+
+	var missingUIDs []string
+	for rows.Next() {
+		var id, field, legacyUid string
+		err = rows.Scan(&id, &field, &legacyUid)
+		if err != nil {
+			log.Fatalf("Failed to scan jobsB row: %v", err)
+		}
+		missingUIDs = append(missingUIDs, fmt.Sprintf("%s (%s): %s", id, field, legacyUid))
+	}
+
+	if err = rows.Err(); err != nil {
+		log.Fatalf("Error iterating jobsB rows: %v", err)
+	}
+
+	if len(missingUIDs) > 0 {
+		log.Println("Missing PocketBase UID mappings for Jobs.parquet")
+		for _, missing := range missingUIDs {
+			log.Println(missing)
+		}
+		log.Fatal("Please update uid_replacements.csv with the missing PocketBase UID mappings and rerun this script.")
 	}
 
 	// fold in the proposal_id

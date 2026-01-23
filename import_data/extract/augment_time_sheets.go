@@ -54,8 +54,36 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 		log.Fatalf("Failed to create time_sheetsA: %v", err)
 	}
 
-	// Look for missing pocketbase_uid values
-	rows, err := db.Query("SELECT DISTINCT uid, givenName, surname FROM time_sheetsA WHERE pocketbase_uid IS NULL")
+	// Fail fast if any time sheet is missing a uid (always required).
+	missingUidRows, err := db.Query("SELECT DISTINCT id FROM time_sheetsA WHERE uid IS NULL OR uid = ''")
+	if err != nil {
+		log.Fatalf("Failed to query time_sheetsA missing uid: %v", err)
+	}
+	defer missingUidRows.Close()
+
+	var missingUids []string
+	for missingUidRows.Next() {
+		var id string
+		if err := missingUidRows.Scan(&id); err != nil {
+			log.Fatalf("Failed to scan missing uid row: %v", err)
+		}
+		missingUids = append(missingUids, id)
+	}
+
+	if err = missingUidRows.Err(); err != nil {
+		log.Fatalf("Error iterating missing uid rows: %v", err)
+	}
+
+	if len(missingUids) > 0 {
+		log.Println("TimeSheets with missing uid values")
+		for _, missing := range missingUids {
+			log.Println(missing)
+		}
+		log.Fatal("TimeSheets must reference a valid uid; fix source data and rerun this script.")
+	}
+
+	// Look for missing pocketbase_uid mappings for existing uids.
+	rows, err := db.Query("SELECT DISTINCT uid, givenName, surname FROM time_sheetsA WHERE uid IS NOT NULL AND uid != '' AND pocketbase_uid IS NULL")
 	if err != nil {
 		log.Fatalf("Failed to query time_sheetsA: %v", err)
 	}
@@ -82,6 +110,35 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 			log.Println(missing)
 		}
 		log.Fatal("Please update uid_replacements.csv with the missing pocketbase_uid values and rerun this script. Also verify that the defaultDivision of the problematic profiles is set to an existing division in the sqlite database.")
+	}
+
+	// Fail fast when a time sheet has an approver UID that cannot map to PocketBase.
+	approverRows, err := db.Query("SELECT DISTINCT id, managerUid FROM time_sheetsA WHERE managerUid IS NOT NULL AND managerUid != '' AND pocketbase_approver_uid IS NULL")
+	if err != nil {
+		log.Fatalf("Failed to query time_sheetsA approvers: %v", err)
+	}
+	defer approverRows.Close()
+
+	var missingApproverUIDs []string
+	for approverRows.Next() {
+		var id, uid string
+		err = approverRows.Scan(&id, &uid)
+		if err != nil {
+			log.Fatalf("Failed to scan approver row: %v", err)
+		}
+		missingApproverUIDs = append(missingApproverUIDs, fmt.Sprintf("%s: %s", id, uid))
+	}
+
+	if err = approverRows.Err(); err != nil {
+		log.Fatalf("Error iterating approver rows: %v", err)
+	}
+
+	if len(missingApproverUIDs) > 0 {
+		log.Println("Missing pocketbase_approver_uid values for TimeSheets.parquet")
+		for _, missing := range missingApproverUIDs {
+			log.Println(missing)
+		}
+		log.Fatal("Please update uid_replacements.csv with the missing pocketbase_uid values for time sheet approvers and rerun this script.")
 	}
 
 	// overwrite the timesheets table with the final augmented table

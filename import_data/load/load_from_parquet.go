@@ -172,8 +172,10 @@ type TimeAmendment struct {
 }
 
 type Vendor struct {
-	Id   string `parquet:"id"`
-	Name string `parquet:"name"`
+	Id     string `parquet:"id"`
+	Name   string `parquet:"name"`
+	Alias  string `parquet:"alias"`  // For TurboVendors
+	Status string `parquet:"status"` // For TurboVendors
 }
 
 type Expense struct {
@@ -216,16 +218,38 @@ type MileageResetDate struct {
 }
 
 type PurchaseOrder struct {
-	Id          string  `parquet:"id"`
-	PoNumber    string  `parquet:"number"`
-	Approver    string  `parquet:"approver"`
-	Date        string  `parquet:"date"`
-	Vendor      string  `parquet:"vendor"`
-	Uid         string  `parquet:"uid"`
-	Total       float64 `parquet:"total"`
-	PaymentType string  `parquet:"payment_type"`
-	Job         string  `parquet:"job"`
-	Division    string  `parquet:"division"`
+	Id                     string  `parquet:"id"`
+	PoNumber               string  `parquet:"number"`
+	Approver               string  `parquet:"approver"`
+	Date                   string  `parquet:"date"`
+	EndDate                string  `parquet:"end_date"` // for recurring POs
+	Vendor                 string  `parquet:"vendor"`
+	Uid                    string  `parquet:"uid"`
+	Total                  float64 `parquet:"total"`
+	ApprovalTotal          float64 `parquet:"approval_total"`
+	PaymentType            string  `parquet:"payment_type"`
+	Job                    string  `parquet:"job"`
+	Description            string  `parquet:"description"` // PO's own description
+	Division               string  `parquet:"division"`
+	Type                   string  `parquet:"type"`
+	Frequency              string  `parquet:"frequency"`
+	Status                 string  `parquet:"status"`
+	Approved               string  `parquet:"approved"`        // timestamp
+	SecondApproval         string  `parquet:"second_approval"` // timestamp
+	SecondApprover         string  `parquet:"second_approver"` // legacy_uid (converted to PocketBase UID in expenses_to_pos)
+	PrioritySecondApprover string  `parquet:"priority_second_approver"` // legacy_uid (converted to PocketBase UID in expenses_to_pos)
+	Closed                 string  `parquet:"closed"`    // timestamp
+	Closer                 string  `parquet:"closer"`    // legacy_uid (converted to PocketBase UID in expenses_to_pos)
+	Cancelled              string  `parquet:"cancelled"` // timestamp
+	Canceller              string  `parquet:"canceller"` // legacy_uid (converted to PocketBase UID in expenses_to_pos)
+	Rejected               string  `parquet:"rejected"`  // timestamp
+	Rejector               string  `parquet:"rejector"`  // legacy_uid (converted to PocketBase UID in expenses_to_pos)
+	RejectionReason        string  `parquet:"rejection_reason"`
+	Category               string  `parquet:"category"`  // PocketBase category ID
+	ParentPo               string  `parquet:"parent_po"` // PocketBase parent PO ID
+	Branch                 string  `parquet:"branch"`    // PocketBase branch ID
+	Attachment             string  `parquet:"attachment"`      // PocketBase filename (for Turbo-originated POs)
+	AttachmentHash         string  `parquet:"attachment_hash"` // SHA256 hash of attachment file
 }
 
 // JobTimeAllocation represents a single division-hours allocation for a job.

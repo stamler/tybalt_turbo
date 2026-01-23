@@ -15,7 +15,7 @@ import (
 
 // The tablesToDump variable is used to specify the tables that should be
 // exported to Parquet format.
-var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts"}
+var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts", "TurboVendors", "TurboPurchaseOrders"}
 
 func ToParquet(sourceSQLiteDb string) {
 	err := godotenv.Load()
@@ -235,6 +235,59 @@ func ToParquet(sourceSQLiteDb string) {
 					SELECT id, surname, givenName, email, clientId
 					FROM mysql_db.TurboClientContacts
 				) TO 'parquet/TurboClientContacts.parquet' (FORMAT PARQUET)
+			`
+		case "TurboVendors":
+			// Export TurboVendors for round-trip of Turbo-originated vendors.
+			// Uses id as-is since Turbo vendors already have PocketBase IDs.
+			query = `
+				COPY (
+					SELECT id, name, alias, status
+					FROM mysql_db.TurboVendors
+				) TO 'parquet/TurboVendors.parquet' (FORMAT PARQUET)
+			`
+		case "TurboPurchaseOrders":
+			// Export TurboPurchaseOrders for round-trip of Turbo-originated POs.
+			// These include attachment and attachment_hash fields for POs created in Turbo.
+			// Uses id as pocketbase_id since Turbo POs already have PocketBase IDs.
+			// vendorId is used directly (it already exists in Vendors.parquet via TurboVendors).
+			// Include all fields needed for round-trip fidelity.
+			query = `
+				COPY (
+					SELECT
+						id,
+						poNumber AS number,
+						approverUid AS approver,
+						CAST(date AS VARCHAR) AS date,
+						CAST(endDate AS VARCHAR) AS end_date,
+						vendorId AS vendor,
+						uid,
+						total,
+						approvalTotal AS approval_total,
+						paymentType AS payment_type,
+						job,
+						description,
+						division,
+						type,
+						frequency,
+						status,
+						CAST(approved AS VARCHAR) AS approved,
+						CAST(secondApproval AS VARCHAR) AS second_approval,
+						secondApproverUid AS second_approver,
+						prioritySecondApproverUid AS priority_second_approver,
+						CAST(closed AS VARCHAR) AS closed,
+						closerUid AS closer,
+						CAST(cancelled AS VARCHAR) AS cancelled,
+						cancellerUid AS canceller,
+						CAST(rejected AS VARCHAR) AS rejected,
+						rejectorUid AS rejector,
+						rejectionReason AS rejection_reason,
+						category,
+						parentPo AS parent_po,
+						branch,
+						attachment,
+						attachment_hash
+					FROM mysql_db.TurboPurchaseOrders
+				) TO 'parquet/TurboPurchaseOrders.parquet' (FORMAT PARQUET)
 			`
 		default:
 			// Generic query for other tables, just adding pocketbase_id

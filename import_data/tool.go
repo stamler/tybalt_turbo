@@ -686,15 +686,24 @@ func main() {
 			}
 
 			// --- Load Vendors ---
-			// Define the specific SQL for the vendors table
-			vendorInsertSQL := "INSERT INTO vendors (id, name, status, _imported) VALUES ({:id}, {:name}, {:status}, true)"
+			// Vendors.parquet now includes hybrid ID resolution:
+			// - Vendors matching TurboVendors by name use the TurboVendor's PocketBase ID
+			// - Other vendors get deterministic IDs from MD5 hash of name
+			// - Turbo-only vendors (not in any expense) are also included
+			// - alias and status fields are populated from TurboVendors when matched
+			vendorInsertSQL := "INSERT INTO vendors (id, name, alias, status, _imported) VALUES ({:id}, {:name}, {:alias}, {:status}, true)"
 
 			// Define the binder function for the Vendor type
 			vendorBinder := func(item load.Vendor) dbx.Params {
+				status := item.Status
+				if status == "" {
+					status = "Active"
+				}
 				return dbx.Params{
 					"id":     item.Id,
 					"name":   item.Name,
-					"status": "Active",
+					"alias":  item.Alias,
+					"status": status,
 				}
 			}
 
@@ -719,59 +728,148 @@ func main() {
 				po_number,
 				approved,
 				second_approval,
+				second_approver,
+				priority_second_approver,
 				closed,
+				closer,
+				cancelled,
+				canceller,
+				rejected,
+				rejector,
+				rejection_reason,
 				type,
+				frequency,
 				status,
 				closed_by_system,
 				description,
 				approver,
 				date,
+				end_date,
 				vendor,
 				uid,
 				total,
+				approval_total,
 				payment_type,
 				job,
 				division,
+				category,
+				parent_po,
+				branch,
+				attachment,
+				attachment_hash,
 				_imported
 			) VALUES (
 				{:id},
 				{:po_number},
 				{:approved},
 				{:second_approval},
+				{:second_approver},
+				{:priority_second_approver},
 				{:closed},
-				'Normal',
-				'Closed',
-				1,
-				'Imported from Firebase Expenses',
+				{:closer},
+				{:cancelled},
+				{:canceller},
+				{:rejected},
+				{:rejector},
+				{:rejection_reason},
+				{:type},
+				{:frequency},
+				{:status},
+				{:closed_by_system},
+				{:description},
 				{:approver},
 				{:date},
+				{:end_date},
 				{:vendor},
 				{:uid},
 				{:total},
+				{:approval_total},
 				{:payment_type},
 				{:job},
 				{:division},
+				{:category},
+				{:parent_po},
+				{:branch},
+				{:attachment},
+				{:attachment_hash},
 				true
 			)`,
 				func(item load.PurchaseOrder) dbx.Params {
+					// Use actual values from parquet when available, fall back to defaults for legacy-derived POs
+					approved := item.Approved
+					if approved == "" {
+						approved = fixedTimestamp
+					}
+					// For second_approval: use actual value from Turbo POs, or fixedTimestamp for legacy
+					secondApproval := item.SecondApproval
+					if secondApproval == "" {
+						secondApproval = fixedTimestamp
+					}
+					// Legacy-derived POs have empty status; Turbo POs always include it.
+					isDerived := item.Status == ""
+					poType := item.Type
+					if poType == "" {
+						poType = "Normal"
+					}
+					status := item.Status
+					if status == "" {
+						status = "Closed"
+					}
+					// Only set closed when the status is Closed, and only auto-fill for derived POs.
+					closed := item.Closed
+					if status != "Closed" {
+						closed = ""
+					} else if isDerived && closed == "" {
+						closed = fixedTimestamp
+					}
+					description := item.Description
+					if description == "" {
+						description = "Imported from Firebase Expenses"
+					}
 					return dbx.Params{
-						"id":              item.Id,
-						"po_number":       item.PoNumber,
-						"approved":        fixedTimestamp,
-						"second_approval": fixedTimestamp,
-						"closed":          fixedTimestamp,
-						"approver":        item.Approver,
-						"date":            item.Date,
-						"vendor":          item.Vendor,
-						"uid":             item.Uid,
-						"total":           item.Total,
-						"payment_type":    item.PaymentType,
-						"job":             item.Job,
-						"division":        item.Division,
+						"id":                       item.Id,
+						"po_number":                item.PoNumber,
+						"approved":                 approved,
+						"second_approval":          secondApproval,
+						"second_approver":          item.SecondApprover,          // May be empty for legacy POs
+						"priority_second_approver": item.PrioritySecondApprover, // May be empty for legacy POs
+						"closed":                   closed,
+						"closer":                   item.Closer,                  // May be empty for legacy POs
+						"cancelled":                item.Cancelled,
+						"canceller":                item.Canceller,               // May be empty for legacy POs
+						"rejected":                 item.Rejected,
+						"rejector":                 item.Rejector,                // May be empty for legacy POs
+						"rejection_reason":         item.RejectionReason,
+						"type":                     poType,
+						"frequency":                item.Frequency,
+						"status":                   status,
+						"closed_by_system":         1, // Not in MySQL, keep as default
+						"description":              description,
+						"approver":                 item.Approver,
+						"date":                     item.Date,
+						"end_date":                 item.EndDate,
+						"vendor":                   item.Vendor,
+						"uid":                      item.Uid,
+						"total":                    item.Total,
+						"approval_total":           item.ApprovalTotal,
+						"payment_type":             item.PaymentType,
+						"job":                      item.Job,
+						"division":                 item.Division,
+						"category":                 item.Category,                // PocketBase ID, may be empty
+						"parent_po":                item.ParentPo,                // PocketBase ID, may be empty
+						"branch":                   item.Branch,                  // PocketBase ID, may be empty
+						"attachment":               item.Attachment,
+						"attachment_hash":          item.AttachmentHash,
 					}
 				},
 				true, // Enable upsert for idempotency
 			)
+
+			// Note: TurboPurchaseOrders are now merged during extraction in expensesToPurchaseOrders()
+			// using hybrid ID resolution. purchase_orders.parquet includes:
+			// - POs matching TurboPurchaseOrders by number (using Turbo's ID and fields)
+			// - Derived POs from expenses (using generated IDs)
+			// - Turbo-only POs (no matching expenses)
 
 			// --- Load Expenses ---
 			// Define the specific SQL for the expenses table
@@ -970,14 +1068,27 @@ func synthesizePoApproverProps(dbPath string) error {
 
 	var toUpsert []rowData
 	for rows.Next() {
-		var uid, claims, defaultDivision string
+		var uid, claims, defaultDivision sql.NullString
 		if err := rows.Scan(&uid, &claims, &defaultDivision); err != nil {
 			return fmt.Errorf("scan profile: %w", err)
 		}
 
-		hasTapr := strings.Contains(claims, "tapr")
-		hasVp := strings.Contains(claims, "vp")
-		hasSmg := strings.Contains(claims, "smg")
+		uidValue := ""
+		if uid.Valid {
+			uidValue = uid.String
+		}
+		claimsValue := ""
+		if claims.Valid {
+			claimsValue = claims.String
+		}
+		defaultDivisionValue := ""
+		if defaultDivision.Valid {
+			defaultDivisionValue = defaultDivision.String
+		}
+
+		hasTapr := strings.Contains(claimsValue, "tapr")
+		hasVp := strings.Contains(claimsValue, "vp")
+		hasSmg := strings.Contains(claimsValue, "smg")
 
 		var maxAmount float64
 		var divisionsJSON string
@@ -997,14 +1108,23 @@ func synthesizePoApproverProps(dbPath string) error {
 			continue
 		}
 
+		// Cannot create approver props without a valid PocketBase user id.
+		if uidValue == "" {
+			continue
+		}
+
 		if divisionsJSON == "" {
-			b, _ := json.Marshal([]string{defaultDivision})
+			// Tapr/vp approvers require a default division; skip if missing.
+			if defaultDivisionValue == "" && (hasTapr || hasVp) {
+				continue
+			}
+			b, _ := json.Marshal([]string{defaultDivisionValue})
 			divisionsJSON = string(b)
 		}
 
 		toUpsert = append(toUpsert, rowData{
-			uid:             uid,
-			defaultDivision: defaultDivision,
+			uid:             uidValue,
+			defaultDivision: defaultDivisionValue,
 			maxAmount:       maxAmount,
 			divisionsJSON:   divisionsJSON,
 		})

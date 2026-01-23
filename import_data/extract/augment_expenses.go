@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -90,6 +91,75 @@ func augmentExpenses() {
 	`)
 	if err != nil {
 		log.Fatalf("Failed to create expensesA: %v", err)
+	}
+
+	// Fail fast if any expense is missing a uid (always required).
+	missingUidRows, err := db.Query("SELECT pocketbase_id FROM expensesA WHERE uid IS NULL OR uid = ''")
+	if err != nil {
+		log.Fatalf("Failed to query expensesA missing uid: %v", err)
+	}
+	defer missingUidRows.Close()
+
+	var missingUids []string
+	for missingUidRows.Next() {
+		var id string
+		if err := missingUidRows.Scan(&id); err != nil {
+			log.Fatalf("Failed to scan missing uid row: %v", err)
+		}
+		missingUids = append(missingUids, id)
+	}
+
+	if err = missingUidRows.Err(); err != nil {
+		log.Fatalf("Error iterating missing uid rows: %v", err)
+	}
+
+	if len(missingUids) > 0 {
+		log.Println("Expenses with missing uid values")
+		for _, missing := range missingUids {
+			log.Println(missing)
+		}
+		log.Fatal("Expenses must reference a valid uid; fix source data and rerun this script.")
+	}
+
+	// Fail fast when expenses reference legacy UIDs that don't map to PocketBase.
+	rows, err := db.Query(`
+		SELECT pocketbase_id, 'uid' AS field, uid AS legacy_uid
+		FROM expensesA
+		WHERE uid IS NOT NULL AND uid != '' AND pocketbase_uid IS NULL
+		UNION ALL
+		SELECT pocketbase_id, 'managerUid' AS field, managerUid AS legacy_uid
+		FROM expensesA
+		WHERE managerUid IS NOT NULL AND managerUid != '' AND pocketbase_approver_uid IS NULL
+		UNION ALL
+		SELECT pocketbase_id, 'commitUid' AS field, commitUid AS legacy_uid
+		FROM expensesA
+		WHERE commitUid IS NOT NULL AND commitUid != '' AND pocketbase_commit_uid IS NULL
+	`)
+	if err != nil {
+		log.Fatalf("Failed to query expensesA: %v", err)
+	}
+	defer rows.Close()
+
+	var missingUIDs []string
+	for rows.Next() {
+		var id, field, legacyUid string
+		err = rows.Scan(&id, &field, &legacyUid)
+		if err != nil {
+			log.Fatalf("Failed to scan expensesA row: %v", err)
+		}
+		missingUIDs = append(missingUIDs, fmt.Sprintf("%s (%s): %s", id, field, legacyUid))
+	}
+
+	if err = rows.Err(); err != nil {
+		log.Fatalf("Error iterating expensesA rows: %v", err)
+	}
+
+	if len(missingUIDs) > 0 {
+		log.Println("Missing PocketBase UID mappings for Expenses.parquet")
+		for _, missing := range missingUIDs {
+			log.Println(missing)
+		}
+		log.Fatal("Please update uid_replacements.csv with the missing PocketBase UID mappings and rerun this script.")
 	}
 
 	// augment expensesA with category_id

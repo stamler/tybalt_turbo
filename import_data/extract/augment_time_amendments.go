@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"fmt"
 	"log"
 )
 
@@ -114,6 +115,47 @@ func augmentTimeAmendments() {
 	`)
 	if err != nil {
 		log.Fatalf("Failed to create time_amendmentsA: %v", err)
+	}
+
+	// Fail fast when time amendments reference legacy UIDs that don't map to PocketBase.
+	rows, err := db.Query(`
+		SELECT pocketbase_id, 'uid' AS field, uid AS legacy_uid
+		FROM time_amendmentsA
+		WHERE uid IS NOT NULL AND uid != '' AND pocketbase_uid IS NULL
+		UNION ALL
+		SELECT pocketbase_id, 'creator' AS field, creator AS legacy_uid
+		FROM time_amendmentsA
+		WHERE creator IS NOT NULL AND creator != '' AND pocketbase_creator_uid IS NULL
+		UNION ALL
+		SELECT pocketbase_id, 'commitUid' AS field, commitUid AS legacy_uid
+		FROM time_amendmentsA
+		WHERE commitUid IS NOT NULL AND commitUid != '' AND pocketbase_commit_uid IS NULL
+	`)
+	if err != nil {
+		log.Fatalf("Failed to query time_amendmentsA: %v", err)
+	}
+	defer rows.Close()
+
+	var missingUIDs []string
+	for rows.Next() {
+		var id, field, legacyUid string
+		err = rows.Scan(&id, &field, &legacyUid)
+		if err != nil {
+			log.Fatalf("Failed to scan time_amendmentsA row: %v", err)
+		}
+		missingUIDs = append(missingUIDs, fmt.Sprintf("%s (%s): %s", id, field, legacyUid))
+	}
+
+	if err = rows.Err(); err != nil {
+		log.Fatalf("Error iterating time_amendmentsA rows: %v", err)
+	}
+
+	if len(missingUIDs) > 0 {
+		log.Println("Missing PocketBase UID mappings for TimeAmendments.parquet")
+		for _, missing := range missingUIDs {
+			log.Println(missing)
+		}
+		log.Fatal("Please update uid_replacements.csv with the missing PocketBase UID mappings and rerun this script.")
 	}
 
 	// add commited and created_date columns by converting commitTime and created
