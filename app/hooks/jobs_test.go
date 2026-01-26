@@ -3,6 +3,7 @@ package hooks
 import (
 	"testing"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -129,5 +130,42 @@ func TestGenerateTopLevelJobNumber_EmptyYearProposal(t *testing.T) {
 	expected := "P99-0001"
 	if number != expected {
 		t.Errorf("expected %q, got %q", expected, number)
+	}
+}
+
+// TestValidateRateSheetIsActive_InactiveRateSheet verifies that setting a job's
+// rate_sheet to an inactive rate sheet returns an error.
+//
+// Test data in test_pb_data/data.db:
+//   - rate_sheets: "c41ofep525bcacj" (2025 Standard Rates)
+func TestValidateRateSheetIsActive_InactiveRateSheet(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	// Ensure the test rate sheet is inactive
+	rateSheet, err := app.FindRecordById("rate_sheets", "c41ofep525bcacj")
+	if err != nil {
+		t.Fatalf("failed to find rate sheet: %v", err)
+	}
+	rateSheet.Set("active", false)
+	if err := app.Save(rateSheet); err != nil {
+		t.Fatalf("failed to deactivate rate sheet: %v", err)
+	}
+
+	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
+	if err != nil {
+		t.Fatalf("failed to get jobs collection: %v", err)
+	}
+
+	// Create a new job record and set rate_sheet to the inactive rate sheet
+	record := core.NewRecord(jobsCollection)
+	record.Set("rate_sheet", "c41ofep525bcacj")
+
+	err = validateRateSheetIsActive(app, record)
+	if err == nil {
+		t.Error("expected error when setting inactive rate sheet, got nil")
 	}
 }

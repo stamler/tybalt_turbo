@@ -54,6 +54,10 @@ func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Recor
 		return err
 	}
 
+	if err := validateRateSheetIsActive(app, jobRecord); err != nil {
+		return err
+	}
+
 	// Caveat: cleanJob runs before validateJob. If cleanJob normalizes fields
 	// (e.g., clears authorizing_document/client_po/client_reference_number on proposals
 	// or updates outstanding_balance_date), a request intending to change only "status"
@@ -884,6 +888,60 @@ func jobHasClientNoteForStatus(app core.App, jobID string, targetStatus string) 
 		return false, err
 	}
 	return note != nil, nil
+}
+
+// validateRateSheetIsActive checks that when a rate_sheet is being set or changed,
+// the referenced rate sheet is active. The check only runs when:
+//   - On create: rate_sheet is set (non-empty)
+//   - On update: rate_sheet changed from its previous value
+//
+// Clearing rate_sheet (setting to empty) is always allowed.
+func validateRateSheetIsActive(app core.App, record *core.Record) error {
+	newRateSheet := record.GetString("rate_sheet")
+
+	// If rate_sheet is empty, no validation needed
+	if newRateSheet == "" {
+		return nil
+	}
+
+	// Determine if rate_sheet is being set or changed
+	var rateSheetChanged bool
+	if record.IsNew() {
+		// On create, any non-empty value counts as "being set"
+		rateSheetChanged = true
+	} else {
+		// On update, only validate if the value changed
+		originalRateSheet := record.Original().GetString("rate_sheet")
+		rateSheetChanged = newRateSheet != originalRateSheet
+	}
+
+	if !rateSheetChanged {
+		return nil
+	}
+
+	// Fetch the rate sheet and check if it's active
+	rateSheetRec, err := app.FindRecordById("rate_sheets", newRateSheet)
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "invalid rate sheet",
+			Data: map[string]errs.CodeError{
+				"rate_sheet": {Code: "invalid_reference", Message: "referenced rate sheet not found"},
+			},
+		}
+	}
+
+	if !rateSheetRec.GetBool("active") {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "rate sheet must be active",
+			Data: map[string]errs.CodeError{
+				"rate_sheet": {Code: "rate_sheet_not_active", Message: "the selected rate sheet is not active"},
+			},
+		}
+	}
+
+	return nil
 }
 
 // validateManagersAreActive checks that the manager and alternate_manager (if set)
