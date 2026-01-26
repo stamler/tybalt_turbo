@@ -3,9 +3,11 @@
 package hooks
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
+	"time"
 	"tybalt/errs"
 	"tybalt/utilities"
 
@@ -160,6 +162,62 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 
 	switch paymentType {
 	case "Mileage":
+		// Check personal vehicle insurance expiry for mileage expenses
+		uid := expenseRecord.GetString("uid")
+		adminProfile, apErr := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
+		if apErr != nil || adminProfile == nil {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning expense",
+				Data: map[string]errs.CodeError{
+					"uid": {Code: "profile_lookup_error", Message: "error looking up admin profile for insurance check"},
+				},
+			}
+		}
+
+		insuranceExpiry := adminProfile.GetString("personal_vehicle_insurance_expiry")
+		if insuranceExpiry == "" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "personal vehicle insurance expiry not set",
+				Data: map[string]errs.CodeError{
+					"date": {
+						Code:    "insurance_expiry_missing",
+						Message: "cannot submit mileage expense: personal vehicle insurance expiry must be updated with a valid date",
+					},
+				},
+			}
+		}
+
+		expiryDate, parseErr := time.Parse(time.DateOnly, insuranceExpiry)
+		if parseErr != nil {
+			return &errs.HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "error parsing insurance expiry date",
+			}
+		}
+
+		expenseDate, parseErr := time.Parse(time.DateOnly, expenseRecord.GetString("date"))
+		if parseErr != nil {
+			return &errs.HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "error parsing expense date",
+			}
+		}
+
+		if expenseDate.After(expiryDate) {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "personal vehicle insurance expired",
+				Data: map[string]errs.CodeError{
+					"date": {
+						Code:    "insurance_expired",
+						Message: fmt.Sprintf("cannot submit mileage expense: personal vehicle insurance expired on %s", insuranceExpiry),
+					},
+				},
+			}
+		}
+
 		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {
 			return &errs.HookError{

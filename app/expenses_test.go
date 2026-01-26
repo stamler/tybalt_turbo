@@ -408,6 +408,17 @@ func TestExpensesCreate(t *testing.T) {
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
+				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+					// Set valid insurance expiry for the user
+					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
+					if err != nil {
+						t.Fatalf("failed to find admin_profile: %v", err)
+					}
+					adminProfile.Set("personal_vehicle_insurance_expiry", "2025-12-31")
+					if err := app.Save(adminProfile); err != nil {
+						t.Fatalf("failed to save admin_profile: %v", err)
+					}
+				},
 			}
 		}(),
 		func() tests.ApiScenario {
@@ -441,6 +452,181 @@ func TestExpensesCreate(t *testing.T) {
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
+				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+					// Set valid insurance expiry for the user
+					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
+					if err != nil {
+						t.Fatalf("failed to find admin_profile: %v", err)
+					}
+					adminProfile.Set("personal_vehicle_insurance_expiry", "2025-12-31")
+					if err := app.Save(adminProfile); err != nil {
+						t.Fatalf("failed to save admin_profile: %v", err)
+					}
+				},
+			}
+		}(),
+		func() tests.ApiScenario {
+			// Mileage expense should fail when insurance expiry is not set
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2025-01-10",
+				"division": "vccd5fo56ctbigh",
+				"description": "mileage with no insurance",
+				"payment_type": "Mileage",
+				"distance": 100,
+				"total": 0,
+				"vendor": "2zqxtsmymf670ha"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "mileage expense fails when insurance expiry is not set",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"code":"insurance_expiry_missing"`,
+					`personal vehicle insurance expiry must be updated with a valid date`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreateRequest": 1},
+				TestAppFactory: testutils.SetupTestApp,
+				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+					// Ensure insurance expiry is empty
+					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
+					if err != nil {
+						t.Fatalf("failed to find admin_profile: %v", err)
+					}
+					adminProfile.Set("personal_vehicle_insurance_expiry", "")
+					if err := app.Save(adminProfile); err != nil {
+						t.Fatalf("failed to save admin_profile: %v", err)
+					}
+				},
+			}
+		}(),
+		func() tests.ApiScenario {
+			// Mileage expense should fail when insurance has expired
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2025-01-10",
+				"division": "vccd5fo56ctbigh",
+				"description": "mileage with expired insurance",
+				"payment_type": "Mileage",
+				"distance": 100,
+				"total": 0,
+				"vendor": "2zqxtsmymf670ha"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "mileage expense fails when insurance has expired",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"code":"insurance_expired"`,
+					`personal vehicle insurance expired on 2024-12-31`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreateRequest": 1},
+				TestAppFactory: testutils.SetupTestApp,
+				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+					// Set insurance expiry to a date before the expense date
+					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
+					if err != nil {
+						t.Fatalf("failed to find admin_profile: %v", err)
+					}
+					adminProfile.Set("personal_vehicle_insurance_expiry", "2024-12-31")
+					if err := app.Save(adminProfile); err != nil {
+						t.Fatalf("failed to save admin_profile: %v", err)
+					}
+				},
+			}
+		}(),
+		func() tests.ApiScenario {
+			// Mileage expense should succeed when expense date equals insurance expiry date
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2025-01-10",
+				"division": "vccd5fo56ctbigh",
+				"description": "mileage on expiry day",
+				"payment_type": "Mileage",
+				"distance": 100,
+				"total": 0,
+				"vendor": "2zqxtsmymf670ha"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "mileage expense succeeds when expense date equals insurance expiry date",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					"\"payment_type\":\"Mileage\"",
+					"\"distance\":100",
+					"\"total\":70",
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+					// Set insurance expiry to the same date as the expense
+					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
+					if err != nil {
+						t.Fatalf("failed to find admin_profile: %v", err)
+					}
+					adminProfile.Set("personal_vehicle_insurance_expiry", "2025-01-10")
+					if err := app.Save(adminProfile); err != nil {
+						t.Fatalf("failed to save admin_profile: %v", err)
+					}
+				},
+			}
+		}(),
+		func() tests.ApiScenario {
+			// Non-mileage expense should not be affected by missing insurance expiry
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "regular expense",
+				"payment_type": "Expense",
+				"total": 99,
+				"vendor": "2zqxtsmymf670ha"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "non-mileage expense not affected by missing insurance expiry",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					`"payment_type":"Expense"`,
+					`"total":99`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+					// Ensure insurance expiry is empty - should not affect non-mileage expenses
+					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
+					if err != nil {
+						t.Fatalf("failed to find admin_profile: %v", err)
+					}
+					adminProfile.Set("personal_vehicle_insurance_expiry", "")
+					if err := app.Save(adminProfile); err != nil {
+						t.Fatalf("failed to save admin_profile: %v", err)
+					}
+				},
 			}
 		}(),
 
