@@ -66,6 +66,8 @@ type Job struct {
 	ProposalId                  string  `parquet:"proposal_id"`
 	ProposalOpeningDate         string  `parquet:"proposalOpeningDate"`
 	ProposalSubmissionDueDate   string  `parquet:"proposalSubmissionDueDate"`
+	ProposalValue               float64 `parquet:"proposalValue"`
+	TimeAndMaterials            bool    `parquet:"timeAndMaterials"`
 	Status                      string  `parquet:"status"`
 	Timestamp                   string  `parquet:"timestamp"`
 	Id                          string  `parquet:"pocketbase_id"`

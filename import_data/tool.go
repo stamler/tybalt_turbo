@@ -232,6 +232,8 @@ func main() {
 					"outstanding_balance":          item.OutstandingBalance,
 					"outstanding_balance_date":     outstandingBalanceDate,
 					"parent":                       item.Parent,
+					"proposal_value":               item.ProposalValue,
+					"time_and_materials":           item.TimeAndMaterials,
 				}
 			}
 

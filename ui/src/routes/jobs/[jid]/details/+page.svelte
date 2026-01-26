@@ -19,6 +19,9 @@
   import { JobsStatusOptions } from "$lib/pocketbase-types";
   let awarding = $state(false);
 
+  let { data }: { data: PageData } = $props();
+  let isProposal = $derived(data.job.number?.startsWith("P") ?? false);
+
   type TabContentProps = {
     summary: Record<string, any>;
     items: any[];
@@ -27,8 +30,6 @@
     page: number;
     totalPages: number;
   };
-
-  let { data }: { data: PageData } = $props();
 
   function personName(person: any) {
     if (!person) return "";
@@ -358,34 +359,36 @@
           {data.job.fn_agreement ? "Yes" : "No"}
         </div>
 
-        {#if data.job.authorizing_document}
-          <div>
-            <span class="font-semibold">Authorizing Document:</span>
-            {data.job.authorizing_document}
-          </div>
-        {/if}
-        {#if data.job.authorizing_document === "PO" && data.job.client_po}
-          <div>
-            <span class="font-semibold">Client PO:</span>
-            {data.job.client_po}
-          </div>
-        {/if}
-        {#if data.job.client_reference_number}
-          <div>
-            <span class="font-semibold">Client Reference Number:</span>
-            {data.job.client_reference_number}
-          </div>
-        {/if}
-
-        <div>
-          <span class="font-semibold">Outstanding Balance:</span>
-          {formatCurrency(data.job.outstanding_balance ?? 0)}
-          {#if data.job.outstanding_balance_date}
-            <span class="text-sm text-neutral-500">
-              (As of {shortDate(data.job.outstanding_balance_date, true)})
-            </span>
+        {#if !isProposal}
+          {#if data.job.authorizing_document}
+            <div>
+              <span class="font-semibold">Authorizing Document:</span>
+              {data.job.authorizing_document}
+            </div>
           {/if}
-        </div>
+          {#if data.job.authorizing_document === "PO" && data.job.client_po}
+            <div>
+              <span class="font-semibold">Client PO:</span>
+              {data.job.client_po}
+            </div>
+          {/if}
+          {#if data.job.client_reference_number}
+            <div>
+              <span class="font-semibold">Client Reference Number:</span>
+              {data.job.client_reference_number}
+            </div>
+          {/if}
+
+          <div>
+            <span class="font-semibold">Outstanding Balance:</span>
+            {formatCurrency(data.job.outstanding_balance ?? 0)}
+            {#if data.job.outstanding_balance_date}
+              <span class="text-sm text-neutral-500">
+                (As of {shortDate(data.job.outstanding_balance_date, true)})
+              </span>
+            {/if}
+          </div>
+        {/if}
 
         {#if data.job.categories && data.job.categories.length > 0}
           <div class="flex items-start gap-2">
@@ -420,25 +423,34 @@
           </div>
         {/if}
 
-        {#if data.job.project_award_date}
+        {#if !isProposal && data.job.project_award_date}
           <div>
             <span class="font-semibold">Project Award Date:</span>
             {data.job.project_award_date}
           </div>
         {/if}
 
-        {#if data.job.proposal_opening_date}
+        {#if isProposal}
           <div>
-            <span class="font-semibold">Proposal Opening Date:</span>
-            {data.job.proposal_opening_date}
+            <span class="font-semibold">Proposal Value:</span>
+            {formatCurrency(data.job.proposal_value ?? 0)}
           </div>
-        {/if}
-
-        {#if data.job.proposal_submission_due_date}
           <div>
-            <span class="font-semibold">Proposal Submission Due:</span>
-            {data.job.proposal_submission_due_date}
+            <span class="font-semibold">Time & Materials:</span>
+            {data.job.time_and_materials ? "Yes" : "No"}
           </div>
+          {#if data.job.proposal_opening_date}
+            <div>
+              <span class="font-semibold">Proposal Opening Date:</span>
+              {data.job.proposal_opening_date}
+            </div>
+          {/if}
+          {#if data.job.proposal_submission_due_date}
+            <div>
+              <span class="font-semibold">Proposal Submission Due:</span>
+              {data.job.proposal_submission_due_date}
+            </div>
+          {/if}
         {/if}
 
         {#if data.job.allocations && Array.isArray(data.job.allocations) && data.job.allocations.length > 0}

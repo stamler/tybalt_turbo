@@ -65,6 +65,8 @@ type jobDetailsRow struct {
 	ProjectAwardDate          sql.NullString  `db:"project_award_date"`
 	ProposalOpeningDate       sql.NullString  `db:"proposal_opening_date"`
 	ProposalSubmissionDueDate sql.NullString  `db:"proposal_submission_due_date"`
+	ProposalValue             sql.NullFloat64 `db:"proposal_value"`
+	TimeAndMaterials          sql.NullBool    `db:"time_and_materials"`
 	OutstandingBalance        sql.NullFloat64 `db:"outstanding_balance"`
 	OutstandingBalanceDate    sql.NullString  `db:"outstanding_balance_date"`
 	AllocationsJSON           string          `db:"allocations_json"`
@@ -84,36 +86,38 @@ type JobRef struct {
 }
 
 type JobDetails struct {
-	ID                        string     `json:"id"`
-	Number                    string     `json:"number"`
-	Description               string     `json:"description"`
-	Status                    string     `json:"status"`
-	ParentID                  string     `json:"parent_id"`
-	ParentNumber              string     `json:"parent_number"`
-	Location                  string     `json:"location"`
-	AuthorizingDocument       string     `json:"authorizing_document"`
-	ClientPO                  string     `json:"client_po"`
-	ClientReferenceNumber     string     `json:"client_reference_number"`
-	Client                    ClientInfo `json:"client"`
-	Contact                   Person     `json:"contact"`
-	Manager                   Person     `json:"manager"`
-	AlternateManager          Person     `json:"alternate_manager"`
-	JobOwner                  ClientInfo `json:"job_owner"`
-	ProposalID                string     `json:"proposal_id"`
-	ProposalNumber            string     `json:"proposal_number"`
-	BranchID                  string     `json:"branch_id"`
-	BranchCode                string     `json:"branch_code"`
-	BranchName                string     `json:"branch_name"`
-	FnAgreement               bool       `json:"fn_agreement"`
-	ProjectAwardDate          string     `json:"project_award_date"`
-	ProposalOpeningDate       string     `json:"proposal_opening_date"`
-	ProposalSubmissionDueDate string     `json:"proposal_submission_due_date"`
-	OutstandingBalance        float64    `json:"outstanding_balance"`
-	OutstandingBalanceDate    string     `json:"outstanding_balance_date"`
+	ID                        string       `json:"id"`
+	Number                    string       `json:"number"`
+	Description               string       `json:"description"`
+	Status                    string       `json:"status"`
+	ParentID                  string       `json:"parent_id"`
+	ParentNumber              string       `json:"parent_number"`
+	Location                  string       `json:"location"`
+	AuthorizingDocument       string       `json:"authorizing_document"`
+	ClientPO                  string       `json:"client_po"`
+	ClientReferenceNumber     string       `json:"client_reference_number"`
+	Client                    ClientInfo   `json:"client"`
+	Contact                   Person       `json:"contact"`
+	Manager                   Person       `json:"manager"`
+	AlternateManager          Person       `json:"alternate_manager"`
+	JobOwner                  ClientInfo   `json:"job_owner"`
+	ProposalID                string       `json:"proposal_id"`
+	ProposalNumber            string       `json:"proposal_number"`
+	BranchID                  string       `json:"branch_id"`
+	BranchCode                string       `json:"branch_code"`
+	BranchName                string       `json:"branch_name"`
+	FnAgreement               bool         `json:"fn_agreement"`
+	ProjectAwardDate          string       `json:"project_award_date"`
+	ProposalOpeningDate       string       `json:"proposal_opening_date"`
+	ProposalSubmissionDueDate string       `json:"proposal_submission_due_date"`
+	ProposalValue             float64      `json:"proposal_value"`
+	TimeAndMaterials          bool         `json:"time_and_materials"`
+	OutstandingBalance        float64      `json:"outstanding_balance"`
+	OutstandingBalanceDate    string       `json:"outstanding_balance_date"`
 	Allocations               []Allocation `json:"allocations"`
-	Projects                  []JobRef   `json:"projects"`
-	Children                  []JobRef   `json:"children"`
-	Categories                []Category `json:"categories"`
+	Projects                  []JobRef     `json:"projects"`
+	Children                  []JobRef     `json:"children"`
+	Categories                []Category   `json:"categories"`
 }
 
 type Category struct {
@@ -178,6 +182,8 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			ProjectAwardDate:          ns(r.ProjectAwardDate),
 			ProposalOpeningDate:       ns(r.ProposalOpeningDate),
 			ProposalSubmissionDueDate: ns(r.ProposalSubmissionDueDate),
+			ProposalValue:             r.ProposalValue.Float64,
+			TimeAndMaterials:          r.TimeAndMaterials.Bool,
 			OutstandingBalance:        r.OutstandingBalance.Float64,
 			OutstandingBalanceDate:    ns(r.OutstandingBalanceDate),
 			Allocations:               allocations,

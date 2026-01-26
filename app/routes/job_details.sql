@@ -30,6 +30,8 @@ SELECT
   j.project_award_date AS project_award_date,
   j.proposal_opening_date AS proposal_opening_date,
   j.proposal_submission_due_date AS proposal_submission_due_date,
+  j.proposal_value AS proposal_value,
+  j.time_and_materials AS time_and_materials,
   j.outstanding_balance AS outstanding_balance,
   j.outstanding_balance_date AS outstanding_balance_date,
   j.branch           AS branch_id,

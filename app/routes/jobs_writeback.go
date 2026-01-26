@@ -66,6 +66,8 @@ type jobExportDBRow struct {
 	ProjectAwardDate          string  `db:"project_award_date"`
 	ProposalOpeningDate       string  `db:"proposal_opening_date"`
 	ProposalSubmissionDueDate string  `db:"proposal_submission_due_date"`
+	ProposalValue             float64 `db:"proposal_value"`
+	TimeAndMaterials          bool    `db:"time_and_materials"`
 	Location                  string  `db:"location"`
 	OutstandingBalance        float64 `db:"outstanding_balance"`
 	OutstandingBalanceDate    string  `db:"outstanding_balance_date"`
@@ -127,6 +129,8 @@ type jobExportOutput struct {
 	ProjectAwardDate            string  `json:"projectAwardDate,omitempty"`
 	ProposalOpeningDate         string  `json:"proposalOpeningDate,omitempty"`
 	ProposalSubmissionDueDate   string  `json:"proposalSubmissionDueDate,omitempty"`
+	ProposalValue               float64 `json:"proposalValue"`
+	TimeAndMaterials            bool    `json:"timeAndMaterials"`
 	Location                    string  `json:"location,omitempty"`
 	OutstandingBalance          float64 `json:"outstandingBalance"`
 	OutstandingBalanceDate      string  `json:"outstandingBalanceDate,omitempty"`
@@ -188,6 +192,8 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 			  COALESCE(j.project_award_date, '') AS project_award_date,
 			  COALESCE(j.proposal_opening_date, '') AS proposal_opening_date,
 			  COALESCE(j.proposal_submission_due_date, '') AS proposal_submission_due_date,
+			  COALESCE(j.proposal_value, 0) AS proposal_value,
+			  COALESCE(j.time_and_materials, 0) AS time_and_materials,
 			  COALESCE(j.location, '') AS location,
 			  j.outstanding_balance,
 			  COALESCE(j.outstanding_balance_date, '') AS outstanding_balance_date,
@@ -292,6 +298,8 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 				ProjectAwardDate:            r.ProjectAwardDate,
 				ProposalOpeningDate:         r.ProposalOpeningDate,
 				ProposalSubmissionDueDate:   r.ProposalSubmissionDueDate,
+				ProposalValue:               r.ProposalValue,
+				TimeAndMaterials:            r.TimeAndMaterials,
 				Location:                    r.Location,
 				OutstandingBalance:          r.OutstandingBalance,
 				OutstandingBalanceDate:      r.OutstandingBalanceDate,
