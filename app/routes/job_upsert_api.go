@@ -118,13 +118,21 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 				}
 			}
 
-			// Validate all divisions exist
+			// Validate all divisions exist and are active
 			for _, a := range req.Allocations {
-				if _, err := txApp.FindRecordById("divisions", a.Division); err != nil {
+				divRec, err := txApp.FindRecordById("divisions", a.Division)
+				if err != nil {
 					httpResponseStatusCode = http.StatusBadRequest
 					return &CodeError{
 						Code:    "invalid_division",
 						Message: fmt.Sprintf("division not found: %s", a.Division),
+					}
+				}
+				if !divRec.GetBool("active") {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "division_not_active",
+						Message: fmt.Sprintf("division is inactive: %s", a.Division),
 					}
 				}
 			}
@@ -271,13 +279,21 @@ func createCreateJobHandler(app core.App) func(e *core.RequestEvent) error {
 			}
 			newJobID = jobRec.Id
 
-			// Validate all divisions exist
+			// Validate all divisions exist and are active
 			for _, a := range req.Allocations {
-				if _, err := txApp.FindRecordById("divisions", a.Division); err != nil {
+				divRec, err := txApp.FindRecordById("divisions", a.Division)
+				if err != nil {
 					httpResponseStatusCode = http.StatusBadRequest
 					return &CodeError{
 						Code:    "invalid_division",
 						Message: fmt.Sprintf("division not found: %s", a.Division),
+					}
+				}
+				if !divRec.GetBool("active") {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "division_not_active",
+						Message: fmt.Sprintf("division is inactive: %s", a.Division),
 					}
 				}
 			}

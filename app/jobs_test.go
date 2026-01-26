@@ -455,3 +455,117 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+// TestJobsAPI_InactiveDivisionFails verifies that creating or updating jobs with
+// inactive divisions in allocations fails validation.
+//
+// Test data:
+//   - apkev2ow1zjtm7w is an inactive division
+//   - fy4i9poneukvq9u is an active division
+//   - cjf0kt0defhq480 is an existing job (25-001)
+func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
+	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const activeDivision = "fy4i9poneukvq9u"
+	const inactiveDivision = "apkev2ow1zjtm7w"
+	const existingJobID = "cjf0kt0defhq480"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "creating job with inactive division in allocations fails",
+			Method: http.MethodPost,
+			URL:    "/api/jobs",
+			Body: strings.NewReader(`{
+				"job": {
+					"description": "Test job with inactive division",
+					"client": "ee3xvodl583b61o",
+					"contact": "235g6k01xx3sdjk",
+					"manager": "f2j5a8vk006baub",
+					"authorizing_document": "Unauthorized",
+					"branch": "80875lm27v8wgi4",
+					"location": "87Q8H976+2M",
+					"project_award_date": "2025-02-01"
+				},
+				"allocations": [
+					{ "division": "` + inactiveDivision + `", "hours": 10 }
+				]
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"division_not_active"`,
+				`"error":"division is inactive:`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "creating job with active division in allocations succeeds",
+			Method: http.MethodPost,
+			URL:    "/api/jobs",
+			Body: strings.NewReader(`{
+				"job": {
+					"description": "Test job with active division",
+					"client": "ee3xvodl583b61o",
+					"contact": "235g6k01xx3sdjk",
+					"manager": "f2j5a8vk006baub",
+					"authorizing_document": "Unauthorized",
+					"branch": "80875lm27v8wgi4",
+					"location": "87Q8H976+2M",
+					"project_award_date": "2025-02-01"
+				},
+				"allocations": [
+					{ "division": "` + activeDivision + `", "hours": 10 }
+				]
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"id":`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "updating job with inactive division in allocations fails",
+			Method: http.MethodPut,
+			URL:    "/api/jobs/" + existingJobID,
+			Body: strings.NewReader(`{
+				"job": {},
+				"allocations": [
+					{ "division": "` + inactiveDivision + `", "hours": 5 }
+				]
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"division_not_active"`,
+				`"error":"division is inactive:`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "updating job with active division in allocations succeeds",
+			Method: http.MethodPut,
+			URL:    "/api/jobs/" + existingJobID,
+			Body: strings.NewReader(`{
+				"job": {},
+				"allocations": [
+					{ "division": "` + activeDivision + `", "hours": 5 }
+				]
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"id":"` + existingJobID + `"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
