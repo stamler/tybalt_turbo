@@ -223,6 +223,42 @@ func ensureOutstandingBalancePermission(app core.App, jobRecord *core.Record, au
 	}
 }
 
+// validateProposalDateOrder ensures the proposal submission due date is on or
+// after the proposal opening date. Both dates must be non-empty strings in
+// "YYYY-MM-DD" format.
+func validateProposalDateOrder(openingDate, submissionDueDate string) error {
+	opening, err := time.Parse("2006-01-02", openingDate)
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "invalid proposal opening date format",
+			Data: map[string]errs.CodeError{
+				"proposal_opening_date": {Code: "invalid_date_format", Message: "proposal_opening_date must be in YYYY-MM-DD format"},
+			},
+		}
+	}
+	due, err := time.Parse("2006-01-02", submissionDueDate)
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "invalid proposal submission due date format",
+			Data: map[string]errs.CodeError{
+				"proposal_submission_due_date": {Code: "invalid_date_format", Message: "proposal_submission_due_date must be in YYYY-MM-DD format"},
+			},
+		}
+	}
+	if due.Before(opening) {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "proposal submission due date must be on or after opening date",
+			Data: map[string]errs.CodeError{
+				"proposal_submission_due_date": {Code: "date_order_invalid", Message: "submission due date must be on or after opening date"},
+			},
+		}
+	}
+	return nil
+}
+
 // isProposalRecord determines if the current record should be treated as a
 // proposal for cleaning/validation purposes at this stage of processing.
 //
@@ -490,6 +526,10 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 					},
 				}
 			}
+			// Validate that submission due date is on or after opening date
+			if err := validateProposalDateOrder(proposalOpeningDate, proposalSubmissionDueDate); err != nil {
+				return 0, err
+			}
 		}
 	} else {
 		// update: only enforce if any date field changed
@@ -536,6 +576,10 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 							"proposal_submission_due_date": {Code: "required_for_proposal", Message: "proposal_submission_due_date is required"},
 						},
 					}
+				}
+				// Validate that submission due date is on or after opening date
+				if err := validateProposalDateOrder(effectiveOpen, effectiveDue); err != nil {
+					return 0, err
 				}
 			}
 		}

@@ -396,6 +396,94 @@ func TestProposalStatus_CommentRequirement(t *testing.T) {
 	}
 }
 
+// TestProposal_DateOrderValidation verifies that the proposal submission due date
+// must be on or after the proposal opening date.
+//
+// Test data: Uses existing client (ee3xvodl583b61o), contact (235g6k01xx3sdjk),
+// manager (f2j5a8vk006baub), and branch (1r7r6hyp681vi15) from test_pb_data/data.db
+// For update test: test_prop_inprog (P24-0801)
+func TestProposal_DateOrderValidation(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "new proposal with submission due date before opening date fails",
+			Method: http.MethodPost,
+			URL:    "/api/collections/jobs/records",
+			Body: strings.NewReader(`{
+				"description": "Test Proposal Bad Dates",
+				"client": "ee3xvodl583b61o",
+				"contact": "235g6k01xx3sdjk",
+				"manager": "f2j5a8vk006baub",
+				"branch": "1r7r6hyp681vi15",
+				"proposal_opening_date": "2024-12-15",
+				"proposal_submission_due_date": "2024-12-01",
+				"status": "In Progress",
+				"location": "87G8Q2GX+HV"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"date_order_invalid"`,
+				`"submission due date must be on or after opening date"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "new proposal with submission due date equal to opening date succeeds",
+			Method: http.MethodPost,
+			URL:    "/api/collections/jobs/records",
+			Body: strings.NewReader(`{
+				"description": "Test Proposal Same Day",
+				"client": "ee3xvodl583b61o",
+				"contact": "235g6k01xx3sdjk",
+				"manager": "f2j5a8vk006baub",
+				"branch": "1r7r6hyp681vi15",
+				"proposal_opening_date": "2024-12-15",
+				"proposal_submission_due_date": "2024-12-15",
+				"status": "In Progress",
+				"location": "87G8Q2GX+HV"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"proposal_opening_date":"2024-12-15"`,
+				`"proposal_submission_due_date":"2024-12-15"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "updating proposal to have submission due date before opening date fails",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/jobs/records/test_prop_inprog",
+			Body: strings.NewReader(`{
+				"proposal_opening_date": "2024-12-20",
+				"proposal_submission_due_date": "2024-12-10"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"date_order_invalid"`,
+				`"submission due date must be on or after opening date"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
 // TestNewProposal_StatusRestrictions verifies that new proposals can only have
 // "In Progress" or "Submitted" status. Other statuses like "Awarded" are not allowed
 // for new proposals because they require the job ID to exist (for comment requirements)
