@@ -1,8 +1,7 @@
 <script lang="ts">
   import DsSearchList from "$lib/components/DSSearchList.svelte";
+  import DSToggle from "$lib/components/DSToggle.svelte";
   import { jobs } from "$lib/stores/jobs";
-  // TODO: JobsResponse isn't actually the correct type for the items in the
-  // index, but hobbles along for now
   import type { JobApiResponse } from "$lib/stores/jobs";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
@@ -12,6 +11,20 @@
 
   // initialize the jobs store, noop if already initialized
   jobs.init();
+
+  // Toggle: "projects" or "proposals" - default to projects
+  let jobType = $state<"projects" | "proposals">("projects");
+
+  const jobTypeOptions = [
+    { id: "projects", label: "Projects" },
+    { id: "proposals", label: "Proposals" },
+  ];
+
+  // Filter function for search results based on job type
+  const jobTypeFilter = $derived((job: JobApiResponse) => {
+    const isProposal = job.number?.startsWith("P");
+    return jobType === "proposals" ? isProposal : !isProposal;
+  });
 
   async function downloadJson() {
     try {
@@ -34,21 +47,24 @@
 </script>
 
 {#if $jobs.index !== null}
-  <DsSearchList index={$jobs.index} inListHeader="Jobs" fieldName="job" uiName="search jobs...">
+  <DsSearchList index={$jobs.index} filter={jobTypeFilter} inListHeader={jobType === "projects" ? "Projects" : "Proposals"} fieldName="job" uiName="search jobs...">
     {#snippet searchBarExtra()}
-      <button
-        onclick={downloadJson}
-        class="flex items-center gap-1 rounded bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
-      >
-        <Icon icon="mdi:download" class="text-base" /> JSON
-      </button>
+      <div class="flex items-center gap-2">
+        <DSToggle bind:value={jobType} options={jobTypeOptions} />
+        <button
+          onclick={downloadJson}
+          class="flex items-center gap-1 rounded bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
+        >
+          <Icon icon="mdi:download" class="text-base" /> JSON
+        </button>
+      </div>
     {/snippet}
     {#snippet anchor({ id, number }: JobApiResponse)}
       <a href="/jobs/{id}/details" class="font-bold hover:underline">{number}</a>
     {/snippet}
     {#snippet headline({ description }: JobApiResponse)}{description}{/snippet}
     {#snippet byline({ client }: JobApiResponse)}{client}{/snippet}
-    {#snippet line1({ branch }: JobApiResponse)}{#if branch}<DsLabel color="neutral">{branch}</DsLabel>{/if}{/snippet}
+    {#snippet line1({ branch, manager }: JobApiResponse)}{#if branch}<DsLabel color="neutral">{branch}</DsLabel>{/if}{#if manager}<DsLabel color="purple">{manager}</DsLabel>{/if}{/snippet}
     {#snippet actions({ id }: JobApiResponse)}
       <DsActionButton action="/jobs/{id}/edit" icon="mdi:pencil" title="Edit" color="blue" />
     {/snippet}

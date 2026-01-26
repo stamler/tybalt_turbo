@@ -15,7 +15,7 @@
   import { appConfig, jobsEditingEnabled } from "$lib/stores/appConfig";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import MiniSearch from "minisearch";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import type {
     BranchesResponse,
     ClientContactsResponse,
@@ -35,14 +35,14 @@
 
   let errors = $state({} as Record<string, { message: string }>);
   // Allow extra field `location` introduced by migration to be present on item
-  let item = $state(data.item as JobsRecord | (JobsRecord & Record<string, unknown>));
-  let categories = $state(data.categories);
+  let item = $state(untrack(() => data.item) as JobsRecord | (JobsRecord & Record<string, unknown>));
+  let categories = $state(untrack(() => data.categories));
   let client_contacts = $state([] as ClientContactsResponse[]);
   let clientContactsRequestId = 0;
 
-  if (item.status === undefined) {
-    item.status = JobsStatusOptions.Active;
-  }
+  // Default status will be set reactively based on job type
+  // For now, initialize to empty and let the $effect handle it
+  const initialStatus = item.status;
   if (item.fn_agreement === undefined) {
     item.fn_agreement = false;
   }
@@ -58,8 +58,18 @@
   item.authorizing_document = item.authorizing_document ?? "";
   item.client_po = item.client_po ?? "";
   item.client_reference_number = item.client_reference_number ?? "";
+  item.proposal_value = item.proposal_value ?? 0;
+  item.time_and_materials = item.time_and_materials ?? false;
 
   let newCategory = $state("");
+
+  // Comment modal state for No Bid / Cancelled status changes
+  let showStatusCommentModal = $state(false);
+  let pendingStatus = $state<JobsStatusOptions | null>(null);
+  let statusComment = $state("");
+  let statusCommentError = $state<string | null>(null);
+  let statusCommentSubmitting = $state(false);
+  let previousStatus = $state<JobsStatusOptions | undefined>(item.status);
   let newCategories = $state([] as string[]);
   let categoriesToDelete = $state([] as string[]);
 
@@ -70,10 +80,54 @@
 
   const alternateManagerErrorMessage = "Alternate manager must be different from manager.";
 
-  const statusOptionsList = Object.values(JobsStatusOptions).map((status) => ({
-    id: status,
-    name: status,
-  }));
+  // Determine if this is a proposal based on number prefix or proposal dates
+  const isProposal = $derived.by(() => {
+    // If number starts with P, it's a proposal
+    if (item.number?.startsWith("P")) return true;
+    // For new jobs, check if proposal dates are set but no project award date
+    const projectAwardDate = item.project_award_date ?? "";
+    const proposalOpeningDate = item.proposal_opening_date ?? "";
+    const proposalSubmissionDueDate = item.proposal_submission_due_date ?? "";
+    if (projectAwardDate === "" && (proposalOpeningDate !== "" || proposalSubmissionDueDate !== "")) {
+      return true;
+    }
+    return false;
+  });
+
+  // Check if this is a cancelled proposal (terminal state - no edits allowed)
+  const isCancelledProposal = $derived(isProposal && item.status === JobsStatusOptions.Cancelled);
+
+  // Status options filtered by job type
+  // New proposals can only be "In Progress" or "Submitted" (no ID yet for comment-requiring statuses)
+  const newProposalStatuses = [
+    JobsStatusOptions["In Progress"],
+    JobsStatusOptions.Submitted,
+  ];
+  const existingProposalStatuses = [
+    JobsStatusOptions["In Progress"],
+    JobsStatusOptions.Submitted,
+    JobsStatusOptions.Awarded,
+    JobsStatusOptions["Not Awarded"],
+    JobsStatusOptions.Cancelled,
+    JobsStatusOptions["No Bid"],
+  ];
+  const projectStatuses = [
+    JobsStatusOptions.Active,
+    JobsStatusOptions.Closed,
+    JobsStatusOptions.Cancelled,
+  ];
+
+  const isNewJob = $derived(data.id === null);
+
+  const statusOptionsList = $derived.by(() => {
+    let statuses: JobsStatusOptions[];
+    if (isProposal) {
+      statuses = isNewJob ? newProposalStatuses : existingProposalStatuses;
+    } else {
+      statuses = projectStatuses;
+    }
+    return statuses.map((status) => ({ id: status, name: status }));
+  });
 
   const authorizingDocumentOptions = [
     { id: "Unauthorized", name: "Unauthorized" },
@@ -106,10 +160,17 @@
     return index;
   });
 
-  // Hide proposal-only fields when creating a project from the dedicated route.
-  // The loader for /jobs/add/from/[proposal] sets _prefilled_from_proposal on item.
+  // Hide proposal dates when:
+  // 1. Creating a project from the dedicated route (loader sets _prefilled_from_proposal)
+  // 2. Project award date has a value (job is a project)
   const hideProposalDates = $derived.by(() =>
-    Boolean((item as unknown as Record<string, unknown>)._prefilled_from_proposal),
+    Boolean((item as unknown as Record<string, unknown>)._prefilled_from_proposal) ||
+    Boolean(item.project_award_date),
+  );
+
+  // Hide project award date when either proposal date has a value (job is a proposal)
+  const hideProjectDate = $derived.by(() =>
+    Boolean(item.proposal_opening_date) || Boolean(item.proposal_submission_due_date),
   );
 
   function setFieldError(fieldName: string, message: string) {
@@ -226,6 +287,89 @@
       if (errors.client_po) clearFieldError("client_po");
     }
   });
+
+  // Set default status based on job type, and correct status if it becomes invalid
+  // when job type changes (e.g., entering proposal dates changes project to proposal)
+  $effect(() => {
+    const validStatuses = isProposal
+      ? (isNewJob ? newProposalStatuses : existingProposalStatuses)
+      : projectStatuses;
+    const currentStatusIsValid = item.status && validStatuses.includes(item.status as JobsStatusOptions);
+    
+    if (!currentStatusIsValid) {
+      // Status is missing or invalid for current job type - set appropriate default
+      item.status = isProposal ? JobsStatusOptions["In Progress"] : JobsStatusOptions.Active;
+    }
+  });
+
+  // Watch for status changes to No Bid or Cancelled for proposals - require comment first
+  $effect(() => {
+    const currentStatus = item.status;
+    if (!isProposal) {
+      previousStatus = currentStatus;
+      return;
+    }
+
+    const requiresComment =
+      currentStatus === JobsStatusOptions["No Bid"] ||
+      currentStatus === JobsStatusOptions.Cancelled;
+
+    // If status changed to one that requires a comment, show modal and revert
+    if (requiresComment && currentStatus !== previousStatus && !showStatusCommentModal) {
+      pendingStatus = currentStatus;
+      // Revert to previous status until comment is added
+      if (previousStatus !== undefined) {
+        item.status = previousStatus;
+      }
+      showStatusCommentModal = true;
+      statusComment = "";
+      statusCommentError = null;
+    } else if (!requiresComment) {
+      previousStatus = currentStatus;
+    }
+  });
+
+  async function submitStatusComment() {
+    if (!statusComment.trim()) {
+      statusCommentError = "A comment is required";
+      return;
+    }
+    if (!pendingStatus || !data.id || !item.client) {
+      statusCommentError = "Unable to add comment - missing job or client data";
+      return;
+    }
+
+    statusCommentSubmitting = true;
+    statusCommentError = null;
+
+    try {
+      // Create the client note with the status change
+      await pb.collection("client_notes").create({
+        client: item.client,
+        job: data.id,
+        note: statusComment,
+        job_status_changed_to: pendingStatus,
+      });
+
+      // Now set the status
+      item.status = pendingStatus;
+      previousStatus = pendingStatus;
+      pendingStatus = null;
+      showStatusCommentModal = false;
+      statusComment = "";
+    } catch (error: any) {
+      statusCommentError = error?.response?.message ?? "Failed to add comment";
+    } finally {
+      statusCommentSubmitting = false;
+    }
+  }
+
+  function cancelStatusChange() {
+    showStatusCommentModal = false;
+    pendingStatus = null;
+    statusComment = "";
+    statusCommentError = null;
+  }
 
   async function save(event: Event) {
     event.preventDefault();
@@ -371,30 +515,43 @@
     <p>Job creation and editing is temporarily disabled during a system transition.</p>
     <p>Please check back later or contact an administrator if you need immediate assistance.</p>
   </div>
+{:else if isCancelledProposal}
+  <div class="disabled-notice">
+    <p>This proposal has been cancelled and cannot be modified.</p>
+    <p>Cancelled proposals are in a terminal state. No further changes are allowed.</p>
+    <div class="mt-4">
+      <a href="/jobs/{data.id}/details" class="text-blue-600 hover:underline">← Back to job details</a>
+    </div>
+  </div>
 {:else}
   <form
     class="flex w-full flex-col items-center gap-2 p-2"
     enctype="multipart/form-data"
     onsubmit={save}
   >
-  <span class="flex w-full gap-2 {errors.project_award_date !== undefined ? 'bg-red-200' : ''}">
-    <label for="project_award_date">Project Award Date</label>
-    <input
-      class="flex-1"
-      type="text"
-      name="project_award_date"
-      placeholder="Project Award Date"
-      use:flatpickrAction
-      bind:value={item.project_award_date}
-    />
-    {#if errors.project_award_date !== undefined}
-      <span class="text-red-600">{errors.project_award_date.message}</span>
-    {/if}
-  </span>
+  {#if !hideProjectDate}
+    <span class="flex w-full items-center gap-2 {errors.project_award_date !== undefined ? 'bg-red-200' : ''}">
+      <label for="project_award_date">Project Award Date</label>
+      <input
+        class="flex-1"
+        type="text"
+        name="project_award_date"
+        placeholder="Project Award Date"
+        use:flatpickrAction
+        bind:value={item.project_award_date}
+      />
+      {#if item.project_award_date}
+        <DsActionButton icon="mdi:close" title="Clear date" color="red" action={() => item.project_award_date = ""} />
+      {/if}
+      {#if errors.project_award_date !== undefined}
+        <span class="text-red-600">{errors.project_award_date.message}</span>
+      {/if}
+    </span>
+  {/if}
 
   {#if !hideProposalDates}
     <span
-      class="flex w-full gap-2 {errors.proposal_opening_date !== undefined ? 'bg-red-200' : ''}"
+      class="flex w-full items-center gap-2 {errors.proposal_opening_date !== undefined ? 'bg-red-200' : ''}"
     >
       <label for="proposal_opening_date">Proposal Opening Date</label>
       <input
@@ -405,13 +562,16 @@
         use:flatpickrAction
         bind:value={item.proposal_opening_date}
       />
+      {#if item.proposal_opening_date}
+        <DsActionButton icon="mdi:close" title="Clear date" color="red" action={() => item.proposal_opening_date = ""} />
+      {/if}
       {#if errors.proposal_opening_date !== undefined}
         <span class="text-red-600">{errors.proposal_opening_date.message}</span>
       {/if}
     </span>
 
     <span
-      class="flex w-full gap-2 {errors.proposal_submission_due_date !== undefined
+      class="flex w-full items-center gap-2 {errors.proposal_submission_due_date !== undefined
         ? 'bg-red-200'
         : ''}"
     >
@@ -424,6 +584,9 @@
         use:flatpickrAction
         bind:value={item.proposal_submission_due_date}
       />
+      {#if item.proposal_submission_due_date}
+        <DsActionButton icon="mdi:close" title="Clear date" color="red" action={() => item.proposal_submission_due_date = ""} />
+      {/if}
       {#if errors.proposal_submission_due_date !== undefined}
         <span class="text-red-600">{errors.proposal_submission_due_date.message}</span>
       {/if}
@@ -535,12 +698,47 @@
   >
     {#snippet optionTemplate(item)}{item.name}{/snippet}
   </DsSelector>
+  {#if !isProposal}
   <p
     class="cursor-help self-start text-sm text-neutral-600"
     title="Use the status Closed if the purpose of this job is to act as a reporting container for many sub jobs. These “Parent” jobs can be billed to if their status is set to “Active”, however they are created as “Closed” by default. For example MTO retainers are usually created as Closed."
   >
     Creating a parent job? Use Closed.
   </p>
+  {/if}
+
+  {#if isProposal}
+    <div
+      class="flex w-full flex-col gap-1"
+      class:bg-red-200={errors.proposal_value !== undefined}
+    >
+      <label class="text-sm font-semibold" for="proposal_value">Proposal Value ($)</label>
+      <input
+        id="proposal_value"
+        name="proposal_value"
+        type="number"
+        class="rounded border border-neutral-300 px-2 py-1"
+        bind:value={item.proposal_value as number}
+        min={0}
+        step={1}
+        disabled={isCancelledProposal}
+      />
+      {#if errors.proposal_value !== undefined}
+        <span class="text-sm text-red-600">{errors.proposal_value.message}</span>
+      {/if}
+    </div>
+
+    <DsCheck
+      bind:value={item.time_and_materials as boolean}
+      {errors}
+      fieldName="time_and_materials"
+      uiName="Time and Materials"
+      disabled={isCancelledProposal}
+    />
+    <p class="self-start text-xs text-neutral-600">
+      Proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be marked as Time and Materials. If both, interpret proposal value as a maximum.
+    </p>
+  {/if}
 
   <DsSelector
     bind:value={item.authorizing_document}
@@ -561,28 +759,30 @@
     uiName="Client Reference Number"
   />
 
-  <div
-    class="flex w-full flex-col gap-1"
-    class:bg-red-200={errors.outstanding_balance !== undefined}
-  >
-    <label class="text-sm font-semibold" for="outstanding_balance">Outstanding Balance</label>
-    <input
-      id="outstanding_balance"
-      name="outstanding_balance"
-      type="number"
-      class="rounded border border-neutral-300 px-2 py-1"
-      bind:value={item.outstanding_balance as number}
-      min={0}
-      step={0.01}
-    />
-    {#if errors.outstanding_balance !== undefined}
-      <span class="text-sm text-red-600">{errors.outstanding_balance.message}</span>
+  {#if !isProposal}
+    <div
+      class="flex w-full flex-col gap-1"
+      class:bg-red-200={errors.outstanding_balance !== undefined}
+    >
+      <label class="text-sm font-semibold" for="outstanding_balance">Outstanding Balance</label>
+      <input
+        id="outstanding_balance"
+        name="outstanding_balance"
+        type="number"
+        class="rounded border border-neutral-300 px-2 py-1"
+        bind:value={item.outstanding_balance as number}
+        min={0}
+        step={0.01}
+      />
+      {#if errors.outstanding_balance !== undefined}
+        <span class="text-sm text-red-600">{errors.outstanding_balance.message}</span>
+      {/if}
+    </div>
+    {#if item.outstanding_balance_date}
+      <p class="self-start text-sm text-neutral-600">
+        Last updated: {item.outstanding_balance_date}
+      </p>
     {/if}
-  </div>
-  {#if item.outstanding_balance_date}
-    <p class="self-start text-sm text-neutral-600">
-      Last updated: {item.outstanding_balance_date}
-    </p>
   {/if}
 
   {#if proposalsIndex !== null}
@@ -737,6 +937,48 @@
     {/if}
   </div>
   </form>
+{/if}
+
+<!-- Status Comment Modal for No Bid / Cancelled -->
+{#if showStatusCommentModal}
+  <div class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+      <h2 class="mb-4 text-xl font-bold">
+        {pendingStatus === "No Bid" ? "No Bid" : "Cancel Proposal"} - Comment Required
+      </h2>
+      <p class="mb-4 text-sm text-neutral-600">
+        A comment is required to set the status to "{pendingStatus}". Please provide a reason.
+      </p>
+      <textarea
+        class="mb-4 w-full rounded border border-neutral-300 p-2"
+        rows="4"
+        placeholder="Enter your comment..."
+        bind:value={statusComment}
+        disabled={statusCommentSubmitting}
+      ></textarea>
+      {#if statusCommentError}
+        <p class="mb-4 text-sm text-red-600">{statusCommentError}</p>
+      {/if}
+      <div class="flex justify-end gap-2">
+        <button
+          type="button"
+          class="rounded bg-neutral-200 px-4 py-2 text-neutral-700 hover:bg-neutral-300"
+          onclick={cancelStatusChange}
+          disabled={statusCommentSubmitting}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+          onclick={submitStatusComment}
+          disabled={statusCommentSubmitting}
+        >
+          {statusCommentSubmitting ? "Saving..." : "Add Comment & Set Status"}
+        </button>
+      </div>
+    </div>
+  </div>
 {/if}
 
 <style>

@@ -19,6 +19,7 @@
     line2,
     line3,
     actions,
+    searchBarExtra,
   }: {
     items: T[];
     search?: boolean;
@@ -35,6 +36,7 @@
     line2?: Snippet<[T]>;
     line3?: Snippet<[T]>;
     actions?: Snippet<[T]>;
+    searchBarExtra?: Snippet;
   } = $props();
 
   let searchTerm = $state("");
@@ -140,6 +142,9 @@
           <!-- when grouping, get the sum of the length of the lists for every key in processed items -->
           {Object.keys(processedItems).reduce((acc, key) => acc + processedItems[key].length, 0)} items
         </span>
+      {/if}
+      {#if searchBarExtra}
+        {@render searchBarExtra()}
       {/if}
     </li>
   {/if}

@@ -233,7 +233,7 @@
           title="Create Project from Proposal"
           color="green"
         />
-      {:else if data.job.number?.startsWith("P") && data.job.status === "Active"}
+      {:else if data.job.number?.startsWith("P") && data.job.status === "Submitted"}
         {#key data.job.id}
           <DsActionButton
             action={async () => {

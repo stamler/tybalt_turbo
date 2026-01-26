@@ -9,6 +9,7 @@ WITH latest_proposals AS (
     j.location AS location,
     j.client AS client_id,
     j.branch AS branch_id,
+    j.manager AS manager_id,
     COALESCE(j.outstanding_balance, 0) AS outstanding_balance,
     COALESCE(j.outstanding_balance_date, '') AS outstanding_balance_date,
     j.created,
@@ -26,6 +27,7 @@ latest_projects AS (
     j.location AS location,
     j.client AS client_id,
     j.branch AS branch_id,
+    j.manager AS manager_id,
     COALESCE(j.outstanding_balance, 0) AS outstanding_balance,
     COALESCE(j.outstanding_balance_date, '') AS outstanding_balance_date,
     j.created,
@@ -48,6 +50,7 @@ SELECT
   u.client_id,
   c.name AS client,
   COALESCE(b.code, '') AS branch,
+  COALESCE(m.given_name || ' ' || m.surname, '') AS manager,
   u.outstanding_balance,
   u.outstanding_balance_date,
   CASE WHEN u.sort_group = 1 THEN 'Proposals' ELSE 'Projects' END AS group_name,
@@ -56,6 +59,7 @@ SELECT
 FROM unioned u
 LEFT JOIN clients c ON c.id = u.client_id
 LEFT JOIN branches b ON b.id = u.branch_id
+LEFT JOIN managers m ON m.id = u.manager_id
 ORDER BY u.sort_group ASC, u.created DESC;
 
 

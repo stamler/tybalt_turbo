@@ -204,6 +204,15 @@ func main() {
 				if outstandingBalanceDate == "" {
 					outstandingBalanceDate = time.Now().Format("2006-01-02")
 				}
+
+				// For proposals (number starts with "P"), map "Active" or blank status to "In Progress"
+				// This is because "Active" is not a valid status for proposals in the new workflow.
+				status := item.Status
+				isProposal := strings.HasPrefix(item.Number, "P")
+				if isProposal && (status == "Active" || status == "") {
+					status = "In Progress"
+				}
+
 				return dbx.Params{
 					"id":                           item.Id,
 					"number":                       item.Number,
@@ -213,7 +222,7 @@ func main() {
 					"manager":                      item.Manager,
 					"alternate_manager":            item.AlternateManagerId,
 					"fn_agreement":                 item.FnAgreement,
-					"status":                       item.Status,
+					"status":                       status,
 					"project_award_date":           item.ProjectAwardDate,
 					"proposal_opening_date":        item.ProposalOpeningDate,
 					"proposal_submission_due_date": item.ProposalSubmissionDueDate,

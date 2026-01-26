@@ -46,12 +46,13 @@ type Job struct {
 	ClientID               string  `db:"client_id" json:"client_id"`
 	Client                 string  `db:"client" json:"client"`
 	Branch                 string  `db:"branch" json:"branch"`
+	Manager                string  `db:"manager" json:"manager"`
 	OutstandingBalance     float64 `db:"outstanding_balance" json:"outstanding_balance"`
 	OutstandingBalanceDate string  `db:"outstanding_balance_date" json:"outstanding_balance_date"`
 }
 
 // latestJobsLimit controls how many proposals and how many projects are returned.
-const latestJobsLimit = 20
+const latestJobsLimit = 50
 
 // LatestJob models a latest job row with grouping label.
 type LatestJob struct {

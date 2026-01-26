@@ -7,6 +7,7 @@ export interface JobApiResponse {
   client_id: string;
   client: string; // client name
   branch: string; // branch code
+  manager: string; // manager name
   outstanding_balance: number;
   outstanding_balance_date: string;
 }
@@ -35,6 +36,7 @@ export const jobs = createCollectionStore<any>(
       "location",
       "client",
       "branch",
+      "manager",
       "outstanding_balance",
       "outstanding_balance_date",
     ],

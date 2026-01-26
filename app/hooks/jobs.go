@@ -34,6 +34,22 @@ func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Recor
 		return utilities.ErrJobsEditingDisabled
 	}
 
+	// Cancelled proposals are terminal - reject all modifications
+	if !jobRecord.IsNew() {
+		original := jobRecord.Original()
+		if typeFromNumber(original.GetString("number")) == jobTypeProposal {
+			if original.GetString("status") == "Cancelled" {
+				return &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: "cancelled proposals cannot be modified",
+					Data: map[string]errs.CodeError{
+						"global": {Code: "cancelled_proposal_immutable", Message: "this proposal has been cancelled and cannot be modified"},
+					},
+				}
+			}
+		}
+	}
+
 	if err := ensureOutstandingBalancePermission(app, jobRecord, authRecord); err != nil {
 		return err
 	}
@@ -228,25 +244,35 @@ func isProposalRecord(record *core.Record) bool {
 // job type. In particular, proposals must not carry authorizing_document,
 // client_po, or client_reference_number.
 func cleanJob(app core.App, record *core.Record) error {
-	// Centralize outstanding balance normalization as part of cleaning
-	if err := cleanJobOutstandingBalance(record); err != nil {
-		return err
-	}
+	isProposal := isProposalRecord(record)
+
 	// Normalize client_po by trimming whitespace
 	trimmedClientPO := strings.TrimSpace(record.GetString("client_po"))
 	if record.GetString("client_po") != trimmedClientPO {
 		record.Set("client_po", trimmedClientPO)
 	}
-	// If this is a project and authorizing_document != PO, clear any provided client_po
-	if !isProposalRecord(record) {
+
+	if !isProposal {
+		// Projects should NOT have these proposal-specific fields
+		record.Set("proposal_value", 0)
+		record.Set("time_and_materials", false)
+
+		// If authorizing_document != PO, clear any provided client_po
 		if record.GetString("authorizing_document") != "PO" && record.GetString("client_po") != "" {
 			record.Set("client_po", "")
 		}
+
+		// Centralize outstanding balance normalization for projects only
+		if err := cleanJobOutstandingBalance(record); err != nil {
+			return err
+		}
 	} else {
-		// Proposals should NOT have these fields
+		// Proposals should NOT have these project-specific fields
 		record.Set("authorizing_document", "")
 		record.Set("client_po", "")
 		record.Set("client_reference_number", "")
+		record.Set("outstanding_balance", 0)
+		record.Set("outstanding_balance_date", "")
 	}
 	return nil
 }
@@ -372,7 +398,8 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 			oldStatus := original.GetString("status")
 			if newStatus != "" && newStatus != oldStatus {
 				if derived == jobTypeProject {
-					if newStatus == "Awarded" || newStatus == "Not Awarded" {
+					// Projects: allowed statuses are Active, Closed, Cancelled
+					if newStatus == "Awarded" || newStatus == "Not Awarded" || newStatus == "Submitted" || newStatus == "In Progress" || newStatus == "No Bid" {
 						return 0, &errs.HookError{
 							Status:  http.StatusBadRequest,
 							Message: "invalid status for project",
@@ -382,13 +409,52 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 						}
 					}
 				} else { // proposal
-					if newStatus == "Closed" {
+					// Proposals: allowed statuses are In Progress, Submitted, Awarded, Not Awarded, Cancelled, No Bid
+					// Disallowed: Active, Closed
+					if newStatus == "Active" || newStatus == "Closed" {
 						return 0, &errs.HookError{
 							Status:  http.StatusBadRequest,
 							Message: "invalid status for proposal",
 							Data: map[string]errs.CodeError{
-								"status": {Code: "invalid_status_for_type", Message: "proposals may be Active, Awarded, Not Awarded or Cancelled"},
+								"status": {Code: "invalid_status_for_type", Message: "proposals may be In Progress, Submitted, Awarded, Not Awarded, Cancelled or No Bid"},
 							},
+						}
+					}
+					// For Submitted, Awarded, Not Awarded: require proposal_value > 0 OR time_and_materials = true
+					if newStatus == "Submitted" || newStatus == "Awarded" || newStatus == "Not Awarded" {
+						proposalValue := record.GetInt("proposal_value")
+						timeAndMaterials := record.GetBool("time_and_materials")
+						if proposalValue <= 0 && !timeAndMaterials {
+							return 0, &errs.HookError{
+								Status:  http.StatusBadRequest,
+								Message: "proposal value or time and materials required",
+								Data: map[string]errs.CodeError{
+									"status": {Code: "value_required_for_status", Message: "proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be marked as time and materials"},
+								},
+							}
+						}
+					}
+					// For No Bid or Cancelled: require a client_note with matching status_change_to
+					if newStatus == "No Bid" || newStatus == "Cancelled" {
+						jobID := record.Id
+						hasNote, err := jobHasClientNoteForStatus(app, jobID, newStatus)
+						if err != nil {
+							return 0, &errs.HookError{
+								Status:  http.StatusInternalServerError,
+								Message: "failed to check for client notes",
+								Data: map[string]errs.CodeError{
+									"status": {Code: "note_check_failed", Message: "unable to verify client notes exist"},
+								},
+							}
+						}
+						if !hasNote {
+							return 0, &errs.HookError{
+								Status:  http.StatusBadRequest,
+								Message: "a comment is required to set this status",
+								Data: map[string]errs.CodeError{
+									"status": {Code: "comment_required_for_status", Message: "a comment must be added before setting status to " + newStatus},
+								},
+							}
 						}
 					}
 				}
@@ -528,7 +594,8 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 	// Enforce status constraints
 	if status != "" {
 		if derived == jobTypeProject {
-			if status == "Awarded" || status == "Not Awarded" {
+			// Projects: allowed statuses are Active, Closed, Cancelled
+			if status == "Awarded" || status == "Not Awarded" || status == "Submitted" || status == "In Progress" || status == "No Bid" {
 				return 0, &errs.HookError{
 					Status:  http.StatusBadRequest,
 					Message: "invalid status for project",
@@ -538,13 +605,67 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 				}
 			}
 		} else { // proposal
-			if status == "Closed" {
+			// Proposals: allowed statuses are In Progress, Submitted, Awarded, Not Awarded, Cancelled, No Bid
+			// Disallowed: Active, Closed
+			if status == "Active" || status == "Closed" {
 				return 0, &errs.HookError{
 					Status:  http.StatusBadRequest,
 					Message: "invalid status for proposal",
 					Data: map[string]errs.CodeError{
-						"status": {Code: "invalid_status_for_type", Message: "proposals may be Active, Awarded, Not Awarded or Cancelled"},
+						"status": {Code: "invalid_status_for_type", Message: "proposals may be In Progress, Submitted, Awarded, Not Awarded, Cancelled or No Bid"},
 					},
+				}
+			}
+			// New proposals can only be "In Progress" or "Submitted" (other statuses require
+			// the job ID to exist for comment requirements or represent later workflow states)
+			if isCreate && status != "In Progress" && status != "Submitted" {
+				return 0, &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: "new proposals must start as In Progress or Submitted",
+					Data: map[string]errs.CodeError{
+						"status": {Code: "invalid_status_for_new_proposal", Message: "new proposals can only have status In Progress or Submitted"},
+					},
+				}
+			}
+			// For Submitted, Awarded, Not Awarded: require proposal_value > 0 OR time_and_materials = true
+			if status == "Submitted" || status == "Awarded" || status == "Not Awarded" {
+				proposalValue := record.GetInt("proposal_value")
+				timeAndMaterials := record.GetBool("time_and_materials")
+				if proposalValue <= 0 && !timeAndMaterials {
+					return 0, &errs.HookError{
+						Status:  http.StatusBadRequest,
+						Message: "proposal value or time and materials required",
+						Data: map[string]errs.CodeError{
+							"proposal_value": {Code: "value_required_for_status", Message: "proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be marked as time and materials"},
+						},
+					}
+				}
+			}
+			// For No Bid or Cancelled: require a client_note with matching status_change_to (only on updates)
+			if !isCreate && (status == "No Bid" || status == "Cancelled") {
+				oldStatus := original.GetString("status")
+				// Only check when actually transitioning to this status
+				if oldStatus != status {
+					jobID := record.Id
+					hasNote, err := jobHasClientNoteForStatus(app, jobID, status)
+					if err != nil {
+						return 0, &errs.HookError{
+							Status:  http.StatusInternalServerError,
+							Message: "failed to check for client notes",
+							Data: map[string]errs.CodeError{
+								"status": {Code: "note_check_failed", Message: "unable to verify client notes exist"},
+							},
+						}
+					}
+					if !hasNote {
+						return 0, &errs.HookError{
+							Status:  http.StatusBadRequest,
+							Message: "a comment is required to set this status",
+							Data: map[string]errs.CodeError{
+								"status": {Code: "comment_required_for_status", Message: "a comment must be added before setting status to " + status},
+							},
+						}
+					}
 				}
 			}
 		}
@@ -573,9 +694,9 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 				},
 			}
 		}
-		// referenced status must be Awarded; if Active → prompt-able error; Not Awarded/Cancelled → reject
+		// referenced status must be Awarded; if In Progress/Submitted → prompt-able error; Not Awarded/Cancelled/No Bid → reject
 		refStatus := refRec.GetString("status")
-		if refStatus == "Active" {
+		if refStatus == "In Progress" || refStatus == "Submitted" {
 			return 0, &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "proposal must be awarded",
@@ -584,7 +705,7 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 				},
 			}
 		}
-		if refStatus == "Not Awarded" || refStatus == "Cancelled" || refStatus == "Closed" {
+		if refStatus == "Not Awarded" || refStatus == "Cancelled" || refStatus == "No Bid" {
 			return 0, &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "proposal has invalid status",
@@ -707,6 +828,18 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 	}
 
 	return derived, nil
+}
+
+// jobHasClientNoteForStatus checks if a client_note exists for the given job
+// with job_status_changed_to matching the target status.
+// This is used to enforce the requirement that a comment must be added before
+// setting a proposal's status to "No Bid" or "Cancelled".
+func jobHasClientNoteForStatus(app core.App, jobID string, targetStatus string) (bool, error) {
+	note, err := app.FindFirstRecordByFilter("client_notes", "job = {:jobID} && job_status_changed_to = {:status}", dbx.Params{"jobID": jobID, "status": targetStatus})
+	if err != nil && err != sql.ErrNoRows {
+		return false, err
+	}
+	return note != nil, nil
 }
 
 // validateManagersAreActive checks that the manager and alternate_manager (if set)

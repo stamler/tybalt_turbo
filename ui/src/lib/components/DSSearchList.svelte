@@ -18,7 +18,6 @@
   const thisId = idCounter;
   idCounter += 1;
 
-  let results = $state([] as SearchResult[]);
 
   let {
     index,
@@ -34,6 +33,7 @@
     uiName,
     collectionName,
     searchBarExtra,
+    filter,
   }: {
     index: MiniSearch<T>;
     inListHeader?: string;
@@ -48,9 +48,17 @@
     uiName: string;
     collectionName?: string;
     searchBarExtra?: Snippet;
+    filter?: (item: T) => boolean;
   } = $props();
 
   let searchTerm = $state("");
+  let rawResults = $state([] as SearchResult[]);
+
+  // Apply filter to results if provided
+  const filteredResults = $derived.by(() => {
+    if (!filter) return rawResults;
+    return rawResults.filter((r) => filter(r as unknown as T));
+  });
 
   function updateResults(event?: Event) {
     // if an event is provided, update the search term from the input
@@ -61,10 +69,10 @@
     // if the search term is less than 3 characters, don't search and reset the
     // results
     if (searchTerm.length < MIN_SEARCH_LENGTH) {
-      results = [];
+      rawResults = [];
       return;
     }
-    results = index.search(searchTerm, { prefix: true });
+    rawResults = index.search(searchTerm, { prefix: true });
   }
 
   // Subscribe to collection events and refresh when relevant events occur
@@ -77,6 +85,16 @@
     });
 
     return unsubscribe;
+  });
+
+  // Re-run search when the index changes (e.g., when filtering by job type)
+  $effect(() => {
+    // Access index to create dependency
+    const _ = index;
+    // Re-run search if we have an active search term
+    if (searchTerm.length >= MIN_SEARCH_LENGTH) {
+      rawResults = index.search(searchTerm, { prefix: true });
+    }
   });
 </script>
 
@@ -92,7 +110,7 @@
       placeholder={uiName}
       oninput={updateResults}
     />
-    <span>{results.length} items</span>
+    <span>{filteredResults.length} items</span>
     {#if searchBarExtra}
       {@render searchBarExtra()}
     {/if}
@@ -136,8 +154,8 @@
     {/each}
   {/snippet}
 
-  {#if results.length > 0}
-    {@render itemList(results.map((searchResult) => searchResult as unknown as T))}
+  {#if filteredResults.length > 0}
+    {@render itemList(filteredResults.map((searchResult) => searchResult as unknown as T))}
   {:else if searchTerm.length >= MIN_SEARCH_LENGTH}
     <li class="col-span-3">
       <div class="flex items-center justify-center p-2">

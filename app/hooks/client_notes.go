@@ -109,5 +109,53 @@ func validateClientNote(app core.App, record *core.Record) error {
 		}
 	}
 
+	// Validate job_status_changed_to against allowed values for the job type.
+	// When adding new job_status_changed_to options to the schema, update the appropriate
+	// list below to allow them for proposals and/or projects.
+	statusChangeTo := record.GetString("job_status_changed_to")
+	if statusChangeTo != "" {
+		jobNumber := jobRecord.GetString("number")
+		isProposal := len(jobNumber) > 0 && jobNumber[0] == 'P'
+
+		// Allowed status_change_to values for proposals.
+		// Update this list when adding new proposal status options that require comments.
+		allowedForProposals := []string{"No Bid", "Cancelled"}
+
+		// Allowed status_change_to values for projects.
+		// Update this list when adding new project status options that require comments.
+		allowedForProjects := []string{}
+
+		var allowed []string
+		var jobTypeName string
+		if isProposal {
+			allowed = allowedForProposals
+			jobTypeName = "proposals"
+		} else {
+			allowed = allowedForProjects
+			jobTypeName = "projects"
+		}
+
+		isAllowed := false
+		for _, v := range allowed {
+			if v == statusChangeTo {
+				isAllowed = true
+				break
+			}
+		}
+
+		if !isAllowed {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "client note validation error",
+				Data: map[string]errs.CodeError{
+					"job_status_changed_to": {
+						Code:    "invalid_for_job_type",
+						Message: "job_status_changed_to value '" + statusChangeTo + "' is not valid for " + jobTypeName,
+					},
+				},
+			}
+		}
+	}
+
 	return nil
 }

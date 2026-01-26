@@ -233,3 +233,121 @@ func TestClientNotes_CreateNote_JobNotFound_Fails(t *testing.T) {
 // Note: Authentication is handled by PocketBase's collection-level auth rules,
 // so we don't need to test it here. The hook validation tests above cover
 // the business logic validation that happens after auth.
+
+// =============================================================================
+// job_status_changed_to Validation Tests
+// =============================================================================
+
+// TestClientNotes_StatusChangeTo_ProposalAllowed verifies that proposals can have
+// job_status_changed_to set to allowed values.
+//
+// Test data: P24-0801 is a proposal
+func TestClientNotes_StatusChangeTo_ProposalAllowed(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "proposal can have job_status_changed_to No Bid",
+			Method: http.MethodPost,
+			URL:    "/api/collections/client_notes/records",
+			Body: strings.NewReader(`{
+				"client": "lb0fnenkeyitsny",
+				"job": "test_prop_inprog",
+				"note": "We decided not to bid on this project",
+				"job_status_changed_to": "No Bid"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"job_status_changed_to":"No Bid"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "proposal can have job_status_changed_to Cancelled",
+			Method: http.MethodPost,
+			URL:    "/api/collections/client_notes/records",
+			Body: strings.NewReader(`{
+				"client": "lb0fnenkeyitsny",
+				"job": "test_prop_inprog",
+				"note": "Client cancelled the project",
+				"job_status_changed_to": "Cancelled"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"job_status_changed_to":"Cancelled"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// TestClientNotes_StatusChangeTo_ProjectRejected verifies that projects cannot have
+// job_status_changed_to set (no allowed values for projects currently).
+//
+// Test data: 24-321 (cjf0kt0defhq480) is a project
+func TestClientNotes_StatusChangeTo_ProjectRejected(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "project cannot have job_status_changed_to No Bid",
+			Method: http.MethodPost,
+			URL:    "/api/collections/client_notes/records",
+			Body: strings.NewReader(`{
+				"client": "lb0fnenkeyitsny",
+				"job": "cjf0kt0defhq480",
+				"note": "This should fail",
+				"job_status_changed_to": "No Bid"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"invalid_for_job_type"`,
+				`"job_status_changed_to value 'No Bid' is not valid for projects"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "project cannot have job_status_changed_to Cancelled",
+			Method: http.MethodPost,
+			URL:    "/api/collections/client_notes/records",
+			Body: strings.NewReader(`{
+				"client": "lb0fnenkeyitsny",
+				"job": "cjf0kt0defhq480",
+				"note": "This should fail",
+				"job_status_changed_to": "Cancelled"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"invalid_for_job_type"`,
+				`"job_status_changed_to value 'Cancelled' is not valid for projects"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
