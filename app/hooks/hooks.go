@@ -192,6 +192,19 @@ func AddHooks(app core.App) {
 		}
 		return e.Next()
 	})
+	// hooks for rate_sheets model
+	app.OnRecordCreateRequest("rate_sheets").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessRateSheet(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	app.OnRecordUpdateRequest("rate_sheets").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessRateSheet(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
 
 	// For notification hooks, we need to use the RecordEvent instead of the
 	// RecordRequestEvent because the notifications model is not exposed to the
