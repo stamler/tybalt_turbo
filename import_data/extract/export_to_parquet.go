@@ -15,7 +15,7 @@ import (
 
 // The tablesToDump variable is used to specify the tables that should be
 // exported to Parquet format.
-var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts", "TurboVendors", "TurboPurchaseOrders"}
+var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts", "TurboClientNotes", "TurboVendors", "TurboPurchaseOrders"}
 
 func ToParquet(sourceSQLiteDb string) {
 	err := godotenv.Load()
@@ -235,6 +235,27 @@ func ToParquet(sourceSQLiteDb string) {
 					SELECT id, surname, givenName, email, clientId
 					FROM mysql_db.TurboClientContacts
 				) TO 'parquet/TurboClientContacts.parquet' (FORMAT PARQUET)
+			`
+		case "TurboClientNotes":
+			// Export TurboClientNotes for round-trip of client notes.
+			// These are notes written back from Turbo embedded in clients, then flattened to MySQL.
+			// The uid field is legacy_uid and will be converted to PocketBase uid on import.
+			// The jobId field is already a PocketBase job ID.
+			query = `
+				COPY (
+					SELECT 
+						id,
+						created,
+						updated,
+						note,
+						clientId,
+						jobId,
+						jobNumber,
+						uid,
+						jobNotApplicable,
+						jobStatusChangedTo
+					FROM mysql_db.TurboClientNotes
+				) TO 'parquet/ClientNotes.parquet' (FORMAT PARQUET)
 			`
 		case "TurboVendors":
 			// Export TurboVendors for round-trip of Turbo-originated vendors.

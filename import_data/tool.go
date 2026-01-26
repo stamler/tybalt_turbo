@@ -110,10 +110,10 @@ func main() {
 
 		// =========================================================================
 		// PHASE: JOBS (--jobs)
-		// Tables: clients, client_contacts, jobs, categories, job_time_allocations
+		// Tables: clients, client_contacts, client_notes, jobs, categories, job_time_allocations
 		// =========================================================================
 		if *jobsFlag {
-			fmt.Println("Importing jobs phase: clients, contacts, jobs, categories, job_time_allocations...")
+			fmt.Println("Importing jobs phase: clients, contacts, client_notes, jobs, categories, job_time_allocations...")
 
 			// Delete all existing records before import (full replace)
 			// Order doesn't matter since foreign keys are disabled during deletion
@@ -121,6 +121,7 @@ func main() {
 				"job_time_allocations",
 				"jobs",
 				"client_contacts",
+				"client_notes",
 				"categories",
 				"clients",
 			})
@@ -288,6 +289,57 @@ func main() {
 				categoryInsertSQL, // The specific INSERT SQL
 				categoryBinder,    // The specific binder function
 				true,              // Enable upsert for idempotency
+			)
+
+			// --- Load Client Notes ---
+			// Import client notes from TurboClientNotes (exported via Firebase sync).
+			// The uid field contains legacy_uid and needs to be converted to PocketBase uid via admin_profiles.
+			// The jobId field is already a PocketBase job ID and can be used directly.
+			clientNoteInsertSQL := `INSERT INTO client_notes (
+				id, 
+				created, 
+				updated, 
+				note, 
+				client, 
+				job, 
+				job_not_applicable, 
+				uid, 
+				job_status_changed_to, 
+				_imported
+			) VALUES (
+				{:id}, 
+				{:created}, 
+				{:updated}, 
+				{:note}, 
+				{:client_id}, 
+				IIF({:job_id} = '', NULL, {:job_id}),
+				{:job_not_applicable}, 
+				(SELECT uid FROM admin_profiles WHERE legacy_uid = {:uid}),
+				{:job_status_changed_to}, 
+				true
+			)`
+
+			clientNoteBinder := func(item load.ClientNote) dbx.Params {
+				return dbx.Params{
+					"id":                    item.Id,
+					"created":               item.Created,
+					"updated":               item.Updated,
+					"note":                  item.Note,
+					"client_id":             item.ClientId,
+					"job_id":                item.JobId,
+					"job_not_applicable":    item.JobNotApplicable,
+					"uid":                   item.Uid,
+					"job_status_changed_to": item.JobStatusChangedTo,
+				}
+			}
+
+			load.FromParquet(
+				"./parquet/ClientNotes.parquet",
+				targetDatabase,
+				"client_notes",
+				clientNoteInsertSQL,
+				clientNoteBinder,
+				true,
 			)
 
 		} // end jobs phase

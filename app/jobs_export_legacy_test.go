@@ -210,3 +210,62 @@ func TestJobsExportLegacyCount(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+func TestJobsExportLegacyClientNotes(t *testing.T) {
+	// Test that client notes are included in the export.
+	// The test database has client_notes for clients associated with non-imported jobs:
+	//   - note_lb0: "Target client note" for client lb0fnenkeyitsny (Mobilia SA), job 24-321
+	//   - note_eld: "Absorbed client note 1" for client eldtxi3i4h00k8r (BN Rail Corporation), job 24-326
+	//   - note_pqp: "Absorbed client note 2" for client pqpd90fqd5ohjcs (Sepulchi & Co), job 24-291
+	//   - note_nobid_test: "We decided not to bid on this project" for client lb0fnenkeyitsny, job P24-0804
+	//   - note_cancel_test: "Client cancelled the project" for client lb0fnenkeyitsny, job P24-0805
+	validToken := "test-secret-123"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "clients include notes array with full fidelity",
+			Method: http.MethodGet,
+			URL:    "/api/export_legacy/jobs/2000-01-01",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + validToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				// Verify notes are included in the response
+				`"notes":[`,
+				// Verify note content
+				`"note":"Target client note"`,
+				`"note":"Absorbed client note 1"`,
+				`"note":"Absorbed client note 2"`,
+				// Verify job references are included (job number)
+				`"jobNumber":"24-321"`,
+				`"jobNumber":"24-326"`,
+				`"jobNumber":"24-291"`,
+				// Verify note IDs are included
+				`"id":"note_lb0"`,
+				`"id":"note_eld"`,
+				`"id":"note_pqp"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "notes include jobStatusChangedTo for status change notes",
+			Method: http.MethodGet,
+			URL:    "/api/export_legacy/jobs/2000-01-01",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + validToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				// Notes that changed job status should include jobStatusChangedTo
+				`"jobStatusChangedTo":"No Bid"`,
+				`"jobStatusChangedTo":"Cancelled"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}

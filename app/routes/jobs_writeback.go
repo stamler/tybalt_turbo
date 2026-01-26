@@ -37,11 +37,25 @@ type jobsWritebackResponse struct {
 	ClientContacts []contactExportOutput `json:"clientContacts"`
 }
 
+// Client note export struct for notes array within each client
+type clientNoteExportOutput struct {
+	Id                 string `json:"id"`
+	Created            string `json:"created"`
+	Updated            string `json:"updated"`
+	Note               string `json:"note"`
+	Uid                string `json:"uid"`                          // legacy_uid of the author
+	JobId              string `json:"jobId,omitempty"`              // PocketBase job ID
+	JobNumber          string `json:"jobNumber,omitempty"`          // job number for reference
+	JobNotApplicable   bool   `json:"jobNotApplicable"`
+	JobStatusChangedTo string `json:"jobStatusChangedTo,omitempty"`
+}
+
 // Client export struct for separate clients array
 type clientExportOutput struct {
-	Id                      string `json:"id"`
-	Name                    string `json:"name"`
-	BusinessDevelopmentLead string `json:"businessDevelopmentLead,omitempty"` // legacy_uid of the user
+	Id                      string                   `json:"id"`
+	Name                    string                   `json:"name"`
+	BusinessDevelopmentLead string                   `json:"businessDevelopmentLead,omitempty"` // legacy_uid of the user
+	Notes                   []clientNoteExportOutput `json:"notes,omitempty"`
 }
 
 // Client contact export struct for separate clientContacts array
@@ -107,6 +121,20 @@ type contactExportDBRow struct {
 	GivenName string `db:"given_name"`
 	Email     string `db:"email"`
 	ClientId  string `db:"client_id"`
+}
+
+// Internal struct for DB scanning - client notes query
+type clientNoteExportDBRow struct {
+	Id                 string `db:"id"`
+	Created            string `db:"created"`
+	Updated            string `db:"updated"`
+	Note               string `db:"note"`
+	ClientId           string `db:"client_id"`
+	JobId              string `db:"job_id"`
+	JobNumber          string `db:"job_number"`
+	Uid                string `db:"uid"` // legacy_uid from admin_profiles
+	JobNotApplicable   bool   `db:"job_not_applicable"`
+	JobStatusChangedTo string `db:"job_status_changed_to"`
 }
 
 // Output struct matching legacy Firestore format with ID references instead of _row objects
@@ -276,6 +304,40 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 			return e.Error(http.StatusInternalServerError, "failed to query contacts: "+err.Error(), nil)
 		}
 
+		// Query 4: All client_notes for matched clients (full fidelity - no _imported filtering)
+		// Join with jobs to get job number, admin_profiles to get legacy_uid for author
+		clientNotesQuery := `
+			SELECT 
+				cn.id,
+				cn.created,
+				cn.updated,
+				cn.note,
+				cn.client AS client_id,
+				COALESCE(cn.job, '') AS job_id,
+				COALESCE(j.number, '') AS job_number,
+				COALESCE(ap.legacy_uid, '') AS uid,
+				cn.job_not_applicable,
+				COALESCE(cn.job_status_changed_to, '') AS job_status_changed_to
+			FROM client_notes cn
+			LEFT JOIN jobs j ON cn.job = j.id
+			LEFT JOIN admin_profiles ap ON cn.uid = ap.uid
+			WHERE cn.client IN (
+				SELECT j.client FROM jobs j 
+				WHERE j.updated >= {:updatedAfter} AND j._imported = 0 AND j.client IS NOT NULL AND j.client != ''
+				UNION
+				SELECT j.job_owner FROM jobs j 
+				WHERE j.updated >= {:updatedAfter} AND j._imported = 0 AND j.job_owner IS NOT NULL AND j.job_owner != ''
+			)
+			ORDER BY cn.client, cn.created DESC
+		`
+
+		var noteRows []clientNoteExportDBRow
+		if err := app.DB().NewQuery(clientNotesQuery).Bind(dbx.Params{
+			"updatedAfter": updatedAfter,
+		}).All(&noteRows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to query client notes: "+err.Error(), nil)
+		}
+
 		// Convert job DB rows to output format
 		jobs := make([]jobExportOutput, len(jobRows))
 		for i, r := range jobRows {
@@ -323,13 +385,30 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 			}
 		}
 
-		// Convert client DB rows to output format
+		// Group notes by client_id for efficient lookup
+		notesByClient := make(map[string][]clientNoteExportOutput)
+		for _, n := range noteRows {
+			notesByClient[n.ClientId] = append(notesByClient[n.ClientId], clientNoteExportOutput{
+				Id:                 n.Id,
+				Created:            n.Created,
+				Updated:            n.Updated,
+				Note:               n.Note,
+				Uid:                n.Uid,
+				JobId:              n.JobId,
+				JobNumber:          n.JobNumber,
+				JobNotApplicable:   n.JobNotApplicable,
+				JobStatusChangedTo: n.JobStatusChangedTo,
+			})
+		}
+
+		// Convert client DB rows to output format, attaching notes
 		clients := make([]clientExportOutput, len(clientRows))
 		for i, r := range clientRows {
 			clients[i] = clientExportOutput{
 				Id:                      r.Id,
 				Name:                    r.Name,
 				BusinessDevelopmentLead: r.BusinessDevelopmentLead,
+				Notes:                   notesByClient[r.Id], // may be nil if no notes, omitted from JSON
 			}
 		}
 

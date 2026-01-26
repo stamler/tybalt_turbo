@@ -262,6 +262,20 @@ type JobTimeAllocation struct {
 	Hours    float64 `parquet:"hours"`
 }
 
+// ClientNote represents a note associated with a client, exported from TurboClientNotes MySQL table.
+type ClientNote struct {
+	Id                 string `parquet:"id"`                   // PocketBase note ID
+	Created            string `parquet:"created"`              // timestamp
+	Updated            string `parquet:"updated"`              // timestamp
+	Note               string `parquet:"note"`                 // note text
+	ClientId           string `parquet:"clientId"`             // PocketBase client ID
+	JobId              string `parquet:"jobId"`                // PocketBase job ID (already resolved)
+	JobNumber          string `parquet:"jobNumber"`            // job number for reference
+	Uid                string `parquet:"uid"`                  // legacy_uid of author (needs conversion on import)
+	JobNotApplicable   bool   `parquet:"jobNotApplicable"`     // whether job is not applicable
+	JobStatusChangedTo string `parquet:"jobStatusChangedTo"`   // status the job was changed to (if any)
+}
+
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.
 // T: The struct type corresponding to the Parquet file schema.
 // parquetFilePath: Path to the input Parquet file.
