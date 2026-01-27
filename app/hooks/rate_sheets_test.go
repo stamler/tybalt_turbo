@@ -11,13 +11,9 @@ import (
 // returns all roles as missing.
 //
 // Test data in test_pb_data/data.db:
-//   - rate_sheets: "c41ofep525bcacj" (2025 Standard Rates, active=false)
-//   - rate_roles: 30 roles
-//   - rate_sheet_entries: none
-//
-// FIXTURE DEPENDENCY: This test assumes no rate_sheet_entries exist for the test
-// rate sheet. If entries are added to the fixture, either create a new rate_sheet
-// for this test or delete this test entirely (the other tests cover the core logic).
+//   - rate_sheets: "test_empty_sheet" (Empty Test Rate Sheet, active=false)
+//   - rate_roles: 33 roles
+//   - rate_sheet_entries: none for test_empty_sheet
 func TestValidateRateSheetComplete_NoEntries(t *testing.T) {
 	app, err := tests.NewTestApp("../test_pb_data")
 	if err != nil {
@@ -25,16 +21,16 @@ func TestValidateRateSheetComplete_NoEntries(t *testing.T) {
 	}
 	defer app.Cleanup()
 
-	rateSheetId := "c41ofep525bcacj"
+	rateSheetId := "test_empty_sheet"
 
 	missingRoles, err := validateRateSheetComplete(app, rateSheetId)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should have 30 missing roles (all of them)
-	if len(missingRoles) != 30 {
-		t.Errorf("expected 30 missing roles, got %d", len(missingRoles))
+	// Should have 33 missing roles (all of them)
+	if len(missingRoles) != 33 {
+		t.Errorf("expected 33 missing roles, got %d", len(missingRoles))
 	}
 }
 
@@ -47,7 +43,7 @@ func TestValidateRateSheetComplete_AllEntries(t *testing.T) {
 	}
 	defer app.Cleanup()
 
-	rateSheetId := "c41ofep525bcacj"
+	rateSheetId := "test_empty_sheet"
 
 	// Get all roles
 	roles, err := app.FindRecordsByFilter("rate_roles", "1=1", "", 100, 0, nil)
@@ -85,10 +81,6 @@ func TestValidateRateSheetComplete_AllEntries(t *testing.T) {
 
 // TestValidateRateSheetComplete_PartialEntries tests that a rate sheet with some entries
 // returns only the missing roles.
-//
-// FIXTURE DEPENDENCY: This test assumes no rate_sheet_entries exist for the test
-// rate sheet. If entries are added to the fixture, create a new rate_sheet for this
-// test to ensure a known starting state.
 func TestValidateRateSheetComplete_PartialEntries(t *testing.T) {
 	app, err := tests.NewTestApp("../test_pb_data")
 	if err != nil {
@@ -96,7 +88,7 @@ func TestValidateRateSheetComplete_PartialEntries(t *testing.T) {
 	}
 	defer app.Cleanup()
 
-	rateSheetId := "c41ofep525bcacj"
+	rateSheetId := "test_empty_sheet"
 
 	// Get all roles
 	roles, err := app.FindRecordsByFilter("rate_roles", "1=1", "", 100, 0, nil)
