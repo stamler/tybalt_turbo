@@ -139,6 +139,18 @@ export const navSections: NavSection[] = [
         ],
       },
       {
+        label: "Rate Sheets",
+        href: "/rate-sheets/list",
+        buttons: [
+          {
+            action: "/rate-sheets/add",
+            icon: "feather:plus-circle",
+            title: "New Rate Sheet",
+            color: "green",
+          },
+        ],
+      },
+      {
         label: "Clients",
         href: "/clients/list",
         buttons: [

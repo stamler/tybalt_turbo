@@ -46,6 +46,9 @@
                 if (item.href.startsWith("/absorb/actions")) {
                   return $globalStore.claims.includes("absorb");
                 }
+                if (item.href.startsWith("/rate-sheets")) {
+                  return $globalStore.claims.includes("job");
+                }
                 if (item.href.startsWith("/reports/expense/queue")) {
                   return $globalStore.claims.includes("commit");
                 }
@@ -71,7 +74,8 @@
                     btn.action === "/jobs/unused" ||
                     btn.action === "/jobs/stale" ||
                     btn.action === "/jobs/latest" ||
-                    btn.action === "/clients/add"
+                    btn.action === "/clients/add" ||
+                    btn.action === "/rate-sheets/add"
                   ) {
                     return $globalStore.claims.includes("job");
                   }
