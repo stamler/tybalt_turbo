@@ -5,6 +5,7 @@
   import ObjectTable from "$lib/components/ObjectTable.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsToggle from "$lib/components/DSToggle.svelte";
+  import Icon from "@iconify/svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -28,6 +29,20 @@
 
   // Overtime multiplier for bulk calculation
   let overtimeMultiplier = $state(1.3);
+
+  // Column sorting state
+  type SortColumn = "role" | "rate" | "overtime_rate";
+  let sortColumn = $state<SortColumn>("role");
+  let sortOrder = $state<"asc" | "desc">("asc");
+
+  function toggleSort(column: SortColumn) {
+    if (sortColumn === column) {
+      sortOrder = sortOrder === "asc" ? "desc" : "asc";
+    } else {
+      sortColumn = column;
+      sortOrder = "asc";
+    }
+  }
 
   // Form state for adding new entry
   let newEntry = $state({
@@ -130,12 +145,20 @@
     editedEntries = newEdits;
   }
 
-  // Sort entries by role name
+  // Sort entries by selected column
   const sortedEntries = $derived(
     [...entries].sort((a, b) => {
-      const nameA = a.expand?.role?.name ?? "";
-      const nameB = b.expand?.role?.name ?? "";
-      return nameA.localeCompare(nameB);
+      let comparison = 0;
+      if (sortColumn === "role") {
+        const nameA = a.expand?.role?.name ?? "";
+        const nameB = b.expand?.role?.name ?? "";
+        comparison = nameA.localeCompare(nameB);
+      } else if (sortColumn === "rate") {
+        comparison = a.rate - b.rate;
+      } else if (sortColumn === "overtime_rate") {
+        comparison = a.overtime_rate - b.overtime_rate;
+      }
+      return sortOrder === "asc" ? comparison : -comparison;
     })
   );
 
@@ -311,9 +334,30 @@
                 <th></th>
               </tr>
               <tr class="border-b border-neutral-300">
-                <th class="pb-2 pr-4 text-left">Role</th>
-                <th class="pb-2 pr-4 text-right">Rate</th>
-                <th class="pb-2 pr-4 text-right">Overtime Rate</th>
+                <th class="pb-2 pr-4 text-left">
+                  <button class="hover:underline" onclick={() => toggleSort("role")}>
+                    Role
+                    {#if sortColumn === "role"}
+                      <Icon icon={sortOrder === "asc" ? "mdi:sort-ascending" : "mdi:sort-descending"} class="inline w-4" />
+                    {/if}
+                  </button>
+                </th>
+                <th class="pb-2 pr-4 text-right">
+                  <button class="hover:underline" onclick={() => toggleSort("rate")}>
+                    Rate
+                    {#if sortColumn === "rate"}
+                      <Icon icon={sortOrder === "asc" ? "mdi:sort-ascending" : "mdi:sort-descending"} class="inline w-4" />
+                    {/if}
+                  </button>
+                </th>
+                <th class="pb-2 pr-4 text-right">
+                  <button class="hover:underline" onclick={() => toggleSort("overtime_rate")}>
+                    Overtime Rate
+                    {#if sortColumn === "overtime_rate"}
+                      <Icon icon={sortOrder === "asc" ? "mdi:sort-ascending" : "mdi:sort-descending"} class="inline w-4" />
+                    {/if}
+                  </button>
+                </th>
                 <th class="pb-2 text-left">Actions</th>
               </tr>
             </thead>
