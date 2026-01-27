@@ -42,6 +42,17 @@ func createActivateRateSheetHandler(app core.App) func(e *core.RequestEvent) err
 			})
 		}
 
+		// Check if a newer revision exists (cannot activate older revisions)
+		name := record.GetString("name")
+		revision := record.GetInt("revision")
+		newerExists, err := hooks.CheckNewerRevisionExists(app, name, revision)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to check for newer revisions", err)
+		}
+		if newerExists {
+			return e.Error(http.StatusBadRequest, "cannot activate - a newer revision exists", nil)
+		}
+
 		// Validate completeness using the existing hook logic
 		missingRoles, err := hooks.ValidateRateSheetComplete(app, id)
 		if err != nil {
@@ -51,6 +62,12 @@ func createActivateRateSheetHandler(app core.App) func(e *core.RequestEvent) err
 			return e.Error(http.StatusBadRequest, "rate sheet is incomplete - missing entries for some roles", map[string]any{
 				"missing_roles": missingRoles,
 			})
+		}
+
+		// Deactivate other revisions with same name BEFORE activating this one
+		// (no transaction, so order matters - ensures never two active revisions)
+		if err := hooks.DeactivateOtherRevisions(app, name, id); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to deactivate previous revisions", err)
 		}
 
 		// Update the record

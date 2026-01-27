@@ -153,3 +153,38 @@ func CheckRevisionEffectiveDate(app core.App, name string, revision int, newEffe
 
 	return "", nil
 }
+
+// CheckNewerRevisionExists checks if a rate sheet with the same name and a higher
+// revision number exists. Used to prevent activating older revisions.
+func CheckNewerRevisionExists(app core.App, name string, revision int) (bool, error) {
+	var count int
+	err := app.DB().NewQuery(`
+		SELECT COUNT(*) FROM rate_sheets
+		WHERE name = {:name} AND revision > {:revision}
+	`).Bind(dbx.Params{
+		"name":     name,
+		"revision": revision,
+	}).Row(&count)
+
+	if err != nil {
+		return false, err
+	}
+
+	return count > 0, nil
+}
+
+// DeactivateOtherRevisions deactivates all rate sheets with the same name except
+// the one with the given ID. Used when activating a new revision to ensure only
+// one revision is active at a time.
+func DeactivateOtherRevisions(app core.App, name string, excludeId string) error {
+	_, err := app.DB().NewQuery(`
+		UPDATE rate_sheets
+		SET active = false
+		WHERE name = {:name} AND id != {:id} AND active = true
+	`).Bind(dbx.Params{
+		"name": name,
+		"id":   excludeId,
+	}).Execute()
+
+	return err
+}
