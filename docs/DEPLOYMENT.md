@@ -102,7 +102,15 @@ Before your first deployment, you must push a database to S3:
    source scripts/setup-env.sh
    ```
 
-2. **Push your local database to S3:**
+2. **Clear any stale litestream state** (required for fresh deployments):
+
+   ```bash
+   rm -rf app/pb_data/.data.db-litestream
+   ```
+
+   This removes local replication metadata that may be out of sync with S3.
+
+3. **Push your local database to S3:**
 
    ```bash
    litestream replicate -config litestream.local.yml
@@ -110,7 +118,7 @@ Before your first deployment, you must push a database to S3:
 
    Let this run for 30-60 seconds to ensure the backup completes, then press Ctrl+C.
 
-3. **Deploy the app:**
+4. **Deploy the app:**
 
    ```bash
    flyctl deploy
