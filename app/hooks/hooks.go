@@ -194,6 +194,9 @@ func AddHooks(app core.App) {
 	})
 	// hooks for rate_sheets model
 	app.OnRecordCreateRequest("rate_sheets").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ValidateRateSheetEffectiveDate(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
 		if err := ProcessRateSheet(app, e); err != nil {
 			return AnnotateHookError(app, e, err)
 		}

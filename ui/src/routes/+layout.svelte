@@ -74,8 +74,7 @@
                     btn.action === "/jobs/unused" ||
                     btn.action === "/jobs/stale" ||
                     btn.action === "/jobs/latest" ||
-                    btn.action === "/clients/add" ||
-                    btn.action === "/rate-sheets/add"
+                    btn.action === "/clients/add"
                   ) {
                     return $globalStore.claims.includes("job");
                   }

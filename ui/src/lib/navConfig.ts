@@ -141,14 +141,7 @@ export const navSections: NavSection[] = [
       {
         label: "Rate Sheets",
         href: "/rate-sheets/list",
-        buttons: [
-          {
-            action: "/rate-sheets/add",
-            icon: "feather:plus-circle",
-            title: "New Rate Sheet",
-            color: "green",
-          },
-        ],
+        buttons: [],
       },
       {
         label: "Clients",

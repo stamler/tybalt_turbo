@@ -17,9 +17,9 @@
       </a>
     {/snippet}
 
-    {#snippet byline({ effective_date, revision }: RateSheetResponse)}
+    {#snippet byline({ effective_date, revision, job_count }: RateSheetResponse)}
       <span class="text-neutral-500">
-        rev. {revision} • {shortDate(effective_date, true)}
+        rev. {revision} • {shortDate(effective_date, true)} • {job_count} job{job_count === 1 ? "" : "s"}
       </span>
     {/snippet}
 
@@ -38,7 +38,7 @@
     {#snippet actions({ id, active }: RateSheetResponse)}
       {#if active}
         <DsActionButton
-          action={`/rate-sheets/add?revise=${id}`}
+          action={`/rate-sheets/copy?revise=${id}`}
           icon="mdi:file-replace-outline"
           title="Revise"
           color="blue"
@@ -47,7 +47,7 @@
       <DsActionButton
         action={`/rate-sheets/copy?from=${id}`}
         icon="mdi:content-copy"
-        title="New from Template"
+        title="Use as Template"
         color="green"
       />
     {/snippet}

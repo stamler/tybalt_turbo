@@ -9,24 +9,39 @@
 
   const sourceSheet = data.sourceSheet;
   const sourceEntries = data.sourceEntries;
+  const isRevising = data.isRevising;
+  const nextRevision = data.nextRevision;
 
   let errors = $state({} as Record<string, { message: string }>);
   let saveError = $state("");
   let saving = $state(false);
 
-  // Form state
-  let name = $state(`Copy of ${sourceSheet.name}`);
+  // Form state - name is locked when revising
+  let name = $state(isRevising ? sourceSheet.name : `Copy of ${sourceSheet.name}`);
   let effective_date = $state("");
 
-  // Staged entries - editable copies of source entries
+  // Staged entries - editable copies of source entries, sorted by role name
   let stagedEntries = $state(
-    sourceEntries.map((e) => ({
-      role: e.role,
-      roleName: e.expand?.role?.name ?? "Unknown",
-      rate: e.rate,
-      overtime_rate: e.overtime_rate,
-    }))
+    sourceEntries
+      .map((e) => ({
+        role: e.role,
+        roleName: e.expand?.role?.name ?? "Unknown",
+        rate: e.rate,
+        overtime_rate: e.overtime_rate,
+      }))
+      .sort((a, b) => a.roleName.localeCompare(b.roleName))
   );
+
+  // Overtime multiplier for bulk calculation
+  let overtimeMultiplier = $state(1.3);
+
+  // Apply overtime multiplier to all staged entries
+  function applyOvertimeMultiplier() {
+    stagedEntries = stagedEntries.map((entry) => ({
+      ...entry,
+      overtime_rate: Math.round(entry.rate * overtimeMultiplier * 100) / 100,
+    }));
+  }
 
   async function save(event: Event) {
     event.preventDefault();
@@ -51,25 +66,25 @@
       const createdSheet = await pb.collection("rate_sheets").create({
         name: name.trim(),
         effective_date,
-        revision: 0,
+        revision: isRevising ? nextRevision : 0,
         active: false,
       });
       createdSheetId = createdSheet.id;
 
       // Step 2: Create all entries
-      const entryPromises = stagedEntries.map((entry) =>
-        pb.collection("rate_sheet_entries").create({
+      for (const entry of stagedEntries) {
+        await pb.collection("rate_sheet_entries").create({
           rate_sheet: createdSheetId,
           role: entry.role,
           rate: entry.rate,
           overtime_rate: entry.overtime_rate,
-        })
-      );
-
-      await Promise.all(entryPromises);
+        });
+      }
 
       // 100% success - redirect to details page
+      saving = false;
       goto(`/rate-sheets/${createdSheetId}/details`);
+      return; // Exit early to avoid finally block issues
     } catch (error: any) {
       console.error("Failed to save:", error);
 
@@ -83,21 +98,40 @@
           errors = error.data.data;
         }
       }
-    } finally {
       saving = false;
     }
   }
 </script>
 
 <div class="p-4">
-  <h1 class="mb-4 text-xl font-bold">New Rate Sheet from Template</h1>
+  <h1 class="mb-4 text-xl font-bold">
+    {isRevising ? "Revise Rate Sheet" : "New Rate Sheet"}
+  </h1>
   <p class="mb-6 text-neutral-600">
-    Creating a new rate sheet based on "{sourceSheet.name}"
+    {isRevising
+      ? `Creating revision ${nextRevision} of "${sourceSheet.name}"`
+      : `Creating a new rate sheet based on "${sourceSheet.name}"`}
   </p>
 
   <form onsubmit={save} class="flex flex-col gap-4">
     <!-- Name field -->
-    <DsTextInput bind:value={name} {errors} fieldName="name" uiName="Name" />
+    {#if isRevising}
+      <div class="flex w-full flex-col gap-2">
+        <span class="flex w-full items-center gap-2">
+          <label for="name">Name</label>
+          <input
+            class="flex-1 cursor-not-allowed rounded border border-neutral-300 bg-neutral-100 px-1 opacity-60"
+            type="text"
+            id="name"
+            value={name}
+            disabled
+          />
+          <span class="text-sm italic text-neutral-500">revising</span>
+        </span>
+      </div>
+    {:else}
+      <DsTextInput bind:value={name} {errors} fieldName="name" uiName="Name" />
+    {/if}
 
     <!-- Effective Date field -->
     <div class="flex w-full flex-col gap-2 {errors.effective_date !== undefined ? 'bg-red-200' : ''}">
@@ -126,6 +160,31 @@
       <div class="overflow-x-auto">
         <table class="w-full border-collapse">
           <thead>
+            <!-- Multiplier row above headers -->
+            <tr>
+              <th></th>
+              <th></th>
+              <th class="px-3 py-2 text-left">
+                <div class="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0.01"
+                    step="0.01"
+                    bind:value={overtimeMultiplier}
+                    class="w-16 rounded border border-neutral-300 px-2 py-1 text-right text-sm"
+                    title="Overtime multiplier"
+                  />
+                  <button
+                    type="button"
+                    class="rounded bg-neutral-200 px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-300"
+                    onclick={applyOvertimeMultiplier}
+                    title="Apply multiplier to all overtime rates"
+                  >
+                    &times;
+                  </button>
+                </div>
+              </th>
+            </tr>
             <tr class="border-b border-neutral-300">
               <th class="px-3 py-2 text-left">Role</th>
               <th class="px-3 py-2 text-left">Rate</th>

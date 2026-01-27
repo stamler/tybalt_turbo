@@ -23,7 +23,7 @@ func TestValidateRateSheetComplete_NoEntries(t *testing.T) {
 
 	rateSheetId := "test_empty_sheet"
 
-	missingRoles, err := validateRateSheetComplete(app, rateSheetId)
+	missingRoles, err := ValidateRateSheetComplete(app, rateSheetId)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestValidateRateSheetComplete_AllEntries(t *testing.T) {
 	}
 
 	// Now validate - should have no missing roles
-	missingRoles, err := validateRateSheetComplete(app, rateSheetId)
+	missingRoles, err := ValidateRateSheetComplete(app, rateSheetId)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestValidateRateSheetComplete_PartialEntries(t *testing.T) {
 	}
 
 	// Validate - should have 25 missing roles (30 - 5)
-	missingRoles, err := validateRateSheetComplete(app, rateSheetId)
+	missingRoles, err := ValidateRateSheetComplete(app, rateSheetId)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -126,5 +126,108 @@ func TestValidateRateSheetComplete_PartialEntries(t *testing.T) {
 	expected := len(roles) - 5
 	if len(missingRoles) != expected {
 		t.Errorf("expected %d missing roles, got %d", expected, len(missingRoles))
+	}
+}
+
+// TestCheckRevisionEffectiveDate_Revision0 tests that revision 0 is always allowed
+// regardless of effective date.
+func TestCheckRevisionEffectiveDate_Revision0(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	// Revision 0 should always pass validation, even with any date
+	prevDate, err := CheckRevisionEffectiveDate(app, "Any Name", 0, "2020-01-01")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prevDate != "" {
+		t.Errorf("expected empty string (valid), got %q", prevDate)
+	}
+}
+
+// TestCheckRevisionEffectiveDate_ValidRevision tests that a revision with
+// effective_date >= previous revision's date is allowed.
+func TestCheckRevisionEffectiveDate_ValidRevision(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	collection, err := app.FindCollectionByNameOrId("rate_sheets")
+	if err != nil {
+		t.Fatalf("failed to get collection: %v", err)
+	}
+
+	sheetName := "Test Effective Date Validation"
+
+	// Create revision 0
+	rev0 := core.NewRecord(collection)
+	rev0.Set("name", sheetName)
+	rev0.Set("effective_date", "2025-01-15")
+	rev0.Set("revision", 0)
+	rev0.Set("active", false)
+	if err := app.Save(rev0); err != nil {
+		t.Fatalf("failed to create revision 0: %v", err)
+	}
+
+	// Test revision 1 with same date - should be valid
+	prevDate, err := CheckRevisionEffectiveDate(app, sheetName, 1, "2025-01-15")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prevDate != "" {
+		t.Errorf("same date should be valid, got previous date %q", prevDate)
+	}
+
+	// Test revision 1 with later date - should be valid
+	prevDate, err = CheckRevisionEffectiveDate(app, sheetName, 1, "2025-06-01")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prevDate != "" {
+		t.Errorf("later date should be valid, got previous date %q", prevDate)
+	}
+}
+
+// TestCheckRevisionEffectiveDate_InvalidRevision tests that a revision with
+// effective_date < previous revision's date is rejected.
+func TestCheckRevisionEffectiveDate_InvalidRevision(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	collection, err := app.FindCollectionByNameOrId("rate_sheets")
+	if err != nil {
+		t.Fatalf("failed to get collection: %v", err)
+	}
+
+	sheetName := "Test Invalid Effective Date"
+
+	// Create revision 0 with effective date 2025-06-15
+	rev0 := core.NewRecord(collection)
+	rev0.Set("name", sheetName)
+	rev0.Set("effective_date", "2025-06-15")
+	rev0.Set("revision", 0)
+	rev0.Set("active", false)
+	if err := app.Save(rev0); err != nil {
+		t.Fatalf("failed to create revision 0: %v", err)
+	}
+
+	// Test revision 1 with earlier date - should be invalid
+	prevDate, err := CheckRevisionEffectiveDate(app, sheetName, 1, "2025-01-01")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prevDate == "" {
+		t.Error("earlier date should be invalid, but validation passed")
+	}
+	if prevDate != "2025-06-15" {
+		t.Errorf("expected previous date to be 2025-06-15, got %q", prevDate)
 	}
 }

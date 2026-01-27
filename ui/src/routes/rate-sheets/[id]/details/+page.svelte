@@ -1,9 +1,10 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import { shortDate } from "$lib/utilities";
+  import { globalStore } from "$lib/stores/global";
   import ObjectTable from "$lib/components/ObjectTable.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
-  import { invalidateAll } from "$app/navigation";
+  import DsToggle from "$lib/components/DSToggle.svelte";
   import type { PageData } from "./$types";
 
   let { data }: { data: PageData } = $props();
@@ -17,6 +18,17 @@
   let rateSheet = $state(initialRateSheet);
   let allRoles = $state(initialRoles);
 
+  // Admin check for editing capability
+  const isAdmin = $derived($globalStore.claims.includes("admin"));
+
+  // Track edited entries by id -> { rate, overtime_rate }
+  let editedEntries = $state<Record<string, { rate: number; overtime_rate: number }>>({});
+  let savingEntryId = $state<string | null>(null);
+  let entryErrors = $state<Record<string, string>>({});
+
+  // Overtime multiplier for bulk calculation
+  let overtimeMultiplier = $state(1.3);
+
   // Form state for adding new entry
   let newEntry = $state({
     role: "",
@@ -25,6 +37,107 @@
   });
   let saveError = $state("");
   let saving = $state(false);
+  let toggleError = $state("");
+
+  // Check if an entry has been modified (values differ from original)
+  function isEntryModified(entry: any): boolean {
+    const edits = editedEntries[entry.id];
+    if (!edits) return false;
+    return edits.rate !== entry.rate || edits.overtime_rate !== entry.overtime_rate;
+  }
+
+  // Get the current value for an entry field (edited or original)
+  function getEntryValue(entry: any, field: "rate" | "overtime_rate"): number {
+    if (editedEntries[entry.id]) {
+      return editedEntries[entry.id][field];
+    }
+    return entry[field];
+  }
+
+  // Update an entry field in the edited state
+  function updateEntryField(entry: any, field: "rate" | "overtime_rate", value: number) {
+    if (!editedEntries[entry.id]) {
+      // Initialize with current values
+      editedEntries[entry.id] = {
+        rate: entry.rate,
+        overtime_rate: entry.overtime_rate,
+      };
+    }
+    editedEntries[entry.id][field] = value;
+    // Trigger reactivity
+    editedEntries = { ...editedEntries };
+  }
+
+  // Save a single edited entry
+  async function saveEditedEntry(entryId: string) {
+    const edits = editedEntries[entryId];
+    if (!edits) return;
+
+    savingEntryId = entryId;
+    delete entryErrors[entryId];
+    entryErrors = { ...entryErrors };
+
+    try {
+      const response = await pb.send(`/api/rate_sheet_entries/${entryId}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          rate: edits.rate,
+          overtime_rate: edits.overtime_rate,
+        }),
+      });
+
+      // Update local entries with new values
+      entries = entries.map((e) =>
+        e.id === entryId
+          ? { ...e, rate: response.rate, overtime_rate: response.overtime_rate }
+          : e
+      );
+
+      // Remove from edited state
+      delete editedEntries[entryId];
+      editedEntries = { ...editedEntries };
+    } catch (error: any) {
+      console.error("Failed to update entry:", error);
+      entryErrors[entryId] = error.data?.message ?? "Failed to update";
+      entryErrors = { ...entryErrors };
+    } finally {
+      savingEntryId = null;
+    }
+  }
+
+  // Cancel edits for an entry
+  function cancelEntryEdit(entryId: string) {
+    delete editedEntries[entryId];
+    editedEntries = { ...editedEntries };
+    delete entryErrors[entryId];
+    entryErrors = { ...entryErrors };
+  }
+
+  // Apply overtime multiplier to all entries
+  function applyOvertimeMultiplier() {
+    const newEdits: Record<string, { rate: number; overtime_rate: number }> = { ...editedEntries };
+    
+    for (const entry of entries) {
+      const currentRate = editedEntries[entry.id]?.rate ?? entry.rate;
+      const calculatedOvertime = Math.round(currentRate * overtimeMultiplier * 100) / 100;
+      
+      newEdits[entry.id] = {
+        rate: currentRate,
+        overtime_rate: calculatedOvertime,
+      };
+    }
+    
+    editedEntries = newEdits;
+  }
+
+  // Sort entries by role name
+  const sortedEntries = $derived(
+    [...entries].sort((a, b) => {
+      const nameA = a.expand?.role?.name ?? "";
+      const nameB = b.expand?.role?.name ?? "";
+      return nameA.localeCompare(nameB);
+    })
+  );
 
   // Compute missing roles
   const missingRoles = $derived(
@@ -41,19 +154,40 @@
     }))
   );
 
-  // Toggle active status
-  async function toggleActive() {
-    if (!isComplete) return;
+  // Toggle value for DSToggle (string-based)
+  let activeToggleValue = $state(rateSheet.active ? "active" : "inactive");
+  let isToggling = $state(false);
 
-    try {
-      const newActive = !rateSheet.active;
-      await pb.collection("rate_sheets").update(rateSheet.id, { active: newActive });
-      rateSheet = { ...rateSheet, active: newActive };
-    } catch (error: any) {
-      console.error("Failed to update active status:", error);
-      alert(error.data?.data?.active?.message ?? "Failed to update active status");
+  // React to toggle value changes
+  $effect(() => {
+    const newValue = activeToggleValue;
+    const currentActive = rateSheet.active;
+    const shouldBeActive = newValue === "active";
+
+    // Only call API if value actually changed and we're not already toggling
+    if (shouldBeActive !== currentActive && !isToggling) {
+      isToggling = true;
+      toggleError = "";
+
+      const endpoint = shouldBeActive
+        ? `/api/rate_sheets/${rateSheet.id}/activate`
+        : `/api/rate_sheets/${rateSheet.id}/deactivate`;
+
+      pb.send(endpoint, { method: "POST" })
+        .then((response) => {
+          rateSheet = { ...rateSheet, active: response.active };
+        })
+        .catch((error: any) => {
+          console.error("Failed to update active status:", error);
+          toggleError = error.data?.message ?? "Failed to update status";
+          // Revert toggle value on error
+          activeToggleValue = currentActive ? "active" : "inactive";
+        })
+        .finally(() => {
+          isToggling = false;
+        });
     }
-  }
+  });
 
   // Save new entry
   async function saveEntry(event: Event) {
@@ -108,45 +242,139 @@
   <!-- Action Buttons -->
   <div class="mb-4 flex gap-2">
     {#if rateSheet.active}
-      <DsActionButton action={`/rate-sheets/add?revise=${rateSheet.id}`}>
+      <DsActionButton action={`/rate-sheets/copy?revise=${rateSheet.id}`}>
         Revise
       </DsActionButton>
     {/if}
     <DsActionButton action={`/rate-sheets/copy?from=${rateSheet.id}`}>
-      New from Template
+      Use as Template
     </DsActionButton>
   </div>
 
   <!-- Active Toggle -->
-  <div class="mb-6">
-    <label
-      class="flex items-center gap-2"
-      class:opacity-50={!isComplete}
-      class:cursor-not-allowed={!isComplete}
+  <div class="mb-6 flex items-center gap-4">
+    <div
+      class:opacity-50={!isComplete || isToggling}
+      class:pointer-events-none={!isComplete || isToggling}
     >
-      <input
-        type="checkbox"
-        checked={rateSheet.active}
-        disabled={!isComplete}
-        onchange={toggleActive}
-        class="h-5 w-5"
+      <DsToggle
+        bind:value={activeToggleValue}
+        options={[
+          { id: "inactive", label: "Inactive" },
+          { id: "active", label: "Active" },
+        ]}
       />
-      <span class="font-medium">
-        {rateSheet.active ? "Active" : "Inactive"}
+    </div>
+    {#if !isComplete}
+      <span class="text-sm text-neutral-500">
+        (Cannot activate - missing {missingRoles.length} role{missingRoles.length === 1 ? "" : "s"})
       </span>
-      {#if !isComplete}
-        <span class="text-sm text-neutral-500">
-          (Cannot activate - missing {missingRoles.length} role{missingRoles.length === 1 ? "" : "s"})
-        </span>
-      {/if}
-    </label>
+    {/if}
+    {#if toggleError}
+      <span class="text-sm text-red-600">{toggleError}</span>
+    {/if}
   </div>
 
   <!-- Entries Table -->
   <div class="mb-6">
     <h2 class="mb-2 text-lg font-semibold">Rate Entries</h2>
     {#if entries.length > 0}
-      <ObjectTable {tableData} />
+      {#if isAdmin}
+        <!-- Editable table for admins -->
+        <div class="overflow-x-auto">
+          <table class="w-full">
+            <thead>
+              <!-- Multiplier row above headers -->
+              <tr>
+                <th></th>
+                <th></th>
+                <th class="pb-2 pr-4 text-right">
+                  <div class="flex items-center justify-end gap-1">
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="0.01"
+                      bind:value={overtimeMultiplier}
+                      class="w-16 rounded border border-neutral-300 px-2 py-1 text-right text-sm"
+                      title="Overtime multiplier"
+                    />
+                    <button
+                      type="button"
+                      class="rounded bg-neutral-200 px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-300"
+                      onclick={applyOvertimeMultiplier}
+                      title="Apply multiplier to all overtime rates"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </th>
+                <th></th>
+              </tr>
+              <tr class="border-b border-neutral-300">
+                <th class="pb-2 pr-4 text-left">Role</th>
+                <th class="pb-2 pr-4 text-right">Rate</th>
+                <th class="pb-2 pr-4 text-right">Overtime Rate</th>
+                <th class="pb-2 text-left">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {#each sortedEntries as entry (entry.id)}
+                <tr class="border-b border-neutral-200">
+                  <td class="py-2 pr-4">{entry.expand?.role?.name ?? "Unknown"}</td>
+                  <td class="py-2 pr-4 text-right">
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      class="w-24 rounded border border-neutral-300 px-2 py-1 text-right"
+                      value={getEntryValue(entry, "rate")}
+                      oninput={(e) => updateEntryField(entry, "rate", parseFloat(e.currentTarget.value) || 0)}
+                    />
+                  </td>
+                  <td class="py-2 pr-4 text-right">
+                    <input
+                      type="number"
+                      min="1"
+                      step="0.01"
+                      class="w-24 rounded border border-neutral-300 px-2 py-1 text-right"
+                      value={getEntryValue(entry, "overtime_rate")}
+                      oninput={(e) => updateEntryField(entry, "overtime_rate", parseFloat(e.currentTarget.value) || 0)}
+                    />
+                  </td>
+                  <td class="py-2">
+                    {#if isEntryModified(entry)}
+                      <div class="flex items-center gap-2">
+                        <button
+                          type="button"
+                          class="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-600 disabled:opacity-50"
+                          disabled={savingEntryId === entry.id}
+                          onclick={() => saveEditedEntry(entry.id)}
+                        >
+                          {savingEntryId === entry.id ? "Saving..." : "Save"}
+                        </button>
+                        <button
+                          type="button"
+                          class="rounded bg-neutral-200 px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-300"
+                          disabled={savingEntryId === entry.id}
+                          onclick={() => cancelEntryEdit(entry.id)}
+                        >
+                          Cancel
+                        </button>
+                        {#if entryErrors[entry.id]}
+                          <span class="text-sm text-red-600">{entryErrors[entry.id]}</span>
+                        {/if}
+                      </div>
+                    {/if}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {:else}
+        <!-- Read-only table for non-admins -->
+        <ObjectTable {tableData} />
+      {/if}
     {:else}
       <p class="text-neutral-500">No entries yet. Add entries below to complete this rate sheet.</p>
     {/if}

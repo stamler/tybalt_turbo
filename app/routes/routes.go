@@ -198,6 +198,17 @@ func AddRoutes(app core.App) {
 		machineSecretsGroup.GET("/list", listMachineSecretsHandler(app))
 		machineSecretsGroup.POST("/create", createMachineSecretHandler(app))
 
+		// Rate sheets management (job claim required)
+		rateSheetsGroup := se.Router.Group("/api/rate_sheets")
+		rateSheetsGroup.Bind(apis.RequireAuth("users"))
+		rateSheetsGroup.POST("/{id}/activate", createActivateRateSheetHandler(app))
+		rateSheetsGroup.POST("/{id}/deactivate", createDeactivateRateSheetHandler(app))
+
+		// Rate sheet entries management (admin claim required)
+		rateSheetEntriesGroup := se.Router.Group("/api/rate_sheet_entries")
+		rateSheetEntriesGroup.Bind(apis.RequireAuth("users"))
+		rateSheetEntriesGroup.PUT("/{id}", createUpdateRateSheetEntryHandler(app))
+
 		return se.Next()
 	})
 

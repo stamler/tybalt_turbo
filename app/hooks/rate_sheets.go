@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"fmt"
 	"net/http"
 
 	"tybalt/errs"
@@ -29,7 +30,7 @@ func ProcessRateSheet(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
-	missingRoles, err := validateRateSheetComplete(app, e.Record.Id)
+	missingRoles, err := ValidateRateSheetComplete(app, e.Record.Id)
 	if err != nil {
 		return &errs.HookError{
 			Status:  http.StatusInternalServerError,
@@ -57,9 +58,9 @@ func ProcessRateSheet(app core.App, e *core.RecordRequestEvent) error {
 	return nil
 }
 
-// validateRateSheetComplete checks if a rate sheet has entries for all roles.
+// ValidateRateSheetComplete checks if a rate sheet has entries for all roles.
 // Returns the names of any missing roles, or nil if complete.
-func validateRateSheetComplete(app core.App, rateSheetId string) ([]string, error) {
+func ValidateRateSheetComplete(app core.App, rateSheetId string) ([]string, error) {
 	var missingRoleNames []string
 
 	err := app.DB().NewQuery(`
@@ -80,4 +81,75 @@ func validateRateSheetComplete(app core.App, rateSheetId string) ([]string, erro
 	}
 
 	return missingRoleNames, nil
+}
+
+// ValidateRateSheetEffectiveDate validates that for a revised rate sheet,
+// the effective_date is on or after the effective_date of the previous revision.
+// This only applies to new rate sheets with revision > 0.
+func ValidateRateSheetEffectiveDate(app core.App, e *core.RecordRequestEvent) error {
+	// Only validate on create
+	if !e.Record.IsNew() {
+		return nil
+	}
+
+	revision := e.Record.GetInt("revision")
+	// Skip validation for first revision (revision 0)
+	if revision == 0 {
+		return nil
+	}
+
+	name := e.Record.GetString("name")
+	newEffectiveDate := e.Record.GetString("effective_date")
+
+	prevEffectiveDate, err := CheckRevisionEffectiveDate(app, name, revision, newEffectiveDate)
+	if err != nil {
+		return err
+	}
+	if prevEffectiveDate != "" {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "effective date must be on or after the previous revision's effective date",
+			Data: map[string]errs.CodeError{
+				"effective_date": {
+					Code:    "invalid_effective_date",
+					Message: fmt.Sprintf("effective date must be on or after %s (previous revision's date)", prevEffectiveDate),
+				},
+			},
+		}
+	}
+
+	return nil
+}
+
+// CheckRevisionEffectiveDate checks if a new rate sheet revision has a valid effective date.
+// Returns the previous revision's effective_date if the new date is invalid (earlier than previous),
+// or empty string if valid. Returns error only for database failures.
+func CheckRevisionEffectiveDate(app core.App, name string, revision int, newEffectiveDate string) (string, error) {
+	// Skip validation for first revision (revision 0)
+	if revision == 0 {
+		return "", nil
+	}
+
+	// Find the previous revision's effective_date
+	var prevEffectiveDate string
+	err := app.DB().NewQuery(`
+		SELECT effective_date
+		FROM rate_sheets
+		WHERE name = {:name} AND revision = {:prevRevision}
+	`).Bind(dbx.Params{
+		"name":         name,
+		"prevRevision": revision - 1,
+	}).Row(&prevEffectiveDate)
+
+	if err != nil {
+		// No previous revision found - this shouldn't happen but allow it
+		return "", nil
+	}
+
+	// Compare dates (YYYY-MM-DD format, so string comparison works)
+	if newEffectiveDate < prevEffectiveDate {
+		return prevEffectiveDate, nil
+	}
+
+	return "", nil
 }
