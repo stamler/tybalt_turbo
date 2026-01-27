@@ -1532,6 +1532,15 @@ func cleanupFreshDatabase(dbPath string) error {
 		}
 	}
 
+	// Remove test-only rate sheet fixture (used by rate_sheets_test.go)
+	// Keep the real rate sheet (c41ofep525bcacj) and its entries intact
+	if _, err := tx.Exec("DELETE FROM rate_sheets WHERE id = 'test_empty_sheet'"); err != nil {
+		if !strings.Contains(strings.ToLower(err.Error()), "no such table") {
+			_ = tx.Rollback()
+			return fmt.Errorf("delete test rate sheet: %w", err)
+		}
+	}
+
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit tx: %w", err)
 	}
