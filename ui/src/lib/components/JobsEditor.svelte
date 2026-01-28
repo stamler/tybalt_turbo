@@ -447,17 +447,52 @@
       if (proposalErr?.code === "proposal_not_awarded" && typeof proposalId === "string") {
         const proceed =
           typeof window !== "undefined" &&
-          window.confirm("The referenced proposal is Active. Set it to Awarded and continue?");
+          window.confirm("The referenced proposal is not marked as Awarded. Set it to Awarded and continue?");
         if (proceed) {
+          // First, try to update the proposal to Awarded status
           try {
             await pb.collection("jobs").update(proposalId, { status: JobsStatusOptions.Awarded });
-            // retry create/update once
+          } catch (proposalUpdateErr) {
+            // Handle proposal update failure - show the actual error with link to edit proposal
+            const proposalErrData = (
+              proposalUpdateErr as {
+                data?: { data?: Record<string, { message: string }> };
+              }
+            )?.data?.data;
+
+            // Build error message with details from backend
+            let errorDetails = "";
+            if (proposalErrData) {
+              errorDetails = Object.values(proposalErrData)
+                .map((v) => v.message)
+                .join("; ");
+            }
+
+            // Set a special error on the proposal field that includes a link
+            errors = {
+              proposal: {
+                message: `Cannot set proposal to Awarded: ${errorDetails || "validation failed"}. Please edit the proposal to fix these issues.`,
+                // Store the proposal ID for the link
+                proposalId: proposalId,
+              } as { message: string; proposalId?: string },
+            };
+            return;
+          }
+
+          // Proposal was successfully updated to Awarded, now retry the job creation
+          try {
             let retryJobId = (data as JobsPageData).id;
             if ((data as JobsPageData).editing && retryJobId !== null) {
-              await pb.collection("jobs").update(retryJobId, item);
+              await pb.send(`/api/jobs/${retryJobId}`, {
+                method: "PUT",
+                body: { job: item, allocations },
+              });
             } else {
-              const createdJob = await pb.collection("jobs").create(item);
-              retryJobId = createdJob.id;
+              const resp = (await pb.send(`/api/jobs`, {
+                method: "POST",
+                body: { job: item, allocations },
+              })) as { id: string };
+              retryJobId = resp.id;
             }
             // continue categories changes as usual
             for (const categoryName of newCategories) {
@@ -544,6 +579,14 @@
     enctype="multipart/form-data"
     onsubmit={save}
   >
+  <h1 class="w-full text-xl font-bold text-neutral-800">
+    {#if data.editing && item.number}
+      Editing {item.number}
+    {:else}
+      Create Job
+    {/if}
+  </h1>
+
   {#if !hideProjectDate}
     <span class="flex w-full items-center gap-2 {errors.project_award_date !== undefined ? 'bg-red-200' : ''}">
       <label for="project_award_date">Project Award Date</label>
@@ -815,10 +858,12 @@
   {/if}
 
   {#if proposalsIndex !== null}
+    {@const proposalHasCustomError = errors.proposal !== undefined && (errors.proposal as { message: string; proposalId?: string }).proposalId}
+    {@const proposalErrors = proposalHasCustomError ? {} : errors}
     <DsAutoComplete
       bind:value={item.proposal as string}
       index={proposalsIndex}
-      {errors}
+      errors={proposalErrors}
       fieldName="proposal"
       uiName="Proposal"
     >
@@ -826,6 +871,22 @@
           job as unknown as Pick<JobApiResponse, "id" | "number" | "description">,
         )}{/snippet}
     </DsAutoComplete>
+  {/if}
+  {#if errors.proposal !== undefined && (errors.proposal as { message: string; proposalId?: string }).proposalId}
+    <div class="w-full rounded border border-red-300 bg-red-50 p-3 text-red-800">
+      <p class="font-semibold">Cannot create project from proposal</p>
+      <p class="mt-1">{errors.proposal.message}</p>
+      <p class="mt-2">
+        <a
+          href="/jobs/{(errors.proposal as { message: string; proposalId?: string }).proposalId}/edit"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="text-blue-600 underline hover:text-blue-800"
+        >
+          Edit the proposal in a new tab →
+        </a>
+      </p>
+    </div>
   {/if}
 
   {#if $divisions.index !== null}
