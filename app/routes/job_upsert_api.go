@@ -10,6 +10,7 @@ import (
 	"tybalt/hooks"
 	"tybalt/utilities"
 
+	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
@@ -112,6 +113,23 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 
 			if err := txApp.Save(jobRec); err != nil {
 				httpResponseStatusCode = http.StatusBadRequest
+				// Check if it's a validation error with field-level details
+				var validationErrs validation.Errors
+				if errors.As(err, &validationErrs) {
+					// Convert to HookError format for consistent frontend handling
+					fieldErrors := make(map[string]errs.CodeError)
+					for field, fieldErr := range validationErrs {
+						fieldErrors[field] = errs.CodeError{
+							Code:    "validation_error",
+							Message: fieldErr.Error(),
+						}
+					}
+					return &errs.HookError{
+						Status:  http.StatusBadRequest,
+						Message: "validation failed",
+						Data:    fieldErrors,
+					}
+				}
 				return &CodeError{
 					Code:    "error_saving_job",
 					Message: fmt.Sprintf("error saving job: %v", err),
@@ -272,6 +290,23 @@ func createCreateJobHandler(app core.App) func(e *core.RequestEvent) error {
 
 			if err := txApp.Save(jobRec); err != nil {
 				httpResponseStatusCode = http.StatusBadRequest
+				// Check if it's a validation error with field-level details
+				var validationErrs validation.Errors
+				if errors.As(err, &validationErrs) {
+					// Convert to HookError format for consistent frontend handling
+					fieldErrors := make(map[string]errs.CodeError)
+					for field, fieldErr := range validationErrs {
+						fieldErrors[field] = errs.CodeError{
+							Code:    "validation_error",
+							Message: fieldErr.Error(),
+						}
+					}
+					return &errs.HookError{
+						Status:  http.StatusBadRequest,
+						Message: "validation failed",
+						Data:    fieldErrors,
+					}
+				}
 				return &CodeError{
 					Code:    "error_creating_job",
 					Message: fmt.Sprintf("error creating job: %v", err),
