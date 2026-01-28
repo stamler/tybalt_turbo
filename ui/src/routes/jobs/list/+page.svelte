@@ -8,9 +8,47 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import Icon from "@iconify/svelte";
+  import { goto } from "$app/navigation";
 
   // initialize the jobs store, noop if already initialized
   jobs.init();
+
+  // Track which job is currently being validated for project creation
+  let validatingJobId = $state<string | null>(null);
+
+  // Validate proposal and redirect to create project or edit page
+  async function handleCreateReferencingProject(jobId: string) {
+    if (validatingJobId !== null) return;
+    validatingJobId = jobId;
+    try {
+      const response = await pb.send(`/api/jobs/${jobId}/validate-proposal`, {
+        method: "GET",
+      });
+      if (response.valid) {
+        // Proposal is valid - redirect to create project with today's award date
+        await goto(`/jobs/add/from/${jobId}?setAwardToday=true`);
+      } else {
+        // Proposal has validation errors - store errors and redirect flag, then go to edit page
+        if (typeof sessionStorage !== "undefined") {
+          if (response.errors) {
+            sessionStorage.setItem(
+              `proposal_validation_errors_${jobId}`,
+              JSON.stringify(response.errors)
+            );
+          }
+          // Flag to redirect back to create project page after successful save
+          sessionStorage.setItem(`redirect_to_create_project_${jobId}`, "true");
+        }
+        await goto(`/jobs/${jobId}/edit`);
+      }
+    } catch (e) {
+      console.error("Failed to validate proposal", e);
+      // On error, redirect to edit page as a fallback
+      await goto(`/jobs/${jobId}/edit`);
+    } finally {
+      validatingJobId = null;
+    }
+  }
 
   // Toggle: "projects" or "proposals" - default to projects
   let jobType = $state<"projects" | "proposals">("projects");
@@ -65,7 +103,16 @@
     {#snippet headline({ description }: JobApiResponse)}{description}{/snippet}
     {#snippet byline({ client }: JobApiResponse)}{client}{/snippet}
     {#snippet line1({ branch, manager }: JobApiResponse)}{#if branch}<DsLabel color="neutral">{branch}</DsLabel>{/if}{#if manager}<DsLabel color="purple">{manager}</DsLabel>{/if}{/snippet}
-    {#snippet actions({ id }: JobApiResponse)}
+    {#snippet actions({ id, number }: JobApiResponse)}
+      {#if number?.startsWith("P")}
+        <DsActionButton
+          action={() => handleCreateReferencingProject(id)}
+          icon="mdi:briefcase-plus"
+          title="Create referencing project"
+          color="yellow"
+          loading={validatingJobId === id}
+        />
+      {/if}
       <DsActionButton action="/jobs/{id}/edit" icon="mdi:pencil" title="Edit" color="blue" />
     {/snippet}
   </DsSearchList>

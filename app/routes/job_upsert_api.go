@@ -5,7 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 
+	"tybalt/constants"
 	"tybalt/errs"
 	"tybalt/hooks"
 	"tybalt/utilities"
@@ -378,4 +380,213 @@ func createCreateJobHandler(app core.App) func(e *core.RequestEvent) error {
 
 		return e.JSON(http.StatusOK, map[string]any{"id": newJobID})
 	}
+}
+
+// createValidateProposalHandler returns a handler that validates a proposal for project creation readiness.
+// It checks if the proposal would pass validation if saved, without actually modifying the record.
+// Returns { valid: true } if the proposal is valid, or { valid: false, errors: {...} } with validation errors.
+func createValidateProposalHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		authRecord := e.Auth
+		if authRecord == nil || authRecord.Id == "" {
+			return e.Error(http.StatusUnauthorized, "unauthorized", nil)
+		}
+
+		proposalID := e.Request.PathValue("id")
+		if proposalID == "" {
+			return e.Error(http.StatusBadRequest, "missing proposal id", nil)
+		}
+
+		// Load the proposal
+		proposalRec, err := app.FindRecordById("jobs", proposalID)
+		if err != nil {
+			return e.JSON(http.StatusNotFound, map[string]any{
+				"valid": false,
+				"errors": map[string]any{
+					"global": map[string]string{
+						"code":    "not_found",
+						"message": "proposal not found",
+					},
+				},
+			})
+		}
+
+		// Verify it's actually a proposal (number starts with "P")
+		number := proposalRec.GetString("number")
+		if !strings.HasPrefix(number, "P") {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"valid": false,
+				"errors": map[string]any{
+					"global": map[string]string{
+						"code":    "not_a_proposal",
+						"message": "the specified job is not a proposal",
+					},
+				},
+			})
+		}
+
+		// Validate the proposal using the same logic as ProcessJobCore
+		// We create a clone to avoid modifying the original record
+		validationErrors := validateProposalForProjectCreation(app, proposalRec)
+
+		if len(validationErrors) > 0 {
+			return e.JSON(http.StatusOK, map[string]any{
+				"valid":  false,
+				"errors": validationErrors,
+			})
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"valid": true,
+		})
+	}
+}
+
+// validateProposalForProjectCreation checks if a proposal has all required fields
+// and would pass validation if saved AND is ready to be used as a template for project creation.
+// Returns a map of field errors, or empty map if valid.
+func validateProposalForProjectCreation(app core.App, record *core.Record) map[string]map[string]string {
+	errors := make(map[string]map[string]string)
+
+	// Check for valid location (Plus Code)
+	loc := record.GetString("location")
+	if loc == "" || !constants.LocationPlusCodeRegex.MatchString(loc) {
+		errors["location"] = map[string]string{
+			"code":    "invalid_or_missing",
+			"message": "location (Plus Code) is required",
+		}
+	}
+
+	// Check for required branch
+	if record.GetString("branch") == "" {
+		errors["branch"] = map[string]string{
+			"code":    "required",
+			"message": "branch is required",
+		}
+	}
+
+	// Check for required client
+	if record.GetString("client") == "" {
+		errors["client"] = map[string]string{
+			"code":    "required",
+			"message": "client is required",
+		}
+	}
+
+	// Check for required contact
+	contactRef := record.GetString("contact")
+	if contactRef == "" {
+		errors["contact"] = map[string]string{
+			"code":    "required",
+			"message": "contact is required",
+		}
+	} else {
+		// Verify contact belongs to client
+		clientRef := record.GetString("client")
+		if clientRef != "" {
+			contactRec, err := app.FindRecordById("client_contacts", contactRef)
+			if err != nil || contactRec == nil {
+				errors["contact"] = map[string]string{
+					"code":    "invalid_reference",
+					"message": "specified contact not found",
+				}
+			} else if contactRec.GetString("client") != clientRef {
+				errors["contact"] = map[string]string{
+					"code":    "contact_client_mismatch",
+					"message": "contact must belong to the selected client",
+				}
+			}
+		}
+	}
+
+	// Check for required manager - use utilities.IsUserActive which checks admin_profiles
+	managerID := record.GetString("manager")
+	if managerID == "" {
+		errors["manager"] = map[string]string{
+			"code":    "required",
+			"message": "manager is required",
+		}
+	} else {
+		// Verify manager is an active user via admin_profiles
+		active, err := utilities.IsUserActive(app, managerID)
+		if err != nil {
+			errors["manager"] = map[string]string{
+				"code":    "check_failed",
+				"message": "failed to verify manager active status",
+			}
+		} else if !active {
+			errors["manager"] = map[string]string{
+				"code":    "inactive_user",
+				"message": "manager must be an active user",
+			}
+		}
+	}
+
+	// Check alternate_manager if set - use utilities.IsUserActive which checks admin_profiles
+	altManagerID := record.GetString("alternate_manager")
+	if altManagerID != "" {
+		active, err := utilities.IsUserActive(app, altManagerID)
+		if err != nil {
+			errors["alternate_manager"] = map[string]string{
+				"code":    "check_failed",
+				"message": "failed to verify alternate manager active status",
+			}
+		} else if !active {
+			errors["alternate_manager"] = map[string]string{
+				"code":    "inactive_user",
+				"message": "alternate manager must be an active user",
+			}
+		}
+	}
+
+	// Check proposal dates
+	proposalOpeningDate := record.GetString("proposal_opening_date")
+	proposalSubmissionDueDate := record.GetString("proposal_submission_due_date")
+
+	if proposalOpeningDate == "" {
+		errors["proposal_opening_date"] = map[string]string{
+			"code":    "required_for_proposal",
+			"message": "proposal_opening_date is required",
+		}
+	}
+
+	if proposalSubmissionDueDate == "" {
+		errors["proposal_submission_due_date"] = map[string]string{
+			"code":    "required_for_proposal",
+			"message": "proposal_submission_due_date is required",
+		}
+	}
+
+	// Validate date order if both dates are present
+	if proposalOpeningDate != "" && proposalSubmissionDueDate != "" {
+		if proposalSubmissionDueDate < proposalOpeningDate {
+			errors["proposal_submission_due_date"] = map[string]string{
+				"code":    "invalid_date_order",
+				"message": "proposal submission due date must be on or after opening date",
+			}
+		}
+	}
+
+	// For project creation readiness, the proposal must have proposal_value > 0 OR time_and_materials = true.
+	// This is required because projects can only reference Awarded proposals, and Awarded status
+	// requires this. We check it regardless of current status so the proposal is ready to be awarded.
+	proposalValue := record.GetInt("proposal_value")
+	timeAndMaterials := record.GetBool("time_and_materials")
+	if proposalValue <= 0 && !timeAndMaterials {
+		errors["proposal_value"] = map[string]string{
+			"code":    "value_required_for_project_creation",
+			"message": "proposal must have a proposal value or be marked as time and materials to create a referencing project",
+		}
+	}
+
+	// Check description (required, min 3 chars)
+	description := record.GetString("description")
+	if len(description) < 3 {
+		errors["description"] = map[string]string{
+			"code":    "min_length",
+			"message": "description must be at least 3 characters",
+		}
+	}
+
+	return errors
 }

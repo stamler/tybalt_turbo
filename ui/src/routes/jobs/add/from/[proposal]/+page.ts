@@ -4,8 +4,27 @@ import type { PageLoad } from "./$types";
 import type { JobsPageData } from "$lib/svelte-types";
 import { pb } from "$lib/pocketbase";
 
-export const load: PageLoad<JobsPageData> = async ({ params }) => {
+// Helper to get today's date in YYYY-MM-DD format
+function getTodayDateString(): string {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export const load: PageLoad<JobsPageData> = async ({ params, url }) => {
   const details = await pb.send(`/api/jobs/${params.proposal}/details`, { method: "GET" });
+
+  // Check if setAwardToday query param is present
+  const setAwardToday = url.searchParams.get("setAwardToday") === "true";
+
+  // Extract any existing projects that already reference this proposal
+  const existingReferencingProjects: { id: string; number: string }[] = Array.isArray(
+    details?.projects,
+  )
+    ? details.projects
+    : [];
 
   const item: Partial<JobsRecord> & { _prefilled_from_proposal: true } = {
     number: "",
@@ -26,7 +45,8 @@ export const load: PageLoad<JobsPageData> = async ({ params }) => {
     authorizing_document: "",
     client_po: "",
     client_reference_number: "",
-    project_award_date: "",
+    // Set project_award_date to today if setAwardToday param is present
+    project_award_date: setAwardToday ? getTodayDateString() : "",
     proposal_opening_date: "",
     proposal_submission_due_date: "",
     _prefilled_from_proposal: true,
@@ -37,5 +57,6 @@ export const load: PageLoad<JobsPageData> = async ({ params }) => {
     editing: false,
     id: null,
     categories: [] as CategoriesResponse[],
+    existingReferencingProjects,
   };
 };

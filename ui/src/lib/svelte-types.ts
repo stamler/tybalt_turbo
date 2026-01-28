@@ -30,7 +30,11 @@ export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord | PurchaseOrd
   parent_po_number?: string;
 };
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse>;
-export type JobsPageData = PageData<JobsRecord> & { categories: CategoriesResponse[] };
+export type JobsPageData = PageData<JobsRecord> & {
+  categories: CategoriesResponse[];
+  // When creating a project from a proposal, this contains any existing projects that already reference the proposal
+  existingReferencingProjects?: { id: string; number: string }[];
+};
 export type ClientsPageData = PageData<ClientsRecord> & {
   client_contacts: ClientContactsResponse[];
 };

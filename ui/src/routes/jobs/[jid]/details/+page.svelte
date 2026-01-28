@@ -12,12 +12,47 @@
   import DivisionsSummaryContent from "$lib/components/jobs/DivisionsSummaryContent.svelte";
   import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
   import { pb } from "$lib/pocketbase";
-  import { invalidateAll } from "$app/navigation";
+  import { goto, invalidateAll } from "$app/navigation";
   import type { FilterDef } from "$lib/components/jobs/types";
   import { formatCurrency, shortDate } from "$lib/utilities";
   import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
   let awarding = $state(false);
+  let validatingForProject = $state(false);
+
+  // Validate proposal and redirect to create project or edit page
+  async function handleCreateReferencingProject() {
+    if (validatingForProject) return;
+    validatingForProject = true;
+    try {
+      const response = await pb.send(`/api/jobs/${data.job.id}/validate-proposal`, {
+        method: "GET",
+      });
+      if (response.valid) {
+        // Proposal is valid - redirect to create project with today's award date
+        await goto(`/jobs/add/from/${data.job.id}?setAwardToday=true`);
+      } else {
+        // Proposal has validation errors - store errors and redirect flag, then go to edit page
+        if (typeof sessionStorage !== "undefined") {
+          if (response.errors) {
+            sessionStorage.setItem(
+              `proposal_validation_errors_${data.job.id}`,
+              JSON.stringify(response.errors)
+            );
+          }
+          // Flag to redirect back to create project page after successful save
+          sessionStorage.setItem(`redirect_to_create_project_${data.job.id}`, "true");
+        }
+        await goto(`/jobs/${data.job.id}/edit`);
+      }
+    } catch (e) {
+      console.error("Failed to validate proposal", e);
+      // On error, redirect to edit page as a fallback
+      await goto(`/jobs/${data.job.id}/edit`);
+    } finally {
+      validatingForProject = false;
+    }
+  }
 
   let { data }: { data: PageData } = $props();
   let isProposal = $derived(data.job.number?.startsWith("P") ?? false);
@@ -227,6 +262,15 @@
   <div class="flex items-center justify-between gap-2">
     <h1 class="text-2xl font-bold">Job Details</h1>
     <div class="flex items-center gap-2">
+      {#if data.job.number?.startsWith("P")}
+        <DsActionButton
+          action={handleCreateReferencingProject}
+          icon="mdi:briefcase-plus"
+          title="Create referencing project"
+          color="yellow"
+          loading={validatingForProject}
+        />
+      {/if}
       {#if data.job.number?.startsWith("P") && data.job.status === "Awarded"}
         <DsActionButton
           action={`/jobs/add/from/${data.job.id}`}

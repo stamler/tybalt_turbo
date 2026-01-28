@@ -3,13 +3,22 @@
 // - Feature flags controlling system behavior (POAutoApprove, LIMIT_NON_PO_AMOUNTS)
 // - Validation parameters for business rules (MAX_PURCHASE_ORDER_EXCESS_PERCENT/VALUE)
 // - Operational limits (RECURRING_MAX_DAYS, NO_PO_EXPENSE_LIMIT)
+// - Validation patterns (LocationPlusCodeRegex)
 //
 // These constants are used across multiple packages to ensure consistent application
 // of business rules and simplify configuration changes.
 
 package constants
 
-import "time"
+import (
+	"regexp"
+	"time"
+)
+
+// LocationPlusCodeRegex validates Plus Code location format.
+// Plus Codes are 8 characters followed by '+' and 2-3 characters.
+// Valid characters are: 23456789CFGHJMPQRVWX
+var LocationPlusCodeRegex = regexp.MustCompile(`^[23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2,3}$`)
 
 const (
 	// admin_profiles defaults

@@ -231,6 +231,29 @@
             filter: `job="${(data as JobsPageData).id}"`,
           });
         allocations = list.map((r) => ({ division: r.division, hours: r.hours ?? 0 }));
+
+        // Check for stored validation errors from "Create referencing project" flow
+        if (typeof sessionStorage !== "undefined") {
+          const storageKey = `proposal_validation_errors_${(data as JobsPageData).id}`;
+          const storedErrors = sessionStorage.getItem(storageKey);
+          if (storedErrors) {
+            try {
+              const parsedErrors = JSON.parse(storedErrors);
+              // Convert from { field: { code, message } } to { field: { message } }
+              const formattedErrors: Record<string, { message: string }> = {};
+              for (const [field, error] of Object.entries(parsedErrors)) {
+                if (error && typeof error === "object" && "message" in error) {
+                  formattedErrors[field] = { message: (error as { message: string }).message };
+                }
+              }
+              errors = formattedErrors;
+            } catch (e) {
+              console.error("Failed to parse stored validation errors", e);
+            }
+            // Clear the stored errors after reading
+            sessionStorage.removeItem(storageKey);
+          }
+        }
       }
     } catch (error) {
       console.error("Failed to load branches", error);
@@ -428,9 +451,20 @@
       }
 
       errors = {};
-      // Redirect to job details for new jobs, jobs list for edits
+      // Check if we should redirect to create project page after fixing proposal errors
       if (data.editing && data.id !== null) {
-        goto("/jobs/list");
+        const redirectKey = `redirect_to_create_project_${data.id}`;
+        const shouldRedirectToCreateProject =
+          typeof sessionStorage !== "undefined" && sessionStorage.getItem(redirectKey) === "true";
+
+        if (shouldRedirectToCreateProject) {
+          sessionStorage.removeItem(redirectKey);
+          // Also remove any stored validation errors
+          sessionStorage.removeItem(`proposal_validation_errors_${data.id}`);
+          goto(`/jobs/add/from/${data.id}?setAwardToday=true`);
+        } else {
+          goto("/jobs/list");
+        }
       } else {
         goto(`/jobs/${jobId}/details`);
       }
@@ -548,6 +582,11 @@
   }
 
   function cancel() {
+    // Clean up any redirect flags if user cancels
+    if (data.editing && data.id !== null && typeof sessionStorage !== "undefined") {
+      sessionStorage.removeItem(`redirect_to_create_project_${data.id}`);
+      sessionStorage.removeItem(`proposal_validation_errors_${data.id}`);
+    }
     if (data.editing && data.id !== null) {
       goto(`/jobs/${data.id}/details`);
     } else {
@@ -586,6 +625,22 @@
       Create Job
     {/if}
   </h1>
+
+  {#if (data as JobsPageData).existingReferencingProjects && (data as JobsPageData).existingReferencingProjects!.length > 0}
+    <div class="w-full rounded border border-yellow-400 bg-yellow-50 p-3 text-yellow-800">
+      <p class="font-semibold">This proposal is already referenced by existing project(s):</p>
+      <ul class="mt-1 list-inside list-disc">
+        {#each (data as JobsPageData).existingReferencingProjects! as project}
+          <li>
+            <a href="/jobs/{project.id}/details" class="text-blue-600 underline hover:text-blue-800">
+              {project.number}
+            </a>
+          </li>
+        {/each}
+      </ul>
+      <p class="mt-2 text-sm">Creating another project will result in multiple projects referencing the same proposal.</p>
+    </div>
+  {/if}
 
   {#if !hideProjectDate}
     <span class="flex w-full items-center gap-2 {errors.project_award_date !== undefined ? 'bg-red-200' : ''}">

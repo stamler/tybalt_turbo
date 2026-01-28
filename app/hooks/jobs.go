@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"tybalt/constants"
 	"tybalt/errs"
 	"tybalt/utilities"
 
@@ -354,8 +355,6 @@ var (
 	// This is intentional - typeFromNumber() still works correctly because it only needs to
 	// check if the number starts with "P" to determine the type, and that check works on any format.
 	childNumberRegex = regexp.MustCompile(`^(?:P)?\d{2}-\d{3,4}-\d{1,2}$`)
-
-	locationPlusCodeRegex = regexp.MustCompile(`^[23456789CFGHJMPQRVWX]{8}\+[23456789CFGHJMPQRVWX]{2,3}$`)
 )
 
 // isBaseNumber returns true if s is a valid base (top-level) job number.
@@ -592,7 +591,7 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 
 	// All jobs must have a valid location (schema rules may be relaxed, enforce here)
 	loc := record.GetString("location")
-	if loc == "" || !locationPlusCodeRegex.MatchString(loc) {
+	if loc == "" || !constants.LocationPlusCodeRegex.MatchString(loc) {
 		return 0, &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "invalid or missing location",
