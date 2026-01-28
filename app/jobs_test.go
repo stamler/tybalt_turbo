@@ -202,6 +202,8 @@ func TestJobsCreate_ProposalReferenceValidation(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	const activeRateSheet = "c41ofep525bcacj"
+
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "creating job with Active proposal reference fails with proposal_not_awarded",
@@ -216,7 +218,8 @@ func TestJobsCreate_ProposalReferenceValidation(t *testing.T) {
 				"branch": "80875lm27v8wgi4",
 				"location": "87Q8H976+2M",
 				"project_award_date": "2025-02-01",
-				"proposal": "pactprop0000001"
+				"proposal": "pactprop0000001",
+				"rate_sheet": "` + activeRateSheet + `"
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
@@ -246,6 +249,7 @@ func TestJobsCreateViaAPI_NumberAssigned(t *testing.T) {
 	}
 
 	const divisionID = "fy4i9poneukvq9u"
+	const activeRateSheet = "c41ofep525bcacj"
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -261,7 +265,8 @@ func TestJobsCreateViaAPI_NumberAssigned(t *testing.T) {
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
 					"location": "87Q8H976+2M",
-					"project_award_date": "2025-02-01"
+					"project_award_date": "2025-02-01",
+					"rate_sheet": "` + activeRateSheet + `"
 				},
 				"allocations": [
 					{ "division": "` + divisionID + `", "hours": 10 }
@@ -290,6 +295,8 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	const activeRateSheet = "c41ofep525bcacj"
+
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "creating job without location fails validation",
@@ -304,7 +311,8 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
 					"location": "",
-					"project_award_date": "2025-02-01"
+					"project_award_date": "2025-02-01",
+					"rate_sheet": "` + activeRateSheet + `"
 				},
 				"allocations": []
 			}`),
@@ -329,7 +337,8 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 					"branch": "80875lm27v8wgi4",
 					"location": "87Q8H976+2M",
 					"project_award_date": "2025-02-01",
-					"proposal_opening_date": "2025-02-01"
+					"proposal_opening_date": "2025-02-01",
+					"rate_sheet": "` + activeRateSheet + `"
 				},
 				"allocations": []
 			}`),
@@ -398,6 +407,7 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 	// u_inactive is a test user with admin_profiles.active=0
 	const inactiveUserID = "u_inactive"
 	const activeManagerID = "f2j5a8vk006baub"
+	const activeRateSheet = "c41ofep525bcacj"
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -413,7 +423,8 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
 					"location": "87Q8H976+2M",
-					"project_award_date": "2025-02-01"
+					"project_award_date": "2025-02-01",
+					"rate_sheet": "` + activeRateSheet + `"
 				},
 				"allocations": []
 			}`),
@@ -438,7 +449,8 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
 					"location": "87Q8H976+2M",
-					"project_award_date": "2025-02-01"
+					"project_award_date": "2025-02-01",
+					"rate_sheet": "` + activeRateSheet + `"
 				},
 				"allocations": []
 			}`),
@@ -473,6 +485,7 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 	const activeDivision = "fy4i9poneukvq9u"
 	const inactiveDivision = "apkev2ow1zjtm7w"
 	const existingJobID = "cjf0kt0defhq480"
+	const activeRateSheet = "c41ofep525bcacj"
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -488,7 +501,8 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
 					"location": "87Q8H976+2M",
-					"project_award_date": "2025-02-01"
+					"project_award_date": "2025-02-01",
+					"rate_sheet": "` + activeRateSheet + `"
 				},
 				"allocations": [
 					{ "division": "` + inactiveDivision + `", "hours": 10 }
@@ -515,7 +529,8 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
 					"location": "87Q8H976+2M",
-					"project_award_date": "2025-02-01"
+					"project_award_date": "2025-02-01",
+					"rate_sheet": "` + activeRateSheet + `"
 				},
 				"allocations": [
 					{ "division": "` + activeDivision + `", "hours": 10 }

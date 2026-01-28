@@ -37,6 +37,9 @@ SELECT
   j.branch           AS branch_id,
   br.code            AS branch_code,
   br.name            AS branch_name,
+  j.rate_sheet       AS rate_sheet_id,
+  rs.name            AS rate_sheet_name,
+  rs.revision        AS rate_sheet_revision,
   (
     SELECT COALESCE(json_group_array(json_object('id', pj.id, 'number', pj.number)), '[]')
     FROM jobs pj
@@ -76,4 +79,5 @@ LEFT JOIN managers m           ON m.id   = j.manager
 LEFT JOIN managers am          ON am.id  = j.alternate_manager
 LEFT JOIN clients jo           ON jo.id  = j.job_owner
 LEFT JOIN branches br          ON br.id  = j.branch
+LEFT JOIN rate_sheets rs       ON rs.id  = j.rate_sheet
 WHERE j.id = {:id}; 

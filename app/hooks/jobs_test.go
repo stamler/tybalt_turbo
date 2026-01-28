@@ -3,6 +3,8 @@ package hooks
 import (
 	"testing"
 
+	"tybalt/errs"
+
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
@@ -167,5 +169,180 @@ func TestValidateRateSheetIsActive_InactiveRateSheet(t *testing.T) {
 	err = validateRateSheetIsActive(app, record)
 	if err == nil {
 		t.Error("expected error when setting inactive rate sheet, got nil")
+	}
+}
+
+// TestValidateRateSheetIsActive_RequiredForNewProject verifies that creating
+// a new project without a rate_sheet returns an error.
+func TestValidateRateSheetIsActive_RequiredForNewProject(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
+	if err != nil {
+		t.Fatalf("failed to get jobs collection: %v", err)
+	}
+
+	// Create a new project record (has project_award_date, no proposal dates)
+	// without a rate_sheet - should fail
+	record := core.NewRecord(jobsCollection)
+	record.Set("project_award_date", "2025-01-15")
+	// rate_sheet intentionally left empty
+
+	err = validateRateSheetIsActive(app, record)
+	if err == nil {
+		t.Error("expected error when creating project without rate_sheet, got nil")
+	}
+
+	// Verify it's the right error
+	hookErr, ok := err.(*errs.HookError)
+	if !ok {
+		t.Fatalf("expected HookError, got %T", err)
+	}
+	if _, exists := hookErr.Data["rate_sheet"]; !exists {
+		t.Error("expected error on rate_sheet field")
+	}
+}
+
+// TestValidateRateSheetIsActive_NotRequiredForExistingProject verifies that
+// updating an existing project without changing rate_sheet is allowed,
+// even if rate_sheet is empty.
+//
+// Test data in test_pb_data/data.db:
+//   - jobs: "u09fwwcg07y03m7" (24-291, project with no rate_sheet)
+func TestValidateRateSheetIsActive_NotRequiredForExistingProject(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	// Use an existing project job from the test database
+	existingRecord, err := app.FindRecordById("jobs", "u09fwwcg07y03m7")
+	if err != nil {
+		t.Fatalf("failed to fetch existing project: %v", err)
+	}
+
+	// Verify it's a project without a rate_sheet
+	if existingRecord.GetString("rate_sheet") != "" {
+		t.Fatalf("test expects project without rate_sheet, but got: %q", existingRecord.GetString("rate_sheet"))
+	}
+
+	// Update some other field, leave rate_sheet empty
+	existingRecord.Set("description", "Updated description for test")
+
+	// Should not fail because rate_sheet isn't being changed
+	err = validateRateSheetIsActive(app, existingRecord)
+	if err != nil {
+		t.Errorf("expected no error when updating existing project without rate_sheet, got: %v", err)
+	}
+}
+
+// TestValidateRateSheetIsActive_SkippedForProposal verifies that
+// rate_sheet validation is skipped for proposals.
+func TestValidateRateSheetIsActive_SkippedForProposal(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
+	if err != nil {
+		t.Fatalf("failed to get jobs collection: %v", err)
+	}
+
+	// Create a new proposal record (has proposal dates, no project_award_date)
+	// without a rate_sheet - should NOT fail
+	record := core.NewRecord(jobsCollection)
+	record.Set("proposal_opening_date", "2025-01-15")
+	record.Set("proposal_submission_due_date", "2025-01-20")
+	// rate_sheet intentionally left empty
+
+	err = validateRateSheetIsActive(app, record)
+	if err != nil {
+		t.Errorf("expected no error for proposal without rate_sheet, got: %v", err)
+	}
+}
+
+// TestCleanJob_ClearsRateSheetForProposal verifies that cleanJob
+// clears the rate_sheet field for proposals.
+func TestCleanJob_ClearsRateSheetForProposal(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
+	if err != nil {
+		t.Fatalf("failed to get jobs collection: %v", err)
+	}
+
+	// Create a proposal record with a rate_sheet set
+	record := core.NewRecord(jobsCollection)
+	record.Set("proposal_opening_date", "2025-01-15")
+	record.Set("proposal_submission_due_date", "2025-01-20")
+	record.Set("rate_sheet", "c41ofep525bcacj") // Set a rate_sheet
+
+	// Run cleanJob
+	err = cleanJob(app, record)
+	if err != nil {
+		t.Fatalf("cleanJob returned error: %v", err)
+	}
+
+	// Verify rate_sheet was cleared
+	if record.GetString("rate_sheet") != "" {
+		t.Errorf("expected rate_sheet to be cleared for proposal, got: %q", record.GetString("rate_sheet"))
+	}
+}
+
+// TestValidateRateSheetIsActive_ChangeToInactiveRejected verifies that
+// changing an existing project's rate_sheet to an inactive one fails.
+//
+// Test data in test_pb_data/data.db:
+//   - jobs: "u09fwwcg07y03m7" (24-291, project)
+//   - rate_sheets: "c41ofep525bcacj" (active), "test_empty_sheet" (inactive)
+func TestValidateRateSheetIsActive_ChangeToInactiveRejected(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	// Set up: give an existing project an active rate_sheet
+	project, err := app.FindRecordById("jobs", "u09fwwcg07y03m7")
+	if err != nil {
+		t.Fatalf("failed to fetch project: %v", err)
+	}
+	project.Set("rate_sheet", "c41ofep525bcacj") // active rate sheet
+	if err := app.Save(project); err != nil {
+		t.Fatalf("failed to save project with rate_sheet: %v", err)
+	}
+
+	// Fetch again so Original() has the active rate_sheet
+	project, err = app.FindRecordById("jobs", "u09fwwcg07y03m7")
+	if err != nil {
+		t.Fatalf("failed to re-fetch project: %v", err)
+	}
+
+	// Try to change to inactive rate_sheet
+	project.Set("rate_sheet", "test_empty_sheet")
+
+	err = validateRateSheetIsActive(app, project)
+	if err == nil {
+		t.Error("expected error when changing to inactive rate_sheet, got nil")
+	}
+
+	// Verify it's the right error
+	hookErr, ok := err.(*errs.HookError)
+	if !ok {
+		t.Fatalf("expected HookError, got %T", err)
+	}
+	if _, exists := hookErr.Data["rate_sheet"]; !exists {
+		t.Error("expected error on rate_sheet field")
 	}
 }

@@ -310,6 +310,7 @@ func TestJobCreationAllowedWhenEditingEnabled(t *testing.T) {
 	const clientID = "lb0fnenkeyitsny"
 	const contactID = "nh5u9z3cyknjclv" // belongs to clientID
 	const managerID = "f2j5a8vk006baub" // valid manager from existing jobs
+	const activeRateSheet = "c41ofep525bcacj"
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -325,7 +326,8 @@ func TestJobCreationAllowedWhenEditingEnabled(t *testing.T) {
 					"contact": "` + contactID + `",
 					"manager": "` + managerID + `",
 					"project_award_date": "2025-01-15",
-					"authorizing_document": "PA"
+					"authorizing_document": "PA",
+					"rate_sheet": "` + activeRateSheet + `"
 				},
 				"allocations": []
 			}`),

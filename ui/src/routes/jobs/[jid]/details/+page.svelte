@@ -388,6 +388,18 @@
               </span>
             {/if}
           </div>
+
+          {#if data.job.rate_sheet?.id}
+            <div>
+              <span class="font-semibold">Rate Sheet:</span>
+              <a
+                href={`/rate-sheets/${data.job.rate_sheet.id}/details`}
+                class="text-blue-600 hover:underline"
+              >
+                {data.job.rate_sheet.name} (rev. {data.job.rate_sheet.revision})
+              </a>
+            </div>
+          {/if}
         {/if}
 
         {#if data.job.categories && data.job.categories.length > 0}

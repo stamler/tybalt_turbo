@@ -311,6 +311,7 @@ func cleanJob(app core.App, record *core.Record) error {
 		record.Set("authorizing_document", "")
 		record.Set("client_po", "")
 		record.Set("client_reference_number", "")
+		record.Set("rate_sheet", "")
 		record.Set("outstanding_balance", 0)
 		record.Set("outstanding_balance_date", "")
 	}
@@ -890,16 +891,36 @@ func jobHasClientNoteForStatus(app core.App, jobID string, targetStatus string) 
 	return note != nil, nil
 }
 
-// validateRateSheetIsActive checks that when a rate_sheet is being set or changed,
-// the referenced rate sheet is active. The check only runs when:
-//   - On create: rate_sheet is set (non-empty)
-//   - On update: rate_sheet changed from its previous value
+// validateRateSheetIsActive validates rate_sheet requirements:
+//   - Proposals: skip validation (cleanJob clears rate_sheet for proposals)
+//   - New projects: rate_sheet is required and must be active
+//   - Existing projects: only validate if rate_sheet changed, and it must be active
 //
-// Clearing rate_sheet (setting to empty) is always allowed.
+// Clearing rate_sheet (setting to empty) on existing projects is allowed.
 func validateRateSheetIsActive(app core.App, record *core.Record) error {
 	newRateSheet := record.GetString("rate_sheet")
+	isProposal := isProposalRecord(record)
 
-	// If rate_sheet is empty, no validation needed
+	// Proposals don't use rate sheets (cleanJob clears them)
+	if isProposal {
+		return nil
+	}
+
+	// For new projects, rate_sheet is required
+	if record.IsNew() {
+		if newRateSheet == "" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "rate sheet is required for new projects",
+				Data: map[string]errs.CodeError{
+					"rate_sheet": {Code: "required", Message: "a rate sheet must be selected for new projects"},
+				},
+			}
+		}
+	}
+
+	// If rate_sheet is empty at this point, no further validation needed
+	// (only possible for updates to existing projects)
 	if newRateSheet == "" {
 		return nil
 	}

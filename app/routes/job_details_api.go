@@ -61,6 +61,9 @@ type jobDetailsRow struct {
 	BranchID                  sql.NullString  `db:"branch_id"`
 	BranchCode                sql.NullString  `db:"branch_code"`
 	BranchName                sql.NullString  `db:"branch_name"`
+	RateSheetID               sql.NullString  `db:"rate_sheet_id"`
+	RateSheetName             sql.NullString  `db:"rate_sheet_name"`
+	RateSheetRevision         sql.NullInt64   `db:"rate_sheet_revision"`
 	FnAgreement               bool            `db:"fn_agreement"`
 	ProjectAwardDate          sql.NullString  `db:"project_award_date"`
 	ProposalOpeningDate       sql.NullString  `db:"proposal_opening_date"`
@@ -78,6 +81,12 @@ type jobDetailsRow struct {
 type ClientInfo struct {
 	ID   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type RateSheetInfo struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Revision int    `json:"revision"`
 }
 
 type JobRef struct {
@@ -103,10 +112,11 @@ type JobDetails struct {
 	JobOwner                  ClientInfo   `json:"job_owner"`
 	ProposalID                string       `json:"proposal_id"`
 	ProposalNumber            string       `json:"proposal_number"`
-	BranchID                  string       `json:"branch_id"`
-	BranchCode                string       `json:"branch_code"`
-	BranchName                string       `json:"branch_name"`
-	FnAgreement               bool         `json:"fn_agreement"`
+	BranchID                  string        `json:"branch_id"`
+	BranchCode                string        `json:"branch_code"`
+	BranchName                string        `json:"branch_name"`
+	RateSheet                 RateSheetInfo `json:"rate_sheet"`
+	FnAgreement               bool          `json:"fn_agreement"`
 	ProjectAwardDate          string       `json:"project_award_date"`
 	ProposalOpeningDate       string       `json:"proposal_opening_date"`
 	ProposalSubmissionDueDate string       `json:"proposal_submission_due_date"`
@@ -178,6 +188,7 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			BranchID:                  ns(r.BranchID),
 			BranchCode:                ns(r.BranchCode),
 			BranchName:                ns(r.BranchName),
+			RateSheet:                 RateSheetInfo{ID: ns(r.RateSheetID), Name: ns(r.RateSheetName), Revision: int(r.RateSheetRevision.Int64)},
 			FnAgreement:               r.FnAgreement,
 			ProjectAwardDate:          ns(r.ProjectAwardDate),
 			ProposalOpeningDate:       ns(r.ProposalOpeningDate),

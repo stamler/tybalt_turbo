@@ -12,6 +12,7 @@
   import { clients } from "$lib/stores/clients";
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
+  import { rateSheets } from "$lib/stores/rateSheets";
   import { appConfig, jobsEditingEnabled } from "$lib/stores/appConfig";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import MiniSearch from "minisearch";
@@ -31,6 +32,7 @@
   profiles.init();
   jobs.init();
   divisions.init();
+  rateSheets.init();
   appConfig.init();
 
   let errors = $state({} as Record<string, { message: string }>);
@@ -60,6 +62,7 @@
   item.client_reference_number = item.client_reference_number ?? "";
   item.proposal_value = item.proposal_value ?? 0;
   item.time_and_materials = item.time_and_materials ?? false;
+  (item as Record<string, unknown>).rate_sheet = (item as Record<string, unknown>).rate_sheet ?? "";
 
   let newCategory = $state("");
 
@@ -157,6 +160,18 @@
       storeFields: ["id", "number", "description", "client"],
     });
     index.addAll(proposals);
+    return index;
+  });
+
+  const activeRateSheetsIndex = $derived.by(() => {
+    if (!$rateSheets.items || $rateSheets.items.length === 0) return null;
+    const activeSheets = $rateSheets.items.filter((sheet) => sheet.active);
+    if (activeSheets.length === 0) return null;
+    const index = new MiniSearch({
+      fields: ["name", "effective_date"],
+      storeFields: ["id", "name", "effective_date", "revision"],
+    });
+    index.addAll(activeSheets);
     return index;
   });
 
@@ -782,6 +797,20 @@
       <p class="self-start text-sm text-neutral-600">
         Last updated: {item.outstanding_balance_date}
       </p>
+    {/if}
+
+    {#if activeRateSheetsIndex !== null}
+      <DsAutoComplete
+        bind:value={(item as Record<string, unknown>).rate_sheet as string}
+        index={activeRateSheetsIndex}
+        {errors}
+        fieldName="rate_sheet"
+        uiName="Rate Sheet"
+      >
+        {#snippet resultTemplate(sheet)}
+          {sheet.name} (rev. {sheet.revision}) - {sheet.effective_date}
+        {/snippet}
+      </DsAutoComplete>
     {/if}
   {/if}
 
