@@ -315,6 +315,7 @@ func cleanJob(app core.App, record *core.Record) error {
 		record.Set("rate_sheet", "")
 		record.Set("outstanding_balance", 0)
 		record.Set("outstanding_balance_date", "")
+		record.Set("proposal", "")
 	}
 	return nil
 }

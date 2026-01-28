@@ -10,15 +10,19 @@
   import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { divisions } from "$lib/stores/divisions";
   import { managers } from "$lib/stores/managers";
+  import { rateRoles } from "$lib/stores/rateRoles";
   import DsCheck from "$lib/components/DsCheck.svelte";
 
   // initialize the stores, noop if already initialized
   divisions.init();
   managers.init();
+  rateRoles.init();
 
   let { data }: { data: PageData } = $props();
   let errors = $state({} as any);
   let item = $state(data.item as ProfilesResponse);
+  let saving = $state(false);
+  let saveSuccess = $state(false);
 
   // Sync item with data.item when it changes (e.g., when navigating to different profiles)
   $effect(() => {
@@ -26,6 +30,8 @@
   });
 
   async function save() {
+    saving = true;
+    saveSuccess = false;
     try {
       if (data.editing && data.id !== null) {
         // update the item
@@ -43,9 +49,15 @@
       // submission was successful, clear the errors
       errors = {};
 
-      // TODO: notify the user that save was successful
+      // Show success feedback briefly
+      saveSuccess = true;
+      setTimeout(() => {
+        saveSuccess = false;
+      }, 2000);
     } catch (error: any) {
       errors = error.data.data;
+    } finally {
+      saving = false;
     }
   }
 </script>
@@ -89,6 +101,17 @@
       {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
     </DSAutoComplete>
   {/if}
+  {#if $rateRoles.index !== null}
+    <DSAutoComplete
+      bind:value={item.default_role as string}
+      index={$rateRoles.index}
+      {errors}
+      fieldName="default_role"
+      uiName="Default Role"
+    >
+      {#snippet resultTemplate(item)}{item.name}{/snippet}
+    </DSAutoComplete>
+  {/if}
   <DsCheck
     bind:value={item.do_not_accept_submissions as boolean}
     {errors}
@@ -96,8 +119,11 @@
     uiName="Do Not Accept Submissions"
   />
   <p>Token expiration date: {authStore.tokenExpirationDate() ?? "No token"}</p>
-  <span class="flex w-full gap-2">
-    <DsActionButton action={save}>Save</DsActionButton>
+  <span class="flex w-full items-center gap-2">
+    <DsActionButton action={save} loading={saving}>Save</DsActionButton>
+    {#if saveSuccess}
+      <span class="text-sm text-green-600">Saved!</span>
+    {/if}
   </span>
 
   <p>Claims:</p>
