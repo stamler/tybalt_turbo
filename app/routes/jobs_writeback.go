@@ -57,11 +57,11 @@ type rateSheetExportOutput struct {
 
 // Rate sheet entry export struct
 type rateSheetEntryExportOutput struct {
-	Id           string `json:"id"`
-	RoleId       string `json:"roleId"`
-	RateSheetId  string `json:"rateSheetId"`
-	Rate         int    `json:"rate"`
-	OvertimeRate int    `json:"overtimeRate"`
+	Id           string  `json:"id"`
+	RoleId       string  `json:"roleId"`
+	RateSheetId  string  `json:"rateSheetId"`
+	Rate         float64 `json:"rate"`
+	OvertimeRate float64 `json:"overtimeRate"`
 }
 
 // Client note export struct for notes array within each client
@@ -182,11 +182,11 @@ type rateSheetExportDBRow struct {
 
 // Internal struct for DB scanning - rate sheet entries query
 type rateSheetEntryExportDBRow struct {
-	Id           string `db:"id"`
-	RoleId       string `db:"role"`
-	RateSheetId  string `db:"rate_sheet"`
-	Rate         int    `db:"rate"`
-	OvertimeRate int    `db:"overtime_rate"`
+	Id           string  `db:"id"`
+	RoleId       string  `db:"role"`
+	RateSheetId  string  `db:"rate_sheet"`
+	Rate         float64 `db:"rate"`
+	OvertimeRate float64 `db:"overtime_rate"`
 }
 
 // Output struct matching legacy Firestore format with ID references instead of _row objects

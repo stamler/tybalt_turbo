@@ -195,11 +195,11 @@ type RateSheet struct {
 }
 
 type RateSheetEntry struct {
-	Id           string `parquet:"id"`
-	Role         string `parquet:"roleId"`      // -> role column (FK)
-	RateSheet    string `parquet:"rateSheetId"` // -> rate_sheet column (FK)
-	Rate         int    `parquet:"rate"`
-	OvertimeRate int    `parquet:"overtimeRate"` // -> overtime_rate column
+	Id           string  `parquet:"id"`
+	Role         string  `parquet:"roleId"`      // -> role column (FK)
+	RateSheet    string  `parquet:"rateSheetId"` // -> rate_sheet column (FK)
+	Rate         float64 `parquet:"rate"`
+	OvertimeRate float64 `parquet:"overtimeRate"` // -> overtime_rate column
 }
 
 type Expense struct {
