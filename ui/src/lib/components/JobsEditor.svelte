@@ -8,6 +8,7 @@
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DSLocationPicker from "./DSLocationPicker.svelte";
+  import DSPopover from "./DSPopover.svelte";
   import { profiles } from "$lib/stores/profiles";
   import { clients } from "$lib/stores/clients";
   import { jobs } from "$lib/stores/jobs";
@@ -88,6 +89,14 @@
   let newClientBusdevLead = $state("");
   let newClientSubmitting = $state(false);
   let newClientError = $state<string | null>(null);
+
+  // Add Contact popover state
+  let showAddContactPopover = $state(false);
+  let newContactGivenName = $state("");
+  let newContactSurname = $state("");
+  let newContactEmail = $state("");
+  let newContactSubmitting = $state(false);
+  let newContactError = $state<string | null>(null);
 
   // Initialize busdevLeads store for the Add Client popover
   busdevLeads.init();
@@ -656,6 +665,73 @@
       newClientSubmitting = false;
     }
   }
+
+  function openAddContactPopover() {
+    newContactGivenName = "";
+    newContactSurname = "";
+    newContactEmail = "";
+    newContactError = null;
+    showAddContactPopover = true;
+  }
+
+  function closeAddContactPopover() {
+    showAddContactPopover = false;
+    newContactGivenName = "";
+    newContactSurname = "";
+    newContactEmail = "";
+    newContactError = null;
+  }
+
+  // Get the selected client's name for display in the Add Contact popover
+  const selectedClientName = $derived.by(() => {
+    if (!item.client || !$clients.items) return "";
+    const client = $clients.items.find((c: { id: string }) => c.id === item.client);
+    return client?.name ?? "";
+  });
+
+  async function createNewContact() {
+    if (!newContactGivenName.trim() && !newContactSurname.trim()) {
+      newContactError = "At least given name or surname is required";
+      return;
+    }
+    if (!item.client) {
+      newContactError = "No client selected";
+      return;
+    }
+
+    newContactSubmitting = true;
+    newContactError = null;
+
+    try {
+      const createdContact = await pb.collection("client_contacts").create({
+        client: item.client,
+        given_name: newContactGivenName.trim(),
+        surname: newContactSurname.trim(),
+        email: newContactEmail.trim(),
+      });
+
+      // Add the new contact to the local client_contacts list
+      client_contacts = [...client_contacts, createdContact];
+
+      // Select the newly created contact
+      item.contact = createdContact.id;
+
+      closeAddContactPopover();
+    } catch (error: any) {
+      const hookErrors = error?.data?.data;
+      if (hookErrors?.given_name?.message) {
+        newContactError = hookErrors.given_name.message;
+      } else if (hookErrors?.surname?.message) {
+        newContactError = hookErrors.surname.message;
+      } else if (hookErrors?.email?.message) {
+        newContactError = hookErrors.email.message;
+      } else {
+        newContactError = error?.message ?? "Failed to create contact";
+      }
+    } finally {
+      newContactSubmitting = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -818,23 +894,32 @@
     </div>
   {/if}
 
-  <div class="flex w-full gap-2 {errors.contact !== undefined ? 'bg-red-200' : ''}">
-    <span class="flex w-full gap-2">
-      <label for="contact">Client Contact</label>
-      <select
-        id="contact"
-        name="contact"
-        bind:value={item.contact}
-        class="flex-1 rounded border border-neutral-300 px-1"
-        disabled={item.client === "" || client_contacts.length === 0}
-      >
-        <option value="">{item.client === "" ? "Select a client first" : "Select a contact"}</option
+  <div class="flex w-full flex-col gap-1 {errors.contact !== undefined ? 'bg-red-200' : ''}">
+    <div class="flex w-full items-end gap-1">
+      <span class="flex flex-1 gap-2">
+        <label for="contact">Client Contact</label>
+        <select
+          id="contact"
+          name="contact"
+          bind:value={item.contact}
+          class="flex-1 rounded border border-neutral-300 px-1"
+          disabled={item.client === "" || client_contacts.length === 0}
         >
-        {#each client_contacts as contact}
-          <option value={contact.id}>{formatContactName(contact)}</option>
-        {/each}
-      </select>
-    </span>
+          <option value="">{item.client === "" ? "Select a client first" : "Select a contact"}</option>
+          {#each client_contacts as contact}
+            <option value={contact.id}>{formatContactName(contact)}</option>
+          {/each}
+        </select>
+      </span>
+      {#if item.client && !item.contact}
+        <DsActionButton
+          action={openAddContactPopover}
+          icon="feather:plus-circle"
+          color="green"
+          title="Add new contact"
+        />
+      {/if}
+    </div>
     {#if errors.contact !== undefined}
       <span class="text-red-600">{errors.contact.message}</span>
     {/if}
@@ -1160,133 +1245,136 @@
 {/if}
 
 <!-- Status Comment Modal for No Bid / Cancelled -->
-{#if showStatusCommentModal}
-  <div class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-      <h2 class="mb-4 text-xl font-bold">
-        {pendingStatus === "No Bid" ? "No Bid" : "Cancel Proposal"} - Comment Required
-      </h2>
-      <p class="mb-4 text-sm text-neutral-600">
-        A comment is required to set the status to "{pendingStatus}". Please provide a reason.
-      </p>
-      <textarea
-        class="mb-4 w-full rounded border border-neutral-300 p-2"
-        rows="4"
-        placeholder="Enter your comment..."
-        bind:value={statusComment}
-        disabled={statusCommentSubmitting}
-      ></textarea>
-      {#if statusCommentError}
-        <p class="mb-4 text-sm text-red-600">{statusCommentError}</p>
-      {/if}
-      <div class="flex justify-end gap-2">
-        <button
-          type="button"
-          class="rounded bg-neutral-200 px-4 py-2 text-neutral-700 hover:bg-neutral-300"
-          onclick={cancelStatusChange}
-          disabled={statusCommentSubmitting}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
-          onclick={submitStatusComment}
-          disabled={statusCommentSubmitting}
-        >
-          {statusCommentSubmitting ? "Saving..." : "Add Comment & Set Status"}
-        </button>
-      </div>
-    </div>
-  </div>
-{/if}
+<DSPopover
+  bind:show={showStatusCommentModal}
+  title="{pendingStatus === 'No Bid' ? 'No Bid' : 'Cancel Proposal'} - Comment Required"
+  subtitle="A comment is required to set the status to &quot;{pendingStatus}&quot;. Please provide a reason."
+  error={statusCommentError}
+  submitting={statusCommentSubmitting}
+  submitLabel="Add Comment & Set Status"
+  onSubmit={submitStatusComment}
+  onCancel={cancelStatusChange}
+>
+  <textarea
+    class="w-full rounded border border-neutral-300 p-2"
+    rows="4"
+    placeholder="Enter your comment..."
+    bind:value={statusComment}
+    disabled={statusCommentSubmitting}
+  ></textarea>
+</DSPopover>
 
 <!-- Add Client Popover -->
-{#if showAddClientPopover}
-  <div class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
-    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-      <h2 class="mb-4 text-xl font-bold">Add New Client</h2>
-      
-      <div class="mb-4 flex flex-col gap-4">
-        <div class="flex flex-col gap-1">
-          <label class="text-sm font-semibold" for="new_client_name">Name</label>
-          <input
-            id="new_client_name"
-            type="text"
-            class="rounded border border-neutral-300 px-2 py-1"
-            placeholder="Client name"
-            bind:value={newClientName}
-            disabled={newClientSubmitting}
-          />
-        </div>
-
-        <div class="flex flex-col gap-1">
-          {#if $busdevLeads.items.length > 0}
-            {#if $busdevLeads.items.length <= 10}
-              <DsSelector
-                bind:value={newClientBusdevLead}
-                items={[{ id: "", given_name: "", surname: "" }, ...$busdevLeads.items]}
-                errors={{}}
-                fieldName="new_client_busdev_lead"
-                uiName="Business Development Lead"
-              >
-                {#snippet optionTemplate(option)}
-                  {#if option.id === ""}
-                    -- select --
-                  {:else}
-                    {option.surname}{option.given_name ? `, ${option.given_name}` : ""}
-                  {/if}
-                {/snippet}
-              </DsSelector>
-            {:else if $busdevLeads.index !== null}
-              <DsAutoComplete
-                bind:value={newClientBusdevLead}
-                index={$busdevLeads.index}
-                errors={{}}
-                fieldName="new_client_busdev_lead"
-                uiName="Business Development Lead"
-                idField="id"
-              >
-                {#snippet resultTemplate(option)}
-                  {option.surname}{option.given_name ? `, ${option.given_name}` : ""}
-                {/snippet}
-              </DsAutoComplete>
-            {/if}
-          {:else if $busdevLeads.loading}
-            <span class="text-sm font-semibold">Business Development Lead</span>
-            <span class="text-sm text-neutral-500">Loading business development leads…</span>
-          {:else}
-            <span class="text-sm font-semibold">Business Development Lead</span>
-            <span class="text-sm text-neutral-500">No eligible Business Development Leads found.</span>
-          {/if}
-        </div>
-      </div>
-
-      {#if newClientError}
-        <p class="mb-4 text-sm text-red-600">{newClientError}</p>
-      {/if}
-
-      <div class="flex justify-end gap-2">
-        <button
-          type="button"
-          class="rounded bg-neutral-200 px-4 py-2 text-neutral-700 hover:bg-neutral-300"
-          onclick={closeAddClientPopover}
-          disabled={newClientSubmitting}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
-          onclick={createNewClient}
-          disabled={newClientSubmitting}
-        >
-          {newClientSubmitting ? "Creating..." : "Create Client"}
-        </button>
-      </div>
-    </div>
+<DSPopover
+  bind:show={showAddClientPopover}
+  title="Add New Client"
+  error={newClientError}
+  submitting={newClientSubmitting}
+  submitLabel="Create Client"
+  onSubmit={createNewClient}
+  onCancel={closeAddClientPopover}
+>
+  <div class="flex flex-col gap-1">
+    <label class="text-sm font-semibold" for="new_client_name">Name</label>
+    <input
+      id="new_client_name"
+      type="text"
+      class="rounded border border-neutral-300 px-2 py-1"
+      placeholder="Client name"
+      bind:value={newClientName}
+      disabled={newClientSubmitting}
+    />
   </div>
-{/if}
+
+  <div class="flex flex-col gap-1">
+    {#if $busdevLeads.items.length > 0}
+      {#if $busdevLeads.items.length <= 10}
+        <DsSelector
+          bind:value={newClientBusdevLead}
+          items={[{ id: "", given_name: "", surname: "" }, ...$busdevLeads.items]}
+          errors={{}}
+          fieldName="new_client_busdev_lead"
+          uiName="Business Development Lead"
+        >
+          {#snippet optionTemplate(option)}
+            {#if option.id === ""}
+              -- select --
+            {:else}
+              {option.surname}{option.given_name ? `, ${option.given_name}` : ""}
+            {/if}
+          {/snippet}
+        </DsSelector>
+      {:else if $busdevLeads.index !== null}
+        <DsAutoComplete
+          bind:value={newClientBusdevLead}
+          index={$busdevLeads.index}
+          errors={{}}
+          fieldName="new_client_busdev_lead"
+          uiName="Business Development Lead"
+          idField="id"
+        >
+          {#snippet resultTemplate(option)}
+            {option.surname}{option.given_name ? `, ${option.given_name}` : ""}
+          {/snippet}
+        </DsAutoComplete>
+      {/if}
+    {:else if $busdevLeads.loading}
+      <span class="text-sm font-semibold">Business Development Lead</span>
+      <span class="text-sm text-neutral-500">Loading business development leads…</span>
+    {:else}
+      <span class="text-sm font-semibold">Business Development Lead</span>
+      <span class="text-sm text-neutral-500">No eligible Business Development Leads found.</span>
+    {/if}
+  </div>
+</DSPopover>
+
+<!-- Add Contact Popover -->
+<DSPopover
+  bind:show={showAddContactPopover}
+  title="Add New Contact"
+  subtitle="Adding contact for: {selectedClientName}"
+  error={newContactError}
+  submitting={newContactSubmitting}
+  submitLabel="Create Contact"
+  onSubmit={createNewContact}
+  onCancel={closeAddContactPopover}
+>
+  <div class="flex flex-col gap-1">
+    <label class="text-sm font-semibold" for="new_contact_given_name">Given Name</label>
+    <input
+      id="new_contact_given_name"
+      type="text"
+      class="rounded border border-neutral-300 px-2 py-1"
+      placeholder="Given name"
+      bind:value={newContactGivenName}
+      disabled={newContactSubmitting}
+    />
+  </div>
+
+  <div class="flex flex-col gap-1">
+    <label class="text-sm font-semibold" for="new_contact_surname">Surname</label>
+    <input
+      id="new_contact_surname"
+      type="text"
+      class="rounded border border-neutral-300 px-2 py-1"
+      placeholder="Surname"
+      bind:value={newContactSurname}
+      disabled={newContactSubmitting}
+    />
+  </div>
+
+  <div class="flex flex-col gap-1">
+    <label class="text-sm font-semibold" for="new_contact_email">Email</label>
+    <input
+      id="new_contact_email"
+      type="email"
+      class="rounded border border-neutral-300 px-2 py-1"
+      placeholder="Email"
+      bind:value={newContactEmail}
+      disabled={newContactSubmitting}
+    />
+  </div>
+</DSPopover>
 
 <style>
   .disabled-notice {
