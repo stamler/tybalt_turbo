@@ -16,7 +16,6 @@
   import { rateSheets } from "$lib/stores/rateSheets";
   import { appConfig, jobsEditingEnabled } from "$lib/stores/appConfig";
   import DsCheck from "$lib/components/DsCheck.svelte";
-  import MiniSearch from "minisearch";
   import { onMount, untrack } from "svelte";
   import type {
     BranchesResponse,
@@ -169,31 +168,9 @@
     return `${displayNumber}${displayDescription}`;
   }
 
-  const proposalsIndex = $derived.by(() => {
-    if (!$jobs.items || $jobs.items.length === 0) return null;
-    const proposals = ($jobs.items as JobApiResponse[]).filter((job) =>
-      job.number?.startsWith("P"),
-    );
-    if (proposals.length === 0) return null;
-    const index = new MiniSearch<JobApiResponse>({
-      fields: ["number", "description", "client", "id"],
-      storeFields: ["id", "number", "description", "client"],
-    });
-    index.addAll(proposals);
-    return index;
-  });
-
-  const activeRateSheetsIndex = $derived.by(() => {
-    if (!$rateSheets.items || $rateSheets.items.length === 0) return null;
-    const activeSheets = $rateSheets.items.filter((sheet) => sheet.active);
-    if (activeSheets.length === 0) return null;
-    const index = new MiniSearch({
-      fields: ["name", "effective_date"],
-      storeFields: ["id", "name", "effective_date", "revision"],
-    });
-    index.addAll(activeSheets);
-    return index;
-  });
+  // Filter functions for autocomplete - applied to search results, not indices
+  const proposalFilter = (job: JobApiResponse) => job.number?.startsWith("P") ?? false;
+  const activeRateSheetFilter = (sheet: { active: boolean }) => sheet.active;
 
   // Hide proposal dates when:
   // 1. Creating a project from the dedicated route (loader sets _prefilled_from_proposal)
@@ -1057,10 +1034,11 @@
       </p>
     {/if}
 
-    {#if activeRateSheetsIndex !== null}
+    {#if $rateSheets.index !== null}
       <DsAutoComplete
         bind:value={(item as Record<string, unknown>).rate_sheet as string}
-        index={activeRateSheetsIndex}
+        index={$rateSheets.index}
+        filter={activeRateSheetFilter}
         {errors}
         fieldName="rate_sheet"
         uiName="Rate Sheet"
@@ -1072,12 +1050,13 @@
     {/if}
   {/if}
 
-  {#if proposalsIndex !== null}
+  {#if $jobs.index !== null}
     {@const proposalHasCustomError = errors.proposal !== undefined && (errors.proposal as { message: string; proposalId?: string }).proposalId}
     {@const proposalErrors = proposalHasCustomError ? {} : errors}
     <DsAutoComplete
       bind:value={item.proposal as string}
-      index={proposalsIndex}
+      index={$jobs.index}
+      filter={proposalFilter}
       errors={proposalErrors}
       fieldName="proposal"
       uiName="Proposal"

@@ -23,6 +23,7 @@
     disabled = false,
     idField = "id", // the field in the index that is the id, defaults to "id"
     excludeIds = [] as (string | number)[], // optional list of ids to exclude from results
+    filter, // optional filter function to apply to search results
     multi = false,
     choose,
   }: {
@@ -35,6 +36,7 @@
     disabled?: boolean;
     idField?: string;
     excludeIds?: (string | number)[];
+    filter?: (item: T) => boolean;
     multi?: boolean;
     choose?: (id: string | number) => void;
   } = $props();
@@ -54,12 +56,16 @@
   function updateResults(event: Event) {
     const typedQuery = (event.target as HTMLInputElement).value;
     searchQuery = typedQuery;
-    // Search then filter out any excluded ids
-    results = index
+    // Search, filter out excluded ids, then apply optional filter
+    let searchResults = index
       .search(typedQuery, { prefix: true })
       .filter(
         (r) => !excludeIds.includes(r[idField] as unknown as string | number),
-      ) as SearchResult[];
+      );
+    if (filter) {
+      searchResults = searchResults.filter((r) => filter(r as unknown as T));
+    }
+    results = searchResults as SearchResult[];
   }
 
   function keydown(event: KeyboardEvent) {

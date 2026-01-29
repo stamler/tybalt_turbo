@@ -8,7 +8,7 @@
   import type { SearchResult } from "minisearch";
   import DSInListHeader from "./DSInListHeader.svelte";
   import { collectionEvents } from "$lib/stores/collectionEvents";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
 
   const MAX_RESULTS = 100; // don't render more than 100 results
   const MIN_SEARCH_LENGTH = 2; // don't search if term is less than 2 characters
@@ -87,14 +87,17 @@
     return unsubscribe;
   });
 
-  // Re-run search when the index changes (e.g., when filtering by job type)
+  // Re-run search when the index changes (e.g., when new items are added)
   $effect(() => {
     // Access index to create dependency
     const _ = index;
     // Re-run search if we have an active search term
-    if (searchTerm.length >= MIN_SEARCH_LENGTH) {
-      rawResults = index.search(searchTerm, { prefix: true });
-    }
+    // Use untrack to avoid re-running on searchTerm changes (updateResults handles that)
+    untrack(() => {
+      if (searchTerm.length >= MIN_SEARCH_LENGTH) {
+        rawResults = index.search(searchTerm, { prefix: true });
+      }
+    });
   });
 </script>
 
