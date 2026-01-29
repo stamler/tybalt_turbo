@@ -163,6 +163,19 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			return fmt.Errorf("there is an existing absorb action for collection %s that must be undone or deleted first", collectionName)
 		}
 
+		// Check if a parent collection has a pending absorb that would conflict
+		blockedBy, _ := GetAbsorbDependencies(collectionName)
+		for _, parentCollection := range blockedBy {
+			parentAction, err := getAbsorbAction(txApp, parentCollection)
+			if err != nil {
+				return fmt.Errorf("error checking %s absorb action: %w", parentCollection, err)
+			}
+			if parentAction != nil {
+				return fmt.Errorf("cannot absorb %s while a %s absorb action exists; undo the %s absorb first",
+					collectionName, parentCollection, parentCollection)
+			}
+		}
+
 		// Serialize the records to be absorbed
 		absorbedRecords, err := serializeRecords(txApp, collectionName, idsToAbsorb)
 		if err != nil {
@@ -308,6 +321,24 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 			return apis.NewNotFoundError("No absorb action found for collection", nil)
 		}
 
+		// Step 2b: Check if a child collection has a pending absorb that depends on this one
+		// This enforces LIFO ordering - child absorbs must be undone before parent absorbs
+		_, blocks := GetAbsorbDependencies(collectionName)
+		for _, childCollection := range blocks {
+			childAction, err := getAbsorbAction(app, childCollection)
+			if err != nil {
+				return apis.NewApiError(http.StatusInternalServerError,
+					fmt.Sprintf("Failed to check %s absorb action", childCollection), err)
+			}
+			if childAction != nil {
+				return apis.NewBadRequestError(
+					fmt.Sprintf("Cannot undo %s absorb while %s absorb exists; undo %s absorb first",
+						collectionName, childCollection, childCollection),
+					nil,
+				)
+			}
+		}
+
 		// Step 3: Parse Stored Data
 		// Deserialize the JSON data stored in the absorb action record.
 		// This includes both the original records that were absorbed and
@@ -450,6 +481,27 @@ func GetConfigsAndTable(collectionName string) ([]RefConfig, *ParentConstraint, 
 	default:
 		// return an error if the collection is not supported
 		return nil, nil, fmt.Errorf("unknown collection: %s", collectionName)
+	}
+}
+
+// GetAbsorbDependencies returns collections that must not have pending
+// absorb actions when operating on the given collection.
+//   - blockedBy: collections that block absorbing this collection
+//   - blocks: collections that block undoing this collection's absorb
+//
+// This enforces LIFO ordering of absorb/undo operations to prevent data
+// inconsistencies where undoing a parent absorb would reference records
+// that were deleted by a subsequent child absorb.
+func GetAbsorbDependencies(collectionName string) (blockedBy []string, blocks []string) {
+	switch collectionName {
+	case "clients":
+		// Undoing a clients absorb requires client_contacts records to still exist
+		return nil, []string{"client_contacts"}
+	case "client_contacts":
+		// Cannot absorb contacts while clients absorb is pending
+		return []string{"clients"}, nil
+	default:
+		return nil, nil
 	}
 }
 

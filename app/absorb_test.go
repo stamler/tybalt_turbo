@@ -842,3 +842,293 @@ func TestUndoAbsorb(t *testing.T) {
 		t.Error("absorb action still exists after undo")
 	}
 }
+
+// TestAbsorbBlockedByParentAbsorb verifies that absorbing client_contacts
+// is blocked when there's a pending clients absorb action.
+//
+// Test fixtures in test_pb_data/data.db:
+//   - client: lb0fnenkeyitsny (target client)
+//   - client_contacts: nh5u9z3cyknjclv (target contact), nqy9f0oojeyzasa (contact to absorb)
+//   - job: test_absorb_contact_job (references nqy9f0oojeyzasa)
+func TestAbsorbBlockedByParentAbsorb(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Fixture IDs
+	targetClientID := "lb0fnenkeyitsny"
+	targetContactID := "nh5u9z3cyknjclv"   // Joe Muchico
+	contactToAbsorbID := "nqy9f0oojeyzasa" // Franklin Costanza
+
+	// First absorb clients - this should succeed
+	err := routes.AbsorbRecords(app, "clients", targetClientID, []string{"eldtxi3i4h00k8r"})
+	if err != nil {
+		t.Fatalf("failed to absorb clients: %v", err)
+	}
+
+	// Verify the clients absorb action exists
+	clientsAction, err := app.FindFirstRecordByData("absorb_actions", "collection_name", "clients")
+	if err != nil {
+		t.Fatalf("failed to find clients absorb action: %v", err)
+	}
+	if clientsAction == nil {
+		t.Fatal("clients absorb action should exist")
+	}
+
+	// Now try to absorb client_contacts - this should fail because clients absorb is pending
+	err = routes.AbsorbRecords(app, "client_contacts", targetContactID, []string{contactToAbsorbID})
+	if err == nil {
+		t.Fatal("expected error when absorbing client_contacts with pending clients absorb")
+	}
+	if !strings.Contains(err.Error(), "cannot absorb client_contacts while a clients absorb action exists") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+// TestUndoAbsorbBlockedByChildAbsorb verifies that undoing a clients absorb
+// is blocked when there's a pending client_contacts absorb action.
+//
+// Test fixtures in test_pb_data/data.db:
+//   - client: lb0fnenkeyitsny (target client)
+//   - client_contacts: nh5u9z3cyknjclv (target contact), nqy9f0oojeyzasa (contact to absorb)
+//   - job: test_absorb_contact_job (references nqy9f0oojeyzasa)
+func TestUndoAbsorbBlockedByChildAbsorb(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Fixture IDs
+	targetClientID := "lb0fnenkeyitsny"
+	targetContactID := "nh5u9z3cyknjclv"   // Joe Muchico
+	contactToAbsorbID := "nqy9f0oojeyzasa" // Franklin Costanza
+
+	// First absorb client_contacts - this should succeed (no parent absorb pending)
+	// The job fixture test_absorb_contact_job references contactToAbsorbID, so absorb will have refs to update
+	err := routes.AbsorbRecords(app, "client_contacts", targetContactID, []string{contactToAbsorbID})
+	if err != nil {
+		t.Fatalf("failed to absorb client_contacts: %v", err)
+	}
+
+	// Now manually create a clients absorb action to simulate the blocked undo scenario
+	// We need to do this because we can't absorb clients after contacts (due to our new rule)
+	// Use direct SQL insert to bypass field validation that requires non-empty JSON
+	_, err = app.NonconcurrentDB().NewQuery(`
+		INSERT INTO absorb_actions (id, collection_name, target_id, absorbed_records, updated_references, created, updated)
+		VALUES ('test_clients_action', 'clients', {:target_id}, '[{"id":"dummy"}]', '{"dummy":{}}', datetime('now'), datetime('now'))
+	`).Bind(dbx.Params{"target_id": targetClientID}).Execute()
+	if err != nil {
+		t.Fatalf("failed to create clients absorb action: %v", err)
+	}
+
+	// Generate a token for a user with absorb claim
+	bookKeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Try to undo clients absorb via HTTP - should fail because client_contacts absorb exists
+	scenario := tests.ApiScenario{
+		Name:   "undo clients absorb blocked by child absorb",
+		Method: http.MethodPost,
+		URL:    "/api/clients/undo_absorb",
+		Headers: map[string]string{
+			"Authorization": bookKeeperToken,
+		},
+		ExpectedStatus: 400,
+		ExpectedContent: []string{
+			`Cannot undo clients absorb while client_contacts absorb exists; undo client_contacts absorb first`,
+		},
+		TestAppFactory: func(t testing.TB) *tests.TestApp {
+			return app
+		},
+	}
+
+	scenario.Test(t)
+}
+
+// TestUnrelatedAbsorbsDoNotBlock verifies that absorbing unrelated collections
+// (e.g., vendors) does not block clients operations.
+func TestUnrelatedAbsorbsDoNotBlock(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	targetClientID := "lb0fnenkeyitsny"
+	idsToAbsorb := []string{"eldtxi3i4h00k8r"}
+
+	// First absorb clients
+	err := routes.AbsorbRecords(app, "clients", targetClientID, idsToAbsorb)
+	if err != nil {
+		t.Fatalf("failed to absorb clients: %v", err)
+	}
+
+	// Check if vendors collection has test data we can use
+	// If not, we'll just verify that the dependency lookup returns nil for vendors
+	blockedBy, blocks := routes.GetAbsorbDependencies("vendors")
+	if len(blockedBy) != 0 || len(blocks) != 0 {
+		t.Error("vendors should have no dependencies")
+	}
+
+	// Verify clients absorb can still be undone (no blocking child absorbs)
+	err = app.RunInTransaction(func(txApp core.App) error {
+		action, err := txApp.FindFirstRecordByData("absorb_actions", "collection_name", "clients")
+		if err != nil {
+			return err
+		}
+		return txApp.Delete(action)
+	})
+	if err != nil {
+		t.Fatalf("failed to delete clients absorb action: %v", err)
+	}
+}
+
+// TestAbsorbAndUndoLIFOOrder verifies the valid LIFO flow:
+// absorb clients → undo clients → absorb contacts → undo contacts
+//
+// Test fixtures in test_pb_data/data.db:
+//   - client: lb0fnenkeyitsny (target client)
+//   - client_contacts: nh5u9z3cyknjclv (target contact), nqy9f0oojeyzasa (contact to absorb)
+//   - job: test_absorb_contact_job (references nqy9f0oojeyzasa)
+func TestAbsorbAndUndoLIFOOrder(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Fixture IDs
+	targetClientID := "lb0fnenkeyitsny"
+	clientToAbsorb := "eldtxi3i4h00k8r"
+	targetContactID := "nh5u9z3cyknjclv"   // Joe Muchico
+	contactToAbsorbID := "nqy9f0oojeyzasa" // Franklin Costanza
+
+	// Step 1: Absorb clients
+	err := routes.AbsorbRecords(app, "clients", targetClientID, []string{clientToAbsorb})
+	if err != nil {
+		t.Fatalf("Step 1 - failed to absorb clients: %v", err)
+	}
+
+	// Verify client was absorbed
+	_, err = app.FindRecordById("clients", clientToAbsorb)
+	if err == nil {
+		t.Fatal("Step 1 - absorbed client should not exist")
+	}
+
+	// Step 2: Undo clients absorb (should succeed - no child absorbs)
+	err = app.RunInTransaction(func(txApp core.App) error {
+		action, err := txApp.FindFirstRecordByData("absorb_actions", "collection_name", "clients")
+		if err != nil {
+			return err
+		}
+
+		// Parse the absorbed records
+		var absorbedRecords []map[string]interface{}
+		if err := json.Unmarshal([]byte(action.GetString("absorbed_records")), &absorbedRecords); err != nil {
+			return err
+		}
+
+		// Recreate absorbed records
+		collection, err := txApp.FindCollectionByNameOrId("clients")
+		if err != nil {
+			return err
+		}
+		for _, recordData := range absorbedRecords {
+			record := core.NewRecord(collection)
+			for field, value := range recordData {
+				record.Set(field, value)
+			}
+			if err := txApp.Save(record); err != nil {
+				return err
+			}
+		}
+
+		// Restore references
+		var updatedRefs map[string]map[string]map[string]string
+		if err := json.Unmarshal([]byte(action.GetString("updated_references")), &updatedRefs); err != nil {
+			return err
+		}
+		for table, columns := range updatedRefs {
+			for column, updates := range columns {
+				for recordId, oldValue := range updates {
+					query := fmt.Sprintf("UPDATE %s SET %s = {:old_value} WHERE id = {:record_id}", table, column)
+					_, err = txApp.NonconcurrentDB().NewQuery(query).Bind(dbx.Params{
+						"old_value": oldValue,
+						"record_id": recordId,
+					}).Execute()
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+		return txApp.Delete(action)
+	})
+	if err != nil {
+		t.Fatalf("Step 2 - failed to undo clients absorb: %v", err)
+	}
+
+	// Verify client was restored
+	_, err = app.FindRecordById("clients", clientToAbsorb)
+	if err != nil {
+		t.Fatalf("Step 2 - absorbed client should be restored: %v", err)
+	}
+
+	// Step 3: Absorb client_contacts (should succeed - no parent absorb pending)
+	// The job fixture test_absorb_contact_job references contactToAbsorbID, so absorb will have refs to update
+	err = routes.AbsorbRecords(app, "client_contacts", targetContactID, []string{contactToAbsorbID})
+	if err != nil {
+		t.Fatalf("Step 3 - failed to absorb client_contacts: %v", err)
+	}
+
+	// Verify contactToAbsorbID was absorbed
+	_, err = app.FindRecordById("client_contacts", contactToAbsorbID)
+	if err == nil {
+		t.Fatal("Step 3 - absorbed contact should not exist")
+	}
+
+	// Step 4: Undo client_contacts absorb
+	err = app.RunInTransaction(func(txApp core.App) error {
+		action, err := txApp.FindFirstRecordByData("absorb_actions", "collection_name", "client_contacts")
+		if err != nil {
+			return err
+		}
+
+		// Parse the absorbed records
+		var absorbedRecords []map[string]interface{}
+		if err := json.Unmarshal([]byte(action.GetString("absorbed_records")), &absorbedRecords); err != nil {
+			return err
+		}
+
+		// Recreate absorbed records
+		collection, err := txApp.FindCollectionByNameOrId("client_contacts")
+		if err != nil {
+			return err
+		}
+		for _, recordData := range absorbedRecords {
+			record := core.NewRecord(collection)
+			for field, value := range recordData {
+				record.Set(field, value)
+			}
+			if err := txApp.Save(record); err != nil {
+				return err
+			}
+		}
+
+		return txApp.Delete(action)
+	})
+	if err != nil {
+		t.Fatalf("Step 4 - failed to undo client_contacts absorb: %v", err)
+	}
+
+	// Verify contactToAbsorbID was restored
+	_, err = app.FindRecordById("client_contacts", contactToAbsorbID)
+	if err != nil {
+		t.Fatalf("Step 4 - absorbed contact should be restored: %v", err)
+	}
+
+	// Final verification: no absorb actions remain
+	_, err = app.FindFirstRecordByData("absorb_actions", "collection_name", "clients")
+	if err == nil || err.Error() != "sql: no rows in result set" {
+		t.Error("clients absorb action should not exist")
+	}
+
+	_, err = app.FindFirstRecordByData("absorb_actions", "collection_name", "client_contacts")
+	if err == nil || err.Error() != "sql: no rows in result set" {
+		t.Error("client_contacts absorb action should not exist")
+	}
+}
