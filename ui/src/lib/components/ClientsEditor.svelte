@@ -173,7 +173,7 @@
         }
       }
       errors = {};
-      goto("/clients/list");
+      goto(`/clients/${clientId}/details`);
     } catch (error: any) {
       errors = error.data.data;
     }
