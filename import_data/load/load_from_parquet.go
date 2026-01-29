@@ -81,6 +81,7 @@ type Job struct {
 	Parent                      string  `parquet:"parent_id"`
 	OutstandingBalance          float64 `parquet:"outstandingBalance"`
 	OutstandingBalanceDate      string  `parquet:"outstandingBalanceDate"`
+	RateSheet                   string  `parquet:"rateSheetId"` // -> rate_sheet column (FK)
 }
 
 type Profile struct {
@@ -180,6 +181,27 @@ type Vendor struct {
 	Status string `parquet:"status"` // For TurboVendors
 }
 
+type RateRole struct {
+	Id   string `parquet:"id"`
+	Name string `parquet:"name"`
+}
+
+type RateSheet struct {
+	Id            string `parquet:"id"`
+	Name          string `parquet:"name"`
+	EffectiveDate string `parquet:"effectiveDate"` // -> effective_date column
+	Revision      int    `parquet:"revision"`
+	Active        bool   `parquet:"active"`
+}
+
+type RateSheetEntry struct {
+	Id           string `parquet:"id"`
+	Role         string `parquet:"roleId"`      // -> role column (FK)
+	RateSheet    string `parquet:"rateSheetId"` // -> rate_sheet column (FK)
+	Rate         int    `parquet:"rate"`
+	OvertimeRate int    `parquet:"overtimeRate"` // -> overtime_rate column
+}
+
 type Expense struct {
 	Id                  string    `parquet:"pocketbase_id"`
 	Uid                 string    `parquet:"pocketbase_uid"`
@@ -236,20 +258,20 @@ type PurchaseOrder struct {
 	Type                   string  `parquet:"type"`
 	Frequency              string  `parquet:"frequency"`
 	Status                 string  `parquet:"status"`
-	Approved               string  `parquet:"approved"`        // timestamp
-	SecondApproval         string  `parquet:"second_approval"` // timestamp
-	SecondApprover         string  `parquet:"second_approver"` // legacy_uid (converted to PocketBase UID in expenses_to_pos)
+	Approved               string  `parquet:"approved"`                 // timestamp
+	SecondApproval         string  `parquet:"second_approval"`          // timestamp
+	SecondApprover         string  `parquet:"second_approver"`          // legacy_uid (converted to PocketBase UID in expenses_to_pos)
 	PrioritySecondApprover string  `parquet:"priority_second_approver"` // legacy_uid (converted to PocketBase UID in expenses_to_pos)
-	Closed                 string  `parquet:"closed"`    // timestamp
-	Closer                 string  `parquet:"closer"`    // legacy_uid (converted to PocketBase UID in expenses_to_pos)
-	Cancelled              string  `parquet:"cancelled"` // timestamp
-	Canceller              string  `parquet:"canceller"` // legacy_uid (converted to PocketBase UID in expenses_to_pos)
-	Rejected               string  `parquet:"rejected"`  // timestamp
-	Rejector               string  `parquet:"rejector"`  // legacy_uid (converted to PocketBase UID in expenses_to_pos)
+	Closed                 string  `parquet:"closed"`                   // timestamp
+	Closer                 string  `parquet:"closer"`                   // legacy_uid (converted to PocketBase UID in expenses_to_pos)
+	Cancelled              string  `parquet:"cancelled"`                // timestamp
+	Canceller              string  `parquet:"canceller"`                // legacy_uid (converted to PocketBase UID in expenses_to_pos)
+	Rejected               string  `parquet:"rejected"`                 // timestamp
+	Rejector               string  `parquet:"rejector"`                 // legacy_uid (converted to PocketBase UID in expenses_to_pos)
 	RejectionReason        string  `parquet:"rejection_reason"`
-	Category               string  `parquet:"category"`  // PocketBase category ID
-	ParentPo               string  `parquet:"parent_po"` // PocketBase parent PO ID
-	Branch                 string  `parquet:"branch"`    // PocketBase branch ID
+	Category               string  `parquet:"category"`        // PocketBase category ID
+	ParentPo               string  `parquet:"parent_po"`       // PocketBase parent PO ID
+	Branch                 string  `parquet:"branch"`          // PocketBase branch ID
 	Attachment             string  `parquet:"attachment"`      // PocketBase filename (for Turbo-originated POs)
 	AttachmentHash         string  `parquet:"attachment_hash"` // SHA256 hash of attachment file
 }
@@ -264,16 +286,16 @@ type JobTimeAllocation struct {
 
 // ClientNote represents a note associated with a client, exported from TurboClientNotes MySQL table.
 type ClientNote struct {
-	Id                 string `parquet:"id"`                   // PocketBase note ID
-	Created            string `parquet:"created"`              // timestamp
-	Updated            string `parquet:"updated"`              // timestamp
-	Note               string `parquet:"note"`                 // note text
-	ClientId           string `parquet:"clientId"`             // PocketBase client ID
-	JobId              string `parquet:"jobId"`                // PocketBase job ID (already resolved)
-	JobNumber          string `parquet:"jobNumber"`            // job number for reference
-	Uid                string `parquet:"uid"`                  // legacy_uid of author (needs conversion on import)
-	JobNotApplicable   bool   `parquet:"jobNotApplicable"`     // whether job is not applicable
-	JobStatusChangedTo string `parquet:"jobStatusChangedTo"`   // status the job was changed to (if any)
+	Id                 string `parquet:"id"`                 // PocketBase note ID
+	Created            string `parquet:"created"`            // timestamp
+	Updated            string `parquet:"updated"`            // timestamp
+	Note               string `parquet:"note"`               // note text
+	ClientId           string `parquet:"clientId"`           // PocketBase client ID
+	JobId              string `parquet:"jobId"`              // PocketBase job ID (already resolved)
+	JobNumber          string `parquet:"jobNumber"`          // job number for reference
+	Uid                string `parquet:"uid"`                // legacy_uid of author (needs conversion on import)
+	JobNotApplicable   bool   `parquet:"jobNotApplicable"`   // whether job is not applicable
+	JobStatusChangedTo string `parquet:"jobStatusChangedTo"` // status the job was changed to (if any)
 }
 
 // FromParquet reads data from a Parquet file and inserts it into a SQLite table using a generic approach.

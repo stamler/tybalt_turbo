@@ -32,9 +32,36 @@ func parseFloatMap(jsonStr string) map[string]float64 {
 
 // Wrapper response struct for structured jobs writeback
 type jobsWritebackResponse struct {
-	Jobs           []jobExportOutput     `json:"jobs"`
-	Clients        []clientExportOutput  `json:"clients"`
-	ClientContacts []contactExportOutput `json:"clientContacts"`
+	Jobs             []jobExportOutput            `json:"jobs"`
+	Clients          []clientExportOutput         `json:"clients"`
+	ClientContacts   []contactExportOutput        `json:"clientContacts"`
+	RateRoles        []rateRoleExportOutput       `json:"rateRoles"`
+	RateSheets       []rateSheetExportOutput      `json:"rateSheets"`
+	RateSheetEntries []rateSheetEntryExportOutput `json:"rateSheetEntries"`
+}
+
+// Rate role export struct
+type rateRoleExportOutput struct {
+	Id   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// Rate sheet export struct
+type rateSheetExportOutput struct {
+	Id            string `json:"id"`
+	Name          string `json:"name"`
+	EffectiveDate string `json:"effectiveDate"`
+	Revision      int    `json:"revision"`
+	Active        bool   `json:"active"`
+}
+
+// Rate sheet entry export struct
+type rateSheetEntryExportOutput struct {
+	Id           string `json:"id"`
+	RoleId       string `json:"roleId"`
+	RateSheetId  string `json:"rateSheetId"`
+	Rate         int    `json:"rate"`
+	OvertimeRate int    `json:"overtimeRate"`
 }
 
 // Client note export struct for notes array within each client
@@ -43,9 +70,9 @@ type clientNoteExportOutput struct {
 	Created            string `json:"created"`
 	Updated            string `json:"updated"`
 	Note               string `json:"note"`
-	Uid                string `json:"uid"`                          // legacy_uid of the author
-	JobId              string `json:"jobId,omitempty"`              // PocketBase job ID
-	JobNumber          string `json:"jobNumber,omitempty"`          // job number for reference
+	Uid                string `json:"uid"`                 // legacy_uid of the author
+	JobId              string `json:"jobId,omitempty"`     // PocketBase job ID
+	JobNumber          string `json:"jobNumber,omitempty"` // job number for reference
 	JobNotApplicable   bool   `json:"jobNotApplicable"`
 	JobStatusChangedTo string `json:"jobStatusChangedTo,omitempty"`
 }
@@ -105,6 +132,7 @@ type jobExportDBRow struct {
 	JobOwnerID         string `db:"job_owner_id"`
 	JobOwnerName       string `db:"job_owner_name"`
 	BranchCode         string `db:"branch_code"`
+	RateSheetID        string `db:"rate_sheet"`
 }
 
 // Internal struct for DB scanning - clients query
@@ -135,6 +163,30 @@ type clientNoteExportDBRow struct {
 	Uid                string `db:"uid"` // legacy_uid from admin_profiles
 	JobNotApplicable   bool   `db:"job_not_applicable"`
 	JobStatusChangedTo string `db:"job_status_changed_to"`
+}
+
+// Internal struct for DB scanning - rate roles query
+type rateRoleExportDBRow struct {
+	Id   string `db:"id"`
+	Name string `db:"name"`
+}
+
+// Internal struct for DB scanning - rate sheets query
+type rateSheetExportDBRow struct {
+	Id            string `db:"id"`
+	Name          string `db:"name"`
+	EffectiveDate string `db:"effective_date"`
+	Revision      int    `db:"revision"`
+	Active        bool   `db:"active"`
+}
+
+// Internal struct for DB scanning - rate sheet entries query
+type rateSheetEntryExportDBRow struct {
+	Id           string `db:"id"`
+	RoleId       string `db:"role"`
+	RateSheetId  string `db:"rate_sheet"`
+	Rate         int    `db:"rate"`
+	OvertimeRate int    `db:"overtime_rate"`
 }
 
 // Output struct matching legacy Firestore format with ID references instead of _row objects
@@ -179,6 +231,7 @@ type jobExportOutput struct {
 	ClientContactId string `json:"clientContactId,omitempty"`
 	ParentId        string `json:"parentId,omitempty"`
 	ProposalId      string `json:"proposalId,omitempty"`
+	RateSheetId     string `json:"rateSheetId,omitempty"`
 }
 
 func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) error {
@@ -246,7 +299,8 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 			  COALESCE(pa.given_name || ' ' || pa.surname, '') AS alt_manager_display,
 			  COALESCE(j.job_owner, '') AS job_owner_id,
 			  COALESCE(jo.name, '') AS job_owner_name,
-			  b.code AS branch_code
+			  b.code AS branch_code,
+			  j.rate_sheet
 			FROM jobs j
 			LEFT JOIN clients c ON j.client = c.id
 			LEFT JOIN client_contacts co ON j.contact = co.id
@@ -338,6 +392,48 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 			return e.Error(http.StatusInternalServerError, "failed to query client notes: "+err.Error(), nil)
 		}
 
+		// Query 5: All rate roles (small table, full sync for consistency)
+		rateRolesQuery := `SELECT id, name FROM rate_roles ORDER BY name`
+
+		var rateRoleRows []rateRoleExportDBRow
+		if err := app.DB().NewQuery(rateRolesQuery).All(&rateRoleRows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to query rate roles: "+err.Error(), nil)
+		}
+
+		// Query 6: Rate sheets referenced by matched jobs
+		rateSheetsQuery := `
+			SELECT DISTINCT rs.id, rs.name, rs.effective_date, rs.revision, rs.active
+			FROM rate_sheets rs
+			WHERE rs.id IN (
+				SELECT j.rate_sheet FROM jobs j
+				WHERE j.updated >= {:updatedAfter} AND j._imported = 0 AND j.rate_sheet IS NOT NULL AND j.rate_sheet != ''
+			)
+		`
+
+		var rateSheetRows []rateSheetExportDBRow
+		if err := app.DB().NewQuery(rateSheetsQuery).Bind(dbx.Params{
+			"updatedAfter": updatedAfter,
+		}).All(&rateSheetRows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to query rate sheets: "+err.Error(), nil)
+		}
+
+		// Query 7: Rate sheet entries for matched rate sheets
+		rateSheetEntriesQuery := `
+			SELECT rse.id, rse.role, rse.rate_sheet, rse.rate, rse.overtime_rate
+			FROM rate_sheet_entries rse
+			WHERE rse.rate_sheet IN (
+				SELECT j.rate_sheet FROM jobs j
+				WHERE j.updated >= {:updatedAfter} AND j._imported = 0 AND j.rate_sheet IS NOT NULL AND j.rate_sheet != ''
+			)
+		`
+
+		var rateSheetEntryRows []rateSheetEntryExportDBRow
+		if err := app.DB().NewQuery(rateSheetEntriesQuery).Bind(dbx.Params{
+			"updatedAfter": updatedAfter,
+		}).All(&rateSheetEntryRows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to query rate sheet entries: "+err.Error(), nil)
+		}
+
 		// Convert job DB rows to output format
 		jobs := make([]jobExportOutput, len(jobRows))
 		for i, r := range jobRows {
@@ -382,6 +478,7 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 				ClientContactId: r.ContactID,
 				ParentId:        r.Parent,
 				ProposalId:      r.ProposalId,
+				RateSheetId:     r.RateSheetID,
 			}
 		}
 
@@ -424,11 +521,47 @@ func createJobsExportLegacyHandler(app core.App) func(e *core.RequestEvent) erro
 			}
 		}
 
-		// Return structured response with all three arrays
+		// Convert rate role DB rows to output format
+		rateRoles := make([]rateRoleExportOutput, len(rateRoleRows))
+		for i, r := range rateRoleRows {
+			rateRoles[i] = rateRoleExportOutput{
+				Id:   r.Id,
+				Name: r.Name,
+			}
+		}
+
+		// Convert rate sheet DB rows to output format
+		rateSheets := make([]rateSheetExportOutput, len(rateSheetRows))
+		for i, r := range rateSheetRows {
+			rateSheets[i] = rateSheetExportOutput{
+				Id:            r.Id,
+				Name:          r.Name,
+				EffectiveDate: r.EffectiveDate,
+				Revision:      r.Revision,
+				Active:        r.Active,
+			}
+		}
+
+		// Convert rate sheet entry DB rows to output format
+		rateSheetEntries := make([]rateSheetEntryExportOutput, len(rateSheetEntryRows))
+		for i, r := range rateSheetEntryRows {
+			rateSheetEntries[i] = rateSheetEntryExportOutput{
+				Id:           r.Id,
+				RoleId:       r.RoleId,
+				RateSheetId:  r.RateSheetId,
+				Rate:         r.Rate,
+				OvertimeRate: r.OvertimeRate,
+			}
+		}
+
+		// Return structured response with all arrays
 		return e.JSON(http.StatusOK, jobsWritebackResponse{
-			Jobs:           jobs,
-			Clients:        clients,
-			ClientContacts: contacts,
+			Jobs:             jobs,
+			Clients:          clients,
+			ClientContacts:   contacts,
+			RateRoles:        rateRoles,
+			RateSheets:       rateSheets,
+			RateSheetEntries: rateSheetEntries,
 		})
 	}
 }

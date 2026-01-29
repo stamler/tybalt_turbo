@@ -124,6 +124,9 @@ func main() {
 				"client_notes",
 				"categories",
 				"clients",
+				"rate_sheet_entries",
+				"rate_sheets",
+				"rate_roles",
 			})
 			if err != nil {
 				log.Fatalf("Failed to clear jobs phase tables: %v", err)
@@ -178,6 +181,66 @@ func main() {
 				true,              // Enable upsert for idempotency
 			)
 
+			// --- Load Rate Roles ---
+			// Rate roles must be loaded before rate_sheet_entries (FK constraint).
+			rateRoleInsertSQL := "INSERT INTO rate_roles (id, name) VALUES ({:id}, {:name})"
+			rateRoleBinder := func(item load.RateRole) dbx.Params {
+				return dbx.Params{
+					"id":   item.Id,
+					"name": item.Name,
+				}
+			}
+			load.FromParquet(
+				"./parquet/RateRoles.parquet",
+				targetDatabase,
+				"rate_roles",
+				rateRoleInsertSQL,
+				rateRoleBinder,
+				true,
+			)
+
+			// --- Load Rate Sheets ---
+			// Rate sheets must be loaded before jobs (FK) and rate_sheet_entries (FK).
+			rateSheetInsertSQL := "INSERT INTO rate_sheets (id, name, effective_date, revision, active) VALUES ({:id}, {:name}, {:effective_date}, {:revision}, {:active})"
+			rateSheetBinder := func(item load.RateSheet) dbx.Params {
+				return dbx.Params{
+					"id":             item.Id,
+					"name":           item.Name,
+					"effective_date": item.EffectiveDate,
+					"revision":       item.Revision,
+					"active":         item.Active,
+				}
+			}
+			load.FromParquet(
+				"./parquet/RateSheets.parquet",
+				targetDatabase,
+				"rate_sheets",
+				rateSheetInsertSQL,
+				rateSheetBinder,
+				true,
+			)
+
+			// --- Load Rate Sheet Entries ---
+			// Rate sheet entries reference both rate_roles and rate_sheets.
+			rateSheetEntryInsertSQL := "INSERT INTO rate_sheet_entries (id, role, rate_sheet, rate, overtime_rate) VALUES ({:id}, {:role}, {:rate_sheet}, {:rate}, {:overtime_rate})"
+			rateSheetEntryBinder := func(item load.RateSheetEntry) dbx.Params {
+				return dbx.Params{
+					"id":            item.Id,
+					"role":          item.Role,
+					"rate_sheet":    item.RateSheet,
+					"rate":          item.Rate,
+					"overtime_rate": item.OvertimeRate,
+				}
+			}
+			load.FromParquet(
+				"./parquet/RateSheetEntries.parquet",
+				targetDatabase,
+				"rate_sheet_entries",
+				rateSheetEntryInsertSQL,
+				rateSheetEntryBinder,
+				true,
+			)
+
 			// --- Load Jobs ---
 			// Define the specific SQL for the jobs table
 			//
@@ -196,7 +259,7 @@ func main() {
 			//   - Local modifications to imported jobs get overwritten with MySQL data
 			//   - Related records (time entries, etc.) work correctly since they also get updated IDs
 			//
-			jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal, job_owner, branch, outstanding_balance, outstanding_balance_date, parent, _imported) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal}, {:job_owner}, (SELECT id FROM branches WHERE code = {:branch}), {:outstanding_balance}, {:outstanding_balance_date}, {:parent}, true)"
+			jobInsertSQL := "INSERT INTO jobs (id, number, description, client, contact, manager, alternate_manager, fn_agreement, status, project_award_date, proposal_opening_date, proposal_submission_due_date, proposal, job_owner, branch, outstanding_balance, outstanding_balance_date, parent, rate_sheet, _imported) VALUES ({:id}, {:number}, {:description}, {:client}, {:contact}, {:manager}, {:alternate_manager}, {:fn_agreement}, {:status}, {:project_award_date}, {:proposal_opening_date}, {:proposal_submission_due_date}, {:proposal}, {:job_owner}, (SELECT id FROM branches WHERE code = {:branch}), {:outstanding_balance}, {:outstanding_balance_date}, {:parent}, IIF({:rate_sheet} = '', NULL, {:rate_sheet}), true)"
 
 			// Define the binder function for the Job type
 			jobBinder := func(item load.Job) dbx.Params {
@@ -235,6 +298,7 @@ func main() {
 					"parent":                       item.Parent,
 					"proposal_value":               item.ProposalValue,
 					"time_and_materials":           item.TimeAndMaterials,
+					"rate_sheet":                   item.RateSheet,
 				}
 			}
 
@@ -894,14 +958,14 @@ func main() {
 						"po_number":                item.PoNumber,
 						"approved":                 approved,
 						"second_approval":          secondApproval,
-						"second_approver":          item.SecondApprover,          // May be empty for legacy POs
+						"second_approver":          item.SecondApprover,         // May be empty for legacy POs
 						"priority_second_approver": item.PrioritySecondApprover, // May be empty for legacy POs
 						"closed":                   closed,
-						"closer":                   item.Closer,                  // May be empty for legacy POs
+						"closer":                   item.Closer, // May be empty for legacy POs
 						"cancelled":                item.Cancelled,
-						"canceller":                item.Canceller,               // May be empty for legacy POs
+						"canceller":                item.Canceller, // May be empty for legacy POs
 						"rejected":                 item.Rejected,
-						"rejector":                 item.Rejector,                // May be empty for legacy POs
+						"rejector":                 item.Rejector, // May be empty for legacy POs
 						"rejection_reason":         item.RejectionReason,
 						"type":                     poType,
 						"frequency":                item.Frequency,
@@ -918,9 +982,9 @@ func main() {
 						"payment_type":             item.PaymentType,
 						"job":                      item.Job,
 						"division":                 item.Division,
-						"category":                 item.Category,                // PocketBase ID, may be empty
-						"parent_po":                item.ParentPo,                // PocketBase ID, may be empty
-						"branch":                   item.Branch,                  // PocketBase ID, may be empty
+						"category":                 item.Category, // PocketBase ID, may be empty
+						"parent_po":                item.ParentPo, // PocketBase ID, may be empty
+						"branch":                   item.Branch,   // PocketBase ID, may be empty
 						"attachment":               item.Attachment,
 						"attachment_hash":          item.AttachmentHash,
 					}

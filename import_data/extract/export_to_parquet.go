@@ -15,7 +15,7 @@ import (
 
 // The tablesToDump variable is used to specify the tables that should be
 // exported to Parquet format.
-var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts", "TurboClientNotes", "TurboVendors", "TurboPurchaseOrders"}
+var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts", "TurboClientNotes", "TurboVendors", "TurboPurchaseOrders", "TurboRateRoles", "TurboRateSheets", "TurboRateSheetEntries"}
 
 func ToParquet(sourceSQLiteDb string) {
 	err := godotenv.Load()
@@ -309,6 +309,34 @@ func ToParquet(sourceSQLiteDb string) {
 						attachment_hash
 					FROM mysql_db.TurboPurchaseOrders
 				) TO 'parquet/TurboPurchaseOrders.parquet' (FORMAT PARQUET)
+			`
+		case "TurboRateRoles":
+			// Export TurboRateRoles for round-trip of rate roles.
+			// These are rate roles that were written back from Turbo with preserved PocketBase IDs.
+			query = `
+				COPY (
+					SELECT id, name
+					FROM mysql_db.TurboRateRoles
+				) TO 'parquet/RateRoles.parquet' (FORMAT PARQUET)
+			`
+		case "TurboRateSheets":
+			// Export TurboRateSheets for round-trip of rate sheets.
+			// These are rate sheets that were written back from Turbo with preserved PocketBase IDs.
+			query = `
+				COPY (
+					SELECT id, name, effectiveDate, revision, active
+					FROM mysql_db.TurboRateSheets
+				) TO 'parquet/RateSheets.parquet' (FORMAT PARQUET)
+			`
+		case "TurboRateSheetEntries":
+			// Export TurboRateSheetEntries for round-trip of rate sheet entries.
+			// These are rate sheet entries that were written back from Turbo with preserved PocketBase IDs.
+			// Uses roleId and rateSheetId from Firestore writeback (camelCase).
+			query = `
+				COPY (
+					SELECT id, roleId, rateSheetId, rate, overtimeRate
+					FROM mysql_db.TurboRateSheetEntries
+				) TO 'parquet/RateSheetEntries.parquet' (FORMAT PARQUET)
 			`
 		default:
 			// Generic query for other tables, just adding pocketbase_id
