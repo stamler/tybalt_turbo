@@ -6,13 +6,10 @@
   import DsActionButton from "./DSActionButton.svelte";
   import type { ClientContactsRecord, ClientContactsResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { authStore } from "$lib/stores/auth";
   import { clients } from "$lib/stores/clients";
+  import { busdevLeads } from "$lib/stores/busdevLeads";
   import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
-  import MiniSearch from "minisearch";
-  import { onMount } from "svelte";
-  import type { SearchResult } from "minisearch";
 
   let { data }: { data: ClientsPageData } = $props();
 
@@ -22,51 +19,8 @@
 
   item.business_development_lead = item.business_development_lead ?? "";
 
-  let busdevLeads: Array<{ id: string; given_name: string; surname: string; email: string }> =
-    $state([]);
-  let busdevLeadsIndex: MiniSearch<any> | null = $state(null);
-  let loadingLeads = $state(false);
-
-  async function loadBusdevLeads() {
-    // Only attempt to load data if user is authenticated
-    if (!$authStore?.isValid) {
-      return;
-    }
-
-    try {
-      loadingLeads = true;
-      const list = (await pb.send("/api/clients/devleads", { method: "GET" })) as Array<{
-        id: string;
-        given_name: string;
-        surname: string;
-        email: string;
-      }>;
-      busdevLeads = list;
-    } catch (error: unknown) {
-      globalStore.addError(`error loading business development leads: ${String(error)}`);
-    } finally {
-      loadingLeads = false;
-    }
-  }
-
-  // Load once on mount
-  onMount(() => {
-    loadBusdevLeads();
-  });
-
-  // Build a local MiniSearch index for large lists
-  $effect(() => {
-    if (busdevLeads.length > 10) {
-      const idx = new MiniSearch({
-        fields: ["surname", "given_name", "id"],
-        storeFields: ["surname", "given_name", "id"],
-      });
-      idx.addAll(busdevLeads as any);
-      busdevLeadsIndex = idx;
-    } else {
-      busdevLeadsIndex = null;
-    }
-  });
+  // Initialize busdevLeads store
+  busdevLeads.init();
 
   interface ClientContactWithTempId extends ClientContactsRecord {
     tempId: string;
@@ -92,15 +46,6 @@
   });
   let newContacts = $state([] as ClientContactWithTempId[]);
   let clientContactsToDelete = $state([] as (ClientContactsResponse | ClientContactWithTempId)[]);
-
-  const formatLead = (lead: SearchResult | undefined) => {
-    const surname = (lead?.surname as string | undefined)?.trim();
-    const given = (lead?.given_name as string | undefined)?.trim();
-    if (surname && given) return `${surname}, ${given}`;
-    if (surname) return surname;
-    if (given) return given;
-    return "Not assigned";
-  };
 
   async function save(event: Event) {
     event.preventDefault();
@@ -220,11 +165,11 @@
 >
   <DsTextInput bind:value={item.name as string} {errors} fieldName="name" uiName="Name" />
 
-  {#if busdevLeads.length > 0}
-    {#if busdevLeads.length <= 10}
+  {#if $busdevLeads.items.length > 0}
+    {#if $busdevLeads.items.length <= 10}
       <DsSelector
         bind:value={item.business_development_lead as string}
-        items={[{ id: "", given_name: "", surname: "" }, ...busdevLeads]}
+        items={[{ id: "", given_name: "", surname: "" }, ...$busdevLeads.items]}
         {errors}
         fieldName="business_development_lead"
         uiName="Business Development Lead"
@@ -237,10 +182,10 @@
           {/if}
         {/snippet}
       </DsSelector>
-    {:else if busdevLeadsIndex !== null}
+    {:else if $busdevLeads.index !== null}
       <DSAutoComplete
         bind:value={item.business_development_lead as string}
-        index={busdevLeadsIndex}
+        index={$busdevLeads.index}
         {errors}
         fieldName="business_development_lead"
         uiName="Business Development Lead"
@@ -251,7 +196,7 @@
         {/snippet}
       </DSAutoComplete>
     {/if}
-  {:else if loadingLeads}
+  {:else if $busdevLeads.loading}
     <span class="text-sm text-neutral-500">Loading business development leads…</span>
   {:else}
     <span class="text-sm text-neutral-500">No eligible Business Development Leads found.</span>

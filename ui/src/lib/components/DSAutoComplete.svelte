@@ -137,6 +137,9 @@
 
   function clearValue() {
     value = "";
+    searchQuery = "";
+    results = [];
+    selectedIndex = -1;
   }
 
   function clearInput() {

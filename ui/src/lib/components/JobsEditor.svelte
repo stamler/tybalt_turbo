@@ -25,6 +25,7 @@
   } from "$lib/pocketbase-types";
   import type { JobApiResponse } from "$lib/stores/jobs";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
+  import { busdevLeads } from "$lib/stores/busdevLeads";
   let { data }: { data: JobsPageData } = $props();
 
   // initialize the stores, noop if already initialized
@@ -80,6 +81,16 @@
   // Allocations editor state
   type AllocationRow = { division: string; hours: number };
   let allocations = $state([] as AllocationRow[]);
+
+  // Add Client popover state
+  let showAddClientPopover = $state(false);
+  let newClientName = $state("");
+  let newClientBusdevLead = $state("");
+  let newClientSubmitting = $state(false);
+  let newClientError = $state<string | null>(null);
+
+  // Initialize busdevLeads store for the Add Client popover
+  busdevLeads.init();
 
   const alternateManagerErrorMessage = "Alternate manager must be different from manager.";
 
@@ -593,6 +604,58 @@
       goto("/jobs/list");
     }
   }
+
+  function openAddClientPopover() {
+    newClientName = "";
+    newClientBusdevLead = "";
+    newClientError = null;
+    showAddClientPopover = true;
+  }
+
+  function closeAddClientPopover() {
+    showAddClientPopover = false;
+    newClientName = "";
+    newClientBusdevLead = "";
+    newClientError = null;
+  }
+
+  async function createNewClient() {
+    if (!newClientName.trim()) {
+      newClientError = "Name is required";
+      return;
+    }
+    if (!newClientBusdevLead.trim()) {
+      newClientError = "Business Development Lead is required";
+      return;
+    }
+
+    newClientSubmitting = true;
+    newClientError = null;
+
+    try {
+      const createdClient = await pb.collection("clients").create({
+        name: newClientName.trim(),
+        business_development_lead: newClientBusdevLead,
+      });
+
+      // Select the newly created client
+      // The realtime subscription will automatically update the store/index
+      item.client = createdClient.id;
+
+      closeAddClientPopover();
+    } catch (error: any) {
+      const hookErrors = error?.data?.data;
+      if (hookErrors?.name?.message) {
+        newClientError = hookErrors.name.message;
+      } else if (hookErrors?.business_development_lead?.message) {
+        newClientError = hookErrors.business_development_lead.message;
+      } else {
+        newClientError = error?.message ?? "Failed to create client";
+      }
+    } finally {
+      newClientSubmitting = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -729,18 +792,30 @@
   />
 
   {#if $clients.index !== null}
-    <DsAutoComplete
-      bind:value={item.client as string}
-      index={$clients.index}
-      {errors}
-      fieldName="client"
-      uiName="Client"
-      disabled={(data as JobsPageData).editing === false &&
-        (item as any).parent &&
-        (item as any).parent !== ""}
-    >
-      {#snippet resultTemplate(client)}{client.name}{/snippet}
-    </DsAutoComplete>
+    <div class="flex w-full items-end gap-1">
+      <div class="flex-1">
+        <DsAutoComplete
+          bind:value={item.client as string}
+          index={$clients.index}
+          {errors}
+          fieldName="client"
+          uiName="Client"
+          disabled={(data as JobsPageData).editing === false &&
+            (item as any).parent &&
+            (item as any).parent !== ""}
+        >
+          {#snippet resultTemplate(client)}{client.name}{/snippet}
+        </DsAutoComplete>
+      </div>
+      {#if !item.client}
+        <DsActionButton
+          action={openAddClientPopover}
+          icon="feather:plus-circle"
+          color="green"
+          title="Add new client"
+        />
+      {/if}
+    </div>
   {/if}
 
   <div class="flex w-full gap-2 {errors.contact !== undefined ? 'bg-red-200' : ''}">
@@ -1120,6 +1195,93 @@
           disabled={statusCommentSubmitting}
         >
           {statusCommentSubmitting ? "Saving..." : "Add Comment & Set Status"}
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- Add Client Popover -->
+{#if showAddClientPopover}
+  <div class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+      <h2 class="mb-4 text-xl font-bold">Add New Client</h2>
+      
+      <div class="mb-4 flex flex-col gap-4">
+        <div class="flex flex-col gap-1">
+          <label class="text-sm font-semibold" for="new_client_name">Name</label>
+          <input
+            id="new_client_name"
+            type="text"
+            class="rounded border border-neutral-300 px-2 py-1"
+            placeholder="Client name"
+            bind:value={newClientName}
+            disabled={newClientSubmitting}
+          />
+        </div>
+
+        <div class="flex flex-col gap-1">
+          {#if $busdevLeads.items.length > 0}
+            {#if $busdevLeads.items.length <= 10}
+              <DsSelector
+                bind:value={newClientBusdevLead}
+                items={[{ id: "", given_name: "", surname: "" }, ...$busdevLeads.items]}
+                errors={{}}
+                fieldName="new_client_busdev_lead"
+                uiName="Business Development Lead"
+              >
+                {#snippet optionTemplate(option)}
+                  {#if option.id === ""}
+                    -- select --
+                  {:else}
+                    {option.surname}{option.given_name ? `, ${option.given_name}` : ""}
+                  {/if}
+                {/snippet}
+              </DsSelector>
+            {:else if $busdevLeads.index !== null}
+              <DsAutoComplete
+                bind:value={newClientBusdevLead}
+                index={$busdevLeads.index}
+                errors={{}}
+                fieldName="new_client_busdev_lead"
+                uiName="Business Development Lead"
+                idField="id"
+              >
+                {#snippet resultTemplate(option)}
+                  {option.surname}{option.given_name ? `, ${option.given_name}` : ""}
+                {/snippet}
+              </DsAutoComplete>
+            {/if}
+          {:else if $busdevLeads.loading}
+            <span class="text-sm font-semibold">Business Development Lead</span>
+            <span class="text-sm text-neutral-500">Loading business development leads…</span>
+          {:else}
+            <span class="text-sm font-semibold">Business Development Lead</span>
+            <span class="text-sm text-neutral-500">No eligible Business Development Leads found.</span>
+          {/if}
+        </div>
+      </div>
+
+      {#if newClientError}
+        <p class="mb-4 text-sm text-red-600">{newClientError}</p>
+      {/if}
+
+      <div class="flex justify-end gap-2">
+        <button
+          type="button"
+          class="rounded bg-neutral-200 px-4 py-2 text-neutral-700 hover:bg-neutral-300"
+          onclick={closeAddClientPopover}
+          disabled={newClientSubmitting}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+          onclick={createNewClient}
+          disabled={newClientSubmitting}
+        >
+          {newClientSubmitting ? "Creating..." : "Create Client"}
         </button>
       </div>
     </div>
