@@ -166,7 +166,7 @@ func TestValidateRateSheetIsActive_InactiveRateSheet(t *testing.T) {
 	record := core.NewRecord(jobsCollection)
 	record.Set("rate_sheet", "c41ofep525bcacj")
 
-	err = validateRateSheetIsActive(app, record)
+	err = validateRateSheetIsActive(app, record, nil)
 	if err == nil {
 		t.Error("expected error when setting inactive rate sheet, got nil")
 	}
@@ -192,7 +192,7 @@ func TestValidateRateSheetIsActive_RequiredForNewProject(t *testing.T) {
 	record.Set("project_award_date", "2025-01-15")
 	// rate_sheet intentionally left empty
 
-	err = validateRateSheetIsActive(app, record)
+	err = validateRateSheetIsActive(app, record, nil)
 	if err == nil {
 		t.Error("expected error when creating project without rate_sheet, got nil")
 	}
@@ -235,7 +235,7 @@ func TestValidateRateSheetIsActive_NotRequiredForExistingProject(t *testing.T) {
 	existingRecord.Set("description", "Updated description for test")
 
 	// Should not fail because rate_sheet isn't being changed
-	err = validateRateSheetIsActive(app, existingRecord)
+	err = validateRateSheetIsActive(app, existingRecord, nil)
 	if err != nil {
 		t.Errorf("expected no error when updating existing project without rate_sheet, got: %v", err)
 	}
@@ -262,7 +262,7 @@ func TestValidateRateSheetIsActive_SkippedForProposal(t *testing.T) {
 	record.Set("proposal_submission_due_date", "2025-01-20")
 	// rate_sheet intentionally left empty
 
-	err = validateRateSheetIsActive(app, record)
+	err = validateRateSheetIsActive(app, record, nil)
 	if err != nil {
 		t.Errorf("expected no error for proposal without rate_sheet, got: %v", err)
 	}
@@ -332,7 +332,7 @@ func TestValidateRateSheetIsActive_ChangeToInactiveRejected(t *testing.T) {
 	// Try to change to inactive rate_sheet
 	project.Set("rate_sheet", "test_empty_sheet")
 
-	err = validateRateSheetIsActive(app, project)
+	err = validateRateSheetIsActive(app, project, nil)
 	if err == nil {
 		t.Error("expected error when changing to inactive rate_sheet, got nil")
 	}
@@ -346,3 +346,187 @@ func TestValidateRateSheetIsActive_ChangeToInactiveRejected(t *testing.T) {
 		t.Error("expected error on rate_sheet field")
 	}
 }
+
+// TestValidateRateSheetIsActive_ChangeRequiresClaim verifies that changing
+// an existing project's rate_sheet requires the rate_sheet_revise claim.
+//
+// Test data in test_pb_data/data.db:
+//   - jobs: "test_job_w_rs" (98-8001, project with rate_sheet c41ofep525bcacj)
+//   - rate_sheets: "test_rs_alt_actv" (Test Alternative Active Rate Sheet)
+//   - users: "dkv192wxprcqmho" (francesco@mac.com, no rate_sheet_revise claim)
+func TestValidateRateSheetIsActive_ChangeRequiresClaim(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	// Get the test job with rate_sheet set
+	job, err := app.FindRecordById("jobs", "test_job_w_rs")
+	if err != nil {
+		t.Fatalf("failed to find test job: %v", err)
+	}
+
+	// Verify it has a rate_sheet
+	if job.GetString("rate_sheet") == "" {
+		t.Fatal("test expects job with rate_sheet set")
+	}
+
+	// Get a user without the rate_sheet_revise claim
+	userWithoutClaim, err := app.FindRecordById("users", "dkv192wxprcqmho") // francesco@mac.com
+	if err != nil {
+		t.Fatalf("failed to find user: %v", err)
+	}
+
+	// Try to change rate_sheet without the claim - should fail
+	job.Set("rate_sheet", "test_rs_alt_actv")
+	err = validateRateSheetIsActive(app, job, userWithoutClaim)
+	if err == nil {
+		t.Error("expected error when changing rate_sheet without claim, got nil")
+	}
+
+	hookErr, ok := err.(*errs.HookError)
+	if !ok {
+		t.Fatalf("expected HookError, got %T", err)
+	}
+	if hookErr.Status != 403 {
+		t.Errorf("expected status 403, got %d", hookErr.Status)
+	}
+}
+
+// TestValidateRateSheetIsActive_ChangeAllowedWithClaim verifies that changing
+// an existing project's rate_sheet succeeds with the rate_sheet_revise claim.
+//
+// Test data in test_pb_data/data.db:
+//   - jobs: "test_job_w_rs" (98-8001, project with rate_sheet c41ofep525bcacj)
+//   - rate_sheets: "test_rs_alt_actv" (Test Alternative Active Rate Sheet)
+//   - user_claims: "test_uc_rs_revise" (links time@test.com to rate_sheet_revise)
+//   - users: "rzr98oadsp9qc11" (time@test.com, has rate_sheet_revise claim)
+func TestValidateRateSheetIsActive_ChangeAllowedWithClaim(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	// Get the test job with rate_sheet set
+	job, err := app.FindRecordById("jobs", "test_job_w_rs")
+	if err != nil {
+		t.Fatalf("failed to find test job: %v", err)
+	}
+
+	// Verify it has a rate_sheet
+	if job.GetString("rate_sheet") == "" {
+		t.Fatal("test expects job with rate_sheet set")
+	}
+
+	// Get the user with the rate_sheet_revise claim
+	userWithClaim, err := app.FindRecordById("users", "rzr98oadsp9qc11") // time@test.com
+	if err != nil {
+		t.Fatalf("failed to find user: %v", err)
+	}
+
+	// Change rate_sheet with the claim - should succeed
+	job.Set("rate_sheet", "test_rs_alt_actv")
+	err = validateRateSheetIsActive(app, job, userWithClaim)
+	if err != nil {
+		t.Errorf("expected no error when changing rate_sheet with claim, got: %v", err)
+	}
+}
+
+// TestValidateRateSheetIsActive_ClearingNotAllowed verifies that clearing
+// a job's rate_sheet (once set) is not allowed, regardless of claims.
+//
+// Test data in test_pb_data/data.db:
+//   - jobs: "test_job_w_rs" (98-8001, project with rate_sheet c41ofep525bcacj)
+//   - user_claims: "test_uc_rs_revise" (links time@test.com to rate_sheet_revise)
+//   - users: "rzr98oadsp9qc11" (time@test.com, has rate_sheet_revise claim)
+func TestValidateRateSheetIsActive_ClearingNotAllowed(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	// Get the test job with rate_sheet set
+	job, err := app.FindRecordById("jobs", "test_job_w_rs")
+	if err != nil {
+		t.Fatalf("failed to find test job: %v", err)
+	}
+
+	// Verify it has a rate_sheet
+	if job.GetString("rate_sheet") == "" {
+		t.Fatal("test expects job with rate_sheet set")
+	}
+
+	// Get the user with the rate_sheet_revise claim
+	userWithClaim, err := app.FindRecordById("users", "rzr98oadsp9qc11") // time@test.com
+	if err != nil {
+		t.Fatalf("failed to find user: %v", err)
+	}
+
+	// Try to clear rate_sheet - should fail even with the claim
+	job.Set("rate_sheet", "")
+	err = validateRateSheetIsActive(app, job, userWithClaim)
+	if err == nil {
+		t.Error("expected error when clearing rate_sheet, got nil")
+	}
+
+	hookErr, ok := err.(*errs.HookError)
+	if !ok {
+		t.Fatalf("expected HookError, got %T", err)
+	}
+	if _, exists := hookErr.Data["rate_sheet"]; !exists {
+		t.Error("expected error on rate_sheet field")
+	}
+	if hookErr.Data["rate_sheet"].Code != "cannot_clear" {
+		t.Errorf("expected error code 'cannot_clear', got %q", hookErr.Data["rate_sheet"].Code)
+	}
+}
+
+// TestValidateRateSheetIsActive_SetOnEmptyAllowed verifies that setting
+// rate_sheet on a job that previously had no rate_sheet is allowed without
+// the rate_sheet_revise claim.
+//
+// Test data in test_pb_data/data.db:
+//   - jobs: "u09fwwcg07y03m7" (24-291, project with no rate_sheet)
+func TestValidateRateSheetIsActive_SetOnEmptyAllowed(t *testing.T) {
+	app, err := tests.NewTestApp("../test_pb_data")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer app.Cleanup()
+
+	// Get an existing project without a rate_sheet
+	job, err := app.FindRecordById("jobs", "u09fwwcg07y03m7")
+	if err != nil {
+		t.Fatalf("failed to fetch job: %v", err)
+	}
+
+	// Verify it has no rate_sheet
+	if job.GetString("rate_sheet") != "" {
+		t.Fatalf("test expects job without rate_sheet, got: %q", job.GetString("rate_sheet"))
+	}
+
+	// Get a user without the claim
+	userWithoutClaim, err := app.FindRecordById("users", "rzr98oadsp9qc11") // time@test.com
+	if err != nil {
+		t.Fatalf("failed to find user: %v", err)
+	}
+
+	// Set rate_sheet - should succeed without special claim since it was empty
+	job.Set("rate_sheet", "c41ofep525bcacj") // active rate sheet
+	err = validateRateSheetIsActive(app, job, userWithoutClaim)
+	if err != nil {
+		t.Errorf("expected no error when setting rate_sheet on empty job, got: %v", err)
+	}
+}
+
+// Test fixtures in test_pb_data/data.db for rate_sheet_revise tests:
+//
+//   - jobs: "test_job_w_rs" (98-8001, project with rate_sheet c41ofep525bcacj)
+//   - rate_sheets: "test_rs_alt_actv" (Test Alternative Active Rate Sheet, active)
+//   - user_claims: "test_uc_rs_revise" (links time@test.com to rate_sheet_revise)
+//   - claims: "m3kzmuowqlzuic0" (rate_sheet_revise)
+//   - users: "rzr98oadsp9qc11" (time@test.com, HAS rate_sheet_revise claim)
+//   - users: "dkv192wxprcqmho" (francesco@mac.com, NO rate_sheet_revise claim)

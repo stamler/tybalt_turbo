@@ -55,7 +55,7 @@ func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Recor
 		return err
 	}
 
-	if err := validateRateSheetIsActive(app, jobRecord); err != nil {
+	if err := validateRateSheetIsActive(app, jobRecord, authRecord); err != nil {
 		return err
 	}
 
@@ -895,9 +895,9 @@ func jobHasClientNoteForStatus(app core.App, jobID string, targetStatus string) 
 //   - Proposals: skip validation (cleanJob clears rate_sheet for proposals)
 //   - New projects: rate_sheet is required and must be active
 //   - Existing projects: only validate if rate_sheet changed, and it must be active
-//
-// Clearing rate_sheet (setting to empty) on existing projects is allowed.
-func validateRateSheetIsActive(app core.App, record *core.Record) error {
+//   - Changing rate_sheet on existing projects requires rate_sheet_revise claim
+//   - Clearing rate_sheet (once set) is not allowed
+func validateRateSheetIsActive(app core.App, record *core.Record, authRecord *core.Record) error {
 	newRateSheet := record.GetString("rate_sheet")
 	isProposal := isProposalRecord(record)
 
@@ -919,21 +919,66 @@ func validateRateSheetIsActive(app core.App, record *core.Record) error {
 		}
 	}
 
-	// If rate_sheet is empty at this point, no further validation needed
-	// (only possible for updates to existing projects)
-	if newRateSheet == "" {
-		return nil
-	}
-
-	// Determine if rate_sheet is being set or changed
+	// Determine if rate_sheet is being changed on an existing record
 	var rateSheetChanged bool
+	var originalRateSheet string
 	if record.IsNew() {
 		// On create, any non-empty value counts as "being set"
-		rateSheetChanged = true
+		rateSheetChanged = newRateSheet != ""
 	} else {
-		// On update, only validate if the value changed
-		originalRateSheet := record.Original().GetString("rate_sheet")
+		// On update, check if the value changed
+		originalRateSheet = record.Original().GetString("rate_sheet")
 		rateSheetChanged = newRateSheet != originalRateSheet
+	}
+
+	// If rate_sheet had a value and is being changed, require rate_sheet_revise claim
+	// Clearing rate_sheet (once set) is not allowed
+	if !record.IsNew() && originalRateSheet != "" && rateSheetChanged {
+		// Cannot clear rate_sheet once it's been set
+		if newRateSheet == "" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "rate sheet cannot be cleared",
+				Data: map[string]errs.CodeError{
+					"rate_sheet": {
+						Code:    "cannot_clear",
+						Message: "a job's rate sheet cannot be cleared once set",
+					},
+				},
+			}
+		}
+
+		hasReviseClaim, err := utilities.HasClaim(app, authRecord, "rate_sheet_revise")
+		if err != nil {
+			return &errs.HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "error checking rate_sheet_revise claim",
+				Data: map[string]errs.CodeError{
+					"rate_sheet": {
+						Code:    "claim_check_failed",
+						Message: "unable to verify rate_sheet_revise claim",
+					},
+				},
+			}
+		}
+		if !hasReviseClaim {
+			return &errs.HookError{
+				Status:  http.StatusForbidden,
+				Message: "insufficient permissions to change rate sheet",
+				Data: map[string]errs.CodeError{
+					"rate_sheet": {
+						Code:    "missing_claim",
+						Message: "changing a job's rate sheet requires the rate_sheet_revise claim",
+					},
+				},
+			}
+		}
+	}
+
+	// If rate_sheet is empty at this point, no further validation needed
+	// (only possible for updates to existing projects, and we've already checked permissions)
+	if newRateSheet == "" {
+		return nil
 	}
 
 	if !rateSheetChanged {
