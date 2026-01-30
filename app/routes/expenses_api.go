@@ -43,6 +43,7 @@ type ExpensesAugmentedRow struct {
 	Total               float64 `db:"total" json:"total"`
 	PaymentType         string  `db:"payment_type" json:"payment_type"`
 	Attachment          string  `db:"attachment" json:"attachment"`
+	AttachmentHash      string  `db:"attachment_hash" json:"attachment_hash"`
 	Rejector            string  `db:"rejector" json:"rejector"`
 	Rejected            string  `db:"rejected" json:"rejected"`
 	RejectionReason     string  `db:"rejection_reason" json:"rejection_reason"`
@@ -72,6 +73,7 @@ type ExpensesAugmentedRow struct {
 	UIDName             string  `db:"uid_name" json:"uid_name"`
 	ApproverName        string  `db:"approver_name" json:"approver_name"`
 	RejectorName        string  `db:"rejector_name" json:"rejector_name"`
+	BranchName          string  `db:"branch_name" json:"branch_name"`
 }
 
 type PaginatedExpensesResponse struct {

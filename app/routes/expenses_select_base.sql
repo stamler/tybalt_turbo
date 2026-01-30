@@ -7,6 +7,7 @@ SELECT
   CAST(e.total AS REAL) AS total,
   e.payment_type,
   e.attachment,
+  e.attachment_hash,
   e.rejector,
   e.rejected,
   e.rejection_reason,
@@ -35,7 +36,8 @@ SELECT
   COALESCE(v.alias, '') AS vendor_alias,
   COALESCE(p0.given_name || ' ' || p0.surname, '') AS uid_name,
   COALESCE(p1.given_name || ' ' || p1.surname, '') AS approver_name,
-  COALESCE(p2.given_name || ' ' || p2.surname, '') AS rejector_name
+  COALESCE(p2.given_name || ' ' || p2.surname, '') AS rejector_name,
+  COALESCE(b.name, '') AS branch_name
 FROM expenses e
 LEFT JOIN jobs j ON e.job = j.id
 LEFT JOIN clients cl ON j.client = cl.id
@@ -46,4 +48,5 @@ LEFT JOIN profiles p0 ON e.uid = p0.uid
 LEFT JOIN profiles p1 ON e.approver = p1.uid
 LEFT JOIN profiles p2 ON e.rejector = p2.uid
 LEFT JOIN purchase_orders po ON e.purchase_order = po.id
+LEFT JOIN branches b ON e.branch = b.id
 
