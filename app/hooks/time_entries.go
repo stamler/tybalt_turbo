@@ -58,8 +58,9 @@ func cleanTimeEntry(app core.App, timeEntryRecord *core.Record) ([]string, error
 	}
 
 	// Certain fields are always allowed to be set. We add them to the list of
-	// allowed fields here.
-	allowedFields = append(allowedFields, "id", "uid", "created", "updated")
+	// allowed fields here. The role field is included because its requirement
+	// depends on job assignment, not the time_type.
+	allowedFields = append(allowedFields, "id", "uid", "created", "updated", "role")
 
 	// Load the admin_profiles record and set branch from the user's default_branch
 	uid := timeEntryRecord.GetString("uid")
@@ -81,6 +82,11 @@ func cleanTimeEntry(app core.App, timeEntryRecord *core.Record) ([]string, error
 			//log.Println("Removing field: ", key)
 			timeEntryRecord.Set(key, nil)
 		}
+	}
+
+	// Clear role if no job is assigned
+	if timeEntryRecord.GetString("job") == "" {
+		timeEntryRecord.Set("role", nil)
 	}
 
 	return requiredFields, nil
@@ -128,8 +134,14 @@ func validateTimeEntry(app core.App, timeEntryRecord *core.Record, requiredField
 		jobRecord, err := app.FindRecordById("jobs", jobID)
 		if err != nil || jobRecord == nil {
 			otherValidationsErrors["job"] = validation.Validate(jobID, validation.Required.Error("invalid job reference"))
-		} else if jobRecord.GetString("status") != "Active" {
-			otherValidationsErrors["job"] = validation.Validate(jobRecord.GetString("status"), validation.In("Active").Error("Job status must be Active"))
+		} else {
+			if jobRecord.GetString("status") != "Active" {
+				otherValidationsErrors["job"] = validation.Validate(jobRecord.GetString("status"), validation.In("Active").Error("Job status must be Active"))
+			}
+			// Role is required when a job is assigned
+			if timeEntryRecord.GetString("role") == "" {
+				otherValidationsErrors["role"] = validation.Validate(timeEntryRecord.Get("role"), validation.Required.Error("Role is required when a job is assigned"))
+			}
 		}
 	}
 
