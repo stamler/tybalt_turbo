@@ -14,6 +14,7 @@ export interface JobApiResponse {
 
 import { createCollectionStore } from "./collectionStore";
 import { pb } from "$lib/pocketbase";
+import { jobAwareTokenize } from "$lib/utils/jobTokenizer";
 
 // Helper that fetches all jobs via the custom endpoint
 const fetchAllJobs = async (): Promise<JobApiResponse[]> => {
@@ -42,6 +43,7 @@ export const jobs = createCollectionStore<any>(
     ],
     extractField: (document, fieldName) =>
       (document as Record<string, unknown>)[fieldName] as string,
+    tokenize: jobAwareTokenize,
   },
   // onCreate – fetch the full job via the API and add it
   async (item) => {

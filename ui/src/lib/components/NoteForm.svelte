@@ -5,6 +5,7 @@
   import DsAutocomplete from "$lib/components/DSAutoComplete.svelte";
   import type { ClientNote, NoteJobOption } from "$lib/types/notes";
   import MiniSearch from "minisearch";
+  import { jobAwareTokenize } from "$lib/utils/jobTokenizer";
 
   let {
     clientId,
@@ -19,7 +20,7 @@
   } = $props();
 
   let note = $state("");
-  let selectedJob = $state(preselectedJobId);
+  let selectedJob = $state("");
   let jobNotApplicable = $state(false);
   let errors = $state({} as Record<string, { message: string }>);
   let saving = $state(false);
@@ -28,6 +29,7 @@
     const index = new MiniSearch<NoteJobOption>({
       fields: ["id", "number", "description"],
       storeFields: ["id", "number", "description"],
+      tokenize: jobAwareTokenize,
       searchOptions: {
         prefix: true,
       },
@@ -40,10 +42,10 @@
     return index;
   }
 
-  let noteJobIndex = $state(buildJobIndex(jobs));
+  let noteJobIndex = $derived(buildJobIndex(jobs));
 
+  // Clear selectedJob if it's no longer in the jobs list
   $effect(() => {
-    noteJobIndex = buildJobIndex(jobs);
     if (selectedJob && !jobs.some((job) => job.id === selectedJob)) {
       selectedJob = "";
     }
