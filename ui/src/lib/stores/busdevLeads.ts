@@ -49,6 +49,9 @@ function createBusdevLeadsStore() {
         index = new MiniSearch({
           fields: ["surname", "given_name", "id"],
           storeFields: ["surname", "given_name", "id"],
+          searchOptions: {
+            combineWith: "AND",
+          },
         });
         index.addAll(list);
       }

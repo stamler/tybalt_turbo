@@ -5,7 +5,7 @@
   import DsAutocomplete from "$lib/components/DSAutoComplete.svelte";
   import type { ClientNote, NoteJobOption } from "$lib/types/notes";
   import MiniSearch from "minisearch";
-  import { jobAwareTokenize } from "$lib/utils/jobTokenizer";
+  import { jobAwareTokenize, jobAwareTokenizeSearch } from "$lib/utils/jobTokenizer";
 
   let {
     clientId,
@@ -32,6 +32,8 @@
       tokenize: jobAwareTokenize,
       searchOptions: {
         prefix: true,
+        combineWith: "AND",
+        tokenize: jobAwareTokenizeSearch,
       },
     });
 

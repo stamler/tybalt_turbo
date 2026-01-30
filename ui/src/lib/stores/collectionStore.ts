@@ -47,7 +47,14 @@ export function createCollectionStore<T extends BaseSystemFields>(
       : await pb.collection(collectionName).getFullList<T>(queryOptions);
     // Task completed
     tasks.endTask(taskId);
-    const itemsIndex = new MiniSearch<T>(indexOptions);
+    // Merge default searchOptions (AND logic) with any provided options
+    const itemsIndex = new MiniSearch<T>({
+      ...indexOptions,
+      searchOptions: {
+        combineWith: "AND",
+        ...indexOptions.searchOptions,
+      },
+    });
     itemsIndex.addAll(items);
     store.update((state) => ({
       ...state,

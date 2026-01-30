@@ -15,6 +15,9 @@
       // include "id" to allow searching by id when a result is selected
       fields: ["id", "given_name", "surname", "email"],
       storeFields: ["id", "given_name", "surname", "email"],
+      searchOptions: {
+        combineWith: "AND",
+      },
     });
     autoCompleteIndex.addAll(availableRecords);
   }
@@ -22,7 +25,7 @@
 
 <AbsorbEditor
   collectionName="client_contacts"
-  targetRecordId={$page.params.kid}
+  targetRecordId={$page.params.kid!}
   {availableRecords}
   autoCompleteIndex={autoCompleteIndex as unknown as any}
 >
