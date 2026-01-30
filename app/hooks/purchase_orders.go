@@ -499,7 +499,25 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 		return hashErr
 	}
 	if attachmentHash != "" {
-		// New file uploaded - set computed hash
+		// New file uploaded - check for duplicate before setting hash
+		// Look for existing purchase order with the same attachment hash (excluding this record)
+		existingPO, _ := app.FindFirstRecordByFilter("purchase_orders", "attachment_hash = {:hash} && id != {:id}", dbx.Params{
+			"hash": attachmentHash,
+			"id":   record.Id,
+		})
+		if existingPO != nil {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "duplicate attachment detected",
+				Data: map[string]errs.CodeError{
+					"attachment": {
+						Code:    "duplicate_file",
+						Message: "This file has already been uploaded to another purchase order",
+					},
+				},
+			}
+		}
+
 		record.Set("attachment_hash", attachmentHash)
 	} else if record.GetString("attachment") == "" {
 		// Attachment was explicitly removed - clear the hash

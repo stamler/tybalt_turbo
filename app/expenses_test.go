@@ -3,6 +3,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -1794,6 +1796,287 @@ func TestCalculateMileageTotal(t *testing.T) {
 			t.Fatalf("expected total 2450.0, got %v", total)
 		}
 	})
+}
+
+// computeTestHash computes SHA256 hash of data and returns it as a hex string
+func computeTestHash(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
+}
+
+// TestExpensesCreate_DuplicateAttachmentFails verifies that creating an expense
+// with an attachment that has the same hash as an existing expense fails.
+func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Helper to create multipart form data with a specific file content
+	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "receipt.png")
+		if err != nil {
+			return nil, "", err
+		}
+		if _, err := fw.Write(fileContent); err != nil {
+			return nil, "", err
+		}
+		contentType := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, contentType, nil
+	}
+
+	// Use a specific file content that will produce a consistent hash
+	// Compute its SHA256 hash to set on the existing record
+	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xDE, 0xAD, 0xBE, 0xEF}
+	duplicateHash := computeTestHash(duplicateFileContent)
+
+	scenario := tests.ApiScenario{
+		Name:           "duplicate attachment fails with field-level error",
+		Method:         http.MethodPost,
+		URL:            "/api/collections/expenses/records",
+		ExpectedStatus: 400,
+		ExpectedContent: []string{
+			`"attachment":{"code":"duplicate_file"`,
+			`"message":"This file has already been uploaded to another expense"`,
+		},
+		ExpectedEvents: map[string]int{
+			"OnRecordCreateRequest": 1,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+			// Create an existing expense with the same attachment hash directly in DB
+			collection, err := app.FindCollectionByNameOrId("expenses")
+			if err != nil {
+				tb.Fatalf("failed to find expenses collection: %v", err)
+			}
+			record := core.NewRecord(collection)
+			record.Set("uid", "rzr98oadsp9qc11")
+			record.Set("date", "2024-08-01")
+			record.Set("division", "vccd5fo56ctbigh")
+			record.Set("description", "existing expense with attachment")
+			record.Set("pay_period_ending", "2024-08-10")
+			record.Set("payment_type", "Expense")
+			record.Set("total", 50)
+			record.Set("vendor", "2zqxtsmymf670ha")
+			record.Set("approver", "f2j5a8vk006baub")
+			record.Set("branch", "80875lm27v8wgi4")
+			record.Set("attachment_hash", duplicateHash)
+			if err := app.Save(record); err != nil {
+				tb.Fatalf("failed to create existing expense: %v", err)
+			}
+		},
+	}
+
+	// Create the request body for the duplicate attempt
+	b, ct, err := makeMultipartWithContent(`{
+		"uid": "rzr98oadsp9qc11",
+		"date": "2024-09-01",
+		"division": "vccd5fo56ctbigh",
+		"description": "second expense with same attachment",
+		"pay_period_ending": "2006-01-02",
+		"payment_type": "Expense",
+		"total": 99,
+		"vendor": "2zqxtsmymf670ha"
+	}`, duplicateFileContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scenario.Body = b
+	scenario.Headers = map[string]string{"Authorization": recordToken, "Content-Type": ct}
+
+	scenario.Test(t)
+}
+
+// TestExpensesUpdate_DuplicateAttachmentFails verifies that updating an expense
+// with an attachment that has the same hash as another expense fails.
+func TestExpensesUpdate_DuplicateAttachmentFails(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Helper to create multipart form data with a specific file content
+	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "receipt.png")
+		if err != nil {
+			return nil, "", err
+		}
+		if _, err := fw.Write(fileContent); err != nil {
+			return nil, "", err
+		}
+		contentType := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, contentType, nil
+	}
+
+	// Use a specific file content that will produce a consistent hash
+	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xCA, 0xFE, 0xBA, 0xBE}
+	duplicateHash := computeTestHash(duplicateFileContent)
+
+	scenario := tests.ApiScenario{
+		Name:           "updating expense with duplicate attachment fails",
+		Method:         http.MethodPatch,
+		URL:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+		ExpectedStatus: 400,
+		ExpectedContent: []string{
+			`"attachment":{"code":"duplicate_file"`,
+			`"message":"This file has already been uploaded to another expense"`,
+		},
+		ExpectedEvents: map[string]int{
+			"OnRecordUpdateRequest": 1,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+			// Create an existing expense with the same attachment hash directly in DB
+			collection, err := app.FindCollectionByNameOrId("expenses")
+			if err != nil {
+				tb.Fatalf("failed to find expenses collection: %v", err)
+			}
+			record := core.NewRecord(collection)
+			record.Set("uid", "f2j5a8vk006baub") // Different user to avoid conflicts
+			record.Set("date", "2024-08-01")
+			record.Set("division", "vccd5fo56ctbigh")
+			record.Set("description", "expense with attachment for update test")
+			record.Set("pay_period_ending", "2024-08-10")
+			record.Set("payment_type", "Expense")
+			record.Set("total", 50)
+			record.Set("vendor", "2zqxtsmymf670ha")
+			record.Set("approver", "etysnrlup2f6bak")
+			record.Set("branch", "80875lm27v8wgi4")
+			record.Set("attachment_hash", duplicateHash)
+			if err := app.Save(record); err != nil {
+				tb.Fatalf("failed to create existing expense: %v", err)
+			}
+		},
+	}
+
+	// Create the request body for the update with duplicate attachment
+	b, ct, err := makeMultipartWithContent(`{
+		"date": "2024-09-01",
+		"division": "vccd5fo56ctbigh",
+		"description": "trying to update with duplicate attachment",
+		"payment_type": "Expense",
+		"total": 99,
+		"vendor": "2zqxtsmymf670ha"
+	}`, duplicateFileContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scenario.Body = b
+	scenario.Headers = map[string]string{"Authorization": recordToken, "Content-Type": ct}
+
+	scenario.Test(t)
+}
+
+// TestExpensesUpdate_SameAttachmentSucceeds verifies that updating an expense
+// with the same attachment file (re-uploading its own file) succeeds.
+func TestExpensesUpdate_SameAttachmentSucceeds(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Helper to create multipart form data with a specific file content
+	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "receipt.png")
+		if err != nil {
+			return nil, "", err
+		}
+		if _, err := fw.Write(fileContent); err != nil {
+			return nil, "", err
+		}
+		contentType := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, contentType, nil
+	}
+
+	// Use a specific file content
+	fileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x12, 0x34, 0x56, 0x78}
+	existingHash := computeTestHash(fileContent)
+
+	// The test expense record "2gq9uyxmkcyopa4" is owned by user "rzr98oadsp9qc11"
+	// We'll set its attachment_hash to our hash, then try to update it with the same file
+	scenario := tests.ApiScenario{
+		Name:           "updating expense with its own attachment succeeds",
+		Method:         http.MethodPatch,
+		URL:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+		ExpectedStatus: 200,
+		ExpectedContent: []string{
+			`"description":"updated description"`,
+		},
+		ExpectedEvents: map[string]int{
+			"OnRecordUpdate": 1,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+			// Set the attachment_hash on the existing expense to match what we'll upload
+			expense, err := app.FindRecordById("expenses", "2gq9uyxmkcyopa4")
+			if err != nil {
+				tb.Fatalf("failed to find expense: %v", err)
+			}
+			expense.Set("attachment_hash", existingHash)
+			if err := app.Save(expense); err != nil {
+				tb.Fatalf("failed to update expense: %v", err)
+			}
+		},
+	}
+
+	// Create the request body with the same file content
+	b, ct, err := makeMultipartWithContent(`{
+		"date": "2024-09-01",
+		"division": "vccd5fo56ctbigh",
+		"description": "updated description",
+		"payment_type": "Expense",
+		"total": 99,
+		"vendor": "2zqxtsmymf670ha"
+	}`, fileContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scenario.Body = b
+	scenario.Headers = map[string]string{"Authorization": recordToken, "Content-Type": ct}
+
+	scenario.Test(t)
 }
 
 // TestExpensesCreate_InactiveApproverFails verifies that creating an expense

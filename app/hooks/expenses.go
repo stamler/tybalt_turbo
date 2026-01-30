@@ -388,7 +388,25 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		return hashErr
 	}
 	if attachmentHash != "" {
-		// New file uploaded - set computed hash
+		// New file uploaded - check for duplicate before setting hash
+		// Look for existing expense with the same attachment hash (excluding this record)
+		existingExpense, _ := app.FindFirstRecordByFilter("expenses", "attachment_hash = {:hash} && id != {:id}", dbx.Params{
+			"hash": attachmentHash,
+			"id":   expenseRecord.Id,
+		})
+		if existingExpense != nil {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "duplicate attachment detected",
+				Data: map[string]errs.CodeError{
+					"attachment": {
+						Code:    "duplicate_file",
+						Message: "This file has already been uploaded to another expense",
+					},
+				},
+			}
+		}
+
 		log.Println("attachmentHash", attachmentHash)
 		expenseRecord.Set("attachment_hash", attachmentHash)
 	} else if expenseRecord.GetString("attachment") == "" {

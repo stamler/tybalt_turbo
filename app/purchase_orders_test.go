@@ -2,6 +2,8 @@ package main
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -16,6 +18,12 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
+
+// computePOTestHash computes SHA256 hash of data and returns it as a hex string
+func computePOTestHash(data []byte) string {
+	h := sha256.Sum256(data)
+	return hex.EncodeToString(h[:])
+}
 
 func TestPurchaseOrdersCreate(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
@@ -1161,6 +1169,205 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	for _, scenario := range scenarios {
 		scenario.Test(t)
 	}
+}
+
+// TestPurchaseOrdersCreate_DuplicateAttachmentFails verifies that creating a purchase order
+// with an attachment that has the same hash as an existing purchase order fails.
+func TestPurchaseOrdersCreate_DuplicateAttachmentFails(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Helper to create multipart form data with a specific file content
+	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "receipt.png")
+		if err != nil {
+			return nil, "", err
+		}
+		if _, err := fw.Write(fileContent); err != nil {
+			return nil, "", err
+		}
+		contentType := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, contentType, nil
+	}
+
+	// Use a specific file content that will produce a consistent hash
+	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xAB, 0xCD, 0xEF, 0x01}
+	duplicateHash := computePOTestHash(duplicateFileContent)
+
+	scenario := tests.ApiScenario{
+		Name:           "duplicate attachment fails with field-level error",
+		Method:         http.MethodPost,
+		URL:            "/api/collections/purchase_orders/records",
+		ExpectedStatus: 400,
+		ExpectedContent: []string{
+			`"attachment":{"code":"duplicate_file"`,
+			`"message":"This file has already been uploaded to another purchase order"`,
+		},
+		ExpectedEvents: map[string]int{
+			"OnRecordCreateRequest": 1,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+			// Create an existing PO with the same attachment hash directly in DB
+			collection, err := app.FindCollectionByNameOrId("purchase_orders")
+			if err != nil {
+				tb.Fatalf("failed to find purchase_orders collection: %v", err)
+			}
+			record := core.NewRecord(collection)
+			record.Set("uid", "f2j5a8vk006baub") // Different user to avoid conflicts
+			record.Set("date", "2024-08-01")
+			record.Set("division", "vccd5fo56ctbigh")
+			record.Set("description", "existing PO with attachment")
+			record.Set("payment_type", "Expense")
+			record.Set("total", 500)
+			record.Set("approval_total", 500)
+			record.Set("vendor", "2zqxtsmymf670ha")
+			record.Set("approver", "etysnrlup2f6bak")
+			record.Set("status", "Unapproved")
+			record.Set("type", "Normal")
+			record.Set("attachment_hash", duplicateHash)
+			if err := app.Save(record); err != nil {
+				tb.Fatalf("failed to create existing PO: %v", err)
+			}
+		},
+	}
+
+	// Create the request body for the duplicate attempt
+	b, ct, err := makeMultipartWithContent(`{
+		"uid": "rzr98oadsp9qc11",
+		"date": "2024-09-01",
+		"division": "vccd5fo56ctbigh",
+		"description": "second PO with same attachment",
+		"payment_type": "Expense",
+		"total": 600,
+		"vendor": "2zqxtsmymf670ha",
+		"approver": "etysnrlup2f6bak",
+		"status": "Unapproved",
+		"type": "Normal"
+	}`, duplicateFileContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scenario.Body = b
+	scenario.Headers = map[string]string{"Authorization": recordToken, "Content-Type": ct}
+
+	scenario.Test(t)
+}
+
+// TestPurchaseOrdersUpdate_DuplicateAttachmentFails verifies that updating a purchase order
+// with an attachment that has the same hash as another purchase order fails.
+func TestPurchaseOrdersUpdate_DuplicateAttachmentFails(t *testing.T) {
+	// Use author@soup.com who can update PO gal6e5la2fa4rpn (Unapproved status)
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Helper to create multipart form data with a specific file content
+	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
+		m := map[string]any{}
+		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
+			return nil, "", err
+		}
+		buf := &bytes.Buffer{}
+		w := multipart.NewWriter(buf)
+		for k, v := range m {
+			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
+				return nil, "", err
+			}
+		}
+		fw, err := w.CreateFormFile("attachment", "receipt.png")
+		if err != nil {
+			return nil, "", err
+		}
+		if _, err := fw.Write(fileContent); err != nil {
+			return nil, "", err
+		}
+		contentType := w.FormDataContentType()
+		if err := w.Close(); err != nil {
+			return nil, "", err
+		}
+		return buf, contentType, nil
+	}
+
+	// Use a specific file content that will produce a consistent hash
+	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xFE, 0xDC, 0xBA, 0x98}
+	duplicateHash := computePOTestHash(duplicateFileContent)
+
+	scenario := tests.ApiScenario{
+		Name:           "updating PO with duplicate attachment fails",
+		Method:         http.MethodPatch,
+		URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+		ExpectedStatus: 400,
+		ExpectedContent: []string{
+			`"attachment":{"code":"duplicate_file"`,
+			`"message":"This file has already been uploaded to another purchase order"`,
+		},
+		ExpectedEvents: map[string]int{
+			"OnRecordUpdateRequest": 1,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+			// Create an existing PO with the same attachment hash directly in DB
+			collection, err := app.FindCollectionByNameOrId("purchase_orders")
+			if err != nil {
+				tb.Fatalf("failed to find purchase_orders collection: %v", err)
+			}
+			record := core.NewRecord(collection)
+			record.Set("uid", "rzr98oadsp9qc11") // Different user
+			record.Set("date", "2024-08-01")
+			record.Set("division", "vccd5fo56ctbigh")
+			record.Set("description", "PO with attachment for update test")
+			record.Set("payment_type", "Expense")
+			record.Set("total", 500)
+			record.Set("approval_total", 500)
+			record.Set("vendor", "2zqxtsmymf670ha")
+			record.Set("approver", "etysnrlup2f6bak")
+			record.Set("status", "Unapproved")
+			record.Set("type", "Normal")
+			record.Set("attachment_hash", duplicateHash)
+			if err := app.Save(record); err != nil {
+				tb.Fatalf("failed to create existing PO: %v", err)
+			}
+		},
+	}
+
+	// Create the request body for the update with duplicate attachment
+	b, ct, err := makeMultipartWithContent(`{
+		"uid": "f2j5a8vk006baub",
+		"date": "2024-09-01",
+		"division": "vccd5fo56ctbigh",
+		"description": "trying to update with duplicate attachment",
+		"payment_type": "Expense",
+		"total": 2234.56,
+		"vendor": "2zqxtsmymf670ha",
+		"approver": "etysnrlup2f6bak",
+		"status": "Unapproved",
+		"type": "Cumulative"
+	}`, duplicateFileContent)
+	if err != nil {
+		t.Fatal(err)
+	}
+	scenario.Body = b
+	scenario.Headers = map[string]string{"Authorization": recordToken, "Content-Type": ct}
+
+	scenario.Test(t)
 }
 
 func TestPurchaseOrdersUpdate(t *testing.T) {
