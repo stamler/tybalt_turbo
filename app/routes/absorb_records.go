@@ -9,6 +9,7 @@ import (
 	"github.com/pocketbase/pocketbase/tools/subscriptions"
 	"golang.org/x/sync/errgroup"
 
+	"tybalt/absorb"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -75,7 +76,7 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) func(e *cor
 		}
 
 		// Check if the collection is supported and get configs
-		_, parentConstraint, err := GetConfigsAndTable(collectionName)
+		_, parentConstraint, err := absorb.GetRefConfigs(collectionName)
 		if err != nil {
 			return apis.NewApiError(http.StatusInternalServerError, "Failed to absorb records", err)
 		}
@@ -120,7 +121,7 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) func(e *cor
 
 func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAbsorb []string) error {
 	// Get reference configs based on collection name
-	refConfigs, _, err := GetConfigsAndTable(collectionName)
+	refConfigs, _, err := absorb.GetRefConfigs(collectionName)
 	if err != nil {
 		return fmt.Errorf("error getting reference configs: %w", err)
 	}
@@ -161,19 +162,6 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 		}
 		if existingAction != nil {
 			return fmt.Errorf("there is an existing absorb action for collection %s that must be undone or deleted first", collectionName)
-		}
-
-		// Check if a parent collection has a pending absorb that would conflict
-		blockedBy, _ := GetAbsorbDependencies(collectionName)
-		for _, parentCollection := range blockedBy {
-			parentAction, err := getAbsorbAction(txApp, parentCollection)
-			if err != nil {
-				return fmt.Errorf("error checking %s absorb action: %w", parentCollection, err)
-			}
-			if parentAction != nil {
-				return fmt.Errorf("cannot absorb %s while a %s absorb action exists; undo the %s absorb first",
-					collectionName, parentCollection, parentCollection)
-			}
 		}
 
 		// Serialize the records to be absorbed
@@ -323,7 +311,7 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 
 		// Step 2b: Check if a child collection has a pending absorb that depends on this one
 		// This enforces LIFO ordering - child absorbs must be undone before parent absorbs
-		_, blocks := GetAbsorbDependencies(collectionName)
+		blocks := absorb.GetUndoBlockers(collectionName)
 		for _, childCollection := range blocks {
 			childAction, err := getAbsorbAction(app, childCollection)
 			if err != nil {
@@ -430,80 +418,6 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 	}
 }
 
-// Get the configs and target table based on collection
-
-type RefConfig struct {
-	Table  string
-	Column string
-}
-
-// ParentConstraint enforces data integrity during record absorption by ensuring
-// that records being absorbed together must share the same parent relationship.
-// This prevents merging records that don't logically belong together.
-//
-// For example, when absorbing client_contacts, all records must belong to the same
-// client. The constraint specifies which collection and field must match across
-// all records being absorbed into the target record.
-type ParentConstraint struct {
-	Collection string // The parent collection that must match (e.g., "clients")
-	Field      string // The field that must have matching values (e.g., "client")
-}
-
-func GetConfigsAndTable(collectionName string) ([]RefConfig, *ParentConstraint, error) {
-	// TODO: Write configs for each collection that we want to be able to absorb
-	// against. This is a list of tables and their corresponding columns that need
-	// to be updated for each record based on the collection name.
-	switch collectionName {
-	case "clients":
-		return []RefConfig{
-			{"client_contacts", "client"},
-			{"client_notes", "client"},
-			{"jobs", "client"},
-			{"jobs", "job_owner"},
-		}, nil, nil
-
-	case "client_contacts":
-		return []RefConfig{
-				{"jobs", "contact"},
-			}, &ParentConstraint{
-				Collection: "clients",
-				Field:      "client",
-			}, nil
-
-	// Vendor collection: update references in purchase_orders and expenses
-	case "vendors":
-		return []RefConfig{
-			{"purchase_orders", "vendor"},
-			{"expenses", "vendor"},
-		}, nil, nil
-
-	// Add more cases as needed
-	default:
-		// return an error if the collection is not supported
-		return nil, nil, fmt.Errorf("unknown collection: %s", collectionName)
-	}
-}
-
-// GetAbsorbDependencies returns collections that must not have pending
-// absorb actions when operating on the given collection.
-//   - blockedBy: collections that block absorbing this collection
-//   - blocks: collections that block undoing this collection's absorb
-//
-// This enforces LIFO ordering of absorb/undo operations to prevent data
-// inconsistencies where undoing a parent absorb would reference records
-// that were deleted by a subsequent child absorb.
-func GetAbsorbDependencies(collectionName string) (blockedBy []string, blocks []string) {
-	switch collectionName {
-	case "clients":
-		// Undoing a clients absorb requires client_contacts records to still exist
-		return nil, []string{"client_contacts"}
-	case "client_contacts":
-		// Cannot absorb contacts while clients absorb is pending
-		return []string{"clients"}, nil
-	default:
-		return nil, nil
-	}
-}
 
 // getAbsorbAction returns the existing absorb action for the collection or nil if none exists
 func getAbsorbAction(app core.App, collectionName string) (*AbsorbAction, error) {

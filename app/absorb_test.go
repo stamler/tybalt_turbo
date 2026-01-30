@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"tybalt/absorb"
 	"tybalt/internal/testutils"
 	"tybalt/routes"
 
@@ -124,7 +125,7 @@ func TestAbsorbRecords(t *testing.T) {
 
 				// Step 4: Capture the initial state of all reference tables
 				// These tables contain foreign keys pointing to our records
-				refConfigs, _, err := routes.GetConfigsAndTable(tt.collectionName)
+				refConfigs, _, err := absorb.GetRefConfigs(tt.collectionName)
 				if err != nil {
 					t.Fatalf("failed to get ref configs: %v", err)
 				}
@@ -211,7 +212,7 @@ func TestAbsorbRecords(t *testing.T) {
 				}
 
 				// Step 6d: Verify all references were properly updated
-				refConfigs, _, err := routes.GetConfigsAndTable(tt.collectionName)
+				refConfigs, _, err := absorb.GetRefConfigs(tt.collectionName)
 				if err != nil {
 					t.Fatalf("failed to get ref configs: %v", err)
 				}
@@ -674,7 +675,7 @@ func TestUndoAbsorb(t *testing.T) {
 	initialRefCounts := make(map[string]int64)
 
 	// Get reference configs for the collection
-	refConfigs, _, err := routes.GetConfigsAndTable(collectionName)
+	refConfigs, _, err := absorb.GetRefConfigs(collectionName)
 	if err != nil {
 		t.Fatalf("failed to get ref configs: %v", err)
 	}
@@ -843,14 +844,15 @@ func TestUndoAbsorb(t *testing.T) {
 	}
 }
 
-// TestAbsorbBlockedByParentAbsorb verifies that absorbing client_contacts
-// is blocked when there's a pending clients absorb action.
+// TestAbsorbContactsAllowedAfterClientsAbsorb verifies that absorbing
+// client_contacts is allowed even when there's a pending clients absorb action.
+// The restriction only applies when trying to UNDO the clients absorb.
 //
 // Test fixtures in test_pb_data/data.db:
 //   - client: lb0fnenkeyitsny (target client)
 //   - client_contacts: nh5u9z3cyknjclv (target contact), nqy9f0oojeyzasa (contact to absorb)
 //   - job: test_absorb_contact_job (references nqy9f0oojeyzasa)
-func TestAbsorbBlockedByParentAbsorb(t *testing.T) {
+func TestAbsorbContactsAllowedAfterClientsAbsorb(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	defer app.Cleanup()
 
@@ -874,13 +876,19 @@ func TestAbsorbBlockedByParentAbsorb(t *testing.T) {
 		t.Fatal("clients absorb action should exist")
 	}
 
-	// Now try to absorb client_contacts - this should fail because clients absorb is pending
+	// Absorbing client_contacts should succeed - we only block UNDO, not the absorb itself
 	err = routes.AbsorbRecords(app, "client_contacts", targetContactID, []string{contactToAbsorbID})
-	if err == nil {
-		t.Fatal("expected error when absorbing client_contacts with pending clients absorb")
+	if err != nil {
+		t.Fatalf("absorbing client_contacts should be allowed after clients absorb: %v", err)
 	}
-	if !strings.Contains(err.Error(), "cannot absorb client_contacts while a clients absorb action exists") {
-		t.Errorf("unexpected error message: %v", err)
+
+	// Verify both absorb actions exist
+	contactsAction, err := app.FindFirstRecordByData("absorb_actions", "collection_name", "client_contacts")
+	if err != nil {
+		t.Fatalf("failed to find client_contacts absorb action: %v", err)
+	}
+	if contactsAction == nil {
+		t.Fatal("client_contacts absorb action should exist")
 	}
 }
 
@@ -959,10 +967,9 @@ func TestUnrelatedAbsorbsDoNotBlock(t *testing.T) {
 		t.Fatalf("failed to absorb clients: %v", err)
 	}
 
-	// Check if vendors collection has test data we can use
-	// If not, we'll just verify that the dependency lookup returns nil for vendors
-	blockedBy, blocks := routes.GetAbsorbDependencies("vendors")
-	if len(blockedBy) != 0 || len(blocks) != 0 {
+	// Verify that vendors has no dependencies (it's independent of clients/contacts)
+	blocks := absorb.GetUndoBlockers("vendors")
+	if len(blocks) != 0 {
 		t.Error("vendors should have no dependencies")
 	}
 
@@ -977,6 +984,67 @@ func TestUnrelatedAbsorbsDoNotBlock(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to delete clients absorb action: %v", err)
 	}
+}
+
+// TestCommitContactsBlockedByClientsAbsorb verifies that committing (deleting)
+// a client_contacts absorb action is blocked when a clients absorb action exists.
+// This prevents making the contacts absorb permanent while the clients undo
+// still depends on those contact records.
+//
+// Test fixtures in test_pb_data/data.db:
+//   - client: lb0fnenkeyitsny (target client)
+//   - client_contacts: nh5u9z3cyknjclv (target contact), nqy9f0oojeyzasa (contact to absorb)
+//   - job: test_absorb_contact_job (references nqy9f0oojeyzasa)
+func TestCommitContactsBlockedByClientsAbsorb(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Fixture IDs
+	targetClientID := "lb0fnenkeyitsny"
+	targetContactID := "nh5u9z3cyknjclv"   // Joe Muchico
+	contactToAbsorbID := "nqy9f0oojeyzasa" // Franklin Costanza
+
+	// First absorb clients
+	err := routes.AbsorbRecords(app, "clients", targetClientID, []string{"eldtxi3i4h00k8r"})
+	if err != nil {
+		t.Fatalf("failed to absorb clients: %v", err)
+	}
+
+	// Then absorb contacts (this is allowed)
+	err = routes.AbsorbRecords(app, "client_contacts", targetContactID, []string{contactToAbsorbID})
+	if err != nil {
+		t.Fatalf("failed to absorb client_contacts: %v", err)
+	}
+
+	// Get the client_contacts absorb action
+	contactsAction, err := app.FindFirstRecordByData("absorb_actions", "collection_name", "client_contacts")
+	if err != nil {
+		t.Fatalf("failed to find client_contacts absorb action: %v", err)
+	}
+
+	// Try to commit (delete) the client_contacts absorb - should fail
+	bookKeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:   "commit contacts absorb blocked by clients absorb",
+		Method: http.MethodDelete,
+		URL:    "/api/collections/absorb_actions/records/" + contactsAction.Id,
+		Headers: map[string]string{
+			"Authorization": bookKeeperToken,
+		},
+		ExpectedStatus: 400,
+		ExpectedContent: []string{
+			`cannot commit client_contacts absorb while clients absorb exists`,
+		},
+		TestAppFactory: func(t testing.TB) *tests.TestApp {
+			return app
+		},
+	}
+
+	scenario.Test(t)
 }
 
 // TestAbsorbAndUndoLIFOOrder verifies the valid LIFO flow:

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"strings"
+	"tybalt/absorb"
 	"tybalt/constants"
 	"tybalt/errs"
 	"tybalt/notifications"
@@ -246,6 +247,35 @@ func AddHooks(app core.App) {
 			}
 			return AnnotateHookError(e.App, e, hookErr)
 		}
+		return e.Next()
+	})
+
+	// Hook for absorb_actions: block deletion (commit) when a parent absorb depends on this one.
+	// For example, can't commit (delete) a client_contacts absorb while a clients absorb exists,
+	// because the clients undo depends on those contact records still existing.
+	app.OnRecordDeleteRequest("absorb_actions").BindFunc(func(e *core.RecordRequestEvent) error {
+		collectionName := e.Record.GetString("collection_name")
+		parentCollections := absorb.GetCommitBlockers(collectionName)
+
+		for _, parentCollection := range parentCollections {
+			// Check if a parent absorb action exists
+			parentAction, err := e.App.FindFirstRecordByData("absorb_actions", "collection_name", parentCollection)
+			if err != nil && err.Error() != "sql: no rows in result set" {
+				hookErr := &errs.HookError{
+					Status:  http.StatusInternalServerError,
+					Message: fmt.Sprintf("failed to check %s absorb action", parentCollection),
+				}
+				return AnnotateHookError(e.App, e, hookErr)
+			}
+			if parentAction != nil {
+				hookErr := &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: fmt.Sprintf("cannot commit %s absorb while %s absorb exists; commit or undo the %s absorb first", collectionName, parentCollection, parentCollection),
+				}
+				return AnnotateHookError(e.App, e, hookErr)
+			}
+		}
+
 		return e.Next()
 	})
 
