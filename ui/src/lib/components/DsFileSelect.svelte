@@ -88,13 +88,6 @@
           const target = e.target as HTMLInputElement;
           if (target.files) {
             newFileName = target.files[0].name;
-            /*
-              This line produces an ownership_invalid_mutation svelte error in the
-              console at runtime. It's possible this is an issue with Svelte 5, or
-              perhaps we can try to reimplement this component in a way that
-              binds the field itself to the file input rather than the record and
-              fieldName.
-            */
             (record as any)[fieldName as keyof T] = target.files[0];
           }
         }}
