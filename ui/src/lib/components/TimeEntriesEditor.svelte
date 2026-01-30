@@ -1,7 +1,14 @@
 <script lang="ts">
-  import { flatpickrAction, fetchCategories, applyDefaultDivisionOnce } from "$lib/utilities";
+  import { untrack } from "svelte";
+  import {
+    flatpickrAction,
+    fetchCategories,
+    applyDefaultDivisionOnce,
+    applyDefaultRoleOnce,
+  } from "$lib/utilities";
   import { divisions } from "$lib/stores/divisions";
   import { jobs } from "$lib/stores/jobs";
+  import { rateRoles } from "$lib/stores/rateRoles";
   import { timeTypes } from "$lib/stores/time_types";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
@@ -17,6 +24,7 @@
   jobs.init();
   divisions.init();
   timeTypes.init();
+  rateRoles.init();
 
   let { data }: { data: TimeEntriesPageData } = $props();
 
@@ -47,10 +55,18 @@
   const isWorkTime = $derived(hasTimeType(["R", "RT"]));
 
   let errors = $state({} as any);
-  let item = $state(data.item);
+  // Use untrack to capture initial value for form state (component recreates on navigation)
+  let item = $state(untrack(() => data.item));
 
   // Default division from caller's profile if creating and empty
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
+
+  // Default role from caller's profile if creating, has a job, and role is empty
+  $effect(() => {
+    if (item.job && item.job !== "") {
+      applyDefaultRoleOnce(item, data.editing);
+    }
+  });
 
   // given a list of time type codes, return true if the item's time type is in
   // the list
@@ -82,17 +98,23 @@
     // schema validation (!)
     // https://github.com/pocketbase/pocketbase/discussions/2881 so we
     // need a correct value in the payload just to make it to the hook
-    item.uid = $authStore?.model?.id;
+    const userId = $authStore?.model?.id;
+    if (!userId) {
+      errors = { global: { message: "You must be logged in to save time entries" } };
+      return;
+    }
+    item.uid = userId;
 
     // set a dummy value for week_ending to satisfy the schema non-empty
     // requirement. This will be changed in the backend to the correct
     // value every time a record is saved
     item.week_ending = "2006-01-02";
 
-    // if the job is empty, set the category and work_record to empty strings
+    // if the job is empty, clear job-related fields
     if (item.job === "") {
       item.category = "";
       item.work_record = "";
+      item.role = "";
     }
 
     try {
@@ -172,6 +194,17 @@
         uiName="Job"
       >
         {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+      </DsAutoComplete>
+    {/if}
+    {#if item.job && item.job !== "" && $rateRoles.index !== null}
+      <DsAutoComplete
+        bind:value={item.role as string}
+        index={$rateRoles.index}
+        {errors}
+        fieldName="role"
+        uiName="Role"
+      >
+        {#snippet resultTemplate(item)}{item.name}{/snippet}
       </DsAutoComplete>
     {/if}
   {/if}

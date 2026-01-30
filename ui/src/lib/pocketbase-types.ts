@@ -800,6 +800,7 @@ export type TimeEntriesRecord = {
   job: RecordIdString;
   meals_hours: number;
   payout_request_amount: number;
+  role: RecordIdString;
   time_type: RecordIdString;
   tsid: RecordIdString;
   uid: RecordIdString;
@@ -937,6 +938,7 @@ type TimeEntriesRecordExpands = {
   category: CategoriesRecord;
   division: DivisionsRecord;
   job: JobsRecord;
+  role: RateRolesRecord;
   time_type: TimeTypesRecord;
 };
 

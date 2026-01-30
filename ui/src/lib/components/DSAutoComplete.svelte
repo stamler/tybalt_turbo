@@ -180,7 +180,7 @@
   <div class="contents" onkeydown={keydown}>
     <span class="flex w-full gap-2">
       <label for={`autocomplete-input-${thisId}`}>{uiName}</label>
-      {#if value !== ""}
+      {#if value && value !== ""}
         <span class={disabled ? "opacity-50" : ""}>{@render resultTemplate(item)}</span>
         {#if !disabled}
           <DsActionButton action={clearValue}>Clear</DsActionButton>

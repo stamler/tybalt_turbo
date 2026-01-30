@@ -33,6 +33,7 @@ interface StoreState {
   profile: {
     id: string;
     default_division: string;
+    default_role: string;
     maxAge: number;
     lastRefresh: Date;
     unsubscribe?: () => void;
@@ -68,6 +69,7 @@ const createStore = () => {
     profile: {
       id: "",
       default_division: "",
+      default_role: "",
       maxAge: 3600 * 1000,
       lastRefresh: new Date(0),
       unsubscribe: undefined,
@@ -134,14 +136,15 @@ const createStore = () => {
         let unsubPromise: Promise<() => void> | undefined = undefined;
         try {
           unsubPromise = pb.collection("profiles").subscribe(profile.id, (e) => {
-            const newDefaultDivision =
-              (e?.record as unknown as ProfilesResponse)?.default_division ??
-              state.profile.default_division;
+            const rec = e?.record as unknown as ProfilesResponse;
+            const newDefaultDivision = rec?.default_division ?? state.profile.default_division;
+            const newDefaultRole = rec?.default_role ?? state.profile.default_role;
             update((s) => ({
               ...s,
               profile: {
                 ...s.profile,
                 default_division: newDefaultDivision,
+                default_role: newDefaultRole,
               },
             }));
           });
@@ -168,6 +171,7 @@ const createStore = () => {
           profile: {
             id: profile.id,
             default_division: profile.default_division ?? "",
+            default_role: profile.default_role ?? "",
             maxAge: state.profile.maxAge,
             lastRefresh: new Date(),
             unsubscribe,
@@ -198,6 +202,7 @@ const createStore = () => {
           profile: {
             id: "",
             default_division: "",
+            default_role: "",
             maxAge: state.profile.maxAge,
             lastRefresh: new Date(0),
             unsubscribe: undefined,

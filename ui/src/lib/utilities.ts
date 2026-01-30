@@ -419,6 +419,7 @@ export async function downloadZip(endpoint: string, fileName: string) {
 
 // --- Defaults helpers ---
 const appliedDivisionOnce = new WeakSet<object>();
+const appliedRoleOnce = new WeakSet<object>();
 const lastUidAppliedForItem = new WeakMap<object, string>();
 export function applyDefaultDivisionOnce(
   item: { division?: string } | null | undefined,
@@ -456,6 +457,21 @@ export function applyDefaultDivisionOnce(
   if ((!item.division || item.division === "") && dd) {
     item.division = dd as string;
     appliedDivisionOnce.add(item as object);
+  }
+}
+
+export function applyDefaultRoleOnce(
+  item: { role?: string } | null | undefined,
+  editing: boolean,
+) {
+  if (!item || editing) return;
+
+  // Apply default role only once per item instance
+  if (appliedRoleOnce.has(item as object)) return;
+  const dr = get(globalStore)?.profile?.default_role ?? "";
+  if ((!item.role || item.role === "") && dr) {
+    item.role = dr as string;
+    appliedRoleOnce.add(item as object);
   }
 }
 
