@@ -3,7 +3,7 @@ dbs:
     replicas:
       - type: s3
         bucket: ${LITESTREAM_BUCKET}
-        path: tybalt
+        path: litestream
         region: ${LITESTREAM_REGION:-us-east-1}
         endpoint: ${LITESTREAM_ENDPOINT:-https://fly.storage.tigris.dev}
         access-key-id: ${LITESTREAM_ACCESS_KEY_ID}

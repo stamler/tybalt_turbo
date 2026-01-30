@@ -55,6 +55,16 @@ func main() {
 	timeFlag := flag.Bool("time", false, "Import time_sheets, time_entries, time_amendments")
 	usersFlag := flag.Bool("users", false, "Import users, profiles, admin_profiles, user_claims, mileage_reset_dates")
 
+	// Rate table handling flag (used with --jobs)
+	// By default, rate tables (rate_sheets, rate_roles, rate_sheet_entries) are treated as seed
+	// data and preserved during import, similar to divisions, branches, and claims. This allows
+	// the test database's rate sheet configuration to remain intact across imports.
+	//
+	// Use --clear_rates to clear and reimport rate tables from Parquet files. This is useful when:
+	// - Rate sheet data has changed in the source system and needs to be refreshed
+	// - You want to replace test seed data with production rate sheet data
+	clearRatesFlag := flag.Bool("clear_rates", false, "Clear rate_sheets, rate_roles, rate_sheet_entries before import (used with --jobs)")
+
 	flag.Parse()
 
 	// Use the database path from the flag
@@ -111,23 +121,34 @@ func main() {
 		// =========================================================================
 		// PHASE: JOBS (--jobs)
 		// Tables: clients, client_contacts, client_notes, jobs, categories, job_time_allocations
+		//
+		// Rate tables (rate_sheets, rate_roles, rate_sheet_entries) are NOT cleared by default.
+		// These are treated as seed data, similar to divisions, branches, and claims. The test
+		// database contains rate sheet configuration that should persist across imports.
+		// Use --clear_rates to clear and reimport rate tables from Parquet files.
 		// =========================================================================
 		if *jobsFlag {
 			fmt.Println("Importing jobs phase: clients, contacts, client_notes, jobs, categories, job_time_allocations...")
 
-			// Delete all existing records before import (full replace)
-			// Order doesn't matter since foreign keys are disabled during deletion
-			err := deleteAllFromTables(targetDatabase, []string{
+			// Tables to clear before import (full replace)
+			tablesToClear := []string{
 				"job_time_allocations",
 				"jobs",
 				"client_contacts",
 				"client_notes",
 				"categories",
 				"clients",
-				"rate_sheet_entries",
-				"rate_sheets",
-				"rate_roles",
-			})
+			}
+
+			// Optionally clear rate tables when --clear_rates is specified
+			if *clearRatesFlag {
+				fmt.Println("  --clear_rates specified: clearing rate_sheets, rate_roles, rate_sheet_entries")
+				tablesToClear = append(tablesToClear, "rate_sheet_entries", "rate_sheets", "rate_roles")
+			}
+
+			// Delete all existing records before import
+			// Order doesn't matter since foreign keys are disabled during deletion
+			err := deleteAllFromTables(targetDatabase, tablesToClear)
 			if err != nil {
 				log.Fatalf("Failed to clear jobs phase tables: %v", err)
 			}
@@ -181,65 +202,70 @@ func main() {
 				true,              // Enable upsert for idempotency
 			)
 
-			// --- Load Rate Roles ---
-			// Rate roles must be loaded before rate_sheet_entries (FK constraint).
-			rateRoleInsertSQL := "INSERT INTO rate_roles (id, name) VALUES ({:id}, {:name})"
-			rateRoleBinder := func(item load.RateRole) dbx.Params {
-				return dbx.Params{
-					"id":   item.Id,
-					"name": item.Name,
+			// --- Load Rate Tables (only when --clear_rates is specified) ---
+			// Rate tables are treated as seed data by default and preserved across imports.
+			// When --clear_rates is specified, they are cleared above and reimported here.
+			if *clearRatesFlag {
+				// --- Load Rate Roles ---
+				// Rate roles must be loaded before rate_sheet_entries (FK constraint).
+				rateRoleInsertSQL := "INSERT INTO rate_roles (id, name) VALUES ({:id}, {:name})"
+				rateRoleBinder := func(item load.RateRole) dbx.Params {
+					return dbx.Params{
+						"id":   item.Id,
+						"name": item.Name,
+					}
 				}
-			}
-			load.FromParquet(
-				"./parquet/RateRoles.parquet",
-				targetDatabase,
-				"rate_roles",
-				rateRoleInsertSQL,
-				rateRoleBinder,
-				true,
-			)
+				load.FromParquet(
+					"./parquet/RateRoles.parquet",
+					targetDatabase,
+					"rate_roles",
+					rateRoleInsertSQL,
+					rateRoleBinder,
+					true,
+				)
 
-			// --- Load Rate Sheets ---
-			// Rate sheets must be loaded before jobs (FK) and rate_sheet_entries (FK).
-			rateSheetInsertSQL := "INSERT INTO rate_sheets (id, name, effective_date, revision, active) VALUES ({:id}, {:name}, {:effective_date}, {:revision}, {:active})"
-			rateSheetBinder := func(item load.RateSheet) dbx.Params {
-				return dbx.Params{
-					"id":             item.Id,
-					"name":           item.Name,
-					"effective_date": item.EffectiveDate,
-					"revision":       item.Revision,
-					"active":         item.Active,
+				// --- Load Rate Sheets ---
+				// Rate sheets must be loaded before jobs (FK) and rate_sheet_entries (FK).
+				rateSheetInsertSQL := "INSERT INTO rate_sheets (id, name, effective_date, revision, active) VALUES ({:id}, {:name}, {:effective_date}, {:revision}, {:active})"
+				rateSheetBinder := func(item load.RateSheet) dbx.Params {
+					return dbx.Params{
+						"id":             item.Id,
+						"name":           item.Name,
+						"effective_date": item.EffectiveDate,
+						"revision":       item.Revision,
+						"active":         item.Active,
+					}
 				}
-			}
-			load.FromParquet(
-				"./parquet/RateSheets.parquet",
-				targetDatabase,
-				"rate_sheets",
-				rateSheetInsertSQL,
-				rateSheetBinder,
-				true,
-			)
+				load.FromParquet(
+					"./parquet/RateSheets.parquet",
+					targetDatabase,
+					"rate_sheets",
+					rateSheetInsertSQL,
+					rateSheetBinder,
+					true,
+				)
 
-			// --- Load Rate Sheet Entries ---
-			// Rate sheet entries reference both rate_roles and rate_sheets.
-			rateSheetEntryInsertSQL := "INSERT INTO rate_sheet_entries (id, role, rate_sheet, rate, overtime_rate) VALUES ({:id}, {:role}, {:rate_sheet}, {:rate}, {:overtime_rate})"
-			rateSheetEntryBinder := func(item load.RateSheetEntry) dbx.Params {
-				return dbx.Params{
-					"id":            item.Id,
-					"role":          item.Role,
-					"rate_sheet":    item.RateSheet,
-					"rate":          item.Rate,
-					"overtime_rate": item.OvertimeRate,
+				// --- Load Rate Sheet Entries ---
+				// Rate sheet entries reference both rate_roles and rate_sheets.
+				rateSheetEntryInsertSQL := "INSERT INTO rate_sheet_entries (id, role, rate_sheet, rate, overtime_rate) VALUES ({:id}, {:role}, {:rate_sheet}, {:rate}, {:overtime_rate})"
+				rateSheetEntryBinder := func(item load.RateSheetEntry) dbx.Params {
+					return dbx.Params{
+						"id":            item.Id,
+						"role":          item.Role,
+						"rate_sheet":    item.RateSheet,
+						"rate":          item.Rate,
+						"overtime_rate": item.OvertimeRate,
+					}
 				}
+				load.FromParquet(
+					"./parquet/RateSheetEntries.parquet",
+					targetDatabase,
+					"rate_sheet_entries",
+					rateSheetEntryInsertSQL,
+					rateSheetEntryBinder,
+					true,
+				)
 			}
-			load.FromParquet(
-				"./parquet/RateSheetEntries.parquet",
-				targetDatabase,
-				"rate_sheet_entries",
-				rateSheetEntryInsertSQL,
-				rateSheetEntryBinder,
-				true,
-			)
 
 			// --- Load Jobs ---
 			// Define the specific SQL for the jobs table
