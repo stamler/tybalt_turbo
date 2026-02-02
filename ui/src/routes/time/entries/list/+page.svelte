@@ -157,6 +157,46 @@
   <div class="flex flex-col py-2">
     {#if Array.isArray(items)}
       {@const tallies = calculateTally(items)}
+      <!--
+        Daily Hours Totals (GitHub Issue #98)
+        
+        This implementation shows daily totals in the weekly footer for simplicity,
+        avoiding modifications to the DSList component.
+        
+        Alternative approaches for future consideration:
+        1. Add subgrouping to DSList (subGroupField, subGroupFooter props) to show
+           daily totals inline after each day's entries within the list
+        2. Create a specialized TimeEntriesList component with built-in date-based
+           subtotaling
+        3. Inject synthetic "total" rows into the data array (not recommended due
+           to type safety concerns)
+      -->
+      {@const dayNames = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]}
+      {@const dailyTotals = Object.entries(
+        items.reduce(
+          (acc, item) => {
+            const hours = (item.hours || 0) + (item.meals_hours || 0);
+            acc[item.date] = (acc[item.date] || 0) + hours;
+            return acc;
+          },
+          {} as Record<string, number>,
+        ),
+      )
+        .map(([date, total]) => ({
+          day: dayNames[new Date(date + "T00:00:00").getDay()],
+          total,
+          date,
+        }))
+        .filter(({ total }) => total > 0)
+        .sort((a, b) => a.date.localeCompare(b.date))}
+      <div class="mb-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
+        {#each dailyTotals as { day, total }}
+          <span class="whitespace-nowrap">
+            <span class="opacity-50">{day}:</span>
+            {total}h
+          </span>
+        {/each}
+      </div>
       <div class="headline_wrapper">
         <div class="headline">
           {tallies.workHoursTally.total + tallies.nonWorkHoursTally.total} hours
