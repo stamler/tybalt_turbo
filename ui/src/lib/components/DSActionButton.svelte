@@ -28,8 +28,9 @@
 
   const normalizedAction = $derived(typeof action === "string" ? () => goto(action) : action);
   const normalizedColor = $derived(color ?? "yellow");
+  const iconName = $derived(typeof icon === "string" ? icon : undefined);
   const isIconContent = $derived(
-    typeof icon === "string" && color !== undefined && title !== undefined,
+    iconName !== undefined && color !== undefined && title !== undefined,
   );
   const isTextContent = $derived(children !== undefined);
 </script>
@@ -50,10 +51,10 @@
       <LoadingAnimation />
     </span>
   {:else if isIconContent}
-    <Icon {icon} width="24px" class="flex h-6 items-center" />
+    <Icon icon={iconName!} width="24px" class="flex h-6 items-center" />
   {:else if isTextContent}
     <span class="flex h-6 items-center">
-      {@render children()}
+      {@render children!()}
     </span>
   {/if}
 </button>

@@ -5,7 +5,9 @@
 /* Tailwind v4 safelist replacements (former JS safelist patterns). */
 @source inline("border-{cyan,teal,red,green,orange,yellow,blue,purple,gray}-300");
 @source inline("bg-{cyan,teal,red,green,orange,yellow,blue,purple,gray}-100");
+@source inline("bg-{cyan,teal,red,green,orange,yellow,blue,purple,gray}-200");
 @source inline("text-{cyan,teal,red,green,orange,yellow,blue,purple,gray}-500");
+/* prettier-ignore */
 @source inline("{hover:,active:}{text,bg}-{cyan,teal,red,green,orange,yellow,blue,purple,gray}-{200,300,500,800}");
 @source inline("active:shadow-inner");
 @source inline("shadow-none");
