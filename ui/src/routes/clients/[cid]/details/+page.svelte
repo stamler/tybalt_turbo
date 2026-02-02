@@ -10,13 +10,14 @@
   type ClientJob = JobApiResponse & { created?: string };
 
   const { data } = $props<{ data: PageData }>();
-  const d = data as any; // widen for newly added fields (owner tab)
+  const d = $derived(data as any); // widen for newly added fields (owner tab)
   let jobs = $derived(data.jobs as ClientJob[]);
 
-  const leadName =
+  const leadName = $derived(
     data.client.lead_surname && data.client.lead_given_name
       ? `${data.client.lead_surname}, ${data.client.lead_given_name}`
-      : "Not assigned";
+      : "Not assigned"
+  );
 </script>
 
 <div class="mx-auto space-y-6 p-4">

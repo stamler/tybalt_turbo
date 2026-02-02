@@ -17,7 +17,7 @@
   } from "$lib/pocketbase-types";
   import type { AdminProfilesPageData } from "$lib/svelte-types";
   import { goto } from "$app/navigation";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import type { SearchResult } from "minisearch";
   import { divisions as divisionsStore } from "$lib/stores/divisions";
 
@@ -26,7 +26,7 @@
   let { data }: { data: AdminProfilesPageData & { divisions?: DivisionsResponse[] } } = $props();
 
   let errors = $state({} as Record<string, { message: string }>);
-  let item = $state({ ...data.item });
+  let item = $state(untrack(() => ({ ...data.item })));
 
   let branches = $state([] as BranchesResponse[]);
 
@@ -41,9 +41,9 @@
   let poApproverUserClaimId = $state<string | null>(null);
   let claimsLoaded = $state(false);
 
-  const initialPoApproverMaxAmount = normalizeNumber((data.item as any)?.po_approver_max_amount);
-  const initialPoApproverDivisions = normalizeDivisions((data.item as any)?.po_approver_divisions);
-  const initialPoApproverPropsId = ((data.item as any)?.po_approver_props_id as string) ?? null;
+  const initialPoApproverMaxAmount = untrack(() => normalizeNumber((data.item as any)?.po_approver_max_amount));
+  const initialPoApproverDivisions = untrack(() => normalizeDivisions((data.item as any)?.po_approver_divisions));
+  const initialPoApproverPropsId = untrack(() => ((data.item as any)?.po_approver_props_id as string) ?? null);
 
   let poApproverPropsId = $state(initialPoApproverPropsId);
   let poApproverMaxAmount = $state(initialPoApproverMaxAmount);

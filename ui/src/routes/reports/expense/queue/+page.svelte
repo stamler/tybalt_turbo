@@ -5,6 +5,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import { shortDate } from "$lib/utilities";
+  import { untrack } from "svelte";
 
   let { data }: { data: any } = $props();
 
@@ -30,7 +31,7 @@
     total: number;
   };
 
-  let rows: Row[] = $state(data.items || []);
+  let rows: Row[] = $state(untrack(() => data.items || []));
 
   async function commit(id: string) {
     try {

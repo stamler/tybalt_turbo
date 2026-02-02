@@ -6,9 +6,10 @@
   import { goto } from "$app/navigation";
   import type { PageData } from "./$types";
   import type { TimeAmendmentsAugmentedResponse } from "$lib/pocketbase-types";
+  import { untrack } from "svelte";
 
   let { data }: { data: PageData } = $props();
-  let items = $state(data.items);
+  let items = $state(untrack(() => data.items));
 
   function hoursString(item: TimeAmendmentsAugmentedResponse) {
     const hoursArray = [];

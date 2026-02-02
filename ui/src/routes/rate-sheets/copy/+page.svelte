@@ -4,13 +4,14 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { goto } from "$app/navigation";
   import type { PageData } from "./$types";
+  import { untrack } from "svelte";
 
   let { data }: { data: PageData } = $props();
 
-  const sourceSheet = data.sourceSheet;
-  const sourceEntries = data.sourceEntries;
-  const isRevising = data.isRevising;
-  const nextRevision = data.nextRevision;
+  const sourceSheet = untrack(() => data.sourceSheet);
+  const sourceEntries = untrack(() => data.sourceEntries);
+  const isRevising = untrack(() => data.isRevising);
+  const nextRevision = untrack(() => data.nextRevision);
 
   let errors = $state({} as Record<string, { message: string }>);
   let saveError = $state("");

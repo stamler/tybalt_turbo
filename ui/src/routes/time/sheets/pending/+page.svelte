@@ -6,9 +6,10 @@
   import type { TimeSheetTallyQueryRow } from "$lib/utilities";
   import { shortDate } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
+  import { untrack } from "svelte";
 
   let { data }: { data: PageData } = $props();
-  let items: TimeSheetTallyQueryRow[] = $state(data.items);
+  let items: TimeSheetTallyQueryRow[] = $state(untrack(() => data.items));
 
   async function approve(id: string) {
     try {

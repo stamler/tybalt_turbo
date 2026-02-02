@@ -4,9 +4,10 @@
   import type { PageData } from "./$types";
   import type { TimeSheetTallyQueryRow } from "$lib/utilities";
   import { shortDate } from "$lib/utilities";
+  import { untrack } from "svelte";
 
   let { data }: { data: PageData } = $props();
-  let items: TimeSheetTallyQueryRow[] = $state(data.items);
+  let items: TimeSheetTallyQueryRow[] = $state(untrack(() => data.items));
 </script>
 
 <DsList items={items as TimeSheetTallyQueryRow[]} search={true} inListHeader="Approved Time Sheets">

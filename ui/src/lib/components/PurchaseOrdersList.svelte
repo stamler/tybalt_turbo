@@ -17,14 +17,14 @@
   import { globalStore } from "$lib/stores/global";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   // import { toastStore, type ToastSettings } from "@skeletonlabs/skeleton";
 
   let rejectModal: RejectModal;
 
   // Load the initial data
   let { inListHeader, data }: { inListHeader?: string; data: PageData } = $props();
-  let items = $state(data.items);
+  let items = $state(untrack(() => data.items));
 
   // Subscribe to the base collection but update the items from the augmented
   // view

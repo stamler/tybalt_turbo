@@ -8,16 +8,16 @@
   import { globalStore } from "$lib/stores/global";
   import { shortDate } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { goto } from "$app/navigation";
 
   let { data }: { data: PageData } = $props();
-  let items = $state(data.items);
-  let tallies = $state(data.tallies);
-  let timeSheet = $state(data.timeSheet);
-  let approverInfo = $state(data.approverInfo as any);
-  let committerInfo = $state(data.committerInfo);
+  let items = $state(untrack(() => data.items));
+  let tallies = $state(untrack(() => data.tallies));
+  let timeSheet = $state(untrack(() => data.timeSheet));
+  let approverInfo = $state(untrack(() => data.approverInfo as any));
+  let committerInfo = $state(untrack(() => data.committerInfo));
   let rejectModal: RejectModal;
 
   // Subscribe to time entries changes for this specific time sheet

@@ -13,7 +13,7 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeAmendmentsPageData } from "$lib/svelte-types";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import type {
     TimeTypesRecord,
     DivisionsRecord,
@@ -69,7 +69,7 @@
   const isWorkTime = $derived(hasTimeType(["R", "RT"]));
 
   let errors = $state({} as any);
-  let item = $state(data.item);
+  let item = $state(untrack(() => data.item));
 
   // When subject user changes, default division to their profile default (if empty)
   $effect(() => {

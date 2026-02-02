@@ -10,7 +10,7 @@
   import { globalStore } from "$lib/stores/global";
   import { shortDate } from "$lib/utilities";
   import RejectModal from "$lib/components/RejectModal.svelte";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
   let rejectModal: RejectModal;
@@ -26,12 +26,12 @@
     data: { items: any; createdItemIsVisible?: any; totalPages?: number; limit?: number };
     endpoint: string;
   } = $props();
-  let items = $state(data.items);
-  let createdItemIsVisible = $state(data.createdItemIsVisible);
+  let items = $state(untrack(() => data.items));
+  let createdItemIsVisible = $state(untrack(() => data.createdItemIsVisible));
   let page = $state(1);
   let listLoading = $state(false);
-  let hasMore = $state((data.totalPages ?? 0) > 1);
-  const serverLimit = data.limit ?? 20;
+  let hasMore = $state(untrack(() => (data.totalPages ?? 0) > 1));
+  const serverLimit = untrack(() => data.limit ?? 20);
 
   // Subscribe to the base collection but update items using the details API
   let unsubscribeFunc: UnsubscribeFunc;

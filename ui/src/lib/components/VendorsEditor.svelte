@@ -5,11 +5,12 @@
   import DsActionButton from "./DSActionButton.svelte";
   import { goto } from "$app/navigation";
   import type { VendorsPageData } from "$lib/svelte-types";
+  import { untrack } from "svelte";
 
   let { data }: { data: VendorsPageData } = $props();
 
   let errors = $state({} as any);
-  let item = $state(data.item);
+  let item = $state(untrack(() => data.item));
 
   async function save(event: Event) {
     event.preventDefault();

@@ -7,17 +7,14 @@
   import DsToggle from "$lib/components/DSToggle.svelte";
   import Icon from "@iconify/svelte";
   import type { PageData } from "./$types";
+  import { untrack } from "svelte";
 
   let { data }: { data: PageData } = $props();
 
   // Local state for entries and rate sheet (for reactivity after updates)
-  // Using local variables to avoid "state_referenced_locally" warning
-  const initialEntries = data.entries;
-  const initialRateSheet = data.rateSheet;
-  const initialRoles = data.allRoles;
-  let entries = $state(initialEntries);
-  let rateSheet = $state(initialRateSheet);
-  let allRoles = $state(initialRoles);
+  let entries = $state(untrack(() => data.entries));
+  let rateSheet = $state(untrack(() => data.rateSheet));
+  let allRoles = $state(untrack(() => data.allRoles));
 
   // Admin check for editing capability
   const isAdmin = $derived($globalStore.claims.includes("admin"));
@@ -178,7 +175,7 @@
   );
 
   // Toggle value for DSToggle (string-based)
-  let activeToggleValue = $state(rateSheet.active ? "active" : "inactive");
+  let activeToggleValue = $state(untrack(() => rateSheet.active ? "active" : "inactive"));
   let isToggling = $state(false);
 
   // React to toggle value changes

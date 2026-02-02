@@ -26,10 +26,10 @@
     disabled?: boolean;
   } = $props();
 
-  const normalizedAction = typeof action === "string" ? () => goto(action) : action;
-  const normalizedColor = color ?? "yellow";
-  const isIconContent = typeof icon === "string" && color !== undefined && title !== undefined;
-  const isTextContent = children !== undefined;
+  const normalizedAction = $derived(typeof action === "string" ? () => goto(action) : action);
+  const normalizedColor = $derived(color ?? "yellow");
+  const isIconContent = $derived(typeof icon === "string" && color !== undefined && title !== undefined);
+  const isTextContent = $derived(children !== undefined);
 </script>
 
 <button

@@ -12,6 +12,7 @@
   import { managers } from "$lib/stores/managers";
   import { rateRoles } from "$lib/stores/rateRoles";
   import DsCheck from "$lib/components/DsCheck.svelte";
+  import { untrack } from "svelte";
 
   // initialize the stores, noop if already initialized
   divisions.init();
@@ -20,7 +21,7 @@
 
   let { data }: { data: PageData } = $props();
   let errors = $state({} as any);
-  let item = $state(data.item as ProfilesResponse);
+  let item = $state(untrack(() => data.item as ProfilesResponse));
   let saving = $state(false);
   let saveSuccess = $state(false);
 

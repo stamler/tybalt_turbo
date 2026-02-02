@@ -5,9 +5,10 @@
   import type { PageData } from "./$types";
   import type { TimeReportWeekEndingsResponse } from "$lib/pocketbase-types";
   import { downloadCSV, downloadZip } from "$lib/utilities";
+  import { untrack } from "svelte";
 
   let { data }: { data: PageData } = $props();
-  let weekEndings = $state(data.items);
+  let weekEndings = $state(untrack(() => data.items));
   let receiptsLoading = $state(false);
 
   async function fetchTimeReport(weekEnding: string, week: number) {

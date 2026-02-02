@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import { untrack } from "svelte";
 
   let {
     title,
@@ -13,7 +14,7 @@
     headerActions?: Snippet<[boolean]>;
   } = $props();
 
-  let isOpen = $state(!collapsed);
+  let isOpen = $state(untrack(() => !collapsed));
   let isCollapsed = $derived(!isOpen);
 
   $effect(() => {

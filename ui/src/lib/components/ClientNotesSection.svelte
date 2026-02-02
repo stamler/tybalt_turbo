@@ -6,6 +6,7 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import type { ClientNote, NoteJobOption } from "$lib/types/notes";
+  import { untrack } from "svelte";
 
   let {
     clientId,
@@ -17,8 +18,8 @@
     showFormInitially = false,
   } = $props();
 
-  let notes = $state([...initialNotes]);
-  let showNoteForm = $state(showFormInitially);
+  let notes = $state(untrack(() => [...initialNotes]));
+  let showNoteForm = $state(untrack(() => showFormInitially));
   let isLoading = $state(false);
 
   $effect(() => {

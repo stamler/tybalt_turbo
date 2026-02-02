@@ -10,12 +10,13 @@
   import { busdevLeads } from "$lib/stores/busdevLeads";
   import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
+  import { untrack } from "svelte";
 
   let { data }: { data: ClientsPageData } = $props();
 
   let errors = $state({} as any);
-  let item = $state(data.item);
-  let client_contacts = $state(data.client_contacts || []);
+  let item = $state(untrack(() => data.item));
+  let client_contacts = $state(untrack(() => data.client_contacts || []));
 
   item.business_development_lead = item.business_development_lead ?? "";
 

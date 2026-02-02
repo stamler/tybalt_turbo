@@ -11,9 +11,15 @@
   import { goto } from "$app/navigation";
   import { calculateTally } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
-  import { onMount, onDestroy } from "svelte";
+  import { onMount, onDestroy, untrack } from "svelte";
   let { data }: { data: PageData } = $props();
-  let items = $state(data.items);
+
+  // Local state for items that can be mutated by real-time subscriptions.
+  // untrack() suppresses the "initial value" warning - we handle reactivity via $effect.
+  let items = $state(untrack(() => data.items));
+  $effect(() => {
+    items = data.items;
+  });
 
   // Subscribe to the base collection but update the items from the augmented
   // view

@@ -16,6 +16,7 @@
   import CumulativePOOverflowModal from "./CumulativePOOverflowModal.svelte";
   import { jobs } from "$lib/stores/jobs";
   import { vendors } from "$lib/stores/vendors";
+  import { untrack } from "svelte";
 
   // initialize the stores, noop if already initialized
   jobs.init();
@@ -24,7 +25,7 @@
   let { data }: { data: ExpensesPageData } = $props();
 
   let errors = $state({} as any);
-  let item = $state(data.item);
+  let item = $state(untrack(() => data.item));
   let overflowModal: CumulativePOOverflowModal;
 
   let categories = $state([] as CategoriesResponse[]);

@@ -8,7 +8,7 @@ import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { authStore } from "$lib/stores/auth";
 import { get } from "svelte/store";
-import { ClientResponseError } from "pocketbase";
+import type { ClientResponseError } from "pocketbase";
 import type { Readable, Subscriber } from "svelte/store";
 
 interface ErrorMessage {

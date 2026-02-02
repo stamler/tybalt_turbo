@@ -14,6 +14,7 @@
   import type { CategoriesResponse, PoApproversResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DsLabel from "./DsLabel.svelte";
+  import { untrack } from "svelte";
 
   // initialize the stores, noop if already initialized
   jobs.init();
@@ -23,7 +24,7 @@
   let { data }: { data: PurchaseOrdersPageData } = $props();
 
   let errors = $state({} as any);
-  let item = $state(data.item);
+  let item = $state(untrack(() => data.item));
 
   const isRecurring = $derived(item.type === "Recurring");
   const isChildPO = $derived(item.parent_po !== "" && item.parent_po !== undefined);
