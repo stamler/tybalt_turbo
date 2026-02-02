@@ -1,4 +1,4 @@
-<script context="module">
+<script module>
   /* 
   This is a token input UI element. It is a text input that is used to input a
   list of strings. The input accepts regular text input and when a comma is

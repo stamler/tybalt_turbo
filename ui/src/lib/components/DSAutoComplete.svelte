@@ -1,4 +1,4 @@
-<script context="module">
+<script module>
   let idCounter = $state(0);
 </script>
 
