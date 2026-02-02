@@ -162,6 +162,7 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			LEFT JOIN profiles m ON ts.approver = m.uid
 			WHERE ts.week_ending = {:weekEnding}
 			  AND ts.committed != ''
+			  AND ts._imported = 0
 		`
 
 		var rows []timesheetExportRow
