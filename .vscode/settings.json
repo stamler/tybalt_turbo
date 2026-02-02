@@ -10,5 +10,11 @@
   "[svelte]": {
     "editor.defaultFormatter": "svelte.svelte-vscode"
   },
+  // Allow Tailwind v4 directives (e.g., @source) in CSS files.
+  "css.lint.unknownAtRules": "ignore",
+  // Keep Svelte component <style> blocks quiet with Tailwind directives.
+  "scss.lint.unknownAtRules": "ignore",
+  // Prevent Tailwind directives from showing as unknown in LESS contexts.
+  "less.lint.unknownAtRules": "ignore",
   "editor.tabSize": 2
 }

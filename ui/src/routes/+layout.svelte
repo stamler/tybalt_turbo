@@ -176,12 +176,12 @@
     {#if $navigating}
       <!-- Mobile navigation loading bar (green) -->
       <div
-        class="absolute bottom-0 left-0 right-0 h-[4px] animate-pulse bg-green-500 lg:hidden"
+        class="absolute right-0 bottom-0 left-0 h-[4px] animate-pulse bg-green-500 lg:hidden"
       ></div>
     {:else if $tasksLoading}
       <!-- Mobile tasks loading bar (purple) -->
       <div
-        class="absolute bottom-0 left-0 right-0 h-[4px] animate-pulse bg-purple-500 lg:hidden"
+        class="absolute right-0 bottom-0 left-0 h-[4px] animate-pulse bg-purple-500 lg:hidden"
       ></div>
     {/if}
   </header>
@@ -191,9 +191,9 @@
     <aside
       class={`fixed inset-y-0 left-0 w-screen transform bg-neutral-700 text-white transition-transform duration-300 ease-in-out lg:static lg:w-64 ${
         isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      } z-[1100]`}
+      } z-1100`}
     >
-      <div class="h-full overflow-y-auto overflow-x-hidden">
+      <div class="h-full overflow-x-hidden overflow-y-auto">
         <!-- Desktop brand header -->
         <div class="hidden h-10 items-center justify-between px-4 text-lg font-semibold lg:flex">
           <a href="/" class="text-white">𝕋𝕌ℝ𝔹𝕆</a>
@@ -216,7 +216,7 @@
         <nav class="mt-2 px-1">
           {#each navSections as section}
             <div class="mt-2">
-              <p class="p-2 text-lg font-semibold uppercase text-neutral-400 lg:text-xs">
+              <p class="p-2 text-lg font-semibold text-neutral-400 uppercase lg:text-xs">
                 {section.title}
               </p>
               {#each section.items as item}
@@ -226,7 +226,7 @@
                 >
                   <a
                     href={item.href}
-                    class="ml-4 flex h-full flex-grow items-center rounded pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
+                    class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
                     >{item.label}</a
                   >
                   {#if item.buttons}
@@ -251,12 +251,12 @@
             </div>
           {/each}
           {#if $authStore?.isValid}
-            <div class="mb-6 mt-2">
-              <p class="p-2 text-lg font-semibold uppercase text-neutral-400 lg:text-xs">Account</p>
+            <div class="mt-2 mb-6">
+              <p class="p-2 text-lg font-semibold text-neutral-400 uppercase lg:text-xs">Account</p>
               <div class="flex h-12 items-center justify-between pr-4 lg:h-8 lg:pr-2">
                 <a
                   href={`/profile/${$authStore?.model?.id}`}
-                  class="ml-4 flex h-full flex-grow items-center rounded pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
+                  class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
                 >
                   {$authStore?.model?.email}
                 </a>
@@ -291,12 +291,12 @@
       {#if $navigating}
         <!-- Desktop navigation loading bar (green) -->
         <div
-          class="absolute left-0 right-0 top-0 z-50 hidden h-[4px] animate-pulse bg-green-500 lg:block"
+          class="absolute top-0 right-0 left-0 z-50 hidden h-[4px] animate-pulse bg-green-500 lg:block"
         ></div>
       {:else if $tasksLoading}
         <!-- Desktop tasks loading bar (purple) -->
         <div
-          class="absolute left-0 right-0 top-0 z-50 hidden h-[4px] animate-pulse bg-purple-500 lg:block"
+          class="absolute top-0 right-0 left-0 z-50 hidden h-[4px] animate-pulse bg-purple-500 lg:block"
         ></div>
       {/if}
       <div class="h-full">
@@ -307,7 +307,7 @@
     <!-- Overlay for mobile -->
     {#if isSidebarOpen}
       <div
-        class="fixed inset-0 z-[1000] bg-black bg-opacity-50 lg:hidden"
+        class="bg-opacity-50 fixed inset-0 z-1000 bg-black lg:hidden"
         onclick={toggleSidebar}
         aria-hidden="true"
       ></div>

@@ -59,9 +59,7 @@
     // Search, filter out excluded ids, then apply optional filter
     let searchResults = index
       .search(typedQuery, { prefix: true })
-      .filter(
-        (r) => !excludeIds.includes(r[idField] as unknown as string | number),
-      );
+      .filter((r) => !excludeIds.includes(r[idField] as unknown as string | number));
     if (filter) {
       searchResults = searchResults.filter((r) => filter(r as unknown as T));
     }

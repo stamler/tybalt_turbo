@@ -19,17 +19,23 @@
 
     {#snippet byline({ effective_date, revision, job_count }: RateSheetResponse)}
       <span class="text-neutral-500">
-        rev. {revision} • {shortDate(effective_date, true)} • {job_count} job{job_count === 1 ? "" : "s"}
+        rev. {revision} • {shortDate(effective_date, true)} • {job_count} job{job_count === 1
+          ? ""
+          : "s"}
       </span>
     {/snippet}
 
     {#snippet line1({ active }: RateSheetResponse)}
       {#if active}
-        <span class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+        <span
+          class="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800"
+        >
           Active
         </span>
       {:else}
-        <span class="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600">
+        <span
+          class="inline-flex items-center rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium text-neutral-600"
+        >
           Inactive
         </span>
       {/if}

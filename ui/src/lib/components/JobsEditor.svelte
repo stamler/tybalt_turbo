@@ -38,7 +38,9 @@
 
   let errors = $state({} as Record<string, { message: string }>);
   // Allow extra field `location` introduced by migration to be present on item
-  let item = $state(untrack(() => data.item) as JobsRecord | (JobsRecord & Record<string, unknown>));
+  let item = $state(
+    untrack(() => data.item) as JobsRecord | (JobsRecord & Record<string, unknown>),
+  );
   let categories = $state(untrack(() => data.categories));
   let client_contacts = $state([] as ClientContactsResponse[]);
   let clientContactsRequestId = 0;
@@ -110,7 +112,10 @@
     const projectAwardDate = item.project_award_date ?? "";
     const proposalOpeningDate = item.proposal_opening_date ?? "";
     const proposalSubmissionDueDate = item.proposal_submission_due_date ?? "";
-    if (projectAwardDate === "" && (proposalOpeningDate !== "" || proposalSubmissionDueDate !== "")) {
+    if (
+      projectAwardDate === "" &&
+      (proposalOpeningDate !== "" || proposalSubmissionDueDate !== "")
+    ) {
       return true;
     }
     return false;
@@ -121,10 +126,7 @@
 
   // Status options filtered by job type
   // New proposals can only be "In Progress" or "Submitted" (no ID yet for comment-requiring statuses)
-  const newProposalStatuses = [
-    JobsStatusOptions["In Progress"],
-    JobsStatusOptions.Submitted,
-  ];
+  const newProposalStatuses = [JobsStatusOptions["In Progress"], JobsStatusOptions.Submitted];
   const existingProposalStatuses = [
     JobsStatusOptions["In Progress"],
     JobsStatusOptions.Submitted,
@@ -175,14 +177,15 @@
   // Hide proposal dates when:
   // 1. Creating a project from the dedicated route (loader sets _prefilled_from_proposal)
   // 2. Project award date has a value (job is a project)
-  const hideProposalDates = $derived.by(() =>
-    Boolean((item as unknown as Record<string, unknown>)._prefilled_from_proposal) ||
-    Boolean(item.project_award_date),
+  const hideProposalDates = $derived.by(
+    () =>
+      Boolean((item as unknown as Record<string, unknown>)._prefilled_from_proposal) ||
+      Boolean(item.project_award_date),
   );
 
   // Hide project award date when either proposal date has a value (job is a proposal)
-  const hideProjectDate = $derived.by(() =>
-    Boolean(item.proposal_opening_date) || Boolean(item.proposal_submission_due_date),
+  const hideProjectDate = $derived.by(
+    () => Boolean(item.proposal_opening_date) || Boolean(item.proposal_submission_due_date),
   );
 
   function setFieldError(fieldName: string, message: string) {
@@ -327,10 +330,13 @@
   // when job type changes (e.g., entering proposal dates changes project to proposal)
   $effect(() => {
     const validStatuses = isProposal
-      ? (isNewJob ? newProposalStatuses : existingProposalStatuses)
+      ? isNewJob
+        ? newProposalStatuses
+        : existingProposalStatuses
       : projectStatuses;
-    const currentStatusIsValid = item.status && validStatuses.includes(item.status as JobsStatusOptions);
-    
+    const currentStatusIsValid =
+      item.status && validStatuses.includes(item.status as JobsStatusOptions);
+
     if (!currentStatusIsValid) {
       // Status is missing or invalid for current job type - set appropriate default
       item.status = isProposal ? JobsStatusOptions["In Progress"] : JobsStatusOptions.Active;
@@ -478,7 +484,9 @@
       if (proposalErr?.code === "proposal_not_awarded" && typeof proposalId === "string") {
         const proceed =
           typeof window !== "undefined" &&
-          window.confirm("The referenced proposal is not marked as Awarded. Set it to Awarded and continue?");
+          window.confirm(
+            "The referenced proposal is not marked as Awarded. Set it to Awarded and continue?",
+          );
         if (proceed) {
           // First, try to update the proposal to Awarded status
           try {
@@ -725,7 +733,9 @@
     <p>This proposal has been cancelled and cannot be modified.</p>
     <p>Cancelled proposals are in a terminal state. No further changes are allowed.</p>
     <div class="mt-4">
-      <a href="/jobs/{data.id}/details" class="text-blue-600 hover:underline">← Back to job details</a>
+      <a href="/jobs/{data.id}/details" class="text-blue-600 hover:underline"
+        >← Back to job details</a
+      >
     </div>
   </div>
 {:else}
@@ -734,100 +744,126 @@
     enctype="multipart/form-data"
     onsubmit={save}
   >
-  <h1 class="w-full text-xl font-bold text-neutral-800">
-    {#if data.editing && item.number}
-      Editing {item.number}
-    {:else}
-      Create Job
+    <h1 class="w-full text-xl font-bold text-neutral-800">
+      {#if data.editing && item.number}
+        Editing {item.number}
+      {:else}
+        Create Job
+      {/if}
+    </h1>
+
+    {#if (data as JobsPageData).existingReferencingProjects && (data as JobsPageData).existingReferencingProjects!.length > 0}
+      <div class="w-full rounded-sm border border-yellow-400 bg-yellow-50 p-3 text-yellow-800">
+        <p class="font-semibold">This proposal is already referenced by existing project(s):</p>
+        <ul class="mt-1 list-inside list-disc">
+          {#each (data as JobsPageData).existingReferencingProjects! as project}
+            <li>
+              <a
+                href="/jobs/{project.id}/details"
+                class="text-blue-600 underline hover:text-blue-800"
+              >
+                {project.number}
+              </a>
+            </li>
+          {/each}
+        </ul>
+        <p class="mt-2 text-sm">
+          Creating another project will result in multiple projects referencing the same proposal.
+        </p>
+      </div>
     {/if}
-  </h1>
 
-  {#if (data as JobsPageData).existingReferencingProjects && (data as JobsPageData).existingReferencingProjects!.length > 0}
-    <div class="w-full rounded border border-yellow-400 bg-yellow-50 p-3 text-yellow-800">
-      <p class="font-semibold">This proposal is already referenced by existing project(s):</p>
-      <ul class="mt-1 list-inside list-disc">
-        {#each (data as JobsPageData).existingReferencingProjects! as project}
-          <li>
-            <a href="/jobs/{project.id}/details" class="text-blue-600 underline hover:text-blue-800">
-              {project.number}
-            </a>
-          </li>
-        {/each}
-      </ul>
-      <p class="mt-2 text-sm">Creating another project will result in multiple projects referencing the same proposal.</p>
+    {#if !hideProjectDate}
+      <span
+        class="flex w-full items-center gap-2 {errors.project_award_date !== undefined
+          ? 'bg-red-200'
+          : ''}"
+      >
+        <label for="project_award_date">Project Award Date</label>
+        <input
+          class="flex-1"
+          type="text"
+          name="project_award_date"
+          placeholder="Project Award Date"
+          use:flatpickrAction
+          bind:value={item.project_award_date}
+        />
+        {#if item.project_award_date}
+          <DsActionButton
+            icon="mdi:close"
+            title="Clear date"
+            color="red"
+            action={() => (item.project_award_date = "")}
+          />
+        {/if}
+        {#if errors.project_award_date !== undefined}
+          <span class="text-red-600">{errors.project_award_date.message}</span>
+        {/if}
+      </span>
+    {/if}
+
+    {#if !hideProposalDates}
+      <span
+        class="flex w-full items-center gap-2 {errors.proposal_opening_date !== undefined
+          ? 'bg-red-200'
+          : ''}"
+      >
+        <label for="proposal_opening_date">Proposal Opening Date</label>
+        <input
+          class="flex-1"
+          type="text"
+          name="proposal_opening_date"
+          placeholder="Proposal Opening Date"
+          use:flatpickrAction
+          bind:value={item.proposal_opening_date}
+        />
+        {#if item.proposal_opening_date}
+          <DsActionButton
+            icon="mdi:close"
+            title="Clear date"
+            color="red"
+            action={() => (item.proposal_opening_date = "")}
+          />
+        {/if}
+        {#if errors.proposal_opening_date !== undefined}
+          <span class="text-red-600">{errors.proposal_opening_date.message}</span>
+        {/if}
+      </span>
+
+      <span
+        class="flex w-full items-center gap-2 {errors.proposal_submission_due_date !== undefined
+          ? 'bg-red-200'
+          : ''}"
+      >
+        <label for="proposal_submission_due_date">Proposal Submission Due Date</label>
+        <input
+          class="flex-1"
+          type="text"
+          name="proposal_submission_due_date"
+          placeholder="Proposal Submission Due Date"
+          use:flatpickrAction
+          bind:value={item.proposal_submission_due_date}
+        />
+        {#if item.proposal_submission_due_date}
+          <DsActionButton
+            icon="mdi:close"
+            title="Clear date"
+            color="red"
+            action={() => (item.proposal_submission_due_date = "")}
+          />
+        {/if}
+        {#if errors.proposal_submission_due_date !== undefined}
+          <span class="text-red-600">{errors.proposal_submission_due_date.message}</span>
+        {/if}
+      </span>
+    {/if}
+
+    <div class="flex w-full flex-col gap-1 {errors.location !== undefined ? 'bg-red-200' : ''}">
+      <label for="location">Location</label>
+      <DSLocationPicker bind:value={item.location as string} {errors} fieldName="location" />
     </div>
-  {/if}
 
-  {#if !hideProjectDate}
-    <span class="flex w-full items-center gap-2 {errors.project_award_date !== undefined ? 'bg-red-200' : ''}">
-      <label for="project_award_date">Project Award Date</label>
-      <input
-        class="flex-1"
-        type="text"
-        name="project_award_date"
-        placeholder="Project Award Date"
-        use:flatpickrAction
-        bind:value={item.project_award_date}
-      />
-      {#if item.project_award_date}
-        <DsActionButton icon="mdi:close" title="Clear date" color="red" action={() => item.project_award_date = ""} />
-      {/if}
-      {#if errors.project_award_date !== undefined}
-        <span class="text-red-600">{errors.project_award_date.message}</span>
-      {/if}
-    </span>
-  {/if}
-
-  {#if !hideProposalDates}
-    <span
-      class="flex w-full items-center gap-2 {errors.proposal_opening_date !== undefined ? 'bg-red-200' : ''}"
-    >
-      <label for="proposal_opening_date">Proposal Opening Date</label>
-      <input
-        class="flex-1"
-        type="text"
-        name="proposal_opening_date"
-        placeholder="Proposal Opening Date"
-        use:flatpickrAction
-        bind:value={item.proposal_opening_date}
-      />
-      {#if item.proposal_opening_date}
-        <DsActionButton icon="mdi:close" title="Clear date" color="red" action={() => item.proposal_opening_date = ""} />
-      {/if}
-      {#if errors.proposal_opening_date !== undefined}
-        <span class="text-red-600">{errors.proposal_opening_date.message}</span>
-      {/if}
-    </span>
-
-    <span
-      class="flex w-full items-center gap-2 {errors.proposal_submission_due_date !== undefined
-        ? 'bg-red-200'
-        : ''}"
-    >
-      <label for="proposal_submission_due_date">Proposal Submission Due Date</label>
-      <input
-        class="flex-1"
-        type="text"
-        name="proposal_submission_due_date"
-        placeholder="Proposal Submission Due Date"
-        use:flatpickrAction
-        bind:value={item.proposal_submission_due_date}
-      />
-      {#if item.proposal_submission_due_date}
-        <DsActionButton icon="mdi:close" title="Clear date" color="red" action={() => item.proposal_submission_due_date = ""} />
-      {/if}
-      {#if errors.proposal_submission_due_date !== undefined}
-        <span class="text-red-600">{errors.proposal_submission_due_date.message}</span>
-      {/if}
-    </span>
-  {/if}
-
-  <div class="flex w-full flex-col gap-1 {errors.location !== undefined ? 'bg-red-200' : ''}">
-    <label for="location">Location</label>
-    <DSLocationPicker bind:value={item.location as string} {errors} fieldName="location" />
-  </div>
-
-  <!---
+    <!---
   <DsTextInput
     bind:value={item.number as string}
     {errors}
@@ -837,389 +873,395 @@
   />
   <p class="self-start text-xs text-neutral-600">Number is auto-assigned on creation.</p>
 -->
-  <DsTextInput
-    bind:value={item.description as string}
-    {errors}
-    fieldName="description"
-    uiName="Description"
-  />
-
-  {#if $clients.index !== null}
-    <div class="flex w-full items-end gap-1">
-      <div class="flex-1">
-        <DsAutoComplete
-          bind:value={item.client as string}
-          index={$clients.index}
-          {errors}
-          fieldName="client"
-          uiName="Client"
-          disabled={(data as JobsPageData).editing === false &&
-            (item as any).parent &&
-            (item as any).parent !== ""}
-        >
-          {#snippet resultTemplate(client)}{client.name}{/snippet}
-        </DsAutoComplete>
-      </div>
-      {#if !item.client}
-        <DsActionButton
-          action={openAddClientPopover}
-          icon="feather:plus-circle"
-          color="green"
-          title="Add new client"
-        />
-      {/if}
-    </div>
-  {/if}
-
-  <div class="flex w-full flex-col gap-1 {errors.contact !== undefined ? 'bg-red-200' : ''}">
-    <div class="flex w-full items-end gap-1">
-      <span class="flex flex-1 gap-2">
-        <label for="contact">Client Contact</label>
-        <select
-          id="contact"
-          name="contact"
-          bind:value={item.contact}
-          class="flex-1 rounded border border-neutral-300 px-1"
-          disabled={item.client === "" || client_contacts.length === 0}
-        >
-          <option value="">{item.client === "" ? "Select a client first" : "Select a contact"}</option>
-          {#each client_contacts as contact}
-            <option value={contact.id}>{formatContactName(contact)}</option>
-          {/each}
-        </select>
-      </span>
-      {#if item.client && !item.contact}
-        <DsActionButton
-          action={openAddContactPopover}
-          icon="feather:plus-circle"
-          color="green"
-          title="Add new contact"
-        />
-      {/if}
-    </div>
-    {#if errors.contact !== undefined}
-      <span class="text-red-600">{errors.contact.message}</span>
-    {/if}
-  </div>
-
-  {#if $profiles.index !== null}
-    <DsAutoComplete
-      bind:value={item.manager as string}
-      index={$profiles.index}
-      idField="uid"
+    <DsTextInput
+      bind:value={item.description as string}
       {errors}
-      fieldName="manager"
-      uiName="Manager"
-    >
-      {#snippet resultTemplate(item)}
-        {item.surname}, {item.given_name}
-      {/snippet}
-    </DsAutoComplete>
-  {/if}
-  {#if $profiles.index !== null}
-    <DsAutoComplete
-      bind:value={item.alternate_manager as string}
-      index={$profiles.index}
-      idField="uid"
-      {errors}
-      fieldName="alternate_manager"
-      uiName="Alternate Manager"
-      excludeIds={item.manager ? [item.manager] : []}
-    >
-      {#snippet resultTemplate(item)}
-        {item.surname}, {item.given_name}
-      {/snippet}
-    </DsAutoComplete>
-  {/if}
-
-  <DsCheck
-    bind:value={item.fn_agreement as boolean}
-    {errors}
-    fieldName="fn_agreement"
-    uiName="Has First Nation's agreement"
-  />
-
-  <DsSelector
-    bind:value={item.status as string}
-    items={statusOptionsList}
-    {errors}
-    fieldName="status"
-    uiName="Status"
-  >
-    {#snippet optionTemplate(item)}{item.name}{/snippet}
-  </DsSelector>
-  {#if !isProposal}
-  <p
-    class="cursor-help self-start text-sm text-neutral-600"
-    title="Use the status Closed if the purpose of this job is to act as a reporting container for many sub jobs. These “Parent” jobs can be billed to if their status is set to “Active”, however they are created as “Closed” by default. For example MTO retainers are usually created as Closed."
-  >
-    Creating a parent job? Use Closed.
-  </p>
-  {/if}
-
-  {#if isProposal}
-    <div
-      class="flex w-full flex-col gap-1"
-      class:bg-red-200={errors.proposal_value !== undefined}
-    >
-      <label class="text-sm font-semibold" for="proposal_value">Proposal Value ($)</label>
-      <input
-        id="proposal_value"
-        name="proposal_value"
-        type="number"
-        class="rounded border border-neutral-300 px-2 py-1"
-        bind:value={item.proposal_value as number}
-        min={0}
-        step={1}
-        disabled={isCancelledProposal}
-      />
-      {#if errors.proposal_value !== undefined}
-        <span class="text-sm text-red-600">{errors.proposal_value.message}</span>
-      {/if}
-    </div>
-
-    <DsCheck
-      bind:value={item.time_and_materials as boolean}
-      {errors}
-      fieldName="time_and_materials"
-      uiName="Time and Materials"
-      disabled={isCancelledProposal}
+      fieldName="description"
+      uiName="Description"
     />
-    <p class="self-start text-xs text-neutral-600">
-      Proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be marked as Time and Materials. If both, interpret proposal value as a maximum.
-    </p>
-  {/if}
 
-  <DsSelector
-    bind:value={item.authorizing_document}
-    items={authorizingDocumentOptions}
-    {errors}
-    fieldName="authorizing_document"
-    uiName="Authorizing Document"
-  >
-    {#snippet optionTemplate(item)}{item.name}{/snippet}
-  </DsSelector>
-  {#if item.authorizing_document === "PO"}
-    <DsTextInput bind:value={item.client_po} {errors} fieldName="client_po" uiName="Client PO" />
-  {/if}
-  <DsTextInput
-    bind:value={item.client_reference_number}
-    {errors}
-    fieldName="client_reference_number"
-    uiName="Client Reference Number"
-  />
-
-  {#if !isProposal}
-    <div
-      class="flex w-full flex-col gap-1"
-      class:bg-red-200={errors.outstanding_balance !== undefined}
-    >
-      <label class="text-sm font-semibold" for="outstanding_balance">Outstanding Balance</label>
-      <input
-        id="outstanding_balance"
-        name="outstanding_balance"
-        type="number"
-        class="rounded border border-neutral-300 px-2 py-1"
-        bind:value={item.outstanding_balance as number}
-        min={0}
-        step={0.01}
-      />
-      {#if errors.outstanding_balance !== undefined}
-        <span class="text-sm text-red-600">{errors.outstanding_balance.message}</span>
-      {/if}
-    </div>
-    {#if item.outstanding_balance_date}
-      <p class="self-start text-sm text-neutral-600">
-        Last updated: {item.outstanding_balance_date}
-      </p>
+    {#if $clients.index !== null}
+      <div class="flex w-full items-end gap-1">
+        <div class="flex-1">
+          <DsAutoComplete
+            bind:value={item.client as string}
+            index={$clients.index}
+            {errors}
+            fieldName="client"
+            uiName="Client"
+            disabled={(data as JobsPageData).editing === false &&
+              (item as any).parent &&
+              (item as any).parent !== ""}
+          >
+            {#snippet resultTemplate(client)}{client.name}{/snippet}
+          </DsAutoComplete>
+        </div>
+        {#if !item.client}
+          <DsActionButton
+            action={openAddClientPopover}
+            icon="feather:plus-circle"
+            color="green"
+            title="Add new client"
+          />
+        {/if}
+      </div>
     {/if}
 
-    {#if $rateSheets.index !== null}
+    <div class="flex w-full flex-col gap-1 {errors.contact !== undefined ? 'bg-red-200' : ''}">
+      <div class="flex w-full items-end gap-1">
+        <span class="flex flex-1 gap-2">
+          <label for="contact">Client Contact</label>
+          <select
+            id="contact"
+            name="contact"
+            bind:value={item.contact}
+            class="flex-1 rounded-sm border border-neutral-300 px-1"
+            disabled={item.client === "" || client_contacts.length === 0}
+          >
+            <option value=""
+              >{item.client === "" ? "Select a client first" : "Select a contact"}</option
+            >
+            {#each client_contacts as contact}
+              <option value={contact.id}>{formatContactName(contact)}</option>
+            {/each}
+          </select>
+        </span>
+        {#if item.client && !item.contact}
+          <DsActionButton
+            action={openAddContactPopover}
+            icon="feather:plus-circle"
+            color="green"
+            title="Add new contact"
+          />
+        {/if}
+      </div>
+      {#if errors.contact !== undefined}
+        <span class="text-red-600">{errors.contact.message}</span>
+      {/if}
+    </div>
+
+    {#if $profiles.index !== null}
       <DsAutoComplete
-        bind:value={(item as Record<string, unknown>).rate_sheet as string}
-        index={$rateSheets.index}
-        filter={activeRateSheetFilter}
+        bind:value={item.manager as string}
+        index={$profiles.index}
+        idField="uid"
         {errors}
-        fieldName="rate_sheet"
-        uiName="Rate Sheet"
+        fieldName="manager"
+        uiName="Manager"
       >
-        {#snippet resultTemplate(sheet)}
-          {sheet.name} (rev. {sheet.revision}) - {sheet.effective_date}
+        {#snippet resultTemplate(item)}
+          {item.surname}, {item.given_name}
         {/snippet}
       </DsAutoComplete>
     {/if}
-  {/if}
+    {#if $profiles.index !== null}
+      <DsAutoComplete
+        bind:value={item.alternate_manager as string}
+        index={$profiles.index}
+        idField="uid"
+        {errors}
+        fieldName="alternate_manager"
+        uiName="Alternate Manager"
+        excludeIds={item.manager ? [item.manager] : []}
+      >
+        {#snippet resultTemplate(item)}
+          {item.surname}, {item.given_name}
+        {/snippet}
+      </DsAutoComplete>
+    {/if}
 
-  {#if $jobs.index !== null}
-    {@const proposalHasCustomError = errors.proposal !== undefined && (errors.proposal as { message: string; proposalId?: string }).proposalId}
-    {@const proposalErrors = proposalHasCustomError ? {} : errors}
-    <DsAutoComplete
-      bind:value={item.proposal as string}
-      index={$jobs.index}
-      filter={proposalFilter}
-      errors={proposalErrors}
-      fieldName="proposal"
-      uiName="Proposal"
+    <DsCheck
+      bind:value={item.fn_agreement as boolean}
+      {errors}
+      fieldName="fn_agreement"
+      uiName="Has First Nation's agreement"
+    />
+
+    <DsSelector
+      bind:value={item.status as string}
+      items={statusOptionsList}
+      {errors}
+      fieldName="status"
+      uiName="Status"
     >
-      {#snippet resultTemplate(job)}{jobLabel(
-          job as unknown as Pick<JobApiResponse, "id" | "number" | "description">,
-        )}{/snippet}
-    </DsAutoComplete>
-  {/if}
-  {#if errors.proposal !== undefined && (errors.proposal as { message: string; proposalId?: string }).proposalId}
-    <div class="w-full rounded border border-red-300 bg-red-50 p-3 text-red-800">
-      <p class="font-semibold">Cannot create project from proposal</p>
-      <p class="mt-1">{errors.proposal.message}</p>
-      <p class="mt-2">
-        <a
-          href="/jobs/{(errors.proposal as { message: string; proposalId?: string }).proposalId}/edit"
-          target="_blank"
-          rel="noopener noreferrer"
-          class="text-blue-600 underline hover:text-blue-800"
-        >
-          Edit the proposal in a new tab →
-        </a>
+      {#snippet optionTemplate(item)}{item.name}{/snippet}
+    </DsSelector>
+    {#if !isProposal}
+      <p
+        class="cursor-help self-start text-sm text-neutral-600"
+        title="Use the status Closed if the purpose of this job is to act as a reporting container for many sub jobs. These “Parent” jobs can be billed to if their status is set to “Active”, however they are created as “Closed” by default. For example MTO retainers are usually created as Closed."
+      >
+        Creating a parent job? Use Closed.
       </p>
-    </div>
-  {/if}
+    {/if}
 
-  {#if $divisions.index !== null}
-    <div class="flex w-full flex-col gap-2">
-      <span class="font-semibold">Divisions</span>
-      <div class="flex flex-col gap-2">
-        {#each allocations as row, idx}
-          <div class="flex items-center gap-2">
-            <div class="min-w-[280px] flex-1">
-              <DsAutoComplete
-                bind:value={row.division}
-                index={$divisions.index}
-                {errors}
-                fieldName={"allocation_division_" + idx}
-                uiName="Division"
-                choose={(id) => setAllocationDivision(idx, id)}
+    {#if isProposal}
+      <div
+        class="flex w-full flex-col gap-1"
+        class:bg-red-200={errors.proposal_value !== undefined}
+      >
+        <label class="text-sm font-semibold" for="proposal_value">Proposal Value ($)</label>
+        <input
+          id="proposal_value"
+          name="proposal_value"
+          type="number"
+          class="rounded-sm border border-neutral-300 px-2 py-1"
+          bind:value={item.proposal_value as number}
+          min={0}
+          step={1}
+          disabled={isCancelledProposal}
+        />
+        {#if errors.proposal_value !== undefined}
+          <span class="text-sm text-red-600">{errors.proposal_value.message}</span>
+        {/if}
+      </div>
+
+      <DsCheck
+        bind:value={item.time_and_materials as boolean}
+        {errors}
+        fieldName="time_and_materials"
+        uiName="Time and Materials"
+        disabled={isCancelledProposal}
+      />
+      <p class="self-start text-xs text-neutral-600">
+        Proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be
+        marked as Time and Materials. If both, interpret proposal value as a maximum.
+      </p>
+    {/if}
+
+    <DsSelector
+      bind:value={item.authorizing_document}
+      items={authorizingDocumentOptions}
+      {errors}
+      fieldName="authorizing_document"
+      uiName="Authorizing Document"
+    >
+      {#snippet optionTemplate(item)}{item.name}{/snippet}
+    </DsSelector>
+    {#if item.authorizing_document === "PO"}
+      <DsTextInput bind:value={item.client_po} {errors} fieldName="client_po" uiName="Client PO" />
+    {/if}
+    <DsTextInput
+      bind:value={item.client_reference_number}
+      {errors}
+      fieldName="client_reference_number"
+      uiName="Client Reference Number"
+    />
+
+    {#if !isProposal}
+      <div
+        class="flex w-full flex-col gap-1"
+        class:bg-red-200={errors.outstanding_balance !== undefined}
+      >
+        <label class="text-sm font-semibold" for="outstanding_balance">Outstanding Balance</label>
+        <input
+          id="outstanding_balance"
+          name="outstanding_balance"
+          type="number"
+          class="rounded-sm border border-neutral-300 px-2 py-1"
+          bind:value={item.outstanding_balance as number}
+          min={0}
+          step={0.01}
+        />
+        {#if errors.outstanding_balance !== undefined}
+          <span class="text-sm text-red-600">{errors.outstanding_balance.message}</span>
+        {/if}
+      </div>
+      {#if item.outstanding_balance_date}
+        <p class="self-start text-sm text-neutral-600">
+          Last updated: {item.outstanding_balance_date}
+        </p>
+      {/if}
+
+      {#if $rateSheets.index !== null}
+        <DsAutoComplete
+          bind:value={(item as Record<string, unknown>).rate_sheet as string}
+          index={$rateSheets.index}
+          filter={activeRateSheetFilter}
+          {errors}
+          fieldName="rate_sheet"
+          uiName="Rate Sheet"
+        >
+          {#snippet resultTemplate(sheet)}
+            {sheet.name} (rev. {sheet.revision}) - {sheet.effective_date}
+          {/snippet}
+        </DsAutoComplete>
+      {/if}
+    {/if}
+
+    {#if $jobs.index !== null}
+      {@const proposalHasCustomError =
+        errors.proposal !== undefined &&
+        (errors.proposal as { message: string; proposalId?: string }).proposalId}
+      {@const proposalErrors = proposalHasCustomError ? {} : errors}
+      <DsAutoComplete
+        bind:value={item.proposal as string}
+        index={$jobs.index}
+        filter={proposalFilter}
+        errors={proposalErrors}
+        fieldName="proposal"
+        uiName="Proposal"
+      >
+        {#snippet resultTemplate(job)}{jobLabel(
+            job as unknown as Pick<JobApiResponse, "id" | "number" | "description">,
+          )}{/snippet}
+      </DsAutoComplete>
+    {/if}
+    {#if errors.proposal !== undefined && (errors.proposal as { message: string; proposalId?: string }).proposalId}
+      <div class="w-full rounded-sm border border-red-300 bg-red-50 p-3 text-red-800">
+        <p class="font-semibold">Cannot create project from proposal</p>
+        <p class="mt-1">{errors.proposal.message}</p>
+        <p class="mt-2">
+          <a
+            href="/jobs/{(errors.proposal as { message: string; proposalId?: string })
+              .proposalId}/edit"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="text-blue-600 underline hover:text-blue-800"
+          >
+            Edit the proposal in a new tab →
+          </a>
+        </p>
+      </div>
+    {/if}
+
+    {#if $divisions.index !== null}
+      <div class="flex w-full flex-col gap-2">
+        <span class="font-semibold">Divisions</span>
+        <div class="flex flex-col gap-2">
+          {#each allocations as row, idx}
+            <div class="flex items-center gap-2">
+              <div class="min-w-[280px] flex-1">
+                <DsAutoComplete
+                  bind:value={row.division}
+                  index={$divisions.index}
+                  {errors}
+                  fieldName={"allocation_division_" + idx}
+                  uiName="Division"
+                  choose={(id) => setAllocationDivision(idx, id)}
+                >
+                  {#snippet resultTemplate(item: DivisionsResponse)}{item.code} - {item.name}{/snippet}
+                </DsAutoComplete>
+              </div>
+              <input
+                class="w-28 rounded-sm border border-neutral-300 px-2 py-1"
+                type="number"
+                min={0}
+                step={0.5}
+                bind:value={row.hours}
+                oninput={(e) => {
+                  const v = parseFloat((e.target as HTMLInputElement).value || "0");
+                  allocations = allocations.map((r, i) =>
+                    i === idx ? { ...r, hours: isNaN(v) ? 0 : v } : r,
+                  );
+                }}
+              />
+              <button
+                class="text-neutral-600"
+                onclick={preventDefault(() => removeAllocationRow(idx))}
+                title="Remove"
               >
-                {#snippet resultTemplate(item: DivisionsResponse)}{item.code} - {item.name}{/snippet}
-              </DsAutoComplete>
+                &times;
+              </button>
             </div>
-            <input
-              class="w-28 rounded border border-neutral-300 px-2 py-1"
-              type="number"
-              min={0}
-              step={0.5}
-              bind:value={row.hours}
-              oninput={(e) => {
-                const v = parseFloat((e.target as HTMLInputElement).value || "0");
-                allocations = allocations.map((r, i) =>
-                  i === idx ? { ...r, hours: isNaN(v) ? 0 : v } : r,
-                );
-              }}
-            />
+          {/each}
+        </div>
+        <div>
+          <DsActionButton action={addAllocationRow} icon="feather:plus-circle" color="green"
+            >Add division</DsActionButton
+          >
+        </div>
+      </div>
+    {/if}
+
+    {#if $clients.index !== null}
+      <DsAutoComplete
+        bind:value={item.job_owner as string}
+        index={$clients.index}
+        {errors}
+        fieldName="job_owner"
+        uiName="Job Owner"
+      >
+        {#snippet resultTemplate(item)}{item.name}{/snippet}
+      </DsAutoComplete>
+    {/if}
+
+    <div class="flex w-full gap-2 {errors.branch !== undefined ? 'bg-red-200' : ''}">
+      <span class="flex w-full gap-2">
+        <label for="branch">Branch</label>
+        <select
+          id="branch"
+          name="branch"
+          bind:value={item.branch}
+          class="flex-1 rounded-sm border border-neutral-300 px-1"
+        >
+          <option value="">Select a branch</option>
+          {#each branches as branch}
+            <option value={branch.id}>{branch.code ?? branch.name}</option>
+          {/each}
+        </select>
+      </span>
+      {#if errors.branch !== undefined}
+        <span class="text-red-600">{errors.branch.message}</span>
+      {/if}
+    </div>
+
+    <div class="flex w-full flex-col gap-2 {errors.categories !== undefined ? 'bg-red-200' : ''}">
+      <label for="categories">Categories</label>
+      <div class="flex flex-wrap gap-1">
+        {#each categories as category}
+          <span class="flex items-center rounded-full bg-neutral-200 px-2">
+            <span>{category.name}</span>
             <button
-              class="text-neutral-600"
-              onclick={preventDefault(() => removeAllocationRow(idx))}
-              title="Remove"
+              class="text-neutral-500"
+              onclick={preventDefault(() => removeCategory(category.id))}
             >
               &times;
             </button>
-          </div>
+          </span>
+        {/each}
+        {#each newCategories as categoryName}
+          <span class="flex items-center rounded-full bg-neutral-200 px-2">
+            <span>{categoryName}</span>
+            <button
+              class="text-neutral-500"
+              onclick={preventDefault(
+                () => (newCategories = newCategories.filter((name) => name !== categoryName)),
+              )}
+            >
+              &times;
+            </button>
+          </span>
         {/each}
       </div>
-      <div>
-        <DsActionButton action={addAllocationRow} icon="feather:plus-circle" color="green"
-          >Add division</DsActionButton
-        >
+      <div class="flex items-center gap-1">
+        <DsTextInput
+          bind:value={newCategory as string}
+          {errors}
+          fieldName="newCategory"
+          uiName="Add Category"
+        />
+        <DsActionButton
+          action={addCategory}
+          icon="feather:plus-circle"
+          color="green"
+          title="Add Category"
+        />
       </div>
+      {#if errors.categories !== undefined}
+        <span class="text-red-600">{errors.categories.message}</span>
+      {/if}
     </div>
-  {/if}
 
-  {#if $clients.index !== null}
-    <DsAutoComplete
-      bind:value={item.job_owner as string}
-      index={$clients.index}
-      {errors}
-      fieldName="job_owner"
-      uiName="Job Owner"
-    >
-      {#snippet resultTemplate(item)}{item.name}{/snippet}
-    </DsAutoComplete>
-  {/if}
-
-  <div class="flex w-full gap-2 {errors.branch !== undefined ? 'bg-red-200' : ''}">
-    <span class="flex w-full gap-2">
-      <label for="branch">Branch</label>
-      <select
-        id="branch"
-        name="branch"
-        bind:value={item.branch}
-        class="flex-1 rounded border border-neutral-300 px-1"
-      >
-        <option value="">Select a branch</option>
-        {#each branches as branch}
-          <option value={branch.id}>{branch.code ?? branch.name}</option>
-        {/each}
-      </select>
-    </span>
-    {#if errors.branch !== undefined}
-      <span class="text-red-600">{errors.branch.message}</span>
-    {/if}
-  </div>
-
-  <div class="flex w-full flex-col gap-2 {errors.categories !== undefined ? 'bg-red-200' : ''}">
-    <label for="categories">Categories</label>
-    <div class="flex flex-wrap gap-1">
-      {#each categories as category}
-        <span class="flex items-center rounded-full bg-neutral-200 px-2">
-          <span>{category.name}</span>
-          <button
-            class="text-neutral-500"
-            onclick={preventDefault(() => removeCategory(category.id))}
-          >
-            &times;
-          </button>
-        </span>
-      {/each}
-      {#each newCategories as categoryName}
-        <span class="flex items-center rounded-full bg-neutral-200 px-2">
-          <span>{categoryName}</span>
-          <button
-            class="text-neutral-500"
-            onclick={preventDefault(
-              () => (newCategories = newCategories.filter((name) => name !== categoryName)),
-            )}
-          >
-            &times;
-          </button>
-        </span>
-      {/each}
+    <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
+      <span class="flex w-full gap-2">
+        <DsActionButton type="submit">Save</DsActionButton>
+        <DsActionButton action={cancel}>Cancel</DsActionButton>
+      </span>
+      {#if errors.global !== undefined}
+        <span class="text-red-600">{errors.global.message}</span>
+      {/if}
     </div>
-    <div class="flex items-center gap-1">
-      <DsTextInput
-        bind:value={newCategory as string}
-        {errors}
-        fieldName="newCategory"
-        uiName="Add Category"
-      />
-      <DsActionButton
-        action={addCategory}
-        icon="feather:plus-circle"
-        color="green"
-        title="Add Category"
-      />
-    </div>
-    {#if errors.categories !== undefined}
-      <span class="text-red-600">{errors.categories.message}</span>
-    {/if}
-  </div>
-
-  <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
-    <span class="flex w-full gap-2">
-      <DsActionButton type="submit">Save</DsActionButton>
-      <DsActionButton action={cancel}>Cancel</DsActionButton>
-    </span>
-    {#if errors.global !== undefined}
-      <span class="text-red-600">{errors.global.message}</span>
-    {/if}
-  </div>
   </form>
 {/if}
 
@@ -1235,7 +1277,7 @@
   onCancel={cancelStatusChange}
 >
   <textarea
-    class="w-full rounded border border-neutral-300 p-2"
+    class="w-full rounded-sm border border-neutral-300 p-2"
     rows="4"
     placeholder="Enter your comment..."
     bind:value={statusComment}
@@ -1258,7 +1300,7 @@
     <input
       id="new_client_name"
       type="text"
-      class="rounded border border-neutral-300 px-2 py-1"
+      class="rounded-sm border border-neutral-300 px-2 py-1"
       placeholder="Client name"
       bind:value={newClientName}
       disabled={newClientSubmitting}
@@ -1323,7 +1365,7 @@
     <input
       id="new_contact_given_name"
       type="text"
-      class="rounded border border-neutral-300 px-2 py-1"
+      class="rounded-sm border border-neutral-300 px-2 py-1"
       placeholder="Given name"
       bind:value={newContactGivenName}
       disabled={newContactSubmitting}
@@ -1335,7 +1377,7 @@
     <input
       id="new_contact_surname"
       type="text"
-      class="rounded border border-neutral-300 px-2 py-1"
+      class="rounded-sm border border-neutral-300 px-2 py-1"
       placeholder="Surname"
       bind:value={newContactSurname}
       disabled={newContactSubmitting}
@@ -1347,7 +1389,7 @@
     <input
       id="new_contact_email"
       type="email"
-      class="rounded border border-neutral-300 px-2 py-1"
+      class="rounded-sm border border-neutral-300 px-2 py-1"
       placeholder="Email"
       bind:value={newContactEmail}
       disabled={newContactSubmitting}

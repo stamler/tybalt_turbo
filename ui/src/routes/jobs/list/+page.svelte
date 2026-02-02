@@ -33,7 +33,7 @@
           if (response.errors) {
             sessionStorage.setItem(
               `proposal_validation_errors_${jobId}`,
-              JSON.stringify(response.errors)
+              JSON.stringify(response.errors),
             );
           }
           // Flag to redirect back to create project page after successful save
@@ -85,13 +85,19 @@
 </script>
 
 {#if $jobs.index !== null}
-  <DsSearchList index={$jobs.index} filter={jobTypeFilter} inListHeader={jobType === "projects" ? "Projects" : "Proposals"} fieldName="job" uiName="search jobs...">
+  <DsSearchList
+    index={$jobs.index}
+    filter={jobTypeFilter}
+    inListHeader={jobType === "projects" ? "Projects" : "Proposals"}
+    fieldName="job"
+    uiName="search jobs..."
+  >
     {#snippet searchBarExtra()}
       <div class="flex items-center gap-2">
         <DSToggle bind:value={jobType} options={jobTypeOptions} />
         <button
           onclick={downloadJson}
-          class="flex items-center gap-1 rounded bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
+          class="flex items-center gap-1 rounded-sm bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
         >
           <Icon icon="mdi:download" class="text-base" /> JSON
         </button>
@@ -102,7 +108,9 @@
     {/snippet}
     {#snippet headline({ description }: JobApiResponse)}{description}{/snippet}
     {#snippet byline({ client }: JobApiResponse)}{client}{/snippet}
-    {#snippet line1({ branch, manager }: JobApiResponse)}{#if branch}<DsLabel color="neutral">{branch}</DsLabel>{/if}{#if manager}<DsLabel color="purple">{manager}</DsLabel>{/if}{/snippet}
+    {#snippet line1({ branch, manager }: JobApiResponse)}{#if branch}<DsLabel color="neutral"
+          >{branch}</DsLabel
+        >{/if}{#if manager}<DsLabel color="purple">{manager}</DsLabel>{/if}{/snippet}
     {#snippet actions({ id, number }: JobApiResponse)}
       {#if number?.startsWith("P")}
         <DsActionButton

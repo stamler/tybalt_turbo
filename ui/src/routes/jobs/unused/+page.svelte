@@ -60,7 +60,7 @@
     type="text"
     placeholder="Enter job number prefix (e.g., 25- or P23-)"
     bind:value={prefix}
-    class="flex-1 rounded border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
+    class="flex-1 rounded-sm border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
     onkeydown={(e) => e.key === "Enter" && load()}
   />
   <DsActionButton action={load} icon="mdi:magnify" title="Load" color="yellow" />
@@ -77,7 +77,9 @@
     {/snippet}
     {#snippet headline({ description }: JobApiResponse)}{description}{/snippet}
     {#snippet byline({ client }: JobApiResponse)}{client}{/snippet}
-    {#snippet line1({ branch }: JobApiResponse)}{#if branch}<DsLabel color="neutral">{branch}</DsLabel>{/if}{/snippet}
+    {#snippet line1({ branch }: JobApiResponse)}{#if branch}<DsLabel color="neutral"
+          >{branch}</DsLabel
+        >{/if}{/snippet}
     {#snippet actions({ id, number }: JobApiResponse)}
       {#if number?.startsWith("P")}
         <DsActionButton

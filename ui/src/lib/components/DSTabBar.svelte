@@ -14,7 +14,7 @@
       href={t.href}
       class={`rounded-t px-3 py-1 ${
         t.active
-          ? "bg-white font-semibold text-blue-700 shadow"
+          ? "bg-white font-semibold text-blue-700 shadow-sm"
           : "text-gray-700 hover:bg-neutral-200"
       }`}
     >

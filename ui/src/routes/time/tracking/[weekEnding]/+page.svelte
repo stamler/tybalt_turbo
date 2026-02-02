@@ -157,7 +157,7 @@
   {#snippet rightContent()}
     <button
       onclick={downloadJson}
-      class="flex items-center gap-1 rounded bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
+      class="flex items-center gap-1 rounded-sm bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
     >
       <Icon icon="mdi:download" class="text-base" /> JSON
     </button>
@@ -173,7 +173,7 @@
     inListHeader={`Time Tracking for ${weekEnding}`}
   >
     {#snippet groupHeader(label)}
-      <span class="text-xs uppercase tracking-wide text-neutral-600">{label}</span>
+      <span class="text-xs tracking-wide text-neutral-600 uppercase">{label}</span>
     {/snippet}
     {#snippet headline(r)}
       <a href={`/time/sheets/${r.id}/details`} class="underline">{r.surname}, {r.given_name}</a>

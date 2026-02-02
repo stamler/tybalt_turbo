@@ -97,10 +97,10 @@
 
 {#if show}
   <div
-    class="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden"
+    class="fixed inset-0 z-50 overflow-x-hidden overflow-y-auto"
     transition:fade={{ duration: 200 }}
   >
-    <div class="fixed inset-0 z-10 bg-black bg-opacity-80"></div>
+    <div class="bg-opacity-80 fixed inset-0 z-10 bg-black"></div>
     <div
       class="relative z-20 mx-auto my-20 flex w-fit max-w-full flex-col rounded-lg bg-neutral-800 p-4 text-neutral-300"
     >
@@ -111,7 +111,7 @@
         {/if}
       </div>
       <div class="my-2 flex flex-col items-stretch gap-2 overflow-auto">
-        <div class="rounded bg-neutral-700 p-4">
+        <div class="rounded-sm bg-neutral-700 p-4">
           <h3 class="text-lg font-semibold">{reviewers.length === 0 ? "No " : ""}Viewers</h3>
           <!-- Grid layout: two columns (names | delete button) with vertical spacing -->
           <div class="grid grid-cols-[1fr_auto] items-center gap-x-2 gap-y-2">
@@ -128,7 +128,7 @@
         </div>
 
         <span class="flex items-center gap-1">
-          <select name="manager" bind:value={newViewer} class="rounded bg-neutral-700 p-1">
+          <select name="manager" bind:value={newViewer} class="rounded-sm bg-neutral-700 p-1">
             <option disabled selected>- select manager -</option>
             {#each $managers.items as m (m.id)}
               {#if !reviewers.find((r) => r.reviewer === m.id)}

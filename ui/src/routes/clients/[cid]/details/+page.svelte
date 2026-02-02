@@ -16,7 +16,7 @@
   const leadName = $derived(
     data.client.lead_surname && data.client.lead_given_name
       ? `${data.client.lead_surname}, ${data.client.lead_given_name}`
-      : "Not assigned"
+      : "Not assigned",
   );
 </script>
 
@@ -33,7 +33,7 @@
   </div>
 
   <!-- Summary section -->
-  <section class="rounded bg-neutral-100 p-2">
+  <section class="rounded-sm bg-neutral-100 p-2">
     <h2 class="mb-2 font-semibold">Summary</h2>
     <div class="grid gap-2 sm:grid-cols-2">
       <div>
@@ -96,7 +96,7 @@
             }&proposalsPage=${
               data.tab === "proposals" ? data.page - 1 : data.proposalsPage
             }&ownerPage=${data.tab === "owner" ? data.page - 1 : d.ownerPage}`}
-            class="rounded bg-neutral-200 px-2 py-1 hover:bg-neutral-300"
+            class="rounded-sm bg-neutral-200 px-2 py-1 hover:bg-neutral-300"
           >
             &larr; Prev
           </a>
@@ -108,7 +108,7 @@
             }&proposalsPage=${
               data.tab === "proposals" ? data.page + 1 : data.proposalsPage
             }&ownerPage=${data.tab === "owner" ? data.page + 1 : d.ownerPage}`}
-            class="rounded bg-neutral-200 px-2 py-1 hover:bg-neutral-300"
+            class="rounded-sm bg-neutral-200 px-2 py-1 hover:bg-neutral-300"
           >
             Next &rarr;
           </a>
@@ -132,7 +132,7 @@
   </section>
 
   <!-- Contacts section -->
-  <section class="rounded bg-neutral-100 p-2">
+  <section class="rounded-sm bg-neutral-100 p-2">
     <h2 class="mb-2 font-semibold">Contacts</h2>
     {#if data.client.contacts.length > 0}
       <div class="flex flex-wrap gap-1">

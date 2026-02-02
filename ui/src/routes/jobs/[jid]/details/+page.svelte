@@ -37,7 +37,7 @@
           if (response.errors) {
             sessionStorage.setItem(
               `proposal_validation_errors_${data.job.id}`,
-              JSON.stringify(response.errors)
+              JSON.stringify(response.errors),
             );
           }
           // Flag to redirect back to create project page after successful save
@@ -315,7 +315,7 @@
     </div>
   </div>
 
-  <div class="space-y-2 rounded bg-neutral-100 p-4">
+  <div class="space-y-2 rounded-sm bg-neutral-100 p-4">
     <div class="flex items-center gap-2">
       <span class="font-semibold">Job Number:</span>
       <span>{data.job.number}</span>
@@ -611,7 +611,7 @@
             id="staff-start-date"
             type="date"
             bind:value={timeRangeStart}
-            class="rounded border px-2 py-1"
+            class="rounded-sm border px-2 py-1"
           />
         </div>
         <div>
@@ -620,7 +620,7 @@
             id="staff-end-date"
             type="date"
             bind:value={timeRangeEnd}
-            class="rounded border px-2 py-1"
+            class="rounded-sm border px-2 py-1"
           />
         </div>
       </div>
@@ -636,7 +636,7 @@
             id="div-start-date"
             type="date"
             bind:value={timeRangeStart}
-            class="rounded border px-2 py-1"
+            class="rounded-sm border px-2 py-1"
           />
         </div>
         <div>
@@ -645,7 +645,7 @@
             id="div-end-date"
             type="date"
             bind:value={timeRangeEnd}
-            class="rounded border px-2 py-1"
+            class="rounded-sm border px-2 py-1"
           />
         </div>
       </div>

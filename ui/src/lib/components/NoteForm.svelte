@@ -142,7 +142,7 @@
       bind:value={note}
       maxlength={1000}
       rows={3}
-      class="rounded border border-neutral-300 p-2"
+      class="rounded-sm border border-neutral-300 p-2"
     ></textarea>
     <span class="text-xs text-neutral-500">{note.length}/1000</span>
     {#if errors.note}

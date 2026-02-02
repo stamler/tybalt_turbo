@@ -277,7 +277,7 @@
     <input
       id={`location-input-${thisId}`}
       name={fieldName}
-      class="h-8 flex-1 cursor-not-allowed rounded border border-neutral-300 px-1 opacity-50"
+      class="h-8 flex-1 cursor-not-allowed rounded-sm border border-neutral-300 px-1 opacity-50"
       type="text"
       placeholder="8-char + 2-3-char Plus Code (e.g. 849VCWC8+R9)"
       bind:value={code}
@@ -304,7 +304,7 @@
         }}
       >
         <input
-          class="h-8 w-full rounded border border-neutral-300 px-1 outline-none focus:border-neutral-400 focus:ring-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-400"
+          class="h-8 w-full rounded-sm border border-neutral-300 px-1 outline-hidden focus:border-neutral-400 focus:ring-0 focus-visible:ring-2 focus-visible:ring-neutral-400 focus-visible:outline-hidden"
           type="search"
           inputmode="search"
           enterkeyhint="search"
@@ -330,7 +330,7 @@
     <span class="text-red-600">{errors[fieldName].message}</span>
   {/if}
 
-  <div class="h-64 w-full overflow-hidden rounded border border-neutral-300">
+  <div class="h-64 w-full overflow-hidden rounded-sm border border-neutral-300">
     <div bind:this={mapElement} class="h-full w-full"></div>
   </div>
 </div>

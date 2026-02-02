@@ -33,13 +33,13 @@
 </script>
 
 {#if show}
-  <div class="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50">
+  <div class="fixed inset-0 z-9999 flex items-center justify-center bg-black/50">
     <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
       <h2 class="mb-2 text-xl font-bold">{title}</h2>
       {#if subtitle}
         <p class="mb-4 text-sm text-neutral-600">{subtitle}</p>
       {/if}
-      
+
       <div class="mb-4 flex flex-col gap-4">
         {@render children()}
       </div>
@@ -51,7 +51,7 @@
       <div class="flex justify-end gap-2">
         <button
           type="button"
-          class="rounded bg-neutral-200 px-4 py-2 text-neutral-700 hover:bg-neutral-300"
+          class="rounded-sm bg-neutral-200 px-4 py-2 text-neutral-700 hover:bg-neutral-300"
           onclick={handleCancel}
           disabled={submitting}
         >
@@ -59,7 +59,7 @@
         </button>
         <button
           type="button"
-          class="rounded bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+          class="rounded-sm bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
           onclick={onSubmit}
           disabled={submitting}
         >

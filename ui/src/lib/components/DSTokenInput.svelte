@@ -72,7 +72,7 @@
   <span class="flex w-full gap-2">
     <label class="flex shrink-0 items-center" for={`text-input-${thisId}`}>{uiName}</label>
     <div
-      class="focus-within:border-blue-500, flex w-full flex-wrap gap-1 rounded border border-neutral-300 bg-white p-1 focus-within:ring-2 focus-within:ring-blue-500"
+      class="focus-within:border-blue-500, flex w-full flex-wrap gap-1 rounded-sm border border-neutral-300 bg-white p-1 focus-within:ring-2 focus-within:ring-blue-500"
     >
       {#each value as item, i}
         <span class="flex items-center rounded-full bg-neutral-200 px-2">
@@ -83,7 +83,7 @@
         </span>
       {/each}
       <input
-        class="flex-1 focus:outline-none"
+        class="flex-1 focus:outline-hidden"
         id={`text-input-${thisId}`}
         type="text"
         name={fieldName}

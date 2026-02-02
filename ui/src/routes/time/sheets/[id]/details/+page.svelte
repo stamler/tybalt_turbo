@@ -150,7 +150,7 @@
             {/if}
             <span>on {shortDate(timeSheet.rejected.split("T")[0])}</span>
           </div>
-          <div class="mt-1 italic text-red-600">
+          <div class="mt-1 text-red-600 italic">
             {timeSheet.rejection_reason}
           </div>
         {:else if !timeSheet.committed && !timeSheet.approved && timeSheet.rejected === ""}
@@ -246,20 +246,20 @@
     {#if tallies.bankEntries.length > 0 || tallies.payoutRequests.length > 0}
       <div class="mt-4 border-t pt-4">
         {#if tallies.bankEntries.length === 1}
-          <span class="mr-2 inline-block rounded bg-blue-100 px-2 py-1 text-sm text-blue-800">
+          <span class="mr-2 inline-block rounded-sm bg-blue-100 px-2 py-1 text-sm text-blue-800">
             {tallies.bankEntries[0].hours} hours banked
           </span>
         {:else if tallies.bankEntries.length > 1}
-          <span class="mr-2 inline-block rounded bg-red-100 px-2 py-1 text-sm text-red-800">
+          <span class="mr-2 inline-block rounded-sm bg-red-100 px-2 py-1 text-sm text-red-800">
             Multiple bank entries
           </span>
         {/if}
         {#if tallies.payoutRequests.length === 1}
-          <span class="inline-block rounded bg-green-100 px-2 py-1 text-sm text-green-800">
+          <span class="inline-block rounded-sm bg-green-100 px-2 py-1 text-sm text-green-800">
             ${tallies.payoutRequests[0].payout_request_amount} payout requested
           </span>
         {:else if tallies.payoutRequests.length > 1}
-          <span class="inline-block rounded bg-red-100 px-2 py-1 text-sm text-red-800">
+          <span class="inline-block rounded-sm bg-red-100 px-2 py-1 text-sm text-red-800">
             Multiple payout requests
           </span>
         {/if}

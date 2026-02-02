@@ -58,14 +58,14 @@
     type="text"
     placeholder="Enter job number prefix (e.g., 25- or P23-)"
     bind:value={prefix}
-    class="flex-1 rounded border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
+    class="flex-1 rounded-sm border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
     onkeydown={(e) => e.key === "Enter" && load()}
   />
   <input
     type="number"
     min="1"
     bind:value={age}
-    class="w-24 rounded border border-neutral-300 px-2 py-1 text-base"
+    class="w-24 rounded-sm border border-neutral-300 px-2 py-1 text-base"
     title="Age in days"
     onkeydown={(e) => e.key === "Enter" && load()}
   />

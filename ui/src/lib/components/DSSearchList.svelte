@@ -18,7 +18,6 @@
   const thisId = idCounter;
   idCounter += 1;
 
-
   let {
     index,
     inListHeader,
@@ -106,7 +105,7 @@
 >
   <li id="listbar" class="col-span-3 flex items-center gap-x-2 p-2">
     <input
-      class="flex-1 rounded border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
+      class="flex-1 rounded-sm border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
       type="text"
       id={`autocomplete-input-${thisId}`}
       name={fieldName}
@@ -124,7 +123,7 @@
   {#snippet itemList(_items: T[])}
     {#each _items.slice(0, MAX_RESULTS) as item}
       <li class="contents">
-        <div class="col-span-3 grid grid-cols-subgrid items-center bg-[inherit]">
+        <div class="col-span-3 grid grid-cols-subgrid items-center bg-inherit">
           {#if anchor !== undefined}
             <div class="flex min-w-24 items-center justify-center p-2">
               {@render anchor(item)}

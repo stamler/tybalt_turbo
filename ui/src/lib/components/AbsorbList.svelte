@@ -158,7 +158,7 @@
   {#if loading}
     <div class="text-neutral-500">Loading...</div>
   {:else if items.length === 0}
-    <div class="rounded border border-neutral-200 p-4 text-neutral-600">
+    <div class="rounded-sm border border-neutral-200 p-4 text-neutral-600">
       No pending absorb actions.
     </div>
   {:else}
@@ -178,17 +178,17 @@
           </div>
 
           <div class="mb-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-            <div class="rounded bg-yellow-100 p-2 text-sm">
+            <div class="rounded-sm bg-yellow-100 p-2 text-sm">
               <div class="font-semibold">Summary</div>
               <div>Absorbed records: {countAbsorbed(item.absorbed_records) ?? "n/a"}</div>
               <div>Updated references: {countUpdatedRefs(item.updated_references) ?? "n/a"}</div>
             </div>
-            <div class="rounded bg-yellow-100 p-2 text-sm md:col-span-2">
+            <div class="rounded-sm bg-yellow-100 p-2 text-sm md:col-span-2">
               <div class="font-semibold">Details</div>
               <div class="mt-1 grid grid-cols-1 gap-2 md:grid-cols-2">
                 <div>
                   <div class="text-xs font-medium">Absorbed Records</div>
-                  <pre class="mt-1 max-h-48 overflow-auto rounded bg-yellow-200/50 p-2 text-xs">
+                  <pre class="mt-1 max-h-48 overflow-auto rounded-sm bg-yellow-200/50 p-2 text-xs">
 {JSON.stringify(item.absorbed_records, null, 2)}
                   </pre>
                 </div>
@@ -196,7 +196,7 @@
                   <div class="text-xs font-medium">Updated References</div>
                   <div class="mt-1 flex flex-col gap-3">
                     {#each entriesOf(item.updated_references) as [tableName, columns]}
-                      <div class="rounded border border-yellow-200">
+                      <div class="rounded-sm border border-yellow-200">
                         <button
                           class="flex w-full items-center justify-between bg-yellow-200/60 px-2 py-1 text-left text-xs font-semibold"
                           onclick={() => toggleTable(item.id, tableName as string)}
@@ -227,7 +227,7 @@
                                         <td class="border-b border-yellow-100 px-2 py-1 font-mono"
                                           >{rowId}</td
                                         >
-                                        <td class="break-all border-b border-yellow-100 px-2 py-1"
+                                        <td class="border-b border-yellow-100 px-2 py-1 break-all"
                                           >{formatPrevValue(prevValue)}</td
                                         >
                                       </tr>

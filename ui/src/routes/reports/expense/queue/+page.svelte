@@ -48,7 +48,7 @@
 
 <DsList items={rows} groupField="phase" inListHeader="Expense Commit Queue">
   {#snippet groupHeader(label)}
-    <span class="text-xs uppercase tracking-wide text-neutral-600">{label}</span>
+    <span class="text-xs tracking-wide text-neutral-600 uppercase">{label}</span>
   {/snippet}
   {#snippet headline(r: Row)}
     <a href={`/expenses/${r.id}/details`} class="underline">{r.surname}, {r.given_name}</a>

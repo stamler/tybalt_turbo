@@ -51,13 +51,13 @@
         {#if data.page > 1}
           <a
             href={`?tab=${data.tab}&poPage=${data.tab === "purchase_orders" ? data.page - 1 : data.poPage}&expPage=${data.tab === "expenses" ? data.page - 1 : data.expPage}`}
-            class="rounded bg-neutral-200 px-2 py-1 hover:bg-neutral-300">&larr; Prev</a
+            class="rounded-sm bg-neutral-200 px-2 py-1 hover:bg-neutral-300">&larr; Prev</a
           >
         {/if}
         {#if data.page < data.totalPages}
           <a
             href={`?tab=${data.tab}&poPage=${data.tab === "purchase_orders" ? data.page + 1 : data.poPage}&expPage=${data.tab === "expenses" ? data.page + 1 : data.expPage}`}
-            class="rounded bg-neutral-200 px-2 py-1 hover:bg-neutral-300">Next &rarr;</a
+            class="rounded-sm bg-neutral-200 px-2 py-1 hover:bg-neutral-300">Next &rarr;</a
           >
         {/if}
       </div>

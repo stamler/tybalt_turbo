@@ -32,7 +32,7 @@
 <div class="mx-auto space-y-4 p-4">
   <h1 class="text-2xl font-bold">Purchase Order Details</h1>
 
-  <div class="overflow-hidden rounded">
+  <div class="overflow-hidden rounded-sm">
     <div class="flex items-center justify-between bg-neutral-200 p-2">
       <span>{data.po.po_number === "" ? "no po number" : data.po.po_number}</span>
       <div class="flex items-center gap-2">
@@ -231,7 +231,7 @@
   </div>
 
   {#if $globalStore.showAllUi || $globalStore.claims.includes("payables_admin")}
-    <div class="mt-4 rounded border border-red-400 bg-red-50 p-4">
+    <div class="mt-4 rounded-sm border border-red-400 bg-red-50 p-4">
       <h3 class="font-bold text-red-800">Admin Actions</h3>
       <div class="mt-2 flex gap-2">
         <DsActionButton
@@ -240,7 +240,12 @@
           title="Cancel Purchase Order"
           color="red"
         />
-        <DsActionButton action={closePo} icon="mdi:lock" title="Close Purchase Order" color="gray" />
+        <DsActionButton
+          action={closePo}
+          icon="mdi:lock"
+          title="Close Purchase Order"
+          color="gray"
+        />
       </div>
     </div>
   {/if}

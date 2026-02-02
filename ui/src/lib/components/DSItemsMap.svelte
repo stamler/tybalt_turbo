@@ -190,7 +190,7 @@
   });
 </script>
 
-<div class="relative h-full w-full overflow-hidden rounded border border-neutral-300">
+<div class="relative h-full w-full overflow-hidden rounded-sm border border-neutral-300">
   <div bind:this={mapElement} class="h-full w-full"></div>
   <!-- Hidden templates for popup content, one per item -->
   {#each items as it, i}

@@ -48,7 +48,7 @@
 
 <DsList items={rows} groupField="phase" inListHeader={`Expenses for ${payPeriodEnding}`}>
   {#snippet groupHeader(label)}
-    <span class="text-xs uppercase tracking-wide text-neutral-600">{label}</span>
+    <span class="text-xs tracking-wide text-neutral-600 uppercase">{label}</span>
   {/snippet}
   {#snippet anchor(r)}
     <a href={`/expenses/${r.id}/details`} class="text-blue-600 hover:underline">{r.date}</a>

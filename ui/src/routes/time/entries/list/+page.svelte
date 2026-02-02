@@ -235,14 +235,14 @@
         {#if tallies.bankEntries.length === 1}
           <span>{tallies.bankEntries[0].hours} hours banked</span>
         {:else if tallies.bankEntries.length > 1}
-          <span class="rounded bg-red-200 p-1 text-red-600">
+          <span class="rounded-sm bg-red-200 p-1 text-red-600">
             More than one banked time entry exists.
           </span>
         {/if}
         {#if tallies.payoutRequests.length === 1}
           <span>${tallies.payoutRequests[0].payout_request_amount} payout requested</span>
         {:else if tallies.payoutRequests.length > 1}
-          <span class="rounded bg-red-200 p-1 text-red-600">
+          <span class="rounded-sm bg-red-200 p-1 text-red-600">
             More than one payout request entry exists.
           </span>
         {/if}

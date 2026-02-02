@@ -282,7 +282,7 @@
 {#if hasMore}
   <div class="mt-4 text-center">
     <button
-      class="mb-4 rounded bg-blue-600 px-4 py-2 text-white"
+      class="mb-4 rounded-sm bg-blue-600 px-4 py-2 text-white"
       onclick={loadMore}
       disabled={listLoading}
     >

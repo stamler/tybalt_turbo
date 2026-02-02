@@ -30,7 +30,7 @@
   }
 </script>
 
-<li class="rounded border border-neutral-200 p-3">
+<li class="rounded-sm border border-neutral-200 p-3">
   <div class="flex items-center justify-between text-sm">
     <span class="font-semibold">{authorLabel()}</span>
     <span class="text-neutral-500">{formatDateTime(created)}</span>

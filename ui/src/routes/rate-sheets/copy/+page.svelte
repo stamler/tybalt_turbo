@@ -30,7 +30,7 @@
         rate: e.rate,
         overtime_rate: e.overtime_rate,
       }))
-      .sort((a, b) => a.roleName.localeCompare(b.roleName))
+      .sort((a, b) => a.roleName.localeCompare(b.roleName)),
   );
 
   // Overtime multiplier for bulk calculation
@@ -121,13 +121,13 @@
         <span class="flex w-full items-center gap-2">
           <label for="name">Name</label>
           <input
-            class="flex-1 cursor-not-allowed rounded border border-neutral-300 bg-neutral-100 px-1 opacity-60"
+            class="flex-1 cursor-not-allowed rounded-sm border border-neutral-300 bg-neutral-100 px-1 opacity-60"
             type="text"
             id="name"
             value={name}
             disabled
           />
-          <span class="text-sm italic text-neutral-500">revising</span>
+          <span class="text-sm text-neutral-500 italic">revising</span>
         </span>
       </div>
     {:else}
@@ -135,11 +135,13 @@
     {/if}
 
     <!-- Effective Date field -->
-    <div class="flex w-full flex-col gap-2 {errors.effective_date !== undefined ? 'bg-red-200' : ''}">
+    <div
+      class="flex w-full flex-col gap-2 {errors.effective_date !== undefined ? 'bg-red-200' : ''}"
+    >
       <span class="flex w-full gap-2">
         <label for="effective_date">Effective Date</label>
         <input
-          class="flex-1 rounded border border-neutral-300 px-1"
+          class="flex-1 rounded-sm border border-neutral-300 px-1"
           type="date"
           id="effective_date"
           name="effective_date"
@@ -172,12 +174,12 @@
                     min="0.01"
                     step="0.01"
                     bind:value={overtimeMultiplier}
-                    class="w-16 rounded border border-neutral-300 px-2 py-1 text-right text-sm"
+                    class="w-16 rounded-sm border border-neutral-300 px-2 py-1 text-right text-sm"
                     title="Overtime multiplier"
                   />
                   <button
                     type="button"
-                    class="rounded bg-neutral-200 px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-300"
+                    class="rounded-sm bg-neutral-200 px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-300"
                     onclick={applyOvertimeMultiplier}
                     title="Apply multiplier to all overtime rates"
                   >
@@ -202,7 +204,7 @@
                     min="0"
                     step="0.01"
                     bind:value={stagedEntries[i].rate}
-                    class="w-28 rounded border border-neutral-300 px-2 py-1"
+                    class="w-28 rounded-sm border border-neutral-300 px-2 py-1"
                   />
                 </td>
                 <td class="px-3 py-2">
@@ -211,7 +213,7 @@
                     min="0"
                     step="0.01"
                     bind:value={stagedEntries[i].overtime_rate}
-                    class="w-28 rounded border border-neutral-300 px-2 py-1"
+                    class="w-28 rounded-sm border border-neutral-300 px-2 py-1"
                   />
                 </td>
               </tr>

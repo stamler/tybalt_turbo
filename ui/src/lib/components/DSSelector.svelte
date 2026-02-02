@@ -43,7 +43,7 @@
       id={`select-input-${thisId}`}
       name={fieldName}
       bind:value
-      class="rounded border border-neutral-300 px-1 {disabled ? 'opacity-50' : ''}"
+      class="rounded-sm border border-neutral-300 px-1 {disabled ? 'opacity-50' : ''}"
       {disabled}
     >
       {#each items as item}

@@ -47,10 +47,10 @@
 
 {#if show}
   <div
-    class="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden"
+    class="fixed inset-0 z-50 overflow-x-hidden overflow-y-auto"
     transition:fade={{ duration: 200 }}
   >
-    <div class="fixed inset-0 z-10 bg-black bg-opacity-80"></div>
+    <div class="bg-opacity-80 fixed inset-0 z-10 bg-black"></div>
     <div
       class="relative z-20 mx-auto my-20 flex w-11/12 flex-col rounded-lg bg-neutral-800 p-4 text-neutral-300 md:w-3/5"
     >
@@ -62,7 +62,7 @@
         <textarea
           bind:value={rejectionReason}
           placeholder="Enter rejection reason"
-          class="rounded bg-neutral-700 p-2"
+          class="rounded-sm bg-neutral-700 p-2"
         ></textarea>
       </div>
       <div class="gap-2">

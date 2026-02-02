@@ -63,7 +63,7 @@
     {#if page < totalPages}
       <div class="mt-4 text-center">
         <button
-          class="rounded bg-blue-600 px-4 py-2 text-white"
+          class="rounded-sm bg-blue-600 px-4 py-2 text-white"
           onclick={loadMore}
           disabled={listLoading}
         >

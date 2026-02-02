@@ -18,7 +18,7 @@
   </span>
 {:else}
   <span
-    class="inline-flex items-center gap-1 rounded border border-{color}-300 bg-{color}-100 px-2 py-1 text-sm text-{color}-500"
+    class="inline-flex items-center gap-1 rounded-sm border border-{color}-300 bg-{color}-100 px-2 py-1 text-sm text-{color}-500"
     {title}
   >
     {@render children()}

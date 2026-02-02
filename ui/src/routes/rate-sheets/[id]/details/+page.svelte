@@ -100,9 +100,7 @@
 
       // Update local entries with new values
       entries = entries.map((e) =>
-        e.id === entryId
-          ? { ...e, rate: response.rate, overtime_rate: response.overtime_rate }
-          : e
+        e.id === entryId ? { ...e, rate: response.rate, overtime_rate: response.overtime_rate } : e,
       );
 
       // Remove from edited state
@@ -128,17 +126,17 @@
   // Apply overtime multiplier to all entries
   function applyOvertimeMultiplier() {
     const newEdits: Record<string, { rate: number; overtime_rate: number }> = { ...editedEntries };
-    
+
     for (const entry of entries) {
       const currentRate = editedEntries[entry.id]?.rate ?? entry.rate;
       const calculatedOvertime = Math.round(currentRate * overtimeMultiplier * 100) / 100;
-      
+
       newEdits[entry.id] = {
         rate: currentRate,
         overtime_rate: calculatedOvertime,
       };
     }
-    
+
     editedEntries = newEdits;
   }
 
@@ -156,12 +154,12 @@
         comparison = a.overtime_rate - b.overtime_rate;
       }
       return sortOrder === "asc" ? comparison : -comparison;
-    })
+    }),
   );
 
   // Compute missing roles
   const missingRoles = $derived(
-    allRoles.filter((role) => !entries.some((e) => e.role === role.id))
+    allRoles.filter((role) => !entries.some((e) => e.role === role.id)),
   );
   const isComplete = $derived(missingRoles.length === 0);
 
@@ -171,11 +169,11 @@
       Role: e.expand?.role?.name ?? "Unknown",
       Rate: e.rate,
       "Overtime Rate": e.overtime_rate,
-    }))
+    })),
   );
 
   // Toggle value for DSToggle (string-based)
-  let activeToggleValue = $state(untrack(() => rateSheet.active ? "active" : "inactive"));
+  let activeToggleValue = $state(untrack(() => (rateSheet.active ? "active" : "inactive")));
   let isToggling = $state(false);
 
   // React to toggle value changes
@@ -262,9 +260,7 @@
   <!-- Action Buttons -->
   <div class="mb-4 flex gap-2">
     {#if rateSheet.active}
-      <DsActionButton action={`/rate-sheets/copy?revise=${rateSheet.id}`}>
-        Revise
-      </DsActionButton>
+      <DsActionButton action={`/rate-sheets/copy?revise=${rateSheet.id}`}>Revise</DsActionButton>
     {/if}
     <DsActionButton action={`/rate-sheets/copy?from=${rateSheet.id}`}>
       Use as Template
@@ -308,19 +304,19 @@
               <tr>
                 <th></th>
                 <th></th>
-                <th class="pb-2 pr-4 text-right">
+                <th class="pr-4 pb-2 text-right">
                   <div class="flex items-center justify-end gap-1">
                     <input
                       type="number"
                       min="0.01"
                       step="0.01"
                       bind:value={overtimeMultiplier}
-                      class="w-16 rounded border border-neutral-300 px-2 py-1 text-right text-sm"
+                      class="w-16 rounded-sm border border-neutral-300 px-2 py-1 text-right text-sm"
                       title="Overtime multiplier"
                     />
                     <button
                       type="button"
-                      class="rounded bg-neutral-200 px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-300"
+                      class="rounded-sm bg-neutral-200 px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-300"
                       onclick={applyOvertimeMultiplier}
                       title="Apply multiplier to all overtime rates"
                     >
@@ -331,27 +327,36 @@
                 <th></th>
               </tr>
               <tr class="border-b border-neutral-300">
-                <th class="pb-2 pr-4 text-left">
+                <th class="pr-4 pb-2 text-left">
                   <button class="hover:underline" onclick={() => toggleSort("role")}>
                     Role
                     {#if sortColumn === "role"}
-                      <Icon icon={sortOrder === "asc" ? "mdi:sort-ascending" : "mdi:sort-descending"} class="inline w-4" />
+                      <Icon
+                        icon={sortOrder === "asc" ? "mdi:sort-ascending" : "mdi:sort-descending"}
+                        class="inline w-4"
+                      />
                     {/if}
                   </button>
                 </th>
-                <th class="pb-2 pr-4 text-right">
+                <th class="pr-4 pb-2 text-right">
                   <button class="hover:underline" onclick={() => toggleSort("rate")}>
                     Rate
                     {#if sortColumn === "rate"}
-                      <Icon icon={sortOrder === "asc" ? "mdi:sort-ascending" : "mdi:sort-descending"} class="inline w-4" />
+                      <Icon
+                        icon={sortOrder === "asc" ? "mdi:sort-ascending" : "mdi:sort-descending"}
+                        class="inline w-4"
+                      />
                     {/if}
                   </button>
                 </th>
-                <th class="pb-2 pr-4 text-right">
+                <th class="pr-4 pb-2 text-right">
                   <button class="hover:underline" onclick={() => toggleSort("overtime_rate")}>
                     Overtime Rate
                     {#if sortColumn === "overtime_rate"}
-                      <Icon icon={sortOrder === "asc" ? "mdi:sort-ascending" : "mdi:sort-descending"} class="inline w-4" />
+                      <Icon
+                        icon={sortOrder === "asc" ? "mdi:sort-ascending" : "mdi:sort-descending"}
+                        class="inline w-4"
+                      />
                     {/if}
                   </button>
                 </th>
@@ -367,9 +372,10 @@
                       type="number"
                       min="1"
                       step="1"
-                      class="w-24 rounded border border-neutral-300 px-2 py-1 text-right"
+                      class="w-24 rounded-sm border border-neutral-300 px-2 py-1 text-right"
                       value={getEntryValue(entry, "rate")}
-                      oninput={(e) => updateEntryField(entry, "rate", parseFloat(e.currentTarget.value) || 0)}
+                      oninput={(e) =>
+                        updateEntryField(entry, "rate", parseFloat(e.currentTarget.value) || 0)}
                     />
                   </td>
                   <td class="py-2 pr-4 text-right">
@@ -377,9 +383,14 @@
                       type="number"
                       min="1"
                       step="0.01"
-                      class="w-24 rounded border border-neutral-300 px-2 py-1 text-right"
+                      class="w-24 rounded-sm border border-neutral-300 px-2 py-1 text-right"
                       value={getEntryValue(entry, "overtime_rate")}
-                      oninput={(e) => updateEntryField(entry, "overtime_rate", parseFloat(e.currentTarget.value) || 0)}
+                      oninput={(e) =>
+                        updateEntryField(
+                          entry,
+                          "overtime_rate",
+                          parseFloat(e.currentTarget.value) || 0,
+                        )}
                     />
                   </td>
                   <td class="py-2">
@@ -387,7 +398,7 @@
                       <div class="flex items-center gap-2">
                         <button
                           type="button"
-                          class="rounded bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-600 disabled:opacity-50"
+                          class="rounded-sm bg-blue-500 px-2 py-1 text-sm text-white hover:bg-blue-600 disabled:opacity-50"
                           disabled={savingEntryId === entry.id}
                           onclick={() => saveEditedEntry(entry.id)}
                         >
@@ -395,7 +406,7 @@
                         </button>
                         <button
                           type="button"
-                          class="rounded bg-neutral-200 px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-300"
+                          class="rounded-sm bg-neutral-200 px-2 py-1 text-sm text-neutral-700 hover:bg-neutral-300"
                           disabled={savingEntryId === entry.id}
                           onclick={() => cancelEntryEdit(entry.id)}
                         >
@@ -423,7 +434,7 @@
 
   <!-- Add Entry Form (when incomplete) -->
   {#if !isComplete}
-    <div class="rounded border border-neutral-300 bg-neutral-50 p-4">
+    <div class="rounded-sm border border-neutral-300 bg-neutral-50 p-4">
       <h3 class="mb-3 font-semibold">Add Entry</h3>
       <form onsubmit={saveEntry} class="flex flex-wrap items-end gap-4">
         <div class="flex flex-col">
@@ -431,7 +442,7 @@
           <select
             id="role"
             bind:value={newEntry.role}
-            class="rounded border border-neutral-300 px-3 py-2"
+            class="rounded-sm border border-neutral-300 px-3 py-2"
           >
             <option value="">Select a role...</option>
             {#each missingRoles as role}
@@ -448,7 +459,7 @@
             min="1"
             step="0.01"
             bind:value={newEntry.rate}
-            class="w-32 rounded border border-neutral-300 px-3 py-2"
+            class="w-32 rounded-sm border border-neutral-300 px-3 py-2"
           />
         </div>
 
@@ -460,7 +471,7 @@
             min="1"
             step="0.01"
             bind:value={newEntry.overtime_rate}
-            class="w-32 rounded border border-neutral-300 px-3 py-2"
+            class="w-32 rounded-sm border border-neutral-300 px-3 py-2"
           />
         </div>
 

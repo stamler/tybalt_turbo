@@ -151,7 +151,7 @@
       </div>
     </div>
   {:else if existingAbsorbAction}
-    <div class="rounded border-2 border-yellow-500 bg-yellow-50 p-4">
+    <div class="rounded-sm border-2 border-yellow-500 bg-yellow-50 p-4">
       <div class="mb-2 text-yellow-900">
         <p class="font-semibold">There is a pending absorb action for this collection.</p>
         <p class="text-sm">
@@ -212,7 +212,7 @@
         <ul class="flex flex-col gap-2">
           {#each recordsToAbsorb as recordId}
             {#each availableRecords.filter((c) => c.id === recordId) as record}
-              <li class="flex items-center gap-2 rounded bg-neutral-100 p-2">
+              <li class="flex items-center gap-2 rounded-sm bg-neutral-100 p-2">
                 {@render recordSnippet(record as unknown as T)}
                 <DsActionButton
                   action={() => removeRecord(record.id)}

@@ -41,9 +41,15 @@
   let poApproverUserClaimId = $state<string | null>(null);
   let claimsLoaded = $state(false);
 
-  const initialPoApproverMaxAmount = untrack(() => normalizeNumber((data.item as any)?.po_approver_max_amount));
-  const initialPoApproverDivisions = untrack(() => normalizeDivisions((data.item as any)?.po_approver_divisions));
-  const initialPoApproverPropsId = untrack(() => ((data.item as any)?.po_approver_props_id as string) ?? null);
+  const initialPoApproverMaxAmount = untrack(() =>
+    normalizeNumber((data.item as any)?.po_approver_max_amount),
+  );
+  const initialPoApproverDivisions = untrack(() =>
+    normalizeDivisions((data.item as any)?.po_approver_divisions),
+  );
+  const initialPoApproverPropsId = untrack(
+    () => ((data.item as any)?.po_approver_props_id as string) ?? null,
+  );
 
   let poApproverPropsId = $state(initialPoApproverPropsId);
   let poApproverMaxAmount = $state(initialPoApproverMaxAmount);
@@ -599,7 +605,7 @@
     </div>
 
     {#if hasPoApproverClaim}
-      <section class="space-y-3 rounded border border-neutral-200 bg-neutral-50 p-3">
+      <section class="space-y-3 rounded-sm border border-neutral-200 bg-neutral-50 p-3">
         <h3 class="text-base font-semibold">PO Approver Settings</h3>
 
         <DsTextInput

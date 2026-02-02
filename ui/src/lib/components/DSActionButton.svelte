@@ -28,7 +28,9 @@
 
   const normalizedAction = $derived(typeof action === "string" ? () => goto(action) : action);
   const normalizedColor = $derived(color ?? "yellow");
-  const isIconContent = $derived(typeof icon === "string" && color !== undefined && title !== undefined);
+  const isIconContent = $derived(
+    typeof icon === "string" && color !== undefined && title !== undefined,
+  );
   const isTextContent = $derived(children !== undefined);
 </script>
 
@@ -37,7 +39,7 @@
   {type}
   {title}
   disabled={loading || disabled}
-  class="flex items-center rounded-sm {transparentBackground
+  class="flex items-center rounded-xs {transparentBackground
     ? ''
     : 'bg-' + normalizedColor + '-200'} px-1 {isIconContent ? 'py-1' : 'py-0'} {isIconContent
     ? 'text-neutral-500'

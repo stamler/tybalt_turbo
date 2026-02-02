@@ -39,7 +39,9 @@
     <div class="flex flex-col">
       <a
         href={`/admin_profiles/${item.id}/details`}
-        class={item.active === false ? "text-blue-400 hover:underline" : "text-blue-600 hover:underline"}
+        class={item.active === false
+          ? "text-blue-400 hover:underline"
+          : "text-blue-600 hover:underline"}
       >
         {item.given_name}
         {item.surname}

@@ -8,7 +8,7 @@
   } = $props();
 </script>
 
-<div class="flex overflow-hidden rounded border border-neutral-300">
+<div class="flex overflow-hidden rounded-sm border border-neutral-300">
   {#each options as option}
     <button
       type="button"

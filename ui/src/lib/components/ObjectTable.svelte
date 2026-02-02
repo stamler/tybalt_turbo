@@ -143,7 +143,7 @@
   <!-- <DownloadData data={internalTableData} {columns} dlFileName="report.csv" /> -->
   <div class="flex flex-wrap">
     {#each filters as f (f.key)}
-      <div class="mb-2 mr-2 flex rounded-sm border border-blue-700 bg-blue-200 px-2 py-1">
+      <div class="mr-2 mb-2 flex rounded-xs border border-blue-700 bg-blue-200 px-2 py-1">
         <Icon icon="mdi:close-circle" class="w-5 pr-1" onclick={() => removeFilter(f)} />
         {f.key}: {f.value}
       </div>

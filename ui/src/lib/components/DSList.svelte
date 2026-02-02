@@ -133,7 +133,7 @@
         type="textbox"
         placeholder="search..."
         bind:value={searchTerm}
-        class="flex-1 rounded border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
+        class="flex-1 rounded-sm border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
       />
       {#if groupField === undefined}
         <span>{processedItems.length} items</span>
@@ -155,7 +155,7 @@
   {#snippet itemList(_processedItems: T[])}
     {#each _processedItems as item}
       <li class="contents">
-        <div class="col-span-3 grid grid-cols-subgrid items-center bg-[inherit]">
+        <div class="col-span-3 grid grid-cols-subgrid items-center bg-inherit">
           {#if anchor !== undefined}
             <div class="flex min-w-24 items-center justify-center p-2">
               {@render anchor(item)}
@@ -198,7 +198,7 @@
       {@render itemList(processedItems[group])}
       {#if groupFooter !== undefined}
         <li class="contents">
-          <div class="col-span-3 grid grid-cols-subgrid items-center bg-[inherit]">
+          <div class="col-span-3 grid grid-cols-subgrid items-center bg-inherit">
             {@render groupFooter(group, processedItems[group])}
           </div>
         </li>

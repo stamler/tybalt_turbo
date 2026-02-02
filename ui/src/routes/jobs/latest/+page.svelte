@@ -47,7 +47,11 @@
 {:else if errorMessage}
   <div class="p-4 text-red-600">{errorMessage}</div>
 {:else if filteredItems}
-  <DsList items={filteredItems} search={true} inListHeader={jobType === "projects" ? "Latest Projects" : "Latest Proposals"}>
+  <DsList
+    items={filteredItems}
+    search={true}
+    inListHeader={jobType === "projects" ? "Latest Projects" : "Latest Proposals"}
+  >
     {#snippet searchBarExtra()}
       <DSToggle bind:value={jobType} options={jobTypeOptions} />
     {/snippet}
@@ -56,7 +60,9 @@
     {/snippet}
     {#snippet headline({ description }: LatestJob)}{description}{/snippet}
     {#snippet byline({ client }: LatestJob)}{client}{/snippet}
-    {#snippet line1({ branch, manager }: LatestJob)}{#if branch}<DsLabel color="neutral">{branch}</DsLabel>{/if}{#if manager}<DsLabel color="purple">{manager}</DsLabel>{/if}{/snippet}
+    {#snippet line1({ branch, manager }: LatestJob)}{#if branch}<DsLabel color="neutral"
+          >{branch}</DsLabel
+        >{/if}{#if manager}<DsLabel color="purple">{manager}</DsLabel>{/if}{/snippet}
     {#snippet actions({ id }: LatestJob)}
       <DsActionButton action="/jobs/{id}/edit" icon="mdi:pencil" title="Edit" color="blue" />
     {/snippet}

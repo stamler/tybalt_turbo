@@ -3,9 +3,10 @@ import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 export const load: PageLoad = async () => {
   try {
-    const result: { data: ExpensesAugmentedResponse[]; total_pages?: number; limit?: number } = await pb.send(`/api/expenses/pending`, {
-      method: "GET",
-    });
+    const result: { data: ExpensesAugmentedResponse[]; total_pages?: number; limit?: number } =
+      await pb.send(`/api/expenses/pending`, {
+        method: "GET",
+      });
     return {
       items: result?.data ?? [],
       totalPages: result?.total_pages ?? 0,

@@ -85,7 +85,7 @@
       {/if}
 
       {#if notes.length === 0}
-        <p class="text-sm italic text-neutral-600">No notes yet.</p>
+        <p class="text-sm text-neutral-600 italic">No notes yet.</p>
       {:else}
         <ul class="space-y-3">
           {#each notes as note (note.id)}

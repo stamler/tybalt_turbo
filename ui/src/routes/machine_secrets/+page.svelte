@@ -152,7 +152,7 @@
   {/if}
 
   <!-- Create new secret form -->
-  <div class="rounded border border-neutral-300 bg-neutral-50 p-4">
+  <div class="rounded-sm border border-neutral-300 bg-neutral-50 p-4">
     <h2 class="mb-3 text-lg font-semibold">Create New Secret</h2>
     <div class="flex flex-wrap items-end gap-4">
       <div class="flex flex-col gap-1">
@@ -160,7 +160,7 @@
         <select
           id="role-select"
           bind:value={role}
-          class="rounded border border-neutral-300 px-2 py-1"
+          class="rounded-sm border border-neutral-300 px-2 py-1"
         >
           {#each roleOptions as option}
             <option value={option.id}>{option.name}</option>
@@ -174,7 +174,9 @@
           type="number"
           bind:value={days}
           min="1"
-          class="w-24 rounded border border-neutral-300 px-2 py-1 {errors.days ? 'border-red-500 bg-red-50' : ''}"
+          class="w-24 rounded-sm border border-neutral-300 px-2 py-1 {errors.days
+            ? 'border-red-500 bg-red-50'
+            : ''}"
         />
         {#if errors.days}
           <span class="text-xs text-red-600">{errors.days.message}</span>
@@ -191,13 +193,15 @@
 
   <!-- Display newly created secret -->
   {#if newSecret}
-    <div class="rounded border-2 border-green-500 bg-green-50 p-4">
+    <div class="rounded-sm border-2 border-green-500 bg-green-50 p-4">
       <div class="mb-2 flex items-center gap-2">
         <span class="font-semibold text-green-800">New Secret Created</span>
         <span class="text-sm text-green-600">(copy now - won't be shown again)</span>
       </div>
       <div class="flex items-center gap-2">
-        <code class="flex-1 rounded bg-white px-3 py-2 font-mono text-lg">{newSecret.secret}</code>
+        <code class="flex-1 rounded-sm bg-white px-3 py-2 font-mono text-lg"
+          >{newSecret.secret}</code
+        >
         <DsActionButton
           action={copyToClipboard}
           icon={copied ? "feather:check" : "feather:clipboard"}
@@ -206,8 +210,10 @@
         />
       </div>
       <div class="mt-2 text-sm text-green-700">
-        <span class="font-medium">Role:</span> {newSecret.role} |
-        <span class="font-medium">Expires:</span> {formatExpiry(newSecret.expiry)}
+        <span class="font-medium">Role:</span>
+        {newSecret.role} |
+        <span class="font-medium">Expires:</span>
+        {formatExpiry(newSecret.expiry)}
       </div>
     </div>
   {/if}

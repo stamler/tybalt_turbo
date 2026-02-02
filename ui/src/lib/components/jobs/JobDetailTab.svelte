@@ -154,7 +154,7 @@
   }
 </script>
 
-<div class="space-y-4 rounded bg-neutral-50 py-4 shadow-sm">
+<div class="space-y-4 rounded-sm bg-neutral-50 py-4 shadow-xs">
   <!-- Summary & Filters -->
   <div class="px-4">
     {#if summaryLoading}
@@ -167,7 +167,7 @@
           {#if (summary[def.summaryProperty] && summary[def.summaryProperty].length > 1) || selectedFilters[def.type]}
             <span class="font-semibold">{def.label}:</span>
             {#each summary[def.summaryProperty] as item}
-              <button onclick={() => toggleFilter(def.type, item)} class="focus:outline-none">
+              <button onclick={() => toggleFilter(def.type, item)} class="focus:outline-hidden">
                 <DsLabel
                   color={def.color}
                   style={selectedFilters[def.type]?.[def.valueProperty] === item[def.valueProperty]

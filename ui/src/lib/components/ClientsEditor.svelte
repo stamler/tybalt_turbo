@@ -209,7 +209,7 @@
     <label for="client_contacts">Contacts</label>
     <div class="flex flex-col gap-2">
       {#each [...client_contacts, ...newContacts] as contact}
-        <div class="flex items-center gap-2 rounded bg-neutral-100 p-2">
+        <div class="flex items-center gap-2 rounded-sm bg-neutral-100 p-2">
           <span>{contact.surname}, {contact.given_name}</span>
           <span>{contact.email}</span>
           <div class="ml-auto flex gap-2">

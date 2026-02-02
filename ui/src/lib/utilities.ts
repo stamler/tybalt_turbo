@@ -460,10 +460,7 @@ export function applyDefaultDivisionOnce(
   }
 }
 
-export function applyDefaultRoleOnce(
-  item: { role?: string } | null | undefined,
-  editing: boolean,
-) {
+export function applyDefaultRoleOnce(item: { role?: string } | null | undefined, editing: boolean) {
   if (!item || editing) return;
 
   // Apply default role only once per item instance

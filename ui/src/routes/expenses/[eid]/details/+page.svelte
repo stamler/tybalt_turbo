@@ -25,7 +25,7 @@
 <div class="mx-auto space-y-4 p-4">
   <h1 class="text-2xl font-bold">Expense Details</h1>
 
-  <div class="space-y-2 rounded bg-neutral-100 p-4">
+  <div class="space-y-2 rounded-sm bg-neutral-100 p-4">
     <div class="flex items-center gap-2">
       <span class="font-semibold">Date:</span>
       <span>{shortDate(data.expense.date)}</span>
@@ -128,13 +128,15 @@
         <a
           href={`${PUBLIC_POCKETBASE_URL}/api/files/expenses/${data.expense.id}/${data.expense.attachment}`}
           target="_blank"
-          class="inline-flex items-center gap-1 rounded bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700"
+          class="inline-flex items-center gap-1 rounded-sm bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700"
         >
           <Icon icon="mdi:download" width="16" />
           Download
         </a>
         {#if data.expense.attachment_hash}
-          <span class="font-mono text-sm opacity-70">{data.expense.attachment_hash.slice(0, 8)}</span>
+          <span class="font-mono text-sm opacity-70"
+            >{data.expense.attachment_hash.slice(0, 8)}</span
+          >
           <button
             type="button"
             class="text-neutral-500 hover:text-neutral-700"

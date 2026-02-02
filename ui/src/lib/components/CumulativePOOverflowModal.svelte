@@ -34,7 +34,7 @@
 
 {#if show}
   <div
-    class="fixed inset-0 z-50 overflow-y-auto overflow-x-hidden"
+    class="fixed inset-0 z-50 overflow-x-hidden overflow-y-auto"
     transition:fade={{ duration: 200 }}
   >
     <!-- Backdrop/overlay -->
