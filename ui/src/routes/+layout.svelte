@@ -4,7 +4,7 @@
   import { page } from "$app/stores";
   import { authStore } from "$lib/stores/auth";
   import { globalStore } from "$lib/stores/global";
-  import { afterNavigate } from "$app/navigation";
+  import { afterNavigate, beforeNavigate } from "$app/navigation";
   import "../app.css";
   import ErrorBar from "$lib/components/ErrorBar.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
@@ -102,6 +102,14 @@
   // Helper store that reflects whether any task is running
   const tasksLoading = { subscribe: tasks.showTasks };
 
+  // Close sidebar immediately when navigation starts (before server response)
+  // This makes mobile nav feel more responsive
+  beforeNavigate(() => {
+    if (window.innerWidth < 1024) {
+      isSidebarOpen = false;
+    }
+  });
+
   afterNavigate((navigation) => {
     // afterNavigate may be called multiple times, but we only want to run once
     // per navigation event (i.e. when the URL changes) so we check the type of
@@ -113,10 +121,6 @@
 
     // refresh the global store if it's stale
     globalStore.refresh();
-    // Close sidebar on navigation on mobile
-    if (window.innerWidth < 1024) {
-      isSidebarOpen = false;
-    }
   });
 
   // route guards
@@ -169,8 +173,13 @@
         </div>
       {/if}
     </div>
-    {#if $navigating || $tasksLoading}
-      <!-- Mobile loading bar sits at bottom of the header -->
+    {#if $navigating}
+      <!-- Mobile navigation loading bar (green) -->
+      <div
+        class="absolute bottom-0 left-0 right-0 h-[4px] animate-pulse bg-green-500 lg:hidden"
+      ></div>
+    {:else if $tasksLoading}
+      <!-- Mobile tasks loading bar (purple) -->
       <div
         class="absolute bottom-0 left-0 right-0 h-[4px] animate-pulse bg-purple-500 lg:hidden"
       ></div>
@@ -279,8 +288,13 @@
     <!-- Main content -->
     <div class="relative flex-1 overflow-auto bg-white">
       <ErrorBar />
-      {#if $navigating || $tasksLoading}
-        <!-- Desktop loading bar overlays content without shifting layout -->
+      {#if $navigating}
+        <!-- Desktop navigation loading bar (green) -->
+        <div
+          class="absolute left-0 right-0 top-0 z-50 hidden h-[4px] animate-pulse bg-green-500 lg:block"
+        ></div>
+      {:else if $tasksLoading}
+        <!-- Desktop tasks loading bar (purple) -->
         <div
           class="absolute left-0 right-0 top-0 z-50 hidden h-[4px] animate-pulse bg-purple-500 lg:block"
         ></div>
