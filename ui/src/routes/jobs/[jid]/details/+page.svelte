@@ -491,10 +491,6 @@
             <span class="font-semibold">Proposal Value:</span>
             {formatCurrency(data.job.proposal_value ?? 0)}
           </div>
-          <div>
-            <span class="font-semibold">Time & Materials:</span>
-            {data.job.time_and_materials ? "Yes" : "No"}
-          </div>
           {#if data.job.proposal_opening_date}
             <div>
               <span class="font-semibold">Proposal Opening Date:</span>
@@ -507,7 +503,17 @@
               {data.job.proposal_submission_due_date}
             </div>
           {/if}
+        {:else}
+          <div>
+            <span class="font-semibold">Project Value:</span>
+            {formatCurrency(data.job.project_value ?? 0)}
+          </div>
         {/if}
+
+        <div>
+          <span class="font-semibold">Time & Materials:</span>
+          {data.job.time_and_materials ? "Yes" : "No"}
+        </div>
 
         {#if data.job.allocations && Array.isArray(data.job.allocations) && data.job.allocations.length > 0}
           <div>

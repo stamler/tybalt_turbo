@@ -556,3 +556,183 @@ func TestNewProposal_StatusRestrictions(t *testing.T) {
 		scenario.Test(t)
 	}
 }
+
+// TestProjectStatus_ValueRequirement verifies that projects with Active/Closed status
+// must have project_value > 0 or time_and_materials = true.
+// Cancelled projects do NOT have this requirement.
+//
+// Test data: Uses existing client (ee3xvodl583b61o), contact (235g6k01xx3sdjk),
+// manager (f2j5a8vk006baub), branch (1r7r6hyp681vi15), and rate_sheet (c41ofep525bcacj)
+// from test_pb_data/data.db
+func TestProjectStatus_ValueRequirement(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "new project Active without project_value or T&M fails",
+			Method: http.MethodPost,
+			URL:    "/api/collections/jobs/records",
+			Body: strings.NewReader(`{
+				"description": "Test Project No Value",
+				"client": "ee3xvodl583b61o",
+				"contact": "235g6k01xx3sdjk",
+				"manager": "f2j5a8vk006baub",
+				"branch": "1r7r6hyp681vi15",
+				"rate_sheet": "c41ofep525bcacj",
+				"project_award_date": "2024-12-01",
+				"authorizing_document": "Unauthorized",
+				"status": "Active",
+				"location": "87G8Q2GX+HV"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"value_required_for_status"`,
+				`"projects with status Active or Closed must have a project value or be marked as time and materials"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "new project Closed without project_value or T&M fails",
+			Method: http.MethodPost,
+			URL:    "/api/collections/jobs/records",
+			Body: strings.NewReader(`{
+				"description": "Test Project No Value Closed",
+				"client": "ee3xvodl583b61o",
+				"contact": "235g6k01xx3sdjk",
+				"manager": "f2j5a8vk006baub",
+				"branch": "1r7r6hyp681vi15",
+				"rate_sheet": "c41ofep525bcacj",
+				"project_award_date": "2024-12-01",
+				"authorizing_document": "Unauthorized",
+				"status": "Closed",
+				"location": "87G8Q2GX+HV"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"value_required_for_status"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "new project Cancelled without project_value succeeds",
+			Method: http.MethodPost,
+			URL:    "/api/collections/jobs/records",
+			Body: strings.NewReader(`{
+				"description": "Test Project Cancelled No Value",
+				"client": "ee3xvodl583b61o",
+				"contact": "235g6k01xx3sdjk",
+				"manager": "f2j5a8vk006baub",
+				"branch": "1r7r6hyp681vi15",
+				"rate_sheet": "c41ofep525bcacj",
+				"project_award_date": "2024-12-01",
+				"authorizing_document": "Unauthorized",
+				"status": "Cancelled",
+				"location": "87G8Q2GX+HV"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"status":"Cancelled"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "new project Active with project_value succeeds",
+			Method: http.MethodPost,
+			URL:    "/api/collections/jobs/records",
+			Body: strings.NewReader(`{
+				"description": "Test Project With Value",
+				"client": "ee3xvodl583b61o",
+				"contact": "235g6k01xx3sdjk",
+				"manager": "f2j5a8vk006baub",
+				"branch": "1r7r6hyp681vi15",
+				"rate_sheet": "c41ofep525bcacj",
+				"project_award_date": "2024-12-01",
+				"authorizing_document": "Unauthorized",
+				"status": "Active",
+				"project_value": 100000,
+				"location": "87G8Q2GX+HV"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"status":"Active"`,
+				`"project_value":100000`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "new project Active with time_and_materials succeeds",
+			Method: http.MethodPost,
+			URL:    "/api/collections/jobs/records",
+			Body: strings.NewReader(`{
+				"description": "Test Project T&M",
+				"client": "ee3xvodl583b61o",
+				"contact": "235g6k01xx3sdjk",
+				"manager": "f2j5a8vk006baub",
+				"branch": "1r7r6hyp681vi15",
+				"rate_sheet": "c41ofep525bcacj",
+				"project_award_date": "2024-12-01",
+				"authorizing_document": "Unauthorized",
+				"status": "Active",
+				"time_and_materials": true,
+				"location": "87G8Q2GX+HV"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"status":"Active"`,
+				`"time_and_materials":true`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "new project Active with both project_value and time_and_materials succeeds",
+			Method: http.MethodPost,
+			URL:    "/api/collections/jobs/records",
+			Body: strings.NewReader(`{
+				"description": "Test Project Both",
+				"client": "ee3xvodl583b61o",
+				"contact": "235g6k01xx3sdjk",
+				"manager": "f2j5a8vk006baub",
+				"branch": "1r7r6hyp681vi15",
+				"rate_sheet": "c41ofep525bcacj",
+				"project_award_date": "2024-12-01",
+				"authorizing_document": "Unauthorized",
+				"status": "Active",
+				"project_value": 50000,
+				"time_and_materials": true,
+				"location": "87G8Q2GX+HV"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"status":"Active"`,
+				`"project_value":50000`,
+				`"time_and_materials":true`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}

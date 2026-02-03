@@ -1015,19 +1015,40 @@
           <span class="text-sm text-red-600">{errors.proposal_value.message}</span>
         {/if}
       </div>
+    {:else}
+      <div class="flex w-full flex-col gap-1" class:bg-red-200={errors.project_value !== undefined}>
+        <label class="text-sm font-semibold" for="project_value">Project Value ($)</label>
+        <input
+          id="project_value"
+          name="project_value"
+          type="number"
+          class="rounded-sm border border-neutral-300 px-2 py-1"
+          bind:value={item.project_value as number}
+          min={0}
+          step={1}
+        />
+        {#if errors.project_value !== undefined}
+          <span class="text-sm text-red-600">{errors.project_value.message}</span>
+        {/if}
+      </div>
+    {/if}
 
-      <DsCheck
-        bind:value={item.time_and_materials as boolean}
-        {errors}
-        fieldName="time_and_materials"
-        uiName="Time and Materials"
-        disabled={isCancelledProposal}
-      />
-      <p class="self-start text-xs text-neutral-600">
+    <DsCheck
+      bind:value={item.time_and_materials as boolean}
+      {errors}
+      fieldName="time_and_materials"
+      uiName="Time and Materials"
+      disabled={isCancelledProposal && isProposal}
+    />
+    <p class="self-start text-xs text-neutral-600">
+      {#if isProposal}
         Proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be
         marked as Time and Materials. If both, interpret proposal value as a maximum.
-      </p>
-    {/if}
+      {:else}
+        Projects with status Active or Closed must have a project value or be marked as Time and
+        Materials. If both, interpret project value as a maximum.
+      {/if}
+    </p>
 
     <DsSelector
       bind:value={item.authorizing_document}

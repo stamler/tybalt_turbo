@@ -294,9 +294,8 @@ func cleanJob(app core.App, record *core.Record) error {
 	}
 
 	if !isProposal {
-		// Projects should NOT have these proposal-specific fields
+		// Projects should NOT have proposal_value (but keep time_and_materials - it's shared)
 		record.Set("proposal_value", 0)
-		record.Set("time_and_materials", false)
 
 		// If authorizing_document != PO, clear any provided client_po
 		if record.GetString("authorizing_document") != "PO" && record.GetString("client_po") != "" {
@@ -316,6 +315,7 @@ func cleanJob(app core.App, record *core.Record) error {
 		record.Set("outstanding_balance", 0)
 		record.Set("outstanding_balance_date", "")
 		record.Set("proposal", "")
+		record.Set("project_value", 0)
 	}
 	return nil
 }
@@ -449,6 +449,9 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 							},
 						}
 					}
+					if err := validateJobValueRequirement(record, derived, newStatus, "status"); err != nil {
+						return 0, err
+					}
 				} else { // proposal
 					// Proposals: allowed statuses are In Progress, Submitted, Awarded, Not Awarded, Cancelled, No Bid
 					// Disallowed: Active, Closed
@@ -461,19 +464,8 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 							},
 						}
 					}
-					// For Submitted, Awarded, Not Awarded: require proposal_value > 0 OR time_and_materials = true
-					if newStatus == "Submitted" || newStatus == "Awarded" || newStatus == "Not Awarded" {
-						proposalValue := record.GetInt("proposal_value")
-						timeAndMaterials := record.GetBool("time_and_materials")
-						if proposalValue <= 0 && !timeAndMaterials {
-							return 0, &errs.HookError{
-								Status:  http.StatusBadRequest,
-								Message: "proposal value or time and materials required",
-								Data: map[string]errs.CodeError{
-									"status": {Code: "value_required_for_status", Message: "proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be marked as time and materials"},
-								},
-							}
-						}
+					if err := validateJobValueRequirement(record, derived, newStatus, "status"); err != nil {
+						return 0, err
 					}
 					// For No Bid or Cancelled: require a client_note with matching status_change_to
 					if newStatus == "No Bid" || newStatus == "Cancelled" {
@@ -653,6 +645,9 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 					},
 				}
 			}
+			if err := validateJobValueRequirement(record, derived, status, "project_value"); err != nil {
+				return 0, err
+			}
 		} else { // proposal
 			// Proposals: allowed statuses are In Progress, Submitted, Awarded, Not Awarded, Cancelled, No Bid
 			// Disallowed: Active, Closed
@@ -676,19 +671,8 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 					},
 				}
 			}
-			// For Submitted, Awarded, Not Awarded: require proposal_value > 0 OR time_and_materials = true
-			if status == "Submitted" || status == "Awarded" || status == "Not Awarded" {
-				proposalValue := record.GetInt("proposal_value")
-				timeAndMaterials := record.GetBool("time_and_materials")
-				if proposalValue <= 0 && !timeAndMaterials {
-					return 0, &errs.HookError{
-						Status:  http.StatusBadRequest,
-						Message: "proposal value or time and materials required",
-						Data: map[string]errs.CodeError{
-							"proposal_value": {Code: "value_required_for_status", Message: "proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be marked as time and materials"},
-						},
-					}
-				}
+			if err := validateJobValueRequirement(record, derived, status, "proposal_value"); err != nil {
+				return 0, err
 			}
 			// For No Bid or Cancelled: require a client_note with matching status_change_to (only on updates)
 			if !isCreate && (status == "No Bid" || status == "Cancelled") {
@@ -889,6 +873,44 @@ func jobHasClientNoteForStatus(app core.App, jobID string, targetStatus string) 
 		return false, err
 	}
 	return note != nil, nil
+}
+
+// validateJobValueRequirement checks that jobs have either a value or time_and_materials set.
+// For projects (Active/Closed): requires project_value > 0 OR time_and_materials = true
+// For proposals (Submitted/Awarded/Not Awarded): requires proposal_value > 0 OR time_and_materials = true
+// The errorField parameter determines which field the error is attached to ("status" for status-only
+// updates, or "project_value"/"proposal_value" for full validation).
+func validateJobValueRequirement(record *core.Record, derived jobType, status string, errorField string) *errs.HookError {
+	timeAndMaterials := record.GetBool("time_and_materials")
+
+	if derived == jobTypeProject {
+		if status == "Active" || status == "Closed" {
+			projectValue := record.GetInt("project_value")
+			if projectValue <= 0 && !timeAndMaterials {
+				return &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: "project value or time and materials required",
+					Data: map[string]errs.CodeError{
+						errorField: {Code: "value_required_for_status", Message: "projects with status Active or Closed must have a project value or be marked as time and materials"},
+					},
+				}
+			}
+		}
+	} else { // proposal
+		if status == "Submitted" || status == "Awarded" || status == "Not Awarded" {
+			proposalValue := record.GetInt("proposal_value")
+			if proposalValue <= 0 && !timeAndMaterials {
+				return &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: "proposal value or time and materials required",
+					Data: map[string]errs.CodeError{
+						errorField: {Code: "value_required_for_status", Message: "proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be marked as time and materials"},
+					},
+				}
+			}
+		}
+	}
+	return nil
 }
 
 // validateRateSheetIsActive validates rate_sheet requirements:

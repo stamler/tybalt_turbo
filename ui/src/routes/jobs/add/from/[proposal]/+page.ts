@@ -49,6 +49,10 @@ export const load: PageLoad<JobsPageData> = async ({ params, url }) => {
     project_award_date: setAwardToday ? getTodayDateString() : "",
     proposal_opening_date: "",
     proposal_submission_due_date: "",
+    // Copy proposal_value to project_value (user can edit before saving)
+    project_value: details?.proposal_value ?? 0,
+    // Copy time_and_materials flag from proposal
+    time_and_materials: details?.time_and_materials ?? false,
     _prefilled_from_proposal: true,
   };
 
