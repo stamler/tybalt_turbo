@@ -90,6 +90,39 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 		log.Fatalf("Failed to create jobsC: %v", err)
 	}
 
+	// Fail fast when jobs reference proposal numbers that don't map to existing jobs.
+	proposalRows, err := db.Query(`
+		SELECT pocketbase_id, id, proposal
+		FROM jobsC
+		WHERE proposal IS NOT NULL AND proposal != '' AND proposal_id IS NULL
+	`)
+	if err != nil {
+		log.Fatalf("Failed to query jobsC for missing proposals: %v", err)
+	}
+	defer proposalRows.Close()
+
+	var missingProposals []string
+	for proposalRows.Next() {
+		var pocketbaseId, jobNumber, proposalNumber string
+		err = proposalRows.Scan(&pocketbaseId, &jobNumber, &proposalNumber)
+		if err != nil {
+			log.Fatalf("Failed to scan jobsC proposal row: %v", err)
+		}
+		missingProposals = append(missingProposals, fmt.Sprintf("%s (job %s): proposal %s not found", pocketbaseId, jobNumber, proposalNumber))
+	}
+
+	if err = proposalRows.Err(); err != nil {
+		log.Fatalf("Error iterating jobsC proposal rows: %v", err)
+	}
+
+	if len(missingProposals) > 0 {
+		log.Println("Jobs reference proposal numbers that don't exist or lack immutableID:")
+		for _, missing := range missingProposals {
+			log.Println(missing)
+		}
+		log.Fatal("Please fix the proposal references in Firestore/MySQL and rerun this script.")
+	}
+
 	// Unnest division codes into a temporary table
 	_, err = db.Exec(`
 	CREATE TEMP TABLE jobsC_unnested AS
