@@ -58,6 +58,31 @@
   // Use untrack to capture initial value for form state (component recreates on navigation)
   let item = $state(untrack(() => data.item));
 
+  // Track allowed division IDs for the selected job (null = show all divisions, empty Set = job has no allocations)
+  let jobDivisionIds = $state<Set<string> | null>(null);
+  let jobHasNoAllocations = $derived(jobDivisionIds !== null && jobDivisionIds.size === 0);
+
+  // Fetch job divisions when job changes
+  $effect(() => {
+    const jobId = item.job;
+    if (!jobId || jobId === "") {
+      jobDivisionIds = null; // No job = show all divisions
+      return;
+    }
+    // Fetch job details to get allocations
+    pb.send(`/api/jobs/${jobId}`, { method: "GET" })
+      .then((job: { allocations: Array<{ division: { id: string } }> }) => {
+        if (job.allocations && job.allocations.length > 0) {
+          jobDivisionIds = new Set(job.allocations.map((a) => a.division.id));
+        } else {
+          jobDivisionIds = new Set(); // Job has no allocations = empty set (will show no divisions)
+        }
+      })
+      .catch(() => {
+        jobDivisionIds = null;
+      });
+  });
+
   // Default division from caller's profile if creating and empty
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
 
@@ -181,6 +206,7 @@
         {errors}
         fieldName="division"
         uiName="Division"
+        filter={jobDivisionIds ? (div) => jobDivisionIds!.has(div.id) : undefined}
       >
         {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
       </DsAutoComplete>
@@ -195,6 +221,11 @@
       >
         {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
       </DsAutoComplete>
+    {/if}
+    {#if jobHasNoAllocations}
+      <span class="flex w-full gap-2 bg-red-200 text-red-600">
+        This job has no division allocations configured. Contact an administrator.
+      </span>
     {/if}
     {#if item.job && item.job !== "" && $rateRoles.index !== null}
       <DsAutoComplete
