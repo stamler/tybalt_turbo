@@ -360,9 +360,12 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 				for field, value := range recordData {
 					record.Set(field, value)
 				}
-				if err := txApp.Save(record); err != nil {
-					return fmt.Errorf("error recreating record: %w", err)
-				}
+			// Use SaveNoValidate to bypass schema validation since absorbed records
+			// may predate current validation rules (e.g., required fields that were
+			// added after the record was originally created/imported)
+			if err := txApp.SaveNoValidate(record); err != nil {
+				return fmt.Errorf("error recreating record: %w", err)
+			}
 			}
 
 			// Step 4b: Restore References

@@ -605,26 +605,26 @@ func TestAbsorbRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"Successfully undid absorb operation"`,
 			},
-			ExpectedEvents: map[string]int{
-				"OnRecordDelete":             1,
-				"OnRecordDeleteExecute":      1,
-				"OnRecordValidate":           1,
-				"OnRecordCreate":             1,
-				"OnRecordCreateExecute":      1,
-				"OnRecordAfterCreateSuccess": 1,
-				"OnModelDelete":              1,
-				"OnModelDeleteExecute":       1,
-				"OnRecordAfterDeleteSuccess": 1,
-				"OnModelValidate":            1,
-				"OnModelCreate":              1,
-				"OnModelCreateExecute":       1,
-				"OnModelAfterCreateSuccess":  1,
-				"OnModelAfterDeleteSuccess":  1,
-				"*":                          0,
-			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-				// Create an absorb action to undo
+		ExpectedEvents: map[string]int{
+			"OnRecordDelete":             1,
+			"OnRecordDeleteExecute":      1,
+			// OnRecordValidate and OnModelValidate are not called because
+			// undo uses SaveNoValidate to bypass validation for historical data
+			"OnRecordCreate":             1,
+			"OnRecordCreateExecute":      1,
+			"OnRecordAfterCreateSuccess": 1,
+			"OnModelDelete":              1,
+			"OnModelDeleteExecute":       1,
+			"OnRecordAfterDeleteSuccess": 1,
+			"OnModelCreate":              1,
+			"OnModelCreateExecute":       1,
+			"OnModelAfterCreateSuccess":  1,
+			"OnModelAfterDeleteSuccess":  1,
+			"*":                          0,
+		},
+		TestAppFactory: func(t testing.TB) *tests.TestApp {
+			app := testutils.SetupTestApp(t)
+			// Create an absorb action to undo
 				err := routes.AbsorbRecords(app, "clients", "lb0fnenkeyitsny", []string{"eldtxi3i4h00k8r"})
 				if err != nil {
 					t.Fatal(err)
