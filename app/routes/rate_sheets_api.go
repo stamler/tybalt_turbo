@@ -2,13 +2,19 @@ package routes
 
 import (
 	"encoding/json"
+	"fmt"
 	"math"
 	"net/http"
+	"regexp"
+	"strings"
+
+	validation "github.com/go-ozzo/ozzo-validation/v4"
+	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/apis"
+	"github.com/pocketbase/pocketbase/core"
 
 	"tybalt/hooks"
 	"tybalt/utilities"
-
-	"github.com/pocketbase/pocketbase/core"
 )
 
 // createActivateRateSheetHandler creates a handler that activates a rate sheet.
@@ -197,4 +203,306 @@ func createUpdateRateSheetEntryHandler(app core.App) func(e *core.RequestEvent) 
 			"overtime_rate": record.GetFloat("overtime_rate"),
 		})
 	}
+}
+
+// CreateRateSheetEntry defines a single entry in the rate sheet creation request
+type CreateRateSheetEntry struct {
+	Role         string  `json:"role"`
+	Rate         float64 `json:"rate"`
+	OvertimeRate float64 `json:"overtime_rate"`
+}
+
+// CreateRateSheetRequest defines the request body for creating a rate sheet with entries
+type CreateRateSheetRequest struct {
+	Name          string                 `json:"name"`
+	EffectiveDate string                 `json:"effective_date"`
+	Revision      int                    `json:"revision"`
+	Entries       []CreateRateSheetEntry `json:"entries"`
+}
+
+type entryValidationError struct {
+	index  int
+	errors validation.Errors
+}
+
+func (e *entryValidationError) Error() string {
+	return "entry validation error"
+}
+
+type codeError interface {
+	Code() string
+}
+
+func setValidationError(errs validation.Errors, key string, err error) {
+	if err == nil {
+		return
+	}
+	if _, exists := errs[key]; !exists {
+		errs[key] = err
+	}
+}
+
+func rateSheetUniqueValidationErrors() validation.Errors {
+	return validation.Errors{
+		"name": validation.NewError("validation_not_unique", "name and revision must be unique"),
+	}
+}
+
+func hasUniqueValidationError(errs validation.Errors) bool {
+	for _, fieldErr := range errs {
+		if fieldErr == nil {
+			continue
+		}
+		if ce, ok := fieldErr.(codeError); ok && ce.Code() == "validation_not_unique" {
+			return true
+		}
+		if strings.Contains(strings.ToLower(fieldErr.Error()), "unique") {
+			return true
+		}
+	}
+	return false
+}
+
+func asValidationErrors(err error) (validation.Errors, bool) {
+	if err == nil {
+		return nil, false
+	}
+	if ve, ok := err.(validation.Errors); ok {
+		return ve, true
+	}
+	if ve, ok := err.(*validation.Errors); ok && ve != nil {
+		return *ve, true
+	}
+	return nil, false
+}
+
+func prefixEntryErrors(index int, errs validation.Errors) validation.Errors {
+	prefixed := validation.Errors{}
+	for field, fieldErr := range errs {
+		prefixed[fmt.Sprintf("entries.%d.%s", index, field)] = fieldErr
+	}
+	return prefixed
+}
+
+// createRateSheetHandler creates a handler that atomically creates a rate sheet
+// and all its entries in a single transaction. This prevents partial-save states
+// where the rate sheet exists but some entries are missing.
+//
+// Permission model:
+//   - revision == 0 (new/copy): requires "job" claim
+//   - revision > 0 (revise): requires "rate_sheet_revise" or "admin" claim
+func createRateSheetHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		// Parse request body
+		var req CreateRateSheetRequest
+		if err := json.NewDecoder(e.Request.Body).Decode(&req); err != nil {
+			return e.Error(http.StatusBadRequest, "invalid request body", err)
+		}
+
+		// Check claims based on revision
+		if req.Revision == 0 {
+			// New rate sheet or copy: requires "job" claim
+			hasJobClaim, err := utilities.HasClaim(app, e.Auth, "job")
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to check claims", err)
+			}
+			if !hasJobClaim {
+				return e.Error(http.StatusForbidden, "you do not have permission to create rate sheets", nil)
+			}
+		} else {
+			// Revision: requires "rate_sheet_revise" or "admin" claim
+			hasReviseClaim, err := utilities.HasClaim(app, e.Auth, "rate_sheet_revise")
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to check claims", err)
+			}
+			hasAdminClaim, err := utilities.HasClaim(app, e.Auth, "admin")
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to check claims", err)
+			}
+			if !hasReviseClaim && !hasAdminClaim {
+				return e.Error(http.StatusForbidden, "you do not have permission to revise rate sheets", nil)
+			}
+		}
+
+		validationErrors := validation.Errors{}
+
+		// Validate name
+		req.Name = strings.TrimSpace(req.Name)
+		if req.Name == "" {
+			setValidationError(validationErrors, "name", validation.NewError("value_required", "name is required"))
+		}
+
+		// Validate effective_date format (YYYY-MM-DD)
+		req.EffectiveDate = strings.TrimSpace(req.EffectiveDate)
+		datePattern := regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+		if req.EffectiveDate == "" {
+			setValidationError(validationErrors, "effective_date", validation.NewError("value_required", "effective date is required"))
+		} else if !datePattern.MatchString(req.EffectiveDate) {
+			setValidationError(validationErrors, "effective_date", validation.NewError("validation_invalid_date", "effective date must be in YYYY-MM-DD format"))
+		} else if err := utilities.IsValidDate(req.EffectiveDate); err != nil {
+			setValidationError(validationErrors, "effective_date", err)
+		}
+
+		// Validate revision
+		if req.Revision < 0 {
+			setValidationError(validationErrors, "revision", validation.NewError("validation_negative_number", "revision must be 0 or greater"))
+		}
+
+		// Validate entries
+		if len(req.Entries) == 0 {
+			setValidationError(validationErrors, "entries", validation.NewError("value_required", "at least one entry is required"))
+		}
+
+		// Validate each entry
+		seenRoles := map[string]bool{}
+		for i, entry := range req.Entries {
+			entryPrefix := fmt.Sprintf("entries.%d.", i)
+			if entry.Role == "" {
+				setValidationError(validationErrors, entryPrefix+"role", validation.NewError("value_required", "entry role is required"))
+			} else if seenRoles[entry.Role] {
+				setValidationError(validationErrors, entryPrefix+"role", validation.NewError("validation_not_unique", "entry role must be unique"))
+			} else {
+				seenRoles[entry.Role] = true
+			}
+			if entry.Rate < 1 {
+				setValidationError(validationErrors, entryPrefix+"rate", validation.NewError("validation_negative_number", "entry rate must be at least 1"))
+			} else if entry.Rate != math.Floor(entry.Rate) {
+				setValidationError(validationErrors, entryPrefix+"rate", validation.NewError("validation_not_whole_number", "entry rate must be a whole number"))
+			}
+			if entry.OvertimeRate < 1 {
+				setValidationError(validationErrors, entryPrefix+"overtime_rate", validation.NewError("validation_negative_number", "entry overtime_rate must be at least 1"))
+			}
+		}
+
+		if len(validationErrors) > 0 {
+			return apis.NewBadRequestError("Validation error", validationErrors)
+		}
+
+		// Validate revision effective date (for revisions, must be >= previous revision's date)
+		if req.Revision > 0 {
+			prevEffectiveDate, err := hooks.CheckRevisionEffectiveDate(app, req.Name, req.Revision, req.EffectiveDate)
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to validate effective date", err)
+			}
+			if prevEffectiveDate != "" {
+				return e.Error(http.StatusBadRequest, "effective date must be on or after the previous revision's effective date", map[string]any{
+					"previous_effective_date": prevEffectiveDate,
+				})
+			}
+		}
+
+		// Run in transaction for atomicity
+		var createdSheetId string
+		var entriesCreated int
+
+		err := app.RunInTransaction(func(txApp core.App) error {
+			// Get the rate_sheets collection
+			rateSheetsCollection, err := txApp.FindCollectionByNameOrId("rate_sheets")
+			if err != nil {
+				return err
+			}
+
+			// Check for existing rate sheet to provide a consistent conflict response
+			existingSheets, err := txApp.FindRecordsByFilter(
+				"rate_sheets",
+				"name={:name} && revision={:revision}",
+				"",
+				1,
+				0,
+				dbx.Params{"name": req.Name, "revision": req.Revision},
+			)
+			if err != nil {
+				return err
+			}
+			if len(existingSheets) > 0 {
+				return &uniqueConstraintError{
+					message: "a rate sheet with this name and revision already exists",
+					data:    rateSheetUniqueValidationErrors(),
+				}
+			}
+
+			// Create the rate sheet record
+			rateSheet := core.NewRecord(rateSheetsCollection)
+			rateSheet.Set("name", req.Name)
+			rateSheet.Set("effective_date", req.EffectiveDate)
+			rateSheet.Set("revision", req.Revision)
+			rateSheet.Set("active", false)
+
+			if err := txApp.Save(rateSheet); err != nil {
+				return err
+			}
+
+			createdSheetId = rateSheet.Id
+
+			// Get the rate_sheet_entries collection
+			entriesCollection, err := txApp.FindCollectionByNameOrId("rate_sheet_entries")
+			if err != nil {
+				return err
+			}
+
+			// Create all entries
+			for i, entry := range req.Entries {
+				entryRecord := core.NewRecord(entriesCollection)
+				entryRecord.Set("rate_sheet", createdSheetId)
+				entryRecord.Set("role", entry.Role)
+				entryRecord.Set("rate", int(entry.Rate))
+				entryRecord.Set("overtime_rate", entry.OvertimeRate)
+
+				if err := txApp.Save(entryRecord); err != nil {
+					if ve, ok := asValidationErrors(err); ok {
+						return &entryValidationError{index: i, errors: ve}
+					}
+					if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+						return &entryValidationError{
+							index: i,
+							errors: validation.Errors{
+								"role": validation.NewError("validation_not_unique", "entry role must be unique"),
+							},
+						}
+					}
+					return err
+				}
+				entriesCreated++
+			}
+
+			return nil
+		})
+
+		if err != nil {
+			// Check if it's our custom unique constraint error
+			if uce, ok := err.(*uniqueConstraintError); ok {
+				return apis.NewApiError(http.StatusConflict, uce.message, uce.data)
+			}
+			if eve, ok := err.(*entryValidationError); ok {
+				return apis.NewBadRequestError("Validation error", prefixEntryErrors(eve.index, eve.errors))
+			}
+			if ve, ok := asValidationErrors(err); ok {
+				if hasUniqueValidationError(ve) {
+					return apis.NewApiError(http.StatusConflict, "a rate sheet with this name and revision already exists", ve)
+				}
+				return apis.NewBadRequestError("Validation error", ve)
+			}
+			if strings.Contains(err.Error(), "UNIQUE constraint failed") {
+				return apis.NewApiError(http.StatusConflict, "a rate sheet with this name and revision already exists", rateSheetUniqueValidationErrors())
+			}
+			return e.Error(http.StatusInternalServerError, "failed to create rate sheet", err)
+		}
+
+		return e.JSON(http.StatusCreated, map[string]any{
+			"id":              createdSheetId,
+			"name":            req.Name,
+			"revision":        req.Revision,
+			"entries_created": entriesCreated,
+		})
+	}
+}
+
+// uniqueConstraintError is a custom error type for unique constraint violations
+type uniqueConstraintError struct {
+	message string
+	data    validation.Errors
+}
+
+func (e *uniqueConstraintError) Error() string {
+	return e.message
 }

@@ -202,6 +202,7 @@ func AddRoutes(app core.App) {
 		// Rate sheets management (job claim required)
 		rateSheetsGroup := se.Router.Group("/api/rate_sheets")
 		rateSheetsGroup.Bind(apis.RequireAuth("users"))
+		rateSheetsGroup.POST("", createRateSheetHandler(app))
 		rateSheetsGroup.POST("/{id}/activate", createActivateRateSheetHandler(app))
 		rateSheetsGroup.POST("/{id}/deactivate", createDeactivateRateSheetHandler(app))
 

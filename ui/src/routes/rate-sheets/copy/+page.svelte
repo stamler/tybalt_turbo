@@ -16,6 +16,9 @@
   let errors = $state({} as Record<string, { message: string }>);
   let saveError = $state("");
   let saving = $state(false);
+  const entryError = (index: number, field: string) =>
+    errors[`entries.${index}.${field}`] as { message: string } | undefined;
+  const entriesError = () => errors.entries as { message: string } | undefined;
 
   // Form state - name is locked when revising
   let name = $state(isRevising ? sourceSheet.name : `Copy of ${sourceSheet.name}`);
@@ -60,44 +63,31 @@
     }
 
     saving = true;
-    let createdSheetId: string | null = null;
 
     try {
-      // Step 1: Create the rate sheet
-      const createdSheet = await pb.collection("rate_sheets").create({
-        name: name.trim(),
-        effective_date,
-        revision: isRevising ? nextRevision : 0,
-        active: false,
+      // Create rate sheet and all entries atomically via custom endpoint
+      const response = await pb.send("/api/rate_sheets", {
+        method: "POST",
+        body: JSON.stringify({
+          name: name.trim(),
+          effective_date,
+          revision: isRevising ? nextRevision : 0,
+          entries: stagedEntries.map((entry) => ({
+            role: entry.role,
+            rate: entry.rate,
+            overtime_rate: entry.overtime_rate,
+          })),
+        }),
       });
-      createdSheetId = createdSheet.id;
 
-      // Step 2: Create all entries
-      for (const entry of stagedEntries) {
-        await pb.collection("rate_sheet_entries").create({
-          rate_sheet: createdSheetId,
-          role: entry.role,
-          rate: entry.rate,
-          overtime_rate: entry.overtime_rate,
-        });
-      }
-
-      // 100% success - redirect to details page
+      // Success - redirect to details page
       saving = false;
-      goto(`/rate-sheets/${createdSheetId}/details`);
-      return; // Exit early to avoid finally block issues
+      goto(`/rate-sheets/${response.id}/details`);
     } catch (error: any) {
       console.error("Failed to save:", error);
-
-      // Check if rate sheet was created but entries failed
-      if (createdSheetId) {
-        saveError = `Rate sheet created but some entries failed. Visit the details page to add missing entries.`;
-        // Provide link but don't auto-redirect
-      } else {
-        saveError = error.data?.message ?? error.message ?? "Failed to create rate sheet";
-        if (error.data?.data) {
-          errors = error.data.data;
-        }
+      saveError = error.data?.message ?? error.message ?? "Failed to create rate sheet";
+      if (error.data?.data) {
+        errors = error.data.data;
       }
       saving = false;
     }
@@ -201,22 +191,43 @@
                 <td class="px-3 py-2">
                   <input
                     type="number"
-                    min="0"
-                    step="0.01"
+                    min="1"
+                    step="1"
                     bind:value={stagedEntries[i].rate}
-                    class="w-28 rounded-sm border border-neutral-300 px-2 py-1"
+                    class={`w-28 rounded-sm border px-2 py-1 ${
+                      entryError(i, "rate") ? "border-red-500 bg-red-50" : "border-neutral-300"
+                    }`}
                   />
+                  {#if entryError(i, "rate")}
+                    <div class="mt-1 text-xs text-red-600">{entryError(i, "rate")?.message}</div>
+                  {/if}
                 </td>
                 <td class="px-3 py-2">
                   <input
                     type="number"
-                    min="0"
+                    min="1"
                     step="0.01"
                     bind:value={stagedEntries[i].overtime_rate}
-                    class="w-28 rounded-sm border border-neutral-300 px-2 py-1"
+                    class={`w-28 rounded-sm border px-2 py-1 ${
+                      entryError(i, "overtime_rate")
+                        ? "border-red-500 bg-red-50"
+                        : "border-neutral-300"
+                    }`}
                   />
+                  {#if entryError(i, "overtime_rate")}
+                    <div class="mt-1 text-xs text-red-600">
+                      {entryError(i, "overtime_rate")?.message}
+                    </div>
+                  {/if}
                 </td>
               </tr>
+              {#if entryError(i, "role")}
+                <tr class="border-b border-neutral-200">
+                  <td class="px-3 pb-2 text-xs text-red-600" colspan="3">
+                    {entryError(i, "role")?.message}
+                  </td>
+                </tr>
+              {/if}
             {/each}
           </tbody>
         </table>
@@ -226,6 +237,9 @@
         <p class="mt-2 text-neutral-500">
           The source rate sheet has no entries. The new sheet will be created empty.
         </p>
+      {/if}
+      {#if entriesError()}
+        <p class="mt-2 text-red-600">{entriesError()?.message}</p>
       {/if}
     </div>
 
