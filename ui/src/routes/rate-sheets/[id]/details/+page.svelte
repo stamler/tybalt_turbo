@@ -19,6 +19,27 @@
   // Admin check for editing capability
   const isAdmin = $derived($globalStore.claims.includes("admin"));
 
+  // Download entries as CSV sorted by rate descending
+  function downloadCsv() {
+    const sorted = [...entries].sort((a, b) => b.rate - a.rate);
+    const rows = [
+      ["Role", "Rate", "Overtime Rate"],
+      ...sorted.map((e) => [
+        e.expand?.role?.name ?? "Unknown",
+        e.rate.toFixed(2),
+        e.overtime_rate.toFixed(2),
+      ]),
+    ];
+    const csv = rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${rateSheet.name} rev${rateSheet.revision}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   // Track edited entries by id -> { rate, overtime_rate }
   let editedEntries = $state<Record<string, { rate: number; overtime_rate: number }>>({});
   let savingEntryId = $state<string | null>(null);
@@ -248,10 +269,24 @@
 <div class="p-4">
   <!-- Header -->
   <div class="mb-6">
-    <h1 class="flex items-baseline gap-2 text-2xl font-bold">
-      {rateSheet.name}
-      <span class="text-base font-normal text-neutral-500">rev. {rateSheet.revision}</span>
-    </h1>
+    <div class="flex items-baseline gap-2">
+      <h1 class="text-2xl font-bold">
+        {rateSheet.name}
+        <span class="text-base font-normal text-neutral-500">rev. {rateSheet.revision}</span>
+      </h1>
+      <DsActionButton
+        action={() => window.open(`/rate-sheets/${rateSheet.id}/print`, '_blank')}
+        icon="mdi:printer"
+        title="Print"
+        color="gray"
+      />
+      <DsActionButton
+        action={downloadCsv}
+        icon="mdi:download"
+        title="Download CSV"
+        color="gray"
+      />
+    </div>
     <p class="text-neutral-600">
       Effective: {shortDate(rateSheet.effective_date, true)}
     </p>

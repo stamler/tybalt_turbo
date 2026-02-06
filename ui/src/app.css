@@ -35,3 +35,27 @@
     background-color: var(--color-white, white);
   }
 }
+
+/* Print styles: hide app chrome when printing */
+@media print {
+  /* Hide sidebar, mobile header, navigation bars, overlays */
+  aside.flex,
+  aside,
+  header.flex,
+  header,
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  /* Remove layout constraints so content fills the printed page */
+  body,
+  div {
+    overflow: visible !important;
+    height: auto !important;
+    width: auto !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    position: static !important;
+    display: block !important;
+  }
+}
