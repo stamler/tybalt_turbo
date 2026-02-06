@@ -12,7 +12,7 @@ import (
 
 // parseStringArray parses a JSON array string into a slice of strings
 func parseStringArray(jsonStr string) []string {
-	var result []string
+	result := make([]string, 0)
 	if jsonStr == "" || jsonStr == "[]" {
 		return result
 	}
