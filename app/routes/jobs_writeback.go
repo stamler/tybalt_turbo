@@ -222,7 +222,7 @@ type jobExportOutput struct {
 
 	// Legacy-compatible array fields
 	Categories         []string           `json:"categories,omitempty"`
-	Divisions          []string           `json:"divisions"`
+	Divisions          []string           `json:"divisions,omitempty"`
 	JobTimeAllocations map[string]float64 `json:"jobTimeAllocations"`
 
 	// ID references to separate clients/contacts arrays (replaces _row objects)
