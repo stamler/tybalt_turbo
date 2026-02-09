@@ -10,6 +10,7 @@
   import { globalStore } from "$lib/stores/global";
   import { shortDate } from "$lib/utilities";
   import RejectModal from "$lib/components/RejectModal.svelte";
+  import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { onMount, onDestroy, untrack } from "svelte";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
@@ -241,41 +242,55 @@
     </span>
   {/snippet}
   {#snippet actions({ id, submitted, approved, rejected, committed }: ExpensesAugmentedResponse)}
-    {#if !submitted}
-      <DsActionButton
-        action={`/expenses/${id}/edit`}
-        icon="mdi:edit-outline"
-        title="Edit"
-        color="blue"
-      />
-    {/if}
-    {#if (submitted && approved === "") || rejected !== ""}
-      <DsActionButton action={() => recall(id)} icon="mdi:rewind" title="Recall" color="orange" />
-    {/if}
-    {#if !submitted}
-      <DsActionButton action={() => submit(id)} icon="mdi:send" title="Submit" color="blue" />
-    {/if}
-    {#if submitted && approved === ""}
-      <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
-    {/if}
-    <!-- Approved records can be rejected if they haven't been committed or rejected already -->
-    {#if approved !== "" && rejected === "" && committed === ""}
-      <DsActionButton
-        action={() => openRejectModal(id)}
-        icon="mdi:cancel"
-        title="Reject"
-        color="orange"
-      />
-    {/if}
-    <!-- Commit button is disabled if the record has already been committed or is not approved -->
-    {#if committed === "" && approved !== ""}
-      <DsActionButton action={() => commit(id)} icon="mdi:check-all" title="Commit" color="green" />
-    {/if}
-    <!-- Delete button is disabled if the record has already been committed -->
-    {#if committed !== ""}
+    {#if $expensesEditingEnabled}
+      {#if !submitted}
+        <DsActionButton
+          action={`/expenses/${id}/edit`}
+          icon="mdi:edit-outline"
+          title="Edit"
+          color="blue"
+        />
+      {/if}
+      {#if (submitted && approved === "") || rejected !== ""}
+        <DsActionButton action={() => recall(id)} icon="mdi:rewind" title="Recall" color="orange" />
+      {/if}
+      {#if !submitted}
+        <DsActionButton action={() => submit(id)} icon="mdi:send" title="Submit" color="blue" />
+      {/if}
+      {#if submitted && approved === ""}
+        <DsActionButton
+          action={() => approve(id)}
+          icon="mdi:approve"
+          title="Approve"
+          color="green"
+        />
+      {/if}
+      <!-- Approved records can be rejected if they haven't been committed or rejected already -->
+      {#if approved !== "" && rejected === "" && committed === ""}
+        <DsActionButton
+          action={() => openRejectModal(id)}
+          icon="mdi:cancel"
+          title="Reject"
+          color="orange"
+        />
+      {/if}
+      <!-- Commit button is disabled if the record has already been committed or is not approved -->
+      {#if committed === "" && approved !== ""}
+        <DsActionButton
+          action={() => commit(id)}
+          icon="mdi:check-all"
+          title="Commit"
+          color="green"
+        />
+      {/if}
+      <!-- Delete button is disabled if the record has already been committed -->
+      {#if committed !== ""}
+        <DsLabel color="green">Committed</DsLabel>
+      {:else}
+        <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
+      {/if}
+    {:else if committed !== ""}
       <DsLabel color="green">Committed</DsLabel>
-    {:else}
-      <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
     {/if}
   {/snippet}
 </DsList>

@@ -143,6 +143,13 @@ export const jobsEditingEnabled = derived(store, ($store) => {
   return getConfigBool($store.items, "jobs", "create_edit_absorb", true);
 });
 
+// Derived store for expenses/PO/vendor editing enabled
+// Reads from app_config where key="expenses", checks value.create_edit_absorb
+// Defaults to true (fail-open) if config is missing
+export const expensesEditingEnabled = derived(store, ($store) => {
+  return getConfigBool($store.items, "expenses", "create_edit_absorb", true);
+});
+
 // Export the store with init and unsubscribe methods
 export const appConfig = {
   subscribe: store.subscribe,

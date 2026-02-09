@@ -404,3 +404,172 @@ func TestDefaultBehaviorWhenPropertyMissing(t *testing.T) {
 		t.Error("expected job editing to be enabled (fail-open) when property is missing")
 	}
 }
+
+// disableExpensesEditing is a BeforeTestFunc helper that creates an app_config
+// record with key="expenses" and value={"create_edit_absorb": false}.
+func disableExpensesEditing(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+	collection, err := app.FindCollectionByNameOrId("app_config")
+	if err != nil {
+		t.Fatalf("failed to find app_config collection: %v", err)
+	}
+	record := core.NewRecord(collection)
+	record.Set("key", "expenses")
+	record.Set("value", `{"create_edit_absorb": false}`)
+	if err := app.Save(record); err != nil {
+		t.Fatalf("failed to create expenses app_config: %v", err)
+	}
+}
+
+// TestIsExpensesEditingEnabled verifies the convenience function works correctly
+func TestIsExpensesEditingEnabled(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	t.Run("returns true (fail-open) when config missing", func(t *testing.T) {
+		enabled, err := utilities.IsExpensesEditingEnabled(app)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !enabled {
+			t.Error("expected expenses editing to be enabled when config is missing")
+		}
+	})
+}
+
+// TestExpensesEditingDisabledBlocks verifies that expense, PO, and vendor
+// create/update/delete via PocketBase API all fail when expense editing is
+// disabled via app_config.
+func TestExpensesEditingDisabledBlocks(t *testing.T) {
+	const vendorID = "2zqxtsmymf670ha"
+
+	// Each sub-table defines a user, and the scenarios that user should exercise.
+	type userScenarios struct {
+		email     string
+		scenarios []tests.ApiScenario
+	}
+
+	groups := []userScenarios{
+		{
+			email: "time@test.com",
+			scenarios: []tests.ApiScenario{
+				{
+					Name:   "expense creation blocked when editing disabled",
+					Method: http.MethodPost,
+					URL:    "/api/collections/expenses/records",
+					Body: strings.NewReader(`{
+						"uid": "rzr98oadsp9qc11",
+						"date": "2025-01-15",
+						"division": "fy4i9poneukvq9u",
+						"description": "test expense blocked",
+						"payment_type": "Expense",
+						"total": 50.00,
+						"pay_period_ending": "2025-01-20"
+					}`),
+				},
+				{
+					Name:   "PO creation blocked when editing disabled",
+					Method: http.MethodPost,
+					URL:    "/api/collections/purchase_orders/records",
+					Body: strings.NewReader(`{
+						"date": "2025-01-15",
+						"division": "fy4i9poneukvq9u",
+						"vendor": "2zqxtsmymf670ha",
+						"description": "test PO blocked",
+						"payment_type": "OnAccount",
+						"total": 100.00,
+						"type": "Normal",
+						"status": "Unapproved",
+						"approver": "f2j5a8vk006baub"
+					}`),
+				},
+			},
+		},
+		{
+			// book@keeper.com has the payables_admin claim required for vendor CRUD
+			email: "book@keeper.com",
+			scenarios: []tests.ApiScenario{
+				{
+					Name:   "vendor creation blocked when editing disabled",
+					Method: http.MethodPost,
+					URL:    "/api/collections/vendors/records",
+					Body: strings.NewReader(`{
+						"name": "New Vendor Blocked",
+						"alias": "NVB",
+						"status": "Active"
+					}`),
+				},
+				{
+					Name:   "vendor update blocked when editing disabled",
+					Method: http.MethodPatch,
+					URL:    "/api/collections/vendors/records/" + vendorID,
+					Body:   strings.NewReader(`{"alias": "Updated"}`),
+				},
+				{
+					Name:   "vendor delete blocked when editing disabled",
+					Method: http.MethodDelete,
+					URL:    "/api/collections/vendors/records/" + vendorID,
+				},
+			},
+		},
+	}
+
+	for _, g := range groups {
+		recordToken, err := testutils.GenerateRecordToken("users", g.email)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, s := range g.scenarios {
+			// Apply the shared defaults so each scenario entry stays minimal.
+			s.Headers = map[string]string{"Authorization": recordToken}
+			s.BeforeTestFunc = disableExpensesEditing
+			s.ExpectedStatus = 403
+			s.ExpectedContent = []string{`"expenses_editing_disabled"`}
+			s.TestAppFactory = testutils.SetupTestApp
+			s.Test(t)
+		}
+	}
+}
+
+// TestVendorAbsorbBlockedWhenEditingDisabled verifies that absorbing vendors fails
+// when expense editing is disabled
+func TestVendorAbsorbBlockedWhenEditingDisabled(t *testing.T) {
+	// Use a user with the 'absorb' claim: book@keeper.com
+	recordToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "vendor absorb blocked when editing disabled",
+			Method: http.MethodPost,
+			URL:    "/api/vendors/2zqxtsmymf670ha/absorb",
+			Body: strings.NewReader(`{
+				"ids_to_absorb": ["ctswqva5onxj75q"]
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			BeforeTestFunc: disableExpensesEditing,
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"Expense editing is currently disabled."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "vendor undo absorb blocked when editing disabled",
+			Method:         http.MethodPost,
+			URL:            "/api/vendors/undo_absorb",
+			Headers:        map[string]string{"Authorization": recordToken},
+			BeforeTestFunc: disableExpensesEditing,
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"Expense editing is currently disabled."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}

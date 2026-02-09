@@ -5,10 +5,30 @@ import (
 	"tybalt/constants"
 	"tybalt/notifications"
 	"tybalt/reports"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
+
+// requireExpensesEditing returns a 403 error if the expenses feature flag is
+// off and collectionName is a Phase 2 collection ("expenses", "purchase_orders",
+// or "vendors"). Returns nil otherwise.
+func requireExpensesEditing(app core.App, collectionName string) error {
+	switch collectionName {
+	case "expenses", "purchase_orders", "vendors":
+	default:
+		return nil
+	}
+	enabled, err := utilities.IsExpensesEditingEnabled(app)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return apis.NewForbiddenError(utilities.ErrExpensesEditingDisabled.Message, nil)
+	}
+	return nil
+}
 
 // Define request bodies for the handlers
 type RejectionRequest struct {
@@ -127,13 +147,23 @@ func AddRoutes(app core.App) {
 		poGroup := se.Router.Group("/api/purchase_orders")
 		poGroup.Bind(apis.RequireAuth("users"))
 		poGroup.GET("/pending", createGetPendingPurchaseOrdersHandler(app))
-		poGroup.POST("/{id}/approve", createApprovePurchaseOrderHandler(app))
-		poGroup.POST("/{id}/reject", createRejectPurchaseOrderHandler(app))
-		poGroup.POST("/{id}/cancel", createCancelPurchaseOrderHandler(app))
-		poGroup.POST("/{id}/close", createClosePurchaseOrderHandler(app))
-		poGroup.POST("/{id}/make_cumulative", createConvertToCumulativePurchaseOrderHandler(app))
 		poGroup.GET("/approvers/{division}/{amount}", createGetApproversHandler(app, false))
 		poGroup.GET("/second_approvers/{division}/{amount}", createGetApproversHandler(app, true))
+
+		// PO mutation routes are gated on expenses editing via middleware
+		poMutations := se.Router.Group("/api/purchase_orders")
+		poMutations.Bind(apis.RequireAuth("users"))
+		poMutations.BindFunc(func(e *core.RequestEvent) error {
+			if err := requireExpensesEditing(app, "purchase_orders"); err != nil {
+				return err
+			}
+			return e.Next()
+		})
+		poMutations.POST("/{id}/approve", createApprovePurchaseOrderHandler(app))
+		poMutations.POST("/{id}/reject", createRejectPurchaseOrderHandler(app))
+		poMutations.POST("/{id}/cancel", createCancelPurchaseOrderHandler(app))
+		poMutations.POST("/{id}/close", createClosePurchaseOrderHandler(app))
+		poMutations.POST("/{id}/make_cumulative", createConvertToCumulativePurchaseOrderHandler(app))
 
 		clientsGroup := se.Router.Group("/api/clients")
 		clientsGroup.Bind(apis.RequireAuth("users"))

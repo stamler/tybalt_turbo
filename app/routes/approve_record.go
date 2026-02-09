@@ -21,6 +21,10 @@ func createApproveRecordHandler(app core.App, collectionName string) func(e *cor
 	// 3. Returns a success message if approved, or an error message if any checks fail.
 	// This ensures that only valid, submitted records can be approved by the correct user.
 	return func(e *core.RequestEvent) error {
+		if err := requireExpensesEditing(app, collectionName); err != nil {
+			return err
+		}
+
 		authRecord := e.Auth
 		userId := authRecord.Id
 

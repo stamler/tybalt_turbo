@@ -17,6 +17,8 @@
   import { jobs } from "$lib/stores/jobs";
   import { vendors } from "$lib/stores/vendors";
   import { untrack } from "svelte";
+  import { expensesEditingEnabled } from "$lib/stores/appConfig";
+  import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
 
   // initialize the stores, noop if already initialized
   jobs.init();
@@ -100,6 +102,12 @@
 </svelte:head>
 
 <CumulativePOOverflowModal bind:this={overflowModal} />
+
+{#if !$expensesEditingEnabled}
+  <DsEditingDisabledBanner
+    message="Expense editing is currently disabled during a system transition."
+  />
+{/if}
 
 <form
   class="flex w-full flex-col items-center gap-2 p-2"

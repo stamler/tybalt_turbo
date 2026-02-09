@@ -11,7 +11,7 @@
   import type MiniSearch from "minisearch";
   import AbsorbList from "./AbsorbList.svelte";
   import { getAbsorbRedirectUrl } from "$lib/utilities";
-  import { appConfig, jobsEditingEnabled } from "$lib/stores/appConfig";
+  import { jobsEditingEnabled, expensesEditingEnabled } from "$lib/stores/appConfig";
 
   let {
     collectionName,
@@ -27,15 +27,14 @@
     autoCompleteIndex?: MiniSearch<T> | null;
   } = $props();
 
-  // Initialize config store
-  appConfig.init();
-
   // Collections that affect jobs when absorbed
   const collectionsAffectingJobs = ["clients", "client_contacts"];
 
-  // Derived: absorb is disabled if this collection affects jobs and job editing is disabled
+  // Derived: absorb is disabled if this collection affects jobs and job editing is disabled,
+  // or if this is a vendor absorb and expenses editing is disabled
   const absorbDisabled = $derived(
-    collectionsAffectingJobs.includes(collectionName) && !$jobsEditingEnabled,
+    (collectionsAffectingJobs.includes(collectionName) && !$jobsEditingEnabled) ||
+      (collectionName === "vendors" && !$expensesEditingEnabled),
   );
 
   let errors = $state<Record<string, { message: string }>>({});
@@ -145,7 +144,10 @@
         Record absorption is temporarily disabled for <strong>{collectionName}</strong> during a system
         transition.
       </p>
-      <p>Absorbing these records would modify job data which is currently locked.</p>
+      <p>
+        Absorbing these records would modify data that is currently locked during a system
+        transition.
+      </p>
       <div class="mt-4">
         <DsActionButton action={goBack} color="neutral">Go Back</DsActionButton>
       </div>

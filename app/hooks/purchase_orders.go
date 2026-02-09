@@ -467,6 +467,10 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 // purchase_order record is invalid this function throws an error explaining
 // which field(s) are invalid and why.
 func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
+	if err := checkExpensesEditing(app); err != nil {
+		return err
+	}
+
 	record := e.Record
 	// get the auth record from the context
 	authRecord := e.Auth

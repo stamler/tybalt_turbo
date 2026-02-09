@@ -31,6 +31,19 @@ func AnnotateHookError(app core.App, e *core.RecordRequestEvent, err error) erro
 // OnRecordBeforeUpdateRequest hooks for the time_entries model. These hooks are
 // called before a record is created or updated in the time_entries collection.
 
+// checkExpensesEditing returns ErrExpensesEditingDisabled when the expenses
+// feature flag is off, nil otherwise.
+func checkExpensesEditing(app core.App) error {
+	enabled, err := utilities.IsExpensesEditingEnabled(app)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return utilities.ErrExpensesEditingDisabled
+	}
+	return nil
+}
+
 func AddHooks(app core.App) {
 	// OnRecordAuthRequest fires after successful credential verification but before
 	// returning the auth token to the client. We use it to:
@@ -193,6 +206,19 @@ func AddHooks(app core.App) {
 		}
 		return e.Next()
 	})
+	// Gate-only hook: blocks the request when expenses editing is disabled.
+	// Used for delete hooks on expenses/purchase_orders and all CUD hooks on vendors.
+	expensesGateHook := func(e *core.RecordRequestEvent) error {
+		if err := checkExpensesEditing(app); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	}
+	app.OnRecordDeleteRequest("expenses").BindFunc(expensesGateHook)
+	app.OnRecordDeleteRequest("purchase_orders").BindFunc(expensesGateHook)
+	app.OnRecordCreateRequest("vendors").BindFunc(expensesGateHook)
+	app.OnRecordUpdateRequest("vendors").BindFunc(expensesGateHook)
+	app.OnRecordDeleteRequest("vendors").BindFunc(expensesGateHook)
 	// hooks for rate_sheets model
 	app.OnRecordCreateRequest("rate_sheets").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ValidateRateSheetEffectiveDate(app, e); err != nil {
@@ -250,11 +276,18 @@ func AddHooks(app core.App) {
 		return e.Next()
 	})
 
-	// Hook for absorb_actions: block deletion (commit) when a parent absorb depends on this one.
-	// For example, can't commit (delete) a client_contacts absorb while a clients absorb exists,
-	// because the clients undo depends on those contact records still existing.
+	// Hook for absorb_actions: block deletion (commit) when a parent absorb depends on this one
+	// or when the relevant feature flag is disabled.
 	app.OnRecordDeleteRequest("absorb_actions").BindFunc(func(e *core.RecordRequestEvent) error {
 		collectionName := e.Record.GetString("collection_name")
+
+		// Block vendor absorb commits when expenses editing is disabled
+		if collectionName == "vendors" {
+			if err := checkExpensesEditing(app); err != nil {
+				return AnnotateHookError(e.App, e, err)
+			}
+		}
+
 		parentCollections := absorb.GetCommitBlockers(collectionName)
 
 		for _, parentCollection := range parentCollections {

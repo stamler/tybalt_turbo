@@ -82,8 +82,9 @@
       />
     {:else}
       <input
-        id="attachment"
+        id={`file-input-${thisId}`}
         type="file"
+        class="file:mr-2 file:rounded-sm file:border file:border-neutral-300 file:bg-transparent file:px-2 file:py-0.5 file:text-sm file:text-neutral-700 hover:file:bg-neutral-100"
         onchange={(e) => {
           const target = e.target as HTMLInputElement;
           if (target.files) {
@@ -91,7 +92,7 @@
             (record as any)[fieldName as keyof T] = target.files[0];
           }
         }}
-        name="attachment"
+        name={fieldName}
       />
     {/if}
   </span>

@@ -14,7 +14,8 @@
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
   import { rateSheets } from "$lib/stores/rateSheets";
-  import { appConfig, jobsEditingEnabled } from "$lib/stores/appConfig";
+  import { jobsEditingEnabled } from "$lib/stores/appConfig";
+  import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import { onMount, untrack } from "svelte";
   import type {
@@ -34,7 +35,6 @@
   jobs.init();
   divisions.init();
   rateSheets.init();
-  appConfig.init();
 
   let errors = $state({} as Record<string, { message: string }>);
   // Allow extra field `location` introduced by migration to be present on item
@@ -724,12 +724,12 @@
 </svelte:head>
 
 {#if !$jobsEditingEnabled}
-  <div class="disabled-notice">
+  <DsEditingDisabledBanner>
     <p>Job creation and editing is temporarily disabled during a system transition.</p>
     <p>Please check back later or contact an administrator if you need immediate assistance.</p>
-  </div>
+  </DsEditingDisabledBanner>
 {:else if isCancelledProposal}
-  <div class="disabled-notice">
+  <DsEditingDisabledBanner>
     <p>This proposal has been cancelled and cannot be modified.</p>
     <p>Cancelled proposals are in a terminal state. No further changes are allowed.</p>
     <div class="mt-4">
@@ -737,7 +737,7 @@
         >← Back to job details</a
       >
     </div>
-  </div>
+  </DsEditingDisabledBanner>
 {:else}
   <form
     class="flex w-full flex-col items-center gap-2 p-2"
@@ -1417,19 +1417,3 @@
     />
   </div>
 </DSPopover>
-
-<style>
-  .disabled-notice {
-    padding: 1.5rem;
-    background-color: #fff3cd;
-    border: 1px solid #ffc107;
-    border-radius: 0.5rem;
-    margin: 1rem;
-    max-width: 600px;
-  }
-
-  .disabled-notice p {
-    margin: 0.5rem 0;
-    color: #856404;
-  }
-</style>

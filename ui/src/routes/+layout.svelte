@@ -12,6 +12,10 @@
   import { navigating } from "$app/stores";
   import { tasks } from "$lib/stores/tasks";
   import { navSections as allNavSections } from "$lib/navConfig";
+  import { appConfig } from "$lib/stores/appConfig";
+
+  // Initialize app config store globally (idempotent, so safe to call here)
+  appConfig.init();
 
   // children is a function that we will call to render the current route
   // https://svelte-5-preview.vercel.app/docs/snippets#passing-snippets-to-components

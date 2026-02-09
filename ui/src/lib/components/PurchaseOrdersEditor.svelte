@@ -15,6 +15,8 @@
   import DsActionButton from "./DSActionButton.svelte";
   import DsLabel from "./DsLabel.svelte";
   import { untrack } from "svelte";
+  import { expensesEditingEnabled } from "$lib/stores/appConfig";
+  import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
 
   // initialize the stores, noop if already initialized
   jobs.init();
@@ -128,6 +130,12 @@
 <svelte:head>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 </svelte:head>
+
+{#if !$expensesEditingEnabled}
+  <DsEditingDisabledBanner
+    message="Purchase order editing is currently disabled during a system transition."
+  />
+{/if}
 
 <form
   class="flex w-full flex-col items-center gap-2 p-2"

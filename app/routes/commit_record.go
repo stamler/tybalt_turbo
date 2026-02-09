@@ -32,6 +32,10 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 	// 3. Returns a success message if committed, or an error message if any checks fail.
 	// This ensures that only the record's owner can submit it.
 	return func(e *core.RequestEvent) error {
+		if err := requireExpensesEditing(app, collectionName); err != nil {
+			return err
+		}
+
 		authRecord := e.Auth
 		userId := authRecord.Id
 

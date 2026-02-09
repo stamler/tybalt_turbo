@@ -25,6 +25,9 @@ func createRejectRecordHandler(app core.App, collectionName string) func(e *core
 	// 5. Returns a success message if rejected, or an error message if any checks fail.
 	// This ensures that only valid, submitted records can be rejected by the correct user.
 	return func(e *core.RequestEvent) error {
+		if err := requireExpensesEditing(app, collectionName); err != nil {
+			return err
+		}
 
 		id := e.Request.PathValue("id")
 

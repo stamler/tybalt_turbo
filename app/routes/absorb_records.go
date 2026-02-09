@@ -75,6 +75,11 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) func(e *cor
 			}
 		}
 
+		// Check if expenses editing is enabled for vendor absorbs
+		if err := requireExpensesEditing(app, collectionName); err != nil {
+			return err
+		}
+
 		// Check if the collection is supported and get configs
 		_, parentConstraint, err := absorb.GetRefConfigs(collectionName)
 		if err != nil {
@@ -285,6 +290,11 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 //     c. Deletes the absorb action record to allow future absorb operations
 func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
+		// Check if expenses editing is enabled for vendor absorbs
+		if err := requireExpensesEditing(app, collectionName); err != nil {
+			return err
+		}
+
 		// Step 1: Permission Check
 		// Verify that the user has the 'absorb' claim, which is required for both
 		// absorbing and undoing absorb operations

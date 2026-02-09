@@ -4,7 +4,6 @@ package hooks
 
 import (
 	"fmt"
-	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -339,6 +338,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 // called by the hooks for the expenses collection to ensure that the record
 // is in a valid state before it is created or updated.
 func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
+	if err := checkExpensesEditing(app); err != nil {
+		return err
+	}
+
 	expenseRecord := e.Record
 	// if the expense record is submitted, return an error
 	if expenseRecord.Get("submitted") == true {
@@ -407,7 +410,6 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 			}
 		}
 
-		log.Println("attachmentHash", attachmentHash)
 		expenseRecord.Set("attachment_hash", attachmentHash)
 	} else if expenseRecord.GetString("attachment") == "" {
 		// Attachment was explicitly removed - clear the hash
@@ -416,8 +418,8 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	// Otherwise: no new file and attachment still exists - leave hash unchanged
 
 	// if the expense record has a purchase_order, load it
-	var poRecord *core.Record = nil
-	var err error = nil
+	var poRecord *core.Record
+	var err error
 	purchaseOrder := expenseRecord.GetString("purchase_order")
 	if purchaseOrder != "" {
 		poRecord, err = app.FindRecordById("purchase_orders", purchaseOrder)

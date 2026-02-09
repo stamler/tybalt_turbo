@@ -62,3 +62,19 @@ var ErrJobsEditingDisabled = &errs.HookError{
 		"global": {Code: "jobs_editing_disabled", Message: "job creation and editing is disabled during transition"},
 	},
 }
+
+// IsExpensesEditingEnabled checks if expense/vendor/PO creation/editing/absorb is allowed.
+// Reads from app_config where key="expenses", checks value.create_edit_absorb.
+// Defaults to true (fail-open) if config is missing.
+func IsExpensesEditingEnabled(app core.App) (bool, error) {
+	return GetConfigBool(app, "expenses", "create_edit_absorb", true)
+}
+
+// ErrExpensesEditingDisabled is returned when expense editing is disabled
+var ErrExpensesEditingDisabled = &errs.HookError{
+	Status:  http.StatusForbidden,
+	Message: "expense editing is currently disabled",
+	Data: map[string]errs.CodeError{
+		"global": {Code: "expenses_editing_disabled", Message: "expense, purchase order, and vendor creation and editing is disabled during transition"},
+	},
+}

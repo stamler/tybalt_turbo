@@ -4,6 +4,7 @@
   import type { VendorApiResponse } from "$lib/stores/vendors";
   import { pb } from "$lib/pocketbase";
   import { vendors } from "$lib/stores/vendors";
+  import { expensesEditingEnabled } from "$lib/stores/appConfig";
 
   // initialize the stores, noop if already initialized
   vendors.init();
@@ -45,24 +46,26 @@
     {/snippet}
 
     {#snippet actions({ id }: VendorApiResponse)}
-      <DsActionButton
-        action={`/vendors/${id}/edit`}
-        icon="mdi:edit-outline"
-        title="Edit"
-        color="blue"
-      />
-      <DsActionButton
-        action={`/vendors/${id}/absorb`}
-        icon="mdi:merge"
-        title="Absorb other vendors into this one"
-        color="yellow"
-      />
-      <DsActionButton
-        action={() => pb.collection("vendors").delete(id)}
-        icon="mdi:delete"
-        title="Delete"
-        color="red"
-      />
+      {#if $expensesEditingEnabled}
+        <DsActionButton
+          action={`/vendors/${id}/edit`}
+          icon="mdi:edit-outline"
+          title="Edit"
+          color="blue"
+        />
+        <DsActionButton
+          action={`/vendors/${id}/absorb`}
+          icon="mdi:merge"
+          title="Absorb other vendors into this one"
+          color="yellow"
+        />
+        <DsActionButton
+          action={() => pb.collection("vendors").delete(id)}
+          icon="mdi:delete"
+          title="Delete"
+          color="red"
+        />
+      {/if}
     {/snippet}
   </DsSearchList>
 {/if}

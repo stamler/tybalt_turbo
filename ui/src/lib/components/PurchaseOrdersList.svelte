@@ -18,6 +18,7 @@
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
   import { onMount, onDestroy, untrack } from "svelte";
+  import { expensesEditingEnabled } from "$lib/stores/appConfig";
   // import { toastStore, type ToastSettings } from "@skeletonlabs/skeleton";
 
   let rejectModal: RejectModal;
@@ -274,52 +275,54 @@
   {/snippet}
 
   {#snippet actions(item: PurchaseOrdersAugmentedResponse)}
-    {#if item.status === "Active"}
-      <DsActionButton
-        action={`/expenses/add/${item.id}`}
-        icon="mdi:add-bold"
-        title="Create Expense"
-        color="green"
-      />
-      {#if poMayBeCancelledByUser(item)}
+    {#if $expensesEditingEnabled}
+      {#if item.status === "Active"}
         <DsActionButton
-          action={() => cancel(item.id)}
-          icon="mdi:cancel"
-          title="Cancel"
-          color="orange"
-        />
-      {/if}
-      {#if poMayBeClosedByUser(item)}
-        <DsActionButton
-          action={() => closePurchaseOrder(item.id)}
-          icon="mdi:curtains-closed"
-          title="Close Purchase Order"
-          color="orange"
-        />
-      {/if}
-    {/if}
-    {#if item.status === "Unapproved"}
-      <DsActionButton
-        action={`/pos/${item.id}/edit`}
-        icon="mdi:edit-outline"
-        title="Edit"
-        color="blue"
-      />
-      {#if poMayBeApprovedOrRejectedByUser(item)}
-        <DsActionButton
-          action={() => approve(item.id)}
-          icon="mdi:approve"
-          title="Approve"
+          action={`/expenses/add/${item.id}`}
+          icon="mdi:add-bold"
+          title="Create Expense"
           color="green"
         />
-        <DsActionButton
-          action={() => openRejectModal(item.id)}
-          icon="mdi:cancel"
-          title="Reject"
-          color="orange"
-        />
+        {#if poMayBeCancelledByUser(item)}
+          <DsActionButton
+            action={() => cancel(item.id)}
+            icon="mdi:cancel"
+            title="Cancel"
+            color="orange"
+          />
+        {/if}
+        {#if poMayBeClosedByUser(item)}
+          <DsActionButton
+            action={() => closePurchaseOrder(item.id)}
+            icon="mdi:curtains-closed"
+            title="Close Purchase Order"
+            color="orange"
+          />
+        {/if}
       {/if}
-      <DsActionButton action={() => del(item.id)} icon="mdi:delete" title="Delete" color="red" />
+      {#if item.status === "Unapproved"}
+        <DsActionButton
+          action={`/pos/${item.id}/edit`}
+          icon="mdi:edit-outline"
+          title="Edit"
+          color="blue"
+        />
+        {#if poMayBeApprovedOrRejectedByUser(item)}
+          <DsActionButton
+            action={() => approve(item.id)}
+            icon="mdi:approve"
+            title="Approve"
+            color="green"
+          />
+          <DsActionButton
+            action={() => openRejectModal(item.id)}
+            icon="mdi:cancel"
+            title="Reject"
+            color="orange"
+          />
+        {/if}
+        <DsActionButton action={() => del(item.id)} icon="mdi:delete" title="Delete" color="red" />
+      {/if}
     {/if}
   {/snippet}
 </DsList>

@@ -6,6 +6,8 @@
   import { goto } from "$app/navigation";
   import type { VendorsPageData } from "$lib/svelte-types";
   import { untrack } from "svelte";
+  import { expensesEditingEnabled } from "$lib/stores/appConfig";
+  import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
 
   let { data }: { data: VendorsPageData } = $props();
 
@@ -28,6 +30,12 @@
     }
   }
 </script>
+
+{#if !$expensesEditingEnabled}
+  <DsEditingDisabledBanner
+    message="Vendor editing is currently disabled during a system transition."
+  />
+{/if}
 
 <form
   class="flex w-full flex-col items-center gap-2 p-2"

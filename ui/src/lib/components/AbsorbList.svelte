@@ -4,6 +4,15 @@
   import type { AbsorbActionsResponse } from "$lib/pocketbase-types";
   import { goto } from "$app/navigation";
   import { getAbsorbRedirectUrl } from "$lib/utilities";
+  import { jobsEditingEnabled, expensesEditingEnabled } from "$lib/stores/appConfig";
+
+  // Helper: check if actions are disabled for a given absorb item
+  function isAbsorbActionDisabled(item: AbsorbActionsResponse): boolean {
+    const cn = item.collection_name;
+    if ((cn === "clients" || cn === "client_contacts") && !$jobsEditingEnabled) return true;
+    if (cn === "vendors" && !$expensesEditingEnabled) return true;
+    return false;
+  }
 
   let {
     collectionName = undefined,
@@ -247,7 +256,11 @@
           </div>
 
           <div class="flex flex-wrap gap-2">
-            {#if confirms[item.id]?.undo}
+            {#if isAbsorbActionDisabled(item)}
+              <p class="text-sm text-yellow-800">
+                Undo and commit are disabled during a system transition.
+              </p>
+            {:else if confirms[item.id]?.undo}
               <div class="flex flex-col gap-2">
                 <p class="font-bold text-red-600">Confirm undo? This cannot be reversed.</p>
                 <div class="flex gap-2">

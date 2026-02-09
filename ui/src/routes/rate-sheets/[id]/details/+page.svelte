@@ -275,17 +275,12 @@
         <span class="text-base font-normal text-neutral-500">rev. {rateSheet.revision}</span>
       </h1>
       <DsActionButton
-        action={() => window.open(`/rate-sheets/${rateSheet.id}/print`, '_blank')}
+        action={() => window.open(`/rate-sheets/${rateSheet.id}/print`, "_blank")}
         icon="mdi:printer"
         title="Print"
         color="gray"
       />
-      <DsActionButton
-        action={downloadCsv}
-        icon="mdi:download"
-        title="Download CSV"
-        color="gray"
-      />
+      <DsActionButton action={downloadCsv} icon="mdi:download" title="Download CSV" color="gray" />
     </div>
     <p class="text-neutral-600">
       Effective: {shortDate(rateSheet.effective_date, true)}
