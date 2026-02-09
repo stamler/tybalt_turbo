@@ -5,7 +5,6 @@
   import DsAutocomplete from "$lib/components/DSAutoComplete.svelte";
   import type { ClientNote, NoteJobOption } from "$lib/types/notes";
   import MiniSearch from "minisearch";
-  import { jobAwareTokenize, jobAwareTokenizeSearch } from "$lib/utils/jobTokenizer";
 
   let {
     clientId,
@@ -29,11 +28,10 @@
     const index = new MiniSearch<NoteJobOption>({
       fields: ["id", "number", "description"],
       storeFields: ["id", "number", "description"],
-      tokenize: jobAwareTokenize,
       searchOptions: {
         prefix: true,
         combineWith: "AND",
-        tokenize: jobAwareTokenizeSearch,
+        boost: { number: 3 },
       },
     });
 

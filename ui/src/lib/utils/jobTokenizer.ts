@@ -1,3 +1,22 @@
+/**
+ * NOTE: DEAD CODE (eventually deletable).
+ *
+ * This file used to be referenced by:
+ * - `ui/src/lib/stores/jobs.ts` via `tokenize`/`searchOptions.tokenize`
+ * - `ui/src/lib/components/NoteForm.svelte` via `tokenize`/`searchOptions.tokenize`
+ *
+ * Both indexes now use MiniSearch's default tokenizer instead of this custom job-aware tokenizer.
+ * Search behavior also moved to AND semantics (globally in `createCollectionStore` and explicitly in `NoteForm`)
+ * with `number` field boosting (currently `boost: { number: 3 }`), so job number matches are prioritized
+ * while still matching across other indexed fields.
+ *
+ * Implication: job-number parsing is now standard tokenization rather than custom full/partial job-number token
+ * extraction. This specifically allows searching by the second segment of a job number on its own (for example,
+ * searching `731` can now match `24-731`), because tokens are no longer forced into a single monolithic `YY-NNN`
+ * style token. With the old custom tokenizer + prefix search, matching often depended on the year-prefixed token
+ * and did not reliably support the second segment independently. Ranking bias toward job numbers is now handled by
+ * field boost, not tokenizer-specific token shaping.
+ */
 import MiniSearch from "minisearch";
 
 // Strict pattern for indexing - matches complete job number formats only
