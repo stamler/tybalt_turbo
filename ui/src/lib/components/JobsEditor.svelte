@@ -75,6 +75,7 @@
   let statusComment = $state("");
   let statusCommentError = $state<string | null>(null);
   let statusCommentSubmitting = $state(false);
+  let statusCommentConfirming = $state(false);
   let previousStatus = $state<JobsStatusOptions | undefined>(item.status);
   let newCategories = $state([] as string[]);
   let categoriesToDelete = $state([] as string[]);
@@ -370,36 +371,41 @@
     }
   });
 
-  async function submitStatusComment() {
+  function submitStatusComment() {
     if (!statusComment.trim()) {
       statusCommentError = "A comment is required";
       return;
     }
-    if (!pendingStatus || !data.id || !item.client) {
-      statusCommentError = "Unable to add comment - missing job or client data";
+    if (!pendingStatus || !data.id) {
+      statusCommentError = "Unable to set status - missing job data";
       return;
     }
+
+    // Move to the confirmation step
+    statusCommentError = null;
+    statusCommentConfirming = true;
+  }
+
+  async function confirmStatusChange() {
+    if (!pendingStatus || !data.id) return;
 
     statusCommentSubmitting = true;
     statusCommentError = null;
 
     try {
-      // Create the client note with the status change
-      await pb.collection("client_notes").create({
-        client: item.client,
-        job: data.id,
-        note: statusComment,
-        job_status_changed_to: pendingStatus,
+      // Atomically create the client note and update the status in one
+      // backend transaction. This avoids orphaned notes and ensures the
+      // status change is persisted immediately.
+      await pb.send(`/api/jobs/${data.id}/set-status`, {
+        method: "POST",
+        body: { status: pendingStatus, comment: statusComment },
       });
 
-      // Now set the status
-      item.status = pendingStatus;
-      previousStatus = pendingStatus;
-      pendingStatus = null;
-      showStatusCommentModal = false;
-      statusComment = "";
+      // Success - navigate to the job details page.
+      goto(`/jobs/${data.id}/details`);
     } catch (error: any) {
-      statusCommentError = error?.response?.message ?? "Failed to add comment";
+      statusCommentError = error?.data?.message ?? "Failed to set status";
+      statusCommentConfirming = false;
     } finally {
       statusCommentSubmitting = false;
     }
@@ -407,6 +413,7 @@
 
   function cancelStatusChange() {
     showStatusCommentModal = false;
+    statusCommentConfirming = false;
     pendingStatus = null;
     statusComment = "";
     statusCommentError = null;
@@ -1287,24 +1294,52 @@
 {/if}
 
 <!-- Status Comment Modal for No Bid / Cancelled -->
-<DSPopover
-  bind:show={showStatusCommentModal}
-  title="{pendingStatus === 'No Bid' ? 'No Bid' : 'Cancel Proposal'} - Comment Required"
-  subtitle="A comment is required to set the status to &quot;{pendingStatus}&quot;. Please provide a reason."
-  error={statusCommentError}
-  submitting={statusCommentSubmitting}
-  submitLabel="Add Comment & Set Status"
-  onSubmit={submitStatusComment}
-  onCancel={cancelStatusChange}
->
-  <textarea
-    class="w-full rounded-sm border border-neutral-300 p-2"
-    rows="4"
-    placeholder="Enter your comment..."
-    bind:value={statusComment}
-    disabled={statusCommentSubmitting}
-  ></textarea>
-</DSPopover>
+{#if statusCommentConfirming}
+  <DSPopover
+    bind:show={showStatusCommentModal}
+    title="Confirm: Set status to &quot;{pendingStatus}&quot;"
+    subtitle=""
+    error={statusCommentError}
+    submitting={statusCommentSubmitting}
+    submitLabel={pendingStatus === "No Bid" ? "Confirm No Bid" : "Confirm Cancellation"}
+    onSubmit={confirmStatusChange}
+    onCancel={() => (statusCommentConfirming = false)}
+  >
+    <div class="rounded-sm border border-amber-300 bg-amber-50 p-3 text-amber-900">
+      <p class="font-semibold">This action is permanent.</p>
+      <p class="mt-1">
+        {#if pendingStatus === "Cancelled"}
+          This proposal will be cancelled and can no longer be modified.
+        {:else}
+          This proposal will be marked as No Bid and can no longer be modified.
+        {/if}
+      </p>
+    </div>
+    <div>
+      <p class="text-sm font-semibold text-neutral-600">Your comment:</p>
+      <p class="mt-1 text-sm text-neutral-800">{statusComment}</p>
+    </div>
+  </DSPopover>
+{:else}
+  <DSPopover
+    bind:show={showStatusCommentModal}
+    title="{pendingStatus === 'No Bid' ? 'No Bid' : 'Cancel Proposal'} - Comment Required"
+    subtitle="A comment is required to set the status to &quot;{pendingStatus}&quot;. Please provide a reason."
+    error={statusCommentError}
+    submitting={statusCommentSubmitting}
+    submitLabel="Continue"
+    onSubmit={submitStatusComment}
+    onCancel={cancelStatusChange}
+  >
+    <textarea
+      class="w-full rounded-sm border border-neutral-300 p-2"
+      rows="4"
+      placeholder="Enter your comment..."
+      bind:value={statusComment}
+      disabled={statusCommentSubmitting}
+    ></textarea>
+  </DSPopover>
+{/if}
 
 <!-- Add Client Popover -->
 <DSPopover
