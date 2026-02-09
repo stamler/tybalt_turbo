@@ -29,6 +29,38 @@ type JobAllocationUpdate struct {
 	Hours    float64 `json:"hours"`
 }
 
+type existingJobAllocation struct {
+	Division string  `db:"division"`
+	Hours    float64 `db:"hours"`
+}
+
+func allocationsDiffer(existing []existingJobAllocation, incoming []JobAllocationUpdate) bool {
+	if len(existing) != len(incoming) {
+		return true
+	}
+
+	existingByDivision := make(map[string]float64, len(existing))
+	for _, alloc := range existing {
+		if _, alreadySeen := existingByDivision[alloc.Division]; alreadySeen {
+			// Treat duplicate existing rows as a mismatch so we normalize on save.
+			return true
+		}
+		existingByDivision[alloc.Division] = alloc.Hours
+	}
+
+	for _, alloc := range incoming {
+		existingHours, ok := existingByDivision[alloc.Division]
+		if !ok {
+			return true
+		}
+		if existingHours != alloc.Hours {
+			return true
+		}
+	}
+
+	return false
+}
+
 // createUpsertJobHandler returns a handler that updates a job and replaces its allocations in a single transaction.
 func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -113,6 +145,43 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 				return err
 			}
 
+			// Validate all divisions exist and are active
+			for _, a := range req.Allocations {
+				divRec, err := txApp.FindRecordById("divisions", a.Division)
+				if err != nil {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "invalid_division",
+						Message: fmt.Sprintf("division not found: %s", a.Division),
+					}
+				}
+				if !divRec.GetBool("active") {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "division_not_active",
+						Message: fmt.Sprintf("division is inactive: %s", a.Division),
+					}
+				}
+			}
+
+			var existingAllocations []existingJobAllocation
+			if err := txApp.DB().NewQuery(`
+				SELECT division, COALESCE(hours, 0) AS hours
+				FROM job_time_allocations
+				WHERE job = {:job}
+			`).Bind(dbx.Params{"job": jobID}).All(&existingAllocations); err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_loading_allocations",
+					Message: fmt.Sprintf("error loading existing allocations: %v", err),
+				}
+			}
+
+			// Allocation edits count as job edits for writeback tracking.
+			if allocationsDiffer(existingAllocations, req.Allocations) {
+				jobRec.Set("_imported", false)
+			}
+
 			if err := txApp.Save(jobRec); err != nil {
 				httpResponseStatusCode = http.StatusBadRequest
 				// Check if it's a validation error with field-level details
@@ -135,25 +204,6 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 				return &CodeError{
 					Code:    "error_saving_job",
 					Message: fmt.Sprintf("error saving job: %v", err),
-				}
-			}
-
-			// Validate all divisions exist and are active
-			for _, a := range req.Allocations {
-				divRec, err := txApp.FindRecordById("divisions", a.Division)
-				if err != nil {
-					httpResponseStatusCode = http.StatusBadRequest
-					return &CodeError{
-						Code:    "invalid_division",
-						Message: fmt.Sprintf("division not found: %s", a.Division),
-					}
-				}
-				if !divRec.GetBool("active") {
-					httpResponseStatusCode = http.StatusBadRequest
-					return &CodeError{
-						Code:    "division_not_active",
-						Message: fmt.Sprintf("division is inactive: %s", a.Division),
-					}
 				}
 			}
 
