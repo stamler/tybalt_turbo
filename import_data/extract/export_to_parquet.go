@@ -1,6 +1,7 @@
 package extract
 
 import (
+	"database/sql"
 	"fmt"
 	"io"
 	"log"
@@ -18,6 +19,8 @@ import (
 var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts", "TurboClientNotes", "TurboVendors", "TurboPurchaseOrders", "TurboRateRoles", "TurboRateSheets", "TurboRateSheetEntries"}
 
 func ToParquet(sourceSQLiteDb string) {
+	standardExpenditureKindID = GetStandardExpenditureKindID(sourceSQLiteDb)
+
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -136,6 +139,13 @@ func ToParquet(sourceSQLiteDb string) {
 	}
 	if len(offenders) > 0 {
 		log.Fatalf("Export aborted: found %d Profiles with empty/NULL defaultBranch: %s", len(offenders), strings.Join(offenders, ", "))
+	}
+
+	turboPurchaseOrdersHasKind := duckDBTableHasColumn(db, "TurboPurchaseOrders", "kind")
+	if turboPurchaseOrdersHasKind {
+		log.Println("TurboPurchaseOrders.kind detected - preserving kind values in parquet export")
+	} else {
+		log.Println("TurboPurchaseOrders.kind not detected - defaulting export kind to standard")
 	}
 
 	for _, table := range tablesToDump {
@@ -272,7 +282,12 @@ func ToParquet(sourceSQLiteDb string) {
 			// Uses id as pocketbase_id since Turbo POs already have PocketBase IDs.
 			// vendorId is used directly (it already exists in Vendors.parquet via TurboVendors).
 			// Include all fields needed for round-trip fidelity.
-			query = `
+			turboPurchaseOrdersKindSelect := fmt.Sprintf("'%s' AS kind", StandardExpenditureKindID())
+			if turboPurchaseOrdersHasKind {
+				turboPurchaseOrdersKindSelect = fmt.Sprintf("COALESCE(NULLIF(kind, ''), '%s') AS kind", StandardExpenditureKindID())
+			}
+
+			query = fmt.Sprintf(`
 				COPY (
 					SELECT
 						id,
@@ -303,13 +318,14 @@ func ToParquet(sourceSQLiteDb string) {
 						rejectorUid AS rejector,
 						rejectionReason AS rejection_reason,
 						category,
+						%s,
 						parentPo AS parent_po,
 						branch,
 						attachment,
 						attachment_hash
 					FROM mysql_db.TurboPurchaseOrders
 				) TO 'parquet/TurboPurchaseOrders.parquet' (FORMAT PARQUET)
-			`
+			`, turboPurchaseOrdersKindSelect)
 		case "TurboRateRoles":
 			// Export TurboRateRoles for round-trip of rate roles.
 			// These are rate roles that were written back from Turbo with preserved PocketBase IDs.
@@ -413,6 +429,59 @@ func ToParquet(sourceSQLiteDb string) {
 	// LEFT JOIN sqlite.divisions ON sqlite.divisions.code = main.TimeEntries.division
 	// This will allow us to write the id of the time_types and divisions tables
 	// to the TimeEntries table rather than the code from the parquet file.
+}
+
+func duckDBTableHasColumn(db *sql.DB, tableName string, columnName string) bool {
+	rows, err := db.Query(fmt.Sprintf("DESCRIBE SELECT * FROM mysql_db.%s", tableName))
+	if err != nil {
+		log.Printf("warning: failed to inspect columns for %s: %v", tableName, err)
+		return false
+	}
+	defer rows.Close()
+
+	columns, err := rows.Columns()
+	if err != nil {
+		log.Printf("warning: failed to read DESCRIBE columns for %s: %v", tableName, err)
+		return false
+	}
+	if len(columns) == 0 {
+		return false
+	}
+
+	raw := make([]any, len(columns))
+	dest := make([]any, len(columns))
+	for i := range raw {
+		dest[i] = &raw[i]
+	}
+
+	for rows.Next() {
+		if err := rows.Scan(dest...); err != nil {
+			log.Printf("warning: failed to scan DESCRIBE row for %s: %v", tableName, err)
+			return false
+		}
+
+		switch v := raw[0].(type) {
+		case string:
+			if strings.EqualFold(v, columnName) {
+				return true
+			}
+		case []byte:
+			if strings.EqualFold(string(v), columnName) {
+				return true
+			}
+		default:
+			if strings.EqualFold(fmt.Sprintf("%v", v), columnName) {
+				return true
+			}
+		}
+	}
+
+	if err := rows.Err(); err != nil {
+		log.Printf("warning: failed while iterating DESCRIBE rows for %s: %v", tableName, err)
+		return false
+	}
+
+	return false
 }
 
 func copyData(dst net.Conn, src net.Conn) {

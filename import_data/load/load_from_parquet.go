@@ -209,6 +209,7 @@ type Expense struct {
 	Division            string    `parquet:"division_id"`
 	Job                 string    `parquet:"pocketbase_jobid"`
 	Category            string    `parquet:"category_id"`
+	Kind                string    `parquet:"kind"`
 	Date                string    `parquet:"date"`
 	PayPeriodEnding     string    `parquet:"payPeriodEnding"`
 	Description         string    `parquet:"description"`
@@ -270,6 +271,7 @@ type PurchaseOrder struct {
 	Rejector               string  `parquet:"rejector"`                 // legacy_uid (converted to PocketBase UID in expenses_to_pos)
 	RejectionReason        string  `parquet:"rejection_reason"`
 	Category               string  `parquet:"category"`        // PocketBase category ID
+	Kind                   string  `parquet:"kind"`            // PocketBase expenditure_kinds ID
 	ParentPo               string  `parquet:"parent_po"`       // PocketBase parent PO ID
 	Branch                 string  `parquet:"branch"`          // PocketBase branch ID
 	Attachment             string  `parquet:"attachment"`      // PocketBase filename (for Turbo-originated POs)

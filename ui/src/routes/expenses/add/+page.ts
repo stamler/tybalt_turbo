@@ -15,6 +15,7 @@ export const load: PageLoad<ExpensesPageData> = async () => {
     vendor: "",
     job: "",
     category: "",
+    kind: "",
     allowance_types: [],
     // approver is configured as not required in pocketbase so we do not have to
     // set it here, but is set by the server side hook

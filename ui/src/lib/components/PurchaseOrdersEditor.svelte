@@ -6,12 +6,17 @@
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
+  import DSToggle from "$lib/components/DSToggle.svelte";
   import DsFileSelect from "$lib/components/DsFileSelect.svelte";
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { PurchaseOrdersPageData } from "$lib/svelte-types";
-  import type { CategoriesResponse, PoApproversResponse } from "$lib/pocketbase-types";
+  import type {
+    CategoriesResponse,
+    ExpenditureKindsResponse,
+    PoApproversResponse,
+  } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DsLabel from "./DsLabel.svelte";
   import { untrack } from "svelte";
@@ -32,10 +37,23 @@
   const isChildPO = $derived(item.parent_po !== "" && item.parent_po !== undefined);
 
   let categories = $state([] as CategoriesResponse[]);
+  let expenditureKinds = $state([] as ExpenditureKindsResponse[]);
   let approvers = $state([] as PoApproversResponse[]);
   let secondApprovers = $state([] as PoApproversResponse[]);
   let showApproverField = $state(false);
   let showSecondApproverField = $state(false);
+  let loadedKinds = $state(false);
+
+  const kindOptions = $derived.by(() =>
+    expenditureKinds.map((kind) => ({
+      id: kind.id,
+      label: kind.en_ui_label,
+    })),
+  );
+  const selectedKind = $derived.by(() => expenditureKinds.find((kind) => kind.id === item.kind));
+  const standardKindId = $derived.by(
+    () => expenditureKinds.find((kind) => kind.name === "standard")?.id ?? "",
+  );
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
@@ -47,39 +65,60 @@
   // Default division from caller's profile if creating and empty
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
 
+  // Load expenditure kinds once for the kind toggle.
+  $effect(() => {
+    if (loadedKinds) return;
+    loadedKinds = true;
+    pb.collection("expenditure_kinds")
+      .getFullList<ExpenditureKindsResponse>({ sort: "ui_order" })
+      .then((rows) => {
+        expenditureKinds = rows;
+        if (!item.kind || item.kind === "") {
+          const standard = rows.find((r) => r.name === "standard");
+          item.kind = standard?.id ?? rows[0]?.id ?? "";
+        }
+      })
+      .catch((error) => {
+        console.error("Error loading expenditure kinds:", error);
+      });
+  });
+
   // Watch for changes to division, amount, or type to fetch approvers
   $effect(() => {
-    if (item.division && item.total) {
+    if (item.division && item.total && item.kind) {
       fetchApprovers();
+    }
+  });
+
+  // A PO with a job is always treated as project expense (standard kind + has_job=true).
+  $effect(() => {
+    if (item.job !== "" && standardKindId && item.kind !== standardKindId) {
+      item.kind = standardKindId;
     }
   });
 
   async function fetchApprovers() {
     try {
-      // Build query parameters
-      const queryParams = new URLSearchParams();
-      if (isRecurring) {
-        queryParams.append("type", "Recurring");
-        queryParams.append("start_date", item.date || "");
-        queryParams.append("end_date", item.end_date || "");
-        queryParams.append("frequency", item.frequency || "");
-      }
+      const params = new URLSearchParams({
+        division: item.division,
+        amount: String(Number(item.total)),
+        kind: item.kind,
+        has_job: String(item.job !== ""),
+        type: isRecurring ? "Recurring" : item.type,
+        start_date: item.date || "",
+        end_date: item.end_date || "",
+        frequency: item.frequency || "",
+      });
 
       // Fetch first approvers
-      approvers = await pb.send(
-        `/api/purchase_orders/approvers/${item.division}/${item.total}?${queryParams.toString()}`,
-        {
-          method: "GET",
-        },
-      );
+      approvers = await pb.send(`/api/purchase_orders/approvers?${params.toString()}`, {
+        method: "GET",
+      });
 
       // Fetch second approvers
-      secondApprovers = await pb.send(
-        `/api/purchase_orders/second_approvers/${item.division}/${item.total}?${queryParams.toString()}`,
-        {
-          method: "GET",
-        },
-      );
+      secondApprovers = await pb.send(`/api/purchase_orders/second_approvers?${params.toString()}`, {
+        method: "GET",
+      });
 
       // Show approvers field if there are approvers available
       showApproverField = approvers.length > 0;
@@ -93,11 +132,15 @@
 
   async function save(event: Event) {
     event.preventDefault();
-    item.uid = $authStore?.model?.id;
+    item.uid = $authStore?.model?.id ?? "";
 
     // if the job is empty, set the category to empty
     if (item.job === "") {
       item.category = "";
+    }
+    if (!item.kind || item.kind === "") {
+      const standard = expenditureKinds.find((k) => k.name === "standard");
+      item.kind = standard?.id ?? expenditureKinds[0]?.id ?? "";
     }
 
     // set approver to self if the approver field is hidden
@@ -167,6 +210,23 @@
       {item.name}
     {/snippet}
   </DsSelector>
+
+  <div class="flex w-full flex-col gap-1 {errors.kind !== undefined ? 'bg-red-200' : ''}">
+    <div class="flex items-center gap-3">
+      <label for="po-kind">Kind</label>
+      {#if item.job !== ""}
+        <DsLabel color="cyan">{selectedKind?.en_ui_label ?? "Standard"}</DsLabel>
+      {:else}
+        <DSToggle bind:value={item.kind} options={kindOptions} />
+      {/if}
+    </div>
+    {#if selectedKind && selectedKind.name !== "standard" && selectedKind.description}
+      <span class="text-sm text-neutral-600">{selectedKind.description}</span>
+    {/if}
+    {#if errors.kind !== undefined}
+      <span class="text-red-600">{errors.kind.message}</span>
+    {/if}
+  </div>
 
   {#if showApproverField}
     <DsSelector

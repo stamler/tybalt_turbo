@@ -1,9 +1,34 @@
 package extract
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 )
+
+func ensureKindColumnWithDefault(db *sql.DB, table string) {
+	var kindColumnCount int
+	row := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info('%s') WHERE name = 'kind'", table))
+	if err := row.Scan(&kindColumnCount); err != nil {
+		log.Fatalf("Failed checking %s.kind column: %v", table, err)
+	}
+
+	if kindColumnCount == 0 {
+		_, err := db.Exec(fmt.Sprintf("ALTER TABLE %s ADD COLUMN kind TEXT", table))
+		if err != nil {
+			log.Fatalf("Failed to add kind column to %s: %v", table, err)
+		}
+	}
+
+	_, err := db.Exec(fmt.Sprintf(
+		"UPDATE %s SET kind = '%s' WHERE kind IS NULL OR TRIM(CAST(kind AS VARCHAR)) = ''",
+		table,
+		StandardExpenditureKindID(),
+	))
+	if err != nil {
+		log.Fatalf("Failed to backfill kind column on %s: %v", table, err)
+	}
+}
 
 // create pocketbase_uid column that references the pocketbase_uid column in Profiles.parquet
 // create pocketbase_tsid column that references the pocketbase_id column in TimeSheets.parquet
@@ -34,6 +59,7 @@ func augmentExpenses() {
 	if err != nil {
 		log.Fatalf("Failed to load Expenses.parquet: %v", err)
 	}
+	ensureKindColumnWithDefault(db, "expenses")
 	_, err = db.Exec("CREATE TABLE categories AS SELECT * FROM read_parquet('parquet/Categories.parquet')")
 	if err != nil {
 		log.Fatalf("Failed to load Categories.parquet: %v", err)

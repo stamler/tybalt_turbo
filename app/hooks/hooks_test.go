@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase/core"
@@ -15,6 +16,14 @@ import (
 var timeEntriesCollection = core.NewBaseCollection("time_entries")
 
 func buildRecordFromMap(collection *core.Collection, m map[string]any) *core.Record {
+	if collection != nil {
+		switch collection.Name {
+		case "expenses", "purchase_orders":
+			if _, exists := m["kind"]; !exists {
+				m["kind"] = utilities.DefaultExpenditureKindID()
+			}
+		}
+	}
 	record := core.NewRecord(collection)
 	record.Load(m)
 	return record

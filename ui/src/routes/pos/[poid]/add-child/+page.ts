@@ -16,14 +16,25 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     throw error(404, "Parent PO not found");
   }
 
-  // Fetch approvers using the new API endpoints
-  const approvers = await pb.send(`/api/purchase_orders/approvers/${parentPo.division}/0`, {
+  // Fetch approvers using GET query params.
+  const queryParams = new URLSearchParams({
+    division: parentPo.division,
+    amount: "0",
+    kind: parentPo.kind || "",
+    has_job: String(!!parentPo.job),
+    type: "Normal",
+    start_date: parentPo.date || "",
+    end_date: "",
+    frequency: "",
+  });
+
+  const approvers = await pb.send(`/api/purchase_orders/approvers?${queryParams.toString()}`, {
     method: "GET",
   });
 
   // Fetch second approvers
   const secondApprovers = await pb.send(
-    `/api/purchase_orders/second_approvers/${parentPo.division}/0`,
+    `/api/purchase_orders/second_approvers?${queryParams.toString()}`,
     {
       method: "GET",
     },
@@ -46,6 +57,7 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     vendor: parentPo.vendor,
     job: parentPo.job,
     category: parentPo.category,
+    kind: parentPo.kind || "",
     approver: "",
     attachment: "",
   };

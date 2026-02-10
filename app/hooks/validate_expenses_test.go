@@ -4,6 +4,7 @@ import (
 	"testing"
 	"tybalt/constants"
 	"tybalt/errs"
+	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase/core"
@@ -22,6 +23,9 @@ func TestValidateExpense(t *testing.T) {
 		t.Fatalf("failed to init test app: %v", err)
 	}
 	defer app.Cleanup()
+	if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
+		t.Fatalf("failed to load expenditure kinds config: %v", err)
+	}
 	// Test cases
 	tests := map[string]struct {
 		valid                 bool
@@ -211,6 +215,7 @@ func TestValidateExpense_RejectsClosedJob(t *testing.T) {
 	rec.Set("allowance_types", []string{})
 	rec.Set("job", "zke3cs3yipplwtu")
 	rec.Set("payment_type", "Mileage") // avoid attachment/PO requirement
+	rec.Set("kind", utilities.DefaultExpenditureKindID())
 	rec.Set("distance", 10.0)
 	rec.Set("date", "2024-01-22")
 	rec.Set("description", "Valid description")

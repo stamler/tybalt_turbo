@@ -18,6 +18,17 @@ import (
 //go:embed pending_pos.sql
 var pendingPOsQuery string
 
+type poApproversRequest struct {
+	Division  string  `json:"division"`
+	Amount    float64 `json:"amount"`
+	Kind      string  `json:"kind"`
+	HasJob    bool    `json:"has_job"`
+	Type      string  `json:"type"`
+	StartDate string  `json:"start_date"`
+	EndDate   string  `json:"end_date"`
+	Frequency string  `json:"frequency"`
+}
+
 func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		id := e.Request.PathValue("id")
@@ -812,7 +823,18 @@ func GeneratePONumber(txApp core.App, record *core.Record, testDateComponents ..
 */
 
 func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool, error) {
-	approvers, _, err := utilities.GetPOApprovers(txApp, nil, po.GetString("division"), po.GetFloat("approval_total"), false)
+	kindID := po.GetString("kind")
+	hasJob := po.GetString("job") != ""
+
+	approvers, _, err := utilities.GetPOApprovers(
+		txApp,
+		nil,
+		po.GetString("division"),
+		po.GetFloat("approval_total"),
+		kindID,
+		hasJob,
+		false,
+	)
 	if err != nil {
 		return false, false, &CodeError{
 			Code:    "error_fetching_approvers",
@@ -820,7 +842,15 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 		}
 	}
 
-	secondApprovers, _, err := utilities.GetPOApprovers(txApp, nil, po.GetString("division"), po.GetFloat("approval_total"), true)
+	secondApprovers, _, err := utilities.GetPOApprovers(
+		txApp,
+		nil,
+		po.GetString("division"),
+		po.GetFloat("approval_total"),
+		kindID,
+		hasJob,
+		true,
+	)
 	if err != nil {
 		return false, false, &CodeError{
 			Code:    "error_fetching_approvers",
@@ -848,38 +878,85 @@ func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool,
 	return callerIsApprover, callerIsQualifiedSecondApprover, nil
 }
 
-// GetApprovers returns a list of users who can approve a purchase order of the
-// given amount and division. If the current user has approver claims, an empty
-// list is returned (UI will auto-set to self). Results are filtered to
-// approvers with permission for the specified division (empty divisions
-// property on the po_approver_props record means all divisions, otherwise
-// division must be in divisions property). If forSecondApproval is true, the
-// function returns a list of users who can second-approve a purchase order of
-// the given amount and division unless the amount is below tier 1 or the
-// current user has the appropriate claim for the required tier. In this case,
-// an empty list is returned. Results are filtered to approvers with permission
-// for the specified division (empty divisions property on the po_approver_props
-// record means all divisions, otherwise division must be in divisions
-// property).
+func parseApproversRequest(e *core.RequestEvent) (poApproversRequest, error) {
+	req := poApproversRequest{
+		Kind: utilities.DefaultExpenditureKindID(),
+	}
+	q := e.Request.URL.Query()
+	req.Division = q.Get("division")
+	amountStr := q.Get("amount")
+	amount, err := strconv.ParseFloat(amountStr, 64)
+	if err != nil {
+		return req, fmt.Errorf("invalid amount")
+	}
+	req.Amount = amount
+	req.Type = q.Get("type")
+	req.StartDate = q.Get("start_date")
+	req.EndDate = q.Get("end_date")
+	req.Frequency = q.Get("frequency")
+	if kind := strings.TrimSpace(q.Get("kind")); kind != "" {
+		req.Kind = kind
+	}
+	if hasJobRaw := strings.TrimSpace(q.Get("has_job")); hasJobRaw != "" {
+		parsedHasJob, parseErr := strconv.ParseBool(hasJobRaw)
+		if parseErr != nil {
+			return req, fmt.Errorf("invalid has_job")
+		}
+		req.HasJob = parsedHasJob
+	}
+
+	return req, nil
+}
+
+// createGetApproversHandler returns first- or second-approver candidates.
 func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
 
-		// Get the division and amount parameters
-		division := e.Request.PathValue("division")
-		amountStr := e.Request.PathValue("amount")
-		amount, err := strconv.ParseFloat(amountStr, 64)
+		req, err := parseApproversRequest(e)
 		if err != nil {
-			return e.JSON(http.StatusBadRequest, map[string]string{
-				"code":    "invalid_amount",
-				"message": "Amount must be a valid number",
-			})
+			switch err.Error() {
+			case "invalid amount":
+				return e.JSON(http.StatusBadRequest, map[string]string{
+					"code":    "invalid_amount",
+					"message": "Amount must be a valid number",
+				})
+			case "invalid has_job":
+				return e.JSON(http.StatusBadRequest, map[string]string{
+					"code":    "invalid_has_job",
+					"message": "has_job must be a valid boolean",
+				})
+			default:
+				return e.JSON(http.StatusBadRequest, map[string]string{
+					"code":    "invalid_request_query",
+					"message": "request query must be valid",
+				})
+			}
 		}
 
+		if strings.TrimSpace(req.Division) == "" {
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "invalid_division",
+				"message": "division is required",
+			})
+		}
+		if strings.TrimSpace(req.Kind) == "" {
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "invalid_kind",
+				"message": "kind is required",
+			})
+		}
+		req.Kind = utilities.NormalizeExpenditureKindID(req.Kind)
+
 		// Check for recurring purchase order query parameters and calculate the total value if necessary
-		poType := e.Request.URL.Query().Get("type")
-		if poType == "Recurring" {
-			amount, err = calculateRecurringPurchaseOrderTotalValue(app, amount, e.Request.URL.Query().Get("start_date"), e.Request.URL.Query().Get("end_date"), e.Request.URL.Query().Get("frequency"))
+		if req.Type == "Recurring" {
+			req.Amount, err = calculateRecurringPurchaseOrderTotalValue(
+				app,
+				req.Amount,
+				req.StartDate,
+				req.EndDate,
+				req.Frequency,
+			)
 			if err != nil {
 				return e.JSON(http.StatusBadRequest, map[string]string{
 					"code":    "invalid_parameters",
@@ -888,7 +965,15 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 			}
 		}
 
-		approvers, _, err := utilities.GetPOApprovers(app, auth, division, amount, forSecondApproval)
+		approvers, _, err := utilities.GetPOApprovers(
+			app,
+			auth,
+			req.Division,
+			req.Amount,
+			req.Kind,
+			req.HasJob,
+			forSecondApproval,
+		)
 		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_approvers",

@@ -15,6 +15,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     vendor: "",
     job: "",
     category: "",
+    kind: "",
     // approver is configured as not required in pocketbase so we do not have to
     // set it here, but is set by the server side hook
   };
@@ -32,6 +33,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     defaultItem.vendor = result.vendor ?? "";
     defaultItem.job = result.job ?? "";
     defaultItem.category = result.category ?? "";
+    defaultItem.kind = result.kind ?? "";
   }
 
   return { item: { ...defaultItem } as ExpensesRecord, editing: false, id: null };

@@ -3,6 +3,7 @@ package hooks
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	"tybalt/constants"
 	"tybalt/errs"
@@ -142,6 +143,43 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 				"purchase_order": {
 					Code:    "missing_purchase_order",
 					Message: "an expense against a purchase_orders record cannot be validated without a corresponding purchase order record",
+				},
+			},
+		}
+	}
+
+	kindID := strings.TrimSpace(expenseRecord.GetString("kind"))
+	if kindID == "" {
+		// Backward compatibility for legacy records created before kind existed.
+		// Keep create-time enforcement strict while allowing updates to old rows.
+		if !expenseRecord.IsNew() {
+			original := expenseRecord.Original()
+			if original != nil && strings.TrimSpace(original.GetString("kind")) == "" {
+				kindID = utilities.DefaultExpenditureKindID()
+				expenseRecord.Set("kind", kindID)
+			}
+		}
+	}
+	if kindID == "" {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating expense",
+			Data: map[string]errs.CodeError{
+				"kind": {
+					Code:    "required",
+					Message: "kind is required",
+				},
+			},
+		}
+	}
+	if _, err := app.FindRecordById("expenditure_kinds", kindID); err != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating expense",
+			Data: map[string]errs.CodeError{
+				"kind": {
+					Code:    "not_found",
+					Message: "invalid expenditure kind",
 				},
 			},
 		}

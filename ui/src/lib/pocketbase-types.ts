@@ -284,6 +284,15 @@ export type DivisionsRecord = {
   updated: IsoDateString;
 };
 
+export type ExpenditureKindsRecord = {
+  created: IsoDateString;
+  description: string;
+  en_ui_label: string;
+  id: string;
+  name: string;
+  updated: IsoDateString;
+};
+
 export enum ExpenseAllowanceTotalsPaymentTypeOptions {
   "OnAccount" = "OnAccount",
   "Expense" = "Expense",
@@ -363,6 +372,7 @@ export type ExpensesRecord = {
   attachment_hash: string;
   branch: RecordIdString;
   category: RecordIdString;
+  kind: RecordIdString;
   cc_last_4_digits: string;
   committed: IsoDateString;
   committed_week_ending: string;
@@ -411,6 +421,7 @@ export type ExpensesAugmentedRecord = {
   attachment: string;
   category: RecordIdString;
   category_name: string;
+  kind: RecordIdString;
   cc_last_4_digits: string;
   client_name: string;
   committed: IsoDateString;
@@ -555,10 +566,15 @@ export type PoApprovalThresholdsRecord = {
 };
 
 export type PoApproverPropsRecord = {
+  computer_max: number;
   created: IsoDateString;
   divisions: RecordIdString[];
   id: string;
+  media_and_event_max: number;
   max_amount: number;
+  project_max: number;
+  sponsorship_max: number;
+  staff_and_social_max: number;
   updated: IsoDateString;
   user_claim: RecordIdString;
 };
@@ -635,6 +651,7 @@ export type PurchaseOrdersRecord = {
   frequency: PurchaseOrdersFrequencyOptions;
   id: string;
   job: RecordIdString;
+  kind: RecordIdString;
   parent_po: RecordIdString;
   payment_type: PurchaseOrdersPaymentTypeOptions;
   po_number: string;
@@ -704,6 +721,7 @@ export type PurchaseOrdersAugmentedRecord = {
   job: RecordIdString;
   job_description: string;
   job_number: string;
+  kind: RecordIdString;
   lower_threshold: number;
   parent_po: RecordIdString;
   parent_po_number: string;
@@ -1036,6 +1054,8 @@ export type ClientsResponse<Texpand = unknown> = Required<ClientsRecord> &
   BaseSystemFields<Texpand>;
 export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
   BaseSystemFields<Texpand>;
+export type ExpenditureKindsResponse<Texpand = unknown> = Required<ExpenditureKindsRecord> &
+  BaseSystemFields<Texpand>;
 export type ExpenseAllowanceTotalsResponse<Texpand = unknown> =
   Required<ExpenseAllowanceTotalsRecord> & BaseSystemFields<Texpand>;
 export type ExpenseMileageTotalsResponse<Texpand = unknown> = Required<ExpenseMileageTotalsRecord> &
@@ -1126,6 +1146,7 @@ export type CollectionRecords = {
   client_notes: ClientNotesRecord;
   clients: ClientsRecord;
   divisions: DivisionsRecord;
+  expenditure_kinds: ExpenditureKindsRecord;
   expense_allowance_totals: ExpenseAllowanceTotalsRecord;
   expense_mileage_totals: ExpenseMileageTotalsRecord;
   expense_rates: ExpenseRatesRecord;
@@ -1178,6 +1199,7 @@ export type CollectionResponses = {
   client_notes: ClientNotesResponse;
   clients: ClientsResponse;
   divisions: DivisionsResponse;
+  expenditure_kinds: ExpenditureKindsResponse;
   expense_allowance_totals: ExpenseAllowanceTotalsResponse;
   expense_mileage_totals: ExpenseMileageTotalsResponse;
   expense_rates: ExpenseRatesResponse;

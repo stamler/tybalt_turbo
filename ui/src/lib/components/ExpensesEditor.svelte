@@ -10,7 +10,11 @@
   import { divisions } from "$lib/stores/divisions";
   import { goto } from "$app/navigation";
   import type { ExpensesPageData } from "$lib/svelte-types";
-  import type { CategoriesResponse, ExpensesAllowanceTypesOptions } from "$lib/pocketbase-types";
+  import type {
+    CategoriesResponse,
+    ExpenditureKindsResponse,
+    ExpensesAllowanceTypesOptions,
+  } from "$lib/pocketbase-types";
   import { isExpensesResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import CumulativePOOverflowModal from "./CumulativePOOverflowModal.svelte";
@@ -31,6 +35,17 @@
   let overflowModal: CumulativePOOverflowModal;
 
   let categories = $state([] as CategoriesResponse[]);
+  let expenditureKinds = $state([] as ExpenditureKindsResponse[]);
+  let loadedKinds = $state(false);
+
+  const selectedKindLabel = $derived.by(() => {
+    if (!item.purchase_order) {
+      return expenditureKinds.find((k) => k.name === "standard")?.en_ui_label ?? "Unknown";
+    }
+    const match = expenditureKinds.find((k) => k.id === item.kind);
+    if (!match) return "Unknown";
+    return match.en_ui_label;
+  });
 
   // create a local state object to hold the allowance types
   const allowanceTypes = $state({
@@ -50,9 +65,23 @@
   // Default division from caller's profile if creating and empty
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
 
+  // Load expenditure kinds once to resolve stored kind IDs into labels.
+  $effect(() => {
+    if (loadedKinds) return;
+    loadedKinds = true;
+    pb.collection("expenditure_kinds")
+      .getFullList<ExpenditureKindsResponse>({ sort: "name" })
+      .then((rows) => {
+        expenditureKinds = rows;
+      })
+      .catch((error) => {
+        console.error("Error loading expenditure kinds:", error);
+      });
+  });
+
   async function save(event: Event) {
     event.preventDefault();
-    item.uid = $authStore?.model?.id;
+    item.uid = $authStore?.model?.id ?? "";
 
     // set a dummy value for week_ending to satisfy the schema non-empty
     // requirement. This will be changed in the backend to the correct
@@ -63,7 +92,6 @@
     if (item.job === "") {
       item.category = "";
     }
-
     // if the payment_type is not CorporateCreditCard, then the cc_last_4_digits
     // should be empty
     if (item.payment_type !== "CorporateCreditCard") {
@@ -134,6 +162,16 @@
       <DsLabel color="cyan">PO {item.expand.purchase_order.po_number}</DsLabel>
     </span>
   {/if}
+
+  <div class="flex w-full flex-col gap-1 {errors.kind !== undefined ? 'bg-red-200' : ''}">
+    <div class="flex items-center gap-3">
+      <label for="expense-kind">Kind</label>
+      <DsLabel color="cyan">{selectedKindLabel}</DsLabel>
+    </div>
+    {#if errors.kind !== undefined}
+      <span class="text-red-600">{errors.kind.message}</span>
+    {/if}
+  </div>
 
   {#if $divisions.index !== null}
     <DsAutoComplete

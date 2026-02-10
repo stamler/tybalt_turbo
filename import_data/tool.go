@@ -28,10 +28,20 @@ import (
 var expenseCollectionId = "o1vpz1mm7qsfoyy"
 var targetDatabase = "../app/test_pb_data/data.db"
 
+// defaultExpenditureKindID is set at startup from the target DB (name 'standard'); used by normalizeExpenditureKindID during import.
+var defaultExpenditureKindID string
+
 // expenseImportedFalseCount controls how many expenses are imported with _imported=false
 // (triggering writeback to Firebase) during --import --expenses. Set to 0 for production
 // (all _imported=true), or a positive number for testing writeback with a subset.
 const expenseImportedFalseCount = 0
+
+func normalizeExpenditureKindID(kind string) string {
+	if strings.TrimSpace(kind) == "" {
+		return defaultExpenditureKindID
+	}
+	return kind
+}
 
 // This file is used to run either an export or an import.
 
@@ -69,6 +79,9 @@ func main() {
 
 	// Use the database path from the flag
 	targetDatabase = *dbFlag
+
+	// Resolve default expenditure kind ID from target DB (for import normalize and for extract when running export)
+	defaultExpenditureKindID = extract.GetStandardExpenditureKindID(targetDatabase)
 
 	if *initFlag {
 		fmt.Println("This will overwrite any existing data in app/pb_data/data.db.")
@@ -906,6 +919,7 @@ func main() {
 				job,
 				division,
 				category,
+				kind,
 				parent_po,
 				branch,
 				attachment,
@@ -941,6 +955,7 @@ func main() {
 				{:job},
 				{:division},
 				{:category},
+				{:kind},
 				{:parent_po},
 				{:branch},
 				{:attachment},
@@ -1009,6 +1024,7 @@ func main() {
 						"job":                      item.Job,
 						"division":                 item.Division,
 						"category":                 item.Category, // PocketBase ID, may be empty
+						"kind":                     normalizeExpenditureKindID(item.Kind),
 						"parent_po":                item.ParentPo, // PocketBase ID, may be empty
 						"branch":                   item.Branch,   // PocketBase ID, may be empty
 						"attachment":               item.Attachment,
@@ -1032,6 +1048,7 @@ func main() {
 			division,
 			job,
 			category,
+			kind,
 			date,
 			pay_period_ending,
 			description,
@@ -1057,6 +1074,7 @@ func main() {
 			{:division},
 			{:job},
 			{:category},
+			{:kind},
 			{:date},
 			{:pay_period_ending},
 			{:description},
@@ -1119,6 +1137,7 @@ func main() {
 					"division":          item.Division,
 					"job":               item.Job,
 					"category":          item.Category,
+					"kind":              normalizeExpenditureKindID(item.Kind),
 					"date":              item.Date,
 					"pay_period_ending": item.PayPeriodEnding,
 					"description":       item.Description,

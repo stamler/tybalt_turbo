@@ -23,6 +23,7 @@ SELECT
   po.cancelled,
   po.job,
   po.category,
+  po.kind,
   po.vendor,
   po.parent_po,
   po.created,
@@ -62,6 +63,7 @@ LEFT JOIN jobs AS j ON po.job = j.id
 LEFT JOIN divisions AS d ON po.division = d.id
 LEFT JOIN categories AS c ON po.category = c.id
 LEFT JOIN clients AS cl ON j.client = cl.id
+LEFT JOIN expenditure_kinds AS ek ON po.kind = ek.id
 WHERE
   po.status = 'Unapproved' AND po.rejected = '' AND (
     -- Block 1: First-approval candidates
@@ -114,8 +116,28 @@ WHERE
               SELECT 1 FROM JSON_EACH(pap.divisions) WHERE value = po.division
             )
           )
-          AND pap.max_amount >= po.approval_total
-          AND pap.max_amount <= COALESCE((SELECT MIN(threshold) FROM po_approval_thresholds WHERE threshold >= po.approval_total), 1000000)
+          AND (
+            CASE
+              WHEN COALESCE(ek.name, 'standard') = 'standard' AND po.job != '' THEN COALESCE(pap.project_max, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'standard' THEN COALESCE(pap.max_amount, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'sponsorship' THEN COALESCE(pap.sponsorship_max, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'staff_and_social' THEN COALESCE(pap.staff_and_social_max, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'media_and_event' THEN COALESCE(pap.media_and_event_max, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'computer' THEN COALESCE(pap.computer_max, 0)
+              ELSE 0
+            END
+          ) >= po.approval_total
+          AND (
+            CASE
+              WHEN COALESCE(ek.name, 'standard') = 'standard' AND po.job != '' THEN COALESCE(pap.project_max, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'standard' THEN COALESCE(pap.max_amount, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'sponsorship' THEN COALESCE(pap.sponsorship_max, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'staff_and_social' THEN COALESCE(pap.staff_and_social_max, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'media_and_event' THEN COALESCE(pap.media_and_event_max, 0)
+              WHEN COALESCE(ek.name, 'standard') = 'computer' THEN COALESCE(pap.computer_max, 0)
+              ELSE 0
+            END
+          ) <= COALESCE((SELECT MIN(threshold) FROM po_approval_thresholds WHERE threshold >= po.approval_total), 1000000)
       )
     )
   )

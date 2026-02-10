@@ -51,6 +51,7 @@ type ExpensesAugmentedRow struct {
 	Approved            string  `db:"approved" json:"approved"`
 	Job                 string  `db:"job" json:"job"`
 	Category            string  `db:"category" json:"category"`
+	Kind                string  `db:"kind" json:"kind"`
 	PayPeriodEnding     string  `db:"pay_period_ending" json:"pay_period_ending"`
 	AllowanceTypes      string  `db:"allowance_types" json:"allowance_types"`
 	Submitted           bool    `db:"submitted" json:"submitted"`
@@ -64,6 +65,7 @@ type ExpensesAugmentedRow struct {
 	PurchaseOrderNumber string  `db:"purchase_order_number" json:"purchase_order_number"`
 	ClientName          string  `db:"client_name" json:"client_name"`
 	CategoryName        string  `db:"category_name" json:"category_name"`
+	KindName            string  `db:"kind_name" json:"kind_name"`
 	JobNumber           string  `db:"job_number" json:"job_number"`
 	JobDescription      string  `db:"job_description" json:"job_description"`
 	DivisionName        string  `db:"division_name" json:"division_name"`

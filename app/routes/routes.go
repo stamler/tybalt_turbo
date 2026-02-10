@@ -50,6 +50,9 @@ func AddRoutes(app core.App) {
 
 	// Add the bundle timesheet route
 	app.OnServe().BindFunc(func(se *core.ServeEvent) error {
+		if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
+			return err
+		}
 
 		// Version endpoint - publicly accessible
 		se.Router.GET("/api/version", func(e *core.RequestEvent) error {
@@ -147,8 +150,8 @@ func AddRoutes(app core.App) {
 		poGroup := se.Router.Group("/api/purchase_orders")
 		poGroup.Bind(apis.RequireAuth("users"))
 		poGroup.GET("/pending", createGetPendingPurchaseOrdersHandler(app))
-		poGroup.GET("/approvers/{division}/{amount}", createGetApproversHandler(app, false))
-		poGroup.GET("/second_approvers/{division}/{amount}", createGetApproversHandler(app, true))
+		poGroup.GET("/approvers", createGetApproversHandler(app, false))
+		poGroup.GET("/second_approvers", createGetApproversHandler(app, true))
 
 		// PO mutation routes are gated on expenses editing via middleware
 		poMutations := se.Router.Group("/api/purchase_orders")

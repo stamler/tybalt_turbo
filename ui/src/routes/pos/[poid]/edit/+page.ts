@@ -26,6 +26,7 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     vendor: "",
     job: "",
     category: "",
+    kind: "",
     // approver is configured as not required in pocketbase so we do not have to
     // set it here, but is set by the server side hook
   };
@@ -34,27 +35,28 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     // Fetch the purchase order
     const item = await pb.collection("purchase_orders").getOne(params.poid);
 
-    // Fetch approvers using the new API endpoints
-    const approvers = await pb.send(
-      `/api/purchase_orders/approvers/${item.division}/${item.total}`,
-      {
-        method: "GET",
-      },
-    );
+    // Fetch approvers using GET query params.
+    const queryParams = new URLSearchParams({
+      division: item.division,
+      amount: String(item.total),
+      kind: item.kind || "",
+      has_job: String(!!item.job),
+      type: item.type === PurchaseOrdersTypeOptions.Recurring ? "Recurring" : item.type,
+      start_date: item.date || "",
+      end_date: item.end_date || "",
+      frequency: item.frequency || "",
+    });
 
-    // Build query parameters for recurring POs
-    const queryParams = new URLSearchParams();
-    if (item.type === PurchaseOrdersTypeOptions.Recurring) {
-      queryParams.append("type", "Recurring");
-      queryParams.append("start_date", item.date || "");
-      queryParams.append("end_date", item.end_date || "");
-      queryParams.append("frequency", item.frequency || "");
-    }
+    const approvers = await pb.send(`/api/purchase_orders/approvers?${queryParams.toString()}`, {
+      method: "GET",
+    });
 
     // Fetch second approvers
     const secondApprovers = await pb.send(
-      `/api/purchase_orders/second_approvers/${item.division}/${item.total}?${queryParams.toString()}`,
-      { method: "GET" },
+      `/api/purchase_orders/second_approvers?${queryParams.toString()}`,
+      {
+        method: "GET",
+      },
     );
 
     return {

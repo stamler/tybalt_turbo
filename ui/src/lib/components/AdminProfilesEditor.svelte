@@ -44,6 +44,21 @@
   const initialPoApproverMaxAmount = untrack(() =>
     normalizeNumber((data.item as any)?.po_approver_max_amount),
   );
+  const initialPoApproverProjectMax = untrack(() =>
+    normalizeNumber((data.item as any)?.po_approver_project_max),
+  );
+  const initialPoApproverSponsorshipMax = untrack(() =>
+    normalizeNumber((data.item as any)?.po_approver_sponsorship_max),
+  );
+  const initialPoApproverStaffAndSocialMax = untrack(() =>
+    normalizeNumber((data.item as any)?.po_approver_staff_and_social_max),
+  );
+  const initialPoApproverMediaAndEventMax = untrack(() =>
+    normalizeNumber((data.item as any)?.po_approver_media_and_event_max),
+  );
+  const initialPoApproverComputerMax = untrack(() =>
+    normalizeNumber((data.item as any)?.po_approver_computer_max),
+  );
   const initialPoApproverDivisions = untrack(() =>
     normalizeDivisions((data.item as any)?.po_approver_divisions),
   );
@@ -53,7 +68,17 @@
 
   let poApproverPropsId = $state(initialPoApproverPropsId);
   let poApproverMaxAmount = $state(initialPoApproverMaxAmount);
+  let poApproverProjectMax = $state(initialPoApproverProjectMax);
+  let poApproverSponsorshipMax = $state(initialPoApproverSponsorshipMax);
+  let poApproverStaffAndSocialMax = $state(initialPoApproverStaffAndSocialMax);
+  let poApproverMediaAndEventMax = $state(initialPoApproverMediaAndEventMax);
+  let poApproverComputerMax = $state(initialPoApproverComputerMax);
   let originalApproverMaxAmount = $state(initialPoApproverMaxAmount);
+  let originalApproverProjectMax = $state(initialPoApproverProjectMax);
+  let originalApproverSponsorshipMax = $state(initialPoApproverSponsorshipMax);
+  let originalApproverStaffAndSocialMax = $state(initialPoApproverStaffAndSocialMax);
+  let originalApproverMediaAndEventMax = $state(initialPoApproverMediaAndEventMax);
+  let originalApproverComputerMax = $state(initialPoApproverComputerMax);
   let poApproverDivisions = $state(initialPoApproverDivisions);
   let originalApproverDivisions = $state([...initialPoApproverDivisions]);
   let poApproverDivisionsSearch = $state("");
@@ -124,11 +149,62 @@
 
   // divisions are loaded and indexed via the shared store
 
+  function applyLoadedPoApproverProps(props: PoApproverPropsResponse | null) {
+    if (!props) {
+      resetPoApproverPropsState();
+      return;
+    }
+    poApproverPropsId = props.id;
+    poApproverMaxAmount = normalizeNumber(props.max_amount);
+    originalApproverMaxAmount = poApproverMaxAmount;
+    poApproverProjectMax = normalizeNumber(props.project_max);
+    originalApproverProjectMax = poApproverProjectMax;
+    poApproverSponsorshipMax = normalizeNumber(props.sponsorship_max);
+    originalApproverSponsorshipMax = poApproverSponsorshipMax;
+    poApproverStaffAndSocialMax = normalizeNumber(props.staff_and_social_max);
+    originalApproverStaffAndSocialMax = poApproverStaffAndSocialMax;
+    poApproverMediaAndEventMax = normalizeNumber(props.media_and_event_max);
+    originalApproverMediaAndEventMax = poApproverMediaAndEventMax;
+    poApproverComputerMax = normalizeNumber(props.computer_max);
+    originalApproverComputerMax = poApproverComputerMax;
+    poApproverDivisions = Array.isArray(props.divisions) ? [...props.divisions] : [];
+    originalApproverDivisions = [...poApproverDivisions];
+  }
+
+  async function reloadPoApproverProps() {
+    if (!poApproverUserClaimId) {
+      applyLoadedPoApproverProps(null);
+      return;
+    }
+
+    if (poApproverPropsId) {
+      try {
+        const props = await pb
+          .collection("po_approver_props")
+          .getOne<PoApproverPropsResponse>(poApproverPropsId);
+        applyLoadedPoApproverProps(props);
+        return;
+      } catch {
+        // fall through to lookup by user_claim
+      }
+    }
+
+    try {
+      const list = await pb.collection("po_approver_props").getFullList<PoApproverPropsResponse>({
+        filter: `user_claim="${poApproverUserClaimId}"`,
+      });
+      applyLoadedPoApproverProps(list.length > 0 ? list[0] : null);
+    } catch {
+      applyLoadedPoApproverProps(null);
+    }
+  }
+
   async function reloadUserClaims() {
     if (!item?.uid) {
       originalUserClaims = [];
       stagedClaimIds = [];
       poApproverUserClaimId = null;
+      resetPoApproverPropsState();
       claimsLoaded = true;
       return;
     }
@@ -142,10 +218,12 @@
       stagedClaimIds = list.map((uc) => uc.cid);
       const poEntry = list.find((uc) => uc.expand?.cid?.name === PO_APPROVER_CLAIM_NAME);
       poApproverUserClaimId = poEntry?.id ?? poApproverUserClaimId;
+      await reloadPoApproverProps();
     } catch {
       originalUserClaims = [];
       stagedClaimIds = [];
       poApproverUserClaimId = null;
+      resetPoApproverPropsState();
     } finally {
       claimsLoaded = true;
     }
@@ -220,6 +298,9 @@
 
     if (!poApproverUserClaimId) {
       syncPoApproverUserClaimId(originalUserClaims);
+      if (poApproverUserClaimId) {
+        reloadPoApproverProps();
+      }
     }
   });
 
@@ -276,6 +357,16 @@
   function resetPoApproverPropsState() {
     poApproverMaxAmount = 0;
     originalApproverMaxAmount = 0;
+    poApproverProjectMax = 0;
+    originalApproverProjectMax = 0;
+    poApproverSponsorshipMax = 0;
+    originalApproverSponsorshipMax = 0;
+    poApproverStaffAndSocialMax = 0;
+    originalApproverStaffAndSocialMax = 0;
+    poApproverMediaAndEventMax = 0;
+    originalApproverMediaAndEventMax = 0;
+    poApproverComputerMax = 0;
+    originalApproverComputerMax = 0;
     poApproverDivisions = [];
     originalApproverDivisions = [];
     poApproverDivisionsSearch = "";
@@ -326,6 +417,15 @@
     const payload = {
       user_claim: userClaimId,
       max_amount: Number.isFinite(poApproverMaxAmount) ? poApproverMaxAmount : 0,
+      project_max: Number.isFinite(poApproverProjectMax) ? poApproverProjectMax : 0,
+      sponsorship_max: Number.isFinite(poApproverSponsorshipMax) ? poApproverSponsorshipMax : 0,
+      staff_and_social_max: Number.isFinite(poApproverStaffAndSocialMax)
+        ? poApproverStaffAndSocialMax
+        : 0,
+      media_and_event_max: Number.isFinite(poApproverMediaAndEventMax)
+        ? poApproverMediaAndEventMax
+        : 0,
+      computer_max: Number.isFinite(poApproverComputerMax) ? poApproverComputerMax : 0,
       divisions: poApproverDivisions,
     };
 
@@ -334,27 +434,32 @@
         JSON.stringify([...poApproverDivisions].sort()) !==
         JSON.stringify([...originalApproverDivisions].sort());
       const maxChanged = poApproverMaxAmount !== originalApproverMaxAmount;
+      const projectChanged = poApproverProjectMax !== originalApproverProjectMax;
+      const sponsorshipChanged = poApproverSponsorshipMax !== originalApproverSponsorshipMax;
+      const staffAndSocialChanged =
+        poApproverStaffAndSocialMax !== originalApproverStaffAndSocialMax;
+      const mediaAndEventChanged = poApproverMediaAndEventMax !== originalApproverMediaAndEventMax;
+      const computerChanged = poApproverComputerMax !== originalApproverComputerMax;
 
-      if (divisionsChanged || maxChanged) {
+      if (
+        divisionsChanged ||
+        maxChanged ||
+        projectChanged ||
+        sponsorshipChanged ||
+        staffAndSocialChanged ||
+        mediaAndEventChanged ||
+        computerChanged
+      ) {
         const updated = await pb
           .collection("po_approver_props")
           .update<PoApproverPropsResponse>(poApproverPropsId, payload);
-        poApproverMaxAmount = updated.max_amount ?? 0;
-        originalApproverMaxAmount = poApproverMaxAmount;
-        poApproverDivisions = Array.isArray(updated.divisions) ? [...updated.divisions] : [];
-        originalApproverDivisions = [...poApproverDivisions];
+        applyLoadedPoApproverProps(updated);
       }
     } else {
       const createdProps = await pb
         .collection("po_approver_props")
         .create<PoApproverPropsResponse>(payload);
-      poApproverPropsId = createdProps.id;
-      poApproverMaxAmount = createdProps.max_amount ?? 0;
-      originalApproverMaxAmount = poApproverMaxAmount;
-      poApproverDivisions = Array.isArray(createdProps.divisions)
-        ? [...createdProps.divisions]
-        : [];
-      originalApproverDivisions = [...poApproverDivisions];
+      applyLoadedPoApproverProps(createdProps);
     }
   }
 
@@ -612,7 +717,57 @@
           bind:value={poApproverMaxAmount as number}
           {errors}
           fieldName="po_approver_max_amount"
-          uiName="Max PO Approval Amount"
+          uiName="Standard (No Job) Max"
+          type="number"
+          min={0}
+          step={0.01}
+        />
+
+        <DsTextInput
+          bind:value={poApproverProjectMax as number}
+          {errors}
+          fieldName="po_approver_project_max"
+          uiName="Standard (With Job) Project Max"
+          type="number"
+          min={0}
+          step={0.01}
+        />
+
+        <DsTextInput
+          bind:value={poApproverSponsorshipMax as number}
+          {errors}
+          fieldName="po_approver_sponsorship_max"
+          uiName="Sponsorship Max"
+          type="number"
+          min={0}
+          step={0.01}
+        />
+
+        <DsTextInput
+          bind:value={poApproverStaffAndSocialMax as number}
+          {errors}
+          fieldName="po_approver_staff_and_social_max"
+          uiName="Staff and Social Max"
+          type="number"
+          min={0}
+          step={0.01}
+        />
+
+        <DsTextInput
+          bind:value={poApproverMediaAndEventMax as number}
+          {errors}
+          fieldName="po_approver_media_and_event_max"
+          uiName="Media and Event Max"
+          type="number"
+          min={0}
+          step={0.01}
+        />
+
+        <DsTextInput
+          bind:value={poApproverComputerMax as number}
+          {errors}
+          fieldName="po_approver_computer_max"
+          uiName="Computer Max"
           type="number"
           min={0}
           step={0.01}

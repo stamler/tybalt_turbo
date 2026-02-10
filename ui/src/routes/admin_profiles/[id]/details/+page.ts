@@ -9,40 +9,12 @@ import type {
 } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 
-function normalizeNumber(value: unknown): number {
-  if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-  if (typeof value === "string") {
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : 0;
-  }
-  return 0;
-}
-
-function normalizeDivisions(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((id): id is string => typeof id === "string");
-  }
-  if (typeof value === "string" && value.trim().startsWith("[")) {
-    try {
-      const parsed = JSON.parse(value);
-      if (Array.isArray(parsed)) {
-        return parsed.filter((id): id is string => typeof id === "string");
-      }
-    } catch {
-      // noop
-    }
-  }
-  return [];
-}
-
 export const load: PageLoad = async ({ params }) => {
   try {
     type AdminProfilesAugmented = AdminProfilesResponse & {
       active?: boolean;
       given_name: string;
       surname: string;
-      po_approver_max_amount?: number | string | null;
-      po_approver_divisions?: unknown;
     };
     const item = await pb
       .collection("admin_profiles_augmented")
@@ -59,20 +31,9 @@ export const load: PageLoad = async ({ params }) => {
       // noop
     }
 
-    const poApproverDivisions = normalizeDivisions(item.po_approver_divisions);
-    const poApproverProps: PoApproverPropsResponse | null =
-      item.po_approver_max_amount !== undefined || poApproverDivisions.length > 0
-        ? {
-            id: "",
-            created: "",
-            updated: "",
-            user_claim: "",
-            max_amount: normalizeNumber(item.po_approver_max_amount),
-            divisions: poApproverDivisions,
-          }
-        : null;
-
     let claims: Array<{ id: string; name: string }> = [];
+    let poApproverProps: PoApproverPropsResponse | null = null;
+    let poApproverDivisions: string[] = [];
     if (item?.uid) {
       try {
         const list = await pb.collection("user_claims").getFullList<UserClaimsResponse>({
@@ -83,6 +44,19 @@ export const load: PageLoad = async ({ params }) => {
           .map((uc) => uc.expand?.cid)
           .filter((c): c is ClaimsResponse => !!c)
           .map((c) => ({ id: c.id, name: c.name }));
+
+        const poApproverUserClaim = list.find((uc) => uc.expand?.cid?.name === "po_approver");
+        if (poApproverUserClaim?.id) {
+          const props = await pb.collection("po_approver_props").getFullList<PoApproverPropsResponse>({
+            filter: `user_claim="${poApproverUserClaim.id}"`,
+          });
+          if (props.length > 0) {
+            poApproverProps = props[0];
+            poApproverDivisions = Array.isArray(poApproverProps.divisions)
+              ? [...poApproverProps.divisions]
+              : [];
+          }
+        }
       } catch {
         // noop
       }

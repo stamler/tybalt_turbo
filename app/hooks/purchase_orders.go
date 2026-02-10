@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 	"tybalt/constants"
 	"tybalt/errs"
@@ -185,6 +186,58 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		}
 	}
 
+	kindID := strings.TrimSpace(purchaseOrderRecord.GetString("kind"))
+	if kindID == "" {
+		// Backward compatibility for legacy records created before kind existed.
+		// Keep create-time enforcement strict while allowing updates to old rows.
+		if !purchaseOrderRecord.IsNew() {
+			original := purchaseOrderRecord.Original()
+			if original != nil && strings.TrimSpace(original.GetString("kind")) == "" {
+				kindID = utilities.DefaultExpenditureKindID()
+				purchaseOrderRecord.Set("kind", kindID)
+			}
+		}
+	}
+	if kindID == "" {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating purchase order",
+			Data: map[string]errs.CodeError{
+				"kind": {
+					Code:    "required",
+					Message: "kind is required",
+				},
+			},
+		}
+	}
+
+	kindRecord, err := app.FindRecordById("expenditure_kinds", kindID)
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating purchase order",
+			Data: map[string]errs.CodeError{
+				"kind": {
+					Code:    "not_found",
+					Message: "invalid expenditure kind",
+				},
+			},
+		}
+	}
+	if strings.TrimSpace(purchaseOrderRecord.GetString("job")) != "" &&
+		kindRecord.GetString("name") != utilities.ExpenditureKindNameStandard {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating purchase order",
+			Data: map[string]errs.CodeError{
+				"kind": {
+					Code:    "invalid_kind_for_job",
+					Message: "kind must be standard when job is set",
+				},
+			},
+		}
+	}
+
 	// If a vendor is provided, ensure it exists and is Active
 	if vendorId := purchaseOrderRecord.GetString("vendor"); vendorId != "" {
 		vendorRecord, err := app.FindRecordById("vendors", vendorId)
@@ -315,9 +368,16 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		}
 
 		// Validate fields match parent PO
-		fieldsToMatch := []string{"job", "payment_type", "category", "description", "vendor"}
+		fieldsToMatch := []string{"job", "payment_type", "category", "description", "vendor", "kind"}
 		for _, field := range fieldsToMatch {
-			if purchaseOrderRecord.GetString(field) != parentPO.GetString(field) {
+			childValue := purchaseOrderRecord.GetString(field)
+			parentValue := parentPO.GetString(field)
+			if field == "kind" {
+				// Legacy parent records may have empty kind; treat as standard.
+				childValue = utilities.NormalizeExpenditureKindID(childValue)
+				parentValue = utilities.NormalizeExpenditureKindID(parentValue)
+			}
+			if childValue != parentValue {
 				return &errs.HookError{
 					Status:  http.StatusBadRequest,
 					Message: "hook error when validating parent PO",
@@ -387,7 +447,15 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				division := purchaseOrderRecord.GetString("division")
 
 				// Get list of eligible second approvers
-				approvers, _, err := utilities.GetPOApprovers(app, nil, division, purchaseOrderRecord.GetFloat("approval_total"), true)
+				approvers, _, err := utilities.GetPOApprovers(
+					app,
+					nil,
+					division,
+					purchaseOrderRecord.GetFloat("approval_total"),
+					purchaseOrderRecord.GetString("kind"),
+					purchaseOrderRecord.GetString("job") != "",
+					true,
+				)
 				if err != nil {
 					return &errs.HookError{
 						Status:  http.StatusInternalServerError,

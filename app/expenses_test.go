@@ -19,6 +19,12 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
+func ensureDefaultExpenditureKind(payload map[string]any) {
+	if _, exists := payload["kind"]; !exists {
+		payload["kind"] = utilities.DefaultExpenditureKindID()
+	}
+}
+
 func TestExpensesCreate(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
 	if err != nil {
@@ -31,6 +37,7 @@ func TestExpensesCreate(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultExpenditureKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -117,16 +124,17 @@ func TestExpensesCreate(t *testing.T) {
 			// With allowance_types ["Breakfast","Dinner"], total should be 20+30=50.
 			// Vendor is always cleared for Allowance by the cleanExpense hook and
 			// description is set to "Allowance for Breakfast, Dinner".
-			body := strings.NewReader(`{
+			body := strings.NewReader(fmt.Sprintf(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2025-01-10",
 				"division": "vccd5fo56ctbigh",
+				"kind": %q,
 				"payment_type": "Allowance",
 				"allowance_types": ["Breakfast", "Dinner"],
 				"total": 0,
 				"vendor": "2zqxtsmymf670ha",
 				"description": "This will be overwritten"
-			}`)
+			}`, utilities.DefaultExpenditureKindID()))
 			return tests.ApiScenario{
 				Name:           "valid allowance expense calculates total, clears vendor, and sets description",
 				Method:         http.MethodPost,
@@ -140,6 +148,31 @@ func TestExpensesCreate(t *testing.T) {
 					"\"total\":50",
 					"\"vendor\":\"\"",
 					"Allowance for Breakfast, Dinner",
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			// No-PO expenses should be forced to the standard kind by the hook.
+			body := strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2025-01-10",
+				"division": "vccd5fo56ctbigh",
+				"payment_type": "Allowance",
+				"allowance_types": ["Breakfast"],
+				"total": 0,
+				"description": "ignored for allowance"
+			}`)
+			return tests.ApiScenario{
+				Name:           "no-po create without kind is set to standard kind",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           body,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					fmt.Sprintf(`"kind":"%s"`, utilities.DefaultExpenditureKindID()),
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
@@ -981,6 +1014,7 @@ func TestExpensesUpdate(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultExpenditureKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1818,6 +1852,7 @@ func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultExpenditureKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1870,6 +1905,7 @@ func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
 			record.Set("description", "existing expense with attachment")
 			record.Set("pay_period_ending", "2024-08-10")
 			record.Set("payment_type", "Expense")
+			record.Set("kind", utilities.DefaultExpenditureKindID())
 			record.Set("total", 50)
 			record.Set("vendor", "2zqxtsmymf670ha")
 			record.Set("approver", "f2j5a8vk006baub")
@@ -1915,6 +1951,7 @@ func TestExpensesUpdate_DuplicateAttachmentFails(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultExpenditureKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1966,6 +2003,7 @@ func TestExpensesUpdate_DuplicateAttachmentFails(t *testing.T) {
 			record.Set("description", "expense with attachment for update test")
 			record.Set("pay_period_ending", "2024-08-10")
 			record.Set("payment_type", "Expense")
+			record.Set("kind", utilities.DefaultExpenditureKindID())
 			record.Set("total", 50)
 			record.Set("vendor", "2zqxtsmymf670ha")
 			record.Set("approver", "etysnrlup2f6bak")
@@ -2009,6 +2047,7 @@ func TestExpensesUpdate_SameAttachmentSucceeds(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultExpenditureKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -2094,6 +2133,7 @@ func TestExpensesCreate_InactiveApproverFails(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultExpenditureKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {

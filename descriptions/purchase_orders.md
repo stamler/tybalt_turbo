@@ -9,6 +9,48 @@
 | Cumulative | Valid for an unlimited number of expenses where sum of values does not exceed specified value | Yes, if status is Active and > 0 expenses associated                 | Yes, by payables_admin if no expenses are associated             | When the maximum amount is reached      | No                                                                            | Based on approval_total (same as total)               |
 |            |                                                                                               | createClosePurchaseOrderHandler (app/routes/close_purchase_order.go) | createCancelPurchaseOrderHandler (app/routes/purchase_orders.go) | n/a (handled in expense processing)     | createConvertToCumulativePurchaseOrderHandler (app/routes/purchase_orders.go) | getSecondApproverClaim (app/hooks/purchase_orders.go) |
 
+## Expenditure Kinds
+
+Every purchase order has a `kind` field that references the `expenditure_kinds` collection. The kind classifies the nature of the expenditure and determines which approval limit column is used for second-approval qualification.
+
+### Available Kinds
+
+| Kind Name          | `po_approver_props` limit column (no job) | `po_approver_props` limit column (with job) | Description                           |
+| ------------------ | ----------------------------------------- | ------------------------------------------- | ------------------------------------- |
+| `standard`         | `max_amount`                              | `project_max`                               | Default kind for general expenditures |
+| `sponsorship`      | `sponsorship_max`                         | `sponsorship_max`                           | Sponsorship-related expenditures      |
+| `staff_and_social` | `staff_and_social_max`                    | `staff_and_social_max`                      | Staff and social expenditures         |
+| `media_and_event`  | `media_and_event_max`                     | `media_and_event_max`                       | Media and event expenditures          |
+| `computer`         | `computer_max`                            | `computer_max`                              | Computer/IT expenditures              |
+
+The `standard` kind is the only kind that differentiates between job-present and no-job scenarios (using `project_max` vs `max_amount` respectively). All other kinds use the same limit column regardless of whether a job is attached.
+
+### How Kind Affects Approval
+
+The kind determines which `po_approver_props` limit column is checked when evaluating second-approval eligibility. The resolution logic is implemented in `ResolvePOApproverLimitColumn` (`app/utilities/expenditure_kinds.go`).
+
+### Kind on Expenses
+
+- Expenses linked to a purchase order **inherit** the PO's kind automatically. The kind is not user-editable on PO-linked expenses.
+- Expenses without a purchase order (standalone/no-PO expenses) are always forced to the `standard` kind by the `cleanExpense` hook.
+
+### Kind Validation
+
+- `kind` is required on new purchase orders and new expenses.
+- For expenses, clients do not typically need to provide `kind`: the server derives it (`cleanExpense` forces `standard` for no-PO expenses, and `ProcessExpense` overwrites it from the linked PO when a purchase order is present).
+- The referenced `expenditure_kinds` record must exist.
+- Legacy records (created before kind existed) with an empty kind are silently upgraded to `standard` when updated.
+- Child POs must have the same kind as their parent (with normalization for legacy parents that have an empty kind).
+
+### Kind Configuration Validation
+
+At server startup (`app/routes/routes.go` → `ValidateExpenditureKindsConfig`), the system verifies:
+
+1. All expected kind names exist in the `expenditure_kinds` collection
+2. All expected limit columns exist on the `po_approver_props` table
+
+The name↔ID mappings are cached at startup and used throughout the application.
+
 ## Approval Total
 
 The `approval_total` field determines which approval tier a purchase order falls into and whether second approval is required. It is calculated automatically when a purchase order is created or updated.
@@ -25,7 +67,7 @@ The `approval_total` field determines which approval tier a purchase order falls
 
 For Recurring purchase orders, the number of occurrences is calculated based on the date range and frequency:
 
-```
+```go
 occurrences = floor(days_between_start_and_end / frequency_days)
 approval_total = total × occurrences
 ```
@@ -51,7 +93,7 @@ This ensures the approval tier reflects the total financial commitment over the 
 ### How approval_total is Used
 
 1. **Determining if second approval is required:** If approval_total > lowest threshold in `po_approval_thresholds`, second approval is required
-2. **Determining which second approvers are qualified:** Only users whose `po_approver_props.max_amount` >= approval_total (and <= the tier ceiling) can perform second approval
+2. **Determining which second approvers are qualified:** Only users whose kind-specific `po_approver_props` limit column value >= approval_total (and <= the tier ceiling) can perform second approval. See [Expenditure Kinds](#expenditure-kinds) for which column is used.
 3. **Clearing priority_second_approver:** If approval_total <= lowest threshold, the priority_second_approver field is automatically cleared since second approval is not needed
 
 ## Approvals
@@ -76,14 +118,25 @@ Purchase orders with an approval_total greater than the lowest threshold require
 
 **Second Approval:** Any user who meets the first approval requirements, PLUS:
 
-1. Their `po_approver_props.max_amount` >= the PO's approval_total
-2. Their `po_approver_props.max_amount` <= the tier ceiling
+1. Their kind-specific `po_approver_props` limit column value >= the PO's approval_total
+2. Their kind-specific `po_approver_props` limit column value <= the tier ceiling
+
+The limit column is determined by the PO's `kind` and whether the PO has a `job`:
+
+| PO kind            | PO has job? | `po_approver_props` limit column used |
+| ------------------ | ----------- | ------------------------------------- |
+| `standard`         | No          | `max_amount`                          |
+| `standard`         | Yes         | `project_max`                         |
+| `sponsorship`      | Either      | `sponsorship_max`                     |
+| `staff_and_social` | Either      | `staff_and_social_max`                |
+| `media_and_event`  | Either      | `media_and_event_max`                 |
+| `computer`         | Either      | `computer_max`                        |
 
 Note: One user can be both the approver and second_approver if they meet the requirements for both.
 
 ### Approver Selection at Creation
 
-When creating a PO, the creator must select an approver from a list of qualified approvers for the chosen division. The UI fetches this list via `/api/purchase_orders/approvers/{division}/{total}`.
+When creating a PO, the creator must select an approver from a list of qualified approvers for the chosen division. The UI fetches this list via `GET /api/purchase_orders/approvers?division=...&amount=...&kind=...&has_job=...`.
 
 **Special case:** If the creator is themselves a qualified first approver for the division, the approver field is automatically set to the creator (the field is hidden in the UI).
 
@@ -97,7 +150,7 @@ A PO appears in an approver's pending queue when:
 
 1. **First approval needed:** The PO is unapproved (`approved = ''`) and the approver is qualified for the PO's division
 2. **Priority second approval (within 24 hours):** The PO has first approval but needs second approval, and the approver is the designated `priority_second_approver`
-3. **General second approval (after 24 hours):** The PO has first approval, needs second approval, the 24-hour priority window has expired, and the approver is qualified for both the division and the approval_total amount
+3. **General second approval (after 24 hours):** The PO has first approval, needs second approval, the 24-hour priority window has expired, and the approver is qualified for both the division and the approval_total amount (using the kind-specific limit column)
 
 This means:
 
@@ -140,24 +193,25 @@ A purchase order can be of type `Normal`, `Cumulative`, or `Recurring`:
 - **Cumulative:** Valid for multiple expenses until their sum reaches the PO total
 - **Recurring:** Valid for a fixed number of expenses at a specified frequency until an end date
 
-A purchase order has a `payment_type` that specifies how expenses are paid. It may have an attachment file.
+A purchase order has a `payment_type` that specifies how expenses are paid, a `kind` that classifies the expenditure (see [Expenditure Kinds](#expenditure-kinds)), and may have an attachment file.
 
 **Approval Flow:**
 
-1. Creator selects an approver from a list of qualified approvers for the division (or auto-set to self if creator is qualified)
-2. If second approval will be required, creator may optionally designate a `priority_second_approver`
-3. The PO appears in the pending queue of **all** qualified first approvers for that division (not just the selected one)
-4. Any qualified first approver can perform first approval — the `approver` field is overwritten with whoever actually approves
-5. The endpoint determines whether to set first approval, second approval, or both based on the caller's permissions
-6. Upon full approval, a `po_number` is generated in format `YYMM-NNNN` (e.g., `2501-0001`)
+1. Creator selects a kind, division, amount, and other fields
+2. Creator selects an approver from a list of qualified approvers for the division (or auto-set to self if creator is qualified)
+3. If second approval will be required, creator may optionally designate a `priority_second_approver`
+4. The PO appears in the pending queue of **all** qualified first approvers for that division (not just the selected one)
+5. Any qualified first approver can perform first approval — the `approver` field is overwritten with whoever actually approves
+6. The endpoint determines whether to set first approval, second approval, or both based on the caller's permissions
+7. Upon full approval, a `po_number` is generated in format `YYMM-NNNN` (e.g., `2501-0001`)
 
 **Rejection:** Any qualified approver or second approver can reject an unapproved PO. Rejection records the rejector, rejection reason, and timestamp. The status remains `Unapproved`.
 
-**Child POs:** A purchase order may have a `parent_po` reference. Child POs receive a number in format `YYMM-NNNN-XX` (e.g., `2501-0001-01`), supporting up to 99 children per parent.
+**Child POs:** A purchase order may have a `parent_po` reference. Child POs must match the parent's `job`, `payment_type`, `category`, `description`, `vendor`, and `kind`. Child POs receive a number in format `YYMM-NNNN-XX` (e.g., `2501-0001-01`), supporting up to 99 children per parent.
 
 ## Lifecycle of a Purchase Order
 
-1. A purchase order is created by a user who selects an approver from a list (status: `Unapproved`)
+1. A purchase order is created by a user who selects a kind and an approver from a list (status: `Unapproved`)
 2. The PO appears in the pending queue of **all** qualified first approvers for the division (not just the selected one)
 3. The creator may delete the PO as long as it is not `Active`
 4. Any qualified first approver can approve or reject the PO (the `approver` field is set to whoever actually approves)
@@ -165,7 +219,7 @@ A purchase order has a `payment_type` that specifies how expenses are paid. It m
    - If a `priority_second_approver` was designated, they have a 24-hour exclusive window
    - After 24 hours (or immediately if no priority approver), all qualified second approvers can act
 6. Upon full approval, the PO becomes `Active` and receives a po_number
-7. Expenses can be committed against the PO
+7. Expenses can be committed against the PO (expenses inherit the PO's kind)
 8. The PO is closed (manually or automatically) or cancelled
 
 ## Cancellation
@@ -205,11 +259,40 @@ When closed:
 
 Implemented in `app/routes/purchase_orders.go` and registered in `app/routes/routes.go`.
 
+### GET /api/purchase_orders/approvers
+
+Returns a list of users who can first-approve a purchase order with the given parameters.
+
+**Query Parameters:** `division` (required), `amount` (required, number), `kind` (optional, expenditure_kinds ID; defaults to standard), `has_job` (optional, boolean; defaults to false), `type`, `start_date`, `end_date`, `frequency`
+
+**Authorization:** Requires authenticated user.
+
+**Behavior:**
+
+- If the caller is themselves a qualified first approver for the division, returns an empty list (the UI auto-sets the approver to the caller)
+- Otherwise, returns a list of qualified first approvers for the division
+- For Recurring POs, `type=Recurring` triggers server-side calculation of approval_total from `start_date`, `end_date`, and `frequency`
+
+### GET /api/purchase_orders/second_approvers
+
+Returns a list of users who can second-approve a purchase order with the given parameters.
+
+**Query Parameters:** Same as `GET /api/purchase_orders/approvers`
+
+**Authorization:** Requires authenticated user.
+
+**Behavior:**
+
+- Returns an empty list if the amount is below the lowest approval threshold (no second approval needed)
+- Uses the kind-specific `po_approver_props` limit column (determined by `kind` and `has_job`) to filter eligible second approvers
+- If the caller is themselves a qualified second approver, returns an empty list (the UI auto-sets)
+- Otherwise, returns a list of qualified second approvers for the division and amount tier
+
 ### POST /api/purchase_orders/:id/approve
 
 Approves the purchase order with the given ID.
 
-**Authorization:** Caller must be a qualified first approver OR qualified second approver for the PO's division and approval_total.
+**Authorization:** Caller must be a qualified first approver OR qualified second approver for the PO's division, kind, and approval_total.
 
 **Behavior:**
 
@@ -280,36 +363,60 @@ Manually closes the purchase order with the given ID.
 
 ## Pocketbase Collection Schema (purchase_orders)
 
-| Field                    | Type                       | Description                                                                               |
-| ------------------------ | -------------------------- | ----------------------------------------------------------------------------------------- |
-| po_number                | string                     | Format `YYMM-NNNN` or `YYMM-NNNN-XX`, unique, required if Active/Cancelled/Closed         |
-| status                   | enum                       | `Unapproved`, `Active`, `Cancelled`, `Closed`                                             |
-| uid                      | relation → users           | Creator of the PO, required                                                               |
-| type                     | enum                       | `Normal`, `Cumulative`, `Recurring`                                                       |
-| date                     | string                     | Start date, YYYY-MM-DD format, required                                                   |
-| end_date                 | string                     | End date for Recurring POs, YYYY-MM-DD format                                             |
-| frequency                | enum                       | `Weekly`, `Biweekly`, `Monthly` (required for Recurring)                                  |
-| division                 | relation → divisions       | Required                                                                                  |
-| description              | string                     | Minimum 5 characters                                                                      |
-| total                    | number                     | Single payment/expense amount, required                                                   |
-| approval_total           | number                     | Calculated total for approval tier determination                                          |
-| payment_type             | enum                       | `OnAccount`, `Expense`, `CorporateCreditCard`                                             |
-| vendor                   | relation → vendors         | Required                                                                                  |
-| job                      | relation → jobs            | Optional job reference                                                                    |
-| category                 | relation → categories      | Optional category                                                                         |
-| branch                   | relation → branches        | Set from job or user default                                                              |
-| attachment               | file                       | Optional attachment                                                                       |
-| approver                 | relation → users           | Required; selected by creator at creation, but overwritten with whoever actually approves |
-| approved                 | datetime                   | First approval timestamp                                                                  |
-| second_approver          | relation → users           | Set during second approval                                                                |
-| second_approval          | datetime                   | Second approval timestamp                                                                 |
-| priority_second_approver | relation → users           | Creator-designated second approver (optional, only when second approval required)         |
-| rejector                 | relation → users           | Set if rejected                                                                           |
-| rejected                 | datetime                   | Rejection timestamp                                                                       |
-| rejection_reason         | string                     | Minimum 5 characters if rejected                                                          |
-| canceller                | relation → users           | Set if cancelled                                                                          |
-| cancelled                | datetime                   | Cancellation timestamp                                                                    |
-| closer                   | relation → users           | Set if manually closed                                                                    |
-| closed                   | datetime                   | Closure timestamp                                                                         |
-| closed_by_system         | boolean                    | True if automatically closed                                                              |
-| parent_po                | relation → purchase_orders | Parent PO for child POs                                                                   |
+| Field                    | Type                         | Description                                                                               |
+| ------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------- |
+| po_number                | string                       | Format `YYMM-NNNN` or `YYMM-NNNN-XX`, unique, required if Active/Cancelled/Closed         |
+| status                   | enum                         | `Unapproved`, `Active`, `Cancelled`, `Closed`                                             |
+| uid                      | relation → users             | Creator of the PO, required                                                               |
+| type                     | enum                         | `Normal`, `Cumulative`, `Recurring`                                                       |
+| kind                     | relation → expenditure_kinds | Expenditure kind, required; determines which approval limit column is used                |
+| date                     | string                       | Start date, YYYY-MM-DD format, required                                                   |
+| end_date                 | string                       | End date for Recurring POs, YYYY-MM-DD format                                             |
+| frequency                | enum                         | `Weekly`, `Biweekly`, `Monthly` (required for Recurring)                                  |
+| division                 | relation → divisions         | Required                                                                                  |
+| description              | string                       | Minimum 5 characters                                                                      |
+| total                    | number                       | Single payment/expense amount, required                                                   |
+| approval_total           | number                       | Calculated total for approval tier determination                                          |
+| payment_type             | enum                         | `OnAccount`, `Expense`, `CorporateCreditCard`                                             |
+| vendor                   | relation → vendors           | Required                                                                                  |
+| job                      | relation → jobs              | Optional job reference                                                                    |
+| category                 | relation → categories        | Optional category                                                                         |
+| branch                   | relation → branches          | Set from job or user default                                                              |
+| attachment               | file                         | Optional attachment                                                                       |
+| approver                 | relation → users             | Required; selected by creator at creation, but overwritten with whoever actually approves |
+| approved                 | datetime                     | First approval timestamp                                                                  |
+| second_approver          | relation → users             | Set during second approval                                                                |
+| second_approval          | datetime                     | Second approval timestamp                                                                 |
+| priority_second_approver | relation → users             | Creator-designated second approver (optional, only when second approval required)         |
+| rejector                 | relation → users             | Set if rejected                                                                           |
+| rejected                 | datetime                     | Rejection timestamp                                                                       |
+| rejection_reason         | string                       | Minimum 5 characters if rejected                                                          |
+| canceller                | relation → users             | Set if cancelled                                                                          |
+| cancelled                | datetime                     | Cancellation timestamp                                                                    |
+| closer                   | relation → users             | Set if manually closed                                                                    |
+| closed                   | datetime                     | Closure timestamp                                                                         |
+| closed_by_system         | boolean                      | True if automatically closed                                                              |
+| parent_po                | relation → purchase_orders   | Parent PO for child POs                                                                   |
+
+## Pocketbase Collection Schema (expenditure_kinds)
+
+| Field       | Type   | Description                                         |
+| ----------- | ------ | --------------------------------------------------- |
+| id          | string | PocketBase record ID                                |
+| name        | string | Semantic key (`standard`, `sponsorship`, etc.)      |
+| description | string | Human-readable description of the kind              |
+| ui_order    | number | Integer controlling display order in the UI         |
+| en_ui_label | string | English display label shown in the UI (min 3 chars) |
+
+## po_approver_props Limit Columns
+
+Each `po_approver_props` record has the following limit columns that control second-approval eligibility per kind:
+
+| Column                 | Used for kind      | When          |
+| ---------------------- | ------------------ | ------------- |
+| `max_amount`           | `standard`         | PO has no job |
+| `project_max`          | `standard`         | PO has a job  |
+| `sponsorship_max`      | `sponsorship`      | Always        |
+| `staff_and_social_max` | `staff_and_social` | Always        |
+| `media_and_event_max`  | `media_and_event`  | Always        |
+| `computer_max`         | `computer`         | Always        |

@@ -13,6 +13,7 @@ import (
 	"time"
 	"tybalt/internal/testutils"
 	"tybalt/routes"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -23,6 +24,12 @@ import (
 func computePOTestHash(data []byte) string {
 	h := sha256.Sum256(data)
 	return hex.EncodeToString(h[:])
+}
+
+func ensureDefaultPOKind(payload map[string]any) {
+	if _, exists := payload["kind"]; !exists {
+		payload["kind"] = utilities.DefaultExpenditureKindID()
+	}
 }
 
 func TestPurchaseOrdersCreate(t *testing.T) {
@@ -58,6 +65,13 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	// Get approval tier values once and reuse them throughout the tests
 	app := testutils.SetupTestApp(t)
 	tier1, tier2 := testutils.GetApprovalTiers(app)
+	sponsorshipKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "sponsorship",
+	})
+	if err != nil {
+		t.Fatalf("failed to load sponsorship expenditure kind: %v", err)
+	}
+	sponsorshipKindID := sponsorshipKind.Id
 
 	// Helper to convert a JSON body string into multipart/form-data with a tiny PNG attachment
 	makeMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
@@ -65,6 +79,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultPOKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -115,6 +130,43 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"job":{"code":"not_active"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// fails when a job is set and kind is not standard
+	{
+		b, ct, err := makeMultipart(fmt.Sprintf(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "vccd5fo56ctbigh",
+            "description": "job PO with non-standard kind",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "Normal",
+            "job": "cjf0kt0defhq480",
+            "kind": "%s"
+        }`, sponsorshipKindID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails when job is set and kind is not standard",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"kind":{"code":"invalid_kind_for_job"`,
+				`"message":"kind must be standard when job is set"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
@@ -1185,6 +1237,7 @@ func TestPurchaseOrdersCreate_DuplicateAttachmentFails(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultPOKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1241,6 +1294,7 @@ func TestPurchaseOrdersCreate_DuplicateAttachmentFails(t *testing.T) {
 			record.Set("approver", "etysnrlup2f6bak")
 			record.Set("status", "Unapproved")
 			record.Set("type", "Normal")
+			record.Set("kind", utilities.DefaultExpenditureKindID())
 			record.Set("attachment_hash", duplicateHash)
 			if err := app.Save(record); err != nil {
 				tb.Fatalf("failed to create existing PO: %v", err)
@@ -1285,6 +1339,7 @@ func TestPurchaseOrdersUpdate_DuplicateAttachmentFails(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultPOKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1341,6 +1396,7 @@ func TestPurchaseOrdersUpdate_DuplicateAttachmentFails(t *testing.T) {
 			record.Set("approver", "etysnrlup2f6bak")
 			record.Set("status", "Unapproved")
 			record.Set("type", "Normal")
+			record.Set("kind", utilities.DefaultExpenditureKindID())
 			record.Set("attachment_hash", duplicateHash)
 			if err := app.Save(record); err != nil {
 				tb.Fatalf("failed to create existing PO: %v", err)
@@ -1376,6 +1432,14 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app := testutils.SetupTestApp(t)
+	sponsorshipKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "sponsorship",
+	})
+	if err != nil {
+		t.Fatalf("failed to load sponsorship expenditure kind: %v", err)
+	}
+	sponsorshipKindID := sponsorshipKind.Id
 
 	// multipart builder for updates with attachment
 	updateMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
@@ -1383,6 +1447,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
+		ensureDefaultPOKind(m)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1504,6 +1569,43 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 				`"message":"provided vendor is not active"`,
 			},
 			ExpectedEvents: map[string]int{},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// fails to update when a job is set and kind is not standard
+	{
+		b, ct, err := updateMultipart(fmt.Sprintf(`{
+			"uid": "f2j5a8vk006baub",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 2234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Cumulative",
+			"job": "cjf0kt0defhq480",
+			"kind": "%s"
+		}`, sponsorshipKindID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails to update when job is set and kind is not standard",
+			Method:         http.MethodPatch,
+			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"kind":{"code":"invalid_kind_for_job"`,
+				`"message":"kind must be standard when job is set"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdateRequest": 1,
+			},
 			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
@@ -1641,6 +1743,7 @@ func TestGeneratePONumber(t *testing.T) {
 				firstChild.Set("vendor", "2zqxtsmymf670ha")
 				firstChild.Set("approver", "wegviunlyr2jjjv")
 				firstChild.Set("status", "Unapproved")
+				firstChild.Set("kind", utilities.DefaultExpenditureKindID())
 				if err := app.Save(firstChild); err != nil {
 					t.Fatalf("failed to save first child PO: %v", err)
 				}
@@ -1736,6 +1839,7 @@ func TestGeneratePONumber(t *testing.T) {
 					child.Set("vendor", "2zqxtsmymf670ha")
 					child.Set("approver", "wegviunlyr2jjjv")
 					child.Set("status", "Unapproved")
+					child.Set("kind", utilities.DefaultExpenditureKindID())
 					if err := app.Save(child); err != nil {
 						t.Fatalf("failed to save child PO %d: %v", i, err)
 					}

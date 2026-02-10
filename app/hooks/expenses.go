@@ -35,6 +35,11 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		}
 	}
 
+	// No-PO expenses use the standard kind by policy.
+	if strings.TrimSpace(expenseRecord.GetString("purchase_order")) == "" {
+		expenseRecord.Set("kind", utilities.DefaultExpenditureKindID())
+	}
+
 	// get the user's manager and set the approver field
 	profile, err := app.FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
 		"userId": expenseRecord.GetString("uid"),
@@ -435,6 +440,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 				},
 			}
 		}
+
+		// Expense kind is inherited from its purchase order and is not user-editable.
+		inheritedKind := utilities.NormalizeExpenditureKindID(poRecord.GetString("kind"))
+		expenseRecord.Set("kind", inheritedKind)
 	}
 
 	// if the purchaseOrder has a status that is not "Active", return an error

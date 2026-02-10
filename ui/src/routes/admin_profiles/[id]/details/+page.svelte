@@ -138,6 +138,48 @@
         <p class="text-sm text-neutral-500">No claims assigned.</p>
       {/if}
     </section>
+
+    {#if data.poApproverProps}
+      <section class="space-y-2">
+        <h2 class="text-lg font-semibold">PO Approver Limits</h2>
+        <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
+          <div class="flex gap-2">
+            <span class="font-semibold">Standard (No Job):</span>
+            {currency.format(data.poApproverProps.max_amount ?? 0)}
+          </div>
+          <div class="flex gap-2">
+            <span class="font-semibold">Standard (With Job):</span>
+            {currency.format(data.poApproverProps.project_max ?? 0)}
+          </div>
+          <div class="flex gap-2">
+            <span class="font-semibold">Sponsorship:</span>
+            {currency.format(data.poApproverProps.sponsorship_max ?? 0)}
+          </div>
+          <div class="flex gap-2">
+            <span class="font-semibold">Staff and Social:</span>
+            {currency.format(data.poApproverProps.staff_and_social_max ?? 0)}
+          </div>
+          <div class="flex gap-2">
+            <span class="font-semibold">Media and Event:</span>
+            {currency.format(data.poApproverProps.media_and_event_max ?? 0)}
+          </div>
+          <div class="flex gap-2">
+            <span class="font-semibold">Computer:</span>
+            {currency.format(data.poApproverProps.computer_max ?? 0)}
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2">
+          <span class="font-semibold">Divisions:</span>
+          {#if (data.poApproverProps.divisions ?? []).length === 0}
+            <span>All divisions</span>
+          {:else}
+            {#each data.poApproverProps.divisions ?? [] as divisionId}
+              <DsLabel color="purple">{divisionLabel(divisionId)}</DsLabel>
+            {/each}
+          {/if}
+        </div>
+      </section>
+    {/if}
   </div>
 {:else}
   <div class="p-4">Not found.</div>

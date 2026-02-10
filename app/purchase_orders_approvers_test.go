@@ -2,10 +2,12 @@ package main
 
 import (
 	"fmt"
+	"net/url"
 	"net/http"
 	"strings"
 	"testing"
 	"tybalt/internal/testutils"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/tests"
 )
@@ -39,13 +41,21 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 	// Municipal division ID for testing
 	municipalDivision := "2rrfy6m2c8hazjy"
 	drillingServicesDivision := "fy4i9poneukvq9u"
+	makeApproversURL := func(path string, division string, amount string) string {
+		params := url.Values{}
+		params.Set("division", division)
+		params.Set("amount", amount)
+		params.Set("kind", utilities.DefaultExpenditureKindID())
+		params.Set("has_job", "false")
+		return fmt.Sprintf("%s?%s", path, params.Encode())
+	}
 
 	scenarios := []tests.ApiScenario{
-		// Tests for GET /api/purchase_orders/approvers/{division}/{amount}
+		// Tests for GET /api/purchase_orders/approvers
 		{
 			Name:   "regular user can retrieve a list of approvers for their division",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/approvers/%s/500", municipalDivision),
+			URL:    makeApproversURL("/api/purchase_orders/approvers", municipalDivision, "500"),
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},
@@ -62,7 +72,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "po_approver receives empty list of approvers (will auto-set to self in UI) if they have no division restriction",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/approvers/%s/500", drillingServicesDivision),
+			URL:    makeApproversURL("/api/purchase_orders/approvers", drillingServicesDivision, "500"),
 			Headers: map[string]string{
 				"Authorization": poApproverToken,
 			},
@@ -75,7 +85,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "invalid amount returns error",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/approvers/%s/invalid", municipalDivision),
+			URL:    makeApproversURL("/api/purchase_orders/approvers", municipalDivision, "invalid"),
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},
@@ -86,11 +96,11 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-		// Tests for GET /api/purchase_orders/second_approvers/{division}/{amount}
+		// Tests for GET /api/purchase_orders/second_approvers
 		{
 			Name:   "amount below tier1 returns empty list for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier1)-1),
+			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier1)-1)),
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},
@@ -103,7 +113,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "amount exceeding first threshold returns only approvers with max_amount less than or equal to second threshold for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier1)+1),
+			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier1)+1)),
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},
@@ -121,7 +131,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "tier2 amount returns tier3 approvers for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier2)+1),
+			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier2)+1)),
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},
@@ -136,7 +146,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "user with max_amount between first and second thresholds receives empty list for amount in within their max_amount and division restrictions for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", drillingServicesDivision, int(tier1)+1),
+			URL:    makeApproversURL("/api/purchase_orders/second_approvers", drillingServicesDivision, fmt.Sprintf("%d", int(tier1)+1)),
 			Headers: map[string]string{
 				"Authorization": authorSoupToken,
 			},
@@ -149,7 +159,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "user with max_amount between first and second thresholds receives non-empty list for amount in within their max_amount but outside of their division restrictions for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier1)+1),
+			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier1)+1)),
 			Headers: map[string]string{
 				"Authorization": authorSoupToken,
 			},
@@ -164,7 +174,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "user with tier3 claim receives empty list for tier2 amount for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier2)+1),
+			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier2)+1)),
 			Headers: map[string]string{
 				"Authorization": tier3Token,
 			},
@@ -177,7 +187,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "super high amount returns empty list for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/%d", municipalDivision, int(tier2)+1000000),
+			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier2)+1000000)),
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},
@@ -190,7 +200,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		{
 			Name:   "invalid amount returns error for second approvers call",
 			Method: http.MethodGet,
-			URL:    fmt.Sprintf("/api/purchase_orders/second_approvers/%s/invalid", municipalDivision),
+			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, "invalid"),
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},

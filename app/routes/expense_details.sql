@@ -15,6 +15,7 @@ SELECT
   e.approved,
   e.job,
   e.category,
+  e.kind,
   e.pay_period_ending,
   e.allowance_types,
   e.submitted,
@@ -28,6 +29,7 @@ SELECT
   COALESCE(po.po_number, '') AS purchase_order_number,
   COALESCE(cl.name, '') AS client_name,
   COALESCE(ca.name, '') AS category_name,
+  COALESCE(ek.name, '') AS kind_name,
   COALESCE(j.number, '') AS job_number,
   COALESCE(j.description, '') AS job_description,
   COALESCE(d.name, '') AS division_name,
@@ -44,6 +46,7 @@ LEFT JOIN clients cl ON j.client = cl.id
 LEFT JOIN vendors v ON e.vendor = v.id
 LEFT JOIN divisions d ON e.division = d.id
 LEFT JOIN categories ca ON e.category = ca.id
+LEFT JOIN expenditure_kinds ek ON e.kind = ek.id
 LEFT JOIN profiles p0 ON e.uid = p0.uid
 LEFT JOIN profiles p1 ON e.approver = p1.uid
 LEFT JOIN profiles p2 ON e.rejector = p2.uid

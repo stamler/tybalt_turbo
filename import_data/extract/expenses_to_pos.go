@@ -47,11 +47,14 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 
 	if turboPOsExists {
 		log.Println("TurboPurchaseOrders.parquet found - will use hybrid ID resolution for purchase orders")
+		if err := prepareTurboPOsTable(db); err != nil {
+			log.Fatalf("Failed to prepare TurboPurchaseOrders kind data: %v", err)
+		}
 	} else {
 		log.Println("TurboPurchaseOrders.parquet not found - will generate all PO IDs from PO numbers")
 	}
 
-	query := buildPurchaseOrderQuery(turboPOsExists)
+	query := strings.ReplaceAll(buildPurchaseOrderQuery(turboPOsExists), "{{STANDARD_KIND_ID}}", StandardExpenditureKindID())
 
 	_, err = db.Exec(query)
 	if err != nil {
@@ -64,6 +67,28 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 			log.Fatalf("TurboPurchaseOrders UID mapping validation failed: %v", err)
 		}
 	}
+}
+
+func prepareTurboPOsTable(db *sql.DB) error {
+	_, err := db.Exec("CREATE TABLE turbo_pos AS SELECT * FROM read_parquet('parquet/TurboPurchaseOrders.parquet')")
+	if err != nil {
+		return fmt.Errorf("create turbo_pos table: %w", err)
+	}
+
+	_, err = db.Exec("ALTER TABLE turbo_pos ADD COLUMN kind TEXT")
+	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "already exists") {
+		return fmt.Errorf("add turbo_pos.kind column: %w", err)
+	}
+
+	_, err = db.Exec(fmt.Sprintf(
+		"UPDATE turbo_pos SET kind = '%s' WHERE kind IS NULL OR TRIM(CAST(kind AS VARCHAR)) = ''",
+		StandardExpenditureKindID(),
+	))
+	if err != nil {
+		return fmt.Errorf("backfill turbo_pos.kind values: %w", err)
+	}
+
+	return nil
 }
 
 func buildPurchaseOrderQuery(turboPOsExists bool) string {
@@ -106,9 +131,7 @@ func buildPurchaseOrderQuery(turboPOsExists bool) string {
 
 	if turboPOsExists {
 		query += `
-		-- Load TurboPurchaseOrders.parquet as lookup table for preserved IDs
-		CREATE TABLE turbo_pos AS
-		SELECT * FROM read_parquet('parquet/TurboPurchaseOrders.parquet');
+		-- turbo_pos is preloaded in prepareTurboPOsTable(), including kind defaults
 
 		-- Load Profiles.parquet to convert legacy UIDs to PocketBase UIDs
 		-- TurboPurchaseOrders has legacy Firebase UIDs (from writeback), we need PocketBase UIDs
@@ -285,6 +308,12 @@ func buildPurchaseOrderQuery(turboPOsExists bool) string {
 				THEN (SELECT tp.category FROM turbo_pos tp WHERE tp.number = fe.po)
 				ELSE NULL
 			END AS category,
+			-- Kind: prefer TurboPurchaseOrders kind when present, otherwise fall back to expense kind
+			CASE
+				WHEN (SELECT COUNT(*) FROM turbo_pos tp WHERE tp.number = fe.po) = 1
+				THEN COALESCE(NULLIF((SELECT tp.kind FROM turbo_pos tp WHERE tp.number = fe.po), ''), NULLIF(fe.kind, ''), '{{STANDARD_KIND_ID}}')
+				ELSE COALESCE(NULLIF(fe.kind, ''), '{{STANDARD_KIND_ID}}')
+			END AS kind,
 			-- Parent PO: only from TurboPurchaseOrders (PocketBase ID, no conversion needed)
 			CASE
 				WHEN (SELECT COUNT(*) FROM turbo_pos tp WHERE tp.number = fe.po) = 1
@@ -313,7 +342,7 @@ func buildPurchaseOrderQuery(turboPOsExists bool) string {
 
 		-- Also include Turbo-only POs (those not matching any expense PO number)
 		-- Convert legacy UIDs to PocketBase UIDs
-		INSERT INTO purchase_orders (id, number, approver, date, end_date, vendor, uid, total, approval_total, payment_type, job, description, division, type, frequency, status, approved, second_approval, second_approver, priority_second_approver, closed, closer, cancelled, canceller, rejected, rejector, rejection_reason, category, parent_po, branch, attachment, attachment_hash)
+		INSERT INTO purchase_orders (id, number, approver, date, end_date, vendor, uid, total, approval_total, payment_type, job, description, division, type, frequency, status, approved, second_approval, second_approver, priority_second_approver, closed, closer, cancelled, canceller, rejected, rejector, rejection_reason, category, kind, parent_po, branch, attachment, attachment_hash)
 		SELECT
 			tp.id,
 			tp.number,
@@ -343,6 +372,7 @@ func buildPurchaseOrderQuery(turboPOsExists bool) string {
 			(SELECT p.pocketbase_uid FROM profiles p WHERE p.id = tp.rejector) AS rejector,
 			tp.rejection_reason,
 			tp.category,
+			COALESCE(NULLIF(tp.kind, ''), '{{STANDARD_KIND_ID}}') AS kind,
 			tp.parent_po,
 			tp.branch,
 			tp.attachment,
@@ -395,6 +425,7 @@ func buildPurchaseOrderQuery(turboPOsExists bool) string {
 			NULL AS rejector,
 			NULL AS rejection_reason,
 			NULL AS category,
+			COALESCE(NULLIF(fe.kind, ''), '{{STANDARD_KIND_ID}}') AS kind,
 			NULL AS parent_po,
 			NULL AS branch,
 			NULL AS attachment,
@@ -453,11 +484,11 @@ func validateTurboPOUserMappings(db *sql.DB) error {
 	var missing []string
 	for rows.Next() {
 		var (
-			id, number                                                                  string
-			uid, approver, secondApprover, prioritySecondApprover, closer, canceller     string
-			rejector                                                                     string
+			id, number                                                                    string
+			uid, approver, secondApprover, prioritySecondApprover, closer, canceller      string
+			rejector                                                                      string
 			legacyUid, legacyApprover, legacySecondApprover, legacyPrioritySecondApprover string
-			legacyCloser, legacyCanceller, legacyRejector                                string
+			legacyCloser, legacyCanceller, legacyRejector                                 string
 		)
 
 		if err := rows.Scan(

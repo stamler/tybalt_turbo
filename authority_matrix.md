@@ -1,0 +1,19 @@
+# Expenditures
+
+| Activity                               | All Staff   | Managers / Team Leads | Branch Managers | Executives |
+| -------------------------------------- | ----------- | --------------------- | --------------- | ---------- |
+| Capital Expense                        | < 100$      | < 500$ w/PO           | < 2500$ w/PO    | w/PO       |
+| Project Expense (references a job)     | < 100$ w/PO | < 500$ w/PO           | < 20000$ w/PO   | w/PO       |
+| Sponsorships                           |             |                       |                 | w/PO       |
+| Staff Appreciation or Social Committee |             |                       | w/PO            | w/PO       |
+| Media Advertising and Event Fees       |             |                       |                 | w/PO       |
+| Computer and Software Acquisition      |             |                       |                 | w/PO       |
+
+## Implementation Notes
+
+Each of the 6 activities maps to columns in `po_approver_props`. `standard` (Capital Expense) uses `max_amount` with no job and `project_max` when a job is present. Other kinds use dedicated columns: `sponsorship_max`, `staff_and_social_max`, `media_and_event_max`, `computer_max`.
+
+In the UI:
+
+- **Purchase Orders editor**: Kind is selectable via toggle only when no Job is set. If Job is set, Kind selection is hidden and the PO is treated as project expense (`standard` + job-present behavior).
+- **Expenses editor**: Kind is never selectable. It is display-only: inherited from the linked PO when a PO is present, otherwise shown as `standard` for no-PO expenses.
