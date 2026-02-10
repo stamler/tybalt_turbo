@@ -29,4 +29,4 @@ primary_region = "yyz"
 [[vm]]
   memory = '4gb'
   cpu_kind = 'performance'
-  cpus = 1
+  cpus = 2
