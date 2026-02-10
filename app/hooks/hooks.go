@@ -236,6 +236,45 @@ func AddHooks(app core.App) {
 		return e.Next()
 	})
 
+	// Keep jobs writeback in sync when related records change outside direct jobs edits.
+	app.OnRecordCreate("categories").BindFunc(func(e *core.RecordEvent) error {
+		jobID := e.Record.GetString("job")
+		if err := e.Next(); err != nil {
+			return err
+		}
+		return utilities.MarkJobNotImported(e.App, jobID)
+	})
+	app.OnRecordDelete("categories").BindFunc(func(e *core.RecordEvent) error {
+		jobID := e.Record.GetString("job")
+		if err := e.Next(); err != nil {
+			return err
+		}
+		return utilities.MarkJobNotImported(e.App, jobID)
+	})
+	app.OnRecordUpdate("clients").BindFunc(func(e *core.RecordEvent) error {
+		changed := utilities.RecordHasMeaningfulChanges(e.Record, "_imported")
+		if err := e.Next(); err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		if err := utilities.MarkReferencingJobsNotImported(e.App, "client", e.Record.Id); err != nil {
+			return err
+		}
+		return utilities.MarkReferencingJobsNotImported(e.App, "job_owner", e.Record.Id)
+	})
+	app.OnRecordUpdate("client_contacts").BindFunc(func(e *core.RecordEvent) error {
+		changed := utilities.RecordHasMeaningfulChanges(e.Record, "_imported")
+		if err := e.Next(); err != nil {
+			return err
+		}
+		if !changed {
+			return nil
+		}
+		return utilities.MarkReferencingJobsNotImported(e.App, "contact", e.Record.Id)
+	})
+
 	// For notification hooks, we need to use the RecordEvent instead of the
 	// RecordRequestEvent because the notifications model is not exposed to the
 	// API.

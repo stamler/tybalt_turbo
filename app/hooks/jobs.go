@@ -423,18 +423,8 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 	// Allow status-only updates to pass without tripping other validations.
 	// This compensates for relaxed update rules while preserving status constraints.
 	if !isCreate {
-		changedOtherField := false
-		// Check if any field other than "status", "updated", or "created" changed; if none did, treat as status-only update.
-		for _, fieldName := range record.Collection().Fields.FieldNames() {
-			if fieldName == "status" || fieldName == "updated" || fieldName == "created" {
-				continue // Skip the status field itself and auto-date fields
-			}
-			if fmt.Sprintf("%v", record.Get(fieldName)) != fmt.Sprintf("%v", original.Get(fieldName)) {
-				changedOtherField = true
-				break
-			}
-		}
-		if !changedOtherField {
+		// If no field other than status changed, treat this as a status-only update.
+		if !utilities.RecordHasMeaningfulChanges(record, "status") {
 			newStatus := status
 			oldStatus := original.GetString("status")
 			if newStatus != "" && newStatus != oldStatus {

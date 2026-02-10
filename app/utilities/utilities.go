@@ -696,18 +696,21 @@ func GetBoundClaimIdAndMaxAmount(app core.App, highest bool) (string, float64, e
 	return tiers[0].GetString("claim"), tiers[0].GetFloat("max_amount"), nil
 }
 
-// MarkImportedFalseIfChanged checks if any field (other than auto-managed fields)
-// has changed on an existing record, and if so sets _imported to false. This
-// ensures that records edited locally get written back to the legacy system.
-// This function should only be called for updates (not creates).
-func MarkImportedFalseIfChanged(record *core.Record) {
+// RecordHasMeaningfulChanges returns true when any non-auto-managed field on an
+// existing record differs from its original value.
+//
+// The fields "created" and "updated" are always ignored. Callers can provide
+// additional fields to ignore via extraSkipFields.
+func RecordHasMeaningfulChanges(record *core.Record, extraSkipFields ...string) bool {
 	original := record.Original()
 
-	// Skip fields that are auto-managed or are the _imported field itself
+	// Skip auto-managed fields by default.
 	skipFields := map[string]bool{
-		"updated":   true,
-		"created":   true,
-		"_imported": true,
+		"updated": true,
+		"created": true,
+	}
+	for _, fieldName := range extraSkipFields {
+		skipFields[fieldName] = true
 	}
 
 	for _, fieldName := range record.Collection().Fields.FieldNames() {
@@ -715,10 +718,61 @@ func MarkImportedFalseIfChanged(record *core.Record) {
 			continue
 		}
 		if fmt.Sprintf("%v", record.Get(fieldName)) != fmt.Sprintf("%v", original.Get(fieldName)) {
-			record.Set("_imported", false)
-			return
+			return true
 		}
 	}
+	return false
+}
+
+// MarkImportedFalseIfChanged checks if any field (other than auto-managed fields)
+// has changed on an existing record, and if so sets _imported to false. This
+// ensures that records edited locally get written back to the legacy system.
+// This function should only be called for updates (not creates).
+func MarkImportedFalseIfChanged(record *core.Record) {
+	if RecordHasMeaningfulChanges(record, "_imported") {
+		record.Set("_imported", false)
+	}
+}
+
+// MarkJobNotImported marks a single job as locally modified for writeback and
+// updates its timestamp so updatedAfter filters include it.
+func MarkJobNotImported(app core.App, jobID string) error {
+	if jobID == "" {
+		return nil
+	}
+	_, err := app.DB().NewQuery(`
+		UPDATE jobs
+		SET _imported = false,
+		    updated = strftime('%Y-%m-%d %H:%M:%fZ', 'now')
+		WHERE id = {:jobID}
+	`).Bind(dbx.Params{"jobID": jobID}).Execute()
+	return err
+}
+
+// MarkReferencingJobsNotImported marks jobs that reference refID through the
+// specified relation column as locally modified for writeback.
+func MarkReferencingJobsNotImported(app core.App, column string, refID string) error {
+	if refID == "" {
+		return nil
+	}
+
+	allowedColumns := map[string]bool{
+		"client":    true,
+		"job_owner": true,
+		"contact":   true,
+	}
+	if !allowedColumns[column] {
+		return fmt.Errorf("invalid jobs reference column: %s", column)
+	}
+
+	query := fmt.Sprintf(`
+		UPDATE jobs
+		SET _imported = false,
+		    updated = strftime('%%Y-%%m-%%d %%H:%%M:%%fZ', 'now')
+		WHERE %s = {:refID}
+	`, column)
+	_, err := app.DB().NewQuery(query).Bind(dbx.Params{"refID": refID}).Execute()
+	return err
 }
 
 // TableHasImportedColumn checks if the given table has an _imported column.

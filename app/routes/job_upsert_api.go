@@ -178,9 +178,7 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 			}
 
 			// Allocation edits count as job edits for writeback tracking.
-			if allocationsDiffer(existingAllocations, req.Allocations) {
-				jobRec.Set("_imported", false)
-			}
+			allocationsChanged := allocationsDiffer(existingAllocations, req.Allocations)
 
 			if err := txApp.Save(jobRec); err != nil {
 				httpResponseStatusCode = http.StatusBadRequest
@@ -204,6 +202,15 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 				return &CodeError{
 					Code:    "error_saving_job",
 					Message: fmt.Sprintf("error saving job: %v", err),
+				}
+			}
+			if allocationsChanged {
+				if err := utilities.MarkJobNotImported(txApp, jobID); err != nil {
+					httpResponseStatusCode = http.StatusInternalServerError
+					return &CodeError{
+						Code:    "error_marking_job_not_imported",
+						Message: fmt.Sprintf("error marking job as modified: %v", err),
+					}
 				}
 			}
 
