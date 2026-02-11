@@ -2,42 +2,35 @@ package extract
 
 import (
 	"database/sql"
-	"log"
+	"fmt"
 
 	_ "modernc.org/sqlite"
 )
 
-// Fallback when DB lookup fails (e.g. DB not yet initialized).
-const fallbackStandardExpenditureKindID = "l3vtlbqg529m52j"
-
 // standardExpenditureKindID is set by ToParquet before running export steps so
 // that SQL uses the target DB's "standard" kind ID. Also used by tool.go for
 // normalizeExpenditureKindID when importing.
-var standardExpenditureKindID = fallbackStandardExpenditureKindID
+var standardExpenditureKindID string
 
-// GetStandardExpenditureKindID returns the expenditure_kinds.id for name
-// 'standard' from the given SQLite DB, or the fallback constant if the lookup
-// fails.
-func GetStandardExpenditureKindID(dbPath string) string {
+// GetStandardExpenditureKindID resolves the expenditure_kinds.id for the
+// 'standard' kind name from the given SQLite DB.
+func GetStandardExpenditureKindID(dbPath string) (string, error) {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {
-		log.Printf("GetStandardExpenditureKindID: open DB %q: %v; using fallback", dbPath, err)
-		return fallbackStandardExpenditureKindID
+		return "", fmt.Errorf("open DB %q: %w", dbPath, err)
 	}
 	defer db.Close()
 
 	var id string
 	err = db.QueryRow("SELECT id FROM expenditure_kinds WHERE name = 'standard' LIMIT 1").Scan(&id)
 	if err != nil {
-		log.Printf("GetStandardExpenditureKindID: query %q: %v; using fallback", dbPath, err)
-		return fallbackStandardExpenditureKindID
+		return "", fmt.Errorf("query expenditure_kinds name='standard' in %q: %w", dbPath, err)
 	}
-	return id
+	return id, nil
 }
 
-// StandardExpenditureKindID returns the current standard kind ID (set by
-// ToParquet during export, or fallback). Used by augment_expenses,
-// expenses_to_pos, and export_to_parquet.
+// StandardExpenditureKindID returns the current standard kind ID. Must be
+// called after the ID has been resolved via GetStandardExpenditureKindID.
 func StandardExpenditureKindID() string {
 	return standardExpenditureKindID
 }

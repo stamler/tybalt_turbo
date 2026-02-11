@@ -81,7 +81,11 @@ func main() {
 	targetDatabase = *dbFlag
 
 	// Resolve default expenditure kind ID from target DB (for import normalize and for extract when running export)
-	defaultExpenditureKindID = extract.GetStandardExpenditureKindID(targetDatabase)
+	resolvedKindID, kindErr := extract.GetStandardExpenditureKindID(targetDatabase)
+	if kindErr != nil {
+		log.Fatalf("Failed to resolve standard expenditure kind ID from %s: %v", targetDatabase, kindErr)
+	}
+	defaultExpenditureKindID = resolvedKindID
 
 	if *initFlag {
 		fmt.Println("This will overwrite any existing data in app/pb_data/data.db.")
@@ -458,6 +462,7 @@ func main() {
 			// Order doesn't matter since foreign keys are disabled during deletion
 			err := deleteAllFromTables(targetDatabase, []string{
 				"user_claims",
+				"po_approver_props",
 				"mileage_reset_dates",
 				"_externalAuths",
 				"admin_profiles",
@@ -606,9 +611,11 @@ func main() {
 				true,               // Enable upsert for idempotency
 			)
 
-			// After loading user_claims, synthesize po_approver claim and props from Profiles
-			if err := synthesizePoApproverProps(targetDatabase); err != nil {
-				log.Fatalf("Failed to synthesize po_approver props: %v", err)
+			// After loading user_claims, upsert po_approver props:
+			// - TurboPoApproverProps rows (if present) are authoritative per uid.
+			// - Missing uids fall back to synthesized values from Profiles.customClaims.
+			if err := upsertPoApproverPropsWithTurboPrecedence(targetDatabase); err != nil {
+				log.Fatalf("Failed to upsert po_approver props: %v", err)
 			}
 
 			// --- Load MileageResetDates ---
@@ -1203,109 +1210,41 @@ func main() {
 	}
 }
 
-// synthesizePoApproverProps ensures that:
-// 1) Any user whose Profiles.customClaims contains 'tapr', 'vp', or 'smg' has a user_claims row for the 'po_approver' claim.
-// 2) A po_approver_props row exists per such user_claim with max_amount and divisions based on the presence of tapr/vp/smg and default division.
-//
-// Mapping per _ISSUES.md:
-// - tapr (and not vp or smg): max_amount = 500; divisions = [profile.default_division]
-// - vp (and not smg): max_amount = 2500; divisions = [profile.default_division]
-// - smg: max_amount = 250000; divisions = []
-func synthesizePoApproverProps(dbPath string) error {
-	// Read Profiles.parquet via DuckDB, then upsert into SQLite
-	duck, err := sql.Open("duckdb", "")
+type poApproverPropsUpsertRow struct {
+	id                string
+	uid               string
+	maxAmount         float64
+	projectMax        float64
+	sponsorshipMax    float64
+	staffAndSocialMax float64
+	mediaAndEventMax  float64
+	computerMax       float64
+	divisionsJSON     string
+	created           string
+	updated           string
+}
+
+// upsertPoApproverPropsWithTurboPrecedence merges po approver props for --users import:
+// 1) TurboPoApproverProps parquet is authoritative per uid (strict validation, no defaults).
+// 2) Any remaining uid falls back to synthesized values from Profiles.customClaims.
+func upsertPoApproverPropsWithTurboPrecedence(dbPath string) error {
+	turboByUID, err := loadTurboPoApproverProps("./parquet/PoApproverProps.parquet")
 	if err != nil {
-		return fmt.Errorf("open duckdb: %w", err)
+		return err
 	}
-	defer duck.Close()
-
-	rows, err := duck.Query(`
-		SELECT
-			pocketbase_uid AS uid,
-			LOWER(COALESCE(customClaims, '')) AS claims,
-			pocketbase_defaultDivision AS default_division
-		FROM read_parquet('./parquet/Profiles.parquet')
-	`)
+	fallbackByUID, err := synthesizePoApproverPropsFallbackRows()
 	if err != nil {
-		return fmt.Errorf("read Profiles.parquet: %w", err)
-	}
-	defer rows.Close()
-
-	type rowData struct {
-		uid             string
-		defaultDivision string
-		maxAmount       float64
-		divisionsJSON   string
+		return err
 	}
 
-	var toUpsert []rowData
-	for rows.Next() {
-		var uid, claims, defaultDivision sql.NullString
-		if err := rows.Scan(&uid, &claims, &defaultDivision); err != nil {
-			return fmt.Errorf("scan profile: %w", err)
-		}
-
-		uidValue := ""
-		if uid.Valid {
-			uidValue = uid.String
-		}
-		claimsValue := ""
-		if claims.Valid {
-			claimsValue = claims.String
-		}
-		defaultDivisionValue := ""
-		if defaultDivision.Valid {
-			defaultDivisionValue = defaultDivision.String
-		}
-
-		hasTapr := strings.Contains(claimsValue, "tapr")
-		hasVp := strings.Contains(claimsValue, "vp")
-		hasSmg := strings.Contains(claimsValue, "smg")
-
-		var maxAmount float64
-		var divisionsJSON string
-		switch {
-		case hasSmg:
-			maxAmount = 250000
-			divisionsJSON = "[]"
-		case hasVp && !hasSmg:
-			maxAmount = 2500
-		case hasTapr && !hasVp && !hasSmg:
-			maxAmount = 500
-		default:
-			// not a candidate
-		}
-
-		if maxAmount == 0 {
-			continue
-		}
-
-		// Cannot create approver props without a valid PocketBase user id.
-		if uidValue == "" {
-			continue
-		}
-
-		if divisionsJSON == "" {
-			// Tapr/vp approvers require a default division; skip if missing.
-			if defaultDivisionValue == "" && (hasTapr || hasVp) {
-				continue
-			}
-			b, _ := json.Marshal([]string{defaultDivisionValue})
-			divisionsJSON = string(b)
-		}
-
-		toUpsert = append(toUpsert, rowData{
-			uid:             uidValue,
-			defaultDivision: defaultDivisionValue,
-			maxAmount:       maxAmount,
-			divisionsJSON:   divisionsJSON,
-		})
+	rowsByUID := make(map[string]poApproverPropsUpsertRow, len(fallbackByUID)+len(turboByUID))
+	for uid, r := range fallbackByUID {
+		rowsByUID[uid] = r
 	}
-	if err := rows.Err(); err != nil {
-		return fmt.Errorf("iterate profiles: %w", err)
+	for uid, r := range turboByUID {
+		rowsByUID[uid] = r
 	}
-
-	if len(toUpsert) == 0 {
+	if len(rowsByUID) == 0 {
 		return nil
 	}
 
@@ -1338,31 +1277,67 @@ func synthesizePoApproverProps(dbPath string) error {
 	}
 	defer getUserClaimIdStmt.Close()
 
-	deletePropsStmt, err := tx.Prepare(`DELETE FROM po_approver_props WHERE user_claim = ?`)
+	insertTurboStmt, err := tx.Prepare(`
+		INSERT INTO po_approver_props (
+			id, user_claim, max_amount, project_max, sponsorship_max, staff_and_social_max,
+			media_and_event_max, computer_max, divisions, created, updated, _imported
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+	`)
 	if err != nil {
-		return fmt.Errorf("prepare deleteProps: %w", err)
+		return fmt.Errorf("prepare insertTurboStmt: %w", err)
 	}
-	defer deletePropsStmt.Close()
+	defer insertTurboStmt.Close()
 
-	insertPropsStmt, err := tx.Prepare(`INSERT INTO po_approver_props (user_claim, max_amount, divisions) VALUES (?, ?, ?)`)
+	insertFallbackStmt, err := tx.Prepare(`
+		INSERT INTO po_approver_props (
+			user_claim, max_amount, project_max, sponsorship_max, staff_and_social_max,
+			media_and_event_max, computer_max, divisions, _imported
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+	`)
 	if err != nil {
-		return fmt.Errorf("prepare insertProps: %w", err)
+		return fmt.Errorf("prepare insertFallbackStmt: %w", err)
 	}
-	defer insertPropsStmt.Close()
+	defer insertFallbackStmt.Close()
 
-	for _, r := range toUpsert {
+	for _, r := range rowsByUID {
 		if _, err := ensureClaimStmt.Exec(r.uid, poApproverClaimId); err != nil {
 			return fmt.Errorf("ensure user_claim: %w", err)
 		}
-		var userClaimId string
-		if err := getUserClaimIdStmt.QueryRow(r.uid, poApproverClaimId).Scan(&userClaimId); err != nil {
+		var userClaimID string
+		if err := getUserClaimIdStmt.QueryRow(r.uid, poApproverClaimId).Scan(&userClaimID); err != nil {
 			return fmt.Errorf("fetch user_claim id: %w", err)
 		}
-		if _, err := deletePropsStmt.Exec(userClaimId); err != nil {
-			return fmt.Errorf("delete old props: %w", err)
+
+		if r.id != "" {
+			if _, err := insertTurboStmt.Exec(
+				r.id,
+				userClaimID,
+				r.maxAmount,
+				r.projectMax,
+				r.sponsorshipMax,
+				r.staffAndSocialMax,
+				r.mediaAndEventMax,
+				r.computerMax,
+				r.divisionsJSON,
+				r.created,
+				r.updated,
+			); err != nil {
+				return fmt.Errorf("insert authoritative po_approver_props row %s: %w", r.id, err)
+			}
+			continue
 		}
-		if _, err := insertPropsStmt.Exec(userClaimId, r.maxAmount, r.divisionsJSON); err != nil {
-			return fmt.Errorf("insert po_approver_props: %w", err)
+
+		if _, err := insertFallbackStmt.Exec(
+			userClaimID,
+			r.maxAmount,
+			r.projectMax,
+			r.sponsorshipMax,
+			r.staffAndSocialMax,
+			r.mediaAndEventMax,
+			r.computerMax,
+			r.divisionsJSON,
+		); err != nil {
+			return fmt.Errorf("insert fallback po_approver_props for uid %s: %w", r.uid, err)
 		}
 	}
 
@@ -1370,6 +1345,201 @@ func synthesizePoApproverProps(dbPath string) error {
 		return fmt.Errorf("commit tx: %w", err)
 	}
 	return nil
+}
+
+func loadTurboPoApproverProps(parquetPath string) (map[string]poApproverPropsUpsertRow, error) {
+	if _, err := os.Stat(parquetPath); err != nil {
+		if os.IsNotExist(err) {
+			return map[string]poApproverPropsUpsertRow{}, nil
+		}
+		return nil, fmt.Errorf("stat %s: %w", parquetPath, err)
+	}
+
+	duck, err := sql.Open("duckdb", "")
+	if err != nil {
+		return nil, fmt.Errorf("open duckdb: %w", err)
+	}
+	defer duck.Close()
+
+	rows, err := duck.Query(`
+		SELECT
+			id,
+			uid,
+			max_amount,
+			project_max,
+			sponsorship_max,
+			staff_and_social_max,
+			media_and_event_max,
+			computer_max,
+			divisions,
+			created,
+			updated
+		FROM read_parquet(?)
+	`, parquetPath)
+	if err != nil {
+		return nil, fmt.Errorf("read %s with duckdb: %w", parquetPath, err)
+	}
+	defer rows.Close()
+
+	rowsByUID := map[string]poApproverPropsUpsertRow{}
+	seenIDs := map[string]struct{}{}
+
+	for rows.Next() {
+		var id, uid, divisionsJSON, created, updated string
+		var maxAmount, projectMax, sponsorshipMax, staffAndSocialMax, mediaAndEventMax, computerMax float64
+		if err := rows.Scan(
+			&id,
+			&uid,
+			&maxAmount,
+			&projectMax,
+			&sponsorshipMax,
+			&staffAndSocialMax,
+			&mediaAndEventMax,
+			&computerMax,
+			&divisionsJSON,
+			&created,
+			&updated,
+		); err != nil {
+			return nil, fmt.Errorf("scan %s row: %w", parquetPath, err)
+		}
+
+		id = strings.TrimSpace(id)
+		uid = strings.TrimSpace(uid)
+		divisionsJSON = strings.TrimSpace(divisionsJSON)
+		created = strings.TrimSpace(created)
+		updated = strings.TrimSpace(updated)
+
+		if id == "" {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row: missing id")
+		}
+		if uid == "" {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing uid", id)
+		}
+		if divisionsJSON == "" {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing divisions", id)
+		}
+		if created == "" {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing created", id)
+		}
+		if updated == "" {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing updated", id)
+		}
+
+		var parsed []string
+		if err := json.Unmarshal([]byte(divisionsJSON), &parsed); err != nil {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s divisions JSON: %w", id, err)
+		}
+
+		if _, exists := seenIDs[id]; exists {
+			return nil, fmt.Errorf("duplicate TurboPoApproverProps id %s", id)
+		}
+		seenIDs[id] = struct{}{}
+		if _, exists := rowsByUID[uid]; exists {
+			return nil, fmt.Errorf("duplicate TurboPoApproverProps uid %s", uid)
+		}
+
+		rowsByUID[uid] = poApproverPropsUpsertRow{
+			id:                id,
+			uid:               uid,
+			maxAmount:         maxAmount,
+			projectMax:        projectMax,
+			sponsorshipMax:    sponsorshipMax,
+			staffAndSocialMax: staffAndSocialMax,
+			mediaAndEventMax:  mediaAndEventMax,
+			computerMax:       computerMax,
+			divisionsJSON:     divisionsJSON,
+			created:           created,
+			updated:           updated,
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate %s rows: %w", parquetPath, err)
+	}
+
+	return rowsByUID, nil
+}
+
+// synthesizePoApproverPropsFallbackRows builds fallback po approver props from Profiles.customClaims.
+// These rows are only used when no authoritative TurboPoApproverProps row exists for the uid.
+func synthesizePoApproverPropsFallbackRows() (map[string]poApproverPropsUpsertRow, error) {
+	duck, err := sql.Open("duckdb", "")
+	if err != nil {
+		return nil, fmt.Errorf("open duckdb: %w", err)
+	}
+	defer duck.Close()
+
+	rows, err := duck.Query(`
+		SELECT
+			pocketbase_uid AS uid,
+			LOWER(COALESCE(customClaims, '')) AS claims,
+			pocketbase_defaultDivision AS default_division
+		FROM read_parquet('./parquet/Profiles.parquet')
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("read Profiles.parquet: %w", err)
+	}
+	defer rows.Close()
+
+	fallbackByUID := map[string]poApproverPropsUpsertRow{}
+	for rows.Next() {
+		var uid, claims, defaultDivision sql.NullString
+		if err := rows.Scan(&uid, &claims, &defaultDivision); err != nil {
+			return nil, fmt.Errorf("scan profile: %w", err)
+		}
+
+		uidValue := strings.TrimSpace(uid.String)
+		claimsValue := strings.TrimSpace(claims.String)
+		defaultDivisionValue := strings.TrimSpace(defaultDivision.String)
+		if uidValue == "" {
+			continue
+		}
+
+		hasTapr := strings.Contains(claimsValue, "tapr")
+		hasVp := strings.Contains(claimsValue, "vp")
+		hasSmg := strings.Contains(claimsValue, "smg")
+
+		var maxAmount float64
+		var divisionsJSON string
+		switch {
+		case hasSmg:
+			maxAmount = 250000
+			divisionsJSON = "[]"
+		case hasVp && !hasSmg:
+			maxAmount = 2500
+		case hasTapr && !hasVp && !hasSmg:
+			maxAmount = 500
+		default:
+			continue
+		}
+
+		if divisionsJSON == "" {
+			// Tapr/vp approvers require a default division; skip if missing.
+			if defaultDivisionValue == "" {
+				continue
+			}
+			b, err := json.Marshal([]string{defaultDivisionValue})
+			if err != nil {
+				return nil, fmt.Errorf("marshal fallback divisions for uid %s: %w", uidValue, err)
+			}
+			divisionsJSON = string(b)
+		}
+
+		fallbackByUID[uidValue] = poApproverPropsUpsertRow{
+			uid:               uidValue,
+			maxAmount:         maxAmount,
+			projectMax:        0,
+			sponsorshipMax:    0,
+			staffAndSocialMax: 0,
+			mediaAndEventMax:  0,
+			computerMax:       0,
+			divisionsJSON:     divisionsJSON,
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("iterate profiles: %w", err)
+	}
+
+	return fallbackByUID, nil
 }
 
 // backfillAllowanceTotals calculates and writes totals for Allowance/Meals

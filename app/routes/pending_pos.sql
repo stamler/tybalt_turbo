@@ -126,18 +126,7 @@ WHERE
               WHEN COALESCE(ek.name, 'standard') = 'computer' THEN COALESCE(pap.computer_max, 0)
               ELSE 0
             END
-          ) >= po.approval_total
-          AND (
-            CASE
-              WHEN COALESCE(ek.name, 'standard') = 'standard' AND po.job != '' THEN COALESCE(pap.project_max, 0)
-              WHEN COALESCE(ek.name, 'standard') = 'standard' THEN COALESCE(pap.max_amount, 0)
-              WHEN COALESCE(ek.name, 'standard') = 'sponsorship' THEN COALESCE(pap.sponsorship_max, 0)
-              WHEN COALESCE(ek.name, 'standard') = 'staff_and_social' THEN COALESCE(pap.staff_and_social_max, 0)
-              WHEN COALESCE(ek.name, 'standard') = 'media_and_event' THEN COALESCE(pap.media_and_event_max, 0)
-              WHEN COALESCE(ek.name, 'standard') = 'computer' THEN COALESCE(pap.computer_max, 0)
-              ELSE 0
-            END
-          ) <= COALESCE((SELECT MIN(threshold) FROM po_approval_thresholds WHERE threshold >= po.approval_total), 1000000)
+          ) BETWEEN po.approval_total AND COALESCE((SELECT MIN(threshold) FROM po_approval_thresholds WHERE threshold >= po.approval_total), 1000000)
       )
     )
   )

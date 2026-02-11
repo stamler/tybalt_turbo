@@ -75,6 +75,10 @@ func NormalizeExpenditureKindID(kindID string) string {
 // use for second-approval qualification.
 func ResolvePOApproverLimitColumn(kindID string, hasJob bool) (string, error) {
 	if strings.TrimSpace(kindID) == "" {
+		// Legacy records with no kind are treated as standard.
+		if hasJob {
+			return POApproverLimitColumnStandardWithJob, nil
+		}
 		return POApproverLimitColumnStandardNoJob, nil
 	}
 	name := kindIDToName[kindID]

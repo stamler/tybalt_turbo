@@ -16,12 +16,16 @@ import (
 
 // The tablesToDump variable is used to specify the tables that should be
 // exported to Parquet format.
-var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts", "TurboClientNotes", "TurboVendors", "TurboPurchaseOrders", "TurboRateRoles", "TurboRateSheets", "TurboRateSheetEntries"}
+var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts", "TurboClientNotes", "TurboVendors", "TurboPurchaseOrders", "TurboPoApproverProps", "TurboRateRoles", "TurboRateSheets", "TurboRateSheetEntries"}
 
 func ToParquet(sourceSQLiteDb string) {
-	standardExpenditureKindID = GetStandardExpenditureKindID(sourceSQLiteDb)
+	id, err := GetStandardExpenditureKindID(sourceSQLiteDb)
+	if err != nil {
+		log.Fatalf("Failed to resolve standard expenditure kind ID: %v", err)
+	}
+	standardExpenditureKindID = id
 
-	err := godotenv.Load()
+	err = godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
 	}
@@ -326,6 +330,26 @@ func ToParquet(sourceSQLiteDb string) {
 					FROM mysql_db.TurboPurchaseOrders
 				) TO 'parquet/TurboPurchaseOrders.parquet' (FORMAT PARQUET)
 			`, turboPurchaseOrdersKindSelect)
+		case "TurboPoApproverProps":
+			// Export TurboPoApproverProps for full-fidelity round-trip of po_approver_props.
+			// id is the PocketBase po_approver_props record ID, uid is admin_profiles.legacy_uid.
+			query = `
+				COPY (
+					SELECT
+						id,
+						uid,
+						max_amount,
+						project_max,
+						sponsorship_max,
+						staff_and_social_max,
+						media_and_event_max,
+						computer_max,
+						CAST(divisions AS VARCHAR) AS divisions,
+						created,
+						updated
+					FROM mysql_db.TurboPoApproverProps
+				) TO 'parquet/PoApproverProps.parquet' (FORMAT PARQUET)
+			`
 		case "TurboRateRoles":
 			// Export TurboRateRoles for round-trip of rate roles.
 			// These are rate roles that were written back from Turbo with preserved PocketBase IDs.

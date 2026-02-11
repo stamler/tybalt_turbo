@@ -89,6 +89,15 @@ MySQL → [--export] → Parquet Files → [--import] → SQLite/PocketBase
                                    → [--cleanup] → Remove Deletions
 ```
 
+### po_approver_props Precedence
+
+- `--export` includes `TurboPoApproverProps` as `parquet/PoApproverProps.parquet`.
+- `--import --users` resolves po approver props per user:
+  - Turbo row is authoritative when present.
+  - Synthesis is used only as fallback for users without Turbo rows.
+- Import recreates/links `user_claims` (`po_approver`) and writes `po_approver_props` against that claim.
+- Turbo rows are strict-validated (identity, limits, timestamps, and valid JSON array in `divisions`).
+
 ## Usage Examples
 
 ```bash

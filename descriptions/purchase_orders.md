@@ -51,6 +51,8 @@ At server startup (`app/routes/routes.go` → `ValidateExpenditureKindsConfig`),
 
 The name↔ID mappings are cached at startup and used throughout the application.
 
+Operational note: these checks protect runtime behavior, but approver correctness in hybrid Turbo/legacy operation depends on synchronized data flow for approver props (`poApproverProps` writeback -> Firestore `TurboPoApproverProps` -> MySQL `TurboPoApproverProps` -> `import_data --users`).
+
 ## Approval Total
 
 The `approval_total` field determines which approval tier a purchase order falls into and whether second approval is required. It is calculated automatically when a purchase order is created or updated.

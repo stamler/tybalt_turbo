@@ -70,7 +70,7 @@
     if (loadedKinds) return;
     loadedKinds = true;
     pb.collection("expenditure_kinds")
-      .getFullList<ExpenditureKindsResponse>({ sort: "name" })
+      .getFullList<ExpenditureKindsResponse>()
       .then((rows) => {
         expenditureKinds = rows;
       })

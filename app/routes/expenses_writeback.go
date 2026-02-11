@@ -11,9 +11,10 @@ import (
 
 // Wrapper response struct for structured expenses writeback
 type expensesWritebackResponse struct {
-	Expenses       []expenseExportOutput       `json:"expenses"`
-	Vendors        []vendorExportOutput        `json:"vendors"`
-	PurchaseOrders []purchaseOrderExportOutput `json:"purchaseOrders"`
+	Expenses        []expenseExportOutput         `json:"expenses"`
+	Vendors         []vendorExportOutput          `json:"vendors"`
+	PurchaseOrders  []purchaseOrderExportOutput   `json:"purchaseOrders"`
+	PoApproverProps []poApproverPropsExportOutput `json:"poApproverProps"`
 }
 
 // Vendor export struct for separate vendors array
@@ -30,17 +31,17 @@ type purchaseOrderExportOutput struct {
 	PoNumber                  string  `json:"poNumber"`
 	VendorId                  string  `json:"vendorId,omitempty"`
 	VendorName                string  `json:"vendorName,omitempty"`
-	Uid                       string  `json:"uid,omitempty"` // legacy_uid of creator
-	Job                       string  `json:"job,omitempty"` // PocketBase job ID
+	Uid                       string  `json:"uid,omitempty"`         // legacy_uid of creator
+	Job                       string  `json:"job,omitempty"`         // PocketBase job ID
 	Description               string  `json:"description,omitempty"` // PO's own description
-	Division                  string  `json:"division,omitempty"` // division code
+	Division                  string  `json:"division,omitempty"`    // division code
 	DivisionName              string  `json:"divisionName,omitempty"`
 	Total                     float64 `json:"total"`
 	ApprovalTotal             float64 `json:"approvalTotal"`
 	Date                      string  `json:"date,omitempty"`
-	EndDate                   string  `json:"endDate,omitempty"` // for recurring POs
-	Approved                  string  `json:"approved,omitempty"`    // timestamp or empty
-	ApproverUid               string  `json:"approverUid,omitempty"` // legacy_uid (first approver)
+	EndDate                   string  `json:"endDate,omitempty"`                   // for recurring POs
+	Approved                  string  `json:"approved,omitempty"`                  // timestamp or empty
+	ApproverUid               string  `json:"approverUid,omitempty"`               // legacy_uid (first approver)
 	SecondApproval            string  `json:"secondApproval,omitempty"`            // timestamp or empty
 	SecondApproverUid         string  `json:"secondApproverUid,omitempty"`         // legacy_uid
 	PrioritySecondApproverUid string  `json:"prioritySecondApproverUid,omitempty"` // legacy_uid
@@ -55,11 +56,26 @@ type purchaseOrderExportOutput struct {
 	Type                      string  `json:"type,omitempty"`
 	Frequency                 string  `json:"frequency,omitempty"`
 	Status                    string  `json:"status,omitempty"`
-	Category                  string  `json:"category,omitempty"`  // PocketBase category ID
-	ParentPo                  string  `json:"parentPo,omitempty"`  // PocketBase parent PO ID
-	Branch                    string  `json:"branch,omitempty"`    // PocketBase branch ID
+	Category                  string  `json:"category,omitempty"` // PocketBase category ID
+	ParentPo                  string  `json:"parentPo,omitempty"` // PocketBase parent PO ID
+	Branch                    string  `json:"branch,omitempty"`   // PocketBase branch ID
 	Attachment                string  `json:"attachment,omitempty"`
 	AttachmentHash            string  `json:"attachmentHash,omitempty"`
+}
+
+// PO approver props export struct for TurboPoApproverProps writeback
+type poApproverPropsExportOutput struct {
+	Id                string  `json:"id"`
+	Uid               string  `json:"uid"`
+	MaxAmount         float64 `json:"max_amount"`
+	ProjectMax        float64 `json:"project_max"`
+	SponsorshipMax    float64 `json:"sponsorship_max"`
+	StaffAndSocialMax float64 `json:"staff_and_social_max"`
+	MediaAndEventMax  float64 `json:"media_and_event_max"`
+	ComputerMax       float64 `json:"computer_max"`
+	Divisions         string  `json:"divisions"`
+	Created           string  `json:"created"`
+	Updated           string  `json:"updated"`
 }
 
 // Internal struct for DB scanning - expenses query
@@ -126,10 +142,10 @@ type purchaseOrderExportDBRow struct {
 	PoNumber                  string  `db:"po_number"`
 	VendorId                  string  `db:"vendor_id"`
 	VendorName                string  `db:"vendor_name"`
-	Uid                       string  `db:"uid"` // legacy_uid
-	Job                       string  `db:"job"` // PocketBase job ID
+	Uid                       string  `db:"uid"`         // legacy_uid
+	Job                       string  `db:"job"`         // PocketBase job ID
 	Description               string  `db:"description"` // PO's own description
-	Division                  string  `db:"division"` // division code
+	Division                  string  `db:"division"`    // division code
 	DivisionName              string  `db:"division_name"`
 	Total                     float64 `db:"total"`
 	ApprovalTotal             float64 `db:"approval_total"`
@@ -138,7 +154,7 @@ type purchaseOrderExportDBRow struct {
 	Approved                  string  `db:"approved"`
 	ApproverUid               string  `db:"approver_uid"` // legacy_uid (first approver)
 	SecondApproval            string  `db:"second_approval"`
-	SecondApproverUid         string  `db:"second_approver_uid"` // legacy_uid
+	SecondApproverUid         string  `db:"second_approver_uid"`          // legacy_uid
 	PrioritySecondApproverUid string  `db:"priority_second_approver_uid"` // legacy_uid
 	Cancelled                 string  `db:"cancelled"`
 	CancellerUid              string  `db:"canceller_uid"` // legacy_uid
@@ -156,6 +172,21 @@ type purchaseOrderExportDBRow struct {
 	Branch                    string  `db:"branch"`    // PocketBase branch ID
 	Attachment                string  `db:"attachment"`
 	AttachmentHash            string  `db:"attachment_hash"`
+}
+
+// Internal struct for DB scanning - po approver props query
+type poApproverPropsExportDBRow struct {
+	Id                string  `db:"id"`
+	Uid               string  `db:"uid"` // legacy_uid
+	MaxAmount         float64 `db:"max_amount"`
+	ProjectMax        float64 `db:"project_max"`
+	SponsorshipMax    float64 `db:"sponsorship_max"`
+	StaffAndSocialMax float64 `db:"staff_and_social_max"`
+	MediaAndEventMax  float64 `db:"media_and_event_max"`
+	ComputerMax       float64 `db:"computer_max"`
+	Divisions         string  `db:"divisions"`
+	Created           string  `db:"created"`
+	Updated           string  `db:"updated"`
 }
 
 // Output struct matching legacy Tybalt Expenses Firestore format
@@ -416,6 +447,35 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			return e.Error(http.StatusInternalServerError, "failed to query purchase orders: "+err.Error(), nil)
 		}
 
+		// Query 4: export all po_approver_props for full-fidelity round-trip
+		poApproverPropsQuery := `
+			SELECT
+			  pp.id,
+			  COALESCE(ap.legacy_uid, '') AS uid,
+			  COALESCE(pp.max_amount, 0) AS max_amount,
+			  COALESCE(pp.project_max, 0) AS project_max,
+			  COALESCE(pp.sponsorship_max, 0) AS sponsorship_max,
+			  COALESCE(pp.staff_and_social_max, 0) AS staff_and_social_max,
+			  COALESCE(pp.media_and_event_max, 0) AS media_and_event_max,
+			  COALESCE(pp.computer_max, 0) AS computer_max,
+			  COALESCE(pp.divisions, '[]') AS divisions,
+			  COALESCE(pp.created, '') AS created,
+			  COALESCE(pp.updated, '') AS updated
+			FROM po_approver_props pp
+			JOIN user_claims uc ON uc.id = pp.user_claim
+			LEFT JOIN admin_profiles ap ON ap.uid = uc.uid
+		`
+
+		var poApproverPropsRows []poApproverPropsExportDBRow
+		if err := app.DB().NewQuery(poApproverPropsQuery).All(&poApproverPropsRows); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to query po approver props: "+err.Error(), nil)
+		}
+		for _, row := range poApproverPropsRows {
+			if strings.TrimSpace(row.Uid) == "" {
+				return e.Error(http.StatusInternalServerError, "missing legacy uid for po_approver_props id "+row.Id, nil)
+			}
+		}
+
 		// Convert expense DB rows to output format
 		expenses := make([]expenseExportOutput, len(expenseRows))
 		for i, r := range expenseRows {
@@ -541,11 +601,30 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			}
 		}
 
-		// Return structured response with all three arrays
+		// Convert po approver props DB rows to output format
+		poApproverProps := make([]poApproverPropsExportOutput, len(poApproverPropsRows))
+		for i, r := range poApproverPropsRows {
+			poApproverProps[i] = poApproverPropsExportOutput{
+				Id:                r.Id,
+				Uid:               r.Uid,
+				MaxAmount:         r.MaxAmount,
+				ProjectMax:        r.ProjectMax,
+				SponsorshipMax:    r.SponsorshipMax,
+				StaffAndSocialMax: r.StaffAndSocialMax,
+				MediaAndEventMax:  r.MediaAndEventMax,
+				ComputerMax:       r.ComputerMax,
+				Divisions:         r.Divisions,
+				Created:           r.Created,
+				Updated:           r.Updated,
+			}
+		}
+
+		// Return structured response with all arrays
 		return e.JSON(http.StatusOK, expensesWritebackResponse{
-			Expenses:       expenses,
-			Vendors:        vendors,
-			PurchaseOrders: purchaseOrders,
+			Expenses:        expenses,
+			Vendors:         vendors,
+			PurchaseOrders:  purchaseOrders,
+			PoApproverProps: poApproverProps,
 		})
 	}
 }

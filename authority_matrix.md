@@ -17,3 +17,7 @@ In the UI:
 
 - **Purchase Orders editor**: Kind is selectable via toggle only when no Job is set. If Job is set, Kind selection is hidden and the PO is treated as project expense (`standard` + job-present behavior).
 - **Expenses editor**: Kind is never selectable. It is display-only: inherited from the linked PO when a PO is present, otherwise shown as `standard` for no-PO expenses.
+
+Operational dependency:
+
+- Approval eligibility depends on synchronized `po_approver_props` data. In mixed Turbo/legacy operation, authoritative values flow through `poApproverProps` writeback -> Firestore `TurboPoApproverProps` -> MySQL `TurboPoApproverProps` -> `import_data --users` (Turbo values take precedence per user, synthesis is fallback only).
