@@ -9,6 +9,8 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+const poApproverPropsMissingTimestampFallback = "1970-01-01 00:00:00.000Z"
+
 // Wrapper response struct for structured expenses writeback
 type expensesWritebackResponse struct {
 	Expenses        []expenseExportOutput         `json:"expenses"`
@@ -459,15 +461,17 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  COALESCE(pp.media_and_event_max, 0) AS media_and_event_max,
 			  COALESCE(pp.computer_max, 0) AS computer_max,
 			  COALESCE(pp.divisions, '[]') AS divisions,
-			  COALESCE(pp.created, '') AS created,
-			  COALESCE(pp.updated, '') AS updated
+			  COALESCE(NULLIF(TRIM(pp.created), ''), NULLIF(TRIM(pp.updated), ''), {:poApproverPropsMissingTimestampFallback}) AS created,
+			  COALESCE(NULLIF(TRIM(pp.updated), ''), NULLIF(TRIM(pp.created), ''), {:poApproverPropsMissingTimestampFallback}) AS updated
 			FROM po_approver_props pp
 			JOIN user_claims uc ON uc.id = pp.user_claim
 			LEFT JOIN admin_profiles ap ON ap.uid = uc.uid
 		`
 
 		var poApproverPropsRows []poApproverPropsExportDBRow
-		if err := app.DB().NewQuery(poApproverPropsQuery).All(&poApproverPropsRows); err != nil {
+		if err := app.DB().NewQuery(poApproverPropsQuery).Bind(dbx.Params{
+			"poApproverPropsMissingTimestampFallback": poApproverPropsMissingTimestampFallback,
+		}).All(&poApproverPropsRows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to query po approver props: "+err.Error(), nil)
 		}
 		for _, row := range poApproverPropsRows {

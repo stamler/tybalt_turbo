@@ -1247,6 +1247,7 @@ func upsertPoApproverPropsWithTurboPrecedence(dbPath string) error {
 	if len(rowsByUID) == 0 {
 		return nil
 	}
+	fallbackTimestamp := time.Now().UTC().Format("2006-01-02 15:04:05.000Z")
 
 	sqliteDB, err := sql.Open("sqlite", dbPath)
 	if err != nil {
@@ -1291,8 +1292,8 @@ func upsertPoApproverPropsWithTurboPrecedence(dbPath string) error {
 	insertFallbackStmt, err := tx.Prepare(`
 		INSERT INTO po_approver_props (
 			user_claim, max_amount, project_max, sponsorship_max, staff_and_social_max,
-			media_and_event_max, computer_max, divisions, _imported
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+			media_and_event_max, computer_max, divisions, created, updated, _imported
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
 	`)
 	if err != nil {
 		return fmt.Errorf("prepare insertFallbackStmt: %w", err)
@@ -1336,6 +1337,8 @@ func upsertPoApproverPropsWithTurboPrecedence(dbPath string) error {
 			r.mediaAndEventMax,
 			r.computerMax,
 			r.divisionsJSON,
+			fallbackTimestamp,
+			fallbackTimestamp,
 		); err != nil {
 			return fmt.Errorf("insert fallback po_approver_props for uid %s: %w", r.uid, err)
 		}
