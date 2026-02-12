@@ -4,7 +4,7 @@
 
 | PO Type    | Description                                                                                   | May be Closed Manually                                               | May be Canceled if status is Active                              | Closed automatically                    | Can be converted to different PO type                                         | Approval tier required                                |
 | ---------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- | ---------------------------------------------------------------- | --------------------------------------- | ----------------------------------------------------------------------------- | ----------------------------------------------------- |
-| Normal     | Valid for a single expense                                                                    | No                                                                   | Yes, by payables_admin if no expenses are associated             | When an expense is committed against it | Yes, to Cumulative by payables_admin claim holder                             | Based on approval_total (same as total)               |
+| One-Time   | Valid for a single expense                                                                    | No                                                                   | Yes, by payables_admin if no expenses are associated             | When an expense is committed against it | Yes, to Cumulative by payables_admin claim holder                             | Based on approval_total (same as total)               |
 | Recurring  | Valid for a fixed number of expenses not exceeding specified value                            | Yes, if status is Active and > 0 expenses associated                 | Yes, by payables_admin if no expenses are associated             | When the final expense is committed     | No                                                                            | Based on approval_total (total × number of periods)   |
 | Cumulative | Valid for an unlimited number of expenses where sum of values does not exceed specified value | Yes, if status is Active and > 0 expenses associated                 | Yes, by payables_admin if no expenses are associated             | When the maximum amount is reached      | No                                                                            | Based on approval_total (same as total)               |
 |            |                                                                                               | createClosePurchaseOrderHandler (app/routes/close_purchase_order.go) | createCancelPurchaseOrderHandler (app/routes/purchase_orders.go) | n/a (handled in expense processing)     | createConvertToCumulativePurchaseOrderHandler (app/routes/purchase_orders.go) | getSecondApproverClaim (app/hooks/purchase_orders.go) |
@@ -61,7 +61,7 @@ The `approval_total` field determines which approval tier a purchase order falls
 
 | PO Type    | approval_total Calculation      |
 | ---------- | ------------------------------- |
-| Normal     | Same as `total`                 |
+| One-Time   | Same as `total`                 |
 | Cumulative | Same as `total`                 |
 | Recurring  | `total × number_of_occurrences` |
 
@@ -189,9 +189,9 @@ When a purchase order requires second approval:
 
 Any user can create a purchase order. The creator's uid is stored in the `uid` column.
 
-A purchase order can be of type `Normal`, `Cumulative`, or `Recurring`:
+A purchase order can be of type `One-Time`, `Cumulative`, or `Recurring`:
 
-- **Normal:** Valid for one expense, then automatically closed
+- **One-Time:** Valid for one expense, then automatically closed
 - **Cumulative:** Valid for multiple expenses until their sum reaches the PO total
 - **Recurring:** Valid for a fixed number of expenses at a specified frequency until an end date
 
@@ -246,7 +246,7 @@ Purchase orders can be closed manually or automatically:
 
 **Automatic Closure:**
 
-- `Normal` POs: Closed when their single expense is committed
+- `One-Time` POs: Closed when their single expense is committed
 - `Recurring` POs: Closed when all expected expenses have been committed
 - `Cumulative` POs: Closed when expenses total reaches the PO total
 
@@ -370,7 +370,7 @@ Manually closes the purchase order with the given ID.
 | po_number                | string                       | Format `YYMM-NNNN` or `YYMM-NNNN-XX`, unique, required if Active/Cancelled/Closed         |
 | status                   | enum                         | `Unapproved`, `Active`, `Cancelled`, `Closed`                                             |
 | uid                      | relation → users             | Creator of the PO, required                                                               |
-| type                     | enum                         | `Normal`, `Cumulative`, `Recurring`                                                       |
+| type                     | enum                         | `One-Time`, `Cumulative`, `Recurring`                                                     |
 | kind                     | relation → expenditure_kinds | Expenditure kind, required; determines which approval limit column is used                |
 | date                     | string                       | Start date, YYYY-MM-DD format, required                                                   |
 | end_date                 | string                       | End date for Recurring POs, YYYY-MM-DD format                                             |

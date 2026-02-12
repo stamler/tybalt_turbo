@@ -142,6 +142,14 @@
   enctype="multipart/form-data"
   onsubmit={save}
 >
+  <h1 class="w-full text-xl font-bold text-neutral-800">
+    {#if data.editing}
+      Editing Expense
+    {:else}
+      Create Expense
+    {/if}
+  </h1>
+
   <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
     <label for="date">Date</label>
     <input

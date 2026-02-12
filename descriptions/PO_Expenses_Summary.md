@@ -8,7 +8,7 @@
 
 1. Approval is single-tier when `approval_total` is less than or equal to the first threshold returned by `po_approval_thresholds`; otherwise, a second approval is required. (app/routes/purchase_orders.go: `createApprovePurchaseOrderHandler` — sets `recordRequiresSecondApproval` based on `approval_total > thresholds[0]` after calling `utilities.GetPOApprovalThresholds`; app/utilities/po_approvers.go: `GetPOApprovalThresholds`.)
 
-2. The `approval_total` is set to total for `Normal`/`Cumulative` POs and computed for `Recurring` POs using the full period value (app/hooks/purchase_orders.go: `cleanPurchaseOrder`, which calls `utilities.CalculateRecurringPurchaseOrderTotalValue`; app/utilities/po_approvers.go: `GetPOApprovalThresholds`).
+2. The `approval_total` is set to total for `One-Time`/`Cumulative` POs and computed for `Recurring` POs using the full period value (app/hooks/purchase_orders.go: `cleanPurchaseOrder`, which calls `utilities.CalculateRecurringPurchaseOrderTotalValue`; app/utilities/po_approvers.go: `GetPOApprovalThresholds`).
 
 3. During approval, first approval sets `approved` and `approver`; if second approval is required, `second_approval` and `second_approver` must also be set.
 
@@ -30,7 +30,7 @@
 3. When an `expenses` record references a `purchase_orders` record, the following validations also apply (app/hooks/validate_expenses.go: `validateExpense`):
    1. The `expenses` record's `date` must be on or after the PO's date (uses `utilities.DateStringLimit` with the PO's date).
    2. If the PO type is `Recurring`, the expense `date` must be on or before the PO's `end_date` (uses utilities.DateStringLimit with max=true).
-   3. For `Normal` or `Recurring` POs, the expense `total` must not exceed the allowed overage limit (the lesser of `constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT` or `constants.MAX_PURCHASE_ORDER_EXCESS_VALUE` over the PO total); enforced via validation.Max(totalLimit) (app/hooks/validate_expenses.go: `validateExpense`; app/constants/constants.go).
+   3. For `One-Time` or `Recurring` POs, the expense `total` must not exceed the allowed overage limit (the lesser of `constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT` or `constants.MAX_PURCHASE_ORDER_EXCESS_VALUE` over the PO total); enforced via validation.Max(totalLimit) (app/hooks/validate_expenses.go: `validateExpense`; app/constants/constants.go).
    4. For `Cumulative` POs, the sum of existing expenses plus the new expense must not exceed the PO total; overflow returns a `cumulative_po_overflow` error with details (app/hooks/validate_expenses.go: `validateExpense`; existing total computed in app/hooks/expenses.go: ProcessExpense via utilities.CumulativeTotalExpensesForPurchaseOrder).
 
 ### 4. As of now, anybody can submit an expense against any purchase_orders record if the record has a `status` field value of `Active`

@@ -188,7 +188,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:           "caller with the payables_admin claim can convert Active Normal purchase_orders to Cumulative",
+			Name:           "caller with the payables_admin claim can convert Active One-Time purchase_orders to Cumulative",
 			Method:         http.MethodPost,
 			URL:            "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
 			Headers:        map[string]string{"Authorization": closeToken},
@@ -202,7 +202,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:           "caller with the payables_admin claim cannot convert non-Active Normal purchase_orders to Cumulative",
+			Name:           "caller with the payables_admin claim cannot convert non-Active One-Time purchase_orders to Cumulative",
 			Method:         http.MethodPost,
 			URL:            "/api/purchase_orders/gal6e5la2fa4rpn/make_cumulative",
 			Headers:        map[string]string{"Authorization": closeToken},
@@ -219,13 +219,13 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:           "caller with the payables_admin claim cannot convert Active non-Normal purchase_orders to Cumulative",
+			Name:           "caller with the payables_admin claim cannot convert Active non-One-Time purchase_orders to Cumulative",
 			Method:         http.MethodPost,
 			URL:            "/api/purchase_orders/ly8xyzpuj79upq1/make_cumulative",
 			Headers:        map[string]string{"Authorization": closeToken},
 			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
-				`"code":"po_not_normal"`,
+				`"code":"po_not_one_time"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnModelBeforeUpdate": 0,
@@ -236,7 +236,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:           "caller without the payables_admin claim cannot convert Active Normal purchase_orders to Cumulative",
+			Name:           "caller without the payables_admin claim cannot convert Active One-Time purchase_orders to Cumulative",
 			Method:         http.MethodPost,
 			URL:            "/api/purchase_orders/2plsetqdxht7esg/make_cumulative",
 			Headers:        map[string]string{"Authorization": nonCloseToken},
@@ -317,12 +317,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:            "Active Normal -type purchase_orders records cannot be closed",
+			Name:            "Active One-Time purchase_orders records cannot be closed",
 			Method:          http.MethodPost,
 			URL:             "/api/purchase_orders/2plsetqdxht7esg/close",
 			Headers:         map[string]string{"Authorization": closeToken},
 			ExpectedStatus:  400,
-			ExpectedContent: []string{`"code":"invalid_po_type","message":"Normal -type purchase orders may be cancelled but not manually closed"`},
+			ExpectedContent: []string{`"code":"invalid_po_type","message":"One-Time purchase orders may be cancelled but not manually closed"`},
 			ExpectedEvents: map[string]int{
 				"OnBeforeApiError": 0,
 				"OnAfterApiError":  0,

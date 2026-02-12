@@ -168,7 +168,7 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 
 					// The type field will determine what we do here.
 					/*
-					   - `Normal` type means just set the Status to Closed, returning an
+					   - `One-Time` type means just set the Status to Closed, returning an
 					     error if it isn't currently `Active`
 
 					   - `Recurring` type means we need to check if an expense has been
@@ -183,7 +183,7 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 					purchaseOrderType := purchaseOrderRecord.GetString("type")
 					var dirtyPurchaseOrderRecord bool
 					switch purchaseOrderType {
-					case "Normal":
+					case "One-Time":
 						purchaseOrderRecord.Set("status", "Closed")
 						dirtyPurchaseOrderRecord = true
 					case "Recurring":

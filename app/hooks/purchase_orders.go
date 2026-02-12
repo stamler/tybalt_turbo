@@ -32,9 +32,9 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 
 	typeString := purchaseOrderRecord.GetString("type")
 
-	// Normal and Cumulative Purchase both have empty values for
+	// One-Time and Cumulative purchase orders both have empty values for
 	// end_date and frequency
-	if typeString == "Normal" || typeString == "Cumulative" {
+	if typeString == "One-Time" || typeString == "Cumulative" {
 		purchaseOrderRecord.Set("end_date", "")
 		purchaseOrderRecord.Set("frequency", "")
 	}
@@ -513,7 +513,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 			validation.By(approverIsActive(app)),
 			validation.By(utilities.PoApproverPropsHasDivisionPermission(app, constants.PO_APPROVER_CLAIM_ID, purchaseOrderRecord.GetString("division")))),
 		"total": validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.Max(constants.MAX_APPROVAL_TOTAL)),
-		"type":  validation.Validate(purchaseOrderRecord.GetString("type"), validation.When(isChild, validation.In("Normal").Error("child POs must be of type Normal"))),
+		"type":  validation.Validate(purchaseOrderRecord.GetString("type"), validation.When(isChild, validation.In("One-Time").Error("child POs must be of type One-Time"))),
 	}
 
 	// If a job is present, verify the referenced job exists and has Active status

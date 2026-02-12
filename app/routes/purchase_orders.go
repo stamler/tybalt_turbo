@@ -579,7 +579,7 @@ func createCancelPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 
 /*
 createConvertToCumulativePurchaseOrderHandler is a function that converts a
-status=Active type=Normal purchase_orders record to a type=Cumulative
+status=Active type=One-Time purchase_orders record to a type=Cumulative
 purchase_orders record. It may only be called by a user with the
 payables_admin claim.
 */
@@ -610,12 +610,12 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) func(e *core.Re
 				}
 			}
 
-			// check if the purchase order has type=Normal
-			if po.GetString("type") != "Normal" {
+			// check if the purchase order has type=One-Time
+			if po.GetString("type") != "One-Time" {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
-					Code:    "po_not_normal",
-					Message: "only Normal purchase orders can be converted to Cumulative",
+					Code:    "po_not_one_time",
+					Message: "only One-Time purchase orders can be converted to Cumulative",
 				}
 			}
 

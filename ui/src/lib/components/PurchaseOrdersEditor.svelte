@@ -54,6 +54,38 @@
   const standardKindId = $derived.by(
     () => expenditureKinds.find((kind) => kind.name === "standard")?.id ?? "",
   );
+  const typeOptions = [
+    { id: "One-Time", label: "One-Time" },
+    { id: "Cumulative", label: "Cumulative" },
+    { id: "Recurring", label: "Recurring" },
+  ];
+  const selectedType = $derived.by(() => typeOptions.find((type) => type.id === item.type));
+  const selectedTypeDescription = $derived.by(() => {
+    if (item.type === "Recurring") {
+      return "for recurring expenses, requires an end date and frequency";
+    }
+    if (item.type === "Cumulative") {
+      return "allows multiple expenses until the PO total is used";
+    }
+    return "for a single expense, closes after use";
+  });
+  const paymentTypeOptions = [
+    { id: "OnAccount", label: "On Account" },
+    { id: "Expense", label: "Expense" },
+    { id: "CorporateCreditCard", label: "Corporate Credit Card" },
+  ];
+  const selectedPaymentType = $derived.by(() =>
+    paymentTypeOptions.find((paymentType) => paymentType.id === item.payment_type),
+  );
+  const selectedPaymentDescription = $derived.by(() => {
+    if (item.payment_type === "CorporateCreditCard") {
+      return "use for purchases paid directly with a corporate card";
+    }
+    if (item.payment_type === "Expense") {
+      return "use when purchases are paid out-of-pocket and reimbursed";
+    }
+    return "use for purchases charged directly to a vendor account";
+  });
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
@@ -116,9 +148,12 @@
       });
 
       // Fetch second approvers
-      secondApprovers = await pb.send(`/api/purchase_orders/second_approvers?${params.toString()}`, {
-        method: "GET",
-      });
+      secondApprovers = await pb.send(
+        `/api/purchase_orders/second_approvers?${params.toString()}`,
+        {
+          method: "GET",
+        },
+      );
 
       // Show approvers field if there are approvers available
       showApproverField = approvers.length > 0;
@@ -185,6 +220,18 @@
   enctype="multipart/form-data"
   onsubmit={save}
 >
+  <h1 class="w-full text-xl font-bold text-neutral-800">
+    {#if data.editing}
+      {#if item.po_number}
+        Editing {item.po_number}
+      {:else}
+        Editing Purchase Order
+      {/if}
+    {:else}
+      Create Purchase Order
+    {/if}
+  </h1>
+
   {#if isChildPO && data.parent_po_number}
     <span class="flex w-full gap-2 {errors.parent_po !== undefined ? 'bg-red-200' : ''}">
       <DsLabel color="cyan">Child PO of {data.parent_po_number}</DsLabel>
@@ -194,26 +241,36 @@
     </span>
   {/if}
 
-  <DsSelector
-    bind:value={item.type as string}
-    items={[
-      { id: "Normal", name: "Normal" },
-      { id: "Cumulative", name: "Cumulative" },
-      { id: "Recurring", name: "Recurring" },
-    ]}
-    {errors}
-    fieldName="type"
-    uiName="Purchase Order Type"
-    disabled={isChildPO}
+  <div
+    class="grid w-full grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 {errors.type !== undefined
+      ? 'bg-red-200'
+      : ''}"
   >
-    {#snippet optionTemplate(item)}
-      {item.name}
-    {/snippet}
-  </DsSelector>
+    <div>
+      <label for="po-type">Type</label>
+    </div>
+    <div>
+      {#if isChildPO}
+        <DsLabel color="cyan">{selectedType?.label ?? "One-Time"}</DsLabel>
+      {:else}
+        <DSToggle bind:value={item.type} options={typeOptions} />
+      {/if}
+    </div>
+    <span class="col-start-2 text-sm text-neutral-600">{selectedTypeDescription}</span>
+    {#if errors.type !== undefined}
+      <span class="col-start-2 text-red-600">{errors.type.message}</span>
+    {/if}
+  </div>
 
-  <div class="flex w-full flex-col gap-1 {errors.kind !== undefined ? 'bg-red-200' : ''}">
-    <div class="flex items-center gap-3">
+  <div
+    class="grid w-full grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 {errors.kind !== undefined
+      ? 'bg-red-200'
+      : ''}"
+  >
+    <div>
       <label for="po-kind">Kind</label>
+    </div>
+    <div>
       {#if item.job !== ""}
         <DsLabel color="cyan">{selectedKind?.en_ui_label ?? "Standard"}</DsLabel>
       {:else}
@@ -221,10 +278,10 @@
       {/if}
     </div>
     {#if selectedKind && selectedKind.name !== "standard" && selectedKind.description}
-      <span class="text-sm text-neutral-600">{selectedKind.description}</span>
+      <span class="col-start-2 text-sm text-neutral-600">{selectedKind.description}</span>
     {/if}
     {#if errors.kind !== undefined}
-      <span class="text-red-600">{errors.kind.message}</span>
+      <span class="col-start-2 text-red-600">{errors.kind.message}</span>
     {/if}
   </div>
 
@@ -317,22 +374,27 @@
     </DsAutoComplete>
   {/if}
 
-  <DsSelector
-    bind:value={item.payment_type as string}
-    items={[
-      { id: "OnAccount", name: "On Account" },
-      { id: "Expense", name: "Expense" },
-      { id: "CorporateCreditCard", name: "Corporate Credit Card" },
-    ]}
-    {errors}
-    fieldName="payment_type"
-    uiName="Payment Type"
-    disabled={isChildPO}
+  <div
+    class="grid w-full grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 {errors.payment_type !==
+    undefined
+      ? 'bg-red-200'
+      : ''}"
   >
-    {#snippet optionTemplate(item)}
-      {item.name}
-    {/snippet}
-  </DsSelector>
+    <div>
+      <label for="po-payment-type">Payment</label>
+    </div>
+    <div>
+      {#if isChildPO}
+        <DsLabel color="cyan">{selectedPaymentType?.label ?? "On Account"}</DsLabel>
+      {:else}
+        <DSToggle bind:value={item.payment_type} options={paymentTypeOptions} />
+      {/if}
+    </div>
+    <span class="col-start-2 text-sm text-neutral-600">{selectedPaymentDescription}</span>
+    {#if errors.payment_type !== undefined}
+      <span class="col-start-2 text-red-600">{errors.payment_type.message}</span>
+    {/if}
+  </div>
 
   {#if $jobs.index !== null}
     <DsAutoComplete
@@ -380,6 +442,10 @@
     step={0.01}
     min={0}
   />
+  <span class="flex w-full gap-2 text-sm text-neutral-600">
+    <span class="invisible">Total</span>
+    <span>max in CAD including all taxes and shipping</span>
+  </span>
 
   {#if $vendors.index !== null}
     <DsAutoComplete

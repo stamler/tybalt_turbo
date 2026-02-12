@@ -61,24 +61,42 @@
   // Track allowed division IDs for the selected job (null = show all divisions, empty Set = job has no allocations)
   let jobDivisionIds = $state<Set<string> | null>(null);
   let jobHasNoAllocations = $derived(jobDivisionIds !== null && jobDivisionIds.size === 0);
+  let jobAllocationsRequestId = 0;
 
   // Fetch job divisions when job changes
   $effect(() => {
     const jobId = item.job;
     if (!jobId || jobId === "") {
+      // Invalidate any in-flight allocation request so stale responses are ignored.
+      jobAllocationsRequestId++;
       jobDivisionIds = null; // No job = show all divisions
       return;
     }
-    // Fetch job details to get allocations
-    pb.send(`/api/jobs/${jobId}`, { method: "GET" })
-      .then((job: { allocations: Array<{ division: { id: string } }> }) => {
-        if (job.allocations && job.allocations.length > 0) {
-          jobDivisionIds = new Set(job.allocations.map((a) => a.division.id));
+
+    const requestId = ++jobAllocationsRequestId;
+    // Fetch job details to get allocations.
+    // /api/jobs/:id does not include allocations, so we must use /details.
+    pb.send(`/api/jobs/${jobId}/details`, { method: "GET" })
+      .then((job: { allocations?: Array<{ division?: { id?: string } | string }> }) => {
+        if (requestId !== jobAllocationsRequestId) return;
+
+        const allocationDivisionIds =
+          job.allocations
+            ?.map((allocation) =>
+              typeof allocation.division === "string"
+                ? allocation.division
+                : allocation.division?.id,
+            )
+            .filter((id): id is string => !!id) ?? [];
+
+        if (allocationDivisionIds.length > 0) {
+          jobDivisionIds = new Set(allocationDivisionIds);
         } else {
           jobDivisionIds = new Set(); // Job has no allocations = empty set (will show no divisions)
         }
       })
       .catch(() => {
+        if (requestId !== jobAllocationsRequestId) return;
         jobDivisionIds = null;
       });
   });
@@ -167,6 +185,14 @@
 </svelte:head>
 
 <form class="flex w-full flex-col items-center gap-2 p-2">
+  <h1 class="w-full text-xl font-bold text-neutral-800">
+    {#if data.editing}
+      Editing Time Entry
+    {:else}
+      Create Time Entry
+    {/if}
+  </h1>
+
   <span class="flex w-full gap-2">
     <label for="date">Date</label>
     <input

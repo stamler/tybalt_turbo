@@ -147,6 +147,14 @@
 </svelte:head>
 
 <form class="flex w-full flex-col items-center gap-2 p-2">
+  <h1 class="w-full text-xl font-bold text-neutral-800">
+    {#if data.editing}
+      Editing Time Amendment
+    {:else}
+      Create Time Amendment
+    {/if}
+  </h1>
+
   <!-- Input the user here with an autocomplete input-->
   {#if $profiles.index !== null}
     <DsAutoComplete

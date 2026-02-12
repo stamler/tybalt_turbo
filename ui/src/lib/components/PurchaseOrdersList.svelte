@@ -100,8 +100,8 @@
   function poMayBeClosedByUser(po: PurchaseOrdersAugmentedResponse): boolean {
     if (deactivateButtonHiding) return true;
     if (po.status === "Active") {
-      if (po.type !== "Normal") {
-        // only normal POs can be closed manually
+      if (po.type !== "One-Time") {
+        // only non-One-Time POs can be closed manually
         if ($globalStore.user_po_permission_data.claims.includes("payables_admin")) {
           // user has payables_admin claim
           // return true if there is at least one committed expense associated with the PO

@@ -13,7 +13,7 @@ expenses while maintaining proper tracking and relationships.
 
 1. Add new fields to `purchase_orders` collection:
    - `parent_po` (relation) - References the parent purchase_orders record (required for child POs)
-   - fail when creating a child PO with a type other than `Normal`
+   - fail when creating a child PO with a type other than `One-Time`
    - fail when creating a child PO of an existing child PO (child POs cannot be parents)
    - Update SQL pattern matching index for new PO number format
 
@@ -166,7 +166,7 @@ expenses while maintaining proper tracking and relationships.
 6. System maintains data integrity and audit trail
 7. UI provides clear guidance and feedback during overflow scenarios
 8. System properly enforces all constraints:
-   - Child POs must be Normal type
+   - Child POs must be One-Time type
    - No multiple children for same expense
    - Parent PO protection rules
    - Approval workflow integrity

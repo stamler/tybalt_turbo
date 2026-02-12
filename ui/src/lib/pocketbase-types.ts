@@ -614,7 +614,7 @@ export enum PurchaseOrdersStatusOptions {
 }
 
 export enum PurchaseOrdersTypeOptions {
-  "Normal" = "Normal",
+  "One-Time" = "One-Time",
   "Cumulative" = "Cumulative",
   "Recurring" = "Recurring",
 }
@@ -677,7 +677,7 @@ export enum PurchaseOrdersAugmentedStatusOptions {
 }
 
 export enum PurchaseOrdersAugmentedTypeOptions {
-  "Normal" = "Normal",
+  "One-Time" = "One-Time",
   "Cumulative" = "Cumulative",
   "Recurring" = "Recurring",
 }

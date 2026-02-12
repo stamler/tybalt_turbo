@@ -19,7 +19,7 @@ import (
 func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Record, existingExpensesTotal float64, byPassTotalLimit bool) error {
 
 	var (
-		poType           string = "Normal"
+		poType           string = "One-Time"
 		poRecordProvided bool   = false
 		poTotal          float64
 		poDate           time.Time
@@ -229,14 +229,14 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 			validation.When(!(byPassTotalLimit && paymentType == "OnAccount") && constants.LIMIT_NON_PO_AMOUNTS && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
 				validation.Max(constants.NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", constants.NO_PO_EXPENSE_LIMIT)),
 			),
-			validation.When(hasPurchaseOrder && (poType == "Normal" || poType == "Recurring"),
+			validation.When(hasPurchaseOrder && (poType == "One-Time" || poType == "Recurring"),
 				validation.Max(totalLimit).Error(fmt.Sprintf("expense exceeds purchase order total of $%0.2f by more than %s", poTotal, excessErrorText)),
 			),
-			// TODO: Prevent a second expense from being created for a Normal PO i.e.
+			// TODO: Prevent a second expense from being created for a One-Time PO i.e.
 			// Two Expenses cannot exist for the same purchase_order if the type of
-			// that purchase order is Normal. We could potentially do this by checking
+			// that purchase order is One-Time. We could potentially do this by checking
 			// if existingExpensesTotal is greater than 0 and if poType is
-			// Normal then return an error in the "global" field.
+			// One-Time then return an error in the "global" field.
 		),
 		"distance": validation.Validate(
 			expenseRecord.GetFloat("distance"),

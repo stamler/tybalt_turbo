@@ -42,6 +42,18 @@
   enctype="multipart/form-data"
   onsubmit={save}
 >
+  <h1 class="w-full text-xl font-bold text-neutral-800">
+    {#if data.editing}
+      {#if item.name}
+        Editing {item.name}
+      {:else}
+        Editing Vendor
+      {/if}
+    {:else}
+      Create Vendor
+    {/if}
+  </h1>
+
   <DsTextInput bind:value={item.name as string} {errors} fieldName="name" uiName="Name" />
 
   <DsTextInput bind:value={item.alias as string} {errors} fieldName="alias" uiName="Alias" />

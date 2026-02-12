@@ -14,7 +14,7 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     po_number: "",
     status: PurchaseOrdersStatusOptions.Unapproved,
     uid: "",
-    type: PurchaseOrdersTypeOptions.Normal,
+    type: PurchaseOrdersTypeOptions["One-Time"],
     // date in YYYY-MM-DD format
     date: new Date().toISOString().split("T")[0],
     end_date: "",

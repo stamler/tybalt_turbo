@@ -984,7 +984,7 @@ func main() {
 					isDerived := item.Status == ""
 					poType := item.Type
 					if poType == "" {
-						poType = "Normal"
+						poType = "One-Time"
 					}
 					status := item.Status
 					if status == "" {

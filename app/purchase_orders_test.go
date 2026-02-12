@@ -115,7 +115,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
             "vendor": "2zqxtsmymf670ha",
             "approver": "etysnrlup2f6bak",
             "status": "Unapproved",
-            "type": "Normal",
+            "type": "One-Time",
             "job": "%s"
         }`, "zke3cs3yipplwtu"))
 		if err != nil {
@@ -150,7 +150,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
             "vendor": "2zqxtsmymf670ha",
             "approver": "etysnrlup2f6bak",
             "status": "Unapproved",
-            "type": "Normal",
+            "type": "One-Time",
             "job": "cjf0kt0defhq480",
             "kind": "%s"
         }`, sponsorshipKindID))
@@ -187,7 +187,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	            "vendor": "2zqxtsmymf670ha",
 	            "approver": "etysnrlup2f6bak",
 	            "status": "Unapproved",
-	            "type": "Normal"
+	            "type": "One-Time"
 	        }`)
 		scenarios = append(scenarios, tests.ApiScenario{
 			Name:           "fails when attachment is missing",
@@ -218,7 +218,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
             "vendor": "2zqxtsmymf670ha",
             "approver": "etysnrlup2f6bak",
             "status": "Unapproved",
-            "type": "Normal"
+            "type": "One-Time"
         }`)
 		if err != nil {
 			t.Fatal(err)
@@ -252,7 +252,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	            "vendor": "2zqxtsmymf670ha",
 	            "approver": "wegviunlyr2jjjv",
 	            "status": "Unapproved",
-	            "type": "Normal"
+	            "type": "One-Time"
 	        }`)
 		if err != nil {
 			t.Fatal(err)
@@ -522,7 +522,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "tqqf7q0f3378rvp",
 			"status": "Unapproved",
-			"type": "Normal"
+			"type": "One-Time"
 		}`)
 		if err != nil {
 			t.Fatal(err)
@@ -554,7 +554,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "",
 			"status": "Unapproved",
-			"type": "Normal"
+			"type": "One-Time"
 		}`)
 		if err != nil {
 			t.Fatal(err)
@@ -587,7 +587,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal",
+			"type": "One-Time",
 			"job": "cjf0kt0defhq480",
 			"category": "t5nmdl188gtlhz0"
 		}`)
@@ -624,7 +624,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal",
+			"type": "One-Time",
 			"job": "cjf0kt0defhq480",
 			"category": "t5nmdl188gtlhz0"
 		}`)
@@ -731,7 +731,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal",
+			"type": "One-Time",
 			"job": "cjf0kt0defhq480",
 			"category": "t5nmdl188gtlhz0"
 		}`)
@@ -767,7 +767,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal",
+			"type": "One-Time",
 			"job": "cjf0kt0defhq480",
 			"category": "t5nmdl188gtlhz0"
 		}`)
@@ -802,7 +802,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal",
+			"type": "One-Time",
 			"job": "tt4eipt6wapu9zh",
 			"category": "he1f7oej613mxh7"
 		}`)
@@ -836,7 +836,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "ctswqva5onxj75q",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal"
+			"type": "One-Time"
 		}`)
 		if err != nil {
 			t.Fatal(err)
@@ -889,7 +889,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal"
+			"type": "One-Time"
 		}`, rand.Float64()*(tier1-1.0)+1.0)
 		b, ct, err := makeMultipart(json)
 		if err != nil {
@@ -947,7 +947,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal"
+			"type": "One-Time"
 		}`, rand.Float64()*(tier1-1.0)+1.0)
 		b, ct, err := makeMultipart(json)
 		if err != nil {
@@ -983,7 +983,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "wegviunlyr2jjjv",
 			"status": "Unapproved",
-			"type": "Normal"
+			"type": "One-Time"
 		}`, rand.Float64()*(tier1-1.0)+1.0)
 		b, ct, err := makeMultipart(json)
 		if err != nil {
@@ -1036,7 +1036,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal"
+			"type": "One-Time"
 		}`, rand.Float64()*(1000.0)+tier2)
 		b, ct, err := makeMultipart(json)
 		if err != nil {
@@ -1090,7 +1090,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal"
+			"type": "One-Time"
 		}`, rand.Float64()*(tier2-tier1)+tier1)
 		b, ct, err := makeMultipart(json)
 		if err != nil {
@@ -1128,7 +1128,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal",
+			"type": "One-Time",
 			"priority_second_approver": "u_no_claims"
 		}`)
 		if err != nil {
@@ -1162,7 +1162,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
-			"type": "Normal",
+			"type": "One-Time",
 			"priority_second_approver": "u_inactive"
 		}`)
 		if err != nil {
@@ -1196,7 +1196,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "u_inactive",
 			"status": "Unapproved",
-			"type": "Normal"
+			"type": "One-Time"
 		}`)
 		if err != nil {
 			t.Fatal(err)
@@ -1293,7 +1293,7 @@ func TestPurchaseOrdersCreate_DuplicateAttachmentFails(t *testing.T) {
 			record.Set("vendor", "2zqxtsmymf670ha")
 			record.Set("approver", "etysnrlup2f6bak")
 			record.Set("status", "Unapproved")
-			record.Set("type", "Normal")
+			record.Set("type", "One-Time")
 			record.Set("kind", utilities.DefaultExpenditureKindID())
 			record.Set("attachment_hash", duplicateHash)
 			if err := app.Save(record); err != nil {
@@ -1313,7 +1313,7 @@ func TestPurchaseOrdersCreate_DuplicateAttachmentFails(t *testing.T) {
 		"vendor": "2zqxtsmymf670ha",
 		"approver": "etysnrlup2f6bak",
 		"status": "Unapproved",
-		"type": "Normal"
+		"type": "One-Time"
 	}`, duplicateFileContent)
 	if err != nil {
 		t.Fatal(err)
@@ -1395,7 +1395,7 @@ func TestPurchaseOrdersUpdate_DuplicateAttachmentFails(t *testing.T) {
 			record.Set("vendor", "2zqxtsmymf670ha")
 			record.Set("approver", "etysnrlup2f6bak")
 			record.Set("status", "Unapproved")
-			record.Set("type", "Normal")
+			record.Set("type", "One-Time")
 			record.Set("kind", utilities.DefaultExpenditureKindID())
 			record.Set("attachment_hash", duplicateHash)
 			if err := app.Save(record); err != nil {
@@ -1716,7 +1716,7 @@ func TestGeneratePONumber(t *testing.T) {
 				r := core.NewRecord(poCollection)
 				r.Set("parent_po", "2plsetqdxht7esg")
 				r.Set("uid", "f2j5a8vk006baub")
-				r.Set("type", "Normal")
+				r.Set("type", "One-Time")
 				r.Set("date", "2024-01-01")
 				r.Set("division", "ngpjzurmkrfl8fo")
 				r.Set("description", "Test description")
@@ -1732,7 +1732,7 @@ func TestGeneratePONumber(t *testing.T) {
 				firstChild := core.NewRecord(poCollection)
 				firstChild.Set("parent_po", "2plsetqdxht7esg")
 				firstChild.Set("uid", "f2j5a8vk006baub")
-				firstChild.Set("type", "Normal")
+				firstChild.Set("type", "One-Time")
 				firstChild.Set("po_number", "2024-0008-01")
 				firstChild.Set("date", "2024-01-01")
 				firstChild.Set("division", "ngpjzurmkrfl8fo")
@@ -1811,7 +1811,7 @@ func TestGeneratePONumber(t *testing.T) {
 				r := core.NewRecord(poCollection)
 				r.Set("parent_po", "2plsetqdxht7esg")
 				r.Set("uid", "f2j5a8vk006baub")
-				r.Set("type", "Normal")
+				r.Set("type", "One-Time")
 				r.Set("date", "2024-01-01")
 				r.Set("division", "ngpjzurmkrfl8fo")
 				r.Set("description", "Test description")
@@ -1829,7 +1829,7 @@ func TestGeneratePONumber(t *testing.T) {
 					child.Set("parent_po", "2plsetqdxht7esg")
 					child.Set("po_number", fmt.Sprintf("2024-0008-%02d", i))
 					child.Set("uid", "f2j5a8vk006baub")
-					child.Set("type", "Normal")
+					child.Set("type", "One-Time")
 					child.Set("date", "2024-01-01")
 					child.Set("division", "ngpjzurmkrfl8fo")
 					child.Set("description", "Test description")

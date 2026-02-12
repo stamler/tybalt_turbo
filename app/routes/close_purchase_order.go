@@ -47,12 +47,12 @@ func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) er
 			}
 
 			// Check if purchase order is allowed to be closed manually per spec:
-			// Normal purchase orders cannot be closed manually.
-			if po.GetString("type") == "Normal" {
+			// One-Time purchase orders cannot be closed manually.
+			if po.GetString("type") == "One-Time" {
 				httpResponseStatusCode = http.StatusBadRequest
 				return &CodeError{
 					Code:    "invalid_po_type",
-					Message: "Normal -type purchase orders may be cancelled but not manually closed",
+					Message: "One-Time purchase orders may be cancelled but not manually closed",
 				}
 			}
 

@@ -477,7 +477,7 @@ func TestExpensesEditingDisabledBlocks(t *testing.T) {
 						"description": "test PO blocked",
 						"payment_type": "OnAccount",
 						"total": 100.00,
-						"type": "Normal",
+						"type": "One-Time",
 						"status": "Unapproved",
 						"approver": "f2j5a8vk006baub"
 					}`),

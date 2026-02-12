@@ -249,7 +249,7 @@ func TestExpensesCreate(t *testing.T) {
 				t.Fatal(err)
 			}
 			return tests.ApiScenario{
-				Name:            "expense created against an Active, Normal purchase_orders record succeeds",
+				Name:            "expense created against an Active, One-Time purchase_orders record succeeds",
 				Method:          http.MethodPost,
 				URL:             "/api/collections/expenses/records",
 				Body:            b,
@@ -278,7 +278,7 @@ func TestExpensesCreate(t *testing.T) {
 				t.Fatal(err)
 			}
 			return tests.ApiScenario{
-				Name:            "expense created against a non-Active, Normal purchase_orders record fails",
+				Name:            "expense created against a non-Active, One-Time purchase_orders record fails",
 				Method:          http.MethodPost,
 				URL:             "/api/collections/expenses/records",
 				Body:            b,
