@@ -11,16 +11,22 @@
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
-  import type { PurchaseOrdersPageData } from "$lib/svelte-types";
   import type {
+    PurchaseOrdersPageData,
+    SecondApproversResponse,
+    SecondApproverStatus,
+  } from "$lib/svelte-types";
+  import type {
+    BranchesResponse,
     CategoriesResponse,
     ExpenditureKindsResponse,
     PoApproversResponse,
   } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DsLabel from "./DsLabel.svelte";
-  import { untrack } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
+  import { globalStore } from "$lib/stores/global";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
 
   // initialize the stores, noop if already initialized
@@ -42,8 +48,26 @@
   let secondApprovers = $state([] as PoApproversResponse[]);
   let showApproverField = $state(false);
   let showSecondApproverField = $state(false);
+  let secondApproverStatus = $state("" as SecondApproverStatus | "");
+  let secondApproverReasonMessage = $state("");
+  let secondApproverMeta = $state<SecondApproversResponse["meta"] | null>(null);
+  let showSecondApproverWhy = $state(false);
+  let approversLoaded = $state(false);
+  let approversFetchError = $state(false);
+  let approverFetchRequestId = 0;
   let loadedKinds = $state(false);
-
+  let branches = $state([] as BranchesResponse[]);
+  let branchPinnedInSession = $state(false);
+  let lastAutoBranch = $state("");
+  let branchChangeWatchInitialized = $state(false);
+  let lastObservedJobForAuto = $state<string | null>(null);
+  let branchLookupRequestId = 0;
+  type MaybeAbortError = {
+    isAbort?: boolean;
+    originalError?: { name?: string };
+    message?: string;
+    status?: number;
+  };
   const kindOptions = $derived.by(() =>
     expenditureKinds.map((kind) => ({
       id: kind.id,
@@ -86,6 +110,117 @@
     }
     return "use for purchases charged directly to a vendor account";
   });
+  const creatorDefaultBranch = $derived.by(
+    () => $globalStore.profile.default_branch ?? "",
+  );
+  const approverRequest = $derived.by(() => ({
+    division: item.division ?? "",
+    amount: String(Number(item.total)),
+    kind: item.kind ?? "",
+    has_job: String(item.job !== ""),
+    type: isRecurring ? "Recurring" : item.type,
+    start_date: item.date || "",
+    end_date: item.end_date || "",
+    frequency: item.frequency || "",
+  }));
+  const canFetchApprovers = $derived.by(() => Boolean(item.division && item.total && item.kind));
+  const showApproverFetchError = $derived.by(() => canFetchApprovers && approversFetchError);
+  const showSecondApproverStatusHint = $derived.by(
+    () => approversLoaded && canFetchApprovers && !approversFetchError && !showSecondApproverField,
+  );
+  const formatAmount = (value: number) => (Number.isFinite(value) ? value.toFixed(2) : String(value));
+  const isAbortError = (error: unknown): boolean => {
+    const e = error as MaybeAbortError;
+    if (e?.isAbort) return true;
+    if (e?.originalError?.name === "AbortError") return true;
+    return e?.status === 0 && (e?.message ?? "").toLowerCase().includes("aborted");
+  };
+
+  onMount(async () => {
+    try {
+      branches = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
+    } catch (error) {
+      console.error("Error loading branches:", error);
+    }
+  });
+
+  async function resolveDerivedBranch(jobId: string, fallbackDefaultBranch: string): Promise<string> {
+    if (jobId !== "") {
+      try {
+        const job = await pb.collection("jobs").getOne(jobId, { requestKey: null });
+        return job.branch ?? "";
+      } catch (error) {
+        console.error("Error loading job branch:", error);
+      }
+    }
+    return fallbackDefaultBranch;
+  }
+
+  $effect(() => {
+    const branch = item.branch ?? "";
+    if ((item.job ?? "") !== "") {
+      return;
+    }
+    if (!branchChangeWatchInitialized) {
+      branchChangeWatchInitialized = true;
+      return;
+    }
+    if (branch === "" || branch === lastAutoBranch) {
+      return;
+    }
+    branchPinnedInSession = true;
+  });
+
+  $effect(() => {
+    const jobId = item.job ?? "";
+    const fallbackDefaultBranch = creatorDefaultBranch;
+    const branch = item.branch ?? "";
+    const pinned = branchPinnedInSession;
+
+    if (jobId !== "") {
+      branchPinnedInSession = false;
+      lastObservedJobForAuto = jobId;
+      const requestId = ++branchLookupRequestId;
+      resolveDerivedBranch(jobId, fallbackDefaultBranch).then((derivedBranch) => {
+        if (requestId !== branchLookupRequestId || derivedBranch === "") {
+          return;
+        }
+        if (item.branch === derivedBranch) {
+          return;
+        }
+        lastAutoBranch = derivedBranch;
+        item.branch = derivedBranch;
+      });
+      return;
+    }
+
+    if (pinned) {
+      lastObservedJobForAuto = jobId;
+      return;
+    }
+
+    const firstObservation = lastObservedJobForAuto === null;
+    const jobChanged = !firstObservation && lastObservedJobForAuto !== jobId;
+    lastObservedJobForAuto = jobId;
+
+    // Auto-populate when branch starts empty, and auto-switch on job changes
+    // while the branch remains unpinned in this editor session.
+    if (!jobChanged && branch !== "") {
+      return;
+    }
+
+    const requestId = ++branchLookupRequestId;
+    resolveDerivedBranch(jobId, fallbackDefaultBranch).then((derivedBranch) => {
+      if (requestId !== branchLookupRequestId || derivedBranch === "") {
+        return;
+      }
+      if (item.branch === derivedBranch) {
+        return;
+      }
+      lastAutoBranch = derivedBranch;
+      item.branch = derivedBranch;
+    });
+  });
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
@@ -115,10 +250,24 @@
       });
   });
 
-  // Watch for changes to division, amount, or type to fetch approvers
+  // Keep approver options in sync with all request parameters used by
+  // /api/purchase_orders/approvers and /second_approvers.
   $effect(() => {
-    if (item.division && item.total && item.kind) {
-      fetchApprovers();
+    const request = approverRequest;
+    if (canFetchApprovers) {
+      fetchApprovers(request);
+    } else {
+      approverFetchRequestId += 1;
+      approvers = [];
+      secondApprovers = [];
+      showApproverField = false;
+      showSecondApproverField = false;
+      secondApproverStatus = "";
+      secondApproverReasonMessage = "";
+      secondApproverMeta = null;
+      showSecondApproverWhy = false;
+      approversLoaded = false;
+      approversFetchError = false;
     }
   });
 
@@ -129,39 +278,66 @@
     }
   });
 
-  async function fetchApprovers() {
+  async function fetchApprovers(args: {
+    division: string;
+    amount: string;
+    kind: string;
+    has_job: string;
+    type: string;
+    start_date: string;
+    end_date: string;
+    frequency: string;
+  }) {
+    const requestId = ++approverFetchRequestId;
+    approversFetchError = false;
     try {
-      const params = new URLSearchParams({
-        division: item.division,
-        amount: String(Number(item.total)),
-        kind: item.kind,
-        has_job: String(item.job !== ""),
-        type: isRecurring ? "Recurring" : item.type,
-        start_date: item.date || "",
-        end_date: item.end_date || "",
-        frequency: item.frequency || "",
-      });
+      const params = new URLSearchParams(args);
 
       // Fetch first approvers
-      approvers = await pb.send(`/api/purchase_orders/approvers?${params.toString()}`, {
+      const nextApprovers = await pb.send(`/api/purchase_orders/approvers?${params.toString()}`, {
         method: "GET",
+        requestKey: null, // Avoid PocketBase auto-cancel while users type quickly.
       });
+      if (requestId !== approverFetchRequestId) return;
 
-      // Fetch second approvers
-      secondApprovers = await pb.send(
+      // Fetch second approvers and metadata status.
+      const secondApproversResponse = (await pb.send(
         `/api/purchase_orders/second_approvers?${params.toString()}`,
         {
           method: "GET",
+          requestKey: null, // Avoid PocketBase auto-cancel while users type quickly.
         },
-      );
+      )) as SecondApproversResponse;
+      if (requestId !== approverFetchRequestId) return;
+      approvers = nextApprovers;
+      secondApprovers = secondApproversResponse.approvers;
+      secondApproverStatus = secondApproversResponse.meta.status;
+      secondApproverReasonMessage = secondApproversResponse.meta.reason_message ?? "";
+      secondApproverMeta = secondApproversResponse.meta;
+      showSecondApproverWhy = false;
 
       // Show approvers field if there are approvers available
       showApproverField = approvers.length > 0;
 
-      // Show second approver field if there are second approvers available
-      showSecondApproverField = secondApprovers.length > 0;
+      // Show second approver selector only when candidates are available.
+      showSecondApproverField =
+        secondApproverStatus === "candidates_available" && secondApprovers.length > 0;
+      approversLoaded = true;
+      approversFetchError = false;
     } catch (error) {
+      if (requestId !== approverFetchRequestId) return;
+      if (isAbortError(error)) return;
       console.error("Error fetching approvers:", error);
+      approvers = [];
+      secondApprovers = [];
+      showApproverField = false;
+      showSecondApproverField = false;
+      secondApproverStatus = "";
+      secondApproverReasonMessage = "";
+      secondApproverMeta = null;
+      showSecondApproverWhy = false;
+      approversLoaded = false;
+      approversFetchError = true;
     }
   }
 
@@ -183,11 +359,14 @@
       item.approver = item.uid;
     }
 
-    // set priority_second_approver to self if the second approver field is
-    // hidden. This will be cleared in the backend (cleanPurchaseOrder) if the
-    // total is less than the lowest threshold.
+    // Set priority_second_approver based on second-approval status when the
+    // selector is hidden.
     if (!showSecondApproverField) {
-      item.priority_second_approver = item.uid;
+      if (secondApproverStatus === "not_required" || secondApproverStatus === "requester_qualifies") {
+        item.priority_second_approver = item.uid;
+      } else if (secondApproverStatus === "required_no_candidates") {
+        item.priority_second_approver = "";
+      }
     }
 
     try {
@@ -312,6 +491,58 @@
         {item.given_name} {item.surname}
       {/snippet}
     </DsSelector>
+  {:else if showApproverFetchError}
+    <span class="flex w-full gap-2 text-sm text-red-600">
+      <span class="invisible">Priority Second Approver</span>
+      <span>Unable to load approver options right now. Please try again.</span>
+    </span>
+  {:else if showSecondApproverStatusHint && secondApproverStatus === "not_required"}
+    <span class="flex w-full gap-2 text-sm text-neutral-600">
+      <span class="invisible">Priority Second Approver</span>
+      <span>Second approver is not required for this purchase order.</span>
+    </span>
+  {:else if showSecondApproverStatusHint && secondApproverStatus === "requester_qualifies"}
+    <span class="flex w-full gap-2 text-sm text-neutral-600">
+      <span class="invisible">Priority Second Approver</span>
+      <span>Second approval is required; you qualify and will be assigned automatically.</span>
+    </span>
+  {:else if showSecondApproverStatusHint && secondApproverStatus === "required_no_candidates"}
+    <span class="flex w-full gap-2 text-sm text-red-600">
+      <span class="invisible">Priority Second Approver</span>
+      <span>
+        {secondApproverReasonMessage ||
+          "Second approval is required, but no eligible second approver is available."}
+      </span>
+    </span>
+  {/if}
+  {#if showSecondApproverStatusHint && secondApproverMeta}
+    <span class="flex w-full gap-2 text-sm">
+      <span class="invisible">Priority Second Approver</span>
+      <button
+        type="button"
+        class="text-neutral-600 underline hover:text-neutral-900"
+        onclick={() => {
+          showSecondApproverWhy = !showSecondApproverWhy;
+        }}
+      >
+        {showSecondApproverWhy ? "Hide why" : "Why?"}
+      </button>
+    </span>
+    {#if showSecondApproverWhy}
+      <span class="flex w-full gap-2 text-xs text-neutral-600">
+        <span class="invisible">Priority Second Approver</span>
+        <span class="flex flex-col">
+          <span>reason code: {secondApproverMeta.reason_code || "n/a"}</span>
+          <span>evaluated amount: ${formatAmount(secondApproverMeta.evaluated_amount)}</span>
+          <span>second-approval threshold: ${formatAmount(secondApproverMeta.second_approval_threshold)}</span>
+          <span>tier ceiling: ${formatAmount(secondApproverMeta.tier_ceiling)}</span>
+          <span>eligibility limit rule: {secondApproverMeta.limit_column || "n/a"}</span>
+          <span>division: {item.division || "n/a"}</span>
+          <span>kind: {selectedKind?.en_ui_label ?? item.kind ?? "n/a"}</span>
+          <span>has job: {item.job !== "" ? "yes" : "no"}</span>
+        </span>
+      </span>
+    {/if}
   {/if}
 
   {#if isRecurring}
@@ -372,6 +603,20 @@
     >
       {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
     </DsAutoComplete>
+  {/if}
+
+  {#if item.job === ""}
+    <DsSelector
+      bind:value={item.branch as string}
+      items={branches}
+      {errors}
+      fieldName="branch"
+      uiName="Branch"
+    >
+      {#snippet optionTemplate(item: BranchesResponse)}
+        {item.name}
+      {/snippet}
+    </DsSelector>
   {/if}
 
   <div
@@ -462,6 +707,10 @@
 
   <!-- File upload for attachment -->
   <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
+  <span class="flex w-full gap-2 text-sm text-neutral-600">
+    <span class="invisible">Attachment</span>
+    <span>include quotes, agreements, or any relevant supporting documentation</span>
+  </span>
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">

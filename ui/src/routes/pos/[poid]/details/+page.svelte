@@ -8,7 +8,11 @@
   import { globalStore } from "$lib/stores/global";
   import { pb } from "$lib/pocketbase";
   import { goto } from "$app/navigation";
-  export let data: PageData;
+  let { data }: { data: PageData } = $props();
+  let showSecondApproverWhy = $state(false);
+  const formatAmount = (value: number) => (Number.isFinite(value) ? value.toFixed(2) : String(value));
+  const secondApproverMeta = $derived(data.secondApproverDiagnostics?.meta ?? null);
+  const hasSecondApproverAlert = $derived(secondApproverMeta?.status === "required_no_candidates");
 
   async function cancelPo() {
     try {
@@ -37,6 +41,18 @@
       <span>{data.po.po_number === "" ? "no po number" : data.po.po_number}</span>
       <div class="flex items-center gap-2">
         {shortDate(data.po.date, true)}
+        {#if hasSecondApproverAlert}
+          <button
+            type="button"
+            class="rounded-sm border border-red-400 bg-red-100 px-2 py-0.5 text-red-700 hover:bg-red-200"
+            title="Second approval ownership issue"
+            onclick={() => {
+              showSecondApproverWhy = !showSecondApproverWhy;
+            }}
+          >
+            !
+          </button>
+        {/if}
         {#if data.po.status}
           <DsLabel
             color={data.po.status === "Active"
@@ -54,6 +70,38 @@
     </div>
 
     <div class="space-y-2 bg-neutral-100 p-4">
+      {#if hasSecondApproverAlert && secondApproverMeta}
+        <div class="rounded-sm border border-red-300 bg-red-50 p-2 text-sm text-red-800">
+          <div class="font-semibold">{secondApproverMeta.reason_message}</div>
+          <div class="mt-1">
+            <button
+              type="button"
+              class="underline hover:text-red-900"
+              onclick={() => {
+                showSecondApproverWhy = !showSecondApproverWhy;
+              }}
+            >
+              {showSecondApproverWhy ? "Hide why" : "Why?"}
+            </button>
+          </div>
+          {#if showSecondApproverWhy}
+            <div class="mt-2 space-y-0.5 text-xs">
+              <div>reason code: {secondApproverMeta.reason_code || "n/a"}</div>
+              <div>evaluated amount: ${formatAmount(secondApproverMeta.evaluated_amount)}</div>
+              <div>
+                second-approval threshold:
+                ${formatAmount(secondApproverMeta.second_approval_threshold)}
+              </div>
+              <div>tier ceiling: ${formatAmount(secondApproverMeta.tier_ceiling)}</div>
+              <div>eligibility limit rule: {secondApproverMeta.limit_column || "n/a"}</div>
+              <div>division: {data.po.division_code || data.po.division || "n/a"}</div>
+              <div>kind: {data.po.kind || "n/a"}</div>
+              <div>has job: {data.po.job ? "yes" : "no"}</div>
+            </div>
+          {/if}
+        </div>
+      {/if}
+
       {#if data.po.description}
         <div>{data.po.description}</div>
       {/if}
@@ -231,8 +279,8 @@
   </div>
 
   {#if $globalStore.showAllUi || $globalStore.claims.includes("payables_admin")}
-    <div class="mt-4 rounded-sm border border-red-400 bg-red-50 p-4">
-      <h3 class="font-bold text-red-800">Admin Actions</h3>
+    <div class="mt-4 rounded-sm border border-neutral-300 bg-neutral-50 p-4">
+      <h3 class="font-bold text-neutral-800">Admin Actions</h3>
       <div class="mt-2 flex gap-2">
         <DsActionButton
           action={cancelPo}

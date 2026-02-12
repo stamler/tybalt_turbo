@@ -66,7 +66,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"totalItems":7`, // 7 active purchase_orders in the test database
+				`"totalItems":10`, // 10 purchase_orders visible in the fixture set
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

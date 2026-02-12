@@ -277,18 +277,49 @@ Returns a list of users who can first-approve a purchase order with the given pa
 
 ### GET /api/purchase_orders/second_approvers
 
-Returns a list of users who can second-approve a purchase order with the given parameters.
+Returns second-approval candidates plus explicit second-approval status metadata.
 
 **Query Parameters:** Same as `GET /api/purchase_orders/approvers`
 
 **Authorization:** Requires authenticated user.
 
+**Response:**
+
+- `approvers`: array of qualified second-approver candidates
+- `meta.second_approval_required`: whether second approval is required for the evaluated amount
+- `meta.requester_qualifies`: whether the caller is qualified to second-approve this PO context
+- `meta.reason_code`: machine-readable explanation for current second-approval status
+- `meta.reason_message`: user-facing explanation for why candidates are or are not available
+- `meta.evaluated_amount`: amount used to evaluate second approval (including recurring recalculation)
+- `meta.second_approval_threshold`: lowest threshold that triggers second approval
+- `meta.tier_ceiling`: applicable approval ceiling for the evaluated amount
+- `meta.limit_column`: `po_approver_props` column used to evaluate second-approver eligibility
+- `meta.status`: one of:
+  - `not_required`
+  - `requester_qualifies`
+  - `candidates_available`
+  - `required_no_candidates`
+
 **Behavior:**
 
-- Returns an empty list if the amount is below the lowest approval threshold (no second approval needed)
 - Uses the kind-specific `po_approver_props` limit column (determined by `kind` and `has_job`) to filter eligible second approvers
-- If the caller is themselves a qualified second approver, returns an empty list (the UI auto-sets)
-- Otherwise, returns a list of qualified second approvers for the division and amount tier
+- If amount is below the lowest threshold, returns `meta.status = not_required`
+- If caller is qualified second approver, returns `meta.status = requester_qualifies`
+- If second approval is required and candidates exist, returns `meta.status = candidates_available` and a non-empty `approvers` list
+- If second approval is required and no candidates exist, returns `meta.status = required_no_candidates` with an empty `approvers` list
+
+### Future Option: POS List Diagnostics (recommended approach)
+
+To show second-approval diagnostics in `pos/list` without N+1 client requests, prefer a backend-backed bulk path:
+
+- Add a list-safe diagnostics projection (either new API endpoint or computed fields in `purchase_orders_augmented`) that includes:
+  - `second_approval_status`
+  - `second_approval_reason_code`
+  - `second_approval_reason_message`
+- Compute these fields server-side using the same logic as `/api/purchase_orders/second_approvers`.
+- Drive list-page red `!` indicators and hover/expand details from that single list payload.
+
+This avoids making one `/second_approvers` request per row in the list UI.
 
 ### POST /api/purchase_orders/:id/approve
 
@@ -300,6 +331,7 @@ Approves the purchase order with the given ID.
 
 - All operations performed in a transaction
 - Fails if status is not `Unapproved` or if already rejected
+- If second approval is required and first-approval caller is not second-qualified, first approval is blocked when no second-approval owner is assignable (`priority_second_approver` missing and no eligible candidates)
 - If caller is qualified as first approver and PO is not yet first-approved, sets `approved` timestamp and **overwrites** `approver` to caller (regardless of who was originally selected)
 - If caller is qualified as second approver and PO requires second approval, sets `second_approval` timestamp and `second_approver` to caller
 - A single call can perform both approvals if the caller is qualified for both

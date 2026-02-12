@@ -35,8 +35,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		}
 	}
 
+	purchaseOrderID := strings.TrimSpace(expenseRecord.GetString("purchase_order"))
+
 	// No-PO expenses use the standard kind by policy.
-	if strings.TrimSpace(expenseRecord.GetString("purchase_order")) == "" {
+	if purchaseOrderID == "" {
 		expenseRecord.Set("kind", utilities.DefaultExpenditureKindID())
 	}
 
@@ -110,53 +112,78 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	}
 	expenseRecord.Set("approver", approverUID)
 
-	// Set branch from job if provided; otherwise from user's default branch
-	jobId := expenseRecord.GetString("job")
-	if jobId != "" {
-		jobRecord, err := app.FindRecordById("jobs", jobId)
-		if err != nil || jobRecord == nil {
+	// If a purchase order is linked, force branch from the PO branch.
+	if purchaseOrderID != "" {
+		purchaseOrderRecord, err := app.FindRecordById("purchase_orders", purchaseOrderID)
+		if err != nil || purchaseOrderRecord == nil {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "hook error when cleaning expense",
 				Data: map[string]errs.CodeError{
-					"job": {Code: "not_found", Message: "referenced job not found"},
+					"purchase_order": {Code: "not_found", Message: "referenced purchase order not found"},
 				},
 			}
 		}
-		branchId := jobRecord.GetString("branch")
-		if branchId == "" {
+		poBranchID := strings.TrimSpace(purchaseOrderRecord.GetString("branch"))
+		if poBranchID == "" {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "hook error when cleaning expense",
 				Data: map[string]errs.CodeError{
-					"job": {Code: "missing_branch", Message: "referenced job is missing a branch"},
+					"purchase_order": {Code: "missing_branch", Message: "referenced purchase order is missing a branch"},
 				},
 			}
 		}
-		expenseRecord.Set("branch", branchId)
+		expenseRecord.Set("branch", poBranchID)
 	} else {
-		uid := expenseRecord.GetString("uid")
-		adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
-		if err != nil || adminProfile == nil {
-			return &errs.HookError{
-				Status:  http.StatusInternalServerError,
-				Message: "hook error when cleaning expense",
-				Data: map[string]errs.CodeError{
-					"uid": {Code: "profile_lookup_error", Message: "error looking up admin profile"},
-				},
+		// Set branch from job if provided; otherwise from user's default branch.
+		jobId := expenseRecord.GetString("job")
+		if jobId != "" {
+			jobRecord, err := app.FindRecordById("jobs", jobId)
+			if err != nil || jobRecord == nil {
+				return &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: "hook error when cleaning expense",
+					Data: map[string]errs.CodeError{
+						"job": {Code: "not_found", Message: "referenced job not found"},
+					},
+				}
 			}
-		}
-		defaultBranchId := adminProfile.GetString("default_branch")
-		if defaultBranchId == "" {
-			return &errs.HookError{
-				Status:  http.StatusBadRequest,
-				Message: "hook error when cleaning expense",
-				Data: map[string]errs.CodeError{
-					"uid": {Code: "missing_default_branch", Message: "your admin_profiles record is missing a default_branch"},
-				},
+			branchId := jobRecord.GetString("branch")
+			if branchId == "" {
+				return &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: "hook error when cleaning expense",
+					Data: map[string]errs.CodeError{
+						"job": {Code: "missing_branch", Message: "referenced job is missing a branch"},
+					},
+				}
 			}
+			expenseRecord.Set("branch", branchId)
+		} else {
+			uid := expenseRecord.GetString("uid")
+			adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
+			if err != nil || adminProfile == nil {
+				return &errs.HookError{
+					Status:  http.StatusInternalServerError,
+					Message: "hook error when cleaning expense",
+					Data: map[string]errs.CodeError{
+						"uid": {Code: "profile_lookup_error", Message: "error looking up admin profile"},
+					},
+				}
+			}
+			defaultBranchId := adminProfile.GetString("default_branch")
+			if defaultBranchId == "" {
+				return &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: "hook error when cleaning expense",
+					Data: map[string]errs.CodeError{
+						"uid": {Code: "missing_default_branch", Message: "your admin_profiles record is missing a default_branch"},
+					},
+				}
+			}
+			expenseRecord.Set("branch", defaultBranchId)
 		}
-		expenseRecord.Set("branch", defaultBranchId)
 	}
 
 	// if the expense record has a payment_type of Mileage or Allowance, we

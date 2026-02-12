@@ -83,7 +83,9 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	purchaseOrderRecord.Set("rejection_reason", "")
 	purchaseOrderRecord.Set("rejector", "")
 
-	// Set branch from job if provided; otherwise from user's default branch
+	// When a job is present, branch must always match the job's branch.
+	// Without a job, derive from the creator's default branch only when blank.
+	var derivedBranchID string
 	jobId := purchaseOrderRecord.GetString("job")
 	if jobId != "" {
 		jobRecord, err := app.FindRecordById("jobs", jobId)
@@ -96,8 +98,8 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 				},
 			}
 		}
-		branchId := jobRecord.GetString("branch")
-		if branchId == "" {
+		derivedBranchID = jobRecord.GetString("branch")
+		if derivedBranchID == "" {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "hook error when cleaning purchase order",
@@ -106,7 +108,8 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 				},
 			}
 		}
-		purchaseOrderRecord.Set("branch", branchId)
+		// Enforce strict job->branch alignment.
+		purchaseOrderRecord.Set("branch", derivedBranchID)
 	} else {
 		uid := purchaseOrderRecord.GetString("uid")
 		adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
@@ -119,8 +122,8 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 				},
 			}
 		}
-		defaultBranchId := adminProfile.GetString("default_branch")
-		if defaultBranchId == "" {
+		derivedBranchID = adminProfile.GetString("default_branch")
+		if derivedBranchID == "" {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "hook error when cleaning purchase order",
@@ -129,7 +132,9 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 				},
 			}
 		}
-		purchaseOrderRecord.Set("branch", defaultBranchId)
+	}
+	if jobId == "" && strings.TrimSpace(purchaseOrderRecord.GetString("branch")) == "" {
+		purchaseOrderRecord.Set("branch", derivedBranchID)
 	}
 
 	return nil
@@ -155,23 +160,6 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 	// all the errors at once. This can probably be accomplished using a
 	// combination of built-in validation.Validate() and custom
 	// validation.RuleFunc.
-
-	// Always require an attachment (create and update). Accept either an already
-	// stored filename or a new uploaded file in the current multipart request.
-	hasStoredAttachment := purchaseOrderRecord.GetString("attachment") != ""
-	hasUploadedAttachment := len(purchaseOrderRecord.GetUnsavedFiles("attachment")) > 0
-	if !hasStoredAttachment && !hasUploadedAttachment {
-		return &errs.HookError{
-			Status:  http.StatusBadRequest,
-			Message: "hook error when validating purchase order",
-			Data: map[string]errs.CodeError{
-				"attachment": {
-					Code:    "required",
-					Message: "attachment is required",
-				},
-			},
-		}
-	}
 
 	if purchaseOrderRecord.GetString("vendor") == "" {
 		return &errs.HookError{
@@ -523,6 +511,8 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 			validationsErrors["job"] = validation.NewError("invalid_reference", "invalid job reference")
 		} else if jobRecord.GetString("status") != "Active" {
 			validationsErrors["job"] = validation.NewError("not_active", "Job status must be Active")
+		} else if purchaseOrderRecord.GetString("branch") != jobRecord.GetString("branch") {
+			validationsErrors["branch"] = validation.NewError("value_mismatch", "branch must match the selected job")
 		}
 	}
 

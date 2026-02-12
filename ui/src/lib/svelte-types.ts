@@ -2,6 +2,7 @@ import type {
   TimeEntriesRecord,
   PurchaseOrdersRecord,
   PurchaseOrdersResponse,
+  PoApproversResponse,
   ExpensesRecord,
   ExpensesResponse,
   JobsRecord,
@@ -28,6 +29,25 @@ export type TimeEntriesPageData = PageData<TimeEntriesRecord>;
 export type TimeAmendmentsPageData = PageData<TimeAmendmentsRecord>;
 export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord | PurchaseOrdersResponse> & {
   parent_po_number?: string;
+};
+export type SecondApproverStatus =
+  | "not_required"
+  | "requester_qualifies"
+  | "candidates_available"
+  | "required_no_candidates";
+export type SecondApproversResponse = {
+  approvers: PoApproversResponse[];
+  meta: {
+    second_approval_required: boolean;
+    requester_qualifies: boolean;
+    status: SecondApproverStatus;
+    reason_code: string;
+    reason_message: string;
+    evaluated_amount: number;
+    second_approval_threshold: number;
+    tier_ceiling: number;
+    limit_column: string;
+  };
 };
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse>;
 export type JobsPageData = PageData<JobsRecord> & {

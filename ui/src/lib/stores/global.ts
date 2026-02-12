@@ -3,7 +3,7 @@
  * app.
  */
 
-import type { UserPoPermissionDataResponse, ProfilesResponse } from "$lib/pocketbase-types";
+import type { UserPoPermissionDataResponse } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { authStore } from "$lib/stores/auth";
@@ -31,18 +31,39 @@ interface StoreState {
     lastRefresh: Date;
   };
   profile: {
-    id: string;
     default_division: string;
     default_role: string;
+    default_branch: string;
     maxAge: number;
     lastRefresh: Date;
-    unsubscribe?: () => void;
   };
   error: ClientResponseError | null;
   errorMessages: ErrorMessage[];
 }
 
 const createStore = () => {
+  type UserDefaultsResponse = {
+    default_division: string;
+    default_role: string;
+    default_branch: string;
+  };
+  type MaybeAbortError = Partial<ClientResponseError> & {
+    isAbort?: boolean;
+    originalError?: { name?: string };
+    message?: string;
+    status?: number;
+  };
+
+  let userPoPermissionDataPromise: Promise<void> | null = null;
+  let userDefaultsPromise: Promise<void> | null = null;
+
+  const isAutoCancelled = (error: unknown): boolean => {
+    const err = error as MaybeAbortError;
+    if (err?.isAbort) return true;
+    if (err?.originalError?.name === "AbortError") return true;
+    return err?.status === 0 && (err?.message ?? "").toLowerCase().includes("aborted");
+  };
+
   const initialShowAll = (() => {
     try {
       const v = localStorage.getItem("tybalt_showAllUi");
@@ -67,145 +88,102 @@ const createStore = () => {
       lastRefresh: new Date(0),
     },
     profile: {
-      id: "",
       default_division: "",
       default_role: "",
+      default_branch: "",
       maxAge: 3600 * 1000,
       lastRefresh: new Date(0),
-      unsubscribe: undefined,
     },
     error: null,
     errorMessages: [],
   });
 
   const loadUserPoPermissionData = async () => {
-    try {
-      const userId = get(authStore)?.model?.id || "";
-      const userPoPermissionData = await pb
-        .collection("user_po_permission_data")
-        .getFullList<UserPoPermissionDataResponse>({
-          filter: pb.filter("id={:userId}", { userId }),
-        });
-      update((state) => ({
-        ...state,
-        user_po_permission_data: {
-          // If the user has no user_po_permission_data, set the default values
-          ...(userPoPermissionData.length > 0
-            ? userPoPermissionData[0]
-            : {
-                id: "",
-                max_amount: 0,
-                lower_threshold: 0,
-                upper_threshold: 0,
-                divisions: [],
-                claims: [],
-              }),
-          lastRefresh: new Date(),
-          maxAge: state.user_po_permission_data.maxAge,
-        },
-      }));
-    } catch (error: unknown) {
-      const typedErr = error as ClientResponseError;
-      console.error("Error loading user po permission data:", typedErr);
-    }
+    if (userPoPermissionDataPromise) return userPoPermissionDataPromise;
+    userPoPermissionDataPromise = (async () => {
+      try {
+        const userId = get(authStore)?.model?.id || "";
+        if (!userId) return;
+        const userPoPermissionData = await pb
+          .collection("user_po_permission_data")
+          .getFullList<UserPoPermissionDataResponse>({
+            filter: pb.filter("id={:userId}", { userId }),
+            requestKey: null, // Avoid PocketBase auto-cancel across rapid refreshes.
+          });
+        update((state) => ({
+          ...state,
+          user_po_permission_data: {
+            // If the user has no user_po_permission_data, set the default values
+            ...(userPoPermissionData.length > 0
+              ? userPoPermissionData[0]
+              : {
+                  id: "",
+                  max_amount: 0,
+                  lower_threshold: 0,
+                  upper_threshold: 0,
+                  divisions: [],
+                  claims: [],
+                }),
+            lastRefresh: new Date(),
+            maxAge: state.user_po_permission_data.maxAge,
+          },
+        }));
+      } catch (error: unknown) {
+        if (isAutoCancelled(error)) return;
+        const typedErr = error as ClientResponseError;
+        console.error("Error loading user po permission data:", typedErr);
+      }
+    })().finally(() => {
+      userPoPermissionDataPromise = null;
+    });
+    return userPoPermissionDataPromise;
   };
 
-  const loadUserProfile = async () => {
-    try {
-      const userId = get(authStore)?.model?.id || "";
-      if (!userId) return;
+  const loadUserDefaults = async () => {
+    if (userDefaultsPromise) return userDefaultsPromise;
+    userDefaultsPromise = (async () => {
+      try {
+        const defaults = (await pb.send("/api/users/defaults", {
+          method: "GET",
+          requestKey: null, // Avoid PocketBase auto-cancel across rapid refreshes.
+        })) as UserDefaultsResponse;
 
-      const profile = (await pb
-        .collection("profiles")
-        .getFirstListItem<ProfilesResponse>(
-          pb.filter("uid={:uid}", { uid: userId }),
-        )) as ProfilesResponse;
-
-      // update state and (re)subscribe to realtime changes
-      update((state) => {
-        // clean up previous subscription if switching users
-        if (state.profile.unsubscribe) {
-          try {
-            state.profile.unsubscribe();
-          } catch {
-            // noop
-          }
-        }
-
-        // subscribe to this profile record for realtime changes
-        let unsubPromise: Promise<() => void> | undefined = undefined;
-        try {
-          unsubPromise = pb.collection("profiles").subscribe(profile.id, (e) => {
-            const rec = e?.record as unknown as ProfilesResponse;
-            const newDefaultDivision = rec?.default_division ?? state.profile.default_division;
-            const newDefaultRole = rec?.default_role ?? state.profile.default_role;
-            update((s) => ({
-              ...s,
-              profile: {
-                ...s.profile,
-                default_division: newDefaultDivision,
-                default_role: newDefaultRole,
-              },
-            }));
-          });
-        } catch {
-          // noop
-        }
-        const unsubscribe = () => {
-          if (!unsubPromise) return;
-          unsubPromise
-            .then((fn) => {
-              try {
-                fn();
-              } catch {
-                // noop
-              }
-            })
-            .catch(() => {
-              // noop
-            });
-        };
-
-        return {
-          ...state,
-          profile: {
-            id: profile.id,
-            default_division: profile.default_division ?? "",
-            default_role: profile.default_role ?? "",
-            maxAge: state.profile.maxAge,
-            lastRefresh: new Date(),
-            unsubscribe,
-          },
-        };
-      });
-    } catch (error: unknown) {
-      const typedErr = error as ClientResponseError;
-      console.error("Error loading user profile:", typedErr);
-    }
+        update((state) => {
+          return {
+            ...state,
+            profile: {
+              default_division: defaults.default_division ?? "",
+              default_role: defaults.default_role ?? "",
+              default_branch: defaults.default_branch ?? "",
+              maxAge: state.profile.maxAge,
+              lastRefresh: new Date(),
+            },
+          };
+        });
+      } catch (error: unknown) {
+        if (isAutoCancelled(error)) return;
+        const typedErr = error as ClientResponseError;
+        console.error("Error loading user defaults:", typedErr);
+      }
+    })().finally(() => {
+      userDefaultsPromise = null;
+    });
+    return userDefaultsPromise;
   };
 
   const refresh = async () => {
     // refresh() should no-op if the user is not logged in
     if (!get(authStore)?.isValid) {
       console.log("User is not logged in, skipping refresh");
-      // also clear profile subscription if any
       update((state) => {
-        if (state.profile.unsubscribe) {
-          try {
-            state.profile.unsubscribe();
-          } catch {
-            // noop
-          }
-        }
         return {
           ...state,
           profile: {
-            id: "",
             default_division: "",
             default_role: "",
+            default_branch: "",
             maxAge: state.profile.maxAge,
             lastRefresh: new Date(0),
-            unsubscribe: undefined,
           },
         };
       });
@@ -224,7 +202,7 @@ const createStore = () => {
       }
 
       if (now.getTime() - state.profile.lastRefresh.getTime() >= state.profile.maxAge) {
-        loadUserProfile();
+        loadUserDefaults();
       }
 
       return newState;

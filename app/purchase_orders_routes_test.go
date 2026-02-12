@@ -102,6 +102,80 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "first approval is blocked when second approval is required but no second approver can be assigned",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/approve",
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": poApproverToken,
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"second_approval_unassignable"`,
+				`"message":"second approval is required, but no eligible second approver is available. Set a priority second approver before first approval."`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(t)
+				_, err := app.NonconcurrentDB().NewQuery(`
+					UPDATE purchase_orders
+					SET
+						approval_total = 2000000,
+						total = 2000000,
+						status = 'Unapproved',
+						approved = '',
+						second_approval = '',
+						approver = '',
+						second_approver = '',
+						priority_second_approver = ''
+					WHERE id = 'gal6e5la2fa4rpn'
+				`).Execute()
+				if err != nil {
+					t.Fatal(err)
+				}
+				return app
+			},
+		},
+		{
+			Name:   "first approval succeeds when priority second approver is set even with no general second approver candidates",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/approve",
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": poApproverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate),
+				`"status":"Unapproved"`,
+				`"po_number":""`,
+				`"approver":"etysnrlup2f6bak"`,
+				`"priority_second_approver":"6bq4j0eb26631dy"`,
+			},
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(t)
+				_, err := app.NonconcurrentDB().NewQuery(`
+					UPDATE purchase_orders
+					SET
+						approval_total = 2000000,
+						total = 2000000,
+						status = 'Unapproved',
+						approved = '',
+						second_approval = '',
+						approver = '',
+						second_approver = '',
+						priority_second_approver = '6bq4j0eb26631dy'
+					WHERE id = 'gal6e5la2fa4rpn'
+				`).Execute()
+				if err != nil {
+					t.Fatal(err)
+				}
+				return app
+			},
+		},
+		{
 			Name:   "po_approver_tier2 claim holder completes both approvals of high-value PO in single call",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/46efdq319b22480/approve", // Using existing Unapproved PO with total 862.12

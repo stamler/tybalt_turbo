@@ -2,8 +2,8 @@ package main
 
 import (
 	"fmt"
-	"net/url"
 	"net/http"
+	"net/url"
 	"strings"
 	"testing"
 	"tybalt/internal/testutils"
@@ -106,7 +106,11 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`[]`, // Empty array for amounts below tier 1
+				`"approvers":[]`,
+				`"second_approval_required":false`,
+				`"requester_qualifies":false`,
+				`"status":"not_required"`,
+				`"reason_code":"second_approval_not_required"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -119,6 +123,8 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
+				`"status":"candidates_available"`,
+				`"reason_code":"eligible_second_approvers_available"`,
 				`"id":"6bq4j0eb26631dy"`, // Tier Two has max_amount of 2500 with no restrictions
 				`"given_name":"Tier"`,
 				`"surname":"Two"`,
@@ -137,6 +143,8 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
+				`"status":"candidates_available"`,
+				`"reason_code":"eligible_second_approvers_available"`,
 				`"id":"66ct66w380ob6w8"`, // Shallow Hal has tier3 claim
 				`"given_name":"Shallow"`,
 				`"surname":"Hal"`,
@@ -152,7 +160,11 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`[]`, // Empty array (will auto-set to self in UI)
+				`"approvers":[]`,
+				`"second_approval_required":true`,
+				`"requester_qualifies":true`,
+				`"status":"requester_qualifies"`,
+				`"reason_code":"requester_is_eligible_second_approver"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -165,6 +177,8 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
+				`"status":"candidates_available"`,
+				`"reason_code":"eligible_second_approvers_available"`,
 				`"id":"6bq4j0eb26631dy"`, // Tier Two has max_amount of 2500 with no restrictions
 				`"id":"t4g84hfvkt1v9j3"`, // Tier TwoB has max_amount of 2500 with no restrictions
 			},
@@ -180,7 +194,11 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`[]`, // Empty array (will auto-set to self in UI)
+				`"approvers":[]`,
+				`"second_approval_required":true`,
+				`"requester_qualifies":true`,
+				`"status":"requester_qualifies"`,
+				`"reason_code":"requester_is_eligible_second_approver"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -193,7 +211,13 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`[]`, // Empty array as no one is qualified to approve amounts above the highest tier
+				`"approvers":[]`,
+				`"second_approval_required":true`,
+				`"requester_qualifies":false`,
+				`"status":"required_no_candidates"`,
+				`"reason_code":"no_eligible_second_approvers"`,
+				`"limit_column":"max_amount"`,
+				`"reason_message":"Second approval is required, but no eligible second approver is currently available. Assign a priority second approver."`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

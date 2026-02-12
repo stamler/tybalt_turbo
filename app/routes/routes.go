@@ -147,6 +147,10 @@ func AddRoutes(app core.App) {
 		timeEntriesGroup.Bind(apis.RequireAuth("users"))
 		timeEntriesGroup.POST("/{id}/copy_to_tomorrow", createCopyTimeEntryHandler(app))
 
+		usersGroup := se.Router.Group("/api/users")
+		usersGroup.Bind(apis.RequireAuth("users"))
+		usersGroup.GET("/defaults", createGetUserDefaultsHandler(app))
+
 		poGroup := se.Router.Group("/api/purchase_orders")
 		poGroup.Bind(apis.RequireAuth("users"))
 		poGroup.GET("/pending", createGetPendingPurchaseOrdersHandler(app))

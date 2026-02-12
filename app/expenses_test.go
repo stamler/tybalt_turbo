@@ -243,7 +243,7 @@ func TestExpensesCreate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "2plsetqdxht7esg"
+				"purchase_order": "poa1ctvbrnch001"
 			}`)
 			if err != nil {
 				t.Fatal(err)
@@ -255,9 +255,42 @@ func TestExpensesCreate(t *testing.T) {
 				Body:            b,
 				Headers:         map[string]string{"Authorization": recordToken, "Content-Type": ct},
 				ExpectedStatus:  200,
-				ExpectedContent: []string{`"purchase_order":"2plsetqdxht7esg"`},
+				ExpectedContent: []string{`"purchase_order":"poa1ctvbrnch001"`},
 				ExpectedEvents:  map[string]int{"OnRecordCreate": 1},
 				TestAppFactory:  testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test expense branch override",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 132.10,
+				"vendor": "2zqxtsmymf670ha",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "poa1ctvbrnch001",
+				"branch": "xeq9q81q5307f70"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "expense with purchase order forces branch from linked purchase order",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					`"purchase_order":"poa1ctvbrnch001"`,
+					`"branch":"xeq9q81q5307f70"`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
 			}
 		}(),
 		func() tests.ApiScenario {
@@ -272,7 +305,7 @@ func TestExpensesCreate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "gal6e5la2fa4rpn"
+				"purchase_order": "ponactvbrnch001"
 			}`)
 			if err != nil {
 				t.Fatal(err)
@@ -294,6 +327,37 @@ func TestExpensesCreate(t *testing.T) {
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
+				"description": "po with missing branch should fail",
+				"pay_period_ending": "2006-01-02",
+				"payment_type": "Expense",
+				"total": 132.10,
+				"vendor": "2zqxtsmymf670ha",
+				"category": "t5nmdl188gtlhz0",
+				"job": "cjf0kt0defhq480",
+				"purchase_order": "poactvmissbr001"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "expense with purchase order fails when linked purchase order branch is missing",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"purchase_order":{"code":"missing_branch"`,
+				},
+				ExpectedEvents: map[string]int{"*": 0, "OnRecordCreateRequest": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
 				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
@@ -301,7 +365,7 @@ func TestExpensesCreate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "2plsetqdxht7esg"
+				"purchase_order": "poa1ctvbrnch001"
 			}`)
 			if err != nil {
 				t.Fatal(err)
@@ -388,7 +452,7 @@ func TestExpensesCreate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "he1f7oej613mxh7",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "2plsetqdxht7esg"
+				"purchase_order": "poa1ctvbrnch001"
 			}`)
 			if err != nil {
 				t.Fatal(err)
@@ -802,7 +866,7 @@ func TestExpensesCreate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "2plsetqdxht7esg"
+				"purchase_order": "poa1ctvbrnch001"
 			}`)
 			if err != nil {
 				t.Fatal(err)
@@ -901,7 +965,7 @@ func TestExpensesCreate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "he1f7oej613mxh7",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "2plsetqdxht7esg"
+				"purchase_order": "poa1ctvbrnch001"
 			}`)
 			if err != nil {
 				t.Fatal(err)
@@ -1103,7 +1167,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "2plsetqdxht7esg"
+				"purchase_order": "poa1ctvbrnch001"
 			}`)
 			if err != nil {
 				t.Fatal(err)
@@ -1186,7 +1250,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "he1f7oej613mxh7",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "2plsetqdxht7esg"
+				"purchase_order": "poa1ctvbrnch001"
 			}`)
 			if err != nil {
 				t.Fatal(err)
@@ -1356,7 +1420,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "t5nmdl188gtlhz0",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "2plsetqdxht7esg"
+				"purchase_order": "poa1ctvbrnch001"
 			}`)
 			if err != nil {
 				t.Fatal(err)
@@ -1445,7 +1509,7 @@ func TestExpensesUpdate(t *testing.T) {
 				"vendor": "2zqxtsmymf670ha",
 				"category": "he1f7oej613mxh7",
 				"job": "cjf0kt0defhq480",
-				"purchase_order": "2plsetqdxht7esg"
+				"purchase_order": "poa1ctvbrnch001"
 				}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 404,

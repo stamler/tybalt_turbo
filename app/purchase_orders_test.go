@@ -71,6 +71,13 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load sponsorship expenditure kind: %v", err)
 	}
+	standardKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "standard",
+	})
+	if err != nil {
+		t.Fatalf("failed to load standard expenditure kind: %v", err)
+	}
+	standardKindID := standardKind.Id
 	sponsorshipKindID := sponsorshipKind.Id
 
 	// Helper to convert a JSON body string into multipart/form-data with a tiny PNG attachment
@@ -175,9 +182,9 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		})
 	}
 
-	// fails when attachment is missing
+	// valid purchase order can be created without attachment
 	{
-		b := bytes.NewBufferString(`{
+		b := bytes.NewBufferString(fmt.Sprintf(`{
 	            "uid": "rzr98oadsp9qc11",
 	            "date": "2024-09-01",
 	            "division": "vccd5fo56ctbigh",
@@ -187,20 +194,21 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	            "vendor": "2zqxtsmymf670ha",
 	            "approver": "etysnrlup2f6bak",
 	            "status": "Unapproved",
-	            "type": "One-Time"
-	        }`)
+	            "type": "One-Time",
+	            "kind": "%s"
+	        }`, standardKindID))
 		scenarios = append(scenarios, tests.ApiScenario{
-			Name:           "fails when attachment is missing",
+			Name:           "valid purchase order is created without attachment",
 			Method:         http.MethodPost,
 			URL:            "/api/collections/purchase_orders/records",
 			Body:           b,
 			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
-			ExpectedStatus: 400,
+			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"attachment":{"code":"required"`,
+				`"approver":"etysnrlup2f6bak"`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordCreateRequest": 1,
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		})
@@ -236,6 +244,75 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+	// branch defaults from creator profile when omitted and no job is set
+	{
+		b, ct, err := makeMultipart(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+	          "division": "vccd5fo56ctbigh",
+            "description": "default branch assignment",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "One-Time"
+        }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "branch defaults from creator profile when omitted",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"branch":"80875lm27v8wgi4"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 2,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+	// job branch overrides an explicit branch when job is set
+	{
+		b, ct, err := makeMultipart(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+	          "division": "vccd5fo56ctbigh",
+            "description": "manual branch override",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "One-Time",
+            "job": "cjf0kt0defhq480",
+            "branch": "xeq9q81q5307f70"
+        }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "job branch overrides explicit branch when job is set",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"job":"cjf0kt0defhq480"`,
+				`"branch":"80875lm27v8wgi4"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 2,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		})
@@ -1439,6 +1516,13 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load sponsorship expenditure kind: %v", err)
 	}
+	standardKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "standard",
+	})
+	if err != nil {
+		t.Fatalf("failed to load standard expenditure kind: %v", err)
+	}
+	standardKindID := standardKind.Id
 	sponsorshipKindID := sponsorshipKind.Id
 
 	// multipart builder for updates with attachment
@@ -1506,9 +1590,9 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 		})
 	}
 
-	// fails to update when attachment is cleared and no new file uploaded
+	// valid purchase order update can clear attachment without uploading a new file
 	{
-		b := bytes.NewBufferString(`{
+		b := bytes.NewBufferString(fmt.Sprintf(`{
 			"uid": "f2j5a8vk006baub",
 			"date": "2024-09-01",
 			"division": "vccd5fo56ctbigh",
@@ -1519,20 +1603,21 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 			"approver": "etysnrlup2f6bak",
 			"status": "Unapproved",
 			"type": "Cumulative",
+			"kind": "%s",
 			"attachment": ""
-		}`)
+		}`, standardKindID))
 		scenarios = append(scenarios, tests.ApiScenario{
-			Name:           "fails to update when attachment is cleared and no new file uploaded",
+			Name:           "valid purchase order update clears attachment without new upload",
 			Method:         http.MethodPatch,
 			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
 			Body:           b,
 			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
-			ExpectedStatus: 400,
+			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"attachment":{"code":"required"`,
+				`"attachment":""`,
 			},
 			ExpectedEvents: map[string]int{
-				"OnRecordUpdateRequest": 1,
+				"OnRecordUpdate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		})

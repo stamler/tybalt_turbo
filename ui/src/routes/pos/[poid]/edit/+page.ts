@@ -7,7 +7,7 @@ import {
 } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
-import type { PurchaseOrdersPageData } from "$lib/svelte-types";
+import type { PurchaseOrdersPageData, SecondApproversResponse } from "$lib/svelte-types";
 
 export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
   const defaultItem: Partial<PurchaseOrdersRecord> = {
@@ -52,19 +52,19 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     });
 
     // Fetch second approvers
-    const secondApprovers = await pb.send(
+    const secondApproversResponse = (await pb.send(
       `/api/purchase_orders/second_approvers?${queryParams.toString()}`,
       {
         method: "GET",
       },
-    );
+    )) as SecondApproversResponse;
 
     return {
       item,
       editing: true,
       id: params.poid,
       approvers: approvers,
-      second_approvers: secondApprovers,
+      second_approvers: secondApproversResponse.approvers,
     };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);

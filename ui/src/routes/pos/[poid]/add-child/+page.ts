@@ -5,7 +5,7 @@ import {
   PurchaseOrdersTypeOptions,
 } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
-import type { PurchaseOrdersPageData } from "$lib/svelte-types";
+import type { PurchaseOrdersPageData, SecondApproversResponse } from "$lib/svelte-types";
 import { pb } from "$lib/pocketbase";
 import { error } from "@sveltejs/kit";
 
@@ -33,12 +33,12 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
   });
 
   // Fetch second approvers
-  const secondApprovers = await pb.send(
+  const secondApproversResponse = (await pb.send(
     `/api/purchase_orders/second_approvers?${queryParams.toString()}`,
     {
       method: "GET",
     },
-  );
+  )) as SecondApproversResponse;
 
   // Create a new PO with fields that must match the parent
   const defaultItem: Partial<PurchaseOrdersRecord> = {
@@ -71,7 +71,7 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     editing: false,
     id: null,
     approvers: approvers,
-    second_approvers: secondApprovers,
+    second_approvers: secondApproversResponse.approvers,
     parent_po_number: parentPo.po_number,
   };
 };

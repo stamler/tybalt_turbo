@@ -29,6 +29,86 @@ type poApproversRequest struct {
 	Frequency string  `json:"frequency"`
 }
 
+type secondApproversMeta struct {
+	SecondApprovalRequired  bool    `json:"second_approval_required"`
+	RequesterQualifies      bool    `json:"requester_qualifies"`
+	Status                  string  `json:"status"`
+	ReasonCode              string  `json:"reason_code"`
+	ReasonMessage           string  `json:"reason_message"`
+	EvaluatedAmount         float64 `json:"evaluated_amount"`
+	SecondApprovalThreshold float64 `json:"second_approval_threshold"`
+	TierCeiling             float64 `json:"tier_ceiling"`
+	LimitColumn             string  `json:"limit_column"`
+}
+
+type secondApproversResponse struct {
+	Approvers []utilities.Approver `json:"approvers"`
+	Meta      secondApproversMeta  `json:"meta"`
+}
+
+func buildSecondApproversMeta(
+	app core.App,
+	req poApproversRequest,
+	requesterQualifies bool,
+	approvers []utilities.Approver,
+) (secondApproversMeta, error) {
+	thresholds, err := utilities.GetPOApprovalThresholds(app)
+	if err != nil {
+		return secondApproversMeta{}, fmt.Errorf("error fetching approval thresholds: %w", err)
+	}
+	if len(thresholds) == 0 {
+		return secondApproversMeta{}, fmt.Errorf("approval thresholds are not configured")
+	}
+
+	secondApprovalThreshold := thresholds[0]
+	secondApprovalRequired := req.Amount > secondApprovalThreshold
+	tierCeiling := constants.MAX_APPROVAL_TOTAL
+	for _, threshold := range thresholds {
+		if threshold >= req.Amount {
+			tierCeiling = threshold
+			break
+		}
+	}
+
+	limitColumn := ""
+	if secondApprovalRequired {
+		resolvedLimitColumn, resolveErr := utilities.ResolvePOApproverLimitColumn(req.Kind, req.HasJob)
+		if resolveErr != nil {
+			return secondApproversMeta{}, fmt.Errorf("error resolving approver limit column: %w", resolveErr)
+		}
+		limitColumn = resolvedLimitColumn
+	}
+
+	meta := secondApproversMeta{
+		SecondApprovalRequired:  secondApprovalRequired,
+		RequesterQualifies:      requesterQualifies,
+		Status:                  "required_no_candidates",
+		ReasonCode:              "no_eligible_second_approvers",
+		ReasonMessage:           "Second approval is required, but no eligible second approver is currently available. Assign a priority second approver.",
+		EvaluatedAmount:         req.Amount,
+		SecondApprovalThreshold: secondApprovalThreshold,
+		TierCeiling:             tierCeiling,
+		LimitColumn:             limitColumn,
+	}
+
+	switch {
+	case !secondApprovalRequired:
+		meta.Status = "not_required"
+		meta.ReasonCode = "second_approval_not_required"
+		meta.ReasonMessage = "Second approval is not required for this purchase order."
+	case requesterQualifies:
+		meta.Status = "requester_qualifies"
+		meta.ReasonCode = "requester_is_eligible_second_approver"
+		meta.ReasonMessage = "Second approval is required and the requester is eligible to perform it."
+	case len(approvers) > 0:
+		meta.Status = "candidates_available"
+		meta.ReasonCode = "eligible_second_approvers_available"
+		meta.ReasonMessage = "Eligible second approvers are available for this purchase order."
+	}
+
+	return meta, nil
+}
+
 func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		id := e.Request.PathValue("id")
@@ -130,6 +210,37 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				return &CodeError{
 					Code:    "unauthorized_approval",
 					Message: "you are not authorized to perform second approval on this purchase order",
+				}
+			}
+
+			// If a PO requires second approval and caller is only doing first
+			// approval, ensure second-approval ownership can be established.
+			if !recordIsApproved && recordRequiresSecondApproval && !callerIsQualifiedSecondApprover {
+				prioritySecondApproverID := strings.TrimSpace(po.GetString("priority_second_approver"))
+				if prioritySecondApproverID == "" {
+					secondApprovers, _, secondApproverErr := utilities.GetPOApprovers(
+						txApp,
+						nil,
+						po.GetString("division"),
+						po.GetFloat("approval_total"),
+						po.GetString("kind"),
+						po.GetString("job") != "",
+						true,
+					)
+					if secondApproverErr != nil {
+						httpResponseStatusCode = http.StatusInternalServerError
+						return &CodeError{
+							Code:    "error_checking_second_approvers",
+							Message: fmt.Sprintf("error checking second approver availability: %v", secondApproverErr),
+						}
+					}
+					if len(secondApprovers) == 0 {
+						httpResponseStatusCode = http.StatusBadRequest
+						return &CodeError{
+							Code:    "second_approval_unassignable",
+							Message: "second approval is required, but no eligible second approver is available. Set a priority second approver before first approval.",
+						}
+					}
 				}
 			}
 
@@ -965,7 +1076,7 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 			}
 		}
 
-		approvers, _, err := utilities.GetPOApprovers(
+		approvers, requesterQualifies, err := utilities.GetPOApprovers(
 			app,
 			auth,
 			req.Division,
@@ -978,6 +1089,21 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_approvers",
 				"message": fmt.Sprintf("Error fetching approvers: %v", err),
+			})
+		}
+
+		if forSecondApproval {
+			meta, metaErr := buildSecondApproversMeta(app, req, requesterQualifies, approvers)
+			if metaErr != nil {
+				return e.JSON(http.StatusInternalServerError, map[string]string{
+					"code":    "error_building_second_approver_meta",
+					"message": fmt.Sprintf("Error building second approver metadata: %v", metaErr),
+				})
+			}
+
+			return e.JSON(http.StatusOK, secondApproversResponse{
+				Approvers: approvers,
+				Meta:      meta,
 			})
 		}
 
