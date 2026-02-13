@@ -160,7 +160,7 @@
 </script>
 
 <form
-  class="flex w-full flex-col items-center gap-2 p-2"
+  class="flex w-full flex-col items-center gap-2 p-2 max-lg:[&_button]:text-base max-lg:[&_input]:text-base max-lg:[&_label]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base"
   enctype="multipart/form-data"
   onsubmit={save}
 >

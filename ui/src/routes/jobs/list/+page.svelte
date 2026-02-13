@@ -93,8 +93,8 @@
     uiName="search jobs..."
   >
     {#snippet searchBarExtra()}
-      <div class="flex items-center gap-2">
-        <DSToggle bind:value={jobType} options={jobTypeOptions} />
+      <div class="flex items-center gap-2 max-[639px]:w-full max-[639px]:flex-wrap">
+        <DSToggle bind:value={jobType} options={jobTypeOptions} ariaLabel="Job type filter" />
         <button
           onclick={downloadJson}
           class="flex items-center gap-1 rounded-sm bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"

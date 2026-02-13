@@ -559,7 +559,10 @@
   </style>
 </svelte:head>
 
-<form class="flex w-full flex-col items-center gap-2 p-2" onsubmit={save}>
+<form
+  class="flex w-full flex-col items-center gap-2 p-2 max-lg:[&_button]:text-base max-lg:[&_input]:text-base max-lg:[&_label]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base"
+  onsubmit={save}
+>
   <div class="w/full grid grid-cols-1 gap-2 md:grid-cols-2">
     <DsCheck bind:value={item.active as boolean} {errors} fieldName="active" uiName="Active" />
 

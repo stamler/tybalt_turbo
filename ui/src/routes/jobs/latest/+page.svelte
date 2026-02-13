@@ -53,7 +53,9 @@
     inListHeader={jobType === "projects" ? "Latest Projects" : "Latest Proposals"}
   >
     {#snippet searchBarExtra()}
-      <DSToggle bind:value={jobType} options={jobTypeOptions} />
+      <div class="max-[639px]:w-full">
+        <DSToggle bind:value={jobType} options={jobTypeOptions} ariaLabel="Job type filter" />
+      </div>
     {/snippet}
     {#snippet anchor({ id, number }: LatestJob)}
       <a href="/jobs/{id}/details" class="font-bold hover:underline">{number}</a>

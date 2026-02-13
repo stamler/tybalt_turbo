@@ -298,13 +298,14 @@
   </div>
 
   <!-- Active Toggle -->
-  <div class="mb-6 flex items-center gap-4">
+  <div class="mb-6 flex flex-wrap items-center gap-3">
     <div
       class:opacity-50={!isComplete || isToggling}
       class:pointer-events-none={!isComplete || isToggling}
     >
       <DsToggle
         bind:value={activeToggleValue}
+        ariaLabel="Rate sheet status"
         options={[
           { id: "inactive", label: "Inactive" },
           { id: "active", label: "Active" },

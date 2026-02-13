@@ -84,6 +84,7 @@
     $expenditureKindsStore.items.map((kind) => ({
       id: kind.id,
       label: kind.en_ui_label,
+      description: kind.description ?? "",
     })),
   );
   const selectedKind = $derived.by(() =>
@@ -91,37 +92,43 @@
   );
   const kindAllowsJob = $derived.by(() => selectedKind?.allow_job ?? true);
   const typeOptions = [
-    { id: "One-Time", label: "One-Time" },
-    { id: "Cumulative", label: "Cumulative" },
-    { id: "Recurring", label: "Recurring" },
+    {
+      id: "One-Time",
+      label: "One-Time",
+      description: "for a single expense, closes after use",
+    },
+    {
+      id: "Cumulative",
+      label: "Cumulative",
+      description: "allows multiple expenses until the PO total is used",
+    },
+    {
+      id: "Recurring",
+      label: "Recurring",
+      description: "for recurring expenses, requires an end date and frequency",
+    },
   ];
   const selectedType = $derived.by(() => typeOptions.find((type) => type.id === item.type));
-  const selectedTypeDescription = $derived.by(() => {
-    if (item.type === "Recurring") {
-      return "for recurring expenses, requires an end date and frequency";
-    }
-    if (item.type === "Cumulative") {
-      return "allows multiple expenses until the PO total is used";
-    }
-    return "for a single expense, closes after use";
-  });
   const paymentTypeOptions = [
-    { id: "OnAccount", label: "On Account" },
-    { id: "Expense", label: "Expense" },
-    { id: "CorporateCreditCard", label: "Corporate Credit Card" },
+    {
+      id: "OnAccount",
+      label: "On Account",
+      description: "use for purchases charged directly to a vendor account",
+    },
+    {
+      id: "Expense",
+      label: "Expense",
+      description: "use when purchases are paid out-of-pocket and reimbursed",
+    },
+    {
+      id: "CorporateCreditCard",
+      label: "Corporate Credit Card",
+      description: "use for purchases paid directly with a corporate card",
+    },
   ];
   const selectedPaymentType = $derived.by(() =>
     paymentTypeOptions.find((paymentType) => paymentType.id === item.payment_type),
   );
-  const selectedPaymentDescription = $derived.by(() => {
-    if (item.payment_type === "CorporateCreditCard") {
-      return "use for purchases paid directly with a corporate card";
-    }
-    if (item.payment_type === "Expense") {
-      return "use when purchases are paid out-of-pocket and reimbursed";
-    }
-    return "use for purchases charged directly to a vendor account";
-  });
   const creatorDefaultBranch = $derived.by(() => $globalStore.profile.default_branch ?? "");
   const approverRequest = $derived.by(() =>
     buildPoApproverRequest({
@@ -382,7 +389,7 @@
 {/if}
 
 <form
-  class="flex w-full flex-col items-center gap-2 p-2"
+  class="flex w-full flex-col items-center gap-2 p-2 max-lg:[&_button]:text-base max-lg:[&_input]:text-base max-lg:[&_label]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base"
   enctype="multipart/form-data"
   onsubmit={save}
 >
@@ -407,43 +414,34 @@
     </span>
   {/if}
 
-  <div
-    class="grid w-full grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 {errors.type !== undefined
-      ? 'bg-red-200'
-      : ''}"
-  >
-    <div>
-      <label for="po-type">Type</label>
-    </div>
-    <div>
-      {#if isChildPO}
-        <DsLabel color="cyan">{selectedType?.label ?? "One-Time"}</DsLabel>
-      {:else}
-        <DSToggle bind:value={item.type} options={typeOptions} />
-      {/if}
-    </div>
-    <span class="col-start-2 text-sm text-neutral-600">{selectedTypeDescription}</span>
+  <div class="flex w-full flex-col gap-1 {errors.type !== undefined ? 'bg-red-200' : ''}">
+    {#if isChildPO}
+      <span>Type</span>
+      <DsLabel color="cyan">{selectedType?.label ?? "One-Time"}</DsLabel>
+    {:else}
+      <DSToggle
+        bind:value={item.type}
+        label="Type"
+        options={typeOptions}
+        showOptionDescriptions={true}
+        fullWidth={true}
+      />
+    {/if}
     {#if errors.type !== undefined}
-      <span class="col-start-2 text-red-600">{errors.type.message}</span>
+      <span class="text-red-600">{errors.type.message}</span>
     {/if}
   </div>
 
-  <div
-    class="grid w-full grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 {errors.kind !== undefined
-      ? 'bg-red-200'
-      : ''}"
-  >
-    <div>
-      <label for="po-kind">Kind</label>
-    </div>
-    <div>
-      <DSToggle bind:value={item.kind} options={kindOptions} />
-    </div>
-    {#if selectedKind && selectedKind.name !== "standard" && selectedKind.description}
-      <span class="col-start-2 text-sm text-neutral-600">{selectedKind.description}</span>
-    {/if}
+  <div class="flex w-full flex-col gap-1 {errors.kind !== undefined ? 'bg-red-200' : ''}">
+    <DSToggle
+      bind:value={item.kind}
+      label="Kind"
+      options={kindOptions}
+      showOptionDescriptions={true}
+      fullWidth={true}
+    />
     {#if errors.kind !== undefined}
-      <span class="col-start-2 text-red-600">{errors.kind.message}</span>
+      <span class="text-red-600">{errors.kind.message}</span>
     {/if}
   </div>
 
@@ -561,25 +559,21 @@
     </DsSelector>
   {/if}
 
-  <div
-    class="grid w-full grid-cols-[auto_1fr] items-center gap-x-3 gap-y-1 {errors.payment_type !==
-    undefined
-      ? 'bg-red-200'
-      : ''}"
-  >
-    <div>
-      <label for="po-payment-type">Payment</label>
-    </div>
-    <div>
-      {#if isChildPO}
-        <DsLabel color="cyan">{selectedPaymentType?.label ?? "On Account"}</DsLabel>
-      {:else}
-        <DSToggle bind:value={item.payment_type} options={paymentTypeOptions} />
-      {/if}
-    </div>
-    <span class="col-start-2 text-sm text-neutral-600">{selectedPaymentDescription}</span>
+  <div class="flex w-full flex-col gap-1 {errors.payment_type !== undefined ? 'bg-red-200' : ''}">
+    {#if isChildPO}
+      <span>Payment</span>
+      <DsLabel color="cyan">{selectedPaymentType?.label ?? "On Account"}</DsLabel>
+    {:else}
+      <DSToggle
+        bind:value={item.payment_type}
+        label="Payment"
+        options={paymentTypeOptions}
+        showOptionDescriptions={true}
+        fullWidth={true}
+      />
+    {/if}
     {#if errors.payment_type !== undefined}
-      <span class="col-start-2 text-red-600">{errors.payment_type.message}</span>
+      <span class="text-red-600">{errors.payment_type.message}</span>
     {/if}
   </div>
 

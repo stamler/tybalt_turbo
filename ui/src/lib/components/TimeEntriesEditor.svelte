@@ -185,7 +185,9 @@
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
 </svelte:head>
 
-<form class="flex w-full flex-col items-center gap-2 p-2">
+<form
+  class="flex w-full flex-col items-center gap-2 p-2 max-lg:[&_button]:text-base max-lg:[&_input]:text-base max-lg:[&_label]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base"
+>
   <h1 class="w-full text-xl font-bold text-neutral-800">
     {#if data.editing}
       Editing Time Entry

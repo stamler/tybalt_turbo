@@ -127,13 +127,16 @@
   class="grid grid-cols-[auto_1fr_auto] [&>li:not(.inlistheader):nth-child(even)]:bg-neutral-100 [&>li:not(.inlistheader):nth-child(odd)]:bg-neutral-200"
 >
   {#if search && processorFn === undefined}
-    <li id="listbar" class="col-span-3 flex items-center gap-x-2 p-2">
+    <li
+      id="listbar"
+      class="col-span-3 flex items-center gap-x-2 p-2 max-[639px]:flex-wrap max-[639px]:gap-2"
+    >
       <input
         id="searchbox"
         type="textbox"
         placeholder="search..."
         bind:value={searchTerm}
-        class="flex-1 rounded-sm border border-neutral-300 px-1 py-1 text-base max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
+        class="flex-1 rounded-sm border border-neutral-300 px-1 py-1 text-base max-[639px]:basis-full max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
       />
       {#if groupField === undefined}
         <span>{processedItems.length} items</span>
