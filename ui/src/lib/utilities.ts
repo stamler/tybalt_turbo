@@ -289,6 +289,39 @@ export async function fetchCategories(jobId: string): Promise<CategoriesResponse
   }
 }
 
+// Build a small synchronizer for "selected job -> category options" form state.
+//
+// Why this exists:
+// Multiple editors (PO, Expense, Time Entry, Time Amendment) had nearly identical
+// reactive effects that called `fetchCategories(item.job)` and assigned the result.
+// That duplication made behavior easy to drift and hard to update safely.
+//
+// What this does:
+// - Returns a function that accepts the current job id.
+// - Starts a categories fetch when a truthy job id is provided.
+// - Ignores stale responses by using a monotonic request id, so rapid job changes
+//   cannot apply out-of-order data.
+// - Does not clear categories when job id is empty; callers keep existing behavior
+//   and decide when/how category state is reset on save.
+//
+// Usage pattern:
+// `const syncCategoriesForJob = createJobCategoriesSync((rows) => (categories = rows));`
+// then inside an effect:
+// `$effect(() => { syncCategoriesForJob(item.job); });`
+export function createJobCategoriesSync(
+  applyCategories: (rows: CategoriesResponse[]) => void,
+): (jobId: string | undefined | null) => void {
+  let requestId = 0;
+  return (jobId: string | undefined | null) => {
+    const currentRequestId = ++requestId;
+    if (!jobId) return;
+    fetchCategories(jobId).then((rows) => {
+      if (currentRequestId !== requestId) return;
+      applyCategories(rows);
+    });
+  };
+}
+
 // Fetch associated client_contacts
 export async function fetchClientContacts(clientId: string): Promise<ClientContactsResponse[]> {
   // if clientId is an empty string, return an empty array

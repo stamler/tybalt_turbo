@@ -2,9 +2,9 @@
   import { untrack } from "svelte";
   import {
     flatpickrAction,
-    fetchCategories,
     applyDefaultDivisionOnce,
     applyDefaultRoleOnce,
+    createJobCategoriesSync,
   } from "$lib/utilities";
   import { divisions } from "$lib/stores/divisions";
   import { jobs } from "$lib/stores/jobs";
@@ -126,12 +126,13 @@
   }
 
   let categories = $state([] as CategoriesResponse[]);
+  const syncCategoriesForJob = createJobCategoriesSync((rows) => {
+    categories = rows;
+  });
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
-    if (item.job) {
-      fetchCategories(item.job).then((c) => (categories = c));
-    }
+    syncCategoriesForJob(item.job);
   });
 
   async function save() {

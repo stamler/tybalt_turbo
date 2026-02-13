@@ -1,6 +1,11 @@
 <script lang="ts">
-  import { flatpickrAction, fetchCategories, applyDefaultDivisionOnce } from "$lib/utilities";
+  import {
+    flatpickrAction,
+    applyDefaultDivisionOnce,
+    createJobCategoriesSync,
+  } from "$lib/utilities";
   import { jobs } from "$lib/stores/jobs";
+  import { branches as branchesStore } from "$lib/stores/branches";
   import { divisions } from "$lib/stores/divisions";
   import { timeTypes } from "$lib/stores/time_types";
   import { profiles } from "$lib/stores/profiles";
@@ -13,7 +18,7 @@
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeAmendmentsPageData } from "$lib/svelte-types";
-  import { onMount, untrack } from "svelte";
+  import { untrack } from "svelte";
   import type {
     TimeTypesRecord,
     DivisionsRecord,
@@ -23,24 +28,12 @@
 
   // initialize the stores, noop if already initialized
   jobs.init();
+  branchesStore.init();
   divisions.init();
   timeTypes.init();
   profiles.init();
 
   let { data }: { data: TimeAmendmentsPageData } = $props();
-
-  onMount(async () => {
-    try {
-      const list = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
-      branches = list;
-      // If branch is required and not yet set, default to the first branch
-      if (((item as any).branch === undefined || (item as any).branch === "") && list.length > 0) {
-        (item as any).branch = list[0].id;
-      }
-    } catch (e) {
-      // noop
-    }
-  });
 
   const trainingTokensInDescriptionWhileRegularHours = $derived.by(() => {
     if (item.time_type !== undefined && item.description !== undefined) {
@@ -70,6 +63,7 @@
 
   let errors = $state({} as any);
   let item = $state(untrack(() => data.item));
+  let branchDefaultHandled = $state(false);
 
   // When subject user changes, default division to their profile default (if empty)
   $effect(() => {
@@ -93,13 +87,26 @@
   }
 
   let categories = $state([] as CategoriesResponse[]);
-  let branches = $state([] as BranchesResponse[]);
+  const syncCategoriesForJob = createJobCategoriesSync((rows) => {
+    categories = rows;
+  });
+
+  // Apply branch default once after branch options are available.
+  $effect(() => {
+    if (branchDefaultHandled) return;
+    const branchValue = (item as any).branch;
+    if (branchValue !== undefined && branchValue !== "") {
+      branchDefaultHandled = true;
+      return;
+    }
+    if ($branchesStore.items.length === 0) return;
+    (item as any).branch = $branchesStore.items[0].id;
+    branchDefaultHandled = true;
+  });
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
-    if (item.job) {
-      fetchCategories(item.job).then((c) => (categories = c));
-    }
+    syncCategoriesForJob(item.job);
   });
 
   async function save() {
@@ -193,7 +200,7 @@
   />
   <DsSelector
     bind:value={(item as any).branch as string}
-    items={branches}
+    items={$branchesStore.items}
     {errors}
     fieldName="branch"
     uiName="Branch"

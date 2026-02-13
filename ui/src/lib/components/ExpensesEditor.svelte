@@ -1,5 +1,10 @@
 <script lang="ts">
-  import { flatpickrAction, fetchCategories, applyDefaultDivisionOnce } from "$lib/utilities";
+  import {
+    flatpickrAction,
+    applyDefaultDivisionOnce,
+    createJobCategoriesSync,
+  } from "$lib/utilities";
+  import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
@@ -10,41 +15,38 @@
   import { divisions } from "$lib/stores/divisions";
   import { goto } from "$app/navigation";
   import type { ExpensesPageData } from "$lib/svelte-types";
-  import type {
-    CategoriesResponse,
-    ExpenditureKindsResponse,
-    ExpensesAllowanceTypesOptions,
-  } from "$lib/pocketbase-types";
+  import type { CategoriesResponse, ExpensesAllowanceTypesOptions } from "$lib/pocketbase-types";
   import { isExpensesResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import CumulativePOOverflowModal from "./CumulativePOOverflowModal.svelte";
-  import VendorCreatePopover from "./VendorCreatePopover.svelte";
+  import VendorSelector from "./VendorSelector.svelte";
   import { jobs } from "$lib/stores/jobs";
-  import { vendors } from "$lib/stores/vendors";
   import { untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
 
   // initialize the stores, noop if already initialized
   jobs.init();
-  vendors.init();
   divisions.init();
+  expenditureKindsStore.init();
   let { data }: { data: ExpensesPageData } = $props();
 
   let errors = $state({} as any);
   let item = $state(untrack(() => data.item));
   let overflowModal: CumulativePOOverflowModal;
-  let showAddVendorPopover = $state(false);
 
   let categories = $state([] as CategoriesResponse[]);
-  let expenditureKinds = $state([] as ExpenditureKindsResponse[]);
-  let loadedKinds = $state(false);
+  const syncCategoriesForJob = createJobCategoriesSync((rows) => {
+    categories = rows;
+  });
 
   const selectedKindLabel = $derived.by(() => {
     if (!item.purchase_order) {
-      return expenditureKinds.find((k) => k.name === "standard")?.en_ui_label ?? "Unknown";
+      return (
+        $expenditureKindsStore.items.find((k) => k.name === "standard")?.en_ui_label ?? "Unknown"
+      );
     }
-    const match = expenditureKinds.find((k) => k.id === item.kind);
+    const match = $expenditureKindsStore.items.find((k) => k.id === item.kind);
     if (!match) return "Unknown";
     return match.en_ui_label;
   });
@@ -59,27 +61,11 @@
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
-    if (item.job) {
-      fetchCategories(item.job).then((c) => (categories = c));
-    }
+    syncCategoriesForJob(item.job);
   });
 
   // Default division from caller's profile if creating and empty
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
-
-  // Load expenditure kinds once to resolve stored kind IDs into labels.
-  $effect(() => {
-    if (loadedKinds) return;
-    loadedKinds = true;
-    pb.collection("expenditure_kinds")
-      .getFullList<ExpenditureKindsResponse>()
-      .then((rows) => {
-        expenditureKinds = rows;
-      })
-      .catch((error) => {
-        console.error("Error loading expenditure kinds:", error);
-      });
-  });
 
   async function save(event: Event) {
     event.preventDefault();
@@ -124,14 +110,6 @@
         errors = error.data.data;
       }
     }
-  }
-
-  function openAddVendorPopover() {
-    showAddVendorPopover = true;
-  }
-
-  function handleVendorCreated(vendor: { id: string }) {
-    item.vendor = vendor.id;
   }
 </script>
 
@@ -329,29 +307,7 @@
         step={0.01}
         min={0}
       />
-      {#if $vendors.index !== null}
-        <div class="flex w-full items-end gap-1">
-          <div class="flex-1">
-            <DsAutoComplete
-              bind:value={item.vendor as string}
-              index={$vendors.index}
-              {errors}
-              fieldName="vendor"
-              uiName="Vendor"
-            >
-              {#snippet resultTemplate(item)}{item.name} ({item.alias}){/snippet}
-            </DsAutoComplete>
-          </div>
-          {#if !item.vendor}
-            <DsActionButton
-              action={openAddVendorPopover}
-              icon="feather:plus-circle"
-              color="green"
-              title="Add new vendor"
-            />
-          {/if}
-        </div>
-      {/if}
+      <VendorSelector bind:value={item.vendor as string} {errors} />
     {:else}
       <DsTextInput
         bind:value={item.distance as number}
@@ -379,4 +335,3 @@
     {/if}
   </div>
 </form>
-<VendorCreatePopover bind:show={showAddVendorPopover} onCreated={handleVendorCreated} />

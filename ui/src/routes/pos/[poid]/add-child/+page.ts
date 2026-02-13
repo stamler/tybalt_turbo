@@ -5,7 +5,7 @@ import {
   PurchaseOrdersTypeOptions,
 } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
-import type { PurchaseOrdersPageData, SecondApproversResponse } from "$lib/svelte-types";
+import type { PurchaseOrdersPageData } from "$lib/svelte-types";
 import { pb } from "$lib/pocketbase";
 import { error } from "@sveltejs/kit";
 
@@ -15,30 +15,6 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
   if (!parentPo) {
     throw error(404, "Parent PO not found");
   }
-
-  // Fetch approvers using GET query params.
-  const queryParams = new URLSearchParams({
-    division: parentPo.division,
-    amount: "0",
-    kind: parentPo.kind || "",
-    has_job: String(!!parentPo.job),
-    type: "One-Time",
-    start_date: parentPo.date || "",
-    end_date: "",
-    frequency: "",
-  });
-
-  const approvers = await pb.send(`/api/purchase_orders/approvers?${queryParams.toString()}`, {
-    method: "GET",
-  });
-
-  // Fetch second approvers
-  const secondApproversResponse = (await pb.send(
-    `/api/purchase_orders/second_approvers?${queryParams.toString()}`,
-    {
-      method: "GET",
-    },
-  )) as SecondApproversResponse;
 
   // Create a new PO with fields that must match the parent
   const defaultItem: Partial<PurchaseOrdersRecord> = {
@@ -70,8 +46,6 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     item: defaultItem as PurchaseOrdersRecord,
     editing: false,
     id: null,
-    approvers: approvers,
-    second_approvers: secondApproversResponse.approvers,
     parent_po_number: parentPo.po_number,
   };
 };

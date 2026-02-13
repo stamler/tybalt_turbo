@@ -12,7 +12,6 @@
     AdminProfilesAugmentedResponse,
     ClaimsResponse,
     UserClaimsResponse,
-    BranchesResponse,
     DivisionsResponse,
     PoApproverPropsResponse,
   } from "$lib/pocketbase-types";
@@ -21,15 +20,15 @@
   import { onMount, untrack } from "svelte";
   import type { SearchResult } from "minisearch";
   import { divisions as divisionsStore } from "$lib/stores/divisions";
+  import { branches as branchesStore } from "$lib/stores/branches";
 
   const PO_APPROVER_CLAIM_NAME = "po_approver";
 
-  let { data }: { data: AdminProfilesEditPageData & { divisions?: DivisionsResponse[] } } = $props();
+  let { data }: { data: AdminProfilesEditPageData & { divisions?: DivisionsResponse[] } } =
+    $props();
 
   let errors = $state({} as Record<string, { message: string }>);
   let item = $state(untrack(() => ({ ...data.item })));
-
-  let branches = $state([] as BranchesResponse[]);
 
   // Use shared divisions store for items and index
   const divisions = $derived.by(() => $divisionsStore.items as DivisionsResponse[]);
@@ -91,7 +90,7 @@
   });
 
   onMount(async () => {
-    await Promise.all([reloadAllClaims(), reloadUserClaims(), reloadBranches()]);
+    await Promise.all([reloadAllClaims(), reloadUserClaims(), branchesStore.init()]);
   });
 
   function normalizeNumber(value: unknown): number {
@@ -131,30 +130,19 @@
     }
   }
 
-  async function reloadBranches() {
-    try {
-      const list = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
-      branches = list;
-    } catch {
-      // noop
-    }
-  }
-
   // divisions are loaded and indexed via the shared store
 
   function applyPoApproverValues(
-    values:
-      | {
-          id?: string | null;
-          max_amount?: unknown;
-          project_max?: unknown;
-          sponsorship_max?: unknown;
-          staff_and_social_max?: unknown;
-          media_and_event_max?: unknown;
-          computer_max?: unknown;
-          divisions?: unknown;
-        }
-      | null,
+    values: {
+      id?: string | null;
+      max_amount?: unknown;
+      project_max?: unknown;
+      sponsorship_max?: unknown;
+      staff_and_social_max?: unknown;
+      media_and_event_max?: unknown;
+      computer_max?: unknown;
+      divisions?: unknown;
+    } | null,
   ) {
     if (!values) {
       resetPoApproverPropsState();
@@ -709,7 +697,7 @@
 
     <DsSelector
       bind:value={item.default_branch as string}
-      items={branches}
+      items={$branchesStore.items}
       {errors}
       fieldName="default_branch"
       uiName="Default Branch"

@@ -12,6 +12,7 @@
   import { profiles } from "$lib/stores/profiles";
   import { clients } from "$lib/stores/clients";
   import { jobs } from "$lib/stores/jobs";
+  import { branches as branchesStore } from "$lib/stores/branches";
   import { divisions } from "$lib/stores/divisions";
   import { rateSheets } from "$lib/stores/rateSheets";
   import { jobsEditingEnabled } from "$lib/stores/appConfig";
@@ -19,7 +20,6 @@
   import DsCheck from "$lib/components/DsCheck.svelte";
   import { onMount, untrack } from "svelte";
   import type {
-    BranchesResponse,
     ClientContactsResponse,
     DivisionsResponse,
     JobsRecord,
@@ -33,6 +33,7 @@
   clients.init();
   profiles.init();
   jobs.init();
+  branchesStore.init();
   divisions.init();
   rateSheets.init();
 
@@ -80,7 +81,6 @@
   let newCategories = $state([] as string[]);
   let categoriesToDelete = $state([] as string[]);
 
-  let branches = $state([] as BranchesResponse[]);
   // Allocations editor state
   type AllocationRow = { division: string; hours: number };
   let allocations = $state([] as AllocationRow[]);
@@ -223,7 +223,6 @@
 
   onMount(async () => {
     try {
-      branches = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
       // Load allocations when editing
       if ((data as JobsPageData).editing && (data as JobsPageData).id) {
         const list = await pb
@@ -257,7 +256,7 @@
         }
       }
     } catch (error) {
-      console.error("Failed to load branches", error);
+      console.error("Failed to load job form data", error);
     }
   });
 
@@ -1224,7 +1223,7 @@
           class="flex-1 rounded-sm border border-neutral-300 px-1"
         >
           <option value="">Select a branch</option>
-          {#each branches as branch}
+          {#each $branchesStore.items as branch}
             <option value={branch.id}>{branch.code ?? branch.name}</option>
           {/each}
         </select>

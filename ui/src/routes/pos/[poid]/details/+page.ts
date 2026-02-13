@@ -6,6 +6,7 @@ import type {
   ExpensesAugmentedResponse,
 } from "$lib/pocketbase-types";
 import type { SecondApproversResponse } from "$lib/svelte-types";
+import { buildPoApproverRequest, fetchPoSecondApprovers } from "$lib/poApprovers";
 
 export const load: PageLoad = async ({ params }) => {
   try {
@@ -15,20 +16,17 @@ export const load: PageLoad = async ({ params }) => {
 
     let secondApproverDiagnostics: SecondApproversResponse | null = null;
     try {
-      const queryParams = new URLSearchParams({
-        division: po.division || "",
-        amount: String(po.total ?? 0),
-        kind: po.kind || "",
-        has_job: String(!!po.job),
-        type: po.type === "Recurring" ? "Recurring" : po.type || "",
-        start_date: po.date || "",
-        end_date: po.end_date || "",
-        frequency: po.frequency || "",
+      const request = buildPoApproverRequest({
+        division: po.division,
+        total: po.total,
+        kind: po.kind,
+        job: po.job,
+        type: po.type,
+        date: po.date,
+        end_date: po.end_date,
+        frequency: po.frequency,
       });
-      secondApproverDiagnostics = (await pb.send(
-        `/api/purchase_orders/second_approvers?${queryParams.toString()}`,
-        { method: "GET", requestKey: null },
-      )) as SecondApproversResponse;
+      secondApproverDiagnostics = await fetchPoSecondApprovers(request, null);
     } catch (diagErr) {
       // Keep details view available even if diagnostics fetch fails.
       console.error(`loading second approver diagnostics: ${diagErr}`);

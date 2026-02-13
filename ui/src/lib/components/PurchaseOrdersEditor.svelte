@@ -1,8 +1,13 @@
 <script lang="ts">
-  import { flatpickrAction, fetchCategories, applyDefaultDivisionOnce } from "$lib/utilities";
+  import {
+    flatpickrAction,
+    applyDefaultDivisionOnce,
+    createJobCategoriesSync,
+  } from "$lib/utilities";
   import { jobs } from "$lib/stores/jobs";
-  import { vendors } from "$lib/stores/vendors";
   import { divisions } from "$lib/stores/divisions";
+  import { branches as branchesStore } from "$lib/stores/branches";
+  import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
@@ -19,21 +24,27 @@
   import type {
     BranchesResponse,
     CategoriesResponse,
-    ExpenditureKindsResponse,
     PoApproversResponse,
   } from "$lib/pocketbase-types";
+  import {
+    buildPoApproverRequest,
+    fetchPoApproversBundle,
+    type PoApproverRequest,
+  } from "$lib/poApprovers";
   import DsActionButton from "./DSActionButton.svelte";
   import DsLabel from "./DsLabel.svelte";
-  import VendorCreatePopover from "./VendorCreatePopover.svelte";
-  import { onMount, untrack } from "svelte";
+  import PoSecondApproverStatus from "./PoSecondApproverStatus.svelte";
+  import VendorSelector from "./VendorSelector.svelte";
+  import { untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
 
   // initialize the stores, noop if already initialized
   jobs.init();
-  vendors.init();
   divisions.init();
+  branchesStore.init();
+  expenditureKindsStore.init();
 
   let { data }: { data: PurchaseOrdersPageData } = $props();
 
@@ -44,7 +55,9 @@
   const isChildPO = $derived(item.parent_po !== "" && item.parent_po !== undefined);
 
   let categories = $state([] as CategoriesResponse[]);
-  let expenditureKinds = $state([] as ExpenditureKindsResponse[]);
+  const syncCategoriesForJob = createJobCategoriesSync((rows) => {
+    categories = rows;
+  });
   let approvers = $state([] as PoApproversResponse[]);
   let secondApprovers = $state([] as PoApproversResponse[]);
   let showApproverField = $state(false);
@@ -52,18 +65,14 @@
   let secondApproverStatus = $state("" as SecondApproverStatus | "");
   let secondApproverReasonMessage = $state("");
   let secondApproverMeta = $state<SecondApproversResponse["meta"] | null>(null);
-  let showSecondApproverWhy = $state(false);
   let approversLoaded = $state(false);
   let approversFetchError = $state(false);
   let approverFetchRequestId = 0;
-  let loadedKinds = $state(false);
-  let branches = $state([] as BranchesResponse[]);
   let branchPinnedInSession = $state(false);
   let lastAutoBranch = $state("");
   let branchChangeWatchInitialized = $state(false);
   let lastObservedJobForAuto = $state<string | null>(null);
   let branchLookupRequestId = 0;
-  let showAddVendorPopover = $state(false);
   type MaybeAbortError = {
     isAbort?: boolean;
     originalError?: { name?: string };
@@ -71,14 +80,16 @@
     status?: number;
   };
   const kindOptions = $derived.by(() =>
-    expenditureKinds.map((kind) => ({
+    $expenditureKindsStore.items.map((kind) => ({
       id: kind.id,
       label: kind.en_ui_label,
     })),
   );
-  const selectedKind = $derived.by(() => expenditureKinds.find((kind) => kind.id === item.kind));
+  const selectedKind = $derived.by(() =>
+    $expenditureKindsStore.items.find((kind) => kind.id === item.kind),
+  );
   const standardKindId = $derived.by(
-    () => expenditureKinds.find((kind) => kind.name === "standard")?.id ?? "",
+    () => $expenditureKindsStore.items.find((kind) => kind.name === "standard")?.id ?? "",
   );
   const typeOptions = [
     { id: "One-Time", label: "One-Time" },
@@ -112,25 +123,24 @@
     }
     return "use for purchases charged directly to a vendor account";
   });
-  const creatorDefaultBranch = $derived.by(
-    () => $globalStore.profile.default_branch ?? "",
+  const creatorDefaultBranch = $derived.by(() => $globalStore.profile.default_branch ?? "");
+  const approverRequest = $derived.by(() =>
+    buildPoApproverRequest({
+      division: item.division,
+      total: item.total,
+      kind: item.kind,
+      job: item.job,
+      type: isRecurring ? "Recurring" : item.type,
+      date: item.date,
+      end_date: item.end_date,
+      frequency: item.frequency,
+    }),
   );
-  const approverRequest = $derived.by(() => ({
-    division: item.division ?? "",
-    amount: String(Number(item.total)),
-    kind: item.kind ?? "",
-    has_job: String(item.job !== ""),
-    type: isRecurring ? "Recurring" : item.type,
-    start_date: item.date || "",
-    end_date: item.end_date || "",
-    frequency: item.frequency || "",
-  }));
   const canFetchApprovers = $derived.by(() => Boolean(item.division && item.total && item.kind));
   const showApproverFetchError = $derived.by(() => canFetchApprovers && approversFetchError);
   const showSecondApproverStatusHint = $derived.by(
     () => approversLoaded && canFetchApprovers && !approversFetchError && !showSecondApproverField,
   );
-  const formatAmount = (value: number) => (Number.isFinite(value) ? value.toFixed(2) : String(value));
   const isAbortError = (error: unknown): boolean => {
     const e = error as MaybeAbortError;
     if (e?.isAbort) return true;
@@ -138,15 +148,10 @@
     return e?.status === 0 && (e?.message ?? "").toLowerCase().includes("aborted");
   };
 
-  onMount(async () => {
-    try {
-      branches = await pb.collection("branches").getFullList<BranchesResponse>({ sort: "name" });
-    } catch (error) {
-      console.error("Error loading branches:", error);
-    }
-  });
-
-  async function resolveDerivedBranch(jobId: string, fallbackDefaultBranch: string): Promise<string> {
+  async function resolveDerivedBranch(
+    jobId: string,
+    fallbackDefaultBranch: string,
+  ): Promise<string> {
     if (jobId !== "") {
       try {
         const job = await pb.collection("jobs").getOne(jobId, { requestKey: null });
@@ -226,30 +231,20 @@
 
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
-    if (item.job) {
-      fetchCategories(item.job).then((c) => (categories = c));
-    }
+    syncCategoriesForJob(item.job);
   });
 
   // Default division from caller's profile if creating and empty
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
 
-  // Load expenditure kinds once for the kind toggle.
+  // Default kind once kinds are loaded.
   $effect(() => {
-    if (loadedKinds) return;
-    loadedKinds = true;
-    pb.collection("expenditure_kinds")
-      .getFullList<ExpenditureKindsResponse>({ sort: "ui_order" })
-      .then((rows) => {
-        expenditureKinds = rows;
-        if (!item.kind || item.kind === "") {
-          const standard = rows.find((r) => r.name === "standard");
-          item.kind = standard?.id ?? rows[0]?.id ?? "";
-        }
-      })
-      .catch((error) => {
-        console.error("Error loading expenditure kinds:", error);
-      });
+    const kinds = $expenditureKindsStore.items;
+    if (kinds.length === 0) return;
+    if (!item.kind || item.kind === "") {
+      const standard = kinds.find((r) => r.name === "standard");
+      item.kind = standard?.id ?? kinds[0]?.id ?? "";
+    }
   });
 
   // Keep approver options in sync with all request parameters used by
@@ -267,7 +262,6 @@
       secondApproverStatus = "";
       secondApproverReasonMessage = "";
       secondApproverMeta = null;
-      showSecondApproverWhy = false;
       approversLoaded = false;
       approversFetchError = false;
     }
@@ -280,43 +274,20 @@
     }
   });
 
-  async function fetchApprovers(args: {
-    division: string;
-    amount: string;
-    kind: string;
-    has_job: string;
-    type: string;
-    start_date: string;
-    end_date: string;
-    frequency: string;
-  }) {
+  async function fetchApprovers(args: PoApproverRequest) {
     const requestId = ++approverFetchRequestId;
     approversFetchError = false;
     try {
-      const params = new URLSearchParams(args);
-
-      // Fetch first approvers
-      const nextApprovers = await pb.send(`/api/purchase_orders/approvers?${params.toString()}`, {
-        method: "GET",
-        requestKey: null, // Avoid PocketBase auto-cancel while users type quickly.
-      });
-      if (requestId !== approverFetchRequestId) return;
-
-      // Fetch second approvers and metadata status.
-      const secondApproversResponse = (await pb.send(
-        `/api/purchase_orders/second_approvers?${params.toString()}`,
-        {
-          method: "GET",
-          requestKey: null, // Avoid PocketBase auto-cancel while users type quickly.
-        },
-      )) as SecondApproversResponse;
+      const { approvers: nextApprovers, secondApproversResponse } = await fetchPoApproversBundle(
+        args,
+        null, // Avoid PocketBase auto-cancel while users type quickly.
+      );
       if (requestId !== approverFetchRequestId) return;
       approvers = nextApprovers;
       secondApprovers = secondApproversResponse.approvers;
       secondApproverStatus = secondApproversResponse.meta.status;
       secondApproverReasonMessage = secondApproversResponse.meta.reason_message ?? "";
       secondApproverMeta = secondApproversResponse.meta;
-      showSecondApproverWhy = false;
 
       // Show approvers field if there are approvers available
       showApproverField = approvers.length > 0;
@@ -337,7 +308,6 @@
       secondApproverStatus = "";
       secondApproverReasonMessage = "";
       secondApproverMeta = null;
-      showSecondApproverWhy = false;
       approversLoaded = false;
       approversFetchError = true;
     }
@@ -352,8 +322,8 @@
       item.category = "";
     }
     if (!item.kind || item.kind === "") {
-      const standard = expenditureKinds.find((k) => k.name === "standard");
-      item.kind = standard?.id ?? expenditureKinds[0]?.id ?? "";
+      const standard = $expenditureKindsStore.items.find((k) => k.name === "standard");
+      item.kind = standard?.id ?? $expenditureKindsStore.items[0]?.id ?? "";
     }
 
     // set approver to self if the approver field is hidden
@@ -364,7 +334,10 @@
     // Set priority_second_approver based on second-approval status when the
     // selector is hidden.
     if (!showSecondApproverField) {
-      if (secondApproverStatus === "not_required" || secondApproverStatus === "requester_qualifies") {
+      if (
+        secondApproverStatus === "not_required" ||
+        secondApproverStatus === "requester_qualifies"
+      ) {
         item.priority_second_approver = item.uid;
       } else if (secondApproverStatus === "required_no_candidates") {
         item.priority_second_approver = "";
@@ -383,14 +356,6 @@
     } catch (error: any) {
       errors = error.data.data;
     }
-  }
-
-  function openAddVendorPopover() {
-    showAddVendorPopover = true;
-  }
-
-  function handleVendorCreated(vendor: { id: string }) {
-    item.vendor = vendor.id;
   }
 </script>
 
@@ -501,58 +466,17 @@
         {item.given_name} {item.surname}
       {/snippet}
     </DsSelector>
-  {:else if showApproverFetchError}
-    <span class="flex w-full gap-2 text-sm text-red-600">
-      <span class="invisible">Priority Second Approver</span>
-      <span>Unable to load approver options right now. Please try again.</span>
-    </span>
-  {:else if showSecondApproverStatusHint && secondApproverStatus === "not_required"}
-    <span class="flex w-full gap-2 text-sm text-neutral-600">
-      <span class="invisible">Priority Second Approver</span>
-      <span>Second approver is not required for this purchase order.</span>
-    </span>
-  {:else if showSecondApproverStatusHint && secondApproverStatus === "requester_qualifies"}
-    <span class="flex w-full gap-2 text-sm text-neutral-600">
-      <span class="invisible">Priority Second Approver</span>
-      <span>Second approval is required; you qualify and will be assigned automatically.</span>
-    </span>
-  {:else if showSecondApproverStatusHint && secondApproverStatus === "required_no_candidates"}
-    <span class="flex w-full gap-2 text-sm text-red-600">
-      <span class="invisible">Priority Second Approver</span>
-      <span>
-        {secondApproverReasonMessage ||
-          "Second approval is required, but no eligible second approver is available."}
-      </span>
-    </span>
-  {/if}
-  {#if showSecondApproverStatusHint && secondApproverMeta}
-    <span class="flex w-full gap-2 text-sm">
-      <span class="invisible">Priority Second Approver</span>
-      <button
-        type="button"
-        class="text-neutral-600 underline hover:text-neutral-900"
-        onclick={() => {
-          showSecondApproverWhy = !showSecondApproverWhy;
-        }}
-      >
-        {showSecondApproverWhy ? "Hide why" : "Why?"}
-      </button>
-    </span>
-    {#if showSecondApproverWhy}
-      <span class="flex w-full gap-2 text-xs text-neutral-600">
-        <span class="invisible">Priority Second Approver</span>
-        <span class="flex flex-col">
-          <span>reason code: {secondApproverMeta.reason_code || "n/a"}</span>
-          <span>evaluated amount: ${formatAmount(secondApproverMeta.evaluated_amount)}</span>
-          <span>second-approval threshold: ${formatAmount(secondApproverMeta.second_approval_threshold)}</span>
-          <span>tier ceiling: ${formatAmount(secondApproverMeta.tier_ceiling)}</span>
-          <span>eligibility limit rule: {secondApproverMeta.limit_column || "n/a"}</span>
-          <span>division: {item.division || "n/a"}</span>
-          <span>kind: {selectedKind?.en_ui_label ?? item.kind ?? "n/a"}</span>
-          <span>has job: {item.job !== "" ? "yes" : "no"}</span>
-        </span>
-      </span>
-    {/if}
+  {:else}
+    <PoSecondApproverStatus
+      showFetchError={showApproverFetchError}
+      showStatusHint={showSecondApproverStatusHint}
+      status={secondApproverStatus}
+      reasonMessage={secondApproverReasonMessage}
+      meta={secondApproverMeta}
+      division={item.division ?? ""}
+      kindLabel={selectedKind?.en_ui_label ?? item.kind ?? "n/a"}
+      hasJob={item.job !== ""}
+    />
   {/if}
 
   {#if isRecurring}
@@ -618,7 +542,7 @@
   {#if item.job === ""}
     <DsSelector
       bind:value={item.branch as string}
-      items={branches}
+      items={$branchesStore.items}
       {errors}
       fieldName="branch"
       uiName="Branch"
@@ -702,30 +626,7 @@
     <span>max in CAD including all taxes and shipping</span>
   </span>
 
-  {#if $vendors.index !== null}
-    <div class="flex w-full items-end gap-1">
-      <div class="flex-1">
-        <DsAutoComplete
-          bind:value={item.vendor as string}
-          index={$vendors.index}
-          {errors}
-          fieldName="vendor"
-          uiName="Vendor"
-          disabled={isChildPO}
-        >
-          {#snippet resultTemplate(item)}{item.name} ({item.alias}){/snippet}
-        </DsAutoComplete>
-      </div>
-      {#if !item.vendor && !isChildPO}
-        <DsActionButton
-          action={openAddVendorPopover}
-          icon="feather:plus-circle"
-          color="green"
-          title="Add new vendor"
-        />
-      {/if}
-    </div>
-  {/if}
+  <VendorSelector bind:value={item.vendor as string} {errors} disabled={isChildPO} />
 
   <!-- File upload for attachment -->
   <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
@@ -744,4 +645,3 @@
     {/if}
   </div>
 </form>
-<VendorCreatePopover bind:show={showAddVendorPopover} onCreated={handleVendorCreated} />

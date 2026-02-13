@@ -7,7 +7,7 @@ import {
 } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
-import type { PurchaseOrdersPageData, SecondApproversResponse } from "$lib/svelte-types";
+import type { PurchaseOrdersPageData } from "$lib/svelte-types";
 
 export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
   const defaultItem: Partial<PurchaseOrdersRecord> = {
@@ -32,48 +32,10 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
   };
 
   try {
-    // Fetch the purchase order
     const item = await pb.collection("purchase_orders").getOne(params.poid);
-
-    // Fetch approvers using GET query params.
-    const queryParams = new URLSearchParams({
-      division: item.division,
-      amount: String(item.total),
-      kind: item.kind || "",
-      has_job: String(!!item.job),
-      type: item.type === PurchaseOrdersTypeOptions.Recurring ? "Recurring" : item.type,
-      start_date: item.date || "",
-      end_date: item.end_date || "",
-      frequency: item.frequency || "",
-    });
-
-    const approvers = await pb.send(`/api/purchase_orders/approvers?${queryParams.toString()}`, {
-      method: "GET",
-    });
-
-    // Fetch second approvers
-    const secondApproversResponse = (await pb.send(
-      `/api/purchase_orders/second_approvers?${queryParams.toString()}`,
-      {
-        method: "GET",
-      },
-    )) as SecondApproversResponse;
-
-    return {
-      item,
-      editing: true,
-      id: params.poid,
-      approvers: approvers,
-      second_approvers: secondApproversResponse.approvers,
-    };
+    return { item, editing: true, id: params.poid };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);
-    return {
-      item: defaultItem as PurchaseOrdersRecord,
-      editing: false,
-      id: null,
-      approvers: [],
-      second_approvers: [],
-    };
+    return { item: defaultItem as PurchaseOrdersRecord, editing: false, id: null };
   }
 };
