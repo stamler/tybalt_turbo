@@ -212,15 +212,15 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 			},
 		}
 	}
-	if strings.TrimSpace(purchaseOrderRecord.GetString("job")) != "" &&
-		kindRecord.GetString("name") != utilities.ExpenditureKindNameStandard {
+	kindAllowsJob := kindRecord.GetBool("allow_job")
+	if strings.TrimSpace(purchaseOrderRecord.GetString("job")) != "" && !kindAllowsJob {
 		return &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "hook error when validating purchase order",
 			Data: map[string]errs.CodeError{
 				"kind": {
 					Code:    "invalid_kind_for_job",
-					Message: "kind must be standard when job is set",
+					Message: "selected kind does not allow job",
 				},
 			},
 		}

@@ -38,17 +38,27 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 	// Get approval tier amounts from the database for test validation
 	app := testutils.SetupTestApp(t)
 	tier1, tier2 := testutils.GetApprovalTiers(app)
+	computerKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "computer",
+	})
+	if err != nil {
+		t.Fatalf("failed to load computer expenditure kind: %v", err)
+	}
+	computerKindID := computerKind.Id
 
 	// Municipal division ID for testing
 	municipalDivision := "2rrfy6m2c8hazjy"
 	drillingServicesDivision := "fy4i9poneukvq9u"
-	makeApproversURL := func(path string, division string, amount string) string {
+	makeApproversURLWithKindAndJob := func(path string, division string, amount string, kindID string, hasJob bool) string {
 		params := url.Values{}
 		params.Set("division", division)
 		params.Set("amount", amount)
-		params.Set("kind", utilities.DefaultExpenditureKindID())
-		params.Set("has_job", "false")
+		params.Set("kind", kindID)
+		params.Set("has_job", fmt.Sprintf("%t", hasJob))
 		return fmt.Sprintf("%s?%s", path, params.Encode())
+	}
+	makeApproversURL := func(path string, division string, amount string) string {
+		return makeApproversURLWithKindAndJob(path, division, amount, utilities.DefaultExpenditureKindID(), false)
 	}
 
 	scenarios := []tests.ApiScenario{
@@ -219,6 +229,44 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 				`"reason_code":"no_eligible_second_approvers"`,
 				`"limit_column":"max_amount"`,
 				`"reason_message":"Second approval is required, but no eligible second approver is currently available. Assign a priority second approver."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "second approvers metadata uses project_max for standard kind with job",
+			Method: http.MethodGet,
+			URL: makeApproversURLWithKindAndJob(
+				"/api/purchase_orders/second_approvers",
+				municipalDivision,
+				fmt.Sprintf("%d", int(tier2)+1000000),
+				utilities.DefaultExpenditureKindID(),
+				true,
+			),
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"limit_column":"project_max"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "second approvers metadata uses computer_max for computer kind with job",
+			Method: http.MethodGet,
+			URL: makeApproversURLWithKindAndJob(
+				"/api/purchase_orders/second_approvers",
+				municipalDivision,
+				fmt.Sprintf("%d", int(tier2)+1000000),
+				computerKindID,
+				true,
+			),
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"limit_column":"computer_max"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

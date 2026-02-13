@@ -77,8 +77,15 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load standard expenditure kind: %v", err)
 	}
+	computerKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "computer",
+	})
+	if err != nil {
+		t.Fatalf("failed to load computer expenditure kind: %v", err)
+	}
 	standardKindID := standardKind.Id
 	sponsorshipKindID := sponsorshipKind.Id
+	computerKindID := computerKind.Id
 
 	// Helper to convert a JSON body string into multipart/form-data with a tiny PNG attachment
 	makeMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
@@ -145,7 +152,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		})
 	}
 
-	// fails when a job is set and kind is not standard
+	// fails when a job is set and kind does not allow jobs
 	{
 		b, ct, err := makeMultipart(fmt.Sprintf(`{
             "uid": "rzr98oadsp9qc11",
@@ -165,7 +172,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			t.Fatal(err)
 		}
 		scenarios = append(scenarios, tests.ApiScenario{
-			Name:           "fails when job is set and kind is not standard",
+			Name:           "fails when job is set and kind does not allow jobs",
 			Method:         http.MethodPost,
 			URL:            "/api/collections/purchase_orders/records",
 			Body:           b,
@@ -173,10 +180,47 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"kind":{"code":"invalid_kind_for_job"`,
-				`"message":"kind must be standard when job is set"`,
+				`"message":"selected kind does not allow job"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// valid purchase order can be created with a job and computer kind
+	{
+		b, ct, err := makeMultipart(fmt.Sprintf(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "vccd5fo56ctbigh",
+            "description": "job PO with computer kind",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "One-Time",
+            "job": "cjf0kt0defhq480",
+            "kind": "%s"
+        }`, computerKindID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "valid purchase order is created when job is set and kind is computer",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"kind":"%s"`, computerKindID),
+				`"job":"cjf0kt0defhq480"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		})
@@ -1522,8 +1566,15 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load standard expenditure kind: %v", err)
 	}
+	computerKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "computer",
+	})
+	if err != nil {
+		t.Fatalf("failed to load computer expenditure kind: %v", err)
+	}
 	standardKindID := standardKind.Id
 	sponsorshipKindID := sponsorshipKind.Id
+	computerKindID := computerKind.Id
 
 	// multipart builder for updates with attachment
 	updateMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
@@ -1658,7 +1709,44 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 		})
 	}
 
-	// fails to update when a job is set and kind is not standard
+	// valid purchase order updates can keep job with computer kind
+	{
+		b, ct, err := updateMultipart(fmt.Sprintf(`{
+			"uid": "f2j5a8vk006baub",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order",
+			"payment_type": "Expense",
+			"total": 2234.56,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Cumulative",
+			"job": "cjf0kt0defhq480",
+			"kind": "%s"
+		}`, computerKindID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "valid purchase order updates when job is set and kind is computer",
+			Method:         http.MethodPatch,
+			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"kind":"%s"`, computerKindID),
+				`"job":"cjf0kt0defhq480"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// fails to update when a job is set and kind does not allow jobs
 	{
 		b, ct, err := updateMultipart(fmt.Sprintf(`{
 			"uid": "f2j5a8vk006baub",
@@ -1678,7 +1766,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 			t.Fatal(err)
 		}
 		scenarios = append(scenarios, tests.ApiScenario{
-			Name:           "fails to update when job is set and kind is not standard",
+			Name:           "fails to update when job is set and kind does not allow jobs",
 			Method:         http.MethodPatch,
 			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
 			Body:           b,
@@ -1686,7 +1774,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"kind":{"code":"invalid_kind_for_job"`,
-				`"message":"kind must be standard when job is set"`,
+				`"message":"selected kind does not allow job"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,

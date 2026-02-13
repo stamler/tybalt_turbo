@@ -290,6 +290,7 @@ export type DivisionsRecord = {
 };
 
 export type ExpenditureKindsRecord = {
+  allow_job: boolean;
   created: IsoDateString;
   description: string;
   en_ui_label: string;

@@ -15,7 +15,7 @@ Each of the 6 activities maps to columns in `po_approver_props`. `standard` (Cap
 
 In the UI:
 
-- **Purchase Orders editor**: Kind is selectable via toggle only when no Job is set. If Job is set, Kind selection is hidden and the PO is treated as project expense (`standard` + job-present behavior).
+- **Purchase Orders editor**: Kind is always selectable via toggle. If selected kind has `allow_job = false`, Job is hidden and cleared; switching back to an `allow_job = true` kind restores the in-editor Job value.
 - **Expenses editor**: Kind is never selectable. It is display-only: inherited from the linked PO when a PO is present, otherwise shown as `standard` for no-PO expenses.
 
 Operational dependency:

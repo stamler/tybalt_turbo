@@ -14,8 +14,8 @@ export const expenditureKinds = createCollectionStore<ExpenditureKindsResponse>(
     requestKey: "expenditure_kinds",
   },
   {
-    fields: ["name", "en_ui_label", "description"],
-    storeFields: ["id", "name", "en_ui_label", "description"],
+    fields: ["name", "en_ui_label", "description", "allow_job"],
+    storeFields: ["id", "name", "en_ui_label", "description", "allow_job"],
   },
   async (item) => {
     const fullRecord = await pb

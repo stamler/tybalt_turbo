@@ -39,6 +39,7 @@ The kind determines which `po_approver_props` limit column is checked when evalu
 - `kind` is required on new purchase orders and new expenses.
 - For expenses, clients do not typically need to provide `kind`: the server derives it (`cleanExpense` forces `standard` for no-PO expenses, and `ProcessExpense` overwrites it from the linked PO when a purchase order is present).
 - The referenced `expenditure_kinds` record must exist.
+- For purchase orders, if `job` is set then the selected kind must have `allow_job = true` in `expenditure_kinds` (currently `standard` and `computer`).
 - Legacy records (created before kind existed) with an empty kind are silently upgraded to `standard` when updated.
 - Child POs must have the same kind as their parent (with normalization for legacy parents that have an empty kind).
 

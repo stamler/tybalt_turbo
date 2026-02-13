@@ -68,6 +68,7 @@
   let approversLoaded = $state(false);
   let approversFetchError = $state(false);
   let approverFetchRequestId = 0;
+  let stashedJobWhenKindDisallows = $state("");
   let branchPinnedInSession = $state(false);
   let lastAutoBranch = $state("");
   let branchChangeWatchInitialized = $state(false);
@@ -88,9 +89,7 @@
   const selectedKind = $derived.by(() =>
     $expenditureKindsStore.items.find((kind) => kind.id === item.kind),
   );
-  const standardKindId = $derived.by(
-    () => $expenditureKindsStore.items.find((kind) => kind.name === "standard")?.id ?? "",
-  );
+  const kindAllowsJob = $derived.by(() => selectedKind?.allow_job ?? true);
   const typeOptions = [
     { id: "One-Time", label: "One-Time" },
     { id: "Cumulative", label: "Cumulative" },
@@ -267,10 +266,19 @@
     }
   });
 
-  // A PO with a job is always treated as project expense (standard kind + has_job=true).
+  // Kind wins over job. If selected kind disallows jobs, stash+clear job and
+  // restore it when switching back to a kind that allows jobs.
   $effect(() => {
-    if (item.job !== "" && standardKindId && item.kind !== standardKindId) {
-      item.kind = standardKindId;
+    if (kindAllowsJob) {
+      if (item.job === "" && stashedJobWhenKindDisallows !== "") {
+        item.job = stashedJobWhenKindDisallows;
+        stashedJobWhenKindDisallows = "";
+      }
+      return;
+    }
+    if (item.job !== "") {
+      stashedJobWhenKindDisallows = item.job;
+      item.job = "";
     }
   });
 
@@ -324,6 +332,10 @@
     if (!item.kind || item.kind === "") {
       const standard = $expenditureKindsStore.items.find((k) => k.name === "standard");
       item.kind = standard?.id ?? $expenditureKindsStore.items[0]?.id ?? "";
+    }
+    if (!kindAllowsJob) {
+      item.job = "";
+      item.category = "";
     }
 
     // set approver to self if the approver field is hidden
@@ -425,11 +437,7 @@
       <label for="po-kind">Kind</label>
     </div>
     <div>
-      {#if item.job !== ""}
-        <DsLabel color="cyan">{selectedKind?.en_ui_label ?? "Standard"}</DsLabel>
-      {:else}
-        <DSToggle bind:value={item.kind} options={kindOptions} />
-      {/if}
+      <DSToggle bind:value={item.kind} options={kindOptions} />
     </div>
     {#if selectedKind && selectedKind.name !== "standard" && selectedKind.description}
       <span class="col-start-2 text-sm text-neutral-600">{selectedKind.description}</span>
@@ -575,7 +583,7 @@
     {/if}
   </div>
 
-  {#if $jobs.index !== null}
+  {#if kindAllowsJob && $jobs.index !== null}
     <DsAutoComplete
       bind:value={item.job as string}
       index={$jobs.index}
