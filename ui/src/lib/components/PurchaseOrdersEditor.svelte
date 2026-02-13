@@ -24,6 +24,7 @@
   } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DsLabel from "./DsLabel.svelte";
+  import VendorCreatePopover from "./VendorCreatePopover.svelte";
   import { onMount, untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
@@ -62,6 +63,7 @@
   let branchChangeWatchInitialized = $state(false);
   let lastObservedJobForAuto = $state<string | null>(null);
   let branchLookupRequestId = 0;
+  let showAddVendorPopover = $state(false);
   type MaybeAbortError = {
     isAbort?: boolean;
     originalError?: { name?: string };
@@ -382,6 +384,14 @@
       errors = error.data.data;
     }
   }
+
+  function openAddVendorPopover() {
+    showAddVendorPopover = true;
+  }
+
+  function handleVendorCreated(vendor: { id: string }) {
+    item.vendor = vendor.id;
+  }
 </script>
 
 <svelte:head>
@@ -693,16 +703,28 @@
   </span>
 
   {#if $vendors.index !== null}
-    <DsAutoComplete
-      bind:value={item.vendor as string}
-      index={$vendors.index}
-      {errors}
-      fieldName="vendor"
-      uiName="Vendor"
-      disabled={isChildPO}
-    >
-      {#snippet resultTemplate(item)}{item.name} ({item.alias}){/snippet}
-    </DsAutoComplete>
+    <div class="flex w-full items-end gap-1">
+      <div class="flex-1">
+        <DsAutoComplete
+          bind:value={item.vendor as string}
+          index={$vendors.index}
+          {errors}
+          fieldName="vendor"
+          uiName="Vendor"
+          disabled={isChildPO}
+        >
+          {#snippet resultTemplate(item)}{item.name} ({item.alias}){/snippet}
+        </DsAutoComplete>
+      </div>
+      {#if !item.vendor && !isChildPO}
+        <DsActionButton
+          action={openAddVendorPopover}
+          icon="feather:plus-circle"
+          color="green"
+          title="Add new vendor"
+        />
+      {/if}
+    </div>
   {/if}
 
   <!-- File upload for attachment -->
@@ -722,3 +744,4 @@
     {/if}
   </div>
 </form>
+<VendorCreatePopover bind:show={showAddVendorPopover} onCreated={handleVendorCreated} />

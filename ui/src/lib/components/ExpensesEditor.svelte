@@ -18,6 +18,7 @@
   import { isExpensesResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import CumulativePOOverflowModal from "./CumulativePOOverflowModal.svelte";
+  import VendorCreatePopover from "./VendorCreatePopover.svelte";
   import { jobs } from "$lib/stores/jobs";
   import { vendors } from "$lib/stores/vendors";
   import { untrack } from "svelte";
@@ -33,6 +34,7 @@
   let errors = $state({} as any);
   let item = $state(untrack(() => data.item));
   let overflowModal: CumulativePOOverflowModal;
+  let showAddVendorPopover = $state(false);
 
   let categories = $state([] as CategoriesResponse[]);
   let expenditureKinds = $state([] as ExpenditureKindsResponse[]);
@@ -122,6 +124,14 @@
         errors = error.data.data;
       }
     }
+  }
+
+  function openAddVendorPopover() {
+    showAddVendorPopover = true;
+  }
+
+  function handleVendorCreated(vendor: { id: string }) {
+    item.vendor = vendor.id;
   }
 </script>
 
@@ -320,15 +330,27 @@
         min={0}
       />
       {#if $vendors.index !== null}
-        <DsAutoComplete
-          bind:value={item.vendor as string}
-          index={$vendors.index}
-          {errors}
-          fieldName="vendor"
-          uiName="Vendor"
-        >
-          {#snippet resultTemplate(item)}{item.name} ({item.alias}){/snippet}
-        </DsAutoComplete>
+        <div class="flex w-full items-end gap-1">
+          <div class="flex-1">
+            <DsAutoComplete
+              bind:value={item.vendor as string}
+              index={$vendors.index}
+              {errors}
+              fieldName="vendor"
+              uiName="Vendor"
+            >
+              {#snippet resultTemplate(item)}{item.name} ({item.alias}){/snippet}
+            </DsAutoComplete>
+          </div>
+          {#if !item.vendor}
+            <DsActionButton
+              action={openAddVendorPopover}
+              icon="feather:plus-circle"
+              color="green"
+              title="Add new vendor"
+            />
+          {/if}
+        </div>
       {/if}
     {:else}
       <DsTextInput
@@ -357,3 +379,4 @@
     {/if}
   </div>
 </form>
+<VendorCreatePopover bind:show={showAddVendorPopover} onCreated={handleVendorCreated} />
