@@ -77,6 +77,7 @@ export type ClientDetailsPageData = {
 };
 export type VendorsPageData = PageData<VendorsRecord | VendorsResponse>;
 export type AdminProfilesPageData = PageData<AdminProfilesRecord | AdminProfilesAugmentedResponse>;
+export type AdminProfilesEditPageData = PageData<AdminProfilesAugmentedResponse>;
 
 // Expenses list pages use API endpoints returning augmented rows plus pagination metadata
 export type ExpensesListData = {

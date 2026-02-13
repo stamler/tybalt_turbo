@@ -194,8 +194,13 @@ export type AdminProfilesAugmentedRecord = {
   payroll_id: string;
   personal_vehicle_insurance_expiry: string;
   po_approver_divisions: null | string[];
+  po_approver_computer_max: null | number;
+  po_approver_media_and_event_max: null | number;
   po_approver_max_amount: null | number;
+  po_approver_project_max: null | number;
   po_approver_props_id: null | string;
+  po_approver_sponsorship_max: null | number;
+  po_approver_staff_and_social_max: null | number;
   salary: boolean;
   skip_min_time_check: AdminProfilesAugmentedSkipMinTimeCheckOptions;
   surname: string;

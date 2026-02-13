@@ -9,6 +9,7 @@ import (
 	"tybalt/internal/testutils"
 	"tybalt/utilities"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -267,6 +268,109 @@ func TestPoApproverPropsUpdate_InactiveDivisionFails(t *testing.T) {
 				"OnRecordUpdateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+// po_approver_props.user_claim: prevent duplicate rows for same user_claim on create
+func TestPoApproverPropsCreate_DuplicateUserClaimFails(t *testing.T) {
+	recordToken, err := testutils.GenerateAdminToken("test@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "creating po_approver_props with duplicate user_claim fails",
+			Method: http.MethodPost,
+			URL:    "/api/collections/po_approver_props/records",
+			Body: strings.NewReader(`{
+                "user_claim": "dupucclaim00001",
+                "max_amount": 1500,
+                "project_max": 0,
+                "sponsorship_max": 0,
+                "staff_and_social_max": 0,
+                "media_and_event_max": 0,
+                "computer_max": 0,
+                "divisions": []
+            }`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"duplicate_user_claim"`,
+				`"po_approver_props already exists for this user_claim"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(t)
+				var poApproverClaimID string
+				if err := app.NonconcurrentDB().NewQuery(`
+					SELECT id FROM claims WHERE name = 'po_approver' LIMIT 1
+				`).Row(&poApproverClaimID); err != nil {
+					t.Fatalf("missing po_approver claim fixture: %v", err)
+				}
+				if _, err := app.NonconcurrentDB().NewQuery(`
+					DELETE FROM po_approver_props WHERE user_claim = 'dupucclaim00001'
+				`).Execute(); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := app.NonconcurrentDB().NewQuery(`
+					DELETE FROM user_claims WHERE id = 'dupucclaim00001'
+				`).Execute(); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := app.NonconcurrentDB().NewQuery(`
+					INSERT INTO user_claims (id, uid, cid, created, updated)
+					VALUES (
+						'dupucclaim00001',
+						'zzzzzzzzzzzzzzz',
+						{:cid},
+						strftime('%Y-%m-%d %H:%M:%fZ','now'),
+						strftime('%Y-%m-%d %H:%M:%fZ','now')
+					)
+				`).Bind(dbx.Params{
+					"cid": poApproverClaimID,
+				}).Execute(); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := app.NonconcurrentDB().NewQuery(`
+					INSERT INTO po_approver_props (
+						id,
+						max_amount,
+						project_max,
+						sponsorship_max,
+						staff_and_social_max,
+						media_and_event_max,
+						computer_max,
+						divisions,
+						user_claim,
+						created,
+						updated
+					)
+					VALUES (
+						'dupprops0000001',
+						1000,
+						0,
+						0,
+						0,
+						0,
+						0,
+						'[]',
+						'dupucclaim00001',
+						strftime('%Y-%m-%d %H:%M:%fZ','now'),
+						strftime('%Y-%m-%d %H:%M:%fZ','now')
+					)
+				`).Execute(); err != nil {
+					t.Fatal(err)
+				}
+				return app
+			},
 		},
 	}
 

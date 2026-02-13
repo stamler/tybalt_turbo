@@ -1,10 +1,14 @@
 package hooks
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
+	"strings"
 	"tybalt/errs"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tools/types"
 )
@@ -61,6 +65,47 @@ func ProcessPOApproverProps(app core.App, e *core.RecordRequestEvent) error {
 	for _, id := range divisions {
 		if err := ensureActiveDivision(app, id, "divisions"); err != nil {
 			return err
+		}
+	}
+
+	userClaimID := strings.TrimSpace(record.GetString("user_claim"))
+	if userClaimID == "" {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "po_approver_props validation error",
+			Data: map[string]errs.CodeError{
+				"user_claim": {Code: "required", Message: "user_claim is required"},
+			},
+		}
+	}
+
+	existing, err := app.FindFirstRecordByFilter(
+		"po_approver_props",
+		"user_claim = {:userClaim}",
+		dbx.Params{"userClaim": userClaimID},
+	)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "po_approver_props validation failed",
+			Data: map[string]errs.CodeError{
+				"user_claim": {
+					Code:    "validation_query_failed",
+					Message: "unable to validate user_claim uniqueness",
+				},
+			},
+		}
+	}
+	if existing != nil && existing.Id != record.Id {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "po_approver_props validation error",
+			Data: map[string]errs.CodeError{
+				"user_claim": {
+					Code:    "duplicate_user_claim",
+					Message: "po_approver_props already exists for this user_claim",
+				},
+			},
 		}
 	}
 

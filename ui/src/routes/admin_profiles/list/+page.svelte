@@ -6,31 +6,22 @@
   let { data } = $props();
   const items = $derived(data.items as AdminProfilesAugmentedResponse[]);
 
-  const currency = new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: "CAD",
-    minimumFractionDigits: 2,
-  });
-
-  function normalizeNumber(value: number | null | undefined): number {
-    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
-    return 0;
-  }
-
   function normalizeDivisions(value: null | string[] | undefined): string[] {
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
   }
 
   function poApproverLabel(item: AdminProfilesAugmentedResponse): string | null {
     const divisions = normalizeDivisions(item.po_approver_divisions);
-    const hasAmount = typeof item.po_approver_max_amount === "number";
-    if (!hasAmount && divisions.length === 0) return null;
-    const amount = currency.format(normalizeNumber(item.po_approver_max_amount));
+    const hasProps =
+      (typeof item.po_approver_props_id === "string" && item.po_approver_props_id.trim() !== "") ||
+      typeof item.po_approver_max_amount === "number" ||
+      divisions.length > 0;
+    if (!hasProps) return null;
     const divisionsPart =
       divisions.length === 0
         ? "All divisions"
         : `${divisions.length} division${divisions.length === 1 ? "" : "s"}`;
-    return `po_approver • ${amount} • ${divisionsPart}`;
+    return `po_approver • ${divisionsPart}`;
   }
 </script>
 

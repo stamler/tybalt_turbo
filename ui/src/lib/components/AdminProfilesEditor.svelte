@@ -8,14 +8,15 @@
   import { flatpickrAction } from "$lib/utilities";
   import { pb } from "$lib/pocketbase";
   import type {
-    AdminProfilesSkipMinTimeCheckOptions,
+    AdminProfilesAugmentedSkipMinTimeCheckOptions,
+    AdminProfilesAugmentedResponse,
     ClaimsResponse,
     UserClaimsResponse,
     BranchesResponse,
     DivisionsResponse,
     PoApproverPropsResponse,
   } from "$lib/pocketbase-types";
-  import type { AdminProfilesPageData } from "$lib/svelte-types";
+  import type { AdminProfilesEditPageData } from "$lib/svelte-types";
   import { goto } from "$app/navigation";
   import { onMount, untrack } from "svelte";
   import type { SearchResult } from "minisearch";
@@ -23,7 +24,7 @@
 
   const PO_APPROVER_CLAIM_NAME = "po_approver";
 
-  let { data }: { data: AdminProfilesPageData & { divisions?: DivisionsResponse[] } } = $props();
+  let { data }: { data: AdminProfilesEditPageData & { divisions?: DivisionsResponse[] } } = $props();
 
   let errors = $state({} as Record<string, { message: string }>);
   let item = $state(untrack(() => ({ ...data.item })));
@@ -42,29 +43,27 @@
   let claimsLoaded = $state(false);
 
   const initialPoApproverMaxAmount = untrack(() =>
-    normalizeNumber((data.item as any)?.po_approver_max_amount),
+    normalizeNumber(data.item.po_approver_max_amount),
   );
   const initialPoApproverProjectMax = untrack(() =>
-    normalizeNumber((data.item as any)?.po_approver_project_max),
+    normalizeNumber(data.item.po_approver_project_max),
   );
   const initialPoApproverSponsorshipMax = untrack(() =>
-    normalizeNumber((data.item as any)?.po_approver_sponsorship_max),
+    normalizeNumber(data.item.po_approver_sponsorship_max),
   );
   const initialPoApproverStaffAndSocialMax = untrack(() =>
-    normalizeNumber((data.item as any)?.po_approver_staff_and_social_max),
+    normalizeNumber(data.item.po_approver_staff_and_social_max),
   );
   const initialPoApproverMediaAndEventMax = untrack(() =>
-    normalizeNumber((data.item as any)?.po_approver_media_and_event_max),
+    normalizeNumber(data.item.po_approver_media_and_event_max),
   );
   const initialPoApproverComputerMax = untrack(() =>
-    normalizeNumber((data.item as any)?.po_approver_computer_max),
+    normalizeNumber(data.item.po_approver_computer_max),
   );
   const initialPoApproverDivisions = untrack(() =>
-    normalizeDivisions((data.item as any)?.po_approver_divisions),
+    normalizeDivisions(data.item.po_approver_divisions),
   );
-  const initialPoApproverPropsId = untrack(
-    () => ((data.item as any)?.po_approver_props_id as string) ?? null,
-  );
+  const initialPoApproverPropsId = untrack(() => data.item.po_approver_props_id ?? null);
 
   let poApproverPropsId = $state(initialPoApproverPropsId);
   let poApproverMaxAmount = $state(initialPoApproverMaxAmount);
@@ -89,12 +88,6 @@
   const hasPoApproverClaim = $derived.by(() => {
     const claimId = getPoApproverClaimId();
     return claimId !== "" && stagedClaimIds.includes(claimId);
-  });
-
-  const currency = new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: "CAD",
-    minimumFractionDigits: 2,
   });
 
   onMount(async () => {
@@ -149,54 +142,100 @@
 
   // divisions are loaded and indexed via the shared store
 
-  function applyLoadedPoApproverProps(props: PoApproverPropsResponse | null) {
-    if (!props) {
+  function applyPoApproverValues(
+    values:
+      | {
+          id?: string | null;
+          max_amount?: unknown;
+          project_max?: unknown;
+          sponsorship_max?: unknown;
+          staff_and_social_max?: unknown;
+          media_and_event_max?: unknown;
+          computer_max?: unknown;
+          divisions?: unknown;
+        }
+      | null,
+  ) {
+    if (!values) {
       resetPoApproverPropsState();
       return;
     }
-    poApproverPropsId = props.id;
-    poApproverMaxAmount = normalizeNumber(props.max_amount);
+    poApproverPropsId = values.id ?? "";
+    poApproverMaxAmount = normalizeNumber(values.max_amount);
     originalApproverMaxAmount = poApproverMaxAmount;
-    poApproverProjectMax = normalizeNumber(props.project_max);
+    poApproverProjectMax = normalizeNumber(values.project_max);
     originalApproverProjectMax = poApproverProjectMax;
-    poApproverSponsorshipMax = normalizeNumber(props.sponsorship_max);
+    poApproverSponsorshipMax = normalizeNumber(values.sponsorship_max);
     originalApproverSponsorshipMax = poApproverSponsorshipMax;
-    poApproverStaffAndSocialMax = normalizeNumber(props.staff_and_social_max);
+    poApproverStaffAndSocialMax = normalizeNumber(values.staff_and_social_max);
     originalApproverStaffAndSocialMax = poApproverStaffAndSocialMax;
-    poApproverMediaAndEventMax = normalizeNumber(props.media_and_event_max);
+    poApproverMediaAndEventMax = normalizeNumber(values.media_and_event_max);
     originalApproverMediaAndEventMax = poApproverMediaAndEventMax;
-    poApproverComputerMax = normalizeNumber(props.computer_max);
+    poApproverComputerMax = normalizeNumber(values.computer_max);
     originalApproverComputerMax = poApproverComputerMax;
-    poApproverDivisions = Array.isArray(props.divisions) ? [...props.divisions] : [];
+    poApproverDivisions = normalizeDivisions(values.divisions);
     originalApproverDivisions = [...poApproverDivisions];
+  }
+
+  function applyLoadedPoApproverProps(props: PoApproverPropsResponse | null) {
+    if (!props) {
+      applyPoApproverValues(null);
+      return;
+    }
+    applyPoApproverValues({
+      id: props.id,
+      max_amount: props.max_amount,
+      project_max: props.project_max,
+      sponsorship_max: props.sponsorship_max,
+      staff_and_social_max: props.staff_and_social_max,
+      media_and_event_max: props.media_and_event_max,
+      computer_max: props.computer_max,
+      divisions: props.divisions,
+    });
+  }
+
+  async function resolveAugmentedPoApproverValuesByUid() {
+    if (!item?.uid) return null;
+    try {
+      const profile = await pb
+        .collection("admin_profiles_augmented")
+        .getFirstListItem<AdminProfilesAugmentedResponse>(`uid="${item.uid}"`);
+      const id = profile.po_approver_props_id;
+      if (typeof id !== "string" || id.trim() === "") {
+        return null;
+      }
+      return {
+        id,
+        max_amount: profile.po_approver_max_amount,
+        project_max: profile.po_approver_project_max,
+        sponsorship_max: profile.po_approver_sponsorship_max,
+        staff_and_social_max: profile.po_approver_staff_and_social_max,
+        media_and_event_max: profile.po_approver_media_and_event_max,
+        computer_max: profile.po_approver_computer_max,
+        divisions: profile.po_approver_divisions,
+      };
+    } catch {
+      return null;
+    }
   }
 
   async function reloadPoApproverProps() {
     if (!poApproverUserClaimId) {
-      applyLoadedPoApproverProps(null);
+      applyPoApproverValues(null);
       return;
     }
 
-    if (poApproverPropsId) {
-      try {
-        const props = await pb
-          .collection("po_approver_props")
-          .getOne<PoApproverPropsResponse>(poApproverPropsId);
-        applyLoadedPoApproverProps(props);
-        return;
-      } catch {
-        // fall through to lookup by user_claim
-      }
+    const augmentedValues = await resolveAugmentedPoApproverValuesByUid();
+    if (augmentedValues) {
+      applyPoApproverValues(augmentedValues);
+    } else {
+      applyPoApproverValues(null);
     }
+  }
 
-    try {
-      const list = await pb.collection("po_approver_props").getFullList<PoApproverPropsResponse>({
-        filter: `user_claim="${poApproverUserClaimId}"`,
-      });
-      applyLoadedPoApproverProps(list.length > 0 ? list[0] : null);
-    } catch {
-      applyLoadedPoApproverProps(null);
-    }
+  async function resolveExistingPoApproverPropsIdByUid(): Promise<string | null> {
+    const values = await resolveAugmentedPoApproverValuesByUid();
+    return values?.id ?? null;
   }
 
   async function reloadUserClaims() {
@@ -375,16 +414,14 @@
 
   function poApproverClaimLabel(): string {
     if (!hasPoApproverClaim) return "po_approver";
-    const amount = Number.isFinite(poApproverMaxAmount) ? poApproverMaxAmount : 0;
-    const formatted = currency.format(amount);
     if (poApproverDivisions.length === 0) {
-      return `po_approver • ${formatted} • All divisions`;
+      return "po_approver • All divisions";
     }
     const divisionsLabel =
       poApproverDivisions.length === 1
         ? `${poApproverDivisions.length} division`
         : `${poApproverDivisions.length} divisions`;
-    return `po_approver • ${formatted} • ${divisionsLabel}`;
+    return `po_approver • ${divisionsLabel}`;
   }
 
   async function persistPoApproverProps() {
@@ -456,10 +493,19 @@
         applyLoadedPoApproverProps(updated);
       }
     } else {
-      const createdProps = await pb
-        .collection("po_approver_props")
-        .create<PoApproverPropsResponse>(payload);
-      applyLoadedPoApproverProps(createdProps);
+      const existingPropsId = await resolveExistingPoApproverPropsIdByUid();
+      if (existingPropsId) {
+        poApproverPropsId = existingPropsId;
+        const updated = await pb
+          .collection("po_approver_props")
+          .update<PoApproverPropsResponse>(existingPropsId, payload);
+        applyLoadedPoApproverProps(updated);
+      } else {
+        const createdProps = await pb
+          .collection("po_approver_props")
+          .create<PoApproverPropsResponse>(payload);
+        applyLoadedPoApproverProps(createdProps);
+      }
     }
   }
 
@@ -510,7 +556,7 @@
     } catch (error: any) {
       errors = error?.data?.data || {};
       if (!errors.global) {
-        errors.global = { message: "Failed to save changes. Please try again." } as any;
+        errors.global = { message: "Failed to save changes. Please try again." };
       }
     }
   }
@@ -576,7 +622,7 @@
     />
 
     <DsSelector
-      bind:value={item.skip_min_time_check as AdminProfilesSkipMinTimeCheckOptions}
+      bind:value={item.skip_min_time_check as AdminProfilesAugmentedSkipMinTimeCheckOptions}
       items={[
         { id: "no", name: "No" },
         { id: "on_next_bundle", name: "On Next Bundle" },
@@ -705,7 +751,7 @@
         uiName="Add Claim"
         disabled={availableClaims().length === 0}
       >
-        {#snippet optionTemplate(item)}{(item as any).name ?? item.name}{/snippet}
+        {#snippet optionTemplate(item)}{item.name}{/snippet}
       </DsSelector>
     </div>
 

@@ -10,6 +10,31 @@
     minimumFractionDigits: 2,
   });
 
+  function normalizeNumber(value: number | null | undefined): number {
+    if (typeof value === "number") return Number.isFinite(value) ? value : 0;
+    return 0;
+  }
+
+  function normalizeDivisions(value: null | string[] | undefined): string[] {
+    return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
+  }
+
+  function hasPoApproverDetails(): boolean {
+    if (!data.item) return false;
+    const hasId =
+      typeof data.item.po_approver_props_id === "string" && data.item.po_approver_props_id.trim() !== "";
+    const divisions = normalizeDivisions(data.item.po_approver_divisions);
+    return hasId || typeof data.item.po_approver_max_amount === "number" || divisions.length > 0;
+  }
+
+  function poApproverClaimLabel(): string {
+    if (!data.item) return "po_approver";
+    if (!hasPoApproverDetails()) return "po_approver";
+    const divisions = normalizeDivisions(data.item.po_approver_divisions);
+    if (divisions.length === 0) return "po_approver • All divisions";
+    return `po_approver • ${divisions.length} division${divisions.length === 1 ? "" : "s"}`;
+  }
+
   function divisionLabel(id: string): string {
     const division = data.poApproverDivisions?.get?.(id);
     if (!division) return id;
@@ -109,6 +134,14 @@
         <span class="font-semibold">Personal Vehicle Insurance Expiry:</span>
         {data.item.personal_vehicle_insurance_expiry || "—"}
       </div>
+      <div class="flex gap-2">
+        <span class="font-semibold">Record ID:</span>
+        {data.item.id}
+      </div>
+      <div class="flex gap-2">
+        <span class="font-semibold">UID:</span>
+        {data.item.uid}
+      </div>
     </section>
 
     <!-- Claims, styled like the profile page -->
@@ -120,15 +153,7 @@
             <li>
               <DsLabel color={claim.name === "po_approver" ? "purple" : "cyan"}
                 >{claim.name === "po_approver"
-                  ? data.poApproverProps
-                    ? `po_approver • ${currency.format(data.poApproverProps.max_amount ?? 0)} • ${
-                        (data.poApproverProps.divisions ?? []).length === 0
-                          ? "All divisions"
-                          : `${(data.poApproverProps.divisions ?? []).length} division${
-                              (data.poApproverProps.divisions ?? []).length === 1 ? "" : "s"
-                            }`
-                      }`
-                    : "po_approver"
+                  ? poApproverClaimLabel()
                   : claim.name}</DsLabel
               >
             </li>
@@ -139,41 +164,45 @@
       {/if}
     </section>
 
-    {#if data.poApproverProps}
+    {#if hasPoApproverDetails()}
       <section class="space-y-2">
         <h2 class="text-lg font-semibold">PO Approver Limits</h2>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
           <div class="flex gap-2">
             <span class="font-semibold">Standard (No Job):</span>
-            {currency.format(data.poApproverProps.max_amount ?? 0)}
+            {currency.format(normalizeNumber(data.item.po_approver_max_amount))}
           </div>
           <div class="flex gap-2">
             <span class="font-semibold">Standard (With Job):</span>
-            {currency.format(data.poApproverProps.project_max ?? 0)}
+            {currency.format(normalizeNumber(data.item.po_approver_project_max))}
           </div>
           <div class="flex gap-2">
             <span class="font-semibold">Sponsorship:</span>
-            {currency.format(data.poApproverProps.sponsorship_max ?? 0)}
+            {currency.format(normalizeNumber(data.item.po_approver_sponsorship_max))}
           </div>
           <div class="flex gap-2">
             <span class="font-semibold">Staff and Social:</span>
-            {currency.format(data.poApproverProps.staff_and_social_max ?? 0)}
+            {currency.format(normalizeNumber(data.item.po_approver_staff_and_social_max))}
           </div>
           <div class="flex gap-2">
             <span class="font-semibold">Media and Event:</span>
-            {currency.format(data.poApproverProps.media_and_event_max ?? 0)}
+            {currency.format(normalizeNumber(data.item.po_approver_media_and_event_max))}
           </div>
           <div class="flex gap-2">
             <span class="font-semibold">Computer:</span>
-            {currency.format(data.poApproverProps.computer_max ?? 0)}
+            {currency.format(normalizeNumber(data.item.po_approver_computer_max))}
+          </div>
+          <div class="flex gap-2">
+            <span class="font-semibold">PO Approver Props ID:</span>
+            {data.item.po_approver_props_id || "—"}
           </div>
         </div>
         <div class="flex flex-wrap gap-2">
           <span class="font-semibold">Divisions:</span>
-          {#if (data.poApproverProps.divisions ?? []).length === 0}
+          {#if normalizeDivisions(data.item.po_approver_divisions).length === 0}
             <span>All divisions</span>
           {:else}
-            {#each data.poApproverProps.divisions ?? [] as divisionId}
+            {#each normalizeDivisions(data.item.po_approver_divisions) as divisionId}
               <DsLabel color="purple">{divisionLabel(divisionId)}</DsLabel>
             {/each}
           {/if}
