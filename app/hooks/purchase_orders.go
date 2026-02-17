@@ -523,6 +523,78 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 	return validationsErrors.Filter()
 }
 
+var purchaseOrderMeaningfulChangeSkipFields = []string{
+	"approved",
+	"second_approval",
+	"second_approver",
+	"rejector",
+	"rejected",
+	"rejection_reason",
+	"cancelled",
+	"canceller",
+	"closed",
+	"closer",
+	"closed_by_system",
+	"po_number",
+	"status",
+}
+
+func purchaseOrderHasMeaningfulChanges(record *core.Record) bool {
+	return utilities.RecordHasMeaningfulChanges(record, purchaseOrderMeaningfulChangeSkipFields...)
+}
+
+func shouldResetPurchaseOrderApprovals(record *core.Record) bool {
+	if record.IsNew() {
+		return false
+	}
+
+	original := record.Original()
+	if original == nil {
+		return false
+	}
+
+	// Fully approved/terminal records are not reset via update-path editing.
+	if original.GetString("status") != "Unapproved" || strings.TrimSpace(original.GetString("second_approval")) != "" {
+		return false
+	}
+	// Suppress draft-update spam: only first-approved records reset + re-notify.
+	if strings.TrimSpace(original.GetString("approved")) == "" {
+		return false
+	}
+
+	return purchaseOrderHasMeaningfulChanges(record)
+}
+
+func sendPOApprovalRequiredNotification(app core.App, purchaseOrderRecord *core.Record, actorID string) error {
+	approverID := strings.TrimSpace(purchaseOrderRecord.GetString("approver"))
+	if approverID == "" {
+		return nil
+	}
+
+	notificationCollection, err := app.FindCollectionByNameOrId("notifications")
+	if err != nil {
+		return err
+	}
+
+	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
+		"code": "po_approval_required",
+	})
+	if err != nil {
+		return err
+	}
+
+	notificationRecord := core.NewRecord(notificationCollection)
+	notificationRecord.Set("recipient", approverID)
+	notificationRecord.Set("template", notificationTemplate.Id)
+	notificationRecord.Set("status", "pending")
+	notificationRecord.Set("user", actorID)
+	notificationRecord.Set("data", map[string]any{
+		"POId": purchaseOrderRecord.Id,
+	})
+
+	return app.Save(notificationRecord)
+}
+
 // The ProcessPurchaseOrder function is used to validate the purchase_order
 // record before it is created or updated. A lot of the work is done by
 // PocketBase itself so this is for cross-field validation. If the
@@ -552,10 +624,23 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
+	shouldResetApprovals := shouldResetPurchaseOrderApprovals(record)
+	submittedApproverID := strings.TrimSpace(record.GetString("approver"))
+
 	// set properties to nil if they are not allowed to be set based on the type
 	cleanErr := cleanPurchaseOrder(app, record)
 	if cleanErr != nil {
 		return cleanErr
+	}
+
+	if shouldResetApprovals {
+		// Clear approval state for meaningful edits to first-approved in-flight POs.
+		record.Set("approved", "")
+		record.Set("approver", "")
+		record.Set("second_approval", "")
+		record.Set("second_approver", "")
+		// Keep any submitted assignee as the next first-stage approver.
+		record.Set("approver", submittedApproverID)
 	}
 
 	// if the purchase order has a new attachment, calculate the sha256 hash of the
@@ -612,28 +697,12 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 		// https://pocketbase.io/docs/collections/#textfield
 		record.Set("id:autogenerate", "")
 
-		notificationCollection, err := app.FindCollectionByNameOrId("notifications")
-		if err != nil {
+		if err := sendPOApprovalRequiredNotification(app, record, authRecord.Id); err != nil {
 			return err
 		}
-
-		notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
-			"code": "po_approval_required",
-		})
-		if err != nil {
-			return err
-		}
-
-		notificationRecord := core.NewRecord(notificationCollection)
-		notificationRecord.Set("recipient", record.GetString("approver"))
-		notificationRecord.Set("template", notificationTemplate.Id)
-		notificationRecord.Set("status", "pending")
-		notificationRecord.Set("user", authRecord.Id)
-		notificationRecord.Set("data", map[string]any{
-			"POId": record.Id,
-		})
-
-		if err := app.Save(notificationRecord); err != nil {
+	}
+	if shouldResetApprovals {
+		if err := sendPOApprovalRequiredNotification(app, record, authRecord.Id); err != nil {
 			return err
 		}
 	}

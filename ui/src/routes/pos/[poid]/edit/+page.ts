@@ -8,6 +8,7 @@ import {
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 import type { PurchaseOrdersPageData } from "$lib/svelte-types";
+import { isRedirect, redirect } from "@sveltejs/kit";
 
 export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
   const defaultItem: Partial<PurchaseOrdersRecord> = {
@@ -33,8 +34,14 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
 
   try {
     const item = await pb.collection("purchase_orders").getOne(params.poid);
+    if (item.status !== PurchaseOrdersStatusOptions.Unapproved) {
+      throw redirect(303, `/pos/${params.poid}/details`);
+    }
     return { item, editing: true, id: params.poid };
   } catch (error) {
+    if (isRedirect(error)) {
+      throw error;
+    }
     console.error(`error loading data, returning default item: ${error}`);
     return { item: defaultItem as PurchaseOrdersRecord, editing: false, id: null };
   }

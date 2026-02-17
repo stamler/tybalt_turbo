@@ -1818,6 +1818,309 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 	}
 }
 
+func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const firstApprovedPOID = "2blv18f40i2q373"
+	const firstApprovedApproverChangePOID = "po1stgready0001"
+	const draftPOID = "gal6e5la2fa4rpn"
+
+	app := testutils.SetupTestApp(t)
+	approverChangePO, err := app.FindRecordById("purchase_orders", firstApprovedApproverChangePOID)
+	if err != nil {
+		t.Fatalf("failed loading first-approved approver-change fixture: %v", err)
+	}
+	approverChangePolicy, err := utilities.GetPOApproverPolicy(
+		app,
+		approverChangePO.GetString("division"),
+		approverChangePO.GetFloat("approval_total"),
+		approverChangePO.GetString("kind"),
+		approverChangePO.GetString("job") != "",
+	)
+	if err != nil {
+		t.Fatalf("failed computing approver policy for fixture: %v", err)
+	}
+	approverChangeTarget := ""
+	currentApprover := approverChangePO.GetString("approver")
+	for _, candidate := range approverChangePolicy.FirstStageApprovers {
+		if candidate.ID != "" && candidate.ID != currentApprover {
+			approverChangeTarget = candidate.ID
+			break
+		}
+	}
+	if approverChangeTarget == "" {
+		t.Skip("no alternate first-stage approver available for approver-change fixture")
+	}
+
+	var meaningfulBeforeNotificationCount int
+	var approverChangeBeforeNotificationCount int
+	var noOpBeforeNotificationCount int
+	var draftBeforeNotificationCount int
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "approver change on first-approved unapproved PO resets approvals and re-notifies",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/purchase_orders/records/" + firstApprovedApproverChangePOID,
+			Body: bytes.NewBufferString(fmt.Sprintf(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-01-31",
+				"division": "vccd5fo56ctbigh",
+				"description": "single-stage approved-not-active fixture",
+				"payment_type": "OnAccount",
+				"total": 329.01,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "%s",
+				"status": "Unapproved",
+				"type": "One-Time",
+				"job": "u09fwwcg07y03m7",
+				"category": "",
+				"kind": "l3vtlbqg529m52j"
+			}`, approverChangeTarget)),
+			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				var row struct {
+					Count int `db:"count"`
+				}
+				if err := app.DB().NewQuery(`
+					SELECT COUNT(*) AS count
+					FROM notifications
+					WHERE json_extract(data, '$.POId') = {:poID}
+				`).Bind(dbx.Params{"poID": firstApprovedApproverChangePOID}).One(&row); err != nil {
+					tb.Fatalf("failed counting baseline notifications for approver-change PO: %v", err)
+				}
+				approverChangeBeforeNotificationCount = row.Count
+			},
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
+				var row struct {
+					Count int `db:"count"`
+				}
+				if err := app.DB().NewQuery(`
+					SELECT COUNT(*) AS count
+					FROM notifications
+					WHERE json_extract(data, '$.POId') = {:poID}
+				`).Bind(dbx.Params{"poID": firstApprovedApproverChangePOID}).One(&row); err != nil {
+					tb.Fatalf("failed counting notifications after approver-change update: %v", err)
+				}
+				if row.Count != approverChangeBeforeNotificationCount+1 {
+					tb.Fatalf("expected notification count to increase by 1 for approver change, got before=%d after=%d", approverChangeBeforeNotificationCount, row.Count)
+				}
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"second_approval":""`,
+				fmt.Sprintf(`"approver":"%s"`, approverChangeTarget),
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdate": 1,
+				"OnRecordCreate": 1, // new notification
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "meaningful edit on first-approved unapproved PO resets approvals and re-notifies",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/purchase_orders/records/" + firstApprovedPOID,
+			Body: bytes.NewBufferString(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2025-01-29",
+				"division": "vccd5fo56ctbigh",
+				"description": "Higher-value unapproved PO that already has first approval (edited)",
+				"payment_type": "OnAccount",
+				"total": 1022.69,
+				"vendor": "mmgxrnn144767x7",
+				"approver": "wegviunlyr2jjjv",
+				"priority_second_approver": "6bq4j0eb26631dy",
+				"status": "Unapproved",
+				"type": "One-Time",
+				"job": "u09fwwcg07y03m7",
+				"category": "",
+				"kind": "l3vtlbqg529m52j"
+			}`),
+			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				var row struct {
+					Count int `db:"count"`
+				}
+				if err := app.DB().NewQuery(`
+					SELECT COUNT(*) AS count
+					FROM notifications
+					WHERE json_extract(data, '$.POId') = {:poID}
+				`).Bind(dbx.Params{"poID": firstApprovedPOID}).One(&row); err != nil {
+					tb.Fatalf("failed counting baseline notifications: %v", err)
+				}
+				meaningfulBeforeNotificationCount = row.Count
+			},
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
+				var row struct {
+					Count int `db:"count"`
+				}
+				if err := app.DB().NewQuery(`
+					SELECT COUNT(*) AS count
+					FROM notifications
+					WHERE json_extract(data, '$.POId') = {:poID}
+				`).Bind(dbx.Params{"poID": firstApprovedPOID}).One(&row); err != nil {
+					tb.Fatalf("failed counting notifications after update: %v", err)
+				}
+				if row.Count != meaningfulBeforeNotificationCount+1 {
+					tb.Fatalf("expected notification count to increase by 1, got before=%d after=%d", meaningfulBeforeNotificationCount, row.Count)
+				}
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"second_approval":""`,
+				`"description":"Higher-value unapproved PO that already has first approval (edited)"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdate": 1,
+				"OnRecordCreate": 1, // new notification
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "no-op update on first-approved unapproved PO preserves approvals and does not re-notify",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/purchase_orders/records/" + firstApprovedPOID,
+			Body: bytes.NewBufferString(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2025-01-29",
+				"division": "vccd5fo56ctbigh",
+				"description": "Higher-value unapproved PO that already has first approval ",
+				"payment_type": "OnAccount",
+				"total": 1022.69,
+				"vendor": "mmgxrnn144767x7",
+				"approver": "wegviunlyr2jjjv",
+				"priority_second_approver": "6bq4j0eb26631dy",
+				"status": "Unapproved",
+				"type": "One-Time",
+				"job": "u09fwwcg07y03m7",
+				"category": "",
+				"kind": "l3vtlbqg529m52j"
+			}`),
+			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				var row struct {
+					Count int `db:"count"`
+				}
+				if err := app.DB().NewQuery(`
+					SELECT COUNT(*) AS count
+					FROM notifications
+					WHERE json_extract(data, '$.POId') = {:poID}
+				`).Bind(dbx.Params{"poID": firstApprovedPOID}).One(&row); err != nil {
+					tb.Fatalf("failed counting baseline notifications: %v", err)
+				}
+				noOpBeforeNotificationCount = row.Count
+			},
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
+				var row struct {
+					Count int `db:"count"`
+				}
+				if err := app.DB().NewQuery(`
+					SELECT COUNT(*) AS count
+					FROM notifications
+					WHERE json_extract(data, '$.POId') = {:poID}
+				`).Bind(dbx.Params{"poID": firstApprovedPOID}).One(&row); err != nil {
+					tb.Fatalf("failed counting notifications after no-op update: %v", err)
+				}
+				if row.Count != noOpBeforeNotificationCount {
+					tb.Fatalf("expected notification count to remain unchanged, got before=%d after=%d", noOpBeforeNotificationCount, row.Count)
+				}
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approved":"2025-01-29 14:22:29.563Z"`,
+				`"second_approval":""`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "fully approved active PO remains non-editable",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/purchase_orders/records/d8463q483f3da28",
+			Body: bytes.NewBufferString(`{
+				"uid": "f2j5a8vk006baub",
+				"description": "attempted edit on active PO"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "meaningful edit on draft PO does not re-notify approver",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/purchase_orders/records/" + draftPOID,
+			Body: bytes.NewBufferString(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "Unapproved PO for Dirt slugger (edited draft)",
+				"payment_type": "OnAccount",
+				"total": 329.01,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "One-Time",
+				"job": "",
+				"category": "",
+				"kind": "l3vtlbqg529m52j"
+			}`),
+			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				var row struct {
+					Count int `db:"count"`
+				}
+				if err := app.DB().NewQuery(`
+					SELECT COUNT(*) AS count
+					FROM notifications
+					WHERE json_extract(data, '$.POId') = {:poID}
+				`).Bind(dbx.Params{"poID": draftPOID}).One(&row); err != nil {
+					tb.Fatalf("failed counting baseline notifications for draft PO: %v", err)
+				}
+				draftBeforeNotificationCount = row.Count
+			},
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
+				var row struct {
+					Count int `db:"count"`
+				}
+				if err := app.DB().NewQuery(`
+					SELECT COUNT(*) AS count
+					FROM notifications
+					WHERE json_extract(data, '$.POId') = {:poID}
+				`).Bind(dbx.Params{"poID": draftPOID}).One(&row); err != nil {
+					tb.Fatalf("failed counting notifications after draft update: %v", err)
+				}
+				if row.Count != draftBeforeNotificationCount {
+					tb.Fatalf("expected notification count to remain unchanged for draft edit, got before=%d after=%d", draftBeforeNotificationCount, row.Count)
+				}
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approved":""`,
+				`"description":"Unapproved PO for Dirt slugger (edited draft)"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
 func TestPurchaseOrdersDelete(t *testing.T) {
 	/*
 		recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")

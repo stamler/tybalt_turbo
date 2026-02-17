@@ -269,14 +269,16 @@
       {/if}
     </div>
   </div>
-  <div class="flex gap-2">
-    <DsActionButton
-      action={`/pos/${data.po.id}/edit`}
-      icon="mdi:pencil"
-      title="Edit Purchase Order"
-      color="blue"
-    />
-  </div>
+  {#if data.po.status === "Unapproved"}
+    <div class="flex gap-2">
+      <DsActionButton
+        action={`/pos/${data.po.id}/edit`}
+        icon="mdi:pencil"
+        title="Edit Purchase Order"
+        color="blue"
+      />
+    </div>
+  {/if}
 
   {#if $globalStore.showAllUi || $globalStore.claims.includes("payables_admin")}
     <div class="mt-4 rounded-sm border border-neutral-300 bg-neutral-50 p-4">

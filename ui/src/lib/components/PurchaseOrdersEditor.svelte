@@ -38,7 +38,7 @@
   import DsLabel from "./DsLabel.svelte";
   import PoSecondApproverStatus from "./PoSecondApproverStatus.svelte";
   import VendorSelector from "./VendorSelector.svelte";
-  import { untrack } from "svelte";
+  import { onDestroy, untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
@@ -54,9 +54,19 @@
   let errors = $state({} as any);
   let item = $state(untrack(() => data.item));
   const dateInputMax = dateInputMaxMonthsAhead(15);
+  let showApprovalResetSuccess = $state(false);
+  let showApprovalResetToast = $state(false);
+  let resetSuccessTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const isRecurring = $derived(item.type === "Recurring");
   const isChildPO = $derived(item.parent_po !== "" && item.parent_po !== undefined);
+  const isEditingFirstApprovedPendingSecond = $derived.by(
+    () =>
+      data.editing &&
+      item.status === "Unapproved" &&
+      (item.approved ?? "") !== "" &&
+      (item.second_approval ?? "") === "",
+  );
 
   let categories = $state([] as CategoriesResponse[]);
   const syncCategoriesForJob = createJobCategoriesSync((rows) => {
@@ -197,6 +207,13 @@
     "Approver eligibility is still loading. Please wait and try again.";
   const approversUnavailableMessage =
     "Could not load approver eligibility. Resolve the error and try again.";
+
+  onDestroy(() => {
+    if (resetSuccessTimeout !== null) {
+      clearTimeout(resetSuccessTimeout);
+      resetSuccessTimeout = null;
+    }
+  });
 
   function resetApproverState(fetchError: boolean): void {
     approvers = [];
@@ -431,7 +448,14 @@
 
   async function save(event: Event) {
     event.preventDefault();
+    showApprovalResetSuccess = false;
+    showApprovalResetToast = false;
+    if (resetSuccessTimeout !== null) {
+      clearTimeout(resetSuccessTimeout);
+      resetSuccessTimeout = null;
+    }
     item.uid = $authStore?.model?.id ?? "";
+    const shouldShowResetFeedback = isEditingFirstApprovedPendingSecond;
 
     // if the job is empty, set the category to empty
     if (item.job === "") {
@@ -521,9 +545,48 @@
       }
 
       errors = {};
+      if (shouldShowResetFeedback) {
+        showApprovalResetSuccess = true;
+        showApprovalResetToast = true;
+        resetSuccessTimeout = setTimeout(() => {
+          void goto("/pos/list");
+        }, 1250);
+        return;
+      }
       goto("/pos/list");
     } catch (error: any) {
-      errors = error.data.data;
+      const fieldErrors = error?.data?.data;
+      if (fieldErrors && typeof fieldErrors === "object" && Object.keys(fieldErrors).length > 0) {
+        errors = fieldErrors;
+        return;
+      }
+
+      const fallbackMessage = "Failed to save purchase order.";
+      const rawMessage = error?.data?.message ?? error?.message ?? fallbackMessage;
+      const message = typeof rawMessage === "string" ? rawMessage : fallbackMessage;
+      let resolvedMessage = message;
+      if (
+        data.editing &&
+        data.id !== null &&
+        error?.status === 404 &&
+        message.toLowerCase().includes("requested resource wasn't found")
+      ) {
+        try {
+          await pb.collection("purchase_orders").getOne(data.id, { requestKey: null });
+          resolvedMessage =
+            "This purchase order is no longer editable in its current approval state. Refresh and try again.";
+        } catch {
+          resolvedMessage =
+            "This purchase order could not be loaded. It may have been removed or you may no longer have access.";
+        }
+      }
+
+      errors = {
+        global: {
+          code: "save_failed",
+          message: resolvedMessage,
+        },
+      };
     }
   }
 </script>
@@ -550,6 +613,18 @@
       Create Purchase Order
     {/if}
   </h1>
+
+  {#if isEditingFirstApprovedPendingSecond}
+    <div class="w-full rounded-sm border border-amber-300 bg-amber-100 p-2 text-sm text-amber-900">
+      Editing this purchase order will reset approvals and resend it for approval.
+    </div>
+  {/if}
+
+  {#if showApprovalResetSuccess}
+    <div class="w-full rounded-sm border border-emerald-300 bg-emerald-100 p-2 text-sm text-emerald-900">
+      Changes saved. Approvals were reset and the purchase order was re-sent for approval.
+    </div>
+  {/if}
 
   {#if isChildPO && data.parent_po_number}
     <span class="flex w-full gap-2 {errors.parent_po !== undefined ? 'bg-red-200' : ''}">
@@ -796,3 +871,11 @@
     {/if}
   </div>
 </form>
+
+{#if showApprovalResetToast}
+  <div
+    class="pointer-events-none fixed bottom-4 right-4 z-40 rounded-sm border border-emerald-400 bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-lg"
+  >
+    Approval reset. PO re-submitted for approval.
+  </div>
+{/if}

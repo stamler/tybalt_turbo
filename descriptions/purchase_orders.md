@@ -112,7 +112,6 @@ Direct record updates are allowed only when all of the following are true:
 
 - Caller is the PO creator (`uid = @request.auth.id`)
 - `status = Unapproved`
-- `approved = ""`
 - `second_approval = ""`
 
 Direct record deletion is allowed only when all of the following are true:
@@ -128,15 +127,54 @@ Create-path guardrails (collection API rules):
 
 Implications:
 
-- Once a PO has been first-approved or second-approved, it is no longer editable via normal update.
-- Editing an approved PO does not "unapprove" it, because the update is blocked before save.
+- First-approved POs that are still `Unapproved` are editable by the creator.
+- Fully approved / final-state records remain non-editable.
+- Rule-denied updates can surface as a generic `404 The requested resource wasn't found.` response from PocketBase.
 - While a PO is still editable, save-time cleaning clears rejection fields (`rejected`, `rejector`, `rejection_reason`) to support resubmission after changes.
+
+### Editability Matrix
+
+| PO State | Editable by Creator? | Notes |
+| --- | --- | --- |
+| `Unapproved`, `approved = ""`, `second_approval = ""` | Yes | Draft / pending first approval |
+| `Unapproved`, `approved != ""`, `second_approval = ""` | Yes | First-approved, pending second approval |
+| `Unapproved`, `second_approval != ""` | No | Final approval complete; update rule blocks |
+| `Active` | No | Use approve/cancel/close lifecycle actions |
+| `Cancelled` | No | Terminal |
+| `Closed` | No | Terminal |
+
+### Meaningful Edit Detection
+
+Approval reset behavior is gated by `utilities.RecordHasMeaningfulChanges(...)` with PO-specific skipped fields:
+
+- `approved`, `second_approval`, `second_approver`
+- `rejector`, `rejected`, `rejection_reason`
+- `cancelled`, `canceller`
+- `closed`, `closer`, `closed_by_system`
+- `po_number`, `status`
+
+`created`/`updated` are always skipped by the shared utility.
+
+### Approval Reset on Editable Updates
+
+When a first-approved editable PO is updated and the change is meaningful:
+
+- approval state is reset (`approved`, `second_approval`, `second_approver` cleared)
+- first-stage assignment is reset and revalidated (`approver`)
+- approver assignment is revalidated against current policy
+- a new `po_approval_required` notification is sent to the selected first-stage approver
+
+Because `approver` is not in the skipped-field list, changing `approver` on a first-approved editable PO is always treated as a meaningful change and triggers this reset/re-notification flow.
+
+When the update is a no-op (no meaningful business-field change), approval state is preserved and no new approval notification is sent.
+
+When the PO is still a draft (`approved = ""`), edits do not trigger this reset/re-notification flow. This suppresses repeated notification spam during iterative drafting.
 
 ### Save vs Approve
 
 - Creating or saving a PO does **not** approve it.
 - This is true even when the creator is also approval-qualified and assigns themself as approver.
-- A saved PO remains editable (by the creator) while it stays `Unapproved` with empty `approved` and `second_approval` timestamps.
+- A saved PO remains editable by the creator while it stays `Unapproved` and not second-approved.
 - Approval only happens when the explicit approve action is executed (`POST /api/purchase_orders/{id}/approve`).
 - Therefore, managers can draft and save their own POs, review/edit them, and only lock them once they intentionally run approval.
 
