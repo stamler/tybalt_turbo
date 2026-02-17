@@ -53,6 +53,30 @@
     if (!match) return "Unknown";
     return match.en_ui_label;
   });
+  const linkedPurchaseOrderNumber = $derived.by(() => {
+    if (data.linked_purchase_order?.po_number) {
+      return data.linked_purchase_order.po_number;
+    }
+    if (isExpensesResponse(item) && item.purchase_order !== "") {
+      return item.expand.purchase_order.po_number;
+    }
+    return "";
+  });
+  const linkedPurchaseOrderType = $derived.by(() => {
+    if (data.linked_purchase_order?.type) {
+      return data.linked_purchase_order.type;
+    }
+    if (isExpensesResponse(item) && item.purchase_order !== "") {
+      return item.expand.purchase_order.type;
+    }
+    return "";
+  });
+  const linkedRecurringRemainingOccurrences = $derived.by(
+    () => data.linked_purchase_order?.recurring_remaining_occurrences ?? null,
+  );
+  const linkedCumulativeRemainingBalance = $derived.by(
+    () => data.linked_purchase_order?.cumulative_remaining_balance ?? null,
+  );
 
   // create a local state object to hold the allowance types
   const allowanceTypes = $state({
@@ -151,9 +175,32 @@
     {/if}
   </span>
 
-  {#if isExpensesResponse(item) && item.purchase_order !== ""}
+  {#if item.purchase_order !== "" && linkedPurchaseOrderNumber}
     <span class="flex w-full gap-2">
-      <DsLabel color="cyan">PO {item.expand.purchase_order.po_number}</DsLabel>
+      <DsLabel color="cyan">PO {linkedPurchaseOrderNumber}</DsLabel>
+    </span>
+  {/if}
+  {#if item.purchase_order !== "" && linkedPurchaseOrderType === "One-Time"}
+    <span
+      class="w-full rounded-sm border border-amber-300 bg-amber-50 px-2 py-1 text-sm text-amber-900"
+    >
+      This PO will be closed after this expense is committed.
+    </span>
+  {/if}
+  {#if item.purchase_order !== "" && linkedPurchaseOrderType === "Recurring" && linkedRecurringRemainingOccurrences !== null}
+    <span
+      class="w-full rounded-sm border border-cyan-300 bg-cyan-50 px-2 py-1 text-sm text-cyan-900"
+    >
+      {linkedRecurringRemainingOccurrences} recurrence{linkedRecurringRemainingOccurrences === 1
+        ? ""
+        : "s"} remaining before this PO closes.
+    </span>
+  {/if}
+  {#if item.purchase_order !== "" && linkedPurchaseOrderType === "Cumulative" && linkedCumulativeRemainingBalance !== null}
+    <span
+      class="w-full rounded-sm border border-cyan-300 bg-cyan-50 px-2 py-1 text-sm text-cyan-900"
+    >
+      Remaining cumulative balance: ${linkedCumulativeRemainingBalance.toFixed(2)}
     </span>
   {/if}
 

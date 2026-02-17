@@ -286,6 +286,52 @@ Operational handlers:
 - cancel: `createCancelPurchaseOrderHandler` (`/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go`)
 - convert one-time to cumulative: `createConvertToCumulativePurchaseOrderHandler` (`/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go`)
 
+## Expense Validation Against PO Totals
+
+When saving an expense linked to a PO, validation behavior depends on PO type.
+
+Baseline gate:
+
+- The referenced PO must be `Active` or save fails.
+
+### One-Time and Recurring
+
+For `One-Time` and `Recurring` POs, a small overage is allowed.
+
+- Allowed maximum for a single expense is:
+  - `po.total * (1 + MAX_PURCHASE_ORDER_EXCESS_PERCENT)`, capped by
+  - `po.total + MAX_PURCHASE_ORDER_EXCESS_VALUE`
+- The lower of those two limits is used.
+- Current constants are:
+  - `MAX_PURCHASE_ORDER_EXCESS_PERCENT = 0.05` (5%)
+  - `MAX_PURCHASE_ORDER_EXCESS_VALUE = 100.0` ($100)
+- If expense total exceeds that limit, save fails with a `total` validation error:
+  - `expense exceeds purchase order total of $... by more than ...`
+
+Recurring-specific date rules still apply (expense date must be within PO date and end date range).
+
+### Cumulative
+
+For `Cumulative` POs, overage is checked against the running sum of associated expenses:
+
+- `new_total = existing_expenses_total + new_expense_total`
+- If `new_total > po.total`, save fails immediately with code `cumulative_po_overflow`.
+- The error payload includes:
+  - `purchase_order`
+  - `po_number`
+  - `po_total`
+  - `overflow_amount`
+
+Notes:
+
+- The running total check currently uses all associated expenses (not just committed ones) during create/update validation.
+- This overflow error is used by the expense UI to trigger the child-PO overflow workflow.
+
+### Known Limitation
+
+- `One-Time` is described as "single expense", but current validation does not yet hard-block creating a second expense against the same one-time PO.
+- There is an existing TODO in validation code to enforce this.
+
 ## Child PO Semantics
 
 - A purchase order may reference `parent_po`.

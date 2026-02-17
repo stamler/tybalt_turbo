@@ -2,6 +2,9 @@ import type {
   TimeEntriesRecord,
   PurchaseOrdersRecord,
   PurchaseOrdersResponse,
+  PurchaseOrdersPaymentTypeOptions,
+  PurchaseOrdersStatusOptions,
+  PurchaseOrdersTypeOptions,
   PoApproversResponse,
   ExpensesRecord,
   ExpensesResponse,
@@ -49,7 +52,19 @@ export type SecondApproversResponse = {
     second_stage_timeout_hours: number;
   };
 };
-export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse>;
+export type LinkedPurchaseOrderSummary = {
+  id: string;
+  po_number: string;
+  type: PurchaseOrdersTypeOptions;
+  payment_type: PurchaseOrdersPaymentTypeOptions;
+  status: PurchaseOrdersStatusOptions;
+  recurring_expected_occurrences?: number;
+  recurring_remaining_occurrences?: number;
+  cumulative_remaining_balance?: number;
+};
+export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse> & {
+  linked_purchase_order?: LinkedPurchaseOrderSummary;
+};
 export type JobsPageData = PageData<JobsRecord> & {
   categories: CategoriesResponse[];
   // When creating a project from a proposal, this contains any existing projects that already reference the proposal

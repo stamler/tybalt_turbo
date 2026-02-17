@@ -591,8 +591,8 @@ func RecurringPurchaseOrderExhausted(app core.App, purchaseOrderRecord *core.Rec
 	// TODO: implement issue #13, check if an expense has been committed for each
 	// recurrence of the PO and set the Status to Closed if so, otherwise doing nothing.
 
-	// Count the number of committed expenses for the purchase order
-	query := app.DB().NewQuery("SELECT COUNT(*) AS count FROM expenses WHERE purchase_order = {:purchaseOrder}")
+	// Count only committed expenses for the purchase order.
+	query := app.DB().NewQuery("SELECT COUNT(*) AS count FROM expenses WHERE purchase_order = {:purchaseOrder} AND committed != ''")
 	query.Bind(dbx.Params{"purchaseOrder": purchaseOrderRecord.Id})
 	type CountResult struct {
 		Count int `db:"count"`

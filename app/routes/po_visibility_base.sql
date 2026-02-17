@@ -138,6 +138,37 @@ SELECT
   po.priority_second_approver,
   po.approval_total,
   (SELECT COUNT(*) FROM expenses WHERE expenses.purchase_order = po.id AND expenses.committed != '') AS committed_expenses_count,
+  COALESCE((SELECT SUM(expenses.total) FROM expenses WHERE expenses.purchase_order = po.id), 0) AS expenses_total,
+  CASE
+    WHEN po.type = 'Recurring' AND po.end_date != '' AND po.frequency != '' THEN
+      CASE po.frequency
+        WHEN 'Weekly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 7 AS INTEGER)
+        WHEN 'Biweekly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 14 AS INTEGER)
+        WHEN 'Monthly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 30 AS INTEGER)
+        ELSE 0
+      END
+    ELSE 0
+  END AS recurring_expected_occurrences,
+  CASE
+    WHEN po.type = 'Recurring' AND po.end_date != '' AND po.frequency != '' THEN
+      MAX(
+        (
+          CASE po.frequency
+            WHEN 'Weekly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 7 AS INTEGER)
+            WHEN 'Biweekly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 14 AS INTEGER)
+            WHEN 'Monthly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 30 AS INTEGER)
+            ELSE 0
+          END
+        ) - (SELECT COUNT(*) FROM expenses WHERE expenses.purchase_order = po.id AND expenses.committed != ''),
+        0
+      )
+    ELSE 0
+  END AS recurring_remaining_occurrences,
+  CASE
+    WHEN po.type = 'Cumulative' THEN
+      po.total - COALESCE((SELECT SUM(expenses.total) FROM expenses WHERE expenses.purchase_order = po.id), 0)
+    ELSE 0
+  END AS cumulative_remaining_balance,
   COALESCE((p0.given_name || ' ' || p0.surname), '') AS uid_name,
   COALESCE((p1.given_name || ' ' || p1.surname), '') AS approver_name,
   COALESCE((p2.given_name || ' ' || p2.surname), '') AS second_approver_name,

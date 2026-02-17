@@ -111,6 +111,10 @@ type purchaseOrderVisibilityRow struct {
 	PrioritySecondApprover     string  `db:"priority_second_approver" json:"priority_second_approver"`
 	ApprovalTotal              float64 `db:"approval_total" json:"approval_total"`
 	CommittedExpensesCount     int     `db:"committed_expenses_count" json:"committed_expenses_count"`
+	ExpensesTotal              float64 `db:"expenses_total" json:"expenses_total"`
+	RecurringExpectedCount     int     `db:"recurring_expected_occurrences" json:"recurring_expected_occurrences"`
+	RecurringRemainingCount    int     `db:"recurring_remaining_occurrences" json:"recurring_remaining_occurrences"`
+	CumulativeRemainingBalance float64 `db:"cumulative_remaining_balance" json:"cumulative_remaining_balance"`
 	UIDName                    string  `db:"uid_name" json:"uid_name"`
 	ApproverName               string  `db:"approver_name" json:"approver_name"`
 	SecondApproverName         string  `db:"second_approver_name" json:"second_approver_name"`
