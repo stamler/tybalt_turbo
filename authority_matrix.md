@@ -5,7 +5,7 @@
 | Capital Expense                        | < 100$      | < 500$ w/PO           | < 2500$ w/PO    | w/PO       |
 | Project Expense (references a job)     | < 100$ w/PO | < 500$ w/PO           | < 20000$ w/PO   | w/PO       |
 | Sponsorships                           |             |                       |                 | w/PO       |
-| Staff Appreciation or Social Committee |             |                       | w/PO            | w/PO       |
+| Staff Appreciation or Social Committee |             |                       | < 500$ w/PO     | w/PO       |
 | Media Advertising and Event Fees       |             |                       |                 | w/PO       |
 | Computer and Software Acquisition      |             |                       |                 | w/PO       |
 
