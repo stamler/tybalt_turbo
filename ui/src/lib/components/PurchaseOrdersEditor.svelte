@@ -600,6 +600,24 @@
     {/if}
   </div>
 
+  <div class="flex w-full flex-col gap-1 {errors.payment_type !== undefined ? 'bg-red-200' : ''}">
+    {#if isChildPO}
+      <span>Payment</span>
+      <DsLabel color="cyan">{selectedPaymentType?.label ?? "On Account"}</DsLabel>
+    {:else}
+      <DSToggle
+        bind:value={item.payment_type}
+        label="Payment"
+        options={paymentTypeOptions}
+        showOptionDescriptions={true}
+        fullWidth={true}
+      />
+    {/if}
+    {#if errors.payment_type !== undefined}
+      <span class="text-red-600">{errors.payment_type.message}</span>
+    {/if}
+  </div>
+
   {#if showApproverField}
     <DsSelector
       bind:value={item.approver as string}
@@ -716,24 +734,6 @@
       {/snippet}
     </DsSelector>
   {/if}
-
-  <div class="flex w-full flex-col gap-1 {errors.payment_type !== undefined ? 'bg-red-200' : ''}">
-    {#if isChildPO}
-      <span>Payment</span>
-      <DsLabel color="cyan">{selectedPaymentType?.label ?? "On Account"}</DsLabel>
-    {:else}
-      <DSToggle
-        bind:value={item.payment_type}
-        label="Payment"
-        options={paymentTypeOptions}
-        showOptionDescriptions={true}
-        fullWidth={true}
-      />
-    {/if}
-    {#if errors.payment_type !== undefined}
-      <span class="text-red-600">{errors.payment_type.message}</span>
-    {/if}
-  </div>
 
   {#if kindAllowsJob && $jobs.index !== null}
     <DsAutoComplete
