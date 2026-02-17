@@ -8,9 +8,24 @@ import type {
 } from "$lib/pocketbase-types";
 import { type UnsubscribeFunc } from "pocketbase";
 import { pb } from "$lib/pocketbase";
-import flatpickr from "flatpickr";
 import { get } from "svelte/store";
 import { globalStore } from "$lib/stores/global";
+
+export const DATE_INPUT_MIN = "2024-06-01";
+
+function toIsoDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+export function dateInputMaxMonthsAhead(monthsAhead: number): string {
+  const today = new Date();
+  const target = new Date(today);
+  target.setMonth(target.getMonth() + monthsAhead);
+  return toIsoDate(target);
+}
 
 export interface TimeSheetTallyQueryRow {
   id: string;
@@ -255,21 +270,6 @@ export const formatNumber = function <T>(value: T) {
   }
   return nFormatter(value, 1);
 };
-
-export function flatpickrAction(node: HTMLElement, options: flatpickr.Options.Options = {}) {
-  const instance = flatpickr(node, {
-    minDate: "2024-06-01",
-    maxDate: new Date(new Date().setMonth(new Date().getMonth() + 15)),
-    enableTime: false,
-    dateFormat: "Y-m-d",
-    ...options,
-  });
-  return {
-    destroy() {
-      instance.destroy();
-    },
-  };
-}
 
 // Fetch categories for the given job
 export async function fetchCategories(jobId: string): Promise<CategoriesResponse[]> {

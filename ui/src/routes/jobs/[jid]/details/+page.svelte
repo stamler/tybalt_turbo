@@ -11,6 +11,7 @@
   import StaffSummaryContent from "$lib/components/jobs/StaffSummaryContent.svelte";
   import DivisionsSummaryContent from "$lib/components/jobs/DivisionsSummaryContent.svelte";
   import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
+  import DSDateInput from "$lib/components/DSDateInput.svelte";
   import { pb } from "$lib/pocketbase";
   import { goto, invalidateAll } from "$app/navigation";
   import type { FilterDef } from "$lib/components/jobs/types";
@@ -613,18 +614,16 @@
       <div class="flex flex-wrap items-end gap-3 px-4 py-2">
         <div>
           <label for="staff-start-date" class="block text-sm font-semibold">Start date</label>
-          <input
+          <DSDateInput
             id="staff-start-date"
-            type="date"
             bind:value={timeRangeStart}
             class="rounded-sm border px-2 py-1"
           />
         </div>
         <div>
           <label for="staff-end-date" class="block text-sm font-semibold">End date</label>
-          <input
+          <DSDateInput
             id="staff-end-date"
-            type="date"
             bind:value={timeRangeEnd}
             class="rounded-sm border px-2 py-1"
           />
@@ -638,18 +637,16 @@
       <div class="flex flex-wrap items-end gap-3 px-4 py-2">
         <div>
           <label for="div-start-date" class="block text-sm font-semibold">Start date</label>
-          <input
+          <DSDateInput
             id="div-start-date"
-            type="date"
             bind:value={timeRangeStart}
             class="rounded-sm border px-2 py-1"
           />
         </div>
         <div>
           <label for="div-end-date" class="block text-sm font-semibold">End date</label>
-          <input
+          <DSDateInput
             id="div-end-date"
-            type="date"
             bind:value={timeRangeEnd}
             class="rounded-sm border px-2 py-1"
           />

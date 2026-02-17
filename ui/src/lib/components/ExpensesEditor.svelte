@@ -1,12 +1,14 @@
 <script lang="ts">
   import {
-    flatpickrAction,
+    DATE_INPUT_MIN,
     applyDefaultDivisionOnce,
     createJobCategoriesSync,
+    dateInputMaxMonthsAhead,
   } from "$lib/utilities";
   import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DsFileSelect from "$lib/components/DsFileSelect.svelte";
@@ -33,6 +35,7 @@
 
   let errors = $state({} as any);
   let item = $state(untrack(() => data.item));
+  const dateInputMax = dateInputMaxMonthsAhead(15);
   let overflowModal: CumulativePOOverflowModal;
 
   let categories = $state([] as CategoriesResponse[]);
@@ -113,10 +116,6 @@
   }
 </script>
 
-<svelte:head>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-</svelte:head>
-
 <CumulativePOOverflowModal bind:this={overflowModal} />
 
 {#if !$expensesEditingEnabled}
@@ -140,12 +139,11 @@
 
   <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
     <label for="date">Date</label>
-    <input
+    <DsDateInput
       class="flex-1"
-      type="text"
       name="date"
-      placeholder="Date"
-      use:flatpickrAction
+      min={DATE_INPUT_MIN}
+      max={dateInputMax}
       bind:value={item.date}
     />
     {#if errors.date !== undefined}

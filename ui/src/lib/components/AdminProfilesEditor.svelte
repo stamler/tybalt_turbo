@@ -4,8 +4,9 @@
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
-  import { flatpickrAction } from "$lib/utilities";
+  import { DATE_INPUT_MIN, dateInputMaxMonthsAhead } from "$lib/utilities";
   import { pb } from "$lib/pocketbase";
   import type {
     AdminProfilesAugmentedSkipMinTimeCheckOptions,
@@ -29,6 +30,7 @@
 
   let errors = $state({} as Record<string, { message: string }>);
   let item = $state(untrack(() => ({ ...data.item })));
+  const dateInputMax = dateInputMaxMonthsAhead(15);
 
   // Use shared divisions store for items and index
   const divisions = $derived.by(() => $divisionsStore.items as DivisionsResponse[]);
@@ -551,7 +553,6 @@
 </script>
 
 <svelte:head>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
   <style>
     form {
       max-width: 900px;
@@ -628,12 +629,11 @@
 
     <span class="flex w-full gap-2 {errors.opening_date !== undefined ? 'bg-red-200' : ''}">
       <label for="opening_date">Opening Date</label>
-      <input
+      <DsDateInput
         class="flex-1"
-        type="text"
         name="opening_date"
-        placeholder="Opening Date"
-        use:flatpickrAction
+        min={DATE_INPUT_MIN}
+        max={dateInputMax}
         bind:value={item.opening_date}
       />
       {#if errors.opening_date !== undefined}
@@ -647,12 +647,11 @@
         : ''}"
     >
       <label for="personal_vehicle_insurance_expiry">Personal Vehicle Insurance Expiry</label>
-      <input
+      <DsDateInput
         class="flex-1"
-        type="text"
         name="personal_vehicle_insurance_expiry"
-        placeholder="Insurance Expiry"
-        use:flatpickrAction
+        min={DATE_INPUT_MIN}
+        max={dateInputMax}
         bind:value={item.personal_vehicle_insurance_expiry}
       />
       {#if errors.personal_vehicle_insurance_expiry !== undefined}

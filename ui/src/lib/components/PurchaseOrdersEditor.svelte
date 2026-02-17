@@ -1,8 +1,9 @@
 <script lang="ts">
   import {
-    flatpickrAction,
+    DATE_INPUT_MIN,
     applyDefaultDivisionOnce,
     createJobCategoriesSync,
+    dateInputMaxMonthsAhead,
   } from "$lib/utilities";
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
@@ -10,6 +11,7 @@
   import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DSToggle from "$lib/components/DSToggle.svelte";
   import DsFileSelect from "$lib/components/DsFileSelect.svelte";
@@ -51,6 +53,7 @@
 
   let errors = $state({} as any);
   let item = $state(untrack(() => data.item));
+  const dateInputMax = dateInputMaxMonthsAhead(15);
 
   const isRecurring = $derived(item.type === "Recurring");
   const isChildPO = $derived(item.parent_po !== "" && item.parent_po !== undefined);
@@ -174,11 +177,11 @@
     ownPOContext: boolean,
   ): boolean => status === "requester_qualifies" && requesterID !== "" && ownPOContext;
   const authUserID = $derived.by(() => $authStore?.model?.id ?? "");
-  const isOwnPOContext = $derived.by(
-    () => isRequesterOwnPOContext(authUserID, item.uid, data.editing),
+  const isOwnPOContext = $derived.by(() =>
+    isRequesterOwnPOContext(authUserID, item.uid, data.editing),
   );
-  const isDualBypassSelfMode = $derived.by(
-    () => isDualBypassMode(secondApproverStatus, authUserID, isOwnPOContext),
+  const isDualBypassSelfMode = $derived.by(() =>
+    isDualBypassMode(secondApproverStatus, authUserID, isOwnPOContext),
   );
   const isAbortError = (error: unknown): boolean => {
     const e = error as MaybeAbortError;
@@ -190,7 +193,8 @@
     "No eligible first-stage approvers can approve this amount for the selected division and kind. Contact an administrator.";
   const secondPoolEmptyMessage =
     "Second approval is required, but no second-stage approver can final-approve this amount.";
-  const approversLoadingMessage = "Approver eligibility is still loading. Please wait and try again.";
+  const approversLoadingMessage =
+    "Approver eligibility is still loading. Please wait and try again.";
   const approversUnavailableMessage =
     "Could not load approver eligibility. Resolve the error and try again.";
 
@@ -389,8 +393,7 @@
           // This is a policy/config state, not a transport failure.
           nextSecondApprovers = [];
           nextSecondStatus = "required_no_candidates";
-          nextSecondReasonMessage =
-            e?.data?.message ?? secondPoolEmptyMessage;
+          nextSecondReasonMessage = e?.data?.message ?? secondPoolEmptyMessage;
           nextSecondMeta = null;
         } else {
           throw secondResult.reason;
@@ -402,11 +405,7 @@
       secondApproverReasonMessage = nextSecondReasonMessage;
       secondApproverMeta = nextSecondMeta;
 
-      const dualBypassSelfMode = isDualBypassMode(
-        nextSecondStatus,
-        requesterID,
-        isOwnPOContextNow,
-      );
+      const dualBypassSelfMode = isDualBypassMode(nextSecondStatus, requesterID, isOwnPOContextNow);
 
       // Auto-self only when the caller is actually in the first-stage pool.
       // Otherwise keep the approver selector visible (including empty-state),
@@ -480,11 +479,7 @@
     if (firstStageRequesterQualifies) {
       item.approver = item.uid;
     }
-    if (
-      !isDualBypassSelfMode &&
-      !firstStageRequesterQualifies &&
-      approvers.length === 0
-    ) {
+    if (!isDualBypassSelfMode && !firstStageRequesterQualifies && approvers.length === 0) {
       errors = {
         ...errors,
         approver: {
@@ -532,10 +527,6 @@
     }
   }
 </script>
-
-<svelte:head>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-</svelte:head>
 
 {#if !$expensesEditingEnabled}
   <DsEditingDisabledBanner
@@ -664,12 +655,11 @@
   {#if isRecurring}
     <span class="flex w-full gap-2 {errors.end_date !== undefined ? 'bg-red-200' : ''}">
       <label for="end_date">End Date</label>
-      <input
+      <DsDateInput
         class="flex-1"
-        type="text"
         name="end_date"
-        placeholder="End Date"
-        use:flatpickrAction
+        min={DATE_INPUT_MIN}
+        max={dateInputMax}
         bind:value={item.end_date}
       />
       {#if errors.end_date !== undefined}
@@ -696,12 +686,11 @@
 
   <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
     <label for="date">Date</label>
-    <input
+    <DsDateInput
       class="flex-1"
-      type="text"
       name="date"
-      placeholder="Date"
-      use:flatpickrAction
+      min={DATE_INPUT_MIN}
+      max={dateInputMax}
       bind:value={item.date}
     />
     {#if errors.date !== undefined}

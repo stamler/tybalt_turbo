@@ -42,7 +42,6 @@
   "type": "module",
   "dependencies": {
     "@iconify/svelte": "^5.2.1",
-    "flatpickr": "^4.6.13",
     "leaflet": "^1.9.4",
     "lodash": "^4.17.21",
     "minisearch": "^7.1.0",

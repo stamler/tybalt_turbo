@@ -1,6 +1,7 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { goto } from "$app/navigation";
   import type { PageData } from "./$types";
@@ -130,9 +131,8 @@
     >
       <span class="flex w-full gap-2">
         <label for="effective_date">Effective Date</label>
-        <input
+        <DsDateInput
           class="flex-1 rounded-sm border border-neutral-300 px-1"
-          type="date"
           id="effective_date"
           name="effective_date"
           bind:value={effective_date}

@@ -1,8 +1,9 @@
 <script lang="ts">
   import {
-    flatpickrAction,
+    DATE_INPUT_MIN,
     applyDefaultDivisionOnce,
     createJobCategoriesSync,
+    dateInputMaxMonthsAhead,
   } from "$lib/utilities";
   import { jobs } from "$lib/stores/jobs";
   import { branches as branchesStore } from "$lib/stores/branches";
@@ -13,6 +14,7 @@
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
+  import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsAutoComplete from "./DSAutoComplete.svelte";
   import DsActionButton from "./DSActionButton.svelte";
   import { authStore } from "$lib/stores/auth";
@@ -63,6 +65,7 @@
 
   let errors = $state({} as any);
   let item = $state(untrack(() => data.item));
+  const dateInputMax = dateInputMaxMonthsAhead(15);
   let branchDefaultHandled = $state(false);
 
   // When subject user changes, default division to their profile default (if empty)
@@ -149,10 +152,6 @@
   }
 </script>
 
-<svelte:head>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-</svelte:head>
-
 <form
   class="flex w-full flex-col items-center gap-2 p-2 max-lg:[&_button]:text-base max-lg:[&_input]:text-base max-lg:[&_label]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base"
 >
@@ -180,12 +179,11 @@
 
   <span class="flex w-full gap-2">
     <label for="date">Date</label>
-    <input
+    <DsDateInput
       class="flex-1"
-      type="text"
       name="date"
-      placeholder="Date"
-      use:flatpickrAction
+      min={DATE_INPUT_MIN}
+      max={dateInputMax}
       bind:value={item.date}
     />
   </span>

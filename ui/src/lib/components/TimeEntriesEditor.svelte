@@ -1,10 +1,11 @@
 <script lang="ts">
   import { untrack } from "svelte";
   import {
-    flatpickrAction,
+    DATE_INPUT_MIN,
     applyDefaultDivisionOnce,
     applyDefaultRoleOnce,
     createJobCategoriesSync,
+    dateInputMaxMonthsAhead,
   } from "$lib/utilities";
   import { divisions } from "$lib/stores/divisions";
   import { jobs } from "$lib/stores/jobs";
@@ -13,6 +14,7 @@
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
+  import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsAutoComplete from "./DSAutoComplete.svelte";
   import DsActionButton from "./DSActionButton.svelte";
   import { authStore } from "$lib/stores/auth";
@@ -57,6 +59,7 @@
   let errors = $state({} as any);
   // Use untrack to capture initial value for form state (component recreates on navigation)
   let item = $state(untrack(() => data.item));
+  const dateInputMax = dateInputMaxMonthsAhead(15);
 
   // Track allowed division IDs for the selected job (null = show all divisions, empty Set = job has no allocations)
   let jobDivisionIds = $state<Set<string> | null>(null);
@@ -181,10 +184,6 @@
   }
 </script>
 
-<svelte:head>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-</svelte:head>
-
 <form
   class="flex w-full flex-col items-center gap-2 p-2 max-lg:[&_button]:text-base max-lg:[&_input]:text-base max-lg:[&_label]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base"
 >
@@ -198,12 +197,11 @@
 
   <span class="flex w-full gap-2">
     <label for="date">Date</label>
-    <input
+    <DsDateInput
       class="flex-1"
-      type="text"
       name="date"
-      placeholder="Date"
-      use:flatpickrAction
+      min={DATE_INPUT_MIN}
+      max={dateInputMax}
       bind:value={item.date}
     />
   </span>

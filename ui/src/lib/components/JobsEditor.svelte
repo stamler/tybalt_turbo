@@ -1,7 +1,8 @@
 <script lang="ts">
-  import { flatpickrAction, fetchClientContacts } from "$lib/utilities";
+  import { DATE_INPUT_MIN, dateInputMaxMonthsAhead, fetchClientContacts } from "$lib/utilities";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
+  import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { goto } from "$app/navigation";
@@ -43,6 +44,7 @@
     untrack(() => data.item) as JobsRecord | (JobsRecord & Record<string, unknown>),
   );
   let categories = $state(untrack(() => data.categories));
+  const dateInputMax = dateInputMaxMonthsAhead(15);
   let client_contacts = $state([] as ClientContactsResponse[]);
   let clientContactsRequestId = 0;
 
@@ -725,10 +727,6 @@
   }
 </script>
 
-<svelte:head>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" />
-</svelte:head>
-
 {#if !$jobsEditingEnabled}
   <DsEditingDisabledBanner>
     <p>Job creation and editing is temporarily disabled during a system transition.</p>
@@ -786,12 +784,11 @@
           : ''}"
       >
         <label for="project_award_date">Project Award Date</label>
-        <input
+        <DsDateInput
           class="flex-1"
-          type="text"
           name="project_award_date"
-          placeholder="Project Award Date"
-          use:flatpickrAction
+          min={DATE_INPUT_MIN}
+          max={dateInputMax}
           bind:value={item.project_award_date}
         />
         {#if item.project_award_date}
@@ -815,12 +812,11 @@
           : ''}"
       >
         <label for="proposal_opening_date">Proposal Opening Date</label>
-        <input
+        <DsDateInput
           class="flex-1"
-          type="text"
           name="proposal_opening_date"
-          placeholder="Proposal Opening Date"
-          use:flatpickrAction
+          min={DATE_INPUT_MIN}
+          max={dateInputMax}
           bind:value={item.proposal_opening_date}
         />
         {#if item.proposal_opening_date}
@@ -842,12 +838,11 @@
           : ''}"
       >
         <label for="proposal_submission_due_date">Proposal Submission Due Date</label>
-        <input
+        <DsDateInput
           class="flex-1"
-          type="text"
           name="proposal_submission_due_date"
-          placeholder="Proposal Submission Due Date"
-          use:flatpickrAction
+          min={DATE_INPUT_MIN}
+          max={dateInputMax}
           bind:value={item.proposal_submission_due_date}
         />
         {#if item.proposal_submission_due_date}
