@@ -52,10 +52,6 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 	// Get approval tier values from the database
 	app := testutils.SetupTestApp(t)
 	tier1, tier2 := testutils.GetApprovalTiers(app)
-	singleStageAmount := tier1 - 0.01
-	if singleStageAmount <= 0 {
-		singleStageAmount = 0.01
-	}
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -168,7 +164,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:   "single-stage first-approved but unactivated PO can be activated by assigned approver",
 			Method: http.MethodPost,
-			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/approve",
+			URL:    "/api/purchase_orders/po1stgready0001/approve",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": poApproverToken,
@@ -181,29 +177,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				fmt.Sprintf(`"po_number":"%s`, currentPoPrefix),
 				`"approver":"etysnrlup2f6bak"`,
 			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-				_, err := app.NonconcurrentDB().NewQuery(`
-					UPDATE purchase_orders
-					SET
-						status = 'Unapproved',
-						approved = '2025-01-30 12:00:00.000Z',
-						second_approval = '',
-						approver = 'etysnrlup2f6bak',
-						second_approver = '',
-						priority_second_approver = '',
-						po_number = '',
-						approval_total = {:singleStageAmount},
-						total = {:singleStageAmount}
-					WHERE id = 'gal6e5la2fa4rpn'
-				`).Bind(map[string]any{
-					"singleStageAmount": singleStageAmount,
-				}).Execute()
-				if err != nil {
-					t.Fatal(err)
-				}
-				return app
-			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "second approval of high-value PO completes approval process",
@@ -234,7 +208,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:   "second approval succeeds when first-stage pool becomes empty after first approval",
 			Method: http.MethodPost,
-			URL:    "/api/purchase_orders/2blv18f40i2q373/approve",
+			URL:    "/api/purchase_orders/postg2empty0001/approve",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": tier2Token,
@@ -247,23 +221,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				fmt.Sprintf(`"po_number":"%s`, currentPoPrefix),
 				`"second_approver":"6bq4j0eb26631dy"`,
 			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-				_, err := app.NonconcurrentDB().NewQuery(`
-					UPDATE expenditure_kinds
-					SET second_approval_threshold = 499
-					WHERE name = 'standard'
-				`).Execute()
-				if err != nil {
-					t.Fatal(err)
-				}
-				return app
-			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "first approval still returns first_pool_empty when first-stage pool is empty and caller is not bypass-eligible",
 			Method: http.MethodPost,
-			URL:    "/api/purchase_orders/dualwithprio001/approve",
+			URL:    "/api/purchase_orders/pofirstempty001/approve",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": poApproverToken,
@@ -276,18 +239,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"*": 0,
 			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-				_, err := app.NonconcurrentDB().NewQuery(`
-					UPDATE expenditure_kinds
-					SET second_approval_threshold = 499
-					WHERE name = 'standard'
-				`).Execute()
-				if err != nil {
-					t.Fatal(err)
-				}
-				return app
-			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "unauthorized user cannot approve purchase order",
@@ -310,7 +262,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:   "unauthorized caller gets forbidden before assigned-approver validity errors",
 			Method: http.MethodPost,
-			URL:    "/api/purchase_orders/dualwithprio001/approve",
+			URL:    "/api/purchase_orders/pobadassign0001/approve",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": unauthorizedToken,
@@ -323,27 +275,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"*": 0,
 			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-				_, err := app.NonconcurrentDB().NewQuery(`
-					UPDATE purchase_orders
-					SET
-						approver = '',
-						approved = '',
-						second_approval = '',
-						status = 'Unapproved'
-					WHERE id = 'dualwithprio001'
-				`).Execute()
-				if err != nil {
-					t.Fatal(err)
-				}
-				return app
-			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "unauthorized caller gets forbidden before second-pool-empty validation",
 			Method: http.MethodPost,
-			URL:    "/api/purchase_orders/dualwithprio001/approve",
+			URL:    "/api/purchase_orders/posecondempty01/approve",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": unauthorizedToken,
@@ -356,48 +293,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"*": 0,
 			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-				_, err := app.NonconcurrentDB().NewQuery(`
-					UPDATE po_approver_props
-					SET
-						max_amount = 0,
-						project_max = 0,
-						sponsorship_max = 0,
-						staff_and_social_max = 0,
-						media_and_event_max = 0,
-						computer_max = 0
-				`).Execute()
-				if err != nil {
-					t.Fatal(err)
-				}
-				_, err = app.NonconcurrentDB().NewQuery(`
-					UPDATE expenditure_kinds
-					SET second_approval_threshold = 1
-					WHERE name = 'standard'
-				`).Execute()
-				if err != nil {
-					t.Fatal(err)
-				}
-				_, err = app.NonconcurrentDB().NewQuery(`
-					UPDATE purchase_orders
-					SET
-						approver = 'etysnrlup2f6bak',
-						approved = '',
-						second_approval = '',
-						status = 'Unapproved'
-					WHERE id = 'dualwithprio001'
-				`).Execute()
-				if err != nil {
-					t.Fatal(err)
-				}
-				return app
-			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "approval returns invalid_expenditure_kind when purchase order kind is unknown",
 			Method: http.MethodPost,
-			URL:    "/api/purchase_orders/gal6e5la2fa4rpn/approve",
+			URL:    "/api/purchase_orders/poinvalkind0001/approve",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
 				"Authorization": poApproverToken,
@@ -410,18 +311,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"*": 0,
 			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-				_, err := app.NonconcurrentDB().NewQuery(`
-					UPDATE purchase_orders
-					SET kind = 'kind_missing_123'
-					WHERE id = 'gal6e5la2fa4rpn'
-				`).Execute()
-				if err != nil {
-					t.Fatal(err)
-				}
-				return app
-			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "po_approver cannot approve PO in unauthorized division",

@@ -72,27 +72,40 @@ func GetApprovalTiers(app *tests.TestApp) (float64, float64) {
 		return cachedTier1, cachedTier2
 	}
 
-	thresholds := []struct {
+	tier1Result := struct {
 		Threshold float64 `db:"threshold"`
 	}{}
 	if err := app.DB().NewQuery(`
-		SELECT DISTINCT COALESCE(second_approval_threshold, 0) AS threshold
+		SELECT COALESCE(second_approval_threshold, 0) AS threshold
 		FROM expenditure_kinds
-		WHERE COALESCE(second_approval_threshold, 0) > 0
-		ORDER BY threshold ASC
-	`).All(&thresholds); err != nil {
-		panic("Failed to retrieve approval tiers from database: " + err.Error())
+		WHERE name = 'standard'
+		LIMIT 1
+	`).One(&tier1Result); err != nil {
+		panic("Failed to retrieve standard approval threshold: " + err.Error())
 	}
 
-	// Keep existing tier assumptions in legacy tests if fewer than 2 configured thresholds exist.
-	if len(thresholds) < 2 {
-		cachedTier1, cachedTier2 = 500, 2500
-		tiersInitialized = true
-		return cachedTier1, cachedTier2
+	tier1 := tier1Result.Threshold
+	if tier1 <= 0 {
+		tier1 = 500
 	}
 
-	tier1 := thresholds[0].Threshold
-	tier2 := thresholds[1].Threshold
+	tier2Result := struct {
+		Threshold float64 `db:"threshold"`
+	}{}
+	if err := app.DB().NewQuery(`
+		SELECT MIN(max_amount) AS threshold
+		FROM po_approver_props
+		WHERE max_amount > {:tier1}
+	`).Bind(map[string]any{
+		"tier1": tier1,
+	}).One(&tier2Result); err != nil {
+		panic("Failed to retrieve second approval tier: " + err.Error())
+	}
+
+	tier2 := tier2Result.Threshold
+	if tier2 <= tier1 {
+		tier2 = 2500
+	}
 
 	// Cache the values
 	cachedTier1, cachedTier2 = tier1, tier2

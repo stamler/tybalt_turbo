@@ -49,6 +49,12 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Generate token for inactive Tier TwoB-like user (active=0 in fixture)
+	inactiveTier2bToken, err := testutils.GenerateRecordToken("users", "inactive2@poapprover.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Generate token for Hal (project_max and max_amount both 1000000)
 	halToken, err := testutils.GenerateRecordToken("users", "hal@2005.com")
 	if err != nil {
@@ -413,56 +419,29 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		{
 			Name:   "visible endpoint uses kind-specific approval limit columns",
 			Method: http.MethodGet,
-			URL:    "/api/purchase_orders/visible/2blv18f40i2q373",
+			URL:    "/api/purchase_orders/visible/pocompkindvis01",
 			Headers: map[string]string{
 				"Authorization": fattToken,
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"id":"2blv18f40i2q373"`,
+				`"id":"pocompkindvis01"`,
 				`"status":"Unapproved"`,
 			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-				if _, err := app.DB().NewQuery(`
-					UPDATE expenditure_kinds
-					SET second_approval_threshold = 500
-					WHERE id = '7jgifny7fljd9hi'
-				`).Execute(); err != nil {
-					t.Fatal(err)
-				}
-				if _, err := app.DB().NewQuery(`
-					UPDATE purchase_orders
-					SET kind = '7jgifny7fljd9hi'
-					WHERE id = '2blv18f40i2q373'
-				`).Execute(); err != nil {
-					t.Fatal(err)
-				}
-				return app
-			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "inactive admin profile cannot qualify second-stage visibility",
 			Method: http.MethodGet,
 			URL:    "/api/purchase_orders/visible/stg2within24h01",
 			Headers: map[string]string{
-				"Authorization": tier2bToken,
+				"Authorization": inactiveTier2bToken,
 			},
 			ExpectedStatus: http.StatusNotFound,
 			ExpectedContent: []string{
 				`"code":"po_not_found_or_not_visible"`,
 			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-				if _, err := app.DB().NewQuery(`
-					UPDATE admin_profiles
-					SET active = 0
-					WHERE uid = 't4g84hfvkt1v9j3'
-				`).Execute(); err != nil {
-					t.Fatal(err)
-				}
-				return app
-			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 	}
 

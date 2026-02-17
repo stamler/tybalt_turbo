@@ -2,8 +2,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -19,12 +17,6 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
-
-// computePOTestHash computes SHA256 hash of data and returns it as a hex string
-func computePOTestHash(data []byte) string {
-	h := sha256.Sum256(data)
-	return hex.EncodeToString(h[:])
-}
 
 func ensureDefaultPOKind(payload map[string]any) {
 	if _, exists := payload["kind"]; !exists {
@@ -116,21 +108,6 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		return buf, contentType, nil
 	}
 
-	setupTestAppWithStrictParentKinds := func(t testing.TB) *tests.TestApp {
-		app := testutils.SetupTestApp(t)
-		_, err := app.NonconcurrentDB().NewQuery(`
-			UPDATE purchase_orders
-			SET kind = {:kind}
-			WHERE id IN ('ly8xyzpuj79upq1', '25046ft47x49cc2', 'y660i6a14ql2355', '2plsetqdxht7esg')
-		`).Bind(dbx.Params{
-			"kind": standardKindID,
-		}).Execute()
-		if err != nil {
-			t.Fatal(err)
-		}
-		return app
-	}
-
 	var scenarios []tests.ApiScenario
 	// otherwise valid purchase order fails when job is Closed
 	{
@@ -163,7 +140,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 
@@ -200,7 +177,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 
@@ -212,7 +189,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	            "division": "vccd5fo56ctbigh",
 	            "description": "job PO with computer kind",
 	            "payment_type": "Expense",
-	            "total": 1234.56,
+	            "total": 123.45,
 	            "vendor": "2zqxtsmymf670ha",
 	            "approver": "etysnrlup2f6bak",
 	            "status": "Unapproved",
@@ -237,7 +214,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 
@@ -270,7 +247,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 
@@ -306,7 +283,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	// branch defaults from creator profile when omitted and no job is set
@@ -340,7 +317,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	// job branch overrides an explicit branch when job is set
@@ -479,7 +456,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -512,7 +489,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -546,7 +523,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -580,7 +557,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -650,7 +627,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -682,7 +659,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -751,7 +728,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	// We need a test child PO that is status Active
@@ -787,7 +764,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -822,7 +799,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -859,7 +836,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -895,7 +872,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"*":                     0,
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -930,7 +907,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -965,7 +942,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: setupTestAppWithStrictParentKinds,
+			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
 	{
@@ -1483,7 +1460,6 @@ func TestPurchaseOrdersCreate_DuplicateAttachmentFails(t *testing.T) {
 
 	// Use a specific file content that will produce a consistent hash
 	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xAB, 0xCD, 0xEF, 0x01}
-	duplicateHash := computePOTestHash(duplicateFileContent)
 
 	scenario := tests.ApiScenario{
 		Name:           "duplicate attachment fails with field-level error",
@@ -1498,30 +1474,6 @@ func TestPurchaseOrdersCreate_DuplicateAttachmentFails(t *testing.T) {
 			"OnRecordCreateRequest": 1,
 		},
 		TestAppFactory: testutils.SetupTestApp,
-		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			// Create an existing PO with the same attachment hash directly in DB
-			collection, err := app.FindCollectionByNameOrId("purchase_orders")
-			if err != nil {
-				tb.Fatalf("failed to find purchase_orders collection: %v", err)
-			}
-			record := core.NewRecord(collection)
-			record.Set("uid", "f2j5a8vk006baub") // Different user to avoid conflicts
-			record.Set("date", "2024-08-01")
-			record.Set("division", "vccd5fo56ctbigh")
-			record.Set("description", "existing PO with attachment")
-			record.Set("payment_type", "Expense")
-			record.Set("total", 500)
-			record.Set("approval_total", 500)
-			record.Set("vendor", "2zqxtsmymf670ha")
-			record.Set("approver", "etysnrlup2f6bak")
-			record.Set("status", "Unapproved")
-			record.Set("type", "One-Time")
-			record.Set("kind", utilities.DefaultExpenditureKindID())
-			record.Set("attachment_hash", duplicateHash)
-			if err := app.Save(record); err != nil {
-				tb.Fatalf("failed to create existing PO: %v", err)
-			}
-		},
 	}
 
 	// Create the request body for the duplicate attempt
@@ -1585,7 +1537,6 @@ func TestPurchaseOrdersUpdate_DuplicateAttachmentFails(t *testing.T) {
 
 	// Use a specific file content that will produce a consistent hash
 	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xFE, 0xDC, 0xBA, 0x98}
-	duplicateHash := computePOTestHash(duplicateFileContent)
 
 	scenario := tests.ApiScenario{
 		Name:           "updating PO with duplicate attachment fails",
@@ -1600,30 +1551,6 @@ func TestPurchaseOrdersUpdate_DuplicateAttachmentFails(t *testing.T) {
 			"OnRecordUpdateRequest": 1,
 		},
 		TestAppFactory: testutils.SetupTestApp,
-		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			// Create an existing PO with the same attachment hash directly in DB
-			collection, err := app.FindCollectionByNameOrId("purchase_orders")
-			if err != nil {
-				tb.Fatalf("failed to find purchase_orders collection: %v", err)
-			}
-			record := core.NewRecord(collection)
-			record.Set("uid", "rzr98oadsp9qc11") // Different user
-			record.Set("date", "2024-08-01")
-			record.Set("division", "vccd5fo56ctbigh")
-			record.Set("description", "PO with attachment for update test")
-			record.Set("payment_type", "Expense")
-			record.Set("total", 500)
-			record.Set("approval_total", 500)
-			record.Set("vendor", "2zqxtsmymf670ha")
-			record.Set("approver", "etysnrlup2f6bak")
-			record.Set("status", "Unapproved")
-			record.Set("type", "One-Time")
-			record.Set("kind", utilities.DefaultExpenditureKindID())
-			record.Set("attachment_hash", duplicateHash)
-			if err := app.Save(record); err != nil {
-				tb.Fatalf("failed to create existing PO: %v", err)
-			}
-		},
 	}
 
 	// Create the request body for the update with duplicate attachment
@@ -1820,7 +1747,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 				"division": "vccd5fo56ctbigh",
 				"description": "test purchase order",
 				"payment_type": "Expense",
-				"total": 2234.56,
+				"total": 223.45,
 				"vendor": "2zqxtsmymf670ha",
 				"approver": "etysnrlup2f6bak",
 				"status": "Unapproved",
