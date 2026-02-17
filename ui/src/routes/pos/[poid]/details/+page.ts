@@ -7,12 +7,11 @@ import type {
 } from "$lib/pocketbase-types";
 import type { SecondApproversResponse } from "$lib/svelte-types";
 import { buildPoApproverRequest, fetchPoSecondApprovers } from "$lib/poApprovers";
+import { fetchVisiblePO } from "$lib/poVisibility";
 
 export const load: PageLoad = async ({ params }) => {
   try {
-    const po = await pb
-      .collection("purchase_orders_augmented")
-      .getOne<PurchaseOrdersAugmentedResponse>(params.poid);
+    const po = (await fetchVisiblePO(params.poid)) as PurchaseOrdersAugmentedResponse;
 
     let secondApproverDiagnostics: SecondApproversResponse | null = null;
     try {

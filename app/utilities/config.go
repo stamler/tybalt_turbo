@@ -70,6 +70,37 @@ func IsExpensesEditingEnabled(app core.App) (bool, error) {
 	return GetConfigBool(app, "expenses", "create_edit_absorb", true)
 }
 
+func GetPurchaseOrderSecondStageTimeoutHours(app core.App) float64 {
+	const defaultTimeoutHours = 24.0
+
+	config, err := GetConfigValue(app, "purchase_orders")
+	if err != nil || config == nil {
+		return defaultTimeoutHours
+	}
+
+	rawValue, ok := config["second_stage_timeout_hours"]
+	if !ok {
+		return defaultTimeoutHours
+	}
+
+	switch v := rawValue.(type) {
+	case float64:
+		if v > 0 {
+			return v
+		}
+	case int:
+		if v > 0 {
+			return float64(v)
+		}
+	case int64:
+		if v > 0 {
+			return float64(v)
+		}
+	}
+
+	return defaultTimeoutHours
+}
+
 // ErrExpensesEditingDisabled is returned when expense editing is disabled
 var ErrExpensesEditingDisabled = &errs.HookError{
 	Status:  http.StatusForbidden,

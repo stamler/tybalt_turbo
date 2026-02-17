@@ -1,5 +1,11 @@
 # Alternative purchase_orders record approval system
 
+> Legacy design note: this file describes a superseded threshold-era model and is kept only for historical context.
+>
+> Current source of truth:
+> - `/Users/dean/code/tybalt_turbo/descriptions/purchase_orders.md`
+> - `/Users/dean/code/tybalt_turbo/feb26_po_mods.md`
+
 1. The value of a `purchase_orders` record is the `total` field. This amount
    cannot be used for `Recurring` purchase orders as their value for approval is
    determined as the product of the total and the number of recurring payments.

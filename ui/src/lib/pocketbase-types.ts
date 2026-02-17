@@ -36,7 +36,6 @@ export enum Collections {
   PayrollReportWeekEndings = "payroll_report_week_endings",
   PayrollYearEndDates = "payroll_year_end_dates",
   PendingItemsForQualifiedPoSecondApprovers = "pending_items_for_qualified_po_second_approvers",
-  PoApprovalThresholds = "po_approval_thresholds",
   PoApproverProps = "po_approver_props",
   Profiles = "profiles",
   PurchaseOrders = "purchase_orders",
@@ -51,7 +50,8 @@ export enum Collections {
   TimeTracking = "time_tracking",
   TimeTypes = "time_types",
   UserClaims = "user_claims",
-  UserPoPermissionData = "user_po_permission_data",
+  UserClaimsSummary = "user_claims_summary",
+  UserPoApproverProfile = "user_po_approver_profile",
   Users = "users",
   Vendors = "vendors",
   ZipCache = "zip_cache",
@@ -296,6 +296,7 @@ export type ExpenditureKindsRecord = {
   en_ui_label: string;
   id: string;
   name: string;
+  second_approval_threshold: number;
   updated: IsoDateString;
 };
 
@@ -561,14 +562,6 @@ export type PayrollYearEndDatesRecord = {
 export type PendingItemsForQualifiedPoSecondApproversRecord = {
   id: string;
   num_pos_qualified: number;
-};
-
-export type PoApprovalThresholdsRecord = {
-  created: IsoDateString;
-  description: string;
-  id: string;
-  threshold: number;
-  updated: IsoDateString;
 };
 
 export type PoApproverPropsRecord = {
@@ -912,13 +905,21 @@ export type UserClaimsRecord = {
   updated: IsoDateString;
 };
 
-export type UserPoPermissionDataRecord = {
+export type UserClaimsSummaryRecord = {
   claims: string[];
+  id: string;
+};
+
+export type UserPoApproverProfileRecord = {
+  claims: string[];
+  computer_max: number;
   divisions: string[];
   id: string;
-  lower_threshold: number;
   max_amount: number;
-  upper_threshold: number;
+  media_and_event_max: number;
+  project_max: number;
+  sponsorship_max: number;
+  staff_and_social_max: number;
 };
 
 export type UsersRecord = {
@@ -1090,8 +1091,6 @@ export type PayrollYearEndDatesResponse<Texpand = unknown> = Required<PayrollYea
   BaseSystemFields<Texpand>;
 export type PendingItemsForQualifiedPoSecondApproversResponse<Texpand = unknown> =
   Required<PendingItemsForQualifiedPoSecondApproversRecord> & BaseSystemFields<Texpand>;
-export type PoApprovalThresholdsResponse<Texpand = unknown> = Required<PoApprovalThresholdsRecord> &
-  BaseSystemFields<Texpand>;
 export type PoApproverPropsResponse<Texpand = unknown> = Required<PoApproverPropsRecord> &
   BaseSystemFields<Texpand>;
 export type RateRolesResponse<Texpand = unknown> = Required<RateRolesRecord> &
@@ -1122,7 +1121,9 @@ export type TimeTypesResponse<Texpand = unknown> = Required<TimeTypesRecord> &
   BaseSystemFields<Texpand>;
 export type UserClaimsResponse<Texpand = UserClaimsRecordExpands> = Required<UserClaimsRecord> &
   BaseSystemFields<Texpand>;
-export type UserPoPermissionDataResponse<Texpand = unknown> = Required<UserPoPermissionDataRecord> &
+export type UserClaimsSummaryResponse<Texpand = unknown> = Required<UserClaimsSummaryRecord> &
+  BaseSystemFields<Texpand>;
+export type UserPoApproverProfileResponse<Texpand = unknown> = Required<UserPoApproverProfileRecord> &
   BaseSystemFields<Texpand>;
 export type UsersResponse<Texpand = UsersRecordExpands> = Required<UsersRecord> &
   AuthSystemFields<Texpand>;
@@ -1166,7 +1167,6 @@ export type CollectionRecords = {
   payroll_report_week_endings: PayrollReportWeekEndingsRecord;
   payroll_year_end_dates: PayrollYearEndDatesRecord;
   pending_items_for_qualified_po_second_approvers: PendingItemsForQualifiedPoSecondApproversRecord;
-  po_approval_thresholds: PoApprovalThresholdsRecord;
   po_approver_props: PoApproverPropsRecord;
   rate_roles: RateRolesRecord;
   profiles: ProfilesRecord;
@@ -1182,7 +1182,8 @@ export type CollectionRecords = {
   time_tracking: TimeTrackingRecord;
   time_types: TimeTypesRecord;
   user_claims: UserClaimsRecord;
-  user_po_permission_data: UserPoPermissionDataRecord;
+  user_claims_summary: UserClaimsSummaryRecord;
+  user_po_approver_profile: UserPoApproverProfileRecord;
   users: UsersRecord;
   vendors: VendorsRecord;
   zip_cache: ZipCacheRecord;
@@ -1219,7 +1220,6 @@ export type CollectionResponses = {
   payroll_report_week_endings: PayrollReportWeekEndingsResponse;
   payroll_year_end_dates: PayrollYearEndDatesResponse;
   pending_items_for_qualified_po_second_approvers: PendingItemsForQualifiedPoSecondApproversResponse;
-  po_approval_thresholds: PoApprovalThresholdsResponse;
   po_approver_props: PoApproverPropsResponse;
   rate_roles: RateRolesResponse;
   profiles: ProfilesResponse;
@@ -1235,7 +1235,8 @@ export type CollectionResponses = {
   time_tracking: TimeTrackingResponse;
   time_types: TimeTypesResponse;
   user_claims: UserClaimsResponse;
-  user_po_permission_data: UserPoPermissionDataResponse;
+  user_claims_summary: UserClaimsSummaryResponse;
+  user_po_approver_profile: UserPoApproverProfileResponse;
   users: UsersResponse;
   vendors: VendorsResponse;
   zip_cache: ZipCacheResponse;
@@ -1278,7 +1279,6 @@ export type TypedPocketBase = PocketBase & {
   collection(
     idOrName: "pending_items_for_qualified_po_second_approvers",
   ): RecordService<PendingItemsForQualifiedPoSecondApproversResponse>;
-  collection(idOrName: "po_approval_thresholds"): RecordService<PoApprovalThresholdsResponse>;
   collection(idOrName: "po_approver_props"): RecordService<PoApproverPropsResponse>;
   collection(idOrName: "rate_roles"): RecordService<RateRolesResponse>;
   collection(idOrName: "profiles"): RecordService<ProfilesResponse>;
@@ -1294,7 +1294,8 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "time_tracking"): RecordService<TimeTrackingResponse>;
   collection(idOrName: "time_types"): RecordService<TimeTypesResponse>;
   collection(idOrName: "user_claims"): RecordService<UserClaimsResponse>;
-  collection(idOrName: "user_po_permission_data"): RecordService<UserPoPermissionDataResponse>;
+  collection(idOrName: "user_claims_summary"): RecordService<UserClaimsSummaryResponse>;
+  collection(idOrName: "user_po_approver_profile"): RecordService<UserPoApproverProfileResponse>;
   collection(idOrName: "users"): RecordService<UsersResponse>;
   collection(idOrName: "vendors"): RecordService<VendorsResponse>;
   collection(idOrName: "zip_cache"): RecordService<ZipCacheResponse>;

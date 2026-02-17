@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { PurchaseOrdersPageData } from "$lib/svelte-types";
+  import type { PageData } from "./$types";
   import PurchaseOrdersList from "$lib/components/PurchaseOrdersList.svelte";
-  let { data }: { data: PurchaseOrdersPageData } = $props();
+  let { data }: { data: PageData } = $props();
 </script>
 
 <PurchaseOrdersList inListHeader="My Purchase Orders" {data} />

@@ -11,7 +11,6 @@
 // - Request normalization from editor/record models (`buildPoApproverRequest`),
 //   including amount coercion and `has_job` derivation.
 // - Endpoint calls for first approvers and second-approver diagnostics.
-// - A bundled helper that fetches both endpoints together for editor workflows.
 //
 // Notes for maintainers:
 // - `requestKey` defaults to null-friendly signatures because some callers opt out
@@ -76,15 +75,4 @@ export async function fetchPoSecondApprovers(
     method: "GET",
     requestKey,
   }) as Promise<SecondApproversResponse>;
-}
-
-export async function fetchPoApproversBundle(
-  request: PoApproverRequest,
-  requestKey: string | null = null,
-): Promise<{ approvers: PoApproversResponse[]; secondApproversResponse: SecondApproversResponse }> {
-  const [approvers, secondApproversResponse] = await Promise.all([
-    fetchPoApprovers(request, requestKey),
-    fetchPoSecondApprovers(request, requestKey),
-  ]);
-  return { approvers, secondApproversResponse };
 }

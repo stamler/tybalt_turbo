@@ -53,5 +53,6 @@ SELECT
   division_name,
   category_name
 FROM visibility_base
-WHERE is_unapproved_actionable_now = 1
-ORDER BY updated DESC
+WHERE id = {:id}
+  AND is_unapproved_actionable_now = 1
+LIMIT 1

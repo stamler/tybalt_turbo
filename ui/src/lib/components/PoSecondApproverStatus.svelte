@@ -83,7 +83,7 @@
         <span>reason code: {meta.reason_code || "n/a"}</span>
         <span>evaluated amount: ${formatAmount(meta.evaluated_amount)}</span>
         <span>second-approval threshold: ${formatAmount(meta.second_approval_threshold)}</span>
-        <span>tier ceiling: ${formatAmount(meta.tier_ceiling)}</span>
+        <span>second-stage timeout (hours): {meta.second_stage_timeout_hours}</span>
         <span>eligibility limit rule: {meta.limit_column || "n/a"}</span>
         <span>division: {division || "n/a"}</span>
         <span>kind: {kindLabel || "n/a"}</span>

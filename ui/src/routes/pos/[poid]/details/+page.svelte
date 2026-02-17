@@ -92,7 +92,7 @@
                 second-approval threshold:
                 ${formatAmount(secondApproverMeta.second_approval_threshold)}
               </div>
-              <div>tier ceiling: ${formatAmount(secondApproverMeta.tier_ceiling)}</div>
+              <div>second-stage timeout (hours): {secondApproverMeta.second_stage_timeout_hours}</div>
               <div>eligibility limit rule: {secondApproverMeta.limit_column || "n/a"}</div>
               <div>division: {data.po.division_code || data.po.division || "n/a"}</div>
               <div>kind: {data.po.kind || "n/a"}</div>

@@ -53,5 +53,24 @@ SELECT
   division_name,
   category_name
 FROM visibility_base
-WHERE is_unapproved_actionable_now = 1
-ORDER BY updated DESC
+WHERE
+  (
+    is_active_visible = 1
+    OR is_closed_cancelled_visible = 1
+    OR is_unapproved_direct_visible = 1
+    OR is_unapproved_second_stage_eligible = 1
+  )
+  AND (
+    {:scope} = 'all'
+    OR ({:scope} = 'mine' AND uid = {:userId})
+    OR ({:scope} = 'active' AND status = 'Active')
+    OR (
+      {:scope} = 'stale'
+      AND status = 'Active'
+      AND (
+        (second_approval != '' AND second_approval < {:staleBefore})
+        OR (approved < {:staleBefore})
+      )
+    )
+  )
+ORDER BY date DESC, updated DESC

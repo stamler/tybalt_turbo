@@ -3,10 +3,13 @@
  * app.
  */
 
-import type { UserPoPermissionDataResponse } from "$lib/pocketbase-types";
 import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { authStore } from "$lib/stores/auth";
+import type {
+  UserClaimsSummaryResponse,
+  UserPoApproverProfileResponse,
+} from "$lib/pocketbase-types";
 import { get } from "svelte/store";
 import type { ClientResponseError } from "pocketbase";
 import type { Readable, Subscriber } from "svelte/store";
@@ -20,11 +23,20 @@ interface StoreState {
   isLoading: boolean;
   claims: string[];
   showAllUi: boolean;
-  user_po_permission_data: {
+  user_claims_summary: {
+    id: string;
+    claims: string[];
+    maxAge: number;
+    lastRefresh: Date;
+  };
+  user_po_approver_profile: {
     id: string;
     max_amount: number;
-    lower_threshold: number;
-    upper_threshold: number;
+    project_max: number;
+    sponsorship_max: number;
+    staff_and_social_max: number;
+    media_and_event_max: number;
+    computer_max: number;
     divisions: string[];
     claims: string[];
     maxAge: number;
@@ -54,7 +66,8 @@ const createStore = () => {
     status?: number;
   };
 
-  let userPoPermissionDataPromise: Promise<void> | null = null;
+  let userClaimsSummaryPromise: Promise<void> | null = null;
+  let userPoApproverProfilePromise: Promise<void> | null = null;
   let userDefaultsPromise: Promise<void> | null = null;
 
   const isAutoCancelled = (error: unknown): boolean => {
@@ -77,11 +90,20 @@ const createStore = () => {
     isLoading: false,
     claims: [],
     showAllUi: initialShowAll,
-    user_po_permission_data: {
+    user_claims_summary: {
+      id: "",
+      claims: [],
+      maxAge: 3600 * 1000,
+      lastRefresh: new Date(0),
+    },
+    user_po_approver_profile: {
       id: "",
       max_amount: 0,
-      lower_threshold: 0,
-      upper_threshold: 0,
+      project_max: 0,
+      sponsorship_max: 0,
+      staff_and_social_max: 0,
+      media_and_event_max: 0,
+      computer_max: 0,
       divisions: [],
       claims: [],
       maxAge: 3600 * 1000,
@@ -98,45 +120,108 @@ const createStore = () => {
     errorMessages: [],
   });
 
-  const loadUserPoPermissionData = async () => {
-    if (userPoPermissionDataPromise) return userPoPermissionDataPromise;
-    userPoPermissionDataPromise = (async () => {
+  const loadUserClaimsSummary = async () => {
+    if (userClaimsSummaryPromise) return userClaimsSummaryPromise;
+    userClaimsSummaryPromise = (async () => {
       try {
         const userId = get(authStore)?.model?.id || "";
         if (!userId) return;
-        const userPoPermissionData = await pb
-          .collection("user_po_permission_data")
-          .getFullList<UserPoPermissionDataResponse>({
-            filter: pb.filter("id={:userId}", { userId }),
-            requestKey: null, // Avoid PocketBase auto-cancel across rapid refreshes.
-          });
+
+        const response = await pb
+          .collection("user_claims_summary")
+          .getOne<UserClaimsSummaryResponse>(userId, {
+          requestKey: null,
+        });
+
         update((state) => ({
           ...state,
-          user_po_permission_data: {
-            // If the user has no user_po_permission_data, set the default values
-            ...(userPoPermissionData.length > 0
-              ? userPoPermissionData[0]
-              : {
-                  id: "",
-                  max_amount: 0,
-                  lower_threshold: 0,
-                  upper_threshold: 0,
-                  divisions: [],
-                  claims: [],
-                }),
+          user_claims_summary: {
+            id: response.id ?? "",
+            claims: response.claims ?? [],
             lastRefresh: new Date(),
-            maxAge: state.user_po_permission_data.maxAge,
+            maxAge: state.user_claims_summary.maxAge,
           },
         }));
       } catch (error: unknown) {
         if (isAutoCancelled(error)) return;
         const typedErr = error as ClientResponseError;
-        console.error("Error loading user po permission data:", typedErr);
+        if (typedErr?.status === 404) {
+          update((state) => ({
+            ...state,
+            user_claims_summary: {
+              id: "",
+              claims: [],
+              lastRefresh: new Date(),
+              maxAge: state.user_claims_summary.maxAge,
+            },
+          }));
+          return;
+        }
+        console.error("Error loading user claims summary:", typedErr);
       }
     })().finally(() => {
-      userPoPermissionDataPromise = null;
+      userClaimsSummaryPromise = null;
     });
-    return userPoPermissionDataPromise;
+    return userClaimsSummaryPromise;
+  };
+
+  const loadUserPoApproverProfile = async () => {
+    if (userPoApproverProfilePromise) return userPoApproverProfilePromise;
+    userPoApproverProfilePromise = (async () => {
+      try {
+        const userId = get(authStore)?.model?.id || "";
+        if (!userId) return;
+
+        const response = await pb
+          .collection("user_po_approver_profile")
+          .getOne<UserPoApproverProfileResponse>(userId, {
+            requestKey: null,
+          });
+
+        update((state) => ({
+          ...state,
+          user_po_approver_profile: {
+            id: response.id ?? "",
+            max_amount: response.max_amount ?? 0,
+            project_max: response.project_max ?? 0,
+            sponsorship_max: response.sponsorship_max ?? 0,
+            staff_and_social_max: response.staff_and_social_max ?? 0,
+            media_and_event_max: response.media_and_event_max ?? 0,
+            computer_max: response.computer_max ?? 0,
+            divisions: response.divisions ?? [],
+            claims: response.claims ?? [],
+            lastRefresh: new Date(),
+            maxAge: state.user_po_approver_profile.maxAge,
+          },
+        }));
+      } catch (error: unknown) {
+        if (isAutoCancelled(error)) return;
+        const typedErr = error as ClientResponseError;
+        if (typedErr?.status === 404) {
+          update((state) => ({
+            ...state,
+            user_po_approver_profile: {
+              id: "",
+              max_amount: 0,
+              project_max: 0,
+              sponsorship_max: 0,
+              staff_and_social_max: 0,
+              media_and_event_max: 0,
+              computer_max: 0,
+              divisions: [],
+              claims: [],
+              lastRefresh: new Date(),
+              maxAge: state.user_po_approver_profile.maxAge,
+            },
+          }));
+          return;
+        }
+        console.error("Error loading user PO approver profile:", typedErr);
+      }
+    })().finally(() => {
+      userPoApproverProfilePromise = null;
+    });
+    return userPoApproverProfilePromise;
   };
 
   const loadUserDefaults = async () => {
@@ -145,7 +230,7 @@ const createStore = () => {
       try {
         const defaults = (await pb.send("/api/users/defaults", {
           method: "GET",
-          requestKey: null, // Avoid PocketBase auto-cancel across rapid refreshes.
+          requestKey: null,
         })) as UserDefaultsResponse;
 
         update((state) => {
@@ -172,9 +257,7 @@ const createStore = () => {
   };
 
   const refresh = async () => {
-    // refresh() should no-op if the user is not logged in
     if (!get(authStore)?.isValid) {
-      console.log("User is not logged in, skipping refresh");
       update((state) => {
         return {
           ...state,
@@ -195,10 +278,17 @@ const createStore = () => {
       const newState = { ...state };
 
       if (
-        now.getTime() - state.user_po_permission_data.lastRefresh.getTime() >=
-        state.user_po_permission_data.maxAge
+        now.getTime() - state.user_claims_summary.lastRefresh.getTime() >=
+        state.user_claims_summary.maxAge
       ) {
-        loadUserPoPermissionData();
+        loadUserClaimsSummary();
+      }
+
+      if (
+        now.getTime() - state.user_po_approver_profile.lastRefresh.getTime() >=
+        state.user_po_approver_profile.maxAge
+      ) {
+        loadUserPoApproverProfile();
       }
 
       if (now.getTime() - state.profile.lastRefresh.getTime() >= state.profile.maxAge) {
@@ -249,17 +339,15 @@ const createStore = () => {
 
 const _globalStore = createStore();
 
-// Proxy handler to allow access like $globalStore.claims
 const proxyHandler: ProxyHandler<StoreState> = {
   get(target, prop: string | symbol) {
     if (prop === "claims") {
-      return target.user_po_permission_data.claims;
+      return target.user_claims_summary.claims;
     }
     return target[prop as keyof StoreState];
   },
 };
 
-// Wrapped store that provides access to the collections directly
 const wrappedStore: Readable<StoreState> & {
   refresh: typeof _globalStore.refresh;
   addError: typeof _globalStore.addError;

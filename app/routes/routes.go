@@ -154,6 +154,9 @@ func AddRoutes(app core.App) {
 		poGroup := se.Router.Group("/api/purchase_orders")
 		poGroup.Bind(apis.RequireAuth("users"))
 		poGroup.GET("/pending", createGetPendingPurchaseOrdersHandler(app))
+		poGroup.GET("/pending/{id}", createGetPendingPurchaseOrderHandler(app))
+		poGroup.GET("/visible", createGetVisiblePurchaseOrdersHandler(app))
+		poGroup.GET("/visible/{id}", createGetVisiblePurchaseOrderHandler(app))
 		poGroup.GET("/approvers", createGetApproversHandler(app, false))
 		poGroup.GET("/second_approvers", createGetApproversHandler(app, true))
 

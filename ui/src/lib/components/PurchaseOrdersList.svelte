@@ -6,43 +6,85 @@
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
   import { type UnsubscribeFunc } from "pocketbase";
-  import { augmentedProxySubscription } from "$lib/utilities";
+  import { proxySubscriptionWithLoader } from "$lib/utilities";
   import DsList from "$lib/components/DSList.svelte";
-  import type { PageData } from "./$types";
   import type {
     PurchaseOrdersAugmentedResponse,
     PurchaseOrdersResponse,
   } from "$lib/pocketbase-types";
-  import { authStore } from "$lib/stores/auth";
   import { globalStore } from "$lib/stores/global";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
   import { onMount, onDestroy, untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
+  import { fetchPendingPO, fetchVisiblePO } from "$lib/poVisibility";
   // import { toastStore, type ToastSettings } from "@skeletonlabs/skeleton";
+
+  interface PurchaseOrdersListData {
+    items?: PurchaseOrdersAugmentedResponse[];
+    realtime_source?: "visible" | "pending";
+  }
 
   let rejectModal: RejectModal;
 
   // Load the initial data
-  let { inListHeader, data }: { inListHeader?: string; data: PageData } = $props();
+  let { inListHeader, data }: { inListHeader?: string; data: PurchaseOrdersListData } = $props();
   let items = $state(untrack(() => data.items));
+  let pendingApprovalIds = $state(new Set<string>());
 
   // Subscribe to the base collection but update the items from the augmented
   // view
   let unsubscribeFunc: UnsubscribeFunc;
+  async function refreshPendingApprovalIds(): Promise<void> {
+    try {
+      const pending = (await pb.send("/api/purchase_orders/pending", {
+        method: "GET",
+      })) as PurchaseOrdersAugmentedResponse[];
+      pendingApprovalIds = new Set((pending ?? []).map((po) => po.id));
+    } catch (error) {
+      // Fail closed for action buttons when pending-state sync fails.
+      pendingApprovalIds = new Set<string>();
+      console.error("Error loading pending purchase orders:", error);
+    }
+  }
+
   onMount(async () => {
+    await refreshPendingApprovalIds();
     if (items === undefined) {
       return;
     }
-    unsubscribeFunc = await augmentedProxySubscription<
-      PurchaseOrdersResponse,
-      PurchaseOrdersAugmentedResponse
-    >(items, "purchase_orders", "purchase_orders_augmented", (newItems) => {
-      items = newItems;
-    });
+    if (data.realtime_source === "pending") {
+      unsubscribeFunc = await proxySubscriptionWithLoader<
+        PurchaseOrdersResponse,
+        PurchaseOrdersAugmentedResponse
+      >(
+        items,
+        "purchase_orders",
+        (id: string) => fetchPendingPO(id),
+        (newItems) => {
+          items = newItems;
+          void refreshPendingApprovalIds();
+        },
+      );
+    } else {
+      unsubscribeFunc = await proxySubscriptionWithLoader<
+        PurchaseOrdersResponse,
+        PurchaseOrdersAugmentedResponse
+      >(
+        items,
+        "purchase_orders",
+        (id: string) => fetchVisiblePO(id),
+        (newItems) => {
+          items = newItems;
+          void refreshPendingApprovalIds();
+        },
+      );
+    }
   });
   onDestroy(async () => {
-    unsubscribeFunc();
+    if (unsubscribeFunc) {
+      unsubscribeFunc();
+    }
   });
 
   // Set to true to show all buttons regardless of user permissions or PO
@@ -51,45 +93,16 @@
 
   function poMayBeApprovedOrRejectedByUser(po: PurchaseOrdersAugmentedResponse): boolean {
     if (deactivateButtonHiding) return true;
-    if (po.status === "Unapproved") {
-      // po is unapproved
-      if (po.rejected === "") {
-        // po is not rejected
-        if ($globalStore.user_po_permission_data.claims.includes("po_approver")) {
-          // user has po_approver claim
-          if (
-            po.approval_total <= $globalStore.user_po_permission_data.max_amount ||
-            (po.approved === "" && po.approver === $authStore?.model?.id)
-          ) {
-            // po is below the user's max amount or the user is the specified
-            // approver and the PO has not yet been approved
-            if (
-              $globalStore.user_po_permission_data.divisions.includes(po.division) ||
-              $globalStore.user_po_permission_data.divisions.length === 0
-            ) {
-              // po is in the user's division or the user has no divisions
-              if (
-                po.approval_total >= $globalStore.user_po_permission_data.lower_threshold ||
-                po.uid === $authStore?.model?.id
-              ) {
-                // po is above the user's lower threshold (in the same tier as
-                // the user's max amount) or the user created the PO (it's
-                // annoying to have to go through the approval process if you
-                // created it and you're qualified to approve it)
-                return true;
-              }
-            }
-          }
-        }
-      }
+    if (po.status !== "Unapproved" || po.rejected !== "") {
+      return false;
     }
-    return false;
+    return pendingApprovalIds.has(po.id);
   }
 
   function poMayBeCancelledByUser(po: PurchaseOrdersAugmentedResponse): boolean {
     if (deactivateButtonHiding) return true;
     if (po.status === "Active") {
-      if ($globalStore.user_po_permission_data.claims.includes("payables_admin")) {
+      if ($globalStore.claims.includes("payables_admin")) {
         // user has payables_admin claim
         return po.committed_expenses_count === 0;
       }
@@ -102,7 +115,7 @@
     if (po.status === "Active") {
       if (po.type !== "One-Time") {
         // only non-One-Time POs can be closed manually
-        if ($globalStore.user_po_permission_data.claims.includes("payables_admin")) {
+        if ($globalStore.claims.includes("payables_admin")) {
           // user has payables_admin claim
           // return true if there is at least one committed expense associated with the PO
           return po.committed_expenses_count > 0;
@@ -129,6 +142,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+      await refreshPendingApprovalIds();
     } catch (error: any) {
       globalStore.addError(error?.response?.message);
     }
@@ -176,7 +190,13 @@
   }
 </script>
 
-<RejectModal collectionName="purchase_orders" bind:this={rejectModal} />
+<RejectModal
+  collectionName="purchase_orders"
+  bind:this={rejectModal}
+  on:refresh={() => {
+    refreshPendingApprovalIds();
+  }}
+/>
 <DsList items={items as PurchaseOrdersAugmentedResponse[]} search={true} {inListHeader}>
   {#snippet anchor(item: PurchaseOrdersAugmentedResponse)}
     <span class="flex flex-col items-center gap-2">

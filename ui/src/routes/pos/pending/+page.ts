@@ -8,6 +8,7 @@ export const load: PageLoad = async () => {
     })) as PurchaseOrdersAugmentedResponse[];
     return {
       items: result,
+      realtime_source: "pending" as const,
       // createdItemIsVisible: (record: PurchaseOrdersResponse) => {
       // only show items where the caller is the approver. It should be
       // unnecessary to check whether the record is submitted because listRule

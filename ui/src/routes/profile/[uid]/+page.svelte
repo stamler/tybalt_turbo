@@ -129,11 +129,11 @@
 
   <p>Claims:</p>
   <ul class="flex flex-row gap-2">
-    {#each $globalStore.user_po_permission_data.claims as claim}
+    {#each $globalStore.user_claims_summary.claims as claim}
       <DsLabel color="cyan">{claim}</DsLabel>
     {/each}
   </ul>
 
-  <p>User PO Permission Data:</p>
-  <p>{JSON.stringify($globalStore.user_po_permission_data)}</p>
+  <p>User PO Approver Profile:</p>
+  <p>{JSON.stringify($globalStore.user_po_approver_profile)}</p>
 </form>

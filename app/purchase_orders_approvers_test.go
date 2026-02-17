@@ -81,7 +81,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "po_approver receives empty list of approvers (will auto-set to self in UI) if they have no division restriction",
+			Name:   "po_approver receives first-stage pool (including self) when qualified for first approval",
 			Method: http.MethodGet,
 			URL:    makeApproversURL("/api/purchase_orders/approvers", drillingServicesDivision, "500"),
 			Headers: map[string]string{
@@ -89,7 +89,26 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`[]`, // Empty array
+				`"id":"etysnrlup2f6bak"`, // Fatty Maclean
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "first approvers returns empty list when no first-stage approver can approve the amount",
+			Method: http.MethodGet,
+			URL: makeApproversURLWithKindAndJob(
+				"/api/purchase_orders/approvers",
+				municipalDivision,
+				"100",
+				computerKindID,
+				false,
+			),
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`[]`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -214,21 +233,16 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "super high amount returns empty list for second approvers call",
+			Name:   "super high amount returns second_pool_empty when no second approver can final-approve",
 			Method: http.MethodGet,
 			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier2)+1000000)),
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},
-			ExpectedStatus: http.StatusOK,
+			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
-				`"approvers":[]`,
-				`"second_approval_required":true`,
-				`"requester_qualifies":false`,
-				`"status":"required_no_candidates"`,
-				`"reason_code":"no_eligible_second_approvers"`,
-				`"limit_column":"max_amount"`,
-				`"reason_message":"Second approval is required, but no eligible second approver is currently available. Assign a priority second approver."`,
+				`"code":"second_pool_empty"`,
+				`"message":"no second-stage approvers can final-approve this amount; contact an administrator"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -238,7 +252,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			URL: makeApproversURLWithKindAndJob(
 				"/api/purchase_orders/second_approvers",
 				municipalDivision,
-				fmt.Sprintf("%d", int(tier2)+1000000),
+				fmt.Sprintf("%d", int(tier2)+1),
 				utilities.DefaultExpenditureKindID(),
 				true,
 			),
@@ -257,7 +271,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			URL: makeApproversURLWithKindAndJob(
 				"/api/purchase_orders/second_approvers",
 				municipalDivision,
-				fmt.Sprintf("%d", int(tier2)+1000000),
+				"100",
 				computerKindID,
 				true,
 			),

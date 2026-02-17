@@ -505,51 +505,7 @@ export function applyDefaultRoleOnce(item: { role?: string } | null | undefined,
   }
 }
 
-// This function subscribes to collectionName and updates the items in its
-// first argument using the record with the corresponding id from the view
-export function augmentedProxySubscription<
-  CollectionResponse extends BaseSystemFields,
-  ViewResponse extends { id: string },
->(
-  localArray: ViewResponse[],
-  collectionName: string,
-  viewName: string,
-  updateCallback: (newArray: ViewResponse[]) => void,
-  createdItemIsVisible: undefined | ((record: CollectionResponse) => boolean) = undefined,
-): Promise<UnsubscribeFunc> {
-  // Subscribe to collectionName and act on the changes
-  return pb.collection(collectionName).subscribe<CollectionResponse>("*", async (e) => {
-    // return immediately if items is not an array
-    if (!Array.isArray(localArray)) return;
-    const id = e.record.id;
-    let augmentedRecord: ViewResponse;
-    console.log(`Update with action ${e.action} for record ${id}`);
-    switch (e.action) {
-      case "create":
-        // if the record should be ignored, return immediately
-        if (createdItemIsVisible !== undefined && !createdItemIsVisible(e.record)) {
-          console.log(`Ignoring ${id} due to createdItemIsVisible returning false`);
-          return;
-        }
-        // load the augmented record and insert it at the top of the list
-        augmentedRecord = await pb.collection(viewName).getOne(id);
-        localArray = [augmentedRecord, ...localArray];
-        break;
-      case "update":
-        // reload the corresponding augmented record and replace the old
-        // item in the list with the new one
-        augmentedRecord = await pb.collection(viewName).getOne(id);
-        localArray = localArray.map((item) => (item.id === e.record.id ? augmentedRecord : item));
-        break;
-      case "delete":
-        localArray = localArray.filter((item) => item.id !== e.record.id);
-        break;
-    }
-    updateCallback(localArray);
-  });
-}
-
-// Like augmentedProxySubscription but uses a loader callback instead of a view name,
+// Like previously existing augmentedProxySubscription but uses a loader callback instead of a view name,
 // so callers can source augmented rows from a custom API endpoint.
 export function proxySubscriptionWithLoader<
   CollectionResponse extends BaseSystemFields,
@@ -561,6 +517,9 @@ export function proxySubscriptionWithLoader<
   updateCallback: (newArray: ViewResponse[]) => void,
   createdItemIsVisible: undefined | ((record: CollectionResponse) => boolean) = undefined,
 ): Promise<UnsubscribeFunc> {
+  const isNotFoundError = (error: any): boolean =>
+    Boolean(error?.status === 404 || error?.response?.status === 404);
+
   return pb.collection(collectionName).subscribe<CollectionResponse>("*", async (e) => {
     if (!Array.isArray(localArray)) return;
     const id = e.record.id;
@@ -570,7 +529,15 @@ export function proxySubscriptionWithLoader<
         if (createdItemIsVisible !== undefined && !createdItemIsVisible(e.record)) {
           return;
         }
-        augmentedRecord = await loadAugmented(id);
+        try {
+          augmentedRecord = await loadAugmented(id);
+        } catch (error) {
+          if (isNotFoundError(error)) {
+            return;
+          }
+          console.error("Error loading augmented record on create:", error);
+          return;
+        }
         localArray = [augmentedRecord, ...localArray];
         break;
       case "update":
@@ -580,7 +547,16 @@ export function proxySubscriptionWithLoader<
           localArray = localArray.filter((item) => item.id !== e.record.id);
           break;
         }
-        augmentedRecord = await loadAugmented(id);
+        try {
+          augmentedRecord = await loadAugmented(id);
+        } catch (error) {
+          if (isNotFoundError(error)) {
+            localArray = localArray.filter((item) => item.id !== e.record.id);
+            break;
+          }
+          console.error("Error loading augmented record on update:", error);
+          break;
+        }
         localArray = localArray.map((item) => (item.id === e.record.id ? augmentedRecord : item));
         break;
       case "delete":

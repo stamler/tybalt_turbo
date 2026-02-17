@@ -12,7 +12,7 @@ Links: [UI should reflect user permissions #58](https://github.com/stamler/tybal
 
 - Claims are stored in `claims` and linked via `user_claims`.
 - Backend checks claims in hooks/utilities (e.g., `HasClaimByUserID`), and PocketBase rules guard collections (e.g., admin-only create/update on several collections).
-- UI already loads `user_po_permission_data` into `globalStore` (claims, approval thresholds/divisions) and displays claims in `profile/[uid]`.
+- UI now loads `user_claims_summary` (global claims) and `user_po_approver_profile` (PO limits/divisions/claims) into `globalStore`, and displays claims in `profile/[uid]`.
 
 #### Proposed model: user capabilities
 
@@ -74,7 +74,7 @@ Notes:
 1. Store and types
 
    - Add TypeScript types for `user_capabilities` in `ui/src/lib/pocketbase-types.ts`.
-   - Create `capabilitiesStore` (or extend `globalStore`) to load `user_capabilities` by `id={:userId}` on navigation refresh (mirroring `user_po_permission_data`).
+   - Create `capabilitiesStore` (or extend `globalStore`) to load `user_capabilities` by `id={:userId}` on navigation refresh (mirroring `user_claims_summary` + `user_po_approver_profile` patterns).
    - Expose helpers:
      - `can(flag: string): boolean` (reads `booleans[flag] === true`).
      - `limit(key: string): number | undefined`.

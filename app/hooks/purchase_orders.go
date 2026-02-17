@@ -61,18 +61,6 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 		purchaseOrderRecord.Set("approval_total", calculatedTotal)
 	}
 
-	// Clear priority_second_approver if approval_total <= the lowest threshold
-	thresholds, err := utilities.GetPOApprovalThresholds(app)
-	if err != nil {
-		return &errs.HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when fetching po approval thresholds",
-		}
-	}
-	if purchaseOrderRecord.GetFloat("approval_total") <= thresholds[0] {
-		purchaseOrderRecord.Set("priority_second_approver", "")
-	}
-
 	// Clear all rejection fields here. ProcessPurchaseOrder, which calls
 	// cleanPurchaseOrder, is only ever called when a user is creating or
 	// updating a PO. POs cannot be rejected upon creation, so clearing rejection
@@ -175,17 +163,6 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 	}
 
 	kindID := strings.TrimSpace(purchaseOrderRecord.GetString("kind"))
-	if kindID == "" {
-		// Backward compatibility for legacy records created before kind existed.
-		// Keep create-time enforcement strict while allowing updates to old rows.
-		if !purchaseOrderRecord.IsNew() {
-			original := purchaseOrderRecord.Original()
-			if original != nil && strings.TrimSpace(original.GetString("kind")) == "" {
-				kindID = utilities.DefaultExpenditureKindID()
-				purchaseOrderRecord.Set("kind", kindID)
-			}
-		}
-	}
 	if kindID == "" {
 		return &errs.HookError{
 			Status:  http.StatusBadRequest,
@@ -360,11 +337,6 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		for _, field := range fieldsToMatch {
 			childValue := purchaseOrderRecord.GetString(field)
 			parentValue := parentPO.GetString(field)
-			if field == "kind" {
-				// Legacy parent records may have empty kind; treat as standard.
-				childValue = utilities.NormalizeExpenditureKindID(childValue)
-				parentValue = utilities.NormalizeExpenditureKindID(parentValue)
-			}
 			if childValue != parentValue {
 				return &errs.HookError{
 					Status:  http.StatusBadRequest,
@@ -415,12 +387,11 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		}
 	}
 
-	// Validate priority_second_approver if set
-	prioritySecondApproverIsAuthorized := func(app core.App, purchaseOrderRecord *core.Record) validation.RuleFunc {
+	// Validate that priority_second_approver is an active user if set.
+	prioritySecondApproverIsActive := func(app core.App, purchaseOrderRecord *core.Record) validation.RuleFunc {
 		return func(value any) error {
 			prioritySecondApproverId := purchaseOrderRecord.GetString("priority_second_approver")
 			if prioritySecondApproverId != "" {
-				// Check that priority_second_approver is an active user
 				active, err := utilities.IsUserActive(app, prioritySecondApproverId)
 				if err != nil {
 					return &errs.HookError{
@@ -430,44 +401,6 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				}
 				if !active {
 					return validation.NewError("priority_second_approver_not_active", "The selected priority second approver is not an active user")
-				}
-
-				division := purchaseOrderRecord.GetString("division")
-
-				// Get list of eligible second approvers
-				approvers, _, err := utilities.GetPOApprovers(
-					app,
-					nil,
-					division,
-					purchaseOrderRecord.GetFloat("approval_total"),
-					purchaseOrderRecord.GetString("kind"),
-					purchaseOrderRecord.GetString("job") != "",
-					true,
-				)
-				if err != nil {
-					return &errs.HookError{
-						Status:  http.StatusInternalServerError,
-						Message: "hook error when checking eligible second approvers",
-						Data: map[string]errs.CodeError{
-							"global": {
-								Code:    "error_checking_approvers",
-								Message: fmt.Sprintf("error checking eligible second approvers: %v", err),
-							},
-						},
-					}
-				}
-
-				// Check if prioritySecondApprover is in the list of eligible approvers
-				valid := false
-				for _, approver := range approvers {
-					if approver.ID == prioritySecondApproverId {
-						valid = true
-						break
-					}
-				}
-
-				if !valid {
-					return validation.NewError("invalid_priority_second_approver", "The selected priority second approver is not authorized to approve this purchase order")
 				}
 			}
 			return nil
@@ -489,7 +422,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				validation.In("").Error("end_date is not permitted for non-recurring purchase orders"),
 			),
 		),
-		"priority_second_approver": validation.Validate(purchaseOrderRecord.Get("priority_second_approver"), validation.By(prioritySecondApproverIsAuthorized(app, purchaseOrderRecord))),
+		"priority_second_approver": validation.Validate(purchaseOrderRecord.Get("priority_second_approver"), validation.By(prioritySecondApproverIsActive(app, purchaseOrderRecord))),
 		"frequency": validation.Validate(
 			purchaseOrderRecord.Get("frequency"),
 			validation.When(isRecurring,
@@ -498,8 +431,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				validation.In("").Error("frequency is not permitted for non-recurring purchase orders"))),
 		"description": validation.Validate(purchaseOrderRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
 		"approver": validation.Validate(purchaseOrderRecord.GetString("approver"),
-			validation.By(approverIsActive(app)),
-			validation.By(utilities.PoApproverPropsHasDivisionPermission(app, constants.PO_APPROVER_CLAIM_ID, purchaseOrderRecord.GetString("division")))),
+			validation.By(approverIsActive(app))),
 		"total": validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.Max(constants.MAX_APPROVAL_TOTAL)),
 		"type":  validation.Validate(purchaseOrderRecord.GetString("type"), validation.When(isChild, validation.In("One-Time").Error("child POs must be of type One-Time"))),
 	}
@@ -514,6 +446,78 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		} else if purchaseOrderRecord.GetString("branch") != jobRecord.GetString("branch") {
 			validationsErrors["branch"] = validation.NewError("value_mismatch", "branch must match the selected job")
 		}
+	}
+
+	// Policy computation depends on division and kind being valid. If either
+	// already failed field-level validation, return those errors directly.
+	if validationsErrors["division"] != nil || validationsErrors["kind"] != nil {
+		return validationsErrors.Filter()
+	}
+
+	policy, err := utilities.GetPOApproverPolicy(
+		app,
+		purchaseOrderRecord.GetString("division"),
+		purchaseOrderRecord.GetFloat("approval_total"),
+		purchaseOrderRecord.GetString("kind"),
+		purchaseOrderRecord.GetString("job") != "",
+	)
+	if err != nil {
+		if filteredErr := validationsErrors.Filter(); filteredErr != nil {
+			return filteredErr
+		}
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "hook error when computing purchase order approval policy",
+			Data: map[string]errs.CodeError{
+				"global": {
+					Code:    "error_computing_approval_policy",
+					Message: fmt.Sprintf("error computing purchase order approval policy: %v", err),
+				},
+			},
+		}
+	}
+
+	setValidationError := func(field string, code string, message string) {
+		if validationsErrors[field] == nil {
+			validationsErrors[field] = validation.NewError(code, message)
+		}
+	}
+
+	approverID := strings.TrimSpace(purchaseOrderRecord.GetString("approver"))
+	prioritySecondApproverID := strings.TrimSpace(purchaseOrderRecord.GetString("priority_second_approver"))
+	ownerID := strings.TrimSpace(purchaseOrderRecord.GetString("uid"))
+
+	approverValidForStage := policy.IsFirstStageApprover(approverID)
+	// Narrow self-bypass setup exception for dual-required records:
+	// allow owner to set approver=self only when owner is second-stage qualified
+	// and also assigned as priority second approver.
+	if !approverValidForStage &&
+		policy.SecondApprovalRequired &&
+		approverID != "" &&
+		approverID == ownerID &&
+		prioritySecondApproverID == ownerID &&
+		policy.IsSecondStageApprover(ownerID) {
+		approverValidForStage = true
+	}
+
+	if !approverValidForStage {
+		setValidationError("approver", "invalid_approver_for_stage", "selected approver is not valid for first-stage approval")
+	}
+
+	if policy.SecondApprovalRequired {
+		if len(policy.FirstStageApprovers) == 0 {
+			setValidationError("approver", "first_pool_empty", "no configured first-stage approvers are available for this purchase order")
+		}
+		if len(policy.SecondStageApprovers) == 0 {
+			setValidationError("priority_second_approver", "second_pool_empty", "no configured second-stage approvers are available for this purchase order")
+		}
+		if prioritySecondApproverID == "" {
+			setValidationError("priority_second_approver", "priority_second_approver_required", "priority second approver is required when second approval is required")
+		} else if !policy.IsSecondStageApprover(prioritySecondApproverID) {
+			setValidationError("priority_second_approver", "invalid_priority_second_approver_for_stage", "selected priority second approver is not valid for second-stage approval")
+		}
+	} else if prioritySecondApproverID != "" {
+		purchaseOrderRecord.Set("priority_second_approver", "")
 	}
 
 	return validationsErrors.Filter()

@@ -49,6 +49,18 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Generate token for Hal (project_max and max_amount both 1000000)
+	halToken, err := testutils.GenerateRecordToken("users", "hal@2005.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// Generate token for Fatt (max_amount=500 but computer_max=2500)
+	fattToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Generate token for a user with no claims (creator of cancelled PO 1cqrvp4mna33k2b)
 	noclaimsToken, err := testutils.GenerateRecordToken("users", "noclaims@example.com")
 	if err != nil {
@@ -135,48 +147,60 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 
-		// Priority second approver can see an Unapproved PO they're assigned to
+		// Priority second approver cannot see an Unapproved PO before first approval occurs
 		{
-			Name:   "priority second approver can see an Unapproved PO they're assigned to",
+			Name:   "priority second approver cannot see an Unapproved PO before first approval",
 			Method: http.MethodGet,
 			URL:    "/api/collections/purchase_orders/records/n9ev1x7a00c1iy6", // Unapproved PO with Tier Two as priority_second_approver
 			Headers: map[string]string{
 				"Authorization": prioritySecondApproverToken,
 			},
-			ExpectedStatus: http.StatusOK,
+			ExpectedStatus: http.StatusNotFound,
 			ExpectedContent: []string{
-				`"id":"n9ev1x7a00c1iy6"`,
-				`"status":"Unapproved"`,
-				`"priority_second_approver":"6bq4j0eb26631dy"`, // Tier Two's ID
+				`"message":"The requested resource wasn't found."`,
+				`"status":404`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 
-		// User with second_approver_claim CAN see an Unapproved PO with a different priority_second_approver after 24h
+		// Non-direct second-stage approver is no longer visible via collection API
 		{
-			Name:   "user with second_approver_claim CAN see an Unapproved PO with different priority_second_approver AFTER 24 hours if the PO is in the same tier as the user",
+			Name:   "non-direct second-stage approver cannot see first-approved PO via collection API",
 			Method: http.MethodGet,
-			URL:    "/api/collections/purchase_orders/records/n9ev1x7a00c1iy6", // Unapproved PO with Tier Two as priority_second_approver
+			URL:    "/api/collections/purchase_orders/records/2blv18f40i2q373",
 			Headers: map[string]string{
-				"Authorization": tier2bToken, // Tier TwoB has is not the priority_second_approver
+				"Authorization": tier2bToken, // Not the priority second approver
 			},
-			ExpectedStatus: http.StatusOK, // Should be able to see it after 24 hours
+			ExpectedStatus: http.StatusNotFound,
 			ExpectedContent: []string{
-				`"id":"n9ev1x7a00c1iy6"`,
-				`"status":"Unapproved"`,
-				`"priority_second_approver":"6bq4j0eb26631dy"`, // Tier Two's ID
+				`"message":"The requested resource wasn't found."`,
+				`"status":404`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-		// User with second_approver_claim CANNOT see an Unapproved PO with a different priority_second_approver after 24h if the PO is in a lower tier
 		{
-			Name:   "user with second_approver_claim CANNOT see an Unapproved PO with different priority_second_approver AFTER 24 hours if the PO is in a lower tier than the user",
+			Name:   "eligible second-stage approver with project limit can see first-approved PO via visible API",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/2blv18f40i2q373",
+			Headers: map[string]string{
+				"Authorization": halToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2blv18f40i2q373"`,
+				`"status":"Unapproved"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		// Holder of po_approver claim cannot see unapproved PO they are not assigned to in stage 1
+		{
+			Name:   "holder of po_approver claim cannot see unrelated unapproved PO before first approval",
 			Method: http.MethodGet,
 			URL:    "/api/collections/purchase_orders/records/l9w1z13mm3srtoo", // Unapproved PO with approval_total less than 500
 			Headers: map[string]string{
 				"Authorization": tier2bToken, // Tier TwoB has is not the priority_second_approver
 			},
-			ExpectedStatus: http.StatusNotFound, // Should NOT be able to see it even after 24 hours because it's in a lower tier
+			ExpectedStatus: http.StatusNotFound,
 			ExpectedContent: []string{
 				`"message":"The requested resource wasn't found."`,
 				`"status":404`,
@@ -184,30 +208,34 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 
-		// User with second_approver_claim CANNOT see an Unapproved PO with a different priority_second_approver within 24h
+		// Non-direct second-stage approver is no longer visible via collection API
 		{
-			Name:   "user with second_approver_claim CANNOT see an Unapproved PO with different priority_second_approver WITHIN 24 hours",
+			Name:   "non-priority second-stage approver cannot see first-approved PO via collection API",
 			Method: http.MethodGet,
-			URL:    "/api/collections/purchase_orders/records/n9ev1x7a00c1iy6", // Unapproved PO with Tier Two as priority_second_approver
+			URL:    "/api/collections/purchase_orders/records/stg2within24h01",
 			Headers: map[string]string{
-				"Authorization": tier2bToken, // Tier TwoB  is not the priority_second_approver
+				"Authorization": tier2bToken,
 			},
-			ExpectedStatus: http.StatusNotFound, // Should NOT be able to see it within 24 hours
+			ExpectedStatus: http.StatusNotFound,
 			ExpectedContent: []string{
 				`"message":"The requested resource wasn't found."`,
 				`"status":404`,
 			},
-			TestAppFactory: func(t testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(t)
-
-				// Update the PO's timestamp to be within the past 24 hours (2 hours ago)
-				_, err := app.NonconcurrentDB().NewQuery("UPDATE purchase_orders SET updated = datetime('now', '-2 hours') WHERE id = 'n9ev1x7a00c1iy6'").Execute()
-				if err != nil {
-					t.Fatalf("Failed to update timestamp: %v", err)
-				}
-
-				return app
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "non-priority second-stage approver can see first-approved PO via visible API",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/stg2within24h01",
+			Headers: map[string]string{
+				"Authorization": tier2bToken,
 			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"stg2within24h01"`,
+				`"status":"Unapproved"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 
 		// Creator can see their own Cancelled PO
@@ -341,6 +369,100 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 				`"status":404`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible endpoint requires stale_before when scope is stale",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible?scope=stale",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"missing_stale_before"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible stale scope returns stale active purchase orders",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible?scope=stale&stale_before=2025-01-01%2000:00:00.000Z",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2plsetqdxht7esg"`,
+				`"status":"Active"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "pending endpoint behavior remains unchanged for priority second approver",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/pending",
+			Headers: map[string]string{
+				"Authorization": prioritySecondApproverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"stg2within24h01"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible endpoint uses kind-specific approval limit columns",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/2blv18f40i2q373",
+			Headers: map[string]string{
+				"Authorization": fattToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2blv18f40i2q373"`,
+				`"status":"Unapproved"`,
+			},
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(t)
+				if _, err := app.DB().NewQuery(`
+					UPDATE expenditure_kinds
+					SET second_approval_threshold = 500
+					WHERE id = '7jgifny7fljd9hi'
+				`).Execute(); err != nil {
+					t.Fatal(err)
+				}
+				if _, err := app.DB().NewQuery(`
+					UPDATE purchase_orders
+					SET kind = '7jgifny7fljd9hi'
+					WHERE id = '2blv18f40i2q373'
+				`).Execute(); err != nil {
+					t.Fatal(err)
+				}
+				return app
+			},
+		},
+		{
+			Name:   "inactive admin profile cannot qualify second-stage visibility",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/stg2within24h01",
+			Headers: map[string]string{
+				"Authorization": tier2bToken,
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"code":"po_not_found_or_not_visible"`,
+			},
+			TestAppFactory: func(t testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(t)
+				if _, err := app.DB().NewQuery(`
+					UPDATE admin_profiles
+					SET active = 0
+					WHERE uid = 't4g84hfvkt1v9j3'
+				`).Execute(); err != nil {
+					t.Fatal(err)
+				}
+				return app
+			},
 		},
 	}
 

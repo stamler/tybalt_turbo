@@ -3,6 +3,7 @@ package routes
 import (
 	"database/sql"
 	_ "embed" // Needed for //go:embed
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -15,8 +16,36 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+const poVisibilityBaseToken = "__PO_VISIBILITY_BASE__"
+
+//go:embed po_visibility_base.sql
+var poVisibilityBaseQuery string
+
 //go:embed pending_pos.sql
-var pendingPOsQuery string
+var pendingPOsQueryTemplate string
+
+//go:embed pending_po_by_id.sql
+var pendingPOByIDQueryTemplate string
+
+//go:embed visible_pos.sql
+var visiblePOsQueryTemplate string
+
+//go:embed visible_po_by_id.sql
+var visiblePOByIDQueryTemplate string
+
+var (
+	pendingPOsQuery    string
+	pendingPOByIDQuery string
+	visiblePOsQuery    string
+	visiblePOByIDQuery string
+)
+
+func init() {
+	pendingPOsQuery = strings.ReplaceAll(pendingPOsQueryTemplate, poVisibilityBaseToken, poVisibilityBaseQuery)
+	pendingPOByIDQuery = strings.ReplaceAll(pendingPOByIDQueryTemplate, poVisibilityBaseToken, poVisibilityBaseQuery)
+	visiblePOsQuery = strings.ReplaceAll(visiblePOsQueryTemplate, poVisibilityBaseToken, poVisibilityBaseQuery)
+	visiblePOByIDQuery = strings.ReplaceAll(visiblePOByIDQueryTemplate, poVisibilityBaseToken, poVisibilityBaseQuery)
+}
 
 type poApproversRequest struct {
 	Division  string  `json:"division"`
@@ -37,8 +66,8 @@ type secondApproversMeta struct {
 	ReasonMessage           string  `json:"reason_message"`
 	EvaluatedAmount         float64 `json:"evaluated_amount"`
 	SecondApprovalThreshold float64 `json:"second_approval_threshold"`
-	TierCeiling             float64 `json:"tier_ceiling"`
 	LimitColumn             string  `json:"limit_column"`
+	SecondStageTimeoutHours float64 `json:"second_stage_timeout_hours"`
 }
 
 type secondApproversResponse struct {
@@ -46,53 +75,80 @@ type secondApproversResponse struct {
 	Meta      secondApproversMeta  `json:"meta"`
 }
 
+type purchaseOrderVisibilityRow struct {
+	ID                         string  `db:"id" json:"id"`
+	PONumber                   string  `db:"po_number" json:"po_number"`
+	Status                     string  `db:"status" json:"status"`
+	UID                        string  `db:"uid" json:"uid"`
+	Type                       string  `db:"type" json:"type"`
+	Date                       string  `db:"date" json:"date"`
+	EndDate                    string  `db:"end_date" json:"end_date"`
+	Frequency                  string  `db:"frequency" json:"frequency"`
+	Division                   string  `db:"division" json:"division"`
+	Description                string  `db:"description" json:"description"`
+	Total                      float64 `db:"total" json:"total"`
+	PaymentType                string  `db:"payment_type" json:"payment_type"`
+	Attachment                 string  `db:"attachment" json:"attachment"`
+	Rejector                   string  `db:"rejector" json:"rejector"`
+	Rejected                   string  `db:"rejected" json:"rejected"`
+	RejectionReason            string  `db:"rejection_reason" json:"rejection_reason"`
+	Approver                   string  `db:"approver" json:"approver"`
+	Approved                   string  `db:"approved" json:"approved"`
+	SecondApprover             string  `db:"second_approver" json:"second_approver"`
+	SecondApproval             string  `db:"second_approval" json:"second_approval"`
+	Canceller                  string  `db:"canceller" json:"canceller"`
+	Cancelled                  string  `db:"cancelled" json:"cancelled"`
+	Job                        string  `db:"job" json:"job"`
+	Category                   string  `db:"category" json:"category"`
+	Kind                       string  `db:"kind" json:"kind"`
+	Vendor                     string  `db:"vendor" json:"vendor"`
+	ParentPO                   string  `db:"parent_po" json:"parent_po"`
+	Created                    string  `db:"created" json:"created"`
+	Updated                    string  `db:"updated" json:"updated"`
+	Closer                     string  `db:"closer" json:"closer"`
+	Closed                     string  `db:"closed" json:"closed"`
+	ClosedBySystem             bool    `db:"closed_by_system" json:"closed_by_system"`
+	PrioritySecondApprover     string  `db:"priority_second_approver" json:"priority_second_approver"`
+	ApprovalTotal              float64 `db:"approval_total" json:"approval_total"`
+	CommittedExpensesCount     int     `db:"committed_expenses_count" json:"committed_expenses_count"`
+	UIDName                    string  `db:"uid_name" json:"uid_name"`
+	ApproverName               string  `db:"approver_name" json:"approver_name"`
+	SecondApproverName         string  `db:"second_approver_name" json:"second_approver_name"`
+	PrioritySecondApproverName string  `db:"priority_second_approver_name" json:"priority_second_approver_name"`
+	RejectorName               string  `db:"rejector_name" json:"rejector_name"`
+	ParentPONumber             string  `db:"parent_po_number" json:"parent_po_number"`
+	VendorName                 string  `db:"vendor_name" json:"vendor_name"`
+	VendorAlias                string  `db:"vendor_alias" json:"vendor_alias"`
+	JobNumber                  string  `db:"job_number" json:"job_number"`
+	ClientName                 string  `db:"client_name" json:"client_name"`
+	ClientID                   string  `db:"client_id" json:"client_id"`
+	JobDescription             string  `db:"job_description" json:"job_description"`
+	DivisionCode               string  `db:"division_code" json:"division_code"`
+	DivisionName               string  `db:"division_name" json:"division_name"`
+	CategoryName               string  `db:"category_name" json:"category_name"`
+}
+
 func buildSecondApproversMeta(
 	app core.App,
-	req poApproversRequest,
 	requesterQualifies bool,
 	approvers []utilities.Approver,
-) (secondApproversMeta, error) {
-	thresholds, err := utilities.GetPOApprovalThresholds(app)
-	if err != nil {
-		return secondApproversMeta{}, fmt.Errorf("error fetching approval thresholds: %w", err)
-	}
-	if len(thresholds) == 0 {
-		return secondApproversMeta{}, fmt.Errorf("approval thresholds are not configured")
-	}
-
-	secondApprovalThreshold := thresholds[0]
-	secondApprovalRequired := req.Amount > secondApprovalThreshold
-	tierCeiling := constants.MAX_APPROVAL_TOTAL
-	for _, threshold := range thresholds {
-		if threshold >= req.Amount {
-			tierCeiling = threshold
-			break
-		}
-	}
-
-	limitColumn := ""
-	if secondApprovalRequired {
-		resolvedLimitColumn, resolveErr := utilities.ResolvePOApproverLimitColumn(req.Kind, req.HasJob)
-		if resolveErr != nil {
-			return secondApproversMeta{}, fmt.Errorf("error resolving approver limit column: %w", resolveErr)
-		}
-		limitColumn = resolvedLimitColumn
-	}
-
+	policy utilities.POApproverPolicy,
+	amount float64,
+) secondApproversMeta {
 	meta := secondApproversMeta{
-		SecondApprovalRequired:  secondApprovalRequired,
+		SecondApprovalRequired:  policy.SecondApprovalRequired,
 		RequesterQualifies:      requesterQualifies,
 		Status:                  "required_no_candidates",
 		ReasonCode:              "no_eligible_second_approvers",
-		ReasonMessage:           "Second approval is required, but no eligible second approver is currently available. Assign a priority second approver.",
-		EvaluatedAmount:         req.Amount,
-		SecondApprovalThreshold: secondApprovalThreshold,
-		TierCeiling:             tierCeiling,
-		LimitColumn:             limitColumn,
+		ReasonMessage:           "Second approval is required, but no second-stage approver can final-approve this amount.",
+		EvaluatedAmount:         amount,
+		SecondApprovalThreshold: policy.SecondApprovalThreshold,
+		LimitColumn:             policy.LimitColumn,
+		SecondStageTimeoutHours: utilities.GetPurchaseOrderSecondStageTimeoutHours(app),
 	}
 
 	switch {
-	case !secondApprovalRequired:
+	case !policy.SecondApprovalRequired:
 		meta.Status = "not_required"
 		meta.ReasonCode = "second_approval_not_required"
 		meta.ReasonMessage = "Second approval is not required for this purchase order."
@@ -103,10 +159,20 @@ func buildSecondApproversMeta(
 	case len(approvers) > 0:
 		meta.Status = "candidates_available"
 		meta.ReasonCode = "eligible_second_approvers_available"
-		meta.ReasonMessage = "Eligible second approvers are available for this purchase order."
+		meta.ReasonMessage = "Eligible second approvers who can final-approve this amount are available for this purchase order."
 	}
 
-	return meta, nil
+	return meta
+}
+
+func purchaseOrderVisibilityParams(app core.App, userID string, scope string, staleBefore string) dbx.Params {
+	return dbx.Params{
+		"userId":          userID,
+		"poApproverClaim": constants.PO_APPROVER_CLAIM_ID,
+		"timeoutHours":    utilities.GetPurchaseOrderSecondStageTimeoutHours(app),
+		"scope":           scope,
+		"staleBefore":     staleBefore,
+	}
 }
 
 func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
@@ -117,16 +183,10 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 		userId := authRecord.Id
 
 		var httpResponseStatusCode int
-
-		// This variable is used to track whether the original unmodified purchase
-		// order has been approved. It is initialized to false and set to true if
-		// the purchase order has a non-zero approved date during the transaction
-		// prior to any updates. We declare the variable here so that it can be
-		// used after the transaction has completed outside of the transaction
-		// function.
-		recordIsApproved := false
-		updatedRecordIsApproved := false
+		recordWasFirstApproved := false
+		recordNowFirstApproved := false
 		recordRequiresSecondApproval := false
+		recordActivated := false
 
 		err := app.RunInTransaction(func(txApp core.App) error {
 			// Fetch existing purchase order
@@ -157,124 +217,191 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				}
 			}
 
-			/*
-				The caller may not be the approver but still be qualified to approve the
-				purchase order if they have a po_approver claim and the
-				po_approver_props record's divisions property specifies a division that
-				matches the record's division or is missing, and the amount is within
-				the caller's max_amount as specified in their max_amount property on the
-				po_approver_props record. In both cases, callerIsApprover is set to true
-				as during the update we will set approver to the caller's uid.
-			*/
+			kindID := utilities.NormalizeExpenditureKindID(po.GetString("kind"))
+			hasJob := strings.TrimSpace(po.GetString("job")) != ""
+			approvalTotal := po.GetFloat("approval_total")
 
-			// Check if the user is an approver and/or a qualified second approver.
-			// Because a caller may be a second approver without being an approver on
-			// the record, we check for both.
-			callerIsApprover, callerIsQualifiedSecondApprover, err := isApprover(txApp, authRecord, po)
+			policy, err := utilities.GetPOApproverPolicy(
+				txApp,
+				po.GetString("division"),
+				approvalTotal,
+				kindID,
+				hasJob,
+			)
 			if err != nil {
-				httpResponseStatusCode = http.StatusForbidden
-				return err
-			}
-
-			thresholds, err := utilities.GetPOApprovalThresholds(txApp)
-			if err != nil {
+				if errors.Is(err, utilities.ErrUnknownExpenditureKind) {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "invalid_expenditure_kind",
+						Message: "purchase order kind is invalid or no longer exists",
+					}
+				}
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{
-					Code:    "error_fetching_approval_thresholds",
-					Message: fmt.Sprintf("error fetching approval thresholds: %v", err),
+					Code:    "error_computing_approval_policy",
+					Message: fmt.Sprintf("error computing approval policy: %v", err),
 				}
 			}
-			recordIsApproved = !po.GetDateTime("approved").IsZero()
-			updatedRecordIsApproved = recordIsApproved
-			recordRequiresSecondApproval = po.GetFloat("approval_total") > thresholds[0]
+
+			recordRequiresSecondApproval = policy.SecondApprovalRequired
+			recordWasFirstApproved = !po.GetDateTime("approved").IsZero()
+			recordNowFirstApproved = recordWasFirstApproved
 			recordIsSecondApproved := !po.GetDateTime("second_approval").IsZero()
 
-			// If the caller is not an approver or a qualified second approver, and
-			// the PO is not already approved, return a 403 Forbidden status.
-			if !recordIsApproved && !callerIsApprover && !callerIsQualifiedSecondApprover {
-				httpResponseStatusCode = http.StatusForbidden
-				return &CodeError{
-					Code:    "unauthorized_approval",
-					Message: "you are not authorized to approve this purchase order",
-				}
-			}
-
-			// This time will be written to the record if the approval or second
-			// approval status changes
 			now := time.Now()
+			assignedApproverID := strings.TrimSpace(po.GetString("approver"))
 
-			// If the PO is already approved and requires second approval, caller must
-			// be a qualified second approver
-			if recordIsApproved && recordRequiresSecondApproval && !callerIsQualifiedSecondApprover {
-				httpResponseStatusCode = http.StatusForbidden
-				return &CodeError{
-					Code:    "unauthorized_approval",
-					Message: "you are not authorized to perform second approval on this purchase order",
-				}
-			}
-
-			// If a PO requires second approval and caller is only doing first
-			// approval, ensure second-approval ownership can be established.
-			if !recordIsApproved && recordRequiresSecondApproval && !callerIsQualifiedSecondApprover {
-				prioritySecondApproverID := strings.TrimSpace(po.GetString("priority_second_approver"))
-				if prioritySecondApproverID == "" {
-					secondApprovers, _, secondApproverErr := utilities.GetPOApprovers(
-						txApp,
-						nil,
-						po.GetString("division"),
-						po.GetFloat("approval_total"),
-						po.GetString("kind"),
-						po.GetString("job") != "",
-						true,
-					)
-					if secondApproverErr != nil {
-						httpResponseStatusCode = http.StatusInternalServerError
-						return &CodeError{
-							Code:    "error_checking_second_approvers",
-							Message: fmt.Sprintf("error checking second approver availability: %v", secondApproverErr),
-						}
-					}
-					if len(secondApprovers) == 0 {
-						httpResponseStatusCode = http.StatusBadRequest
-						return &CodeError{
-							Code:    "second_approval_unassignable",
-							Message: "second approval is required, but no eligible second approver is available. Set a priority second approver before first approval.",
-						}
-					}
-				}
-			}
-
-			// If the purchase order is not approved and the caller is an approver
-			// or a qualified second approver, approve the purchase order.
-			if !recordIsApproved && (callerIsApprover || callerIsQualifiedSecondApprover) {
-				// Approve the purchase order
-				po.Set("approved", now)
-				po.Set("approver", userId)
-				updatedRecordIsApproved = true
-			}
-
-			// If the purchase order is approved but requires second approval and
-			// the caller is a qualified second approver, second-approve the purchase
-			// order.
-			if updatedRecordIsApproved && recordRequiresSecondApproval && callerIsQualifiedSecondApprover && !recordIsSecondApproved {
-				po.Set("second_approval", now)
-				po.Set("second_approver", userId)
-				recordIsSecondApproved = true
-			}
-
-			// If both approvals are complete (or second approval wasn't needed),
-			// set status and PO number
-			if updatedRecordIsApproved && (!recordRequiresSecondApproval || recordIsSecondApproved) {
+			activateRecord := func() error {
 				po.Set("status", "Active")
-				poNumber, err := GeneratePONumber(txApp, po)
-				if err != nil {
+				if strings.TrimSpace(po.GetString("po_number")) != "" {
+					return nil
+				}
+				poNumber, poNumberErr := GeneratePONumber(txApp, po)
+				if poNumberErr != nil {
 					httpResponseStatusCode = http.StatusInternalServerError
 					return &CodeError{
 						Code:    "error_generating_po_number",
-						Message: fmt.Sprintf("error generating PO number: %v", err),
+						Message: fmt.Sprintf("error generating PO number: %v", poNumberErr),
 					}
 				}
 				po.Set("po_number", poNumber)
+				return nil
+			}
+
+			// Stage 1 or bypass path.
+			if !recordWasFirstApproved {
+				// Combined dual approval (bypass fast path).
+				if recordRequiresSecondApproval && policy.IsSecondStageApprover(userId) {
+					if !policy.HasSufficientFinalLimit(userId, approvalTotal) {
+						httpResponseStatusCode = http.StatusForbidden
+						return &CodeError{
+							Code:    "insufficient_final_limit",
+							Message: "you do not have sufficient approval limit to complete final approval",
+						}
+					}
+					po.Set("approver", userId)
+					po.Set("approved", now)
+					po.Set("second_approver", userId)
+					po.Set("second_approval", now)
+					recordNowFirstApproved = true
+					recordActivated = true
+					if err := activateRecord(); err != nil {
+						return err
+					}
+				} else {
+					if userId != assignedApproverID {
+						httpResponseStatusCode = http.StatusForbidden
+						return &CodeError{
+							Code:    "unauthorized_approval",
+							Message: "you are not authorized to approve this purchase order",
+						}
+					}
+
+					if recordRequiresSecondApproval && len(policy.SecondStageApprovers) == 0 {
+						httpResponseStatusCode = http.StatusBadRequest
+						return &CodeError{
+							Code:    "second_pool_empty",
+							Message: "second approval pool is empty for this purchase order; contact an administrator",
+						}
+					}
+
+					if recordRequiresSecondApproval {
+						prioritySecondApproverID := strings.TrimSpace(po.GetString("priority_second_approver"))
+						if prioritySecondApproverID == "" {
+							httpResponseStatusCode = http.StatusBadRequest
+							return &CodeError{
+								Code:    "priority_second_approver_required",
+								Message: "priority second approver is required when second approval is required",
+							}
+						}
+						if !policy.IsSecondStageApprover(prioritySecondApproverID) {
+							httpResponseStatusCode = http.StatusBadRequest
+							return &CodeError{
+								Code:    "invalid_priority_second_approver_for_stage",
+								Message: "priority second approver is not valid for second-stage approval",
+							}
+						}
+					}
+
+					if recordRequiresSecondApproval && len(policy.FirstStageApprovers) == 0 {
+						httpResponseStatusCode = http.StatusBadRequest
+						return &CodeError{
+							Code:    "first_pool_empty",
+							Message: "first approval pool is empty for this purchase order; contact an administrator",
+						}
+					}
+
+					if assignedApproverID == "" || !policy.IsFirstStageApprover(assignedApproverID) {
+						httpResponseStatusCode = http.StatusBadRequest
+						return &CodeError{
+							Code:    "invalid_approver_for_stage",
+							Message: "assigned approver is not valid for first-stage approval",
+						}
+					}
+
+					po.Set("approved", now)
+					po.Set("approver", userId)
+					recordNowFirstApproved = true
+
+					if !recordRequiresSecondApproval {
+						recordActivated = true
+						if err := activateRecord(); err != nil {
+							return err
+						}
+					}
+				}
+			} else {
+				// Stage 2 (final) path for dual-required records.
+				if recordRequiresSecondApproval {
+					if recordIsSecondApproved {
+						httpResponseStatusCode = http.StatusBadRequest
+						return &CodeError{
+							Code:    "po_not_unapproved",
+							Message: "only unapproved purchase orders can be approved",
+						}
+					}
+					if !policy.IsSecondStageApprover(userId) {
+						httpResponseStatusCode = http.StatusForbidden
+						return &CodeError{
+							Code:    "unauthorized_approval",
+							Message: "you are not authorized to perform second approval on this purchase order",
+						}
+					}
+					if !policy.HasSufficientFinalLimit(userId, approvalTotal) {
+						httpResponseStatusCode = http.StatusForbidden
+						return &CodeError{
+							Code:    "insufficient_final_limit",
+							Message: "you do not have sufficient approval limit to complete final approval",
+						}
+					}
+
+					po.Set("second_approval", now)
+					po.Set("second_approver", userId)
+					recordActivated = true
+					if err := activateRecord(); err != nil {
+						return err
+					}
+				} else {
+					// Single-stage PO that was first-approved but never activated.
+					if assignedApproverID == "" || !policy.IsFirstStageApprover(assignedApproverID) {
+						httpResponseStatusCode = http.StatusBadRequest
+						return &CodeError{
+							Code:    "invalid_approver_for_stage",
+							Message: "assigned approver is not valid for first-stage approval",
+						}
+					}
+					if userId != assignedApproverID && !policy.IsFirstStageApprover(userId) {
+						httpResponseStatusCode = http.StatusForbidden
+						return &CodeError{
+							Code:    "unauthorized_approval",
+							Message: "you are not authorized to approve this purchase order",
+						}
+					}
+					recordActivated = true
+					if err := activateRecord(); err != nil {
+						return err
+					}
+				}
 			}
 
 			if err := txApp.Save(po); err != nil {
@@ -322,11 +449,11 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 		}
 		var notificationRecord *core.Record = nil
 
-		if updatedRecordIsApproved && updatedPO.GetString("priority_second_approver") != "" && updatedPO.GetString("status") != "Active" {
+		if !recordWasFirstApproved && recordNowFirstApproved && recordRequiresSecondApproval && updatedPO.GetString("priority_second_approver") != "" && updatedPO.GetString("status") != "Active" {
 			// The PO is now approved but not second-approved, and the
 			// priority_second_approver is set. Create a message to the
 			// priority_second_approver alerting them that they need to approve the PO
-			// and have a 24 hour window to do so before it is available for approval
+			// and have an exclusive window to do so before it is available for approval
 			// by all qualified approvers.
 			notificationRecord = core.NewRecord(notificationCollection)
 
@@ -344,9 +471,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				"POId":          updatedPO.Id,
 				"POCreatorName": creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
 			})
-		}
-
-		if (!recordIsApproved || (recordIsApproved && recordRequiresSecondApproval)) && updatedPO.GetString("status") == "Active" && updatedPO.GetString("uid") != userId {
+		} else if recordActivated && updatedPO.GetString("status") == "Active" && updatedPO.GetString("uid") != userId {
 			// The PO was just approved (or just second approved) and is active.
 			// Unless the caller is the creator of the PO (and thus would already
 			// know that it has been approved), send a message to the creator
@@ -386,19 +511,18 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 }
 
 // createGetPendingPurchaseOrdersHandler returns purchase orders the caller can approve now.
-// It covers three cases:
-// 1) First approval: status=Unapproved AND approved=” AND caller is eligible first approver for division
-// 2) Priority second approver: status=Unapproved AND approved!=” AND second_approval=” AND caller == priority_second_approver
-// 3) General second approver after 24h: status=Unapproved AND approved!=” AND second_approval=” AND updated < @yesterday AND caller is eligible second approver for division and amount
+// It covers:
+// 1) Stage 1: status=Unapproved, first approval pending, caller is assigned first approver.
+// 2) Stage 2 exclusive window: first approved, second pending, caller is priority second approver.
+// 3) Stage 2 general visibility after timeout T: first approved, second pending, caller is an eligible second approver.
 func createGetPendingPurchaseOrdersHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
 
-		rows := []map[string]any{}
-		if err := app.DB().NewQuery(pendingPOsQuery).Bind(dbx.Params{
-			"userId":          auth.Id,
-			"poApproverClaim": constants.PO_APPROVER_CLAIM_ID,
-		}).All(&rows); err != nil {
+		rows := []purchaseOrderVisibilityRow{}
+		if err := app.DB().NewQuery(pendingPOsQuery).Bind(
+			purchaseOrderVisibilityParams(app, auth.Id, "all", ""),
+		).All(&rows); err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_pending_pos",
 				"message": fmt.Sprintf("error fetching pending purchase orders: %v", err),
@@ -406,6 +530,110 @@ func createGetPendingPurchaseOrdersHandler(app core.App) func(e *core.RequestEve
 		}
 
 		return e.JSON(http.StatusOK, rows)
+	}
+}
+
+func createGetPendingPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+		id := strings.TrimSpace(e.Request.PathValue("id"))
+		if id == "" {
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "invalid_purchase_order_id",
+				"message": "purchase order id is required",
+			})
+		}
+
+		rows := []purchaseOrderVisibilityRow{}
+		params := purchaseOrderVisibilityParams(app, auth.Id, "all", "")
+		params["id"] = id
+
+		if err := app.DB().NewQuery(pendingPOByIDQuery).Bind(params).All(&rows); err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_pending_po",
+				"message": fmt.Sprintf("error fetching pending purchase order: %v", err),
+			})
+		}
+		if len(rows) == 0 {
+			return e.JSON(http.StatusNotFound, map[string]string{
+				"code":    "pending_po_not_found",
+				"message": "pending purchase order not found",
+			})
+		}
+
+		return e.JSON(http.StatusOK, rows[0])
+	}
+}
+
+func createGetVisiblePurchaseOrdersHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+
+		scope := strings.ToLower(strings.TrimSpace(e.Request.URL.Query().Get("scope")))
+		if scope == "" {
+			scope = "all"
+		}
+
+		switch scope {
+		case "all", "mine", "active", "stale":
+		default:
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "invalid_scope",
+				"message": "scope must be one of: all, mine, active, stale",
+			})
+		}
+
+		staleBefore := strings.TrimSpace(e.Request.URL.Query().Get("stale_before"))
+		if scope == "stale" && staleBefore == "" {
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "missing_stale_before",
+				"message": "stale_before is required when scope=stale",
+			})
+		}
+
+		rows := []purchaseOrderVisibilityRow{}
+		if err := app.DB().NewQuery(visiblePOsQuery).Bind(
+			purchaseOrderVisibilityParams(app, auth.Id, scope, staleBefore),
+		).All(&rows); err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_visible_pos",
+				"message": fmt.Sprintf("error fetching visible purchase orders: %v", err),
+			})
+		}
+
+		return e.JSON(http.StatusOK, rows)
+	}
+}
+
+func createGetVisiblePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+		id := strings.TrimSpace(e.Request.PathValue("id"))
+		if id == "" {
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "invalid_purchase_order_id",
+				"message": "purchase order id is required",
+			})
+		}
+
+		rows := []purchaseOrderVisibilityRow{}
+		params := purchaseOrderVisibilityParams(app, auth.Id, "all", "")
+		params["id"] = id
+
+		if err := app.DB().NewQuery(visiblePOByIDQuery).Bind(params).All(&rows); err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_visible_po",
+				"message": fmt.Sprintf("error fetching visible purchase order: %v", err),
+			})
+		}
+		if len(rows) == 0 {
+			return e.JSON(http.StatusNotFound, map[string]string{
+				"code":    "po_not_found_or_not_visible",
+				"message": "purchase order not found or not visible",
+			})
+		}
+
+		return e.JSON(http.StatusOK, rows[0])
 	}
 }
 
@@ -492,16 +720,32 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 				}
 			}
 
-			// Check if the user is an approver and/or a qualified second approver
-			callerIsApprover, callerIsQualifiedSecondApprover, err := isApprover(txApp, authRecord, po)
+			kindID := utilities.NormalizeExpenditureKindID(po.GetString("kind"))
+			hasJob := po.GetString("job") != ""
+			policy, err := utilities.GetPOApproverPolicy(
+				txApp,
+				po.GetString("division"),
+				po.GetFloat("approval_total"),
+				kindID,
+				hasJob,
+			)
 			if err != nil {
-				return err
+				if errors.Is(err, utilities.ErrUnknownExpenditureKind) {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "invalid_expenditure_kind",
+						Message: "purchase order kind is invalid or no longer exists",
+					}
+				}
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_computing_approval_policy",
+					Message: fmt.Sprintf("error computing purchase order approval policy: %v", err),
+				}
 			}
 
-			// Because isApprover uses GetPOApprovers, the second approvers list is
-			// just users below the next threshold. This means that users above the
-			// next threshold cannot reject a PO with an approval_total that exceeds
-			// the threshold immediately below their max_amount.
+			callerIsApprover := policy.IsFirstStageApprover(authRecord.Id)
+			callerIsQualifiedSecondApprover := policy.IsSecondStageApprover(authRecord.Id)
 
 			// If the caller is not an approver or a qualified second approver,
 			// return a 403 Forbidden status. NOTE: This means that even if a
@@ -923,72 +1167,6 @@ func GeneratePONumber(txApp core.App, record *core.Record, testDateComponents ..
 	return "", fmt.Errorf("unable to generate a unique PO number")
 }
 
-/*
-	the isApprover function with 3 arguments: the txApp, the userId of the
-	caller, and the purchase_orders record. The function performs the following
-	checks and returns 2 boolean values indicating:
-		1. whether the caller is permitted to approve the purchase order
-		2. whether the caller is permitted to second-approve the purchase order
-	We will incorporate this function into the approval logic above within the
-	createApprovePurchaseOrderHandler function.
-*/
-
-func isApprover(txApp core.App, auth *core.Record, po *core.Record) (bool, bool, error) {
-	kindID := po.GetString("kind")
-	hasJob := po.GetString("job") != ""
-
-	approvers, _, err := utilities.GetPOApprovers(
-		txApp,
-		nil,
-		po.GetString("division"),
-		po.GetFloat("approval_total"),
-		kindID,
-		hasJob,
-		false,
-	)
-	if err != nil {
-		return false, false, &CodeError{
-			Code:    "error_fetching_approvers",
-			Message: fmt.Sprintf("error fetching approvers: %v", err),
-		}
-	}
-
-	secondApprovers, _, err := utilities.GetPOApprovers(
-		txApp,
-		nil,
-		po.GetString("division"),
-		po.GetFloat("approval_total"),
-		kindID,
-		hasJob,
-		true,
-	)
-	if err != nil {
-		return false, false, &CodeError{
-			Code:    "error_fetching_approvers",
-			Message: fmt.Sprintf("error fetching approvers: %v", err),
-		}
-	}
-
-	callerIsApprover := false
-	callerIsQualifiedSecondApprover := false
-
-	for _, approver := range approvers {
-		if approver.ID == auth.Id {
-			callerIsApprover = true
-			break
-		}
-	}
-
-	for _, secondApprover := range secondApprovers {
-		if secondApprover.ID == auth.Id {
-			callerIsQualifiedSecondApprover = true
-			break
-		}
-	}
-
-	return callerIsApprover, callerIsQualifiedSecondApprover, nil
-}
-
 func parseApproversRequest(e *core.RequestEvent) (poApproversRequest, error) {
 	req := poApproversRequest{
 		Kind: utilities.DefaultExpenditureKindID(),
@@ -1076,16 +1254,20 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 			}
 		}
 
-		approvers, requesterQualifies, err := utilities.GetPOApprovers(
+		policy, err := utilities.GetPOApproverPolicy(
 			app,
-			auth,
 			req.Division,
 			req.Amount,
 			req.Kind,
 			req.HasJob,
-			forSecondApproval,
 		)
 		if err != nil {
+			if errors.Is(err, utilities.ErrUnknownExpenditureKind) {
+				return e.JSON(http.StatusBadRequest, map[string]string{
+					"code":    "invalid_kind",
+					"message": "kind is invalid or no longer exists",
+				})
+			}
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_approvers",
 				"message": fmt.Sprintf("Error fetching approvers: %v", err),
@@ -1093,11 +1275,18 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 		}
 
 		if forSecondApproval {
-			meta, metaErr := buildSecondApproversMeta(app, req, requesterQualifies, approvers)
-			if metaErr != nil {
-				return e.JSON(http.StatusInternalServerError, map[string]string{
-					"code":    "error_building_second_approver_meta",
-					"message": fmt.Sprintf("Error building second approver metadata: %v", metaErr),
+			approvers := policy.SecondStageApprovers
+			requesterQualifies := auth != nil && policy.IsSecondStageApprover(auth.Id)
+			if requesterQualifies && policy.SecondApprovalRequired {
+				// Preserve prior endpoint behavior for self-qualified requester:
+				// empty list indicates UI auto-self handling.
+				approvers = []utilities.Approver{}
+			}
+			meta := buildSecondApproversMeta(app, requesterQualifies, approvers, policy, req.Amount)
+			if meta.SecondApprovalRequired && !requesterQualifies && len(approvers) == 0 {
+				return e.JSON(http.StatusBadRequest, map[string]string{
+					"code":    "second_pool_empty",
+					"message": "no second-stage approvers can final-approve this amount; contact an administrator",
 				})
 			}
 
@@ -1107,7 +1296,7 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 			})
 		}
 
-		return e.JSON(http.StatusOK, approvers)
+		return e.JSON(http.StatusOK, policy.FirstStageApprovers)
 	}
 }
 

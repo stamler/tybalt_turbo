@@ -116,6 +116,21 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		return buf, contentType, nil
 	}
 
+	setupTestAppWithStrictParentKinds := func(t testing.TB) *tests.TestApp {
+		app := testutils.SetupTestApp(t)
+		_, err := app.NonconcurrentDB().NewQuery(`
+			UPDATE purchase_orders
+			SET kind = {:kind}
+			WHERE id IN ('ly8xyzpuj79upq1', '25046ft47x49cc2', 'y660i6a14ql2355', '2plsetqdxht7esg')
+		`).Bind(dbx.Params{
+			"kind": standardKindID,
+		}).Execute()
+		if err != nil {
+			t.Fatal(err)
+		}
+		return app
+	}
+
 	var scenarios []tests.ApiScenario
 	// otherwise valid purchase order fails when job is Closed
 	{
@@ -148,7 +163,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 
@@ -185,23 +200,23 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 
 	// valid purchase order can be created with a job and computer kind
 	{
 		b, ct, err := makeMultipart(fmt.Sprintf(`{
-            "uid": "rzr98oadsp9qc11",
-            "date": "2024-09-01",
-            "division": "vccd5fo56ctbigh",
-            "description": "job PO with computer kind",
-            "payment_type": "Expense",
-            "total": 1234.56,
-            "vendor": "2zqxtsmymf670ha",
-            "approver": "etysnrlup2f6bak",
-            "status": "Unapproved",
-            "type": "One-Time",
+	            "uid": "rzr98oadsp9qc11",
+	            "date": "2024-09-01",
+	            "division": "vccd5fo56ctbigh",
+	            "description": "job PO with computer kind",
+	            "payment_type": "Expense",
+	            "total": 1234.56,
+	            "vendor": "2zqxtsmymf670ha",
+	            "approver": "etysnrlup2f6bak",
+	            "status": "Unapproved",
+	            "type": "One-Time",
             "job": "cjf0kt0defhq480",
             "kind": "%s"
         }`, computerKindID))
@@ -222,22 +237,23 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 
 	// valid purchase order can be created without attachment
 	{
 		b := bytes.NewBufferString(fmt.Sprintf(`{
-	            "uid": "rzr98oadsp9qc11",
-	            "date": "2024-09-01",
-	            "division": "vccd5fo56ctbigh",
-	            "description": "test purchase order",
-	            "payment_type": "Expense",
-	            "total": 1234.56,
-	            "vendor": "2zqxtsmymf670ha",
-	            "approver": "etysnrlup2f6bak",
-	            "status": "Unapproved",
+		            "uid": "rzr98oadsp9qc11",
+		            "date": "2024-09-01",
+		            "division": "vccd5fo56ctbigh",
+		            "description": "test purchase order",
+		            "payment_type": "Expense",
+		            "total": 1234.56,
+		            "vendor": "2zqxtsmymf670ha",
+		            "approver": "etysnrlup2f6bak",
+					"priority_second_approver": "6bq4j0eb26631dy",
+		            "status": "Unapproved",
 	            "type": "One-Time",
 	            "kind": "%s"
 	        }`, standardKindID))
@@ -254,7 +270,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 
@@ -269,6 +285,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
             "total": 1234.56,
             "vendor": "2zqxtsmymf670ha",
             "approver": "etysnrlup2f6bak",
+	            "priority_second_approver": "6bq4j0eb26631dy",
             "status": "Unapproved",
             "type": "One-Time"
         }`)
@@ -289,20 +306,21 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	// branch defaults from creator profile when omitted and no job is set
 	{
 		b, ct, err := makeMultipart(`{
-            "uid": "rzr98oadsp9qc11",
-            "date": "2024-09-01",
-	          "division": "vccd5fo56ctbigh",
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
             "description": "default branch assignment",
             "payment_type": "Expense",
             "total": 1234.56,
             "vendor": "2zqxtsmymf670ha",
             "approver": "etysnrlup2f6bak",
+            "priority_second_approver": "6bq4j0eb26631dy",
             "status": "Unapproved",
             "type": "One-Time"
         }`)
@@ -322,7 +340,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	// job branch overrides an explicit branch when job is set
@@ -336,6 +354,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
             "total": 1234.56,
             "vendor": "2zqxtsmymf670ha",
             "approver": "etysnrlup2f6bak",
+            "priority_second_approver": "6bq4j0eb26631dy",
             "status": "Unapproved",
             "type": "One-Time",
             "job": "cjf0kt0defhq480",
@@ -403,6 +422,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
             "total": 1234.56,
             "vendor": "2zqxtsmymf670ha",
             "approver": "etysnrlup2f6bak",
+            "priority_second_approver": "6bq4j0eb26631dy",
             "status": "Unapproved",
             "type": "Recurring",
             "end_date": "2024-11-01",
@@ -459,7 +479,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -492,7 +512,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -526,7 +546,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -560,7 +580,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -569,14 +589,15 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"date": "2024-09-01",
 			"division": "vccd5fo56ctbigh",
 			"description": "test purchase order",
-			"payment_type": "Expense",
-			"total": 1234.56,
-			"vendor": "2zqxtsmymf670ha",
-			"approver": "etysnrlup2f6bak",
-			"status": "Unapproved",
-			"type": "Recurring",
-			"end_date": "2024-11-01",
-			"frequency": "Weekly"
+				"payment_type": "Expense",
+				"total": 1234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"priority_second_approver": "66ct66w380ob6w8",
+				"status": "Unapproved",
+				"type": "Recurring",
+				"end_date": "2024-11-01",
+				"frequency": "Weekly"
 		}`)
 		if err != nil {
 			t.Fatal(err)
@@ -629,7 +650,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -656,12 +677,12 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"approver":{"code":"validation_no_claim"`,
+				`"approver":{"code":"invalid_approver_for_stage"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -688,7 +709,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"approver":{"code":"value_required"`,
+				`"approver":{"code":"invalid_approver_for_stage"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
@@ -707,6 +728,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"total": 1234.56,
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
+			"priority_second_approver": "6bq4j0eb26631dy",
 			"status": "Unapproved",
 			"type": "One-Time",
 			"job": "cjf0kt0defhq480",
@@ -729,7 +751,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	// We need a test child PO that is status Active
@@ -765,7 +787,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -800,7 +822,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -837,7 +859,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -873,7 +895,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 				"*":                     0,
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -908,7 +930,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -943,7 +965,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithStrictParentKinds,
 		})
 	}
 	{
@@ -1156,6 +1178,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"total": %.2f,
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
+			"priority_second_approver": "66ct66w380ob6w8",
 			"status": "Unapproved",
 			"type": "One-Time"
 		}`, rand.Float64()*(1000.0)+tier2)
@@ -1210,6 +1233,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"total": %.2f,
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
+			"priority_second_approver": "6bq4j0eb26631dy",
 			"status": "Unapproved",
 			"type": "One-Time"
 		}`, rand.Float64()*(tier2-tier1)+tier1)
@@ -1233,6 +1257,83 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+	{
+		// Dual-required self-bypass setup is allowed when creator is second-stage qualified.
+		json := fmt.Sprintf(`{
+			"uid": "66ct66w380ob6w8",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "dual required self bypass setup",
+			"payment_type": "Expense",
+			"total": %.2f,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "66ct66w380ob6w8",
+			"priority_second_approver": "66ct66w380ob6w8",
+			"status": "Unapproved",
+			"type": "One-Time",
+			"kind": "%s"
+		}`, tier1+100, standardKindID)
+		b, ct, err := makeMultipart(json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "dual-required save allows self assignment for creator who is second-stage qualified",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": po_approver_tier3Token, "Content-Type": ct},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approver":"66ct66w380ob6w8"`,
+				`"priority_second_approver":"66ct66w380ob6w8"`,
+				`"approved":""`,
+				`"second_approval":""`,
+				`"status":"Unapproved"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the approval-required notification
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+	{
+		// Guard: self assignment is invalid when creator is not second-stage qualified.
+		json := fmt.Sprintf(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "dual required self bypass invalid",
+			"payment_type": "Expense",
+			"total": %.2f,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "rzr98oadsp9qc11",
+			"priority_second_approver": "rzr98oadsp9qc11",
+			"status": "Unapproved",
+			"type": "One-Time",
+			"kind": "%s"
+		}`, tier1+100, standardKindID)
+		b, ct, err := makeMultipart(json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "dual-required save rejects self assignment for creator who is not second-stage qualified",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"approver":{"code":"invalid_approver_for_stage"`,
+				`"priority_second_approver":{"code":"invalid_priority_second_approver_for_stage"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		})
@@ -1263,7 +1364,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"priority_second_approver":{"code":"invalid_priority_second_approver"`,
+				`"priority_second_approver":{"code":"invalid_priority_second_approver_for_stage"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
@@ -1617,6 +1718,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 			"total": 2234.56,
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
+			"priority_second_approver": "6bq4j0eb26631dy",
 			"status": "Unapproved",
 			"type": "Cumulative"
 		}`)
@@ -1652,6 +1754,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 			"total": 2234.56,
 			"vendor": "2zqxtsmymf670ha",
 			"approver": "etysnrlup2f6bak",
+			"priority_second_approver": "6bq4j0eb26631dy",
 			"status": "Unapproved",
 			"type": "Cumulative",
 			"kind": "%s",
@@ -1712,16 +1815,16 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 	// valid purchase order updates can keep job with computer kind
 	{
 		b, ct, err := updateMultipart(fmt.Sprintf(`{
-			"uid": "f2j5a8vk006baub",
-			"date": "2024-09-01",
-			"division": "vccd5fo56ctbigh",
-			"description": "test purchase order",
-			"payment_type": "Expense",
-			"total": 2234.56,
-			"vendor": "2zqxtsmymf670ha",
-			"approver": "etysnrlup2f6bak",
-			"status": "Unapproved",
-			"type": "Cumulative",
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "test purchase order",
+				"payment_type": "Expense",
+				"total": 2234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Unapproved",
+				"type": "Cumulative",
 			"job": "cjf0kt0defhq480",
 			"kind": "%s"
 		}`, computerKindID))

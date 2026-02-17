@@ -75,12 +75,22 @@ func GetApprovalTiers(app *tests.TestApp) (float64, float64) {
 	thresholds := []struct {
 		Threshold float64 `db:"threshold"`
 	}{}
-	err := app.DB().NewQuery("SELECT threshold FROM po_approval_thresholds ORDER BY threshold ASC").All(&thresholds)
-	if err != nil {
+	if err := app.DB().NewQuery(`
+		SELECT DISTINCT COALESCE(second_approval_threshold, 0) AS threshold
+		FROM expenditure_kinds
+		WHERE COALESCE(second_approval_threshold, 0) > 0
+		ORDER BY threshold ASC
+	`).All(&thresholds); err != nil {
 		panic("Failed to retrieve approval tiers from database: " + err.Error())
 	}
 
-	// Check if all required tiers are present
+	// Keep existing tier assumptions in legacy tests if fewer than 2 configured thresholds exist.
+	if len(thresholds) < 2 {
+		cachedTier1, cachedTier2 = 500, 2500
+		tiersInitialized = true
+		return cachedTier1, cachedTier2
+	}
+
 	tier1 := thresholds[0].Threshold
 	tier2 := thresholds[1].Threshold
 

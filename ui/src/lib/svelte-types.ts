@@ -45,8 +45,8 @@ export type SecondApproversResponse = {
     reason_message: string;
     evaluated_amount: number;
     second_approval_threshold: number;
-    tier_ceiling: number;
     limit_column: string;
+    second_stage_timeout_hours: number;
   };
 };
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse>;

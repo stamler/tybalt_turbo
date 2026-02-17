@@ -3,7 +3,6 @@
   import { fade } from "svelte/transition";
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
-  import type { CollectionName } from "$lib/stores/global";
   import { createEventDispatcher } from "svelte";
 
   const dispatch = createEventDispatcher();
@@ -33,12 +32,12 @@
         },
       });
 
-      globalStore.refresh(collectionName as CollectionName);
+      globalStore.refresh();
       closeModal();
 
       // emit event to refresh the page to the parent
       dispatch("refresh");
-    } catch (error) {
+    } catch (error: any) {
       globalStore.addError(error?.response?.message);
       closeModal();
     }

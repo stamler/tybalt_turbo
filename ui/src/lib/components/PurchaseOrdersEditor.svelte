@@ -28,7 +28,8 @@
   } from "$lib/pocketbase-types";
   import {
     buildPoApproverRequest,
-    fetchPoApproversBundle,
+    fetchPoApprovers,
+    fetchPoSecondApprovers,
     type PoApproverRequest,
   } from "$lib/poApprovers";
   import DsActionButton from "./DSActionButton.svelte";
@@ -61,12 +62,15 @@
   let approvers = $state([] as PoApproversResponse[]);
   let secondApprovers = $state([] as PoApproversResponse[]);
   let showApproverField = $state(false);
+  let firstStageRequesterQualifies = $state(false);
+  let firstApproverReasonMessage = $state("");
   let showSecondApproverField = $state(false);
   let secondApproverStatus = $state("" as SecondApproverStatus | "");
   let secondApproverReasonMessage = $state("");
   let secondApproverMeta = $state<SecondApproversResponse["meta"] | null>(null);
   let approversLoaded = $state(false);
   let approversFetchError = $state(false);
+  let approversLoading = $state(false);
   let approverFetchRequestId = 0;
   let stashedJobWhenKindDisallows = $state("");
   let branchPinnedInSession = $state(false);
@@ -79,6 +83,10 @@
     originalError?: { name?: string };
     message?: string;
     status?: number;
+    data?: {
+      code?: string;
+      message?: string;
+    };
   };
   const kindOptions = $derived.by(() =>
     $expenditureKindsStore.items.map((kind) => ({
@@ -144,8 +152,33 @@
   );
   const canFetchApprovers = $derived.by(() => Boolean(item.division && item.total && item.kind));
   const showApproverFetchError = $derived.by(() => canFetchApprovers && approversFetchError);
+  const approversPendingResolution = $derived.by(
+    () => canFetchApprovers && (approversLoading || !approversLoaded),
+  );
   const showSecondApproverStatusHint = $derived.by(
-    () => approversLoaded && canFetchApprovers && !approversFetchError && !showSecondApproverField,
+    () =>
+      approversLoaded &&
+      canFetchApprovers &&
+      !approversFetchError &&
+      !showSecondApproverField &&
+      secondApproverStatus === "required_no_candidates",
+  );
+  const isRequesterOwnPOContext = (
+    requesterID: string,
+    poUID: string | null | undefined,
+    editing: boolean,
+  ): boolean => !editing || ((poUID ?? "") !== "" && poUID === requesterID);
+  const isDualBypassMode = (
+    status: SecondApproverStatus | "",
+    requesterID: string,
+    ownPOContext: boolean,
+  ): boolean => status === "requester_qualifies" && requesterID !== "" && ownPOContext;
+  const authUserID = $derived.by(() => $authStore?.model?.id ?? "");
+  const isOwnPOContext = $derived.by(
+    () => isRequesterOwnPOContext(authUserID, item.uid, data.editing),
+  );
+  const isDualBypassSelfMode = $derived.by(
+    () => isDualBypassMode(secondApproverStatus, authUserID, isOwnPOContext),
   );
   const isAbortError = (error: unknown): boolean => {
     const e = error as MaybeAbortError;
@@ -153,6 +186,28 @@
     if (e?.originalError?.name === "AbortError") return true;
     return e?.status === 0 && (e?.message ?? "").toLowerCase().includes("aborted");
   };
+  const firstPoolEmptyMessage =
+    "No eligible first-stage approvers can approve this amount for the selected division and kind. Contact an administrator.";
+  const secondPoolEmptyMessage =
+    "Second approval is required, but no second-stage approver can final-approve this amount.";
+  const approversLoadingMessage = "Approver eligibility is still loading. Please wait and try again.";
+  const approversUnavailableMessage =
+    "Could not load approver eligibility. Resolve the error and try again.";
+
+  function resetApproverState(fetchError: boolean): void {
+    approvers = [];
+    secondApprovers = [];
+    showApproverField = false;
+    firstStageRequesterQualifies = false;
+    firstApproverReasonMessage = "";
+    showSecondApproverField = false;
+    secondApproverStatus = "";
+    secondApproverReasonMessage = "";
+    secondApproverMeta = null;
+    approversLoaded = false;
+    approversFetchError = fetchError;
+    approversLoading = false;
+  }
 
   async function resolveDerivedBranch(
     jobId: string,
@@ -261,15 +316,7 @@
       fetchApprovers(request);
     } else {
       approverFetchRequestId += 1;
-      approvers = [];
-      secondApprovers = [];
-      showApproverField = false;
-      showSecondApproverField = false;
-      secondApproverStatus = "";
-      secondApproverReasonMessage = "";
-      secondApproverMeta = null;
-      approversLoaded = false;
-      approversFetchError = false;
+      resetApproverState(false);
     }
   });
 
@@ -292,39 +339,94 @@
   async function fetchApprovers(args: PoApproverRequest) {
     const requestId = ++approverFetchRequestId;
     approversFetchError = false;
+    approversLoading = true;
     try {
-      const { approvers: nextApprovers, secondApproversResponse } = await fetchPoApproversBundle(
-        args,
-        null, // Avoid PocketBase auto-cancel while users type quickly.
-      );
+      const requesterID = $authStore?.model?.id ?? "";
+      const isOwnPOContextNow = isRequesterOwnPOContext(requesterID, item.uid, data.editing);
+      const [firstResult, secondResult] = await Promise.allSettled([
+        fetchPoApprovers(args, null), // Avoid PocketBase auto-cancel while users type quickly.
+        fetchPoSecondApprovers(args, null),
+      ]);
       if (requestId !== approverFetchRequestId) return;
-      approvers = nextApprovers;
-      secondApprovers = secondApproversResponse.approvers;
-      secondApproverStatus = secondApproversResponse.meta.status;
-      secondApproverReasonMessage = secondApproversResponse.meta.reason_message ?? "";
-      secondApproverMeta = secondApproversResponse.meta;
 
-      // Show approvers field if there are approvers available
-      showApproverField = approvers.length > 0;
+      if (firstResult.status === "rejected") {
+        if (isAbortError(firstResult.reason)) {
+          if (requestId === approverFetchRequestId) {
+            approversLoading = false;
+          }
+          return;
+        }
+        throw firstResult.reason;
+      }
+
+      const nextApprovers = firstResult.value;
+      approvers = nextApprovers;
+      firstStageRequesterQualifies =
+        requesterID !== "" && nextApprovers.some((approver) => approver.id === requesterID);
+      firstApproverReasonMessage =
+        !firstStageRequesterQualifies && nextApprovers.length === 0 ? firstPoolEmptyMessage : "";
+
+      let nextSecondApprovers: PoApproversResponse[] = [];
+      let nextSecondStatus = "" as SecondApproverStatus | "";
+      let nextSecondReasonMessage = "";
+      let nextSecondMeta: SecondApproversResponse["meta"] | null = null;
+
+      if (secondResult.status === "fulfilled") {
+        const secondApproversResponse = secondResult.value;
+        nextSecondApprovers = secondApproversResponse.approvers;
+        nextSecondStatus = secondApproversResponse.meta.status;
+        nextSecondReasonMessage = secondApproversResponse.meta.reason_message ?? "";
+        nextSecondMeta = secondApproversResponse.meta;
+      } else {
+        const e = secondResult.reason as MaybeAbortError;
+        if (isAbortError(e)) {
+          if (requestId === approverFetchRequestId) {
+            approversLoading = false;
+          }
+          return;
+        }
+        if (e?.data?.code === "second_pool_empty") {
+          // This is a policy/config state, not a transport failure.
+          nextSecondApprovers = [];
+          nextSecondStatus = "required_no_candidates";
+          nextSecondReasonMessage =
+            e?.data?.message ?? secondPoolEmptyMessage;
+          nextSecondMeta = null;
+        } else {
+          throw secondResult.reason;
+        }
+      }
+
+      secondApprovers = nextSecondApprovers;
+      secondApproverStatus = nextSecondStatus;
+      secondApproverReasonMessage = nextSecondReasonMessage;
+      secondApproverMeta = nextSecondMeta;
+
+      const dualBypassSelfMode = isDualBypassMode(
+        nextSecondStatus,
+        requesterID,
+        isOwnPOContextNow,
+      );
+
+      // Auto-self only when the caller is actually in the first-stage pool.
+      // Otherwise keep the approver selector visible (including empty-state),
+      // except for self-bypass mode where dual-required is requester-qualified.
+      showApproverField = !firstStageRequesterQualifies && !dualBypassSelfMode;
 
       // Show second approver selector only when candidates are available.
       showSecondApproverField =
         secondApproverStatus === "candidates_available" && secondApprovers.length > 0;
       approversLoaded = true;
       approversFetchError = false;
+      approversLoading = false;
     } catch (error) {
       if (requestId !== approverFetchRequestId) return;
-      if (isAbortError(error)) return;
+      if (isAbortError(error)) {
+        approversLoading = false;
+        return;
+      }
       console.error("Error fetching approvers:", error);
-      approvers = [];
-      secondApprovers = [];
-      showApproverField = false;
-      showSecondApproverField = false;
-      secondApproverStatus = "";
-      secondApproverReasonMessage = "";
-      secondApproverMeta = null;
-      approversLoaded = false;
-      approversFetchError = true;
+      resetApproverState(true);
     }
   }
 
@@ -345,9 +447,64 @@
       item.category = "";
     }
 
-    // set approver to self if the approver field is hidden
-    if (!showApproverField) {
+    if (canFetchApprovers && approversFetchError) {
+      errors = {
+        ...errors,
+        global: {
+          code: "approvers_unavailable",
+          message: approversUnavailableMessage,
+        },
+      };
+      return;
+    }
+
+    if (approversPendingResolution) {
+      errors = {
+        ...errors,
+        global: {
+          code: "approvers_loading",
+          message: approversLoadingMessage,
+        },
+      };
+      return;
+    }
+
+    // Self-bypass mode: dual-required + requester qualifies for second stage.
+    // Hide both selectors and persist self-ownership for both stages.
+    if (isDualBypassSelfMode) {
       item.approver = item.uid;
+      item.priority_second_approver = item.uid;
+    }
+
+    // Auto-assign self only when requester is in the first-stage pool.
+    if (firstStageRequesterQualifies) {
+      item.approver = item.uid;
+    }
+    if (
+      !isDualBypassSelfMode &&
+      !firstStageRequesterQualifies &&
+      approvers.length === 0
+    ) {
+      errors = {
+        ...errors,
+        approver: {
+          code: "first_pool_empty",
+          message: firstPoolEmptyMessage,
+        },
+      };
+      return;
+    }
+
+    // Block save when second approval is required but no second-stage pool exists.
+    if (secondApproverStatus === "required_no_candidates") {
+      errors = {
+        ...errors,
+        priority_second_approver: {
+          code: "second_pool_empty",
+          message: secondApproverReasonMessage || secondPoolEmptyMessage,
+        },
+      };
+      return;
     }
 
     // Set priority_second_approver based on second-approval status when the
@@ -358,8 +515,6 @@
         secondApproverStatus === "requester_qualifies"
       ) {
         item.priority_second_approver = item.uid;
-      } else if (secondApproverStatus === "required_no_candidates") {
-        item.priority_second_approver = "";
       }
     }
 
@@ -457,6 +612,9 @@
         {item.given_name} {item.surname}
       {/snippet}
     </DsSelector>
+    {#if firstApproverReasonMessage}
+      <div class="w-full text-sm text-red-700">{firstApproverReasonMessage}</div>
+    {/if}
   {/if}
 
   {#if showSecondApproverField}
@@ -639,7 +797,9 @@
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
-      <DsActionButton type="submit">Save</DsActionButton>
+      <DsActionButton type="submit" disabled={approversPendingResolution || showApproverFetchError}>
+        Save
+      </DsActionButton>
       <DsActionButton action="/pos/list">Cancel</DsActionButton>
     </span>
     {#if errors.global !== undefined}
