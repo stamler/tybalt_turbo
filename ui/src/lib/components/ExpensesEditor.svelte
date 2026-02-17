@@ -200,14 +200,10 @@
     {/snippet}
   </DsSelector>
 
-  <!-- Job + category fields are only allowed if a purchase order is present or
-   if the payment type is Allowance, Mileage, FuelCard, or
-   PersonalReimbursement, so we should 
-     1. show them as uneditable fields when creating an expense from an existing
-        purchase order (purchase_order !== "")
-     2. show them as editable if the payment type is Allowance, Mileage,
-        FuelCard, or PersonalReimbursement
-     3. hide them otherwise
+  <!-- Job + category visibility rules:
+   if a purchase order is present, keep Job locked to the PO but allow Category edits.
+   Without a purchase order, show/edit these fields only for Allowance, Mileage,
+   FuelCard, or PersonalReimbursement.
    -->
   {#if $jobs.index !== null}
     <DsAutoComplete
@@ -236,7 +232,6 @@
       fieldName="category"
       uiName="Category"
       clear={true}
-      disabled={item.purchase_order !== ""}
     >
       {#snippet optionTemplate(item: CategoriesResponse)}
         {item.name}

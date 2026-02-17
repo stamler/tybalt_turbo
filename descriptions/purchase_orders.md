@@ -3,6 +3,7 @@
 This document describes the current PO approval model implemented in February 2026.
 
 For implementation-level details and decision history, see:
+
 - `/Users/dean/code/tybalt_turbo/descriptions/feb26_po_mods.md`
 
 ## Core Approval Model
@@ -28,7 +29,10 @@ The PO `kind` determines which `po_approver_props` limit column is used:
 - `media_and_event`: `media_and_event_max`
 - `computer`: `computer_max`
 
-If `kind` is omitted, backend defaults it to `standard`.
+`kind` handling differs by surface:
+
+- Approver lookup endpoints default missing `kind` to `standard` (legacy-compat behavior).
+- PO create/update validation requires a non-empty, valid `kind`; save fails if `kind` is missing or invalid.
 
 ## approval_total
 
@@ -60,10 +64,15 @@ If dual approval is not required:
 
 `GET /api/purchase_orders/second_approvers` returns candidates who can final-approve the evaluated amount.
 
-When second approval is required and the requester is not self-qualified:
+Behavior by policy state:
 
-- if at least one final-capable candidate exists: `200` with candidates/meta
-- if no final-capable candidate exists: `400` with `code = second_pool_empty`
+- If second approval is not required: `200` with metadata indicating `not_required`.
+- If second approval is required and requester is self-qualified:
+  - `200` with metadata indicating `requester_qualifies`
+  - `approvers` is intentionally returned as an empty list for UI auto-self handling.
+- If second approval is required and the requester is not self-qualified:
+  - if at least one final-capable candidate exists: `200` with candidates/meta
+  - if no final-capable candidate exists: `400` with `code = second_pool_empty`
 
 ## First Approver Endpoint Contract
 
@@ -96,6 +105,40 @@ For dual-required POs (`approval_total > second_approval_threshold`):
 For single-stage POs:
 
 - `priority_second_approver` is cleared
+
+## Editability Rules
+
+Direct record updates are allowed only when all of the following are true:
+
+- Caller is the PO creator (`uid = @request.auth.id`)
+- `status = Unapproved`
+- `approved = ""`
+- `second_approval = ""`
+
+Direct record deletion is allowed only when all of the following are true:
+
+- Caller is the PO creator (`uid = @request.auth.id`)
+- `status = Unapproved`
+
+Create-path guardrails (collection API rules):
+
+- New POs must be created with `status = Unapproved`.
+- Approval/cancellation/closure fields must not be submitted on create.
+- UI delete action is shown only when the caller meets the delete rule above (creator + `Unapproved`).
+
+Implications:
+
+- Once a PO has been first-approved or second-approved, it is no longer editable via normal update.
+- Editing an approved PO does not "unapprove" it, because the update is blocked before save.
+- While a PO is still editable, save-time cleaning clears rejection fields (`rejected`, `rejector`, `rejection_reason`) to support resubmission after changes.
+
+### Save vs Approve
+
+- Creating or saving a PO does **not** approve it.
+- This is true even when the creator is also approval-qualified and assigns themself as approver.
+- A saved PO remains editable (by the creator) while it stays `Unapproved` with empty `approved` and `second_approval` timestamps.
+- Approval only happens when the explicit approve action is executed (`POST /api/purchase_orders/{id}/approve`).
+- Therefore, managers can draft and save their own POs, review/edit them, and only lock them once they intentionally run approval.
 
 ## Approve Endpoint Behavior
 
@@ -136,7 +179,7 @@ When PO is dual-required, not yet first-approved, and caller already qualifies f
   - `status = Active`
   - `po_number` generated/applied
 
-## Pending Visibility
+## Pending Queue Visibility (`GET /api/purchase_orders/pending*`)
 
 Visibility is stage-based and denoising-oriented.
 
@@ -164,11 +207,35 @@ Fallback behavior:
 
 - missing/invalid/non-positive config value uses `24` hours
 
+## Broad Visibility (`GET /api/purchase_orders/visible*`)
+
+The `visible` endpoints use broader read semantics than `pending`:
+
+- `Active`: visible to any authenticated user
+- `Cancelled`/`Closed`: visible to creator, approvers, and `report` claim holders
+- `Unapproved`:
+  - direct visibility: creator, assigned first approver (pre-first-approval), priority second approver (post-first-approval)
+  - plus policy-based second-stage visibility for eligible second-stage approvers on first-approved/not-second-approved records (not timeout-gated)
+
+`GET /api/purchase_orders/visible` supports `scope`:
+
+- `all` (default)
+- `mine` (where `uid = caller`)
+- `active` (status `Active`)
+- `stale` (status `Active` and older than `stale_before`; uses `second_approval` when present, otherwise `approved`)
+
+Note:
+
+- Collection `list/view` rules are direct-only for unapproved records; the broader policy-based second-stage visibility above is implemented by the custom `/visible*` SQL endpoints.
+
 ## priority_second_approver
 
-`priority_second_approver` is mandatory for dual-required POs and defines the exclusive Stage 2 owner during the timeout window.
+`priority_second_approver` is mandatory for dual-required POs and defines the Stage 2 priority owner for the pending queue during the timeout window.
 
-This is noise control, not an authorization bypass. All final approvals still require second-stage eligibility and sufficient limit.
+This is noise control, not an authorization bypass. Approval authorization is still policy-based:
+
+- final approval requires second-stage eligibility and sufficient limit
+- approve-route authorization is not restricted to `priority_second_approver` during the timeout window
 
 ## Notifications
 
@@ -201,17 +268,17 @@ Current canonical views:
 
 1. PO created as `Unapproved`
 2. Stage 1 performed by assigned first approver (or bypass fast path)
-3. If dual-required, Stage 2 performed by priority owner first, then broader pool after timeout
+3. If dual-required, pending queue ownership is priority-owner first, then broader pool after timeout; final approval authorization remains any second-stage-eligible approver
 4. PO becomes `Active` only when approval requirements are fully satisfied
 5. Active PO is later cancelled/closed per existing status rules
 
 ## Purchase Order Types and Behaviors
 
-| PO Type    | Description                                                                                   | May be Closed Manually                               | May be Canceled if status is Active                  | Closed Automatically                    |
-| ---------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------- | --------------------------------------- |
-| One-Time   | Valid for a single expense                                                                    | No                                                   | Yes, by `payables_admin` if no expenses are attached | When an expense is committed            |
-| Recurring  | Valid for a fixed number of expenses not exceeding specified value                            | Yes, if status is `Active` and has at least 1 expense | Yes, by `payables_admin` if no expenses are attached | When final expected expense is committed |
-| Cumulative | Valid for multiple expenses where sum of values does not exceed the PO total                  | Yes, if status is `Active` and has at least 1 expense | Yes, by `payables_admin` if no expenses are attached | When committed total reaches PO total   |
+| PO Type    | Description                                                                  | May be Closed Manually                                              | May be Canceled if status is Active                  | Closed Automatically                     |
+| ---------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------- |
+| One-Time   | Valid for a single expense                                                   | No                                                                  | Yes, by `payables_admin` if no expenses are attached | When an expense is committed             |
+| Recurring  | Valid for a fixed number of expenses not exceeding specified value           | Yes, if status is `Active` and has at least 1 **committed** expense | Yes, by `payables_admin` if no expenses are attached | When final expected expense is committed |
+| Cumulative | Valid for multiple expenses where sum of values does not exceed the PO total | Yes, if status is `Active` and has at least 1 **committed** expense | Yes, by `payables_admin` if no expenses are attached | When committed total reaches PO total    |
 
 Operational handlers:
 
@@ -250,7 +317,7 @@ Route: `POST /api/purchase_orders/:id/close`
 Manual closure rules:
 
 - Only `Recurring` and `Cumulative` POs may be manually closed.
-- PO must have at least one associated expense.
+- PO must have at least one associated **committed** expense.
 - On success:
   - `closer` is set
   - `closed` timestamp is set
@@ -266,13 +333,17 @@ Automatic close sets `closed_by_system = true`.
 
 ## API Endpoints (Non-approver-list)
 
-Implemented in `/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go` and registered in `/Users/dean/code/tybalt_turbo/app/routes/routes.go`.
+Implemented in `/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go` and `/Users/dean/code/tybalt_turbo/app/routes/close_purchase_order.go`, and registered in `/Users/dean/code/tybalt_turbo/app/routes/routes.go`.
 
 - `POST /api/purchase_orders/:id/approve`
 - `POST /api/purchase_orders/:id/reject`
 - `POST /api/purchase_orders/:id/cancel`
 - `POST /api/purchase_orders/:id/close`
+- `POST /api/purchase_orders/:id/make_cumulative`
 - `GET /api/purchase_orders/pending`
+- `GET /api/purchase_orders/pending/:id`
+- `GET /api/purchase_orders/visible`
+- `GET /api/purchase_orders/visible/:id`
 
 ## PO Number Format
 
@@ -288,52 +359,52 @@ Child POs: `YYMM-NNNN-XX`
 
 ## Pocketbase Collection Schema (`purchase_orders`)
 
-| Field                    | Type                         | Description                                                                               |
-| ------------------------ | ---------------------------- | ----------------------------------------------------------------------------------------- |
-| po_number                | string                       | `YYMM-NNNN` or `YYMM-NNNN-XX`; required for `Active`/`Cancelled`/`Closed`               |
-| status                   | enum                         | `Unapproved`, `Active`, `Cancelled`, `Closed`                                            |
-| uid                      | relation -> users            | Creator                                                                                   |
-| type                     | enum                         | `One-Time`, `Cumulative`, `Recurring`                                                    |
-| kind                     | relation -> expenditure_kinds | Expenditure kind; drives limit-column resolution                                          |
-| date                     | string                       | Start date (`YYYY-MM-DD`)                                                                 |
-| end_date                 | string                       | End date for recurring POs                                                                |
-| frequency                | enum                         | `Weekly`, `Biweekly`, `Monthly`                                                           |
-| division                 | relation -> divisions        | Division context                                                                          |
-| description              | string                       | Minimum 5 chars                                                                           |
-| total                    | number                       | User-entered PO amount                                                                    |
-| approval_total           | number                       | Computed amount used for approval policy                                                  |
-| payment_type             | enum                         | `OnAccount`, `Expense`, `CorporateCreditCard`                                             |
-| vendor                   | relation -> vendors          | Vendor                                                                                    |
-| job                      | relation -> jobs             | Optional job                                                                              |
-| category                 | relation -> categories       | Optional category                                                                         |
-| branch                   | relation -> branches         | Derived from job or user default                                                          |
-| attachment               | file                         | Optional file                                                                             |
-| approver                 | relation -> users            | Assigned first-stage approver                                                             |
-| approved                 | datetime                     | First-approval timestamp                                                                  |
-| second_approver          | relation -> users            | Final approver                                                                            |
-| second_approval          | datetime                     | Final-approval timestamp                                                                  |
-| priority_second_approver | relation -> users            | Exclusive stage-2 owner during timeout window                                             |
-| rejector                 | relation -> users            | Rejecting user                                                                            |
-| rejected                 | datetime                     | Rejection timestamp                                                                       |
-| rejection_reason         | string                       | Rejection explanation                                                                     |
-| canceller                | relation -> users            | Cancelling user                                                                           |
-| cancelled                | datetime                     | Cancellation timestamp                                                                    |
-| closer                   | relation -> users            | Manual closer                                                                             |
-| closed                   | datetime                     | Closure timestamp                                                                         |
-| closed_by_system         | boolean                      | Whether closure was automatic                                                             |
-| parent_po                | relation -> purchase_orders  | Parent pointer for child POs                                                              |
+| Field                    | Type                          | Description                                                               |
+| ------------------------ | ----------------------------- | ------------------------------------------------------------------------- |
+| po_number                | string                        | `YYMM-NNNN` or `YYMM-NNNN-XX`; required for `Active`/`Cancelled`/`Closed` |
+| status                   | enum                          | `Unapproved`, `Active`, `Cancelled`, `Closed`                             |
+| uid                      | relation -> users             | Creator                                                                   |
+| type                     | enum                          | `One-Time`, `Cumulative`, `Recurring`                                     |
+| kind                     | relation -> expenditure_kinds | Expenditure kind; drives limit-column resolution                          |
+| date                     | string                        | Start date (`YYYY-MM-DD`)                                                 |
+| end_date                 | string                        | End date for recurring POs                                                |
+| frequency                | enum                          | `Weekly`, `Biweekly`, `Monthly`                                           |
+| division                 | relation -> divisions         | Division context                                                          |
+| description              | string                        | Minimum 5 chars                                                           |
+| total                    | number                        | User-entered PO amount                                                    |
+| approval_total           | number                        | Computed amount used for approval policy                                  |
+| payment_type             | enum                          | `OnAccount`, `Expense`, `CorporateCreditCard`                             |
+| vendor                   | relation -> vendors           | Vendor                                                                    |
+| job                      | relation -> jobs              | Optional job                                                              |
+| category                 | relation -> categories        | Optional category                                                         |
+| branch                   | relation -> branches          | Derived from job or user default                                          |
+| attachment               | file                          | Optional file                                                             |
+| approver                 | relation -> users             | Assigned first-stage approver                                             |
+| approved                 | datetime                      | First-approval timestamp                                                  |
+| second_approver          | relation -> users             | Final approver                                                            |
+| second_approval          | datetime                      | Final-approval timestamp                                                  |
+| priority_second_approver | relation -> users             | Exclusive stage-2 owner during timeout window                             |
+| rejector                 | relation -> users             | Rejecting user                                                            |
+| rejected                 | datetime                      | Rejection timestamp                                                       |
+| rejection_reason         | string                        | Rejection explanation                                                     |
+| canceller                | relation -> users             | Cancelling user                                                           |
+| cancelled                | datetime                      | Cancellation timestamp                                                    |
+| closer                   | relation -> users             | Manual closer                                                             |
+| closed                   | datetime                      | Closure timestamp                                                         |
+| closed_by_system         | boolean                       | Whether closure was automatic                                             |
+| parent_po                | relation -> purchase_orders   | Parent pointer for child POs                                              |
 
 ## Pocketbase Collection Schema (`expenditure_kinds`)
 
-| Field                     | Type   | Description                                                     |
-| ------------------------- | ------ | --------------------------------------------------------------- |
-| id                        | string | PocketBase record ID                                            |
-| name                      | string | Semantic key (`standard`, `sponsorship`, etc.)                 |
-| description               | string | Human-readable description                                      |
-| ui_order                  | number | Display ordering                                                |
-| en_ui_label               | string | UI label                                                        |
-| allow_job                 | bool   | Whether this kind permits a `job` on PO                        |
-| second_approval_threshold | number | Threshold above which dual approval is required for this kind   |
+| Field                     | Type   | Description                                                   |
+| ------------------------- | ------ | ------------------------------------------------------------- |
+| id                        | string | PocketBase record ID                                          |
+| name                      | string | Semantic key (`standard`, `sponsorship`, etc.)                |
+| description               | string | Human-readable description                                    |
+| ui_order                  | number | Display ordering                                              |
+| en_ui_label               | string | UI label                                                      |
+| allow_job                 | bool   | Whether this kind permits a `job` on PO                       |
+| second_approval_threshold | number | Threshold above which dual approval is required for this kind |
 
 ## `po_approver_props` Limit Columns
 

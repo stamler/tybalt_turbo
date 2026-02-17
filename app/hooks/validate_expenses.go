@@ -148,6 +148,24 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 		}
 	}
 
+	// Expenses linked to a PO must retain the same job as the PO (including both empty).
+	if hasPurchaseOrder {
+		poJobID := strings.TrimSpace(poRecord.GetString("job"))
+		expenseJobID := strings.TrimSpace(expenseRecord.GetString("job"))
+		if expenseJobID != poJobID {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating expense",
+				Data: map[string]errs.CodeError{
+					"job": {
+						Code:    "must_match_purchase_order",
+						Message: "job must match purchase order job",
+					},
+				},
+			}
+		}
+	}
+
 	kindID := strings.TrimSpace(expenseRecord.GetString("kind"))
 	if kindID == "" {
 		// Backward compatibility for legacy records created before kind existed.

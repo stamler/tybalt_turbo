@@ -13,6 +13,7 @@
     PurchaseOrdersResponse,
   } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
+  import { authStore } from "$lib/stores/auth";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
   import { onMount, onDestroy, untrack } from "svelte";
@@ -123,6 +124,12 @@
       }
     }
     return false;
+  }
+
+  function poMayBeDeletedByUser(po: PurchaseOrdersAugmentedResponse): boolean {
+    if (deactivateButtonHiding) return true;
+    const currentUserId = $authStore?.model?.id ?? "";
+    return po.status === "Unapproved" && po.uid === currentUserId;
   }
 
   async function del(id: string): Promise<void> {
@@ -341,7 +348,9 @@
             color="orange"
           />
         {/if}
-        <DsActionButton action={() => del(item.id)} icon="mdi:delete" title="Delete" color="red" />
+        {#if poMayBeDeletedByUser(item)}
+          <DsActionButton action={() => del(item.id)} icon="mdi:delete" title="Delete" color="red" />
+        {/if}
       {/if}
     {/if}
   {/snippet}
