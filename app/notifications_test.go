@@ -11,9 +11,30 @@ import (
 	"tybalt/notifications"
 
 	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/core"
 )
 
 // This is the test file for the notifications package.
+
+func upsertNotificationsConfigRawValue(t *testing.T, app core.App, rawValue string) {
+	t.Helper()
+
+	collection, err := app.FindCollectionByNameOrId("app_config")
+	if err != nil {
+		t.Fatalf("failed to find app_config collection: %v", err)
+	}
+
+	record, err := app.FindFirstRecordByData("app_config", "key", "notifications")
+	if err != nil || record == nil {
+		record = core.NewRecord(collection)
+		record.Set("key", "notifications")
+	}
+
+	record.Set("value", rawValue)
+	if err := app.Save(record); err != nil {
+		t.Fatalf("failed to save notifications config: %v", err)
+	}
+}
 
 // SendNextPendingNotification()
 
@@ -264,6 +285,51 @@ func TestSendNotifications_ErrorHandling(t *testing.T) {
 	messageCount := len(app.TestMailer.Messages())
 	if sentCount != int64(messageCount) {
 		t.Errorf("Expected sentCount to be %d, got %d", messageCount, sentCount)
+	}
+}
+
+func TestCreateNotification_SkipsWhenFeatureDisabled(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	upsertNotificationsConfigRawValue(t, app, `{"timesheet_shared":false}`)
+
+	var userRow struct {
+		UID string `db:"uid"`
+	}
+	if err := app.DB().NewQuery(`SELECT id AS uid FROM users LIMIT 1`).One(&userRow); err != nil {
+		t.Fatalf("failed to find recipient user: %v", err)
+	}
+
+	countForTemplate := func(code string) int64 {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": code,
+		}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to count notifications for code %s: %v", code, err)
+		}
+		return result.Count
+	}
+
+	beforeCount := countForTemplate("timesheet_shared")
+
+	if err := notifications.CreateNotification(app, "timesheet_shared", userRow.UID, map[string]any{
+		"WeekEnding": "2026-02-14",
+	}, true); err != nil {
+		t.Fatalf("expected no error when disabled notification is skipped, got %v", err)
+	}
+
+	afterCount := countForTemplate("timesheet_shared")
+	if afterCount != beforeCount {
+		t.Fatalf("expected notification count to remain unchanged when feature is disabled, before=%d after=%d", beforeCount, afterCount)
 	}
 }
 

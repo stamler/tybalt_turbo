@@ -70,6 +70,13 @@ func IsExpensesEditingEnabled(app core.App) (bool, error) {
 	return GetConfigBool(app, "expenses", "create_edit_absorb", true)
 }
 
+// IsNotificationFeatureEnabled checks whether a notification feature/template is enabled.
+// Reads from app_config where key="notifications", and uses templateCode as the JSON key.
+// Defaults to false (fail-closed) when config is missing.
+func IsNotificationFeatureEnabled(app core.App, templateCode string) (bool, error) {
+	return GetConfigBool(app, "notifications", templateCode, false)
+}
+
 func GetPurchaseOrderSecondStageTimeoutHours(app core.App) float64 {
 	const defaultTimeoutHours = 24.0
 

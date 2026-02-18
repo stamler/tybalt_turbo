@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"tybalt/constants"
+	"tybalt/notifications"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -447,64 +448,32 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 		creatorProfile := updatedPO.ExpandedOne("uid").ExpandedOne("profiles_via_uid")
 		approverProfile := updatedPO.ExpandedOne("approver").ExpandedOne("profiles_via_uid")
 
-		notificationCollection, err := app.FindCollectionByNameOrId("notifications")
-		if err != nil {
-			return err
-		}
-		var notificationRecord *core.Record = nil
-
 		if !recordWasFirstApproved && recordNowFirstApproved && recordRequiresSecondApproval && updatedPO.GetString("priority_second_approver") != "" && updatedPO.GetString("status") != "Active" {
 			// The PO is now approved but not second-approved, and the
 			// priority_second_approver is set. Create a message to the
 			// priority_second_approver alerting them that they need to approve the PO
 			// and have an exclusive window to do so before it is available for approval
 			// by all qualified approvers.
-			notificationRecord = core.NewRecord(notificationCollection)
-
-			notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
-				"code": "po_priority_second_approval_required",
-			})
+			err := notifications.CreateNotificationWithUser(app, "po_priority_second_approval_required", updatedPO.GetString("priority_second_approver"), map[string]any{
+				"POId":          updatedPO.Id,
+				"POCreatorName": creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
+			}, false, userId)
 			if err != nil {
 				return err
 			}
-			notificationRecord.Set("recipient", updatedPO.GetString("priority_second_approver"))
-			notificationRecord.Set("template", notificationTemplate.Id)
-			notificationRecord.Set("status", "pending")
-			notificationRecord.Set("user", userId)
-			notificationRecord.Set("data", map[string]any{
-				"POId":          updatedPO.Id,
-				"POCreatorName": creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
-			})
 		} else if recordActivated && updatedPO.GetString("status") == "Active" && updatedPO.GetString("uid") != userId {
 			// The PO was just approved (or just second approved) and is active.
 			// Unless the caller is the creator of the PO (and thus would already
 			// know that it has been approved), send a message to the creator
 			// alerting them that the PO has been approved and is available for
 			// use.
-			notificationRecord = core.NewRecord(notificationCollection)
-
-			notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
-				"code": "po_active",
-			})
-			if err != nil {
-				return err
-			}
-
-			notificationRecord.Set("recipient", updatedPO.GetString("uid"))
-			notificationRecord.Set("template", notificationTemplate.Id)
-			notificationRecord.Set("status", "pending")
-			notificationRecord.Set("user", userId)
-			notificationRecord.Set("data", map[string]any{
+			err := notifications.CreateNotificationWithUser(app, "po_active", updatedPO.GetString("uid"), map[string]any{
 				"POId":           updatedPO.Id,
 				"PONumber":       updatedPO.GetString("po_number"),
 				"POCreatorName":  creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
 				"POApproverName": approverProfile.GetString("given_name") + " " + approverProfile.GetString("surname"),
-			})
-		}
-
-		// If there is a notification record to save, save it
-		if notificationRecord != nil {
-			if err := app.Save(notificationRecord); err != nil {
+			}, false, userId)
+			if err != nil {
 				return err
 			}
 		}
@@ -805,31 +774,11 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 		}
 
 		// Send notification to the creator (uid)
-		notificationCollection, err := app.FindCollectionByNameOrId("notifications")
-		if err != nil {
+		if err := notifications.CreateNotificationWithUser(app, "po_rejected", updatedPO.GetString("uid"), map[string]any{
+			"POId": updatedPO.Id,
+		}, false, userId); err != nil {
 			// Log the error but don't fail the request, as the PO was already rejected
-			app.Logger().Error("notification not sent: error finding notifications collection", "error", err)
-		} else {
-			notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
-				"code": "po_rejected",
-			})
-			if err != nil {
-				// Log the error but don't fail the request
-				app.Logger().Error("notification not sent: error finding po_rejected notification template", "error", err)
-			} else {
-				notificationRecord := core.NewRecord(notificationCollection)
-				notificationRecord.Set("recipient", updatedPO.GetString("uid"))
-				notificationRecord.Set("template", notificationTemplate.Id)
-				notificationRecord.Set("status", "pending")
-				notificationRecord.Set("user", userId)
-				notificationRecord.Set("data", map[string]any{
-					"POId": updatedPO.Id,
-				})
-				if err := app.Save(notificationRecord); err != nil {
-					// Log the error but don't fail the request
-					app.Logger().Error("notification not sent: error saving rejection notification", "error", err)
-				}
-			}
+			app.Logger().Error("notification not sent: error creating rejection notification", "error", err)
 		}
 
 		return e.JSON(http.StatusOK, updatedPO)

@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"encoding/json"
 	"testing"
 	"tybalt/hooks"
 	"tybalt/routes"
@@ -26,7 +27,50 @@ func SetupTestApp(t testing.TB) *tests.TestApp {
 	// Add the routes to the test app
 	routes.AddRoutes(testApp)
 
+	enableAllNotificationTemplates(t, testApp)
+
 	return testApp
+}
+
+func enableAllNotificationTemplates(t testing.TB, app *tests.TestApp) {
+	t.Helper()
+
+	type templateRow struct {
+		Code string `db:"code"`
+	}
+	rows := []templateRow{}
+	if err := app.DB().NewQuery(`
+		SELECT code
+		FROM notification_templates
+		WHERE code != ''
+	`).All(&rows); err != nil {
+		t.Fatalf("failed loading notification templates for test config: %v", err)
+	}
+
+	enabledTemplates := map[string]bool{}
+	for _, row := range rows {
+		enabledTemplates[row.Code] = true
+	}
+
+	rawValue, err := json.Marshal(enabledTemplates)
+	if err != nil {
+		t.Fatalf("failed marshaling notifications test config: %v", err)
+	}
+
+	collection, err := app.FindCollectionByNameOrId("app_config")
+	if err != nil {
+		t.Fatalf("failed finding app_config collection: %v", err)
+	}
+
+	record, err := app.FindFirstRecordByData("app_config", "key", "notifications")
+	if err != nil || record == nil {
+		record = core.NewRecord(collection)
+		record.Set("key", "notifications")
+	}
+	record.Set("value", string(rawValue))
+	if err := app.Save(record); err != nil {
+		t.Fatalf("failed saving notifications test config: %v", err)
+	}
 }
 
 func GenerateAdminToken(email string) (string, error) {

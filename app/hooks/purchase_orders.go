@@ -11,6 +11,7 @@ import (
 	"time"
 	"tybalt/constants"
 	"tybalt/errs"
+	"tybalt/notifications"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -571,28 +572,9 @@ func sendPOApprovalRequiredNotification(app core.App, purchaseOrderRecord *core.
 		return nil
 	}
 
-	notificationCollection, err := app.FindCollectionByNameOrId("notifications")
-	if err != nil {
-		return err
-	}
-
-	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
-		"code": "po_approval_required",
-	})
-	if err != nil {
-		return err
-	}
-
-	notificationRecord := core.NewRecord(notificationCollection)
-	notificationRecord.Set("recipient", approverID)
-	notificationRecord.Set("template", notificationTemplate.Id)
-	notificationRecord.Set("status", "pending")
-	notificationRecord.Set("user", actorID)
-	notificationRecord.Set("data", map[string]any{
+	return notifications.CreateNotificationWithUser(app, "po_approval_required", approverID, map[string]any{
 		"POId": purchaseOrderRecord.Id,
-	})
-
-	return app.Save(notificationRecord)
+	}, false, actorID)
 }
 
 // The ProcessPurchaseOrder function is used to validate the purchase_order

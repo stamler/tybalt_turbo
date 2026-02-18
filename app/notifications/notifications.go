@@ -247,13 +247,51 @@ func SendNotifications(app core.App) (int64, error) {
 
 // CreateNotification creates a notification record with the given template code, recipient, and optional data
 func CreateNotification(app core.App, templateCode string, recipientUID string, data map[string]any, system bool) error {
+	_, err := createNotificationWithUser(app, templateCode, recipientUID, data, system, "")
+	return err
+}
+
+// CreateNotificationWithUser creates a notification record with the given template code,
+// recipient, optional data, system flag, and optional actor user ID.
+func CreateNotificationWithUser(app core.App, templateCode string, recipientUID string, data map[string]any, system bool, actorUID string) error {
+	_, err := createNotificationWithUser(app, templateCode, recipientUID, data, system, actorUID)
+	return err
+}
+
+func createNotificationWithUser(app core.App, templateCode string, recipientUID string, data map[string]any, system bool, actorUID string) (bool, error) {
+	enabled, err := utilities.IsNotificationFeatureEnabled(app, templateCode)
+	if err != nil {
+		// Intentionally fail closed for notification features:
+		// if config cannot be read (for example DB/query error), we skip notification
+		// creation and return (created=false, err=nil). This keeps business workflows
+		// non-blocking (PO approval/rejection, etc.) while ensuring we never send a
+		// notification unless explicitly enabled.
+		//
+		// Important: callers cannot distinguish "disabled by config" from
+		// "config read failure" via return error; use logs to investigate.
+		app.Logger().Error(
+			"error reading notifications feature config; skipping notification (fail-closed)",
+			"template_code", templateCode,
+			"error", err,
+		)
+		return false, nil
+	}
+	if !enabled {
+		app.Logger().Info(
+			"notification creation skipped because feature is disabled",
+			"template_code", templateCode,
+			"recipient_uid", recipientUID,
+		)
+		return false, nil
+	}
+
 	notificationCollection, err := app.FindCollectionByNameOrId("notifications")
 	if err != nil {
 		app.Logger().Error(
 			"error finding notifications collection",
 			"error", err,
 		)
-		return fmt.Errorf("error finding notifications collection: %v", err)
+		return false, fmt.Errorf("error finding notifications collection: %v", err)
 	}
 
 	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
@@ -265,7 +303,7 @@ func CreateNotification(app core.App, templateCode string, recipientUID string, 
 			"template_code", templateCode,
 			"error", err,
 		)
-		return fmt.Errorf("error finding notification template %s: %v", templateCode, err)
+		return false, fmt.Errorf("error finding notification template %s: %v", templateCode, err)
 	}
 
 	notificationRecord := core.NewRecord(notificationCollection)
@@ -275,6 +313,9 @@ func CreateNotification(app core.App, templateCode string, recipientUID string, 
 	notificationRecord.Set("text_email", notificationTemplate.Get("text_email"))
 	notificationRecord.Set("status", "pending")
 	notificationRecord.Set("system_notification", system)
+	if actorUID != "" {
+		notificationRecord.Set("user", actorUID)
+	}
 
 	// If data is provided, marshal it to JSON and store it
 	if len(data) > 0 {
@@ -284,7 +325,7 @@ func CreateNotification(app core.App, templateCode string, recipientUID string, 
 				"error marshaling notification data",
 				"error", err,
 			)
-			return fmt.Errorf("error marshaling notification data: %v", err)
+			return false, fmt.Errorf("error marshaling notification data: %v", err)
 		}
 		notificationRecord.Set("data", string(dataJSON))
 	}
@@ -297,10 +338,10 @@ func CreateNotification(app core.App, templateCode string, recipientUID string, 
 			"recipient_uid", recipientUID,
 			"error", err,
 		)
-		return fmt.Errorf("error saving notification: %v", err)
+		return false, fmt.Errorf("error saving notification: %v", err)
 	}
 
-	return nil
+	return true, nil
 }
 
 // QueueSecondApproverNotifications will create a notification for each user (id
@@ -324,9 +365,11 @@ func QueuePoSecondApproverNotifications(app core.App, send bool) error {
 	}
 
 	// create a notification for each user
+	createdCount := 0
 	for _, record := range records {
 		recipientID := record.GetString("id")
-		if err := CreateNotification(app, "po_second_approval_required", recipientID, nil, true); err != nil {
+		created, err := createNotificationWithUser(app, "po_second_approval_required", recipientID, nil, true, "")
+		if err != nil {
 			app.Logger().Error(
 				"error creating second approval notification",
 				"error", err,
@@ -334,7 +377,16 @@ func QueuePoSecondApproverNotifications(app core.App, send bool) error {
 			)
 			return fmt.Errorf("error saving second approval notification: %v", err)
 		}
+		if created {
+			createdCount++
+		}
 	}
+
+	app.Logger().Info(
+		"queued second approval notifications",
+		"candidate_count", len(records),
+		"created_count", createdCount,
+	)
 
 	// Send the notifications if the send flag is true
 	if send {
@@ -451,7 +503,7 @@ func QueueTimesheetSubmissionRemindersForWeek(app core.App, weekEnding string, s
 		data := map[string]any{
 			"WeekEnding": weekEnding,
 		}
-		err = CreateNotification(app, "timesheet_submission_reminder", user.UID, data, true)
+		created, err := createNotificationWithUser(app, "timesheet_submission_reminder", user.UID, data, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating timesheet submission reminder",
@@ -459,6 +511,9 @@ func QueueTimesheetSubmissionRemindersForWeek(app core.App, weekEnding string, s
 				"error", err,
 			)
 			// Continue with other users even if one fails
+			continue
+		}
+		if !created {
 			continue
 		}
 		createdCount++
@@ -556,7 +611,7 @@ func QueueTimesheetApprovalReminders(app core.App, send bool) error {
 		}
 
 		// Create notification (no extra data needed for approval reminders)
-		err = CreateNotification(app, "timesheet_approval_reminder", manager.ManagerUID, nil, true)
+		created, err := createNotificationWithUser(app, "timesheet_approval_reminder", manager.ManagerUID, nil, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating timesheet approval reminder",
@@ -564,6 +619,9 @@ func QueueTimesheetApprovalReminders(app core.App, send bool) error {
 				"error", err,
 			)
 			// Continue with other managers even if one fails
+			continue
+		}
+		if !created {
 			continue
 		}
 		createdCount++
@@ -660,7 +718,7 @@ func QueueExpenseApprovalReminders(app core.App, send bool) error {
 		}
 
 		// Create notification (no extra data needed for approval reminders)
-		err = CreateNotification(app, "expense_approval_reminder", manager.ManagerUID, nil, true)
+		created, err := createNotificationWithUser(app, "expense_approval_reminder", manager.ManagerUID, nil, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating expense approval reminder",
@@ -668,6 +726,9 @@ func QueueExpenseApprovalReminders(app core.App, send bool) error {
 				"error", err,
 			)
 			// Continue with other managers even if one fails
+			continue
+		}
+		if !created {
 			continue
 		}
 		createdCount++
@@ -747,8 +808,9 @@ func QueueTimesheetRejectedNotifications(app core.App, timesheet *core.Record, r
 	}
 
 	// Create notifications for each recipient
+	createdCount := 0
 	for _, recipientUID := range recipients {
-		err = CreateNotification(app, "timesheet_rejected", recipientUID, data, true)
+		created, err := createNotificationWithUser(app, "timesheet_rejected", recipientUID, data, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating timesheet rejection notification",
@@ -758,11 +820,15 @@ func QueueTimesheetRejectedNotifications(app core.App, timesheet *core.Record, r
 			// Continue with other recipients even if one fails
 			continue
 		}
+		if created {
+			createdCount++
+		}
 	}
 
 	app.Logger().Info(
 		"queued timesheet rejection notifications",
 		"timesheet_id", timesheet.Id,
+		"created_count", createdCount,
 		"recipient_count", len(recipients),
 	)
 
@@ -829,8 +895,9 @@ func QueueExpenseRejectedNotifications(app core.App, expense *core.Record, rejec
 	}
 
 	// Create notifications for each recipient
+	createdCount := 0
 	for _, recipientUID := range recipients {
-		err = CreateNotification(app, "expense_rejected", recipientUID, data, true)
+		created, err := createNotificationWithUser(app, "expense_rejected", recipientUID, data, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating expense rejection notification",
@@ -840,11 +907,15 @@ func QueueExpenseRejectedNotifications(app core.App, expense *core.Record, rejec
 			// Continue with other recipients even if one fails
 			continue
 		}
+		if created {
+			createdCount++
+		}
 	}
 
 	app.Logger().Info(
 		"queued expense rejection notifications",
 		"expense_id", expense.Id,
+		"created_count", createdCount,
 		"recipient_count", len(recipients),
 	)
 
@@ -898,7 +969,7 @@ func QueueTimesheetSharedNotifications(app core.App, timesheet *core.Record, sha
 	// Create notifications for each new viewer
 	createdCount := 0
 	for _, viewerUID := range newViewerUIDs {
-		err = CreateNotification(app, "timesheet_shared", viewerUID, data, true)
+		created, err := createNotificationWithUser(app, "timesheet_shared", viewerUID, data, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating timesheet shared notification",
@@ -906,6 +977,9 @@ func QueueTimesheetSharedNotifications(app core.App, timesheet *core.Record, sha
 				"error", err,
 			)
 			// Continue with other viewers even if one fails
+			continue
+		}
+		if !created {
 			continue
 		}
 		createdCount++
