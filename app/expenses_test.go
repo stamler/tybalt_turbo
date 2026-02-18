@@ -118,6 +118,31 @@ func TestExpensesCreate(t *testing.T) {
 				TestAppFactory: testutils.SetupTestApp,
 			}
 		}(),
+		{
+			Name:   "expense with job fails when division is not allocated to that job",
+			Method: http.MethodPost,
+			URL:    "/api/collections/expenses/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-01",
+				"division": "90drdtwx5v4ew70",
+				"description": "allowance with unallocated division",
+				"payment_type": "Allowance",
+				"allowance_types": ["Breakfast"],
+				"total": 0,
+				"job": "test_job_w_rs"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"division":{"code":"division_not_allowed"`,
+				`Division BM is not allocated to this job`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 		func() tests.ApiScenario {
 			// Using 2025-01-10 so the effective allowance rate row is 2025-01-05
 			// Breakfast=20, Lunch=25, Dinner=30, Lodging=50 on that date.

@@ -276,7 +276,14 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 		),
 	}
 
-	// If a job is present, verify the referenced job exists and has Active status
+	// Job-aware validation for expenses:
+	// 1) job reference must exist and be Active
+	// 2) when creating, or when job/division changes on update, ensure the
+	//    selected division is allocated to the selected job.
+	//
+	// The second check is intentionally gated to avoid breaking updates to legacy
+	// expenses where job/division was historically stored without strict
+	// allocation enforcement.
 	if hasJob {
 		jobID := expenseRecord.GetString("job")
 		jobRecord, err := app.FindRecordById("jobs", jobID)
@@ -284,6 +291,10 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 			validationsErrors["job"] = validation.NewError("invalid_reference", "invalid job reference")
 		} else if jobRecord.GetString("status") != "Active" {
 			validationsErrors["job"] = validation.NewError("not_active", "Job status must be Active")
+		} else if shouldValidateJobDivisionAllocationOnRecord(app, expenseRecord) {
+			if field, allocErr := validateDivisionAllocatedToJob(app, jobID, expenseRecord.GetString("division")); allocErr != nil {
+				validationsErrors[field] = allocErr
+			}
 		}
 	}
 

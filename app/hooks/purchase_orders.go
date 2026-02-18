@@ -437,7 +437,15 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		"type":  validation.Validate(purchaseOrderRecord.GetString("type"), validation.When(isChild, validation.In("One-Time").Error("child POs must be of type One-Time"))),
 	}
 
-	// If a job is present, verify the referenced job exists and has Active status
+	// Job-aware validation is performed in stages:
+	// 1) job must exist and be Active
+	// 2) PO branch must match job branch
+	// 3) division must be allocated to the job, but only when creating a PO or
+	//    when job/division is explicitly changed on update.
+	//
+	// Step (3) intentionally uses shouldValidateJobDivisionAllocationOnRecord so
+	// historical rows can still be edited for unrelated fields without being
+	// blocked by legacy allocation mismatches.
 	if jobID := purchaseOrderRecord.GetString("job"); jobID != "" {
 		jobRecord, err := app.FindRecordById("jobs", jobID)
 		if err != nil || jobRecord == nil {
@@ -446,6 +454,10 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 			validationsErrors["job"] = validation.NewError("not_active", "Job status must be Active")
 		} else if purchaseOrderRecord.GetString("branch") != jobRecord.GetString("branch") {
 			validationsErrors["branch"] = validation.NewError("value_mismatch", "branch must match the selected job")
+		} else if shouldValidateJobDivisionAllocationOnRecord(app, purchaseOrderRecord) {
+			if field, allocErr := validateDivisionAllocatedToJob(app, jobID, purchaseOrderRecord.GetString("division")); allocErr != nil {
+				validationsErrors[field] = allocErr
+			}
 		}
 	}
 

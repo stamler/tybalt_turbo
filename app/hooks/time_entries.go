@@ -142,35 +142,11 @@ func validateTimeEntry(app core.App, timeEntryRecord *core.Record, requiredField
 			if timeEntryRecord.GetString("role") == "" {
 				otherValidationsErrors["role"] = validation.Validate(timeEntryRecord.Get("role"), validation.Required.Error("Role is required when a job is assigned"))
 			}
-			// Verify the division is allocated to this job
-			divisionID := timeEntryRecord.GetString("division")
-			if divisionID != "" {
-				// Get all divisions allocated to this job in a single query
-				var allocatedDivisions []string
-				if err := app.DB().NewQuery(`
-					SELECT division FROM job_time_allocations WHERE job = {:job}
-				`).Bind(dbx.Params{"job": jobID}).Column(&allocatedDivisions); err != nil {
-					otherValidationsErrors["job"] = validation.NewError(
-						"job_allocation_error",
-						"Error checking job allocations",
-					)
-				} else if len(allocatedDivisions) == 0 {
-					// Job has no allocations configured - this is an error
-					otherValidationsErrors["job"] = validation.NewError(
-						"job_no_allocations",
-						"This job has no division allocations configured",
-					)
-				} else if !list.ExistInSlice(divisionID, allocatedDivisions) {
-					// Division is not among the job's allocations
-					divCode := divisionID
-					if divRecord, divErr := app.FindRecordById("divisions", divisionID); divErr == nil && divRecord != nil {
-						divCode = divRecord.GetString("code")
-					}
-					otherValidationsErrors["division"] = validation.NewError(
-						"division_not_allowed",
-						fmt.Sprintf("Division %s is not allocated to this job", divCode),
-					)
-				}
+			// Time entries have always enforced allocation membership for job+division.
+			// Use the shared helper so the exact error codes/messages stay consistent
+			// with PO/expense/time-amendment validation.
+			if field, allocErr := validateDivisionAllocatedToJob(app, jobID, timeEntryRecord.GetString("division")); allocErr != nil {
+				otherValidationsErrors[field] = allocErr
 			}
 		}
 	}

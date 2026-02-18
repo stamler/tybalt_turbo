@@ -114,7 +114,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		b, ct, err := makeMultipart(fmt.Sprintf(`{
             "uid": "rzr98oadsp9qc11",
             "date": "2024-09-01",
-            "division": "vccd5fo56ctbigh",
+						"division": "vccd5fo56ctbigh",
             "description": "test purchase order",
             "payment_type": "Expense",
             "total": 1234.56,
@@ -144,12 +144,48 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		})
 	}
 
+	// fails when job division is not allocated for the selected job
+	{
+		b, ct, err := makeMultipart(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "90drdtwx5v4ew70",
+            "description": "job PO with unallocated division",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "One-Time",
+            "job": "test_job_w_rs"
+        }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails when division is not allocated to selected job",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"division":{"code":"division_not_allowed"`,
+				`Division BM is not allocated to this job`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
 	// fails when a job is set and kind does not allow jobs
 	{
 		b, ct, err := makeMultipart(fmt.Sprintf(`{
             "uid": "rzr98oadsp9qc11",
             "date": "2024-09-01",
-            "division": "vccd5fo56ctbigh",
+						"division": "vccd5fo56ctbigh",
             "description": "job PO with non-standard kind",
             "payment_type": "Expense",
             "total": 1234.56,
@@ -186,7 +222,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		b, ct, err := makeMultipart(fmt.Sprintf(`{
 	            "uid": "rzr98oadsp9qc11",
 	            "date": "2024-09-01",
-	            "division": "vccd5fo56ctbigh",
+						"division": "vccd5fo56ctbigh",
 	            "description": "job PO with computer kind",
 	            "payment_type": "Expense",
 	            "total": 123.45,
@@ -222,8 +258,8 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	{
 		b := bytes.NewBufferString(fmt.Sprintf(`{
 		            "uid": "rzr98oadsp9qc11",
-		            "date": "2024-09-01",
-		            "division": "vccd5fo56ctbigh",
+			            "date": "2024-09-01",
+						"division": "vccd5fo56ctbigh",
 		            "description": "test purchase order",
 		            "payment_type": "Expense",
 		            "total": 1234.56,
@@ -255,8 +291,8 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	{
 		b, ct, err := makeMultipart(`{
             "uid": "rzr98oadsp9qc11",
-            "date": "2024-09-01",
-	          "division": "vccd5fo56ctbigh",
+	            "date": "2024-09-01",
+						"division": "vccd5fo56ctbigh",
             "description": "test purchase order",
             "payment_type": "Expense",
             "total": 1234.56,
@@ -290,8 +326,8 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	{
 		b, ct, err := makeMultipart(`{
 				"uid": "rzr98oadsp9qc11",
-				"date": "2024-09-01",
-				"division": "vccd5fo56ctbigh",
+					"date": "2024-09-01",
+						"division": "vccd5fo56ctbigh",
             "description": "default branch assignment",
             "payment_type": "Expense",
             "total": 1234.56,
@@ -1866,11 +1902,11 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 			Method: http.MethodPatch,
 			URL:    "/api/collections/purchase_orders/records/" + firstApprovedApproverChangePOID,
 			Body: bytes.NewBufferString(fmt.Sprintf(`{
-				"uid": "f2j5a8vk006baub",
-				"date": "2024-01-31",
-				"division": "vccd5fo56ctbigh",
-				"description": "single-stage approved-not-active fixture",
-				"payment_type": "OnAccount",
+					"uid": "f2j5a8vk006baub",
+					"date": "2024-01-31",
+					"division": "fy4i9poneukvq9u",
+					"description": "single-stage approved-not-active fixture",
+					"payment_type": "OnAccount",
 				"total": 329.01,
 				"vendor": "2zqxtsmymf670ha",
 				"approver": "%s",
@@ -1926,11 +1962,11 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 			Method: http.MethodPatch,
 			URL:    "/api/collections/purchase_orders/records/" + firstApprovedPOID,
 			Body: bytes.NewBufferString(`{
-				"uid": "f2j5a8vk006baub",
-				"date": "2025-01-29",
-				"division": "vccd5fo56ctbigh",
-				"description": "Higher-value unapproved PO that already has first approval (edited)",
-				"payment_type": "OnAccount",
+						"uid": "f2j5a8vk006baub",
+						"date": "2025-01-29",
+						"division": "vccd5fo56ctbigh",
+					"description": "Higher-value unapproved PO that already has first approval (edited)",
+					"payment_type": "OnAccount",
 				"total": 1022.69,
 				"vendor": "mmgxrnn144767x7",
 				"approver": "wegviunlyr2jjjv",
@@ -1987,11 +2023,11 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 			Method: http.MethodPatch,
 			URL:    "/api/collections/purchase_orders/records/" + firstApprovedPOID,
 			Body: bytes.NewBufferString(`{
-				"uid": "f2j5a8vk006baub",
-				"date": "2025-01-29",
-				"division": "vccd5fo56ctbigh",
-				"description": "Higher-value unapproved PO that already has first approval ",
-				"payment_type": "OnAccount",
+						"uid": "f2j5a8vk006baub",
+						"date": "2025-01-29",
+						"division": "vccd5fo56ctbigh",
+						"description": "Higher-value unapproved PO that already has first approval ",
+						"payment_type": "OnAccount",
 				"total": 1022.69,
 				"vendor": "mmgxrnn144767x7",
 				"approver": "wegviunlyr2jjjv",

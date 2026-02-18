@@ -81,7 +81,7 @@ func cleanTimeAmendment(app core.App, timeAmendmentRecord *core.Record) ([]strin
 // present in the record prior to validation. The requiredFields slice is used
 // to validate the presence of required fields. The function returns an error if
 // the record is invalid, otherwise it returns nil.
-func validateTimeAmendment(timeAmendmentRecord *core.Record, requiredFields []string) error {
+func validateTimeAmendment(app core.App, timeAmendmentRecord *core.Record, requiredFields []string) error {
 	jobIsPresent := timeAmendmentRecord.Get("job") != ""
 	totalHours := timeAmendmentRecord.GetFloat("hours") + timeAmendmentRecord.GetFloat("meals_hours")
 
@@ -109,9 +109,27 @@ func validateTimeAmendment(timeAmendmentRecord *core.Record, requiredFields []st
 		"description":           validation.Validate(timeAmendmentRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
 		"work_record":           validation.Validate(timeAmendmentRecord.Get("work_record"), validation.When(jobIsPresent, validation.Match(regexp.MustCompile("^[FKQ][0-9]{2}-[0-9]{3,4}(-[0-9]+)?$")).Error("must be in the correct format")).Else(validation.In("").Error("Work Record must be empty when job is not provided"))),
 		"payout_request_amount": validation.Validate(timeAmendmentRecord.Get("payout_request_amount"), validation.Min(0.0).Exclusive().Error("Amount must be greater than 0"), validation.By(utilities.IsPositiveMultipleOfPointZeroOne())),
-	}.Filter()
+	}
 
-	return otherValidationsErrors
+	// Time amendments now follow the same job/division allocation policy as POs
+	// and expenses. We enforce allocation on create and on explicit job/division
+	// changes, while allowing unrelated edits to legacy records that may contain
+	// historical mismatches.
+	if jobIsPresent {
+		jobID := timeAmendmentRecord.GetString("job")
+		jobRecord, err := app.FindRecordById("jobs", jobID)
+		if err != nil || jobRecord == nil {
+			otherValidationsErrors["job"] = validation.NewError("invalid_reference", "invalid job reference")
+		} else if jobRecord.GetString("status") != "Active" {
+			otherValidationsErrors["job"] = validation.NewError("not_active", "Job status must be Active")
+		} else if shouldValidateJobDivisionAllocationOnRecord(app, timeAmendmentRecord) {
+			if field, allocErr := validateDivisionAllocatedToJob(app, jobID, timeAmendmentRecord.GetString("division")); allocErr != nil {
+				otherValidationsErrors[field] = allocErr
+			}
+		}
+	}
+
+	return otherValidationsErrors.Filter()
 }
 
 // The ProcessTimeAmendment function is used to validate the time_amendment
@@ -204,7 +222,7 @@ func ProcessTimeAmendment(app core.App, e *core.RecordRequestEvent) error {
 
 	// perform the validation for the time_amendment record. In this step we also
 	// write the uid property to the record so that we can validate it against the
-	if validationErr := validateTimeAmendment(record, requiredFields); validationErr != nil {
+	if validationErr := validateTimeAmendment(app, record, requiredFields); validationErr != nil {
 		return apis.NewBadRequestError("Validation error", validationErr)
 	}
 
