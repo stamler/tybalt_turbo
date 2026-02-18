@@ -193,6 +193,22 @@
   const isDualBypassSelfMode = $derived.by(() =>
     isDualBypassMode(secondApproverStatus, authUserID, isOwnPOContext),
   );
+  const isCreateMode = $derived.by(() => !data.editing);
+  const canShowSelfAssignmentHints = $derived.by(
+    () => isCreateMode && approversLoaded && canFetchApprovers && !approversFetchError,
+  );
+  const showApproverAutoAssignHint = $derived.by(
+    () =>
+      canShowSelfAssignmentHints &&
+      !showApproverField &&
+      (firstStageRequesterQualifies || isDualBypassSelfMode),
+  );
+  const showSecondApproverAutoAssignHint = $derived.by(
+    () =>
+      canShowSelfAssignmentHints &&
+      !showSecondApproverField &&
+      secondApproverStatus === "requester_qualifies",
+  );
   const isAbortError = (error: unknown): boolean => {
     const e = error as MaybeAbortError;
     if (e?.isAbort) return true;
@@ -700,6 +716,9 @@
       <div class="w-full text-sm text-red-700">{firstApproverReasonMessage}</div>
     {/if}
   {/if}
+  {#if showApproverAutoAssignHint}
+    <div class="w-full text-sm text-neutral-600">You will be set as the approver.</div>
+  {/if}
 
   {#if showSecondApproverField}
     <DsSelector
@@ -725,6 +744,9 @@
       kindLabel={selectedKind?.en_ui_label ?? item.kind ?? "n/a"}
       hasJob={item.job !== ""}
     />
+  {/if}
+  {#if showSecondApproverAutoAssignHint}
+    <div class="w-full text-sm text-neutral-600">You will be set as the second approver.</div>
   {/if}
 
   {#if isRecurring}
