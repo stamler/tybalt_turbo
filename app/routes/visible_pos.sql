@@ -65,6 +65,12 @@ WHERE
     OR ({:scope} = 'mine' AND uid = {:userId})
     OR ({:scope} = 'active' AND status = 'Active')
     OR (
+      {:scope} = 'rejected'
+      AND status = 'Unapproved'
+      AND rejected != ''
+      AND uid = {:userId}
+    )
+    OR (
       {:scope} = 'stale'
       AND status = 'Active'
       AND (

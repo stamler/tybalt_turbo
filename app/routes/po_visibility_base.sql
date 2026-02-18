@@ -206,17 +206,23 @@ SELECT
   END AS is_closed_cancelled_visible,
 
   -- Flag: Direct unapproved visibility (no policy pool computation required).
+  -- Creators can always see their own unapproved records, including rejected
+  -- ones, so they can review rejection context and resubmit.
   CASE
     WHEN
       po.status = 'Unapproved'
-      AND po.rejected = ''
       AND (
         po.uid = {:userId}
-        OR (po.approved = '' AND po.approver = {:userId})
         OR (
-          po.approved != ''
-          AND po.second_approval = ''
-          AND po.priority_second_approver = {:userId}
+          po.rejected = ''
+          AND (
+            (po.approved = '' AND po.approver = {:userId})
+            OR (
+              po.approved != ''
+              AND po.second_approval = ''
+              AND po.priority_second_approver = {:userId}
+            )
+          )
         )
       )
     THEN 1

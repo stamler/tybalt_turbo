@@ -548,11 +548,11 @@ func createGetVisiblePurchaseOrdersHandler(app core.App) func(e *core.RequestEve
 		}
 
 		switch scope {
-		case "all", "mine", "active", "stale":
+		case "all", "mine", "active", "rejected", "stale":
 		default:
 			return e.JSON(http.StatusBadRequest, map[string]string{
 				"code":    "invalid_scope",
-				"message": "scope must be one of: all, mine, active, stale",
+				"message": "scope must be one of: all, mine, active, rejected, stale",
 			})
 		}
 
@@ -775,7 +775,10 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 
 		// Send notification to the creator (uid)
 		if err := notifications.CreateNotificationWithUser(app, "po_rejected", updatedPO.GetString("uid"), map[string]any{
-			"POId": updatedPO.Id,
+			"POId":            updatedPO.Id,
+			"POUrl":           fmt.Sprintf("/pos/%s/details", updatedPO.Id),
+			"PONumber":        updatedPO.GetString("po_number"),
+			"RejectionReason": updatedPO.GetString("rejection_reason"),
 		}, false, userId); err != nil {
 			// Log the error but don't fail the request, as the PO was already rejected
 			app.Logger().Error("notification not sent: error creating rejection notification", "error", err)

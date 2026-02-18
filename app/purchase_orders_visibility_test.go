@@ -152,6 +152,36 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "creator can see their own rejected unapproved PO via visible API",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/l9w1z13mm3srtoo",
+			Headers: map[string]string{
+				"Authorization": creatorToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"l9w1z13mm3srtoo"`,
+				`"status":"Unapproved"`,
+				`"rejected":"`,
+				`"rejection_reason":"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible rejected scope returns creator rejected purchase orders",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible?scope=rejected",
+			Headers: map[string]string{
+				"Authorization": creatorToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"l9w1z13mm3srtoo"`,
+				`"rejected":"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 
 		// Priority second approver cannot see an Unapproved PO before first approval occurs
 		{

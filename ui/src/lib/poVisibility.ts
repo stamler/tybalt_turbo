@@ -1,7 +1,7 @@
 import { pb } from "$lib/pocketbase";
 import type { PurchaseOrdersAugmentedResponse } from "$lib/pocketbase-types";
 
-export type VisiblePOScope = "all" | "mine" | "active" | "stale";
+export type VisiblePOScope = "all" | "mine" | "active" | "rejected" | "stale";
 
 export async function fetchVisiblePOs(
   scope: VisiblePOScope,

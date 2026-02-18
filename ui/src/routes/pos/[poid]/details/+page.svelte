@@ -13,6 +13,8 @@
   const formatAmount = (value: number) => (Number.isFinite(value) ? value.toFixed(2) : String(value));
   const secondApproverMeta = $derived(data.secondApproverDiagnostics?.meta ?? null);
   const hasSecondApproverAlert = $derived(secondApproverMeta?.status === "required_no_candidates");
+  const isRejected = $derived(data.po.status === "Unapproved" && data.po.rejected !== "");
+  const displayStatus = $derived(isRejected ? "Rejected" : data.po.status);
 
   async function cancelPo() {
     try {
@@ -55,21 +57,44 @@
         {/if}
         {#if data.po.status}
           <DsLabel
-            color={data.po.status === "Active"
+            color={displayStatus === "Active"
               ? "green"
-              : data.po.status === "Closed"
+              : displayStatus === "Closed"
                 ? "gray"
-                : data.po.status === "Cancelled"
+                : displayStatus === "Cancelled"
                   ? "gray"
-                  : "yellow"}
+                  : displayStatus === "Rejected"
+                    ? "red"
+                    : "yellow"}
           >
-            {data.po.status}
+            {displayStatus}
           </DsLabel>
         {/if}
       </div>
     </div>
 
     <div class="space-y-2 bg-neutral-100 p-4">
+      {#if isRejected}
+        <div class="rounded-sm border border-red-300 bg-red-50 p-3 text-sm text-red-900">
+          <div class="font-semibold">This purchase order was rejected.</div>
+          <div class="mt-1">
+            {#if data.po.rejector_name}{data.po.rejector_name}{:else}An approver{/if}
+            rejected it on {shortDate(data.po.rejected)}.
+          </div>
+          {#if data.po.rejection_reason}
+            <div class="mt-1"><span class="font-semibold">Reason:</span> {data.po.rejection_reason}</div>
+          {/if}
+          <div class="mt-2">
+            <DsActionButton
+              action={`/pos/${data.po.id}/edit`}
+              icon="mdi:pencil"
+              title="Edit and Resubmit"
+              color="red"
+            />
+          </div>
+        </div>
+      {/if}
+
       {#if hasSecondApproverAlert && secondApproverMeta}
         <div class="rounded-sm border border-red-300 bg-red-50 p-2 text-sm text-red-800">
           <div class="font-semibold">{secondApproverMeta.reason_message}</div>
@@ -274,7 +299,7 @@
       <DsActionButton
         action={`/pos/${data.po.id}/edit`}
         icon="mdi:pencil"
-        title="Edit Purchase Order"
+        title={isRejected ? "Edit and Resubmit" : "Edit Purchase Order"}
         color="blue"
       />
     </div>

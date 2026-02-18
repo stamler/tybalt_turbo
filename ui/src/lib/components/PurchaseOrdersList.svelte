@@ -92,6 +92,27 @@
   // status. This is used for testing purposes.
   const deactivateButtonHiding = $state(false);
 
+  function poIsRejected(po: PurchaseOrdersAugmentedResponse): boolean {
+    return po.status === "Unapproved" && po.rejected !== "";
+  }
+
+  function poDisplayStatus(po: PurchaseOrdersAugmentedResponse): string {
+    return poIsRejected(po) ? "Rejected" : po.status;
+  }
+
+  function poStatusColor(po: PurchaseOrdersAugmentedResponse): "green" | "gray" | "yellow" | "red" {
+    if (po.status === "Active") return "green";
+    if (po.status === "Closed" || po.status === "Cancelled") return "gray";
+    if (poIsRejected(po)) return "red";
+    return "yellow";
+  }
+
+  function rejectionReasonPreview(reason: string, maxLen = 60): string {
+    const trimmed = reason.trim();
+    if (trimmed.length <= maxLen) return trimmed;
+    return `${trimmed.slice(0, maxLen - 1)}…`;
+  }
+
   function poMayBeApprovedOrRejectedByUser(po: PurchaseOrdersAugmentedResponse): boolean {
     if (deactivateButtonHiding) return true;
     if (po.status !== "Unapproved" || po.rejected !== "") {
@@ -234,12 +255,12 @@
     </span>
   {/snippet}
 
-  {#snippet byline({ total, status }: PurchaseOrdersAugmentedResponse)}
+  {#snippet byline(item: PurchaseOrdersAugmentedResponse)}
     <span class="flex items-center gap-2">
-      ${total}
-      {#if status !== "Active"}
-        <DsLabel color={status === "Closed" || status === "Cancelled" ? "gray" : "yellow"}>
-          {status}
+      ${item.total}
+      {#if item.status !== "Active"}
+        <DsLabel color={poStatusColor(item)}>
+          {poDisplayStatus(item)}
         </DsLabel>
       {/if}
     </span>
@@ -267,6 +288,14 @@
   {/snippet}
   {#snippet line3(item: PurchaseOrdersAugmentedResponse)}
     <span class="flex items-center gap-1">
+      {#if poIsRejected(item)}
+        <DsLabel color="red" title={`${shortDate(item.rejected)}: ${item.rejection_reason}`}>
+          <Icon icon="mdi:cancel" width="20px" class="inline-block" />
+          {item.rejector_name} ({shortDate(item.rejected)}) - {rejectionReasonPreview(
+            item.rejection_reason,
+          )}
+        </DsLabel>
+      {/if}
       <!-- if the item is cumulative, show the sigma icon -->
       {#if item.type === "Cumulative"}
         <DsLabel color="cyan">
@@ -331,7 +360,7 @@
         <DsActionButton
           action={`/pos/${item.id}/edit`}
           icon="mdi:edit-outline"
-          title="Edit"
+          title={poIsRejected(item) ? "Edit and Resubmit" : "Edit"}
           color="blue"
         />
         {#if poMayBeApprovedOrRejectedByUser(item)}
@@ -349,7 +378,12 @@
           />
         {/if}
         {#if poMayBeDeletedByUser(item)}
-          <DsActionButton action={() => del(item.id)} icon="mdi:delete" title="Delete" color="red" />
+          <DsActionButton
+            action={() => del(item.id)}
+            icon="mdi:delete"
+            title="Delete"
+            color="red"
+          />
         {/if}
       {/if}
     {/if}

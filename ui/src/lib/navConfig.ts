@@ -73,6 +73,7 @@ export const navSections: NavSection[] = [
           },
         ],
       },
+      { label: "Rejected (Mine)", href: "/pos/rejected", buttons: [] },
       { label: "Pending My Approval", href: "/pos/pending", buttons: [] },
       { label: "All Active", href: "/pos/active", buttons: [] },
       { label: "Stale", href: "/pos/stale", buttons: [] },
