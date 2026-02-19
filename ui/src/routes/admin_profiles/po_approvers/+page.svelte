@@ -2,8 +2,10 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import { divisions as divisionsStore } from "$lib/stores/divisions";
+  import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
+  import DSPopover from "$lib/components/DSPopover.svelte";
   import Icon from "@iconify/svelte";
   import type {
     AdminProfilesAugmentedResponse,
@@ -101,6 +103,14 @@
   let entryErrors = $state<Record<string, string>>({});
   let divisionEditRowId = $state<string | null>(null);
   let divisionSearchValue = $state("");
+  let showDeleteConfirm = $state(false);
+  let deleteConfirmError = $state<string | null>(null);
+  let pendingDelete = $state<{
+    itemId: string;
+    propsId: string;
+    userClaimId: string;
+    fullName: string;
+  } | null>(null);
 
   // Helpers
   function normalizeNumber(value: unknown): number {
@@ -329,35 +339,59 @@
     }
   }
 
-  async function deleteEntry(item: AdminProfilesAugmentedResponse) {
-    const propsId = item.po_approver_props_id!;
-    const fullName = `${item.given_name} ${item.surname}`.trim();
-    const confirmed = window.confirm(`Remove ${fullName} as a PO approver?`);
-    if (!confirmed) return;
+  function clearRowState(propsId: string) {
+    delete editedEntries[propsId];
+    editedEntries = { ...editedEntries };
+    delete entryErrors[propsId];
+    entryErrors = { ...entryErrors };
+    if (divisionEditRowId === propsId) {
+      divisionEditRowId = null;
+    }
+  }
 
+  function closeDeleteConfirm() {
+    if (deletingEntryId !== null) return;
+    showDeleteConfirm = false;
+    deleteConfirmError = null;
+    pendingDelete = null;
+  }
+
+  function openDeleteConfirm(item: AdminProfilesAugmentedResponse) {
+    const propsId = item.po_approver_props_id!;
+    const userClaimId = item.po_approver_user_claim_id;
+    if (typeof userClaimId !== "string" || userClaimId.trim() === "") {
+      entryErrors[propsId] = "No user claim is linked to this approver record.";
+      entryErrors = { ...entryErrors };
+      return;
+    }
+
+    delete entryErrors[propsId];
+    entryErrors = { ...entryErrors };
+    pendingDelete = {
+      itemId: item.id,
+      propsId,
+      userClaimId,
+      fullName: `${item.given_name} ${item.surname}`.trim(),
+    };
+    deleteConfirmError = null;
+    showDeleteConfirm = true;
+  }
+
+  async function deleteEntry() {
+    if (!pendingDelete) return;
+    const { propsId, userClaimId, itemId } = pendingDelete;
     deletingEntryId = propsId;
     delete entryErrors[propsId];
     entryErrors = { ...entryErrors };
+    deleteConfirmError = null;
 
     try {
-      const userClaimId = item.po_approver_user_claim_id;
-      if (typeof userClaimId !== "string" || userClaimId.trim() === "") {
-        entryErrors[propsId] = "No user claim is linked to this approver record.";
-        entryErrors = { ...entryErrors };
-        return;
-      }
-
       await pb.collection("user_claims").delete(userClaimId);
 
-      items = items.filter((i) => i.id !== item.id);
-
-      delete editedEntries[propsId];
-      editedEntries = { ...editedEntries };
-      delete entryErrors[propsId];
-      entryErrors = { ...entryErrors };
-      if (divisionEditRowId === propsId) {
-        divisionEditRowId = null;
-      }
+      items = items.filter((i) => i.id !== itemId);
+      clearRowState(propsId);
+      showDeleteConfirm = false;
+      pendingDelete = null;
     } catch (error: unknown) {
       console.error("Failed to delete po_approver user_claim:", error);
       const msg =
@@ -366,6 +400,7 @@
           : "Failed to delete";
       entryErrors[propsId] = msg;
       entryErrors = { ...entryErrors };
+      deleteConfirmError = msg;
     } finally {
       deletingEntryId = null;
     }
@@ -537,14 +572,14 @@
                     </div>
                   {:else}
                     <div class="flex items-center gap-2">
-                      <button
-                        type="button"
-                        class="rounded-sm bg-red-500 px-2 py-1 text-sm text-white hover:bg-red-600 disabled:opacity-50"
-                        disabled={deletingEntryId === propsId}
-                        onclick={() => deleteEntry(item)}
-                      >
-                        {deletingEntryId === propsId ? "Deleting..." : "Delete"}
-                      </button>
+                      <DsActionButton
+                        action={() => openDeleteConfirm(item)}
+                        icon="mdi:delete"
+                        title="Delete"
+                        color="red"
+                        loading={deletingEntryId === propsId}
+                        disabled={deletingEntryId !== null}
+                      />
                       {#if entryErrors[propsId]}
                         <span class="text-sm text-red-600">{entryErrors[propsId]}</span>
                       {/if}
@@ -565,4 +600,24 @@
       </a>
     </div>
   </div>
+
+  <DSPopover
+    bind:show={showDeleteConfirm}
+    title="Remove PO Approver"
+    subtitle={pendingDelete
+      ? `This will remove the po_approver claim for ${pendingDelete.fullName} and cascade-delete the related approver props.`
+      : ""}
+    error={deleteConfirmError}
+    submitting={deletingEntryId !== null}
+    submitLabel="Delete"
+    onSubmit={deleteEntry}
+    onCancel={closeDeleteConfirm}
+  >
+    <div class="rounded-sm border border-amber-300 bg-amber-50 p-3 text-amber-900">
+      <p class="font-semibold">Confirm removal</p>
+      <p class="mt-1 text-sm">
+        This action removes PO approver access for this user.
+      </p>
+    </div>
+  </DSPopover>
 {/if}
