@@ -1281,8 +1281,8 @@ func upsertPoApproverPropsWithTurboPrecedence(dbPath string) error {
 	insertTurboStmt, err := tx.Prepare(`
 		INSERT INTO po_approver_props (
 			id, user_claim, max_amount, project_max, sponsorship_max, staff_and_social_max,
-			media_and_event_max, computer_max, divisions, created, updated, _imported
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+			media_and_event_max, computer_max, divisions, created, updated
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("prepare insertTurboStmt: %w", err)
@@ -1292,8 +1292,8 @@ func upsertPoApproverPropsWithTurboPrecedence(dbPath string) error {
 	insertFallbackStmt, err := tx.Prepare(`
 		INSERT INTO po_approver_props (
 			user_claim, max_amount, project_max, sponsorship_max, staff_and_social_max,
-			media_and_event_max, computer_max, divisions, created, updated, _imported
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1)
+			media_and_event_max, computer_max, divisions, created, updated
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`)
 	if err != nil {
 		return fmt.Errorf("prepare insertFallbackStmt: %w", err)
@@ -1366,18 +1366,24 @@ func loadTurboPoApproverProps(parquetPath string) (map[string]poApproverPropsUps
 
 	rows, err := duck.Query(`
 		SELECT
-			id,
-			uid,
-			max_amount,
-			project_max,
-			sponsorship_max,
-			staff_and_social_max,
-			media_and_event_max,
-			computer_max,
-			divisions,
-			created,
-			updated
-		FROM read_parquet(?)
+			tpp.id,
+			COALESCE(
+				NULLIF(TRIM(lp.pocketbase_uid), ''),
+				NULLIF(TRIM(pp.pocketbase_uid), ''),
+				''
+			) AS uid,
+			CAST(max_amount AS DOUBLE) AS max_amount,
+			CAST(project_max AS DOUBLE) AS project_max,
+			CAST(sponsorship_max AS DOUBLE) AS sponsorship_max,
+			CAST(staff_and_social_max AS DOUBLE) AS staff_and_social_max,
+			CAST(media_and_event_max AS DOUBLE) AS media_and_event_max,
+			CAST(computer_max AS DOUBLE) AS computer_max,
+			tpp.divisions,
+			tpp.created,
+			tpp.updated
+		FROM read_parquet(?) tpp
+		LEFT JOIN read_parquet('./parquet/Profiles.parquet') lp ON lp.id = tpp.uid
+		LEFT JOIN read_parquet('./parquet/Profiles.parquet') pp ON pp.pocketbase_uid = tpp.uid
 	`, parquetPath)
 	if err != nil {
 		return nil, fmt.Errorf("read %s with duckdb: %w", parquetPath, err)
@@ -1389,7 +1395,7 @@ func loadTurboPoApproverProps(parquetPath string) (map[string]poApproverPropsUps
 
 	for rows.Next() {
 		var id, uid, divisionsJSON, created, updated string
-		var maxAmount, projectMax, sponsorshipMax, staffAndSocialMax, mediaAndEventMax, computerMax float64
+		var maxAmount, projectMax, sponsorshipMax, staffAndSocialMax, mediaAndEventMax, computerMax sql.NullFloat64
 		if err := rows.Scan(
 			&id,
 			&uid,
@@ -1427,6 +1433,24 @@ func loadTurboPoApproverProps(parquetPath string) (map[string]poApproverPropsUps
 		if updated == "" {
 			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing updated", id)
 		}
+		if !maxAmount.Valid {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing max_amount", id)
+		}
+		if !projectMax.Valid {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing project_max", id)
+		}
+		if !sponsorshipMax.Valid {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing sponsorship_max", id)
+		}
+		if !staffAndSocialMax.Valid {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing staff_and_social_max", id)
+		}
+		if !mediaAndEventMax.Valid {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing media_and_event_max", id)
+		}
+		if !computerMax.Valid {
+			return nil, fmt.Errorf("invalid TurboPoApproverProps row %s: missing computer_max", id)
+		}
 
 		var parsed []string
 		if err := json.Unmarshal([]byte(divisionsJSON), &parsed); err != nil {
@@ -1444,12 +1468,12 @@ func loadTurboPoApproverProps(parquetPath string) (map[string]poApproverPropsUps
 		rowsByUID[uid] = poApproverPropsUpsertRow{
 			id:                id,
 			uid:               uid,
-			maxAmount:         maxAmount,
-			projectMax:        projectMax,
-			sponsorshipMax:    sponsorshipMax,
-			staffAndSocialMax: staffAndSocialMax,
-			mediaAndEventMax:  mediaAndEventMax,
-			computerMax:       computerMax,
+			maxAmount:         maxAmount.Float64,
+			projectMax:        projectMax.Float64,
+			sponsorshipMax:    sponsorshipMax.Float64,
+			staffAndSocialMax: staffAndSocialMax.Float64,
+			mediaAndEventMax:  mediaAndEventMax.Float64,
+			computerMax:       computerMax.Float64,
 			divisionsJSON:     divisionsJSON,
 			created:           created,
 			updated:           updated,
