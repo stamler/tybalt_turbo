@@ -199,6 +199,7 @@ export type AdminProfilesAugmentedRecord = {
   po_approver_max_amount: null | number;
   po_approver_project_max: null | number;
   po_approver_props_id: null | string;
+  po_approver_user_claim_id: null | string;
   po_approver_sponsorship_max: null | number;
   po_approver_staff_and_social_max: null | number;
   salary: boolean;

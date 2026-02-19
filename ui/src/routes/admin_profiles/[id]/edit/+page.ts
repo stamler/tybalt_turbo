@@ -38,6 +38,7 @@ export const load: PageLoad<AdminProfilesEditPageData & { divisions: DivisionsRe
     given_name: "",
     surname: "",
     po_approver_props_id: null,
+    po_approver_user_claim_id: null,
     po_approver_max_amount: null,
     po_approver_project_max: null,
     po_approver_sponsorship_max: null,

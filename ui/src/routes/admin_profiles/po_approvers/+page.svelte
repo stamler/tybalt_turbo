@@ -5,7 +5,10 @@
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import Icon from "@iconify/svelte";
-  import type { AdminProfilesAugmentedResponse, DivisionsResponse } from "$lib/pocketbase-types";
+  import type {
+    AdminProfilesAugmentedResponse,
+    DivisionsResponse,
+  } from "$lib/pocketbase-types";
   import type { SearchResult } from "minisearch";
   import type { PageData } from "./$types";
   import { onMount, untrack } from "svelte";
@@ -94,6 +97,7 @@
 
   let editedEntries = $state<Record<string, EditedApproverEntry>>({});
   let savingEntryId = $state<string | null>(null);
+  let deletingEntryId = $state<string | null>(null);
   let entryErrors = $state<Record<string, string>>({});
   let divisionEditRowId = $state<string | null>(null);
   let divisionSearchValue = $state("");
@@ -325,6 +329,48 @@
     }
   }
 
+  async function deleteEntry(item: AdminProfilesAugmentedResponse) {
+    const propsId = item.po_approver_props_id!;
+    const fullName = `${item.given_name} ${item.surname}`.trim();
+    const confirmed = window.confirm(`Remove ${fullName} as a PO approver?`);
+    if (!confirmed) return;
+
+    deletingEntryId = propsId;
+    delete entryErrors[propsId];
+    entryErrors = { ...entryErrors };
+
+    try {
+      const userClaimId = item.po_approver_user_claim_id;
+      if (typeof userClaimId !== "string" || userClaimId.trim() === "") {
+        entryErrors[propsId] = "No user claim is linked to this approver record.";
+        entryErrors = { ...entryErrors };
+        return;
+      }
+
+      await pb.collection("user_claims").delete(userClaimId);
+
+      items = items.filter((i) => i.id !== item.id);
+
+      delete editedEntries[propsId];
+      editedEntries = { ...editedEntries };
+      delete entryErrors[propsId];
+      entryErrors = { ...entryErrors };
+      if (divisionEditRowId === propsId) {
+        divisionEditRowId = null;
+      }
+    } catch (error: unknown) {
+      console.error("Failed to delete po_approver user_claim:", error);
+      const msg =
+        error && typeof error === "object" && "data" in error
+          ? ((error as { data?: { message?: string } }).data?.message ?? "Failed to delete")
+          : "Failed to delete";
+      entryErrors[propsId] = msg;
+      entryErrors = { ...entryErrors };
+    } finally {
+      deletingEntryId = null;
+    }
+  }
+
   const amountColumns = [
     { field: "max_amount" as const, label: "Capital" },
     { field: "project_max" as const, label: "Project" },
@@ -484,6 +530,20 @@
                         onclick={() => cancelEntry(item)}
                       >
                         Cancel
+                      </button>
+                      {#if entryErrors[propsId]}
+                        <span class="text-sm text-red-600">{entryErrors[propsId]}</span>
+                      {/if}
+                    </div>
+                  {:else}
+                    <div class="flex items-center gap-2">
+                      <button
+                        type="button"
+                        class="rounded-sm bg-red-500 px-2 py-1 text-sm text-white hover:bg-red-600 disabled:opacity-50"
+                        disabled={deletingEntryId === propsId}
+                        onclick={() => deleteEntry(item)}
+                      >
+                        {deletingEntryId === propsId ? "Deleting..." : "Delete"}
                       </button>
                       {#if entryErrors[propsId]}
                         <span class="text-sm text-red-600">{entryErrors[propsId]}</span>
