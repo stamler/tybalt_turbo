@@ -2,6 +2,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import Icon from "@iconify/svelte";
   import type { AdminProfilesAugmentedResponse } from "$lib/pocketbase-types";
   let { data } = $props();
   const items = $derived(data.items as AdminProfilesAugmentedResponse[]);
@@ -26,6 +27,15 @@
 </script>
 
 <DsList {items} search={true} inListHeader="Staff">
+  {#snippet searchBarExtra()}
+    <a
+      href="/admin_profiles/po_approvers"
+      class="flex items-center gap-1 rounded-sm bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
+    >
+      <Icon icon="mdi:edit-outline" class="text-base" /> PO Approvers
+    </a>
+  {/snippet}
+
   {#snippet anchor(item: AdminProfilesAugmentedResponse)}
     <div class="flex flex-col">
       <a
