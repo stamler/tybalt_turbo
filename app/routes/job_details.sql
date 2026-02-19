@@ -5,6 +5,7 @@ SELECT
   j.number,
   j.description,
   j.status,
+  j._imported       AS imported,
   j.parent          AS parent_id,
   pa.number         AS parent_number,
   j.location         AS location,

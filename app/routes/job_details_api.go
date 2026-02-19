@@ -37,6 +37,7 @@ type jobDetailsRow struct {
 	Number                    string          `db:"number"`
 	Description               string          `db:"description"`
 	Status                    sql.NullString  `db:"status"`
+	Imported                  bool            `db:"imported"`
 	ParentID                  sql.NullString  `db:"parent_id"`
 	ParentNumber              sql.NullString  `db:"parent_number"`
 	Location                  sql.NullString  `db:"location"`
@@ -95,39 +96,40 @@ type JobRef struct {
 }
 
 type JobDetails struct {
-	ID                        string       `json:"id"`
-	Number                    string       `json:"number"`
-	Description               string       `json:"description"`
-	Status                    string       `json:"status"`
-	ParentID                  string       `json:"parent_id"`
-	ParentNumber              string       `json:"parent_number"`
-	Location                  string       `json:"location"`
-	AuthorizingDocument       string       `json:"authorizing_document"`
-	ClientPO                  string       `json:"client_po"`
-	ClientReferenceNumber     string       `json:"client_reference_number"`
-	Client                    ClientInfo   `json:"client"`
-	Contact                   Person       `json:"contact"`
-	Manager                   Person       `json:"manager"`
-	AlternateManager          Person       `json:"alternate_manager"`
-	JobOwner                  ClientInfo   `json:"job_owner"`
-	ProposalID                string       `json:"proposal_id"`
-	ProposalNumber            string       `json:"proposal_number"`
+	ID                        string        `json:"id"`
+	Number                    string        `json:"number"`
+	Description               string        `json:"description"`
+	Status                    string        `json:"status"`
+	Imported                  bool          `json:"imported"`
+	ParentID                  string        `json:"parent_id"`
+	ParentNumber              string        `json:"parent_number"`
+	Location                  string        `json:"location"`
+	AuthorizingDocument       string        `json:"authorizing_document"`
+	ClientPO                  string        `json:"client_po"`
+	ClientReferenceNumber     string        `json:"client_reference_number"`
+	Client                    ClientInfo    `json:"client"`
+	Contact                   Person        `json:"contact"`
+	Manager                   Person        `json:"manager"`
+	AlternateManager          Person        `json:"alternate_manager"`
+	JobOwner                  ClientInfo    `json:"job_owner"`
+	ProposalID                string        `json:"proposal_id"`
+	ProposalNumber            string        `json:"proposal_number"`
 	BranchID                  string        `json:"branch_id"`
 	BranchCode                string        `json:"branch_code"`
 	BranchName                string        `json:"branch_name"`
 	RateSheet                 RateSheetInfo `json:"rate_sheet"`
 	FnAgreement               bool          `json:"fn_agreement"`
-	ProjectAwardDate          string       `json:"project_award_date"`
-	ProposalOpeningDate       string       `json:"proposal_opening_date"`
-	ProposalSubmissionDueDate string       `json:"proposal_submission_due_date"`
-	ProposalValue             float64      `json:"proposal_value"`
-	TimeAndMaterials          bool         `json:"time_and_materials"`
-	OutstandingBalance        float64      `json:"outstanding_balance"`
-	OutstandingBalanceDate    string       `json:"outstanding_balance_date"`
-	Allocations               []Allocation `json:"allocations"`
-	Projects                  []JobRef     `json:"projects"`
-	Children                  []JobRef     `json:"children"`
-	Categories                []Category   `json:"categories"`
+	ProjectAwardDate          string        `json:"project_award_date"`
+	ProposalOpeningDate       string        `json:"proposal_opening_date"`
+	ProposalSubmissionDueDate string        `json:"proposal_submission_due_date"`
+	ProposalValue             float64       `json:"proposal_value"`
+	TimeAndMaterials          bool          `json:"time_and_materials"`
+	OutstandingBalance        float64       `json:"outstanding_balance"`
+	OutstandingBalanceDate    string        `json:"outstanding_balance_date"`
+	Allocations               []Allocation  `json:"allocations"`
+	Projects                  []JobRef      `json:"projects"`
+	Children                  []JobRef      `json:"children"`
+	Categories                []Category    `json:"categories"`
 }
 
 type Category struct {
@@ -172,6 +174,7 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			Number:                    r.Number,
 			Description:               r.Description,
 			Status:                    ns(r.Status),
+			Imported:                  r.Imported,
 			ParentID:                  ns(r.ParentID),
 			ParentNumber:              ns(r.ParentNumber),
 			Location:                  ns(r.Location),

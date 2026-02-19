@@ -9,6 +9,51 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
+func TestJobsReadEndpoints_ExposeStatusAndImportedFields(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const jobID = "fcprojimpnoprop1"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "jobs list endpoint includes status and imported",
+			Method: http.MethodGet,
+			URL:    "/api/jobs/" + jobID,
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"` + jobID + `"`,
+				`"status":"Active"`,
+				`"imported":true`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "job details endpoint includes imported",
+			Method: http.MethodGet,
+			URL:    "/api/jobs/" + jobID + "/details",
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"` + jobID + `"`,
+				`"imported":true`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
 func TestJobAllocations_PutTransactionalUpdate(t *testing.T) {
 	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
 	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")

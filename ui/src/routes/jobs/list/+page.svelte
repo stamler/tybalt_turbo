@@ -5,6 +5,7 @@
   import type { JobApiResponse } from "$lib/stores/jobs";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import FastCloseConfirmPopover from "$lib/components/FastCloseConfirmPopover.svelte";
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import Icon from "@iconify/svelte";
@@ -15,6 +16,17 @@
 
   // Track which job is currently being validated for project creation
   let validatingJobId = $state<string | null>(null);
+  let closingJobId = $state<string | null>(null);
+  let showFastCloseConfirm = $state(false);
+  let pendingFastCloseJob = $state<JobApiResponse | null>(null);
+  let fastCloseContextLoading = $state(false);
+  let fastCloseContextError = $state<string | null>(null);
+  let fastCloseProposal = $state<{
+    id: string;
+    number: string;
+    status: string;
+    imported: boolean;
+  } | null>(null);
 
   // Validate proposal and redirect to create project or edit page
   async function handleCreateReferencingProject(jobId: string) {
@@ -82,6 +94,73 @@
       globalStore.addError(error?.response?.error || "Failed to download JSON");
     }
   }
+
+  // Open confirmation first, then resolve proposal context so the modal can
+  // show exactly what side effects may occur before the user confirms.
+  async function openFastCloseConfirm(job: JobApiResponse) {
+    pendingFastCloseJob = job;
+    showFastCloseConfirm = true;
+    fastCloseContextLoading = true;
+    fastCloseContextError = null;
+    fastCloseProposal = null;
+
+    try {
+      const jobDetails = await pb.send(`/api/jobs/${job.id}/details`, { method: "GET" });
+      const proposalId = jobDetails?.proposal_id as string | undefined;
+      if (proposalId) {
+        const proposal = await pb.send(`/api/jobs/${proposalId}`, { method: "GET" });
+        fastCloseProposal = {
+          id: proposal.id,
+          number: (jobDetails?.proposal_number as string) || proposal.number || proposalId,
+          status: proposal.status,
+          imported: Boolean(proposal.imported),
+        };
+      }
+    } catch (error: any) {
+      fastCloseContextError =
+        error?.response?.message ??
+        error?.response?.error ??
+        error?.message ??
+        "Unable to load referenced proposal details.";
+    } finally {
+      fastCloseContextLoading = false;
+    }
+  }
+
+  function closeFastCloseConfirm() {
+    showFastCloseConfirm = false;
+    pendingFastCloseJob = null;
+    fastCloseProposal = null;
+    fastCloseContextError = null;
+    fastCloseContextLoading = false;
+  }
+
+  // Close an imported Active project using the dedicated fast-close endpoint.
+  //
+  // Why this exists:
+  // - We intentionally avoid using the generic edit/save route here because the
+  //   fast-close policy is specific: imported legacy projects may bypass full
+  //   validation, while non-imported projects remain strict.
+  // - Calling the dedicated endpoint keeps that policy explicit and prevents
+  //   accidental behavior changes in the regular editor flow.
+  async function handleFastCloseConfirmSubmit() {
+    if (!pendingFastCloseJob || closingJobId !== null || fastCloseContextLoading) return;
+    closingJobId = pendingFastCloseJob.id;
+    try {
+      await pb.send(`/api/jobs/${pendingFastCloseJob.id}/close`, { method: "POST" });
+      await jobs.refresh(pendingFastCloseJob.id);
+      closeFastCloseConfirm();
+    } catch (error: any) {
+      const msg =
+        error?.response?.message ??
+        error?.response?.error ??
+        error?.message ??
+        "Failed to close imported project";
+      globalStore.addError(msg);
+    } finally {
+      closingJobId = null;
+    }
+  }
 </script>
 
 {#if $jobs.index !== null}
@@ -111,7 +190,9 @@
     {#snippet line1({ branch, manager }: JobApiResponse)}{#if branch}<DsLabel color="neutral"
           >{branch}</DsLabel
         >{/if}{#if manager}<DsLabel color="purple">{manager}</DsLabel>{/if}{/snippet}
-    {#snippet actions({ id, number }: JobApiResponse)}
+    {#snippet actions(job: JobApiResponse)}
+      {@const id = job.id}
+      {@const number = job.number}
       {#if number?.startsWith("P")}
         <DsActionButton
           action={() => handleCreateReferencingProject(id)}
@@ -121,7 +202,27 @@
           loading={validatingJobId === id}
         />
       {/if}
+      {#if !number?.startsWith("P") && job.status === "Active" && job.imported}
+        <DsActionButton
+          action={() => openFastCloseConfirm(job)}
+          icon="mdi:archive-check"
+          title="Close imported project"
+          color="red"
+          loading={closingJobId === id}
+        />
+      {/if}
       <DsActionButton action="/jobs/{id}/edit" icon="mdi:pencil" title="Edit" color="blue" />
     {/snippet}
   </DsSearchList>
 {/if}
+
+<FastCloseConfirmPopover
+  bind:show={showFastCloseConfirm}
+  jobNumber={pendingFastCloseJob?.number ?? "Project"}
+  proposal={fastCloseProposal}
+  loadingContext={fastCloseContextLoading}
+  contextError={fastCloseContextError}
+  submitting={closingJobId !== null}
+  onSubmit={handleFastCloseConfirmSubmit}
+  onCancel={closeFastCloseConfirm}
+/>

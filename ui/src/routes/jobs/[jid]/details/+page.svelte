@@ -12,14 +12,26 @@
   import DivisionsSummaryContent from "$lib/components/jobs/DivisionsSummaryContent.svelte";
   import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
   import DSDateInput from "$lib/components/DSDateInput.svelte";
+  import FastCloseConfirmPopover from "$lib/components/FastCloseConfirmPopover.svelte";
   import { pb } from "$lib/pocketbase";
   import { goto, invalidateAll } from "$app/navigation";
+  import { globalStore } from "$lib/stores/global";
   import type { FilterDef } from "$lib/components/jobs/types";
   import { formatCurrency, shortDate } from "$lib/utilities";
   import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
   let awarding = $state(false);
   let validatingForProject = $state(false);
+  let closingImportedProject = $state(false);
+  let showFastCloseConfirm = $state(false);
+  let fastCloseContextLoading = $state(false);
+  let fastCloseContextError = $state<string | null>(null);
+  let fastCloseProposal = $state<{
+    id: string;
+    number: string;
+    status: string;
+    imported: boolean;
+  } | null>(null);
 
   // Validate proposal and redirect to create project or edit page
   async function handleCreateReferencingProject() {
@@ -57,6 +69,73 @@
 
   let { data }: { data: PageData } = $props();
   let isProposal = $derived(data.job.number?.startsWith("P") ?? false);
+  const canFastCloseImportedProject = $derived(
+    !isProposal && data.job.status === "Active" && data.job.imported === true,
+  );
+
+  // Load proposal context and open confirmation modal so users can see exact
+  // side effects before executing a potentially destructive close.
+  async function openFastCloseConfirm() {
+    showFastCloseConfirm = true;
+    fastCloseContextLoading = true;
+    fastCloseContextError = null;
+    fastCloseProposal = null;
+
+    try {
+      const proposalId = data.job.proposal_id;
+      if (proposalId) {
+        const proposal = await pb.send(`/api/jobs/${proposalId}`, { method: "GET" });
+        fastCloseProposal = {
+          id: proposal.id,
+          number: data.job.proposal_number || proposal.number || proposalId,
+          status: proposal.status,
+          imported: Boolean(proposal.imported),
+        };
+      }
+    } catch (error: any) {
+      fastCloseContextError =
+        error?.response?.message ??
+        error?.response?.error ??
+        error?.message ??
+        "Unable to load referenced proposal details.";
+    } finally {
+      fastCloseContextLoading = false;
+    }
+  }
+
+  function closeFastCloseConfirm() {
+    showFastCloseConfirm = false;
+    fastCloseContextLoading = false;
+    fastCloseContextError = null;
+    fastCloseProposal = null;
+  }
+
+  // Close an imported Active project through the dedicated backend flow.
+  //
+  // Why a dedicated handler:
+  // - The project detail page should expose the same "legacy-only fast close"
+  //   policy as the jobs list.
+  // - We intentionally call /api/jobs/{id}/close instead of patching the job
+  //   record directly to guarantee the transactional behavior (close + notes +
+  //   optional proposal auto-award) defined by backend policy.
+  async function handleFastCloseConfirmSubmit() {
+    if (closingImportedProject || fastCloseContextLoading) return;
+    closingImportedProject = true;
+    try {
+      await pb.send(`/api/jobs/${data.job.id}/close`, { method: "POST" });
+      await invalidateAll();
+      closeFastCloseConfirm();
+    } catch (error: any) {
+      const msg =
+        error?.response?.message ??
+        error?.response?.error ??
+        error?.message ??
+        "Failed to close imported project";
+      globalStore.addError(msg);
+    } finally {
+      closingImportedProject = false;
+    }
+  }
 
   type TabContentProps = {
     summary: Record<string, any>;
@@ -307,6 +386,15 @@
           />
         {/key}
       {/if}
+      {#if canFastCloseImportedProject}
+        <DsActionButton
+          action={openFastCloseConfirm}
+          icon="mdi:archive-check"
+          title="Close imported project"
+          color="red"
+          loading={closingImportedProject}
+        />
+      {/if}
       <DsActionButton
         action={`/jobs/${data.job.id}/edit`}
         icon="mdi:pencil"
@@ -315,6 +403,17 @@
       />
     </div>
   </div>
+
+  <FastCloseConfirmPopover
+    bind:show={showFastCloseConfirm}
+    jobNumber={data.job.number ?? "Project"}
+    proposal={fastCloseProposal}
+    loadingContext={fastCloseContextLoading}
+    contextError={fastCloseContextError}
+    submitting={closingImportedProject}
+    onSubmit={handleFastCloseConfirmSubmit}
+    onCancel={closeFastCloseConfirm}
+  />
 
   <div class="space-y-2 rounded-sm bg-neutral-100 p-4">
     <div class="flex items-center gap-2">

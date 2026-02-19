@@ -3,6 +3,8 @@ export interface JobApiResponse {
   id: string;
   number: string;
   description: string;
+  status: string;
+  imported: boolean;
   location: string;
   client_id: string;
   client: string; // client name
@@ -33,6 +35,8 @@ export const jobs = createCollectionStore<any>(
       "id",
       "number",
       "description",
+      "status",
+      "imported",
       "location",
       "client",
       "branch",

@@ -6,6 +6,8 @@ SELECT
   j.id,
   j.number,
   j.description,
+  j.status AS status,
+  j._imported AS imported,
   j.location AS location,
   j.client AS client_id,
   c.name AS client,

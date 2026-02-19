@@ -26,6 +26,29 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 // It operates on plain records rather than RecordRequestEvent, making it reusable
 // from both PocketBase hooks and custom API endpoints.
 func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Record) error {
+	return processJobCoreWithMode(app, jobRecord, authRecord, false)
+}
+
+// ProcessJobCoreStrict enforces the same rules as ProcessJobCore but disables
+// the "status-only update" fast-path.
+//
+// Why this exists:
+//   - Most update flows intentionally allow status-only edits without requiring the
+//     entire record to pass full-field validation (legacy-friendly behavior).
+//   - The dedicated fast-close API needs the opposite behavior for non-imported
+//     jobs: it must run strict/full validation so policy bypass applies ONLY to
+//     imported legacy jobs.
+//
+// Design intent:
+// - Keep existing API/hook behavior unchanged by default (ProcessJobCore).
+// - Offer an explicit strict entrypoint for endpoints that need full validation.
+func ProcessJobCoreStrict(app core.App, jobRecord *core.Record, authRecord *core.Record) error {
+	return processJobCoreWithMode(app, jobRecord, authRecord, true)
+}
+
+// processJobCoreWithMode centralizes job processing while allowing selected
+// callers to force strict validation.
+func processJobCoreWithMode(app core.App, jobRecord *core.Record, authRecord *core.Record, forceFullValidation bool) error {
 	// Check if job editing is enabled via app_config
 	enabled, err := utilities.IsJobsEditingEnabled(app)
 	if err != nil {
@@ -73,7 +96,7 @@ func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Recor
 	// On create, derive the type of job while validating the job then generate a number
 	if jobRecord.IsNew() {
 		// First derive type while validating the job
-		derivedType, derr := validateJob(app, jobRecord)
+		derivedType, derr := validateJob(app, jobRecord, forceFullValidation)
 		if derr != nil {
 			return derr
 		}
@@ -113,7 +136,7 @@ func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Recor
 	} else {
 		// We are updating an existing job
 		// Validate job fields, cross-record constraints and derive type
-		_, err := validateJob(app, jobRecord)
+		_, err := validateJob(app, jobRecord, forceFullValidation)
 		if err != nil {
 			return err
 		}
@@ -384,7 +407,7 @@ func typeFromNumber(num string) jobType {
 	return jobTypeProject
 }
 
-func validateJob(app core.App, record *core.Record) (jobType, error) {
+func validateJob(app core.App, record *core.Record, forceFullValidation bool) (jobType, error) {
 	original := record.Original()
 	isCreate := record.IsNew()
 
@@ -422,7 +445,12 @@ func validateJob(app core.App, record *core.Record) (jobType, error) {
 
 	// Allow status-only updates to pass without tripping other validations.
 	// This compensates for relaxed update rules while preserving status constraints.
-	if !isCreate {
+	//
+	// forceFullValidation lets callers explicitly disable this shortcut. We use
+	// that in the dedicated fast-close endpoint for non-imported jobs so the
+	// endpoint can enforce strict validation for non-legacy data while preserving
+	// legacy-friendly behavior everywhere else.
+	if !isCreate && !forceFullValidation {
 		// If no field other than status changed, treat this as a status-only update.
 		if !utilities.RecordHasMeaningfulChanges(record, "status") {
 			newStatus := status
