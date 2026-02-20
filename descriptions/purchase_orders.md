@@ -121,6 +121,7 @@ Direct record updates are allowed only when all of the following are true:
 - Caller is the PO creator (`uid = @request.auth.id`)
 - `status = Unapproved`
 - `second_approval = ""`
+- Submitted `status` must remain `Unapproved` (hook-level validation rejects create/update requests that attempt `Active`/`Cancelled`/`Closed`)
 
 Direct record deletion is allowed only when all of the following are true:
 
@@ -443,7 +444,8 @@ Parent POs: `YYMM-NNNN`
 
 - `YY`: 2-digit year
 - `MM`: 2-digit month
-- `NNNN`: sequential 4-digit number (`0001`-`5999`)
+- `NNNN`: sequential 4-digit auto-generated number (`0001`-`4999`)
+- `5000+` values are reserved for manually assigned/imported PO numbers
 
 Child POs: `YYMM-NNNN-XX`
 

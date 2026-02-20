@@ -618,6 +618,22 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
+	// Purchase orders must remain Unapproved through collection create/update
+	// requests. Transitioning to Active/Cancelled/Closed is only allowed via the
+	// dedicated action endpoints.
+	if record.GetString("status") != "Unapproved" {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating status",
+			Data: map[string]errs.CodeError{
+				"status": {
+					Code:    "invalid_status",
+					Message: "status must be Unapproved when creating or updating purchase orders",
+				},
+			},
+		}
+	}
+
 	shouldResetApprovals := shouldResetPurchaseOrderApprovals(record)
 	submittedApproverID := strings.TrimSpace(record.GetString("approver"))
 

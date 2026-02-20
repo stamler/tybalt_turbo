@@ -1812,6 +1812,74 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 		})
 	}
 
+	// updates cannot set status to Active directly
+	{
+		b, ct, err := updateMultipart(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "attempt direct active transition",
+				"payment_type": "Expense",
+				"total": 2234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Active",
+				"type": "Cumulative"
+			}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails to update purchase order status to Active directly",
+			Method:         http.MethodPatch,
+			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"message":"hook error when validating status"`,
+				`"status":{"code":"invalid_status"`,
+				`"status must be Unapproved when creating or updating purchase orders"`,
+			},
+			ExpectedEvents: map[string]int{},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// updates cannot set status to Cancelled directly
+	{
+		b, ct, err := updateMultipart(`{
+				"uid": "f2j5a8vk006baub",
+				"date": "2024-09-01",
+				"division": "vccd5fo56ctbigh",
+				"description": "attempt direct cancelled transition",
+				"payment_type": "Expense",
+				"total": 2234.56,
+				"vendor": "2zqxtsmymf670ha",
+				"approver": "etysnrlup2f6bak",
+				"status": "Cancelled",
+				"type": "Cumulative"
+			}`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails to update purchase order status to Cancelled directly",
+			Method:         http.MethodPatch,
+			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"message":"hook error when validating status"`,
+				`"status":{"code":"invalid_status"`,
+				`"status must be Unapproved when creating or updating purchase orders"`,
+			},
+			ExpectedEvents: map[string]int{},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
 	// fails to update when a job is set and kind does not allow jobs
 	{
 		b, ct, err := updateMultipart(fmt.Sprintf(`{
@@ -2153,6 +2221,75 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 	}
 
 	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestPurchaseOrdersUpdate_CannotModifyPONumberForNonUnapprovedStatuses(t *testing.T) {
+	authorToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	noclaimsToken, err := testutils.GenerateRecordToken("users", "noclaims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name              string
+		token             string
+		poID              string
+		attemptedPONumber string
+		expectedPONumber  string
+	}{
+		{
+			name:              "cannot modify po_number on active purchase order",
+			token:             authorToken,
+			poID:              "y660i6a14ql2355",
+			attemptedPONumber: "2599-9999",
+			expectedPONumber:  "2025-0001",
+		},
+		{
+			name:              "cannot modify po_number on cancelled purchase order",
+			token:             authorToken,
+			poID:              "338568325487lo2",
+			attemptedPONumber: "2599-9998",
+			expectedPONumber:  "2025-0002",
+		},
+		{
+			name:              "cannot modify po_number on closed purchase order",
+			token:             noclaimsToken,
+			poID:              "0pia83nnprdlzf8",
+			attemptedPONumber: "2599-9997",
+			expectedPONumber:  "2025-0006",
+		},
+	}
+
+	for _, tc := range cases {
+		scenario := tests.ApiScenario{
+			Name:   tc.name,
+			Method: http.MethodPatch,
+			URL:    "/api/collections/purchase_orders/records/" + tc.poID,
+			Body:   bytes.NewBufferString(fmt.Sprintf(`{"po_number":"%s"}`, tc.attemptedPONumber)),
+			Headers: map[string]string{
+				"Authorization": tc.token,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
+				po, findErr := app.FindRecordById("purchase_orders", tc.poID)
+				if findErr != nil {
+					tb.Fatalf("failed loading purchase order %s: %v", tc.poID, findErr)
+				}
+				if po.GetString("po_number") != tc.expectedPONumber {
+					tb.Fatalf("po_number changed unexpectedly for %s: expected %s, got %s", tc.poID, tc.expectedPONumber, po.GetString("po_number"))
+				}
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		}
 		scenario.Test(t)
 	}
 }
