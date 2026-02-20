@@ -39,7 +39,25 @@ SELECT
   COALESCE(p0.given_name || ' ' || p0.surname, '') AS uid_name,
   COALESCE(p1.given_name || ' ' || p1.surname, '') AS approver_name,
   COALESCE(p2.given_name || ' ' || p2.surname, '') AS rejector_name,
-  COALESCE(b.name, '') AS branch_name
+  COALESCE(b.name, '') AS branch_name,
+  COALESCE(po.vendor, '') AS po_vendor,
+  COALESCE(pov.name, '') AS po_vendor_name,
+  COALESCE(pov.alias, '') AS po_vendor_alias,
+  COALESCE(po.job, '') AS po_job,
+  COALESCE(poj.number, '') AS po_job_number,
+  COALESCE(poj.description, '') AS po_job_description,
+  COALESCE(po.division, '') AS po_division,
+  COALESCE(pod.code, '') AS po_division_code,
+  COALESCE(pod.name, '') AS po_division_name,
+  COALESCE(po.category, '') AS po_category,
+  COALESCE(poca.name, '') AS po_category_name,
+  COALESCE(po.description, '') AS po_description,
+  COALESCE(po.payment_type, '') AS po_payment_type,
+  COALESCE(po.branch, '') AS po_branch,
+  COALESCE(pob.name, '') AS po_branch_name,
+  COALESCE(po.kind, '') AS po_kind,
+  COALESCE(poek.name, '') AS po_kind_name,
+  COALESCE(CAST(po.total AS REAL), 0) AS po_total
 FROM expenses e
 LEFT JOIN jobs j ON e.job = j.id
 LEFT JOIN clients cl ON j.client = cl.id
@@ -52,6 +70,12 @@ LEFT JOIN profiles p1 ON e.approver = p1.uid
 LEFT JOIN profiles p2 ON e.rejector = p2.uid
 LEFT JOIN purchase_orders po ON e.purchase_order = po.id
 LEFT JOIN branches b ON e.branch = b.id
-WHERE 
+LEFT JOIN vendors pov ON po.vendor = pov.id
+LEFT JOIN jobs poj ON po.job = poj.id
+LEFT JOIN divisions pod ON po.division = pod.id
+LEFT JOIN categories poca ON po.category = poca.id
+LEFT JOIN expenditure_kinds poek ON po.kind = poek.id
+LEFT JOIN branches pob ON po.branch = pob.id
+WHERE
   e.id = {:id}
 

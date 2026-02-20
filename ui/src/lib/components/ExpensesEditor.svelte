@@ -240,7 +240,6 @@
     {errors}
     fieldName="payment_type"
     uiName="Payment Type"
-    disabled={item.purchase_order !== ""}
   >
     {#snippet optionTemplate(item)}
       {item.name}
@@ -334,7 +333,6 @@
       {errors}
       fieldName="description"
       uiName="Description"
-      disabled={item.purchase_order !== ""}
     />
 
     {#if item.payment_type !== "Mileage"}

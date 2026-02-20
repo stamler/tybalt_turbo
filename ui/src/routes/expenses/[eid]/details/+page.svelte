@@ -81,6 +81,10 @@
     rejectModal?.openModal(expense.id);
   }
 
+  function poDiffers(expenseVal: string, poVal: string): boolean {
+    return !!expense.purchase_order && !!poVal && expenseVal !== poVal;
+  }
+
   function paymentTypeLabel(pt: string) {
     switch (pt) {
       case "CorporateCreditCard":
@@ -111,14 +115,27 @@
 
     <div><span class="font-semibold">Submitted By:</span> {expense.uid_name}</div>
 
-    <div><span class="font-semibold">Description:</span> {expense.description}</div>
+    <div>
+      <span class="font-semibold">Description:</span> {expense.description}
+      {#if poDiffers(expense.description, expense.po_description)}
+        <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_description}</span>
+      {/if}
+    </div>
 
-    <div><span class="font-semibold">Total:</span> ${expense.total}</div>
+    <div>
+      <span class="font-semibold">Total:</span> ${expense.total}
+      {#if expense.purchase_order && expense.po_total && expense.total !== expense.po_total}
+        <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: ${expense.po_total}</span>
+      {/if}
+    </div>
 
     {#if expense.payment_type}
       <div>
         <span class="font-semibold">Payment Type:</span>
         {paymentTypeLabel(expense.payment_type)}
+        {#if poDiffers(expense.payment_type, expense.po_payment_type)}
+          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {paymentTypeLabel(expense.po_payment_type)}</span>
+        {/if}
       </div>
     {/if}
 
@@ -138,6 +155,9 @@
             <span class="opacity-60">({expense.vendor_alias})</span>
           {/if}
         </a>
+        {#if poDiffers(expense.vendor, expense.po_vendor)}
+          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_vendor_name}{#if expense.po_vendor_alias} ({expense.po_vendor_alias}){/if}</span>
+        {/if}
       </div>
     {/if}
 
@@ -159,6 +179,9 @@
             <span class="opacity-60">— {expense.job_description}</span>
           {/if}
         </a>
+        {#if poDiffers(expense.job, expense.po_job)}
+          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_job_number}{#if expense.po_job_description} — {expense.po_job_description}{/if}</span>
+        {/if}
       </div>
     {/if}
 
@@ -170,15 +193,37 @@
       <div>
         <span class="font-semibold">Division:</span>
         {expense.division_code} — {expense.division_name}
+        {#if poDiffers(expense.division, expense.po_division)}
+          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_division_code} — {expense.po_division_name}</span>
+        {/if}
       </div>
     {/if}
 
     {#if expense.category_name}
-      <div><span class="font-semibold">Category:</span> {expense.category_name}</div>
+      <div>
+        <span class="font-semibold">Category:</span> {expense.category_name}
+        {#if poDiffers(expense.category, expense.po_category)}
+          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_category_name}</span>
+        {/if}
+      </div>
+    {/if}
+
+    {#if expense.kind_name}
+      <div>
+        <span class="font-semibold">Kind:</span> {expense.kind_name}
+        {#if poDiffers(expense.kind, expense.po_kind)}
+          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_kind_name}</span>
+        {/if}
+      </div>
     {/if}
 
     {#if expense.branch_name}
-      <div><span class="font-semibold">Branch:</span> {expense.branch_name}</div>
+      <div>
+        <span class="font-semibold">Branch:</span> {expense.branch_name}
+        {#if poDiffers(expense.branch_name, expense.po_branch_name)}
+          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_branch_name}</span>
+        {/if}
+      </div>
     {/if}
 
     {#if expense.payment_type === "Mileage"}
@@ -239,16 +284,17 @@
     {/if}
 
     {#if expense.rejected}
-      <div>
-        <span class="font-semibold">Rejected:</span>
-        {shortDate(expense.rejected)} by {expense.rejector_name}
-      </div>
-      {#if expense.rejection_reason}
-        <div>
-          <span class="font-semibold">Rejection Reason:</span>
-          {expense.rejection_reason}
+      <div class="rounded-sm border border-red-300 bg-red-50 p-3 space-y-1">
+        <div class="flex items-center gap-2">
+          <DsLabel color="red">
+            <Icon icon="mdi:cancel" width="16" class="inline-block" /> Rejected
+          </DsLabel>
+          <span>{shortDate(expense.rejected)} by {expense.rejector_name}</span>
         </div>
-      {/if}
+        {#if expense.rejection_reason}
+          <div class="text-red-700">{expense.rejection_reason}</div>
+        {/if}
+      </div>
     {/if}
 
     {#if expense.committed}
