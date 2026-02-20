@@ -991,15 +991,11 @@ func createConvertToCumulativePurchaseOrderHandler(app core.App) func(e *core.Re
 func GeneratePONumber(txApp core.App, record *core.Record, testDateComponents ...int) (string, error) {
 	currentYear := time.Now().Year()
 	currentMonth := int(time.Now().Month())
-	var prefix string
 	if len(testDateComponents) > 1 {
 		currentYear = testDateComponents[0]
 		currentMonth = testDateComponents[1]
-		prefix = fmt.Sprintf("%d%02d-", currentYear%100, currentMonth)
-	} else {
-		prefix = fmt.Sprintf("%d%02d-", currentYear%100, currentMonth)
 	}
-	txApp.Logger().Debug("Generating PO number", "prefix", prefix)
+	prefix := fmt.Sprintf("%d%02d-", currentYear%100, currentMonth)
 
 	// If this is a child PO, handle differently
 	if record.GetString("parent_po") != "" {
@@ -1072,18 +1068,22 @@ func GeneratePONumber(txApp core.App, record *core.Record, testDateComponents ..
 	txApp.Logger().Debug("Generating parent PO number", "prefix", prefix)
 
 	// Handle parent PO number generation
-	// We can just filter over all POs and get the last one regardless of whether
-	// it's a parent or child PO because all children POs have a parent PO with
-	// a PO number and the same prefix. We do however need to filter by the current
-	// year otherwise we may create a lastNumber that is sequential for a previous
-	// year rather than the current year.
+	// Filter for parent POs only (parent_po = '') with the current month prefix,
+	// excluding manually assigned/imported numbers (5000+).
+	//
+	// NOTE: Manually assigned/imported PO numbers start at YYMM-5000+. We reserve
+	// 5000+ and only auto-generate numbers below that threshold.
+	upperBound := fmt.Sprintf("%s%04d", prefix, 5000)
 	existingPOs, err := txApp.FindRecordsByFilter(
 		"purchase_orders",
-		`po_number ~ {:prefix}`,
+		`parent_po = '' && po_number ~ {:like} && po_number < {:upperBound}`,
 		"-po_number",
 		1,
 		0,
-		dbx.Params{"prefix": prefix + "%"},
+		dbx.Params{
+			"like":       prefix + "%",
+			"upperBound": upperBound,
+		},
 	)
 	if err != nil {
 		return "", fmt.Errorf("error querying existing PO numbers: %v", err)
@@ -1092,8 +1092,14 @@ func GeneratePONumber(txApp core.App, record *core.Record, testDateComponents ..
 	var lastNumber int
 	if len(existingPOs) > 0 {
 		lastPO := existingPOs[0].GetString("po_number")
-		// Extract the numeric suffix after the prefix
+		// Extract the numeric suffix after the prefix.
+		//
+		// Even though we filter out child POs (`parent_po = ''`), we defensively
+		// strip any trailing "-XX" segment if it exists (e.g. if historical/manual
+		// data contains dashed suffixes). This avoids parse failures like
+		// `strconv.Atoi("0010-01")`.
 		numericSuffix := strings.TrimPrefix(lastPO, prefix)
+		numericSuffix, _, _ = strings.Cut(numericSuffix, "-")
 		parsedNum, err := strconv.Atoi(numericSuffix)
 		if err != nil {
 			return "", fmt.Errorf("error parsing last PO number: %v", err)
@@ -1102,7 +1108,7 @@ func GeneratePONumber(txApp core.App, record *core.Record, testDateComponents ..
 	}
 	txApp.Logger().Debug("Last PO number", "lastNumber", lastNumber)
 	// Generate the new PO number
-	for i := lastNumber + 1; i < 6000; i++ {
+	for i := lastNumber + 1; i < 5000; i++ {
 		newPONumber := fmt.Sprintf("%s%04d", prefix, i)
 
 		// Check if the generated PO number is unique
