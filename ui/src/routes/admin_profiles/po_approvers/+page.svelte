@@ -10,6 +10,8 @@
   import type {
     AdminProfilesAugmentedResponse,
     DivisionsResponse,
+    ManagersResponse,
+    UserClaimsResponse,
   } from "$lib/pocketbase-types";
   import type { SearchResult } from "minisearch";
   import type { PageData } from "./$types";
@@ -66,8 +68,7 @@
     const term = searchTerm.toLowerCase().trim();
     if (!term) return items;
     return items.filter(
-      (i) =>
-        i.given_name.toLowerCase().includes(term) || i.surname.toLowerCase().includes(term),
+      (i) => i.given_name.toLowerCase().includes(term) || i.surname.toLowerCase().includes(term),
     );
   });
 
@@ -75,8 +76,7 @@
     [...filteredItems].sort((a, b) => {
       let comparison = 0;
       if (sortColumn === "name") {
-        comparison =
-          (a.surname + a.given_name).localeCompare(b.surname + b.given_name);
+        comparison = (a.surname + a.given_name).localeCompare(b.surname + b.given_name);
       } else {
         const aVal = normalizeNumber((a as Record<string, unknown>)[itemFieldMap[sortColumn]]);
         const bVal = normalizeNumber((b as Record<string, unknown>)[itemFieldMap[sortColumn]]);
@@ -111,6 +111,10 @@
     userClaimId: string;
     fullName: string;
   } | null>(null);
+  let taprCandidates = $state<ManagersResponse[]>([]);
+  let loadingTaprCandidates = $state(false);
+  let taprCandidatesLoaded = $state(false);
+  let taprCandidatesError = $state<string | null>(null);
 
   // Helpers
   function normalizeNumber(value: unknown): number {
@@ -406,6 +410,46 @@
     }
   }
 
+  async function loadTaprCandidates() {
+    if (loadingTaprCandidates) return;
+
+    loadingTaprCandidates = true;
+    taprCandidatesError = null;
+
+    try {
+      const [taprUsers, poApproverClaims] = await Promise.all([
+        pb.collection("managers").getFullList<ManagersResponse>({
+          sort: "surname,given_name",
+        }),
+        pb.collection("user_claims").getFullList<UserClaimsResponse>({
+          filter: "cid.name = 'po_approver'",
+        }),
+      ]);
+
+      const uniqueTaprUsers = Array.from(
+        new Map(taprUsers.map((user) => [user.id, user])).values(),
+      );
+      const poApproverUserIds = new Set(
+        poApproverClaims
+          .map((claim) => claim.uid)
+          .filter((uid): uid is string => typeof uid === "string"),
+      );
+
+      taprCandidates = uniqueTaprUsers.filter((user) => !poApproverUserIds.has(user.id));
+      taprCandidatesLoaded = true;
+    } catch (error: unknown) {
+      console.error("Failed to load tapr candidates:", error);
+      taprCandidatesError =
+        error && typeof error === "object" && "data" in error
+          ? ((error as { data?: { message?: string } }).data?.message ??
+            "Failed to load tapr users")
+          : "Failed to load tapr users";
+      taprCandidatesLoaded = false;
+    } finally {
+      loadingTaprCandidates = false;
+    }
+  }
+
   const amountColumns = [
     { field: "max_amount" as const, label: "Capital" },
     { field: "project_max" as const, label: "Project" },
@@ -591,8 +635,39 @@
           </tbody>
         </table>
       </div>
-
     {/if}
+
+    <div class="mt-8 border-t border-neutral-200 pt-6">
+      <h2 class="text-lg font-semibold">tapr Reconciliation</h2>
+      <p class="text-sm text-neutral-600">
+        Load users with <code>tapr</code> who do not have <code>po_approver</code>.
+      </p>
+      <div class="mt-3">
+        <button
+          type="button"
+          class="rounded-sm bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600 disabled:opacity-50"
+          disabled={loadingTaprCandidates}
+          onclick={loadTaprCandidates}
+        >
+          {loadingTaprCandidates ? "loading tapr..." : "load tapr"}
+        </button>
+      </div>
+
+      {#if taprCandidatesError}
+        <p class="mt-3 text-sm text-red-600">{taprCandidatesError}</p>
+      {:else if taprCandidatesLoaded}
+        <p class="mt-3 text-sm text-neutral-700">{taprCandidates.length} user(s) found.</p>
+        {#if taprCandidates.length === 0}
+          <p class="mt-2 text-sm text-neutral-500">No tapr users found without po_approver.</p>
+        {:else}
+          <ul class="mt-2 list-disc pl-5">
+            {#each taprCandidates as user (user.id)}
+              <li>{user.given_name} {user.surname}</li>
+            {/each}
+          </ul>
+        {/if}
+      {/if}
+    </div>
 
     <div class="mt-6">
       <a href="/admin_profiles/list" class="text-blue-600 hover:underline">
@@ -615,9 +690,7 @@
   >
     <div class="rounded-sm border border-amber-300 bg-amber-50 p-3 text-amber-900">
       <p class="font-semibold">Confirm removal</p>
-      <p class="mt-1 text-sm">
-        This action removes PO approver access for this user.
-      </p>
+      <p class="mt-1 text-sm">This action removes PO approver access for this user.</p>
     </div>
   </DSPopover>
 {/if}
