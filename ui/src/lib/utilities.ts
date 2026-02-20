@@ -340,6 +340,40 @@ export async function fetchClientContacts(clientId: string): Promise<ClientConta
   }
 }
 
+function csvEscape(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  return `"${String(value).replace(/"/g, '""')}"`;
+}
+
+function rowsToCsv(rows: Array<Record<string, unknown>>, headers: string[]): string {
+  const lines = [headers.map((h) => csvEscape(h)).join(",")];
+  for (const row of rows) {
+    lines.push(headers.map((h) => csvEscape(row[h])).join(","));
+  }
+  return lines.join("\n");
+}
+
+export function downloadCsvRows(
+  fileName: string,
+  rows: Array<Record<string, unknown>>,
+  headers?: string[],
+) {
+  if (!rows || rows.length === 0) return;
+  const resolvedHeaders = headers && headers.length > 0 ? headers : Object.keys(rows[0] ?? {});
+  if (resolvedHeaders.length === 0) return;
+
+  const csv = rowsToCsv(rows, resolvedHeaders);
+  const blob = new Blob([csv], { type: "text/csv" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = fileName;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 export async function downloadCSV(endpoint: string, fileName: string) {
   try {
     // Prepare headers, including Authorization if the user is logged in

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
-  import { shortDate } from "$lib/utilities";
+  import { downloadCsvRows, shortDate } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
   import ObjectTable from "$lib/components/ObjectTable.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
@@ -22,22 +22,16 @@
   // Download entries as CSV sorted by rate descending
   function downloadCsv() {
     const sorted = [...entries].sort((a, b) => b.rate - a.rate);
-    const rows = [
-      ["Role", "Rate", "Overtime Rate"],
-      ...sorted.map((e) => [
-        e.expand?.role?.name ?? "Unknown",
-        e.rate.toFixed(2),
-        e.overtime_rate.toFixed(2),
-      ]),
-    ];
-    const csv = rows.map((r) => r.map((v) => `"${v}"`).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${rateSheet.name} rev${rateSheet.revision}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    const rows = sorted.map((e) => ({
+      Role: e.expand?.role?.name ?? "Unknown",
+      Rate: e.rate.toFixed(2),
+      "Overtime Rate": e.overtime_rate.toFixed(2),
+    }));
+    downloadCsvRows(`${rateSheet.name} rev${rateSheet.revision}.csv`, rows, [
+      "Role",
+      "Rate",
+      "Overtime Rate",
+    ]);
   }
 
   // Track edited entries by id -> { rate, overtime_rate }

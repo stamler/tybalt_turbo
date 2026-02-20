@@ -2,6 +2,7 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import { divisions as divisionsStore } from "$lib/stores/divisions";
+  import { downloadCsvRows } from "$lib/utilities";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
@@ -163,6 +164,50 @@
     const code = "code" in division ? division.code?.trim() : undefined;
     const name = "name" in division ? (division.name?.trim() ?? division.id) : division.id;
     return code && code.length > 0 ? `${code} — ${name}` : name;
+  }
+
+  function downloadPoApproversCsv() {
+    const exportRows = sortedItems.map((item) => {
+      const divisionIds = getDivisions(item);
+      const divisionCodes = divisionIds.map((id) => divisionCode(id)).join(",");
+      return {
+        given_name: item.given_name,
+        surname: item.surname,
+        capital_max: getAmount(item, "max_amount"),
+        project_max: getAmount(item, "project_max"),
+        sponsorship_max: getAmount(item, "sponsorship_max"),
+        staff_social_max: getAmount(item, "staff_and_social_max"),
+        media_event_max: getAmount(item, "media_and_event_max"),
+        computer_max: getAmount(item, "computer_max"),
+        division_codes: divisionCodes || "All",
+      };
+    });
+
+    downloadCsvRows(`po_approvers_${new Date().toISOString().split("T")[0]}.csv`, exportRows, [
+      "given_name",
+      "surname",
+      "capital_max",
+      "project_max",
+      "sponsorship_max",
+      "staff_social_max",
+      "media_event_max",
+      "computer_max",
+      "division_codes",
+    ]);
+  }
+
+  function downloadTaprCandidatesCsv() {
+    if (!taprCandidatesLoaded) return;
+    const exportRows = taprCandidates.map((user) => ({
+      given_name: user.given_name,
+      surname: user.surname,
+    }));
+
+    downloadCsvRows(
+      `tapr_without_po_approver_${new Date().toISOString().split("T")[0]}.csv`,
+      exportRows,
+      ["given_name", "surname"],
+    );
   }
 
   // Initialize edited state for a row if not already present
@@ -484,6 +529,14 @@
         class="flex-1 rounded-sm border border-neutral-300 px-2 py-1 text-base"
       />
       <span class="text-sm text-neutral-600">{sortedItems.length} of {items.length} approvers</span>
+      <button
+        type="button"
+        class="rounded-sm bg-neutral-200 px-3 py-1.5 text-sm text-neutral-800 hover:bg-neutral-300 disabled:opacity-50"
+        disabled={sortedItems.length === 0}
+        onclick={downloadPoApproversCsv}
+      >
+        download csv
+      </button>
     </div>
 
     {#if items.length === 0}
@@ -638,11 +691,11 @@
     {/if}
 
     <div class="mt-8 border-t border-neutral-200 pt-6">
-      <h2 class="text-lg font-semibold">tapr Reconciliation</h2>
+      <h2 class="text-lg font-semibold">TAPR Reconciliation</h2>
       <p class="text-sm text-neutral-600">
         Load users with <code>tapr</code> who do not have <code>po_approver</code>.
       </p>
-      <div class="mt-3">
+      <div class="mt-3 flex items-center gap-2">
         <button
           type="button"
           class="rounded-sm bg-blue-500 px-3 py-1.5 text-sm text-white hover:bg-blue-600 disabled:opacity-50"
@@ -651,6 +704,14 @@
         >
           {loadingTaprCandidates ? "loading tapr..." : "load tapr"}
         </button>
+        <button
+          type="button"
+          class="rounded-sm bg-neutral-200 px-3 py-1.5 text-sm text-neutral-800 hover:bg-neutral-300 disabled:opacity-50"
+          disabled={!taprCandidatesLoaded || taprCandidates.length === 0}
+          onclick={downloadTaprCandidatesCsv}
+        >
+          download csv
+        </button>
       </div>
 
       {#if taprCandidatesError}
@@ -658,7 +719,7 @@
       {:else if taprCandidatesLoaded}
         <p class="mt-3 text-sm text-neutral-700">{taprCandidates.length} user(s) found.</p>
         {#if taprCandidates.length === 0}
-          <p class="mt-2 text-sm text-neutral-500">No tapr users found without po_approver.</p>
+          <p class="mt-2 text-sm text-neutral-500">No TAPR users found without po_approver.</p>
         {:else}
           <ul class="mt-2 list-disc pl-5">
             {#each taprCandidates as user (user.id)}
