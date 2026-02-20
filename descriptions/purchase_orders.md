@@ -18,6 +18,14 @@ Approval is stage-based and kind-aware.
 
 Global `po_approval_thresholds` tiers are no longer used.
 
+### Threshold = 0 Implication (Explicit)
+
+- If `expenditure_kinds.second_approval_threshold` is `0` (or null-coalesced to `0`), dual approval is never required for that kind.
+- In that case, there is no first-stage/second-stage split: first-stage candidates are all eligible approvers with `limit >= approval_total`.
+- A high-authority approver appears as "second approver only" only when both conditions are true:
+  - `second_approval_threshold > 0`
+  - `approval_total > second_approval_threshold`
+
 ## Expenditure Kinds and Limit Columns
 
 The PO `kind` determines which `po_approver_props` limit column is used:
