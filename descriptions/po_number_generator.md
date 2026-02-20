@@ -4,8 +4,8 @@ This document describes the current `GeneratePONumber` implementation: what it d
 
 ## Where it lives / call path
 
-- Generator function: `/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go` (`GeneratePONumber`).
-- Runtime call site: `/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go` inside `createApprovePurchaseOrderHandler`, via `activateRecord()`.
+- Generator function: `app/routes/purchase_orders.go` (`GeneratePONumber`).
+- Runtime call site: `app/routes/purchase_orders.go` inside `createApprovePurchaseOrderHandler`, via `activateRecord()`.
   - The approval handler runs in `app.RunInTransaction(...)`.
   - `activateRecord()` sets `status="Active"` and assigns `po_number` only when the record has a blank `po_number`.
 
