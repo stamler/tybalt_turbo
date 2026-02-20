@@ -9,14 +9,13 @@
   import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { shortDate } from "$lib/utilities";
-  import RejectModal from "$lib/components/RejectModal.svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { onMount, onDestroy, untrack } from "svelte";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
-  let rejectModal: RejectModal;
 
   const collectionId = "expenses";
+  const viewerId = pb.authStore.record?.id ?? "";
 
   let {
     inListHeader,
@@ -92,29 +91,6 @@
       alert(error.data.message);
     }
   }
-  async function approve(id: string) {
-    try {
-      await pb.send(`/api/expenses/${id}/approve`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-    } catch (error: any) {
-      globalStore.addError(error?.response.error);
-    }
-  }
-
-  async function commit(id: string) {
-    try {
-      await pb.send(`/api/expenses/${id}/commit`, {
-        method: "POST",
-      });
-    } catch (error: any) {
-      globalStore.addError(error?.response.error);
-    }
-  }
-
   async function submit(id: string) {
     try {
       await pb.send(`/api/expenses/${id}/submit`, {
@@ -134,13 +110,8 @@
       globalStore.addError(error?.response.error);
     }
   }
-
-  function openRejectModal(recordId: string) {
-    rejectModal?.openModal(recordId);
-  }
 </script>
 
-<RejectModal collectionName="expenses" bind:this={rejectModal} />
 <DsList
   items={items as ExpensesAugmentedResponse[]}
   search={true}
@@ -241,9 +212,10 @@
       {/if}
     </span>
   {/snippet}
-  {#snippet actions({ id, submitted, approved, rejected, committed }: ExpensesAugmentedResponse)}
+  {#snippet actions({ id, uid, submitted, approved, rejected, committed }: ExpensesAugmentedResponse)}
     {#if $expensesEditingEnabled}
-      {#if !submitted}
+      {@const isOwner = uid === viewerId}
+      {#if isOwner && !submitted}
         <DsActionButton
           action={`/expenses/${id}/edit`}
           icon="mdi:edit-outline"
@@ -251,12 +223,18 @@
           color="blue"
         />
       {/if}
-      {#if (submitted && approved === "") || rejected !== ""}
+      {#if isOwner && ((submitted && approved === "") || rejected !== "") && committed === ""}
         <DsActionButton action={() => recall(id)} icon="mdi:rewind" title="Recall" color="orange" />
       {/if}
-      {#if !submitted}
+      {#if isOwner && !submitted}
         <DsActionButton action={() => submit(id)} icon="mdi:send" title="Submit" color="blue" />
       {/if}
+      <!--
+        Review actions intentionally disabled in list views to encourage users
+        to open expense details before approve/reject/commit. Keep commented
+        for easy rollback if policy changes.
+      -->
+      <!--
       {#if submitted && approved === ""}
         <DsActionButton
           action={() => approve(id)}
@@ -265,7 +243,6 @@
           color="green"
         />
       {/if}
-      <!-- Approved records can be rejected if they haven't been committed or rejected already -->
       {#if approved !== "" && rejected === "" && committed === ""}
         <DsActionButton
           action={() => openRejectModal(id)}
@@ -274,7 +251,6 @@
           color="orange"
         />
       {/if}
-      <!-- Commit button is disabled if the record has already been committed or is not approved -->
       {#if committed === "" && approved !== ""}
         <DsActionButton
           action={() => commit(id)}
@@ -283,13 +259,14 @@
           color="green"
         />
       {/if}
+      -->
       <!-- Delete button is disabled if the record has already been committed -->
-      {#if committed !== ""}
+      {#if isOwner && committed !== ""}
         <DsLabel color="green">Committed</DsLabel>
-      {:else}
+      {:else if isOwner}
         <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
       {/if}
-    {:else if committed !== ""}
+    {:else if uid === viewerId && committed !== ""}
       <DsLabel color="green">Committed</DsLabel>
     {/if}
   {/snippet}

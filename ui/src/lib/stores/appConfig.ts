@@ -32,7 +32,7 @@ let unsubscribeFunc: UnsubscribeFunc | null = null;
  */
 async function init() {
   // Check authentication before proceeding
-  if (!pb.authStore.token || !pb.authStore.model) return;
+  if (!pb.authStore.token || !pb.authStore.record) return;
 
   // If already initialized, return (idempotent)
   if (get(store).initialized) return;

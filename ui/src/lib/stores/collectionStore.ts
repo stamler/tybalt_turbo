@@ -167,7 +167,7 @@ export function createCollectionStore<T extends BaseSystemFields>(
     // Initialize the store and subscription (call this when the store is first used)
     init: async () => {
       // Check authentication before proceeding - noop if not authenticated
-      if (!pb.authStore.token || !pb.authStore.model) return;
+      if (!pb.authStore.token || !pb.authStore.record) return;
 
       // if the store is already initialized, return so the function is idempotent
       if (get(store).initialized) return;

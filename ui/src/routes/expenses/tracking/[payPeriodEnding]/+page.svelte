@@ -2,18 +2,15 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import DsList from "$lib/components/DSList.svelte";
-  import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import { shortDate } from "$lib/utilities";
   import Icon from "@iconify/svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
-  import RejectModal from "$lib/components/RejectModal.svelte";
   import { page } from "$app/stores";
 
   const payPeriodEnding = $derived.by(() => $page.params.payPeriodEnding);
   let rows = $state([] as any[]);
-  let rejectModal: RejectModal;
 
   async function init() {
     try {
@@ -28,23 +25,7 @@
       init();
     }
   });
-
-  async function commit(id: string) {
-    try {
-      await pb.send(`/api/expenses/${id}/commit`, { method: "POST" });
-      await init();
-    } catch (error: any) {
-      globalStore.addError(error?.response?.error || "Commit failed");
-    }
-  }
-
-  function openReject(id: string) {
-    // @ts-ignore exported function on the component instance
-    rejectModal?.openModal(id);
-  }
 </script>
-
-<RejectModal collectionName="expenses" bind:this={rejectModal} on:refresh={() => init()} />
 
 <DsList items={rows} groupField="phase" inListHeader={`Expenses for ${payPeriodEnding}`}>
   {#snippet groupHeader(label)}
@@ -124,13 +105,5 @@
         </a>
       {/if}
     </span>
-  {/snippet}
-  {#snippet actions(r)}
-    {#if r.phase === "Approved" && r.rejected === ""}
-      <DsActionButton action={() => commit(r.id)}>Commit</DsActionButton>
-    {/if}
-    {#if r.phase !== "Committed" && r.rejected === ""}
-      <DsActionButton action={() => openReject(r.id)}>Reject</DsActionButton>
-    {/if}
   {/snippet}
 </DsList>

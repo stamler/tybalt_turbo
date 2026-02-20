@@ -51,7 +51,7 @@ AUTH_CONFIG.ACTIVITY_EVENTS.forEach((event) => {
 // STEP 2: Handle existing token on app startup
 // If user has a token from a previous session (stored in browser),
 // try to refresh it to ensure it's still valid and extend its lifetime
-if (pb.authStore.token && pb.authStore.model) {
+if (pb.authStore.token && pb.authStore.record) {
   authStore.refreshAuth().then((success) => {
     if (success) {
       // Token refresh succeeded - start the periodic refresh system
@@ -81,7 +81,7 @@ pb.authStore.onChange(() => {
 
   // If user is now authenticated, set up the refresh timer
   // If user is not authenticated, setupTokenRefresh() will clear any existing timer
-  if (pb.authStore.token && pb.authStore.model) {
+  if (pb.authStore.token && pb.authStore.record) {
     authStore.setupTokenRefresh();
 
     // initialize stores

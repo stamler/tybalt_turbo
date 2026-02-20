@@ -4,6 +4,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
   import { untrack } from "svelte";
 
@@ -32,19 +33,29 @@
   };
 
   let rows: Row[] = $state(untrack(() => data.items || []));
+  let rejectModal: RejectModal;
+
+  async function refreshRows() {
+    rows = await pb.send("/api/expenses/tracking", { method: "GET" });
+  }
 
   async function commit(id: string) {
     try {
       await pb.send(`/api/expenses/${id}/commit`, { method: "POST" });
-      // Refresh list after commit
-      rows = await pb.send("/api/expenses/tracking", { method: "GET" });
+      await refreshRows();
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Commit failed");
     }
   }
+
+  function openReject(id: string) {
+    // @ts-ignore exported function on the component instance
+    rejectModal?.openModal(id);
+  }
 </script>
 
 <!-- No pay period selector; show all pending items -->
+<RejectModal collectionName="expenses" bind:this={rejectModal} on:refresh={() => refreshRows()} />
 
 <DsList items={rows} groupField="phase" inListHeader="Expense Commit Queue">
   {#snippet groupHeader(label)}
@@ -85,6 +96,9 @@
   {#snippet actions(r: Row)}
     {#if r.phase === "Approved" && r.rejected === ""}
       <DsActionButton action={() => commit(r.id)}>Commit</DsActionButton>
+    {/if}
+    {#if r.phase !== "Committed" && r.rejected === ""}
+      <DsActionButton action={() => openReject(r.id)}>Reject</DsActionButton>
     {/if}
     <DsActionButton action={() => (window.location.href = `/expenses/${r.id}/details`)}
       >View</DsActionButton

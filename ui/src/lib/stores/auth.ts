@@ -99,7 +99,7 @@ function checkTokenExpiration(token: string): boolean {
  */
 async function refreshAuth(): Promise<boolean> {
   try {
-    if (!pb.authStore.token || !pb.authStore.model) {
+    if (!pb.authStore.token || !pb.authStore.record) {
       return false;
     }
 
@@ -147,7 +147,7 @@ function setupTokenRefresh() {
   }
 
   // Only setup refresh if we have a valid token
-  if (pb.authStore.token && pb.authStore.model) {
+  if (pb.authStore.token && pb.authStore.record) {
     // Reset activity timestamp when setting up refresh (treat setup as activity)
     lastActivity = Date.now();
 
@@ -189,7 +189,7 @@ function setupTokenRefresh() {
  * If token is expired, automatically clears the auth state
  */
 function getCurrentAuthState(): AuthState | null {
-  if (!pb.authStore.token || !pb.authStore.model) {
+  if (!pb.authStore.token || !pb.authStore.record) {
     return null;
   }
 
@@ -204,7 +204,7 @@ function getCurrentAuthState(): AuthState | null {
 
   return {
     isValid: true, // We've verified the token is valid and not expired
-    model: pb.authStore.model,
+    model: pb.authStore.record,
     token: pb.authStore.token,
   };
 }
