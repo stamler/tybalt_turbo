@@ -136,13 +136,20 @@ When you need to push local database changes (schema changes, data fixes, etc.) 
    source scripts/setup-env.sh
    ```
 
-2. **Stop the production app** (prevents conflicts):
+2. **Mark production to restore from S3 on next boot** (works with Fly volumes too):
 
    ```bash
-   flyctl machine stop
+   flyctl ssh console -C "touch /app/pb_data/.force-restore"
    ```
 
-3. **Push your local database to S3:**
+3. **Stop the production machine** (prevents conflicts):
+
+   ```bash
+   MACHINE_ID=$(flyctl status --json | jq -r '.Machines[0].id')
+   flyctl machine stop $MACHINE_ID
+   ```
+
+4. **Push your local database to S3:**
 
    ```bash
    litestream replicate -config litestream.local.yml
@@ -150,17 +157,18 @@ When you need to push local database changes (schema changes, data fixes, etc.) 
 
    Let this run for 30-60 seconds, then press Ctrl+C.
 
-4. **Delete the production database volume** (forces restore from S3):
+5. **Start the production machine**:
 
    ```bash
-   flyctl ssh console -C "rm /app/pb_data/data.db"
+   flyctl machine start $MACHINE_ID
    ```
 
-5. **Start the production app:**
+On next boot, the app startup script will:
 
-   ```bash
-   flyctl machine start
-   ```
+- Restore `data.db` from S3
+- Clear stale Litestream state (`/app/pb_data/.data.db-litestream`) and any SQLite WAL/SHM files
+
+This prevents common Litestream WAL verification errors after DB replacement.
 
 Alternatively, use the script:
 
@@ -199,17 +207,12 @@ litestream ltx -config /etc/litestream.yml /app/pb_data/data.db
 **If database is corrupted:**
 
 ```bash
-# SSH into your app
-flyctl ssh console
+# Mark the machine to restore from S3 on next boot
+flyctl ssh console -C "touch /app/pb_data/.force-restore"
 
-# Stop the app temporarily
-pkill tybalt
-
-# Restore from latest backup
-litestream restore -config /etc/litestream.yml -if-replica-exists /app/pb_data/data.db
-
-# Restart (or restart the machine from outside)
-/start.sh &
+# Restart the machine so startup performs a clean restore
+MACHINE_ID=$(flyctl status --json | jq -r '.Machines[0].id')
+flyctl machine restart $MACHINE_ID
 ```
 
 **For complete disaster recovery:**
@@ -245,6 +248,11 @@ flyctl secrets list
 - Check litestream logs: `flyctl logs -a your-app`
 - Verify S3 credentials are correct
 - Ensure bucket exists and is accessible
+
+**Litestream WAL verification errors (e.g. `cannot verify wal state`)**
+
+- Mark a clean restore on next boot: `flyctl ssh console -C "touch /app/pb_data/.force-restore"`
+- Restart the machine: `flyctl machine restart $(flyctl status --json | jq -r '.Machines[0].id')`
 
 **App not starting:**
 
