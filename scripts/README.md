@@ -41,9 +41,10 @@ source scripts/setup-env.sh
 **What it does**:
 
 1. Validates environment variables are set
-2. Stops the production app
-3. Replicates local database to S3
-4. Restarts the production app
+2. Marks production to restore on next boot (`/app/pb_data/.force-restore`)
+3. Stops the production machine
+4. Replicates local database to S3
+5. Starts the production machine (startup restores + resets Litestream/WAL state)
 
 ---
 

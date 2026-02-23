@@ -51,6 +51,11 @@ if [ -z "$MACHINE_ID" ] || [ "$MACHINE_ID" = "null" ]; then
     exit 1
 fi
 
+# Mark the machine to restore from S3 on next boot.
+# This makes the workflow safe even when /app/pb_data is on a persistent Fly volume.
+echo "📝 Marking production to restore DB on next boot..."
+flyctl ssh console -C "mkdir -p /app/pb_data && touch /app/pb_data/.force-restore" >/dev/null
+
 # Stop production app to prevent race conditions with S3 replication
 echo "⏹️  Stopping production app..."
 flyctl machine stop $MACHINE_ID
