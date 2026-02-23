@@ -1,13 +1,16 @@
 # Expenditures
 
-| Activity                               | All Staff   | Managers / Team Leads | Branch Managers | Executives |
-| -------------------------------------- | ----------- | --------------------- | --------------- | ---------- |
-| Capital Expense                        | < 100$      | < 500$ w/PO           | < 2500$ w/PO    | w/PO       |
-| Project Expense (references a job)     | < 100$ w/PO | < 500$ w/PO           | < 20000$ w/PO   | w/PO       |
-| Sponsorships                           |             |                       |                 | w/PO       |
-| Staff Appreciation or Social Committee |             |                       | < 500$ w/PO     | w/PO       |
-| Media Advertising and Event Fees       |             |                       |                 | w/PO       |
-| Computer and Software Acquisition      |             |                       |                 | w/PO       |
+| Activity                               | All Staff   | Managers / Team Leads | Branch Managers                  | Executives |
+|----------------------------------------|-------------|-----------------------|----------------------------------|------------|
+| Capital Expense                        | < 100$      | < 500$ w/PO           | < 2500$ w/PO                     | w/PO       |
+| Project Expense (references a job)     | < 100$ w/PO | < 5000$ w/PO          | < 25000$ w/PO                    | w/PO       |
+| Sponsorships                           |             |                       | < budget<sup>1</sup> w/PO        | w/PO       |
+| Staff Appreciation or Social Committee |             |                       | < 500$ w/PO                      | w/PO       |
+| Media Advertising and Event Fees       |             |                       |                                  | w/PO       |
+| Computer and Software Acquisition      |             |                       | w/PO and IT approval<sup>2</sup> | w/PO       |
+
+- <sup>1.</sup> Turbo will enforce that an individual PO does not exceed the budget maximum, however turbo wil not enforce the budget so a branch manager could exceed the budget by approving multiple POs in a given year. It is the responsibility of the branch manager to manage this budget.
+- <sup>2.</sup> It will be given an approval amount for computers up to $500 and thus can act as first approver and vet computer/software purchases for branch managers.
 
 ## Implementation Notes
 
