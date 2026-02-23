@@ -19,9 +19,11 @@ set -e
 #   /app/pb_data/.data.db-litestream
 #
 # Why this matters:
-# - Deploys/restarts can stop processes abruptly.
-# - Even without a persistent volume, the database can be restored/replaced/rewritten
-#   within the same Machine lifecycle (or after a partial restore attempt).
+# - Fly restarts/deploys recreate the root filesystem ("ephemeral storage wipe").
+#   However, this does not protect you from WAL/state mismatches because:
+#     - The DB can be restored/replaced/rewritten within the same Machine lifecycle.
+#     - If you ever mount /app/pb_data on a volume, it persists across restarts.
+#     - Partial restores or manual file operations can leave stale WAL/state behind.
 # - If the database file is restored/replaced/rewritten (or WAL is truncated/reset)
 #   but Litestream’s local state directory is left behind, Litestream can get stuck
 #   in a loop with errors like:
@@ -50,6 +52,10 @@ set -e
 #   (because `set -e`), which is safer than silently starting with a blank DB.
 ###############################################################################
 
+log() {
+  echo "[start] $*"
+}
+
 DB_PATH="/app/pb_data/data.db"
 WAL_PATH="${DB_PATH}-wal"
 SHM_PATH="${DB_PATH}-shm"
@@ -57,30 +63,84 @@ LITESTREAM_STATE_DIR="/app/pb_data/.data.db-litestream"
 FORCE_RESTORE_FILE="/app/pb_data/.force-restore"
 
 restore_needed=0
+restore_reasons=""
 if [ ! -f "$DB_PATH" ]; then
   restore_needed=1
+  restore_reasons="${restore_reasons} missing-db"
 fi
 if [ -f "$FORCE_RESTORE_FILE" ]; then
   restore_needed=1
+  restore_reasons="${restore_reasons} force-file"
 fi
 if [ "${LITESTREAM_FORCE_RESTORE:-}" = "1" ]; then
   restore_needed=1
+  restore_reasons="${restore_reasons} env"
 fi
 
 if [ "$restore_needed" -eq 1 ]; then
-  echo "Restoring database from Litestream..."
+  log "Restore requested:${restore_reasons}"
+  log "Preparing clean restore (clearing local WAL + Litestream state if present)..."
 
-  # If the database was deleted/replaced without clearing Litestream/WAL state then
-  # Litestream can get stuck with WAL verification errors on boot.
-  rm -rf "$LITESTREAM_STATE_DIR" || true
-  rm -f "$WAL_PATH" "$SHM_PATH" || true
-  rm -f "$DB_PATH" || true
+  if [ -d "$LITESTREAM_STATE_DIR" ]; then
+    log "Deleting ${LITESTREAM_STATE_DIR}"
+    rm -rf "$LITESTREAM_STATE_DIR" || true
+  else
+    log "Not deleting ${LITESTREAM_STATE_DIR} (not present)"
+  fi
 
-  litestream restore -config /etc/litestream.yml "$DB_PATH"
-  rm -f "$FORCE_RESTORE_FILE" || true
+  if [ -f "$WAL_PATH" ]; then
+    log "Deleting ${WAL_PATH}"
+    rm -f "$WAL_PATH" || true
+  else
+    log "Not deleting ${WAL_PATH} (not present)"
+  fi
 
-  echo "Database restored successfully"
+  if [ -f "$SHM_PATH" ]; then
+    log "Deleting ${SHM_PATH}"
+    rm -f "$SHM_PATH" || true
+  else
+    log "Not deleting ${SHM_PATH} (not present)"
+  fi
+
+  if [ -f "$DB_PATH" ]; then
+    log "Deleting ${DB_PATH}"
+    rm -f "$DB_PATH" || true
+  else
+    log "Not deleting ${DB_PATH} (not present)"
+  fi
+
+  log "Restoring ${DB_PATH} from Litestream replica (config: /etc/litestream.yml)"
+  if litestream restore -config /etc/litestream.yml "$DB_PATH"; then
+    log "Database restore succeeded"
+  else
+    log "ERROR: Database restore failed; refusing to start with a fresh/empty database."
+    log "If you intentionally want a new empty DB, remove the restore requirement and start the app without Litestream."
+    exit 1
+  fi
+
+  if command -v sqlite3 >/dev/null 2>&1; then
+    log "Running integrity check on restored database (sqlite3 PRAGMA integrity_check)..."
+    integrity_result=$(sqlite3 "$DB_PATH" "PRAGMA integrity_check;" 2>&1) || true
+    if [ "$integrity_result" != "ok" ]; then
+      log "ERROR: Integrity check failed after restore:"
+      log "$integrity_result"
+      log "Refusing to start with a corrupt database."
+      exit 1
+    fi
+    log "Integrity check passed"
+  else
+    log "Skipping integrity check (sqlite3 CLI not installed in image)"
+  fi
+
+  if [ -f "$FORCE_RESTORE_FILE" ]; then
+    log "Clearing restore flag ${FORCE_RESTORE_FILE}"
+    rm -f "$FORCE_RESTORE_FILE" || true
+  fi
+else
+  log "Using existing database at ${DB_PATH} (no restore requested)"
+  log "Not deleting any database/WAL/Litestream state"
 fi
 
 # Run the app under Litestream so signals/shutdown are coordinated.
+log "Starting Litestream + app (litestream replicate -exec)"
 exec litestream replicate -config /etc/litestream.yml -exec "./tybalt serve --http=0.0.0.0:8080"
