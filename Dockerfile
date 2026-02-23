@@ -81,7 +81,7 @@ FROM alpine:latest
 RUN apk add --no-cache ca-certificates tzdata
 
 # Install litestream
-RUN wget https://github.com/benbjohnson/litestream/releases/download/v0.5.2/litestream-0.5.2-linux-x86_64.tar.gz -O - | tar -xzf - -C /usr/local/bin
+RUN wget https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.tar.gz -O - | tar -xzf - -C /usr/local/bin
 
 # Create app directory
 WORKDIR /app
