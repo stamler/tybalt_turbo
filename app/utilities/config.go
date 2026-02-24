@@ -229,6 +229,21 @@ func coerceFloat64(v any) (float64, error) {
 	}
 }
 
+// GetNoPOExpenseLimit reads the no-PO expense limit from the "expenses" domain
+// in app_config. Returns the default from constants when the config is missing,
+// the key is absent, or the value is negative.
+// A value of 0 means all non-exempt expenses require a PO.
+func GetNoPOExpenseLimit(app core.App) float64 {
+	config, err := GetConfigValue(app, "expenses")
+	if err != nil || config == nil {
+		return constants.NO_PO_EXPENSE_LIMIT
+	}
+	if limit, err := coerceFloat64(config["no_po_expense_limit"]); err == nil && limit >= 0 {
+		return limit
+	}
+	return constants.NO_PO_EXPENSE_LIMIT
+}
+
 // ErrExpensesEditingDisabled is returned when expense editing is disabled
 var ErrExpensesEditingDisabled = &errs.HookError{
 	Status:  http.StatusForbidden,

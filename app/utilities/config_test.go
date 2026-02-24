@@ -405,3 +405,71 @@ func TestCalculatePOExpenseTotalLimit(t *testing.T) {
 		})
 	}
 }
+
+func TestGetNoPOExpenseLimit(t *testing.T) {
+	testsTable := []struct {
+		name  string
+		setup func(t *testing.T, app *tests.TestApp)
+		want  float64
+	}{
+		{
+			name: "returns default when expenses config is missing",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				deleteExpensesConfig(t, app)
+			},
+			want: constants.NO_PO_EXPENSE_LIMIT,
+		},
+		{
+			name: "returns default when no_po_expense_limit key is missing",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertExpensesConfig(t, app, `{"create_edit_absorb":true}`)
+			},
+			want: constants.NO_PO_EXPENSE_LIMIT,
+		},
+		{
+			name: "returns configured positive value",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertExpensesConfig(t, app, `{"no_po_expense_limit":250.0}`)
+			},
+			want: 250.0,
+		},
+		{
+			name: "returns zero when value is zero",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertExpensesConfig(t, app, `{"no_po_expense_limit":0}`)
+			},
+			want: 0,
+		},
+		{
+			name: "returns default when value is negative",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertExpensesConfig(t, app, `{"no_po_expense_limit":-50}`)
+			},
+			want: constants.NO_PO_EXPENSE_LIMIT,
+		},
+		{
+			name: "returns default when value is non-numeric",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertExpensesConfig(t, app, `{"no_po_expense_limit":"abc"}`)
+			},
+			want: constants.NO_PO_EXPENSE_LIMIT,
+		},
+	}
+
+	for _, tc := range testsTable {
+		t.Run(tc.name, func(t *testing.T) {
+			app, err := tests.NewTestApp("../test_pb_data")
+			if err != nil {
+				t.Fatalf("failed to init test app: %v", err)
+			}
+			defer app.Cleanup()
+
+			tc.setup(t, app)
+
+			got := GetNoPOExpenseLimit(app)
+			if got != tc.want {
+				t.Fatalf("GetNoPOExpenseLimit() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}

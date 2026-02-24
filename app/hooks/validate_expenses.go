@@ -111,6 +111,8 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 	isCorporateCreditCard := paymentType == "CorporateCreditCard"
 	isFuelCard := paymentType == "FuelCard"
 
+	noPOExpenseLimit := utilities.GetNoPOExpenseLimit(app)
+
 	// Require an attachment for all types except Allowance, Mileage, and PersonalReimbursement.
 	// Accept either an already stored filename or a new uploaded file in the current multipart request.
 	requiresAttachment := !(isAllowance || isMileage || isPersonalReimbursement)
@@ -243,7 +245,7 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 			validation.Required.Error("must be greater than 0"),
 			validation.Min(0.01).Error("must be greater than 0"),
 			validation.When(!(byPassTotalLimit && paymentType == "OnAccount") && constants.LIMIT_NON_PO_AMOUNTS && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
-				validation.Max(constants.NO_PO_EXPENSE_LIMIT).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", constants.NO_PO_EXPENSE_LIMIT)),
+				validation.Max(noPOExpenseLimit).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", noPOExpenseLimit)),
 			),
 			validation.When(hasPurchaseOrder && (poType == "One-Time" || poType == "Recurring"),
 				validation.Max(totalLimit).Error(fmt.Sprintf("expense exceeds purchase order total of $%0.2f by more than %s", poTotal, excessErrorText)),

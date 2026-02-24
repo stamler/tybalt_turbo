@@ -333,6 +333,55 @@ Operational handlers:
 - cancel: `createCancelPurchaseOrderHandler` (`/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go`)
 - convert one-time to cumulative: `createConvertToCumulativePurchaseOrderHandler` (`/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go`)
 
+## When a Purchase Order Is Required
+
+Expenses require a linked PO under two independent rules, enforced in `validate_expenses.go`:
+
+### Rule 1: Job-based requirement (line 265)
+
+Any expense with a `job` requires a PO, **except** these payment types which are exempt:
+
+- `Mileage`
+- `FuelCard`
+- `PersonalReimbursement`
+- `Allowance`
+
+### Rule 2: Amount-based requirement (line 247)
+
+When `LIMIT_NON_PO_AMOUNTS` is enabled (currently `true`), any expense at or above the configured limit requires a PO. The limit is exclusive (e.g., $99.99 is allowed without a PO when the limit is $100).
+
+The limit is configurable via `app_config` under the `"expenses"` domain:
+
+```json
+{ "no_po_expense_limit": 100.0 }
+```
+
+- Positive number: limit enforced at that amount
+- Zero: PO required for all non-exempt expenses (strictest policy)
+- Absent/null: defaults to `constants.NO_PO_EXPENSE_LIMIT` (`100.0`)
+- Negative: ignored, uses default
+
+Read by `utilities.GetNoPOExpenseLimit(app)` in `app/utilities/config.go`.
+
+**Exempt payment types** (no amount cap, PO never required by this rule):
+
+- `Mileage`
+- `FuelCard`
+- `PersonalReimbursement`
+- `Allowance`
+
+**Payables admin bypass**: Users with the `payables_admin` claim can exceed the limit without a PO, but **only** when `payment_type = OnAccount`.
+
+### Combined effect
+
+| Scenario | PO Required? |
+| --- | --- |
+| Has job, payment type is `OnAccount` / `Expense` / `CorporateCreditCard` | Yes (any amount) |
+| Has job, payment type is `Mileage` / `FuelCard` / `PersonalReimbursement` / `Allowance` | No |
+| No job, total >= configured limit (default $100), not exempt type | Yes |
+| No job, total < configured limit (default $100) | No |
+| No job, total >= configured limit (default $100), `OnAccount` + `payables_admin` claim | No |
+
 ## Expense Validation Against PO Totals
 
 When saving an expense linked to a PO, validation behavior depends on PO type.
