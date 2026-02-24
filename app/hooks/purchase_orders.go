@@ -598,7 +598,8 @@ func sendPOApprovalRequiredNotification(app core.App, purchaseOrderRecord *core.
 	}
 
 	return notifications.CreateNotificationWithUser(app, "po_approval_required", approverID, map[string]any{
-		"POId": purchaseOrderRecord.Id,
+		"POId":      purchaseOrderRecord.Id,
+		"ActionURL": notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/edit", purchaseOrderRecord.Id)),
 	}, false, actorID)
 }
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"maps"
 	"net/mail"
+	"strings"
 	"text/template"
 	"time"
 	"tybalt/utilities"
@@ -31,6 +32,37 @@ type Notification struct {
 	SystemNotification bool   `db:"system_notification"`
 	Data               []byte `db:"data"`
 	parsedData         map[string]any
+}
+
+func appURL(app core.App) string {
+	return strings.TrimRight(strings.TrimSpace(app.Settings().Meta.AppURL), "/")
+}
+
+// BuildActionURL converts an absolute app-relative path into an absolute URL
+// rooted at app.Settings().Meta.AppURL.
+func BuildActionURL(app core.App, path string) string {
+	base := appURL(app)
+	if base == "" {
+		return ""
+	}
+	cleanPath := strings.TrimSpace(path)
+	if cleanPath == "" {
+		return base
+	}
+	if !strings.HasPrefix(cleanPath, "/") {
+		cleanPath = "/" + cleanPath
+	}
+	return base + cleanPath
+}
+
+func unresolvedLegacyPlaceholder(text string) string {
+	if strings.Contains(text, "{APP_URL}") {
+		return "{APP_URL}"
+	}
+	if strings.Contains(text, "{:RECORD_ID}") {
+		return "{:RECORD_ID}"
+	}
+	return ""
 }
 
 // WriteStatusUpdatedOnNotification is a hook that writes the current time to the status_updated field
@@ -146,7 +178,7 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 		}
 
 		// populate the text template
-		textTemplate, err := template.New("text_email").Parse(notification.Template)
+		textTemplate, err := template.New("text_email").Option("missingkey=error").Parse(notification.Template)
 		if err != nil {
 			return fmt.Errorf("error parsing text template for notification %s: %s", notification.Id, err)
 		}
@@ -176,10 +208,10 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 		var text bytes.Buffer
 		err = textTemplate.Execute(&text, templateData) // Use the combined map
 		if err != nil {
-			// NOTE: In testing, it was impossible to reliably cause this error since
-			// template execution fails gracefully under most circumstances. As a
-			// result, we are not testing this code path.
 			return fmt.Errorf("error executing text template for notification %s: %s", notification.Id, err)
+		}
+		if unresolved := unresolvedLegacyPlaceholder(text.String()); unresolved != "" {
+			return fmt.Errorf("notification %s rendered with unresolved legacy placeholder %s", notification.Id, unresolved)
 		}
 
 		// create the message
@@ -368,7 +400,9 @@ func QueuePoSecondApproverNotifications(app core.App, send bool) error {
 	createdCount := 0
 	for _, record := range records {
 		recipientID := record.GetString("id")
-		created, err := createNotificationWithUser(app, "po_second_approval_required", recipientID, nil, true, "")
+		created, err := createNotificationWithUser(app, "po_second_approval_required", recipientID, map[string]any{
+			"ActionURL": BuildActionURL(app, "/pos/list"),
+		}, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating second approval notification",
@@ -502,6 +536,7 @@ func QueueTimesheetSubmissionRemindersForWeek(app core.App, weekEnding string, s
 		// Create notification with week ending in data
 		data := map[string]any{
 			"WeekEnding": weekEnding,
+			"ActionURL":  BuildActionURL(app, "/time/entries/list"),
 		}
 		created, err := createNotificationWithUser(app, "timesheet_submission_reminder", user.UID, data, true, "")
 		if err != nil {
@@ -610,8 +645,9 @@ func QueueTimesheetApprovalReminders(app core.App, send bool) error {
 			continue
 		}
 
-		// Create notification (no extra data needed for approval reminders)
-		created, err := createNotificationWithUser(app, "timesheet_approval_reminder", manager.ManagerUID, nil, true, "")
+		created, err := createNotificationWithUser(app, "timesheet_approval_reminder", manager.ManagerUID, map[string]any{
+			"ActionURL": BuildActionURL(app, "/time/sheets/pending"),
+		}, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating timesheet approval reminder",
@@ -717,8 +753,9 @@ func QueueExpenseApprovalReminders(app core.App, send bool) error {
 			continue
 		}
 
-		// Create notification (no extra data needed for approval reminders)
-		created, err := createNotificationWithUser(app, "expense_approval_reminder", manager.ManagerUID, nil, true, "")
+		created, err := createNotificationWithUser(app, "expense_approval_reminder", manager.ManagerUID, map[string]any{
+			"ActionURL": BuildActionURL(app, "/expenses/pending"),
+		}, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating expense approval reminder",
@@ -796,6 +833,7 @@ func QueueTimesheetRejectedNotifications(app core.App, timesheet *core.Record, r
 		"WeekEnding":      weekEnding,
 		"RejectorName":    rejectorName,
 		"RejectionReason": reason,
+		"ActionURL":       BuildActionURL(app, fmt.Sprintf("/time/sheets/%s/details", timesheet.Id)),
 	}
 
 	// Determine recipients: employee, rejector, and manager (if different from rejector)
@@ -883,6 +921,7 @@ func QueueExpenseRejectedNotifications(app core.App, expense *core.Record, rejec
 		"ExpenseAmount":   expenseAmount,
 		"RejectorName":    rejectorName,
 		"RejectionReason": reason,
+		"ActionURL":       BuildActionURL(app, fmt.Sprintf("/expenses/%s/details", expense.Id)),
 	}
 
 	// Determine recipients: employee, rejector, and manager (if different from rejector)
@@ -964,6 +1003,7 @@ func QueueTimesheetSharedNotifications(app core.App, timesheet *core.Record, sha
 		"UserName":     sharerName,
 		"EmployeeName": employeeName,
 		"WeekEnding":   weekEnding,
+		"ActionURL":    BuildActionURL(app, fmt.Sprintf("/time/sheets/%s/details", timesheet.Id)),
 	}
 
 	// Create notifications for each new viewer

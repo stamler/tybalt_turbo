@@ -228,6 +228,146 @@ func TestSendNextPendingNotification_ErrorOnInvalidTemplate(t *testing.T) {
 	}
 }
 
+//  6. the pending count and an error are returned if template execution
+//     references a missing key.
+func TestSendNextPendingNotification_ErrorOnMissingTemplateKey(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	var target struct {
+		ID         string `db:"id"`
+		TemplateID string `db:"template"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT id, template
+		FROM notifications
+		LIMIT 1
+	`).One(&target); err != nil {
+		t.Fatalf("Failed to load target notification: %v", err)
+	}
+
+	_, err := app.NonconcurrentDB().NewQuery("UPDATE notifications SET status = 'sent'").Execute()
+	if err != nil {
+		t.Fatalf("Failed to normalize notification statuses: %v", err)
+	}
+	_, err = app.NonconcurrentDB().NewQuery(`
+		UPDATE notifications
+		SET status = 'pending'
+		WHERE id = {:id}
+	`).Bind(dbx.Params{
+		"id": target.ID,
+	}).Execute()
+	if err != nil {
+		t.Fatalf("Failed to mark target notification as pending: %v", err)
+	}
+
+	_, err = app.NonconcurrentDB().NewQuery(`
+		UPDATE notification_templates
+		SET text_email = {:text}
+		WHERE id = {:id}
+	`).Bind(dbx.Params{
+		"id":   target.TemplateID,
+		"text": "Hello {{.DefinitelyMissingTemplateKey}}",
+	}).Execute()
+	if err != nil {
+		t.Fatalf("Failed to update template: %v", err)
+	}
+
+	var countResult struct {
+		Count int64 `db:"count"`
+	}
+	err = app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&countResult)
+	if err != nil {
+		t.Fatalf("Failed to get initial count: %v", err)
+	}
+	initialCount := countResult.Count
+
+	if initialCount != 1 {
+		t.Fatalf("Expected exactly one pending notification for this test, got %d", initialCount)
+	}
+
+	remaining, err := notifications.SendNextPendingNotification(app)
+	if err == nil {
+		t.Fatal("Expected an error when template key is missing, got nil")
+	}
+	if !strings.Contains(err.Error(), "error executing text template for notification") {
+		t.Fatalf("Expected missing key execution error, got %v", err)
+	}
+	if remaining != initialCount {
+		t.Errorf("Expected remaining count to be %d when template execution fails, got %d", initialCount, remaining)
+	}
+}
+
+//  7. the pending count and an error are returned if legacy placeholders remain
+//     unresolved after rendering.
+func TestSendNextPendingNotification_ErrorOnLegacyPlaceholder(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	var target struct {
+		ID         string `db:"id"`
+		TemplateID string `db:"template"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT id, template
+		FROM notifications
+		LIMIT 1
+	`).One(&target); err != nil {
+		t.Fatalf("Failed to load target notification: %v", err)
+	}
+
+	_, err := app.NonconcurrentDB().NewQuery("UPDATE notifications SET status = 'sent'").Execute()
+	if err != nil {
+		t.Fatalf("Failed to normalize notification statuses: %v", err)
+	}
+	_, err = app.NonconcurrentDB().NewQuery(`
+		UPDATE notifications
+		SET status = 'pending'
+		WHERE id = {:id}
+	`).Bind(dbx.Params{
+		"id": target.ID,
+	}).Execute()
+	if err != nil {
+		t.Fatalf("Failed to mark target notification as pending: %v", err)
+	}
+
+	_, err = app.NonconcurrentDB().NewQuery(`
+		UPDATE notification_templates
+		SET text_email = {:text}
+		WHERE id = {:id}
+	`).Bind(dbx.Params{
+		"id":   target.TemplateID,
+		"text": "{APP_URL}/time/entries/list",
+	}).Execute()
+	if err != nil {
+		t.Fatalf("Failed to update template: %v", err)
+	}
+
+	var countResult struct {
+		Count int64 `db:"count"`
+	}
+	err = app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&countResult)
+	if err != nil {
+		t.Fatalf("Failed to get initial count: %v", err)
+	}
+	initialCount := countResult.Count
+
+	if initialCount != 1 {
+		t.Fatalf("Expected exactly one pending notification for this test, got %d", initialCount)
+	}
+
+	remaining, err := notifications.SendNextPendingNotification(app)
+	if err == nil {
+		t.Fatal("Expected an error when legacy placeholder remains unresolved, got nil")
+	}
+	if !strings.Contains(err.Error(), "unresolved legacy placeholder") {
+		t.Fatalf("Expected unresolved legacy placeholder error, got %v", err)
+	}
+	if remaining != initialCount {
+		t.Errorf("Expected remaining count to be %d when legacy placeholder check fails, got %d", initialCount, remaining)
+	}
+}
+
 // SendNotifications()
 
 //  1. on success, sentCount matches the number of emails in the TestMailer
@@ -254,6 +394,12 @@ func TestSendNotifications_SendsAllPendingNotifications(t *testing.T) {
 	// notifications in the test data.
 	if len(app.TestMailer.Messages()) != 5 {
 		t.Errorf("Expected 5 messages in the TestMailer, got %d", len(app.TestMailer.Messages()))
+	}
+
+	for i, msg := range app.TestMailer.Messages() {
+		if strings.Contains(msg.Text, "{APP_URL}") || strings.Contains(msg.Text, "{:RECORD_ID}") || strings.Contains(msg.Text, "<no value>") {
+			t.Fatalf("message %d contains unresolved placeholders or missing values: %q", i, msg.Text)
+		}
 	}
 }
 

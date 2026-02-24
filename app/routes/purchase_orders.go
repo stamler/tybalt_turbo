@@ -457,6 +457,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			err := notifications.CreateNotificationWithUser(app, "po_priority_second_approval_required", updatedPO.GetString("priority_second_approver"), map[string]any{
 				"POId":          updatedPO.Id,
 				"POCreatorName": creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
+				"ActionURL":     notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/edit", updatedPO.Id)),
 			}, false, userId)
 			if err != nil {
 				return err
@@ -472,6 +473,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				"PONumber":       updatedPO.GetString("po_number"),
 				"POCreatorName":  creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
 				"POApproverName": approverProfile.GetString("given_name") + " " + approverProfile.GetString("surname"),
+				"ActionURL":      notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/details", updatedPO.Id)),
 			}, false, userId)
 			if err != nil {
 				return err
@@ -779,6 +781,7 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 			"POUrl":           fmt.Sprintf("/pos/%s/details", updatedPO.Id),
 			"PONumber":        updatedPO.GetString("po_number"),
 			"RejectionReason": updatedPO.GetString("rejection_reason"),
+			"ActionURL":       notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/details", updatedPO.Id)),
 		}, false, userId); err != nil {
 			// Log the error but don't fail the request, as the PO was already rejected
 			app.Logger().Error("notification not sent: error creating rejection notification", "error", err)
