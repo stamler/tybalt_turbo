@@ -59,7 +59,7 @@ SELECT
 FROM unioned u
 LEFT JOIN clients c ON c.id = u.client_id
 LEFT JOIN branches b ON b.id = u.branch_id
-LEFT JOIN managers m ON m.id = u.manager_id
+LEFT JOIN profiles m ON m.uid = u.manager_id
 ORDER BY u.sort_group ASC, u.created DESC;
 
 

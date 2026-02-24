@@ -18,6 +18,6 @@ SELECT
 FROM jobs j
 LEFT JOIN clients c ON c.id = j.client
 LEFT JOIN branches b ON b.id = j.branch
-LEFT JOIN managers m ON m.id = j.manager
+LEFT JOIN profiles m ON m.uid = j.manager
 WHERE ({:id} IS NULL OR {:id} = '' OR j.id = {:id})
 ORDER BY j.number DESC; 
