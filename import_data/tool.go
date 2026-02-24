@@ -28,17 +28,28 @@ import (
 var expenseCollectionId = "o1vpz1mm7qsfoyy"
 var targetDatabase = "../app/test_pb_data/data.db"
 
-// defaultExpenditureKindID is set at startup from the target DB (name 'standard'); used by normalizeExpenditureKindID during import.
-var defaultExpenditureKindID string
+// defaultCapitalKindID and defaultProjectKindID are set at startup from the
+// target DB; used by normalizeExpenditureKindID during import.
+var (
+	defaultCapitalKindID string
+	defaultProjectKindID string
+)
 
 // expenseImportedFalseCount controls how many expenses are imported with _imported=false
 // (triggering writeback to Firebase) during --import --expenses. Set to 0 for production
 // (all _imported=true), or a positive number for testing writeback with a subset.
 const expenseImportedFalseCount = 0
 
-func normalizeExpenditureKindID(kind string) string {
+func normalizeExpenditureKindID(kind string, hasJob bool) string {
 	if strings.TrimSpace(kind) == "" {
-		return defaultExpenditureKindID
+		if hasJob {
+			return defaultProjectKindID
+		}
+		return defaultCapitalKindID
+	}
+	// Prevent capital+job combos by normalizing to project.
+	if kind == defaultCapitalKindID && hasJob {
+		return defaultProjectKindID
 	}
 	return kind
 }
@@ -80,12 +91,13 @@ func main() {
 	// Use the database path from the flag
 	targetDatabase = *dbFlag
 
-	// Resolve default expenditure kind ID from target DB (for import normalize and for extract when running export)
-	resolvedKindID, kindErr := extract.GetStandardExpenditureKindID(targetDatabase)
+	// Resolve default expenditure kind IDs from target DB (for import normalize and for extract when running export)
+	capitalID, projectID, kindErr := extract.GetCapitalAndProjectKindIDs(targetDatabase)
 	if kindErr != nil {
-		log.Fatalf("Failed to resolve standard expenditure kind ID from %s: %v", targetDatabase, kindErr)
+		log.Fatalf("Failed to resolve expenditure kind IDs from %s: %v", targetDatabase, kindErr)
 	}
-	defaultExpenditureKindID = resolvedKindID
+	defaultCapitalKindID = capitalID
+	defaultProjectKindID = projectID
 
 	if *initFlag {
 		fmt.Println("This will overwrite any existing data in app/pb_data/data.db.")
@@ -1031,7 +1043,7 @@ func main() {
 						"job":                      item.Job,
 						"division":                 item.Division,
 						"category":                 item.Category, // PocketBase ID, may be empty
-						"kind":                     normalizeExpenditureKindID(item.Kind),
+						"kind":                     normalizeExpenditureKindID(item.Kind, strings.TrimSpace(item.Job) != ""),
 						"parent_po":                item.ParentPo, // PocketBase ID, may be empty
 						"branch":                   item.Branch,   // PocketBase ID, may be empty
 						"attachment":               item.Attachment,
@@ -1144,7 +1156,7 @@ func main() {
 					"division":          item.Division,
 					"job":               item.Job,
 					"category":          item.Category,
-					"kind":              normalizeExpenditureKindID(item.Kind),
+					"kind":              normalizeExpenditureKindID(item.Kind, strings.TrimSpace(item.Job) != ""),
 					"date":              item.Date,
 					"pay_period_ending": item.PayPeriodEnding,
 					"description":       item.Description,

@@ -19,11 +19,10 @@ import (
 var tablesToDump = []string{"TimeEntries", "TimeSheets", "TimeAmendments", "Expenses", "MileageResetDates", "Profiles", "Jobs", "TurboClients", "TurboClientContacts", "TurboClientNotes", "TurboVendors", "TurboPurchaseOrders", "TurboPoApproverProps", "TurboRateRoles", "TurboRateSheets", "TurboRateSheetEntries"}
 
 func ToParquet(sourceSQLiteDb string) {
-	id, err := GetStandardExpenditureKindID(sourceSQLiteDb)
+	_, _, err := GetCapitalAndProjectKindIDs(sourceSQLiteDb)
 	if err != nil {
-		log.Fatalf("Failed to resolve standard expenditure kind ID: %v", err)
+		log.Fatalf("Failed to resolve expenditure kind IDs: %v", err)
 	}
-	standardExpenditureKindID = id
 
 	err = godotenv.Load()
 	if err != nil {
@@ -149,7 +148,7 @@ func ToParquet(sourceSQLiteDb string) {
 	if turboPurchaseOrdersHasKind {
 		log.Println("TurboPurchaseOrders.kind detected - preserving kind values in parquet export")
 	} else {
-		log.Println("TurboPurchaseOrders.kind not detected - defaulting export kind to standard")
+		log.Println("TurboPurchaseOrders.kind not detected - defaulting export kind by job presence (capital/project)")
 	}
 
 	for _, table := range tablesToDump {
@@ -286,9 +285,15 @@ func ToParquet(sourceSQLiteDb string) {
 			// Uses id as pocketbase_id since Turbo POs already have PocketBase IDs.
 			// vendorId is used directly (it already exists in Vendors.parquet via TurboVendors).
 			// Include all fields needed for round-trip fidelity.
-			turboPurchaseOrdersKindSelect := fmt.Sprintf("'%s' AS kind", StandardExpenditureKindID())
+			turboPurchaseOrdersKindSelect := fmt.Sprintf(
+				"CASE WHEN job IS NOT NULL AND TRIM(CAST(job AS VARCHAR)) != '' THEN '%s' ELSE '%s' END AS kind",
+				ProjectExpenditureKindID(), CapitalExpenditureKindID(),
+			)
 			if turboPurchaseOrdersHasKind {
-				turboPurchaseOrdersKindSelect = fmt.Sprintf("COALESCE(NULLIF(kind, ''), '%s') AS kind", StandardExpenditureKindID())
+				turboPurchaseOrdersKindSelect = fmt.Sprintf(
+					"COALESCE(NULLIF(kind, ''), CASE WHEN job IS NOT NULL AND TRIM(CAST(job AS VARCHAR)) != '' THEN '%s' ELSE '%s' END) AS kind",
+					ProjectExpenditureKindID(), CapitalExpenditureKindID(),
+				)
 			}
 
 			query = fmt.Sprintf(`

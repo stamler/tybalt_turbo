@@ -44,14 +44,17 @@
   });
 
   const selectedKindLabel = $derived.by(() => {
+    const match = $expenditureKindsStore.items.find((k) => k.id === item.kind);
+    if (match) return match.en_ui_label;
+    // Fallback for blank kind (shouldn't happen after migration): derive from job presence.
     if (!item.purchase_order) {
+      const hasJob = item.job && item.job !== "";
+      const fallbackName = hasJob ? "project" : "capital";
       return (
-        $expenditureKindsStore.items.find((k) => k.name === "standard")?.en_ui_label ?? "Unknown"
+        $expenditureKindsStore.items.find((k) => k.name === fallbackName)?.en_ui_label ?? "Unknown"
       );
     }
-    const match = $expenditureKindsStore.items.find((k) => k.id === item.kind);
-    if (!match) return "Unknown";
-    return match.en_ui_label;
+    return "Unknown";
   });
   const linkedPurchaseOrderNumber = $derived.by(() => {
     if (data.linked_purchase_order?.po_number) {

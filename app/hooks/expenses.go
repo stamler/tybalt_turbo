@@ -37,9 +37,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 
 	purchaseOrderID := strings.TrimSpace(expenseRecord.GetString("purchase_order"))
 
-	// No-PO expenses use the standard kind by policy.
+	// No-PO expenses default to capital (no job) or project (with job).
 	if purchaseOrderID == "" {
-		expenseRecord.Set("kind", utilities.DefaultExpenditureKindID())
+		hasJob := strings.TrimSpace(expenseRecord.GetString("job")) != ""
+		expenseRecord.Set("kind", utilities.DefaultExpenditureKindIDForJob(hasJob))
 	}
 
 	// get the user's manager and set the approver field
@@ -469,7 +470,8 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}
 
 		// Expense kind is inherited from its purchase order and is not user-editable.
-		inheritedKind := utilities.NormalizeExpenditureKindID(poRecord.GetString("kind"))
+		poHasJob := strings.TrimSpace(poRecord.GetString("job")) != ""
+		inheritedKind := utilities.NormalizeExpenditureKindID(poRecord.GetString("kind"), poHasJob)
 		expenseRecord.Set("kind", inheritedKind)
 	}
 

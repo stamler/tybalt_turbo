@@ -9,32 +9,39 @@ import (
 
 // Kind names are the semantic keys; IDs are resolved at runtime from the DB.
 const (
-	ExpenditureKindNameStandard       = "standard"
-	ExpenditureKindNameSponsorship    = "sponsorship"
+	ExpenditureKindNameCapital       = "capital"
+	ExpenditureKindNameProject       = "project"
+	ExpenditureKindNameSponsorship   = "sponsorship"
 	ExpenditureKindNameStaffAndSocial = "staff_and_social"
 	ExpenditureKindNameMediaAndEvent  = "media_and_event"
 	ExpenditureKindNameComputer       = "computer"
+
+	// Legacy name kept only for import/migration back-compat.
+	ExpenditureKindNameStandard = "standard"
 )
 
 const (
-	POApproverLimitColumnStandardNoJob   = "max_amount"
-	POApproverLimitColumnStandardWithJob = "project_max"
-	POApproverLimitColumnSponsorship     = "sponsorship_max"
-	POApproverLimitColumnStaffAndSocial  = "staff_and_social_max"
-	POApproverLimitColumnMediaAndEvent   = "media_and_event_max"
-	POApproverLimitColumnComputer        = "computer_max"
+	POApproverLimitColumnCapital       = "max_amount"
+	POApproverLimitColumnProject       = "project_max"
+	POApproverLimitColumnSponsorship   = "sponsorship_max"
+	POApproverLimitColumnStaffAndSocial = "staff_and_social_max"
+	POApproverLimitColumnMediaAndEvent  = "media_and_event_max"
+	POApproverLimitColumnComputer       = "computer_max"
 )
 
-// nameToPOApproverColumn maps kind name -> po_approver_props limit column (non-standard kinds).
+// nameToPOApproverColumn maps kind name -> po_approver_props limit column.
 var nameToPOApproverColumn = map[string]string{
-	ExpenditureKindNameSponsorship:    POApproverLimitColumnSponsorship,
+	ExpenditureKindNameCapital:       POApproverLimitColumnCapital,
+	ExpenditureKindNameProject:       POApproverLimitColumnProject,
+	ExpenditureKindNameSponsorship:   POApproverLimitColumnSponsorship,
 	ExpenditureKindNameStaffAndSocial: POApproverLimitColumnStaffAndSocial,
 	ExpenditureKindNameMediaAndEvent:  POApproverLimitColumnMediaAndEvent,
 	ExpenditureKindNameComputer:       POApproverLimitColumnComputer,
 }
 
 var expectedExpenditureKindNames = []string{
-	ExpenditureKindNameStandard,
+	ExpenditureKindNameCapital,
+	ExpenditureKindNameProject,
 	ExpenditureKindNameSponsorship,
 	ExpenditureKindNameStaffAndSocial,
 	ExpenditureKindNameMediaAndEvent,
@@ -42,8 +49,8 @@ var expectedExpenditureKindNames = []string{
 }
 
 var expectedPOApproverPropsColumns = []string{
-	POApproverLimitColumnStandardNoJob,
-	POApproverLimitColumnStandardWithJob,
+	POApproverLimitColumnCapital,
+	POApproverLimitColumnProject,
 	POApproverLimitColumnSponsorship,
 	POApproverLimitColumnStaffAndSocial,
 	POApproverLimitColumnMediaAndEvent,
@@ -56,17 +63,37 @@ var (
 	kindIDToName = map[string]string{}
 )
 
-// DefaultExpenditureKindID returns the canonical "standard" expenditure kind ID.
-// Must be called after ValidateExpenditureKindsConfig has run (e.g. after app serve).
-func DefaultExpenditureKindID() string {
-	return kindNameToID[ExpenditureKindNameStandard]
+// DefaultCapitalExpenditureKindID returns the "capital" expenditure kind ID.
+func DefaultCapitalExpenditureKindID() string {
+	return kindNameToID[ExpenditureKindNameCapital]
+}
+
+// DefaultProjectExpenditureKindID returns the "project" expenditure kind ID.
+func DefaultProjectExpenditureKindID() string {
+	return kindNameToID[ExpenditureKindNameProject]
+}
+
+// DefaultExpenditureKindIDForJob returns the appropriate default kind ID
+// based on whether a job is present: project when true, capital when false.
+func DefaultExpenditureKindIDForJob(hasJob bool) string {
+	if hasJob {
+		return DefaultProjectExpenditureKindID()
+	}
+	return DefaultCapitalExpenditureKindID()
 }
 
 // NormalizeExpenditureKindID returns the provided kind ID or falls back to
-// "standard" when no kind is present (legacy records).
-func NormalizeExpenditureKindID(kindID string) string {
+// a job-aware default when no kind is present (legacy records).
+// If the resolved kind is capital but hasJob is true, it returns project
+// to prevent invalid capital+job combos.
+func NormalizeExpenditureKindID(kindID string, hasJob bool) string {
 	if strings.TrimSpace(kindID) == "" {
-		return DefaultExpenditureKindID()
+		return DefaultExpenditureKindIDForJob(hasJob)
+	}
+	// Prevent capital+job combos by normalizing to project.
+	name := kindIDToName[kindID]
+	if name == ExpenditureKindNameCapital && hasJob {
+		return DefaultProjectExpenditureKindID()
 	}
 	return kindID
 }
@@ -75,21 +102,19 @@ func NormalizeExpenditureKindID(kindID string) string {
 // use for second-approval qualification.
 func ResolvePOApproverLimitColumn(kindID string, hasJob bool) (string, error) {
 	if strings.TrimSpace(kindID) == "" {
-		// Legacy records with no kind are treated as standard.
+		// Legacy records with no kind: default by job presence.
 		if hasJob {
-			return POApproverLimitColumnStandardWithJob, nil
+			return POApproverLimitColumnProject, nil
 		}
-		return POApproverLimitColumnStandardNoJob, nil
+		return POApproverLimitColumnCapital, nil
 	}
 	name := kindIDToName[kindID]
 	if name == "" {
-		name = ExpenditureKindNameStandard
-	}
-	if name == ExpenditureKindNameStandard {
+		// Unknown kind ID: fall back by job presence.
 		if hasJob {
-			return POApproverLimitColumnStandardWithJob, nil
+			return POApproverLimitColumnProject, nil
 		}
-		return POApproverLimitColumnStandardNoJob, nil
+		return POApproverLimitColumnCapital, nil
 	}
 	column, ok := nameToPOApproverColumn[name]
 	if !ok {

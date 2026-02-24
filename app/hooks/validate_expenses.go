@@ -173,7 +173,8 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 		if !expenseRecord.IsNew() {
 			original := expenseRecord.Original()
 			if original != nil && strings.TrimSpace(original.GetString("kind")) == "" {
-				kindID = utilities.DefaultExpenditureKindID()
+				legacyHasJob := strings.TrimSpace(expenseRecord.GetString("job")) != ""
+				kindID = utilities.DefaultExpenditureKindIDForJob(legacyHasJob)
 				expenseRecord.Set("kind", kindID)
 			}
 		}

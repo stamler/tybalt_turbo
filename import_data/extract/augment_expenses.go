@@ -20,13 +20,34 @@ func ensureKindColumnWithDefault(db *sql.DB, table string) {
 		}
 	}
 
-	_, err := db.Exec(fmt.Sprintf(
-		"UPDATE %s SET kind = '%s' WHERE kind IS NULL OR TRIM(CAST(kind AS VARCHAR)) = ''",
-		table,
-		StandardExpenditureKindID(),
-	))
-	if err != nil {
-		log.Fatalf("Failed to backfill kind column on %s: %v", table, err)
+	// Check if the table has a job column to enable job-aware kind defaulting.
+	var jobColumnCount int
+	jobRow := db.QueryRow(fmt.Sprintf("SELECT COUNT(*) FROM pragma_table_info('%s') WHERE name = 'job'", table))
+	if err := jobRow.Scan(&jobColumnCount); err != nil {
+		log.Fatalf("Failed checking %s.job column: %v", table, err)
+	}
+
+	if jobColumnCount > 0 {
+		// Job-aware backfill: project when job present, capital otherwise.
+		_, err := db.Exec(fmt.Sprintf(
+			"UPDATE %s SET kind = CASE WHEN TRIM(CAST(job AS VARCHAR)) != '' THEN '%s' ELSE '%s' END WHERE kind IS NULL OR TRIM(CAST(kind AS VARCHAR)) = ''",
+			table,
+			ProjectExpenditureKindID(),
+			CapitalExpenditureKindID(),
+		))
+		if err != nil {
+			log.Fatalf("Failed to backfill kind column on %s: %v", table, err)
+		}
+	} else {
+		// No job column: default to capital.
+		_, err := db.Exec(fmt.Sprintf(
+			"UPDATE %s SET kind = '%s' WHERE kind IS NULL OR TRIM(CAST(kind AS VARCHAR)) = ''",
+			table,
+			CapitalExpenditureKindID(),
+		))
+		if err != nil {
+			log.Fatalf("Failed to backfill kind column on %s: %v", table, err)
+		}
 	}
 }
 

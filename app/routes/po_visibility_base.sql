@@ -32,8 +32,7 @@
 
   Maintainability notes
   - Kind-to-limit resolution is intentionally centralized in caller_po_limits.
-  - Threshold fallback is standardized:
-      COALESCE(kind_threshold, standard_kind_threshold, 0)
+  - Threshold fallback uses job-based effective kind (capital when no job, project when job present).
   - Do not reintroduce duplicated limit CASE expressions elsewhere in this file.
   -----------------------------------------------------------------------------
 */
@@ -85,20 +84,27 @@ caller_po_limits AS (
   SELECT
     po.id AS po_id,
     cap.divisions,
-    COALESCE(ek.second_approval_threshold, ek_standard.second_approval_threshold, 0) AS second_approval_threshold,
-    CASE
-      WHEN COALESCE(ek.name, 'standard') = 'standard' AND po.job != '' THEN cap.project_max
-      WHEN COALESCE(ek.name, 'standard') = 'standard' THEN cap.max_amount
-      WHEN COALESCE(ek.name, 'standard') = 'sponsorship' THEN cap.sponsorship_max
-      WHEN COALESCE(ek.name, 'standard') = 'staff_and_social' THEN cap.staff_and_social_max
-      WHEN COALESCE(ek.name, 'standard') = 'media_and_event' THEN cap.media_and_event_max
-      WHEN COALESCE(ek.name, 'standard') = 'computer' THEN cap.computer_max
+    COALESCE(
+      ek.second_approval_threshold,
+      ek_fallback.second_approval_threshold,
+      0
+    ) AS second_approval_threshold,
+    CASE COALESCE(ek.name, CASE WHEN po.job != '' THEN 'project' ELSE 'capital' END)
+      WHEN 'capital' THEN cap.max_amount
+      WHEN 'project' THEN cap.project_max
+      WHEN 'sponsorship' THEN cap.sponsorship_max
+      WHEN 'staff_and_social' THEN cap.staff_and_social_max
+      WHEN 'media_and_event' THEN cap.media_and_event_max
+      WHEN 'computer' THEN cap.computer_max
       ELSE NULL
     END AS resolved_limit
   FROM purchase_orders po
   JOIN caller_approver_props cap ON 1 = 1
   LEFT JOIN expenditure_kinds ek ON po.kind = ek.id
-  LEFT JOIN expenditure_kinds ek_standard ON ek_standard.name = 'standard'
+  -- Fallback kind for threshold when PO kind is missing: use job-based effective kind.
+  LEFT JOIN expenditure_kinds ek_fallback
+    ON ek.id IS NULL
+    AND ek_fallback.name = CASE WHEN po.job != '' THEN 'project' ELSE 'capital' END
 )
 
 -- Main row projection: one row per purchase order + visibility/actionability flags.

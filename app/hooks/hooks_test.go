@@ -20,7 +20,7 @@ func buildRecordFromMap(collection *core.Collection, m map[string]any) *core.Rec
 		switch collection.Name {
 		case "expenses", "purchase_orders":
 			if _, exists := m["kind"]; !exists {
-				m["kind"] = utilities.DefaultExpenditureKindID()
+				m["kind"] = utilities.DefaultCapitalExpenditureKindID()
 			}
 		}
 	}

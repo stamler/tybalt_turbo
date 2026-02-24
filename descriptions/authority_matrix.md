@@ -14,12 +14,12 @@
 
 ## Implementation Notes
 
-Each of the 6 activities maps to columns in `po_approver_props`. `standard` (Capital Expense) uses `max_amount` with no job and `project_max` when a job is present. Other kinds use dedicated columns: `sponsorship_max`, `staff_and_social_max`, `media_and_event_max`, `computer_max`.
+Each of the 6 activities maps to columns in `po_approver_props`. `capital` uses `max_amount` (no job allowed). `project` uses `project_max` (job required). Other kinds use dedicated columns: `sponsorship_max`, `staff_and_social_max`, `media_and_event_max`, `computer_max`.
 
 In the UI:
 
 - **Purchase Orders editor**: Kind is always selectable via toggle. If selected kind has `allow_job = false`, Job is hidden and cleared; switching back to an `allow_job = true` kind restores the in-editor Job value.
-- **Expenses editor**: Kind is never selectable. It is display-only: inherited from the linked PO when a PO is present, otherwise shown as `standard` for no-PO expenses.
+- **Expenses editor**: Kind is never selectable. It is display-only: inherited from the linked PO when a PO is present, otherwise shown as `capital` for no-PO expenses.
 
 Operational dependency:
 

@@ -753,7 +753,7 @@
           bind:value={poApproverMaxAmount as number}
           {errors}
           fieldName="po_approver_max_amount"
-          uiName="Standard (No Job) Max"
+          uiName="Capital Max"
           type="number"
           min={0}
           step={0.01}
@@ -763,7 +763,7 @@
           bind:value={poApproverProjectMax as number}
           {errors}
           fieldName="po_approver_project_max"
-          uiName="Standard (With Job) Project Max"
+          uiName="Project Max"
           type="number"
           min={0}
           step={0.01}

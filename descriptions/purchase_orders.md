@@ -30,8 +30,8 @@ Global `po_approval_thresholds` tiers are no longer used.
 
 The PO `kind` determines which `po_approver_props` limit column is used:
 
-- `standard` with no job: `max_amount`
-- `standard` with job: `project_max`
+- `capital` (no job, `allow_job=false`): `max_amount`
+- `project` (requires job, `allow_job=true`): `project_max`
 - `sponsorship`: `sponsorship_max`
 - `staff_and_social`: `staff_and_social_max`
 - `media_and_event`: `media_and_event_max`
@@ -39,7 +39,7 @@ The PO `kind` determines which `po_approver_props` limit column is used:
 
 `kind` handling differs by surface:
 
-- Approver lookup endpoints default missing `kind` to `standard` (legacy-compat behavior).
+- Approver lookup endpoints default missing `kind` to `capital` (no job) or `project` (with job).
 - PO create/update validation requires a non-empty, valid `kind`; save fails if `kind` is missing or invalid.
 
 ## approval_total
@@ -493,7 +493,7 @@ Child POs: `YYMM-NNNN-XX`
 | Field                     | Type   | Description                                                   |
 | ------------------------- | ------ | ------------------------------------------------------------- |
 | id                        | string | PocketBase record ID                                          |
-| name                      | string | Semantic key (`standard`, `sponsorship`, etc.)                |
+| name                      | string | Semantic key (`capital`, `project`, `sponsorship`, etc.)      |
 | description               | string | Human-readable description                                    |
 | ui_order                  | number | Display ordering                                              |
 | en_ui_label               | string | UI label                                                      |
@@ -504,8 +504,8 @@ Child POs: `YYMM-NNNN-XX`
 
 | Column                 | Used for kind      | When          |
 | ---------------------- | ------------------ | ------------- |
-| `max_amount`           | `standard`         | PO has no job |
-| `project_max`          | `standard`         | PO has a job  |
+| `max_amount`           | `capital`          | Always        |
+| `project_max`          | `project`          | Always        |
 | `sponsorship_max`      | `sponsorship`      | Always        |
 | `staff_and_social_max` | `staff_and_social` | Always        |
 | `media_and_event_max`  | `media_and_event`  | Always        |

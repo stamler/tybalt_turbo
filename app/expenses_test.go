@@ -19,17 +19,19 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
-func ensureDefaultExpenditureKind(payload map[string]any) {
-	if _, exists := payload["kind"]; !exists {
-		payload["kind"] = utilities.DefaultExpenditureKindID()
-	}
-}
-
 func TestExpensesCreate(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
 	if err != nil {
 		t.Fatal(err)
 	}
+
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = 'capital'")
+	if err != nil {
+		t.Fatalf("failed to load capital kind: %v", err)
+	}
+	capitalKindID := capitalKind.Id
 
 	// multipart builder for creates with attachment
 	makeMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
@@ -37,7 +39,9 @@ func TestExpensesCreate(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultExpenditureKind(m)
+		if _, exists := m["kind"]; !exists {
+			m["kind"] = capitalKindID
+		}
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -159,7 +163,7 @@ func TestExpensesCreate(t *testing.T) {
 				"total": 0,
 				"vendor": "2zqxtsmymf670ha",
 				"description": "This will be overwritten"
-			}`, utilities.DefaultExpenditureKindID()))
+			}`, utilities.DefaultCapitalExpenditureKindID()))
 			return tests.ApiScenario{
 				Name:           "valid allowance expense calculates total, clears vendor, and sets description",
 				Method:         http.MethodPost,
@@ -179,7 +183,7 @@ func TestExpensesCreate(t *testing.T) {
 			}
 		}(),
 		func() tests.ApiScenario {
-			// No-PO expenses should be forced to the standard kind by the hook.
+			// No-PO expenses without a job should be forced to the capital kind by the hook.
 			body := strings.NewReader(`{
 				"uid": "rzr98oadsp9qc11",
 				"date": "2025-01-10",
@@ -190,14 +194,14 @@ func TestExpensesCreate(t *testing.T) {
 				"description": "ignored for allowance"
 			}`)
 			return tests.ApiScenario{
-				Name:           "no-po create without kind is set to standard kind",
+				Name:           "no-po create without kind is set to capital kind",
 				Method:         http.MethodPost,
 				URL:            "/api/collections/expenses/records",
 				Body:           body,
 				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
 				ExpectedStatus: 200,
 				ExpectedContent: []string{
-					fmt.Sprintf(`"kind":"%s"`, utilities.DefaultExpenditureKindID()),
+					fmt.Sprintf(`"kind":"%s"`, utilities.DefaultCapitalExpenditureKindID()),
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
@@ -1097,13 +1101,23 @@ func TestExpensesUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = 'capital'")
+	if err != nil {
+		t.Fatalf("failed to load capital kind: %v", err)
+	}
+	capitalKindID := capitalKind.Id
+
 	// multipart builder for updates with attachment
 	updateMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
 		m := map[string]any{}
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultExpenditureKind(m)
+		if _, exists := m["kind"]; !exists {
+			m["kind"] = capitalKindID
+		}
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1935,13 +1949,23 @@ func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = 'capital'")
+	if err != nil {
+		t.Fatalf("failed to load capital kind: %v", err)
+	}
+	capitalKindID := capitalKind.Id
+
 	// Helper to create multipart form data with a specific file content
 	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
 		m := map[string]any{}
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultExpenditureKind(m)
+		if _, exists := m["kind"]; !exists {
+			m["kind"] = capitalKindID
+		}
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1994,7 +2018,7 @@ func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
 			record.Set("description", "existing expense with attachment")
 			record.Set("pay_period_ending", "2024-08-10")
 			record.Set("payment_type", "Expense")
-			record.Set("kind", utilities.DefaultExpenditureKindID())
+			record.Set("kind", utilities.DefaultCapitalExpenditureKindID())
 			record.Set("total", 50)
 			record.Set("vendor", "2zqxtsmymf670ha")
 			record.Set("approver", "f2j5a8vk006baub")
@@ -2034,13 +2058,23 @@ func TestExpensesUpdate_DuplicateAttachmentFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = 'capital'")
+	if err != nil {
+		t.Fatalf("failed to load capital kind: %v", err)
+	}
+	capitalKindID := capitalKind.Id
+
 	// Helper to create multipart form data with a specific file content
 	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
 		m := map[string]any{}
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultExpenditureKind(m)
+		if _, exists := m["kind"]; !exists {
+			m["kind"] = capitalKindID
+		}
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -2092,7 +2126,7 @@ func TestExpensesUpdate_DuplicateAttachmentFails(t *testing.T) {
 			record.Set("description", "expense with attachment for update test")
 			record.Set("pay_period_ending", "2024-08-10")
 			record.Set("payment_type", "Expense")
-			record.Set("kind", utilities.DefaultExpenditureKindID())
+			record.Set("kind", utilities.DefaultCapitalExpenditureKindID())
 			record.Set("total", 50)
 			record.Set("vendor", "2zqxtsmymf670ha")
 			record.Set("approver", "etysnrlup2f6bak")
@@ -2130,13 +2164,23 @@ func TestExpensesUpdate_SameAttachmentSucceeds(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = 'capital'")
+	if err != nil {
+		t.Fatalf("failed to load capital kind: %v", err)
+	}
+	capitalKindID := capitalKind.Id
+
 	// Helper to create multipart form data with a specific file content
 	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
 		m := map[string]any{}
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultExpenditureKind(m)
+		if _, exists := m["kind"]; !exists {
+			m["kind"] = capitalKindID
+		}
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -2216,13 +2260,23 @@ func TestExpensesCreate_InactiveApproverFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = 'capital'")
+	if err != nil {
+		t.Fatalf("failed to load capital kind: %v", err)
+	}
+	capitalKindID := capitalKind.Id
+
 	// multipart builder for creates with attachment
 	makeMultipart := func(jsonBody string) (*bytes.Buffer, string, error) {
 		m := map[string]any{}
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultExpenditureKind(m)
+		if _, exists := m["kind"]; !exists {
+			m["kind"] = capitalKindID
+		}
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {

@@ -105,9 +105,9 @@ Records with `_imported=true` originated from MySQL. Locally-created records hav
 
 ## Key Business Concepts
 
-**Purchase Orders (POs)**: Central to the approval workflow. Approval authority is determined by `po_approver_props` per user, with limits varying by expenditure kind (`standard`, `project`, `sponsorship`, `staff_and_social`, `media_and_event`, `computer`). See `authority_matrix.md` for the full matrix.
+**Purchase Orders (POs)**: Central to the approval workflow. Approval authority is determined by `po_approver_props` per user, with limits varying by expenditure kind (`capital`, `project`, `sponsorship`, `staff_and_social`, `media_and_event`, `computer`). See `authority_matrix.md` for the full matrix.
 
-**Expenditure Kinds**: Mapped to columns in `po_approver_props`. The `standard` kind uses `max_amount` (no job) or `project_max` (with job). Other kinds have dedicated columns.
+**Expenditure Kinds**: Mapped to columns in `po_approver_props`. The `capital` kind (no job, `allow_job=false`) uses `max_amount`. The `project` kind (requires job, `allow_job=true`) uses `project_max`. Other kinds have dedicated columns.
 
 **Feature Flags**: Checked via `utilities.IsExpensesEditingEnabled(app)`. When expenses editing is disabled, create/update/delete hooks on expenses, purchase_orders, and vendors all return an error before proceeding.
 

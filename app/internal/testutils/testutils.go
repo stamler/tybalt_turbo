@@ -122,10 +122,10 @@ func GetApprovalTiers(app *tests.TestApp) (float64, float64) {
 	if err := app.DB().NewQuery(`
 		SELECT COALESCE(second_approval_threshold, 0) AS threshold
 		FROM expenditure_kinds
-		WHERE name = 'standard'
+		WHERE name = 'capital'
 		LIMIT 1
 	`).One(&tier1Result); err != nil {
-		panic("Failed to retrieve standard approval threshold: " + err.Error())
+		panic("Failed to retrieve capital approval threshold: " + err.Error())
 	}
 
 	tier1 := tier1Result.Threshold

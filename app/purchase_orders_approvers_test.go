@@ -7,7 +7,6 @@ import (
 	"strings"
 	"testing"
 	"tybalt/internal/testutils"
-	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
@@ -37,6 +36,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 
 	// Get approval tier amounts from the database for test validation
 	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
 	tier1, tier2 := testutils.GetApprovalTiers(app)
 	computerKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
 		"name": "computer",
@@ -45,6 +45,20 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		t.Fatalf("failed to load computer expenditure kind: %v", err)
 	}
 	computerKindID := computerKind.Id
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "capital",
+	})
+	if err != nil {
+		t.Fatalf("failed to load capital expenditure kind: %v", err)
+	}
+	capitalKindID := capitalKind.Id
+	projectKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "project",
+	})
+	if err != nil {
+		t.Fatalf("failed to load project expenditure kind: %v", err)
+	}
+	projectKindID := projectKind.Id
 
 	// Municipal division ID for testing
 	municipalDivision := "2rrfy6m2c8hazjy"
@@ -58,7 +72,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 		return fmt.Sprintf("%s?%s", path, params.Encode())
 	}
 	makeApproversURL := func(path string, division string, amount string) string {
-		return makeApproversURLWithKindAndJob(path, division, amount, utilities.DefaultExpenditureKindID(), false)
+		return makeApproversURLWithKindAndJob(path, division, amount, capitalKindID, false)
 	}
 
 	scenarios := []tests.ApiScenario{
@@ -247,13 +261,13 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "second approvers metadata uses project_max for standard kind with job",
+			Name:   "second approvers metadata uses project_max for project kind",
 			Method: http.MethodGet,
 			URL: makeApproversURLWithKindAndJob(
 				"/api/purchase_orders/second_approvers",
 				municipalDivision,
 				fmt.Sprintf("%d", int(tier2)+1),
-				utilities.DefaultExpenditureKindID(),
+				projectKindID,
 				true,
 			),
 			Headers: map[string]string{

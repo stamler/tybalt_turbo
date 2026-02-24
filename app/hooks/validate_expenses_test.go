@@ -219,7 +219,7 @@ func TestValidateExpense_RejectsClosedJob(t *testing.T) {
 	rec.Set("allowance_types", []string{})
 	rec.Set("job", "zke3cs3yipplwtu")
 	rec.Set("payment_type", "Mileage") // avoid attachment/PO requirement
-	rec.Set("kind", utilities.DefaultExpenditureKindID())
+	rec.Set("kind", utilities.DefaultCapitalExpenditureKindID())
 	rec.Set("distance", 10.0)
 	rec.Set("date", "2024-01-22")
 	rec.Set("description", "Valid description")

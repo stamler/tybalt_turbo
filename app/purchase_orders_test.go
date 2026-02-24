@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"mime/multipart"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 	"tybalt/internal/testutils"
@@ -18,9 +19,17 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
-func ensureDefaultPOKind(payload map[string]any) {
+// ensureDefaultPOKind sets the kind field on a payload if not already present.
+// capitalID and projectID must be DB-loaded IDs (not from the global cache,
+// which is populated lazily and may be empty at test-setup time).
+func ensureDefaultPOKind(payload map[string]any, capitalID, projectID string) {
 	if _, exists := payload["kind"]; !exists {
-		payload["kind"] = utilities.DefaultExpenditureKindID()
+		job, _ := payload["job"].(string)
+		if strings.TrimSpace(job) != "" {
+			payload["kind"] = projectID
+		} else {
+			payload["kind"] = capitalID
+		}
 	}
 }
 
@@ -56,6 +65,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 
 	// Get approval tier values once and reuse them throughout the tests
 	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
 	tier1, tier2 := testutils.GetApprovalTiers(app)
 	sponsorshipKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
 		"name": "sponsorship",
@@ -63,11 +73,17 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load sponsorship expenditure kind: %v", err)
 	}
-	standardKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
-		"name": "standard",
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "capital",
 	})
 	if err != nil {
-		t.Fatalf("failed to load standard expenditure kind: %v", err)
+		t.Fatalf("failed to load capital expenditure kind: %v", err)
+	}
+	projectKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "project",
+	})
+	if err != nil {
+		t.Fatalf("failed to load project expenditure kind: %v", err)
 	}
 	computerKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
 		"name": "computer",
@@ -75,7 +91,8 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load computer expenditure kind: %v", err)
 	}
-	standardKindID := standardKind.Id
+	capitalKindID := capitalKind.Id
+	projectKindID := projectKind.Id
 	sponsorshipKindID := sponsorshipKind.Id
 	computerKindID := computerKind.Id
 
@@ -85,7 +102,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultPOKind(m)
+		ensureDefaultPOKind(m, capitalKindID, projectKindID)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -217,6 +234,42 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		})
 	}
 
+	// fails when project kind is used without a job
+	{
+		b, ct, err := makeMultipart(fmt.Sprintf(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "vccd5fo56ctbigh",
+            "description": "project kind without job",
+            "payment_type": "Expense",
+            "total": 1234.56,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "One-Time",
+            "kind": "%s"
+        }`, projectKindID))
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "fails when project kind is used without a job",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"job":{"code":"job_required_for_kind"`,
+				`"message":"a job is required for the project expenditure kind"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
 	// valid purchase order can be created with a job and computer kind
 	{
 		b, ct, err := makeMultipart(fmt.Sprintf(`{
@@ -269,7 +322,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		            "status": "Unapproved",
 	            "type": "One-Time",
 	            "kind": "%s"
-	        }`, standardKindID))
+	        }`, capitalKindID))
 		scenarios = append(scenarios, tests.ApiScenario{
 			Name:           "valid purchase order is created without attachment",
 			Method:         http.MethodPost,
@@ -1289,7 +1342,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"status": "Unapproved",
 			"type": "One-Time",
 			"kind": "%s"
-		}`, tier1+100, standardKindID)
+		}`, tier1+100, capitalKindID)
 		b, ct, err := makeMultipart(json)
 		if err != nil {
 			t.Fatal(err)
@@ -1329,7 +1382,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"status": "Unapproved",
 			"type": "One-Time",
 			"kind": "%s"
-		}`, tier1+100, standardKindID)
+		}`, tier1+100, capitalKindID)
 		b, ct, err := makeMultipart(json)
 		if err != nil {
 			t.Fatal(err)
@@ -1466,13 +1519,22 @@ func TestPurchaseOrdersCreate_DuplicateAttachmentFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = 'capital'")
+	if err != nil {
+		t.Fatalf("failed to load capital kind: %v", err)
+	}
+	capitalKindID := capitalKind.Id
+	projectKindID := capitalKindID // no project-specific tests here
+
 	// Helper to create multipart form data with a specific file content
 	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
 		m := map[string]any{}
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultPOKind(m)
+		ensureDefaultPOKind(m, capitalKindID, projectKindID)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1543,13 +1605,22 @@ func TestPurchaseOrdersUpdate_DuplicateAttachmentFails(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = 'capital'")
+	if err != nil {
+		t.Fatalf("failed to load capital kind: %v", err)
+	}
+	capitalKindID := capitalKind.Id
+	projectKindID := capitalKindID // no project-specific tests here
+
 	// Helper to create multipart form data with a specific file content
 	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
 		m := map[string]any{}
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultPOKind(m)
+		ensureDefaultPOKind(m, capitalKindID, projectKindID)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1618,17 +1689,24 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 		t.Fatal(err)
 	}
 	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
 	sponsorshipKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
 		"name": "sponsorship",
 	})
 	if err != nil {
 		t.Fatalf("failed to load sponsorship expenditure kind: %v", err)
 	}
-	standardKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
-		"name": "standard",
+	capitalKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "capital",
 	})
 	if err != nil {
-		t.Fatalf("failed to load standard expenditure kind: %v", err)
+		t.Fatalf("failed to load capital expenditure kind: %v", err)
+	}
+	projectKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
+		"name": "project",
+	})
+	if err != nil {
+		t.Fatalf("failed to load project expenditure kind: %v", err)
 	}
 	computerKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = {:name}", dbx.Params{
 		"name": "computer",
@@ -1636,7 +1714,8 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load computer expenditure kind: %v", err)
 	}
-	standardKindID := standardKind.Id
+	capitalKindID := capitalKind.Id
+	projectKindID := projectKind.Id
 	sponsorshipKindID := sponsorshipKind.Id
 	computerKindID := computerKind.Id
 
@@ -1646,7 +1725,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
 			return nil, "", err
 		}
-		ensureDefaultPOKind(m)
+		ensureDefaultPOKind(m, capitalKindID, projectKindID)
 		buf := &bytes.Buffer{}
 		w := multipart.NewWriter(buf)
 		for k, v := range m {
@@ -1722,7 +1801,7 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 			"type": "Cumulative",
 			"kind": "%s",
 			"attachment": ""
-		}`, standardKindID))
+		}`, capitalKindID))
 		scenarios = append(scenarios, tests.ApiScenario{
 			Name:           "valid purchase order update clears attachment without new upload",
 			Method:         http.MethodPatch,
@@ -1933,6 +2012,13 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 	const draftPOID = "gal6e5la2fa4rpn"
 
 	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	projectKind, err := app.FindFirstRecordByFilter("expenditure_kinds", "name = 'project'")
+	if err != nil {
+		t.Fatalf("failed to load project expenditure kind: %v", err)
+	}
+	projectKindID := projectKind.Id
+
 	approverChangePO, err := app.FindRecordById("purchase_orders", firstApprovedApproverChangePOID)
 	if err != nil {
 		t.Fatalf("failed loading first-approved approver-change fixture: %v", err)
@@ -1982,8 +2068,8 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				"type": "One-Time",
 				"job": "u09fwwcg07y03m7",
 				"category": "",
-				"kind": "l3vtlbqg529m52j"
-			}`, approverChangeTarget)),
+				"kind": "%s"
+			}`, approverChangeTarget, projectKindID)),
 			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
 			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				var row struct {
@@ -2029,7 +2115,7 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 			Name:   "meaningful edit on first-approved unapproved PO resets approvals and re-notifies",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/purchase_orders/records/" + firstApprovedPOID,
-			Body: bytes.NewBufferString(`{
+			Body: bytes.NewBufferString(fmt.Sprintf(`{
 						"uid": "f2j5a8vk006baub",
 						"date": "2025-01-29",
 						"division": "vccd5fo56ctbigh",
@@ -2043,8 +2129,8 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				"type": "One-Time",
 				"job": "u09fwwcg07y03m7",
 				"category": "",
-				"kind": "l3vtlbqg529m52j"
-			}`),
+				"kind": "%s"
+			}`, projectKindID)),
 			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
 			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				var row struct {
@@ -2090,7 +2176,7 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 			Name:   "no-op update on first-approved unapproved PO preserves approvals and does not re-notify",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/purchase_orders/records/" + firstApprovedPOID,
-			Body: bytes.NewBufferString(`{
+			Body: bytes.NewBufferString(fmt.Sprintf(`{
 						"uid": "f2j5a8vk006baub",
 						"date": "2025-01-29",
 						"division": "vccd5fo56ctbigh",
@@ -2104,8 +2190,8 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				"type": "One-Time",
 				"job": "u09fwwcg07y03m7",
 				"category": "",
-				"kind": "l3vtlbqg529m52j"
-			}`),
+				"kind": "%s"
+			}`, projectKindID)),
 			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
 			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
 				var row struct {
@@ -2348,6 +2434,7 @@ func TestGeneratePONumber(t *testing.T) {
 	currentMonth := time.Now().Month()
 	currentPoPrefix := fmt.Sprintf("%d%02d-", currentYear, currentMonth)
 	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
 	poCollection, err := app.FindCollectionByNameOrId("purchase_orders")
 	if err != nil {
 		t.Fatal(err)
@@ -2422,7 +2509,7 @@ func TestGeneratePONumber(t *testing.T) {
 				firstChild.Set("vendor", "2zqxtsmymf670ha")
 				firstChild.Set("approver", "wegviunlyr2jjjv")
 				firstChild.Set("status", "Unapproved")
-				firstChild.Set("kind", utilities.DefaultExpenditureKindID())
+				firstChild.Set("kind", utilities.DefaultCapitalExpenditureKindID())
 				if err := app.Save(firstChild); err != nil {
 					t.Fatalf("failed to save first child PO: %v", err)
 				}
@@ -2518,7 +2605,7 @@ func TestGeneratePONumber(t *testing.T) {
 					child.Set("vendor", "2zqxtsmymf670ha")
 					child.Set("approver", "wegviunlyr2jjjv")
 					child.Set("status", "Unapproved")
-					child.Set("kind", utilities.DefaultExpenditureKindID())
+					child.Set("kind", utilities.DefaultCapitalExpenditureKindID())
 					if err := app.Save(child); err != nil {
 						t.Fatalf("failed to save child PO %d: %v", i, err)
 					}

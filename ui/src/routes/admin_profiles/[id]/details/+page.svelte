@@ -169,11 +169,11 @@
         <h2 class="text-lg font-semibold">PO Approver Limits</h2>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-2">
           <div class="flex gap-2">
-            <span class="font-semibold">Standard (No Job):</span>
+            <span class="font-semibold">Capital:</span>
             {currency.format(normalizeNumber(data.item.po_approver_max_amount))}
           </div>
           <div class="flex gap-2">
-            <span class="font-semibold">Standard (With Job):</span>
+            <span class="font-semibold">Project:</span>
             {currency.format(normalizeNumber(data.item.po_approver_project_max))}
           </div>
           <div class="flex gap-2">

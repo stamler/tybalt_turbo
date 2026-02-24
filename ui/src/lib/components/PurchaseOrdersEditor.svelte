@@ -340,8 +340,10 @@
     const kinds = $expenditureKindsStore.items;
     if (kinds.length === 0) return;
     if (!item.kind || item.kind === "") {
-      const standard = kinds.find((r) => r.name === "standard");
-      item.kind = standard?.id ?? kinds[0]?.id ?? "";
+      const hasJob = item.job && item.job !== "";
+      const defaultKindName = hasJob ? "project" : "capital";
+      const defaultKind = kinds.find((r) => r.name === defaultKindName);
+      item.kind = defaultKind?.id ?? kinds[0]?.id ?? "";
     }
   });
 
@@ -478,8 +480,10 @@
       item.category = "";
     }
     if (!item.kind || item.kind === "") {
-      const standard = $expenditureKindsStore.items.find((k) => k.name === "standard");
-      item.kind = standard?.id ?? $expenditureKindsStore.items[0]?.id ?? "";
+      const hasJob = item.job && item.job !== "";
+      const defaultKindName = hasJob ? "project" : "capital";
+      const defaultKind = $expenditureKindsStore.items.find((k) => k.name === defaultKindName);
+      item.kind = defaultKind?.id ?? $expenditureKindsStore.items[0]?.id ?? "";
     }
     if (!kindAllowsJob) {
       item.job = "";

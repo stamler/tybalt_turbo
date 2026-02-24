@@ -222,8 +222,8 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				}
 			}
 
-			kindID := utilities.NormalizeExpenditureKindID(po.GetString("kind"))
 			hasJob := strings.TrimSpace(po.GetString("job")) != ""
+			kindID := utilities.NormalizeExpenditureKindID(po.GetString("kind"), hasJob)
 			approvalTotal := po.GetFloat("approval_total")
 
 			policy, err := utilities.GetPOApproverPolicy(
@@ -693,8 +693,8 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 				}
 			}
 
-			kindID := utilities.NormalizeExpenditureKindID(po.GetString("kind"))
 			hasJob := po.GetString("job") != ""
+			kindID := utilities.NormalizeExpenditureKindID(po.GetString("kind"), hasJob)
 			policy, err := utilities.GetPOApproverPolicy(
 				txApp,
 				po.GetString("division"),
@@ -1131,7 +1131,7 @@ func GeneratePONumber(txApp core.App, record *core.Record, testDateComponents ..
 
 func parseApproversRequest(e *core.RequestEvent) (poApproversRequest, error) {
 	req := poApproversRequest{
-		Kind: utilities.DefaultExpenditureKindID(),
+		Kind: utilities.DefaultCapitalExpenditureKindID(),
 	}
 	q := e.Request.URL.Query()
 	req.Division = q.Get("division")
@@ -1197,7 +1197,7 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 				"message": "kind is required",
 			})
 		}
-		req.Kind = utilities.NormalizeExpenditureKindID(req.Kind)
+		req.Kind = utilities.NormalizeExpenditureKindID(req.Kind, req.HasJob)
 
 		// Check for recurring purchase order query parameters and calculate the total value if necessary
 		if req.Type == "Recurring" {

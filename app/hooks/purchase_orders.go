@@ -191,7 +191,8 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		}
 	}
 	kindAllowsJob := kindRecord.GetBool("allow_job")
-	if strings.TrimSpace(purchaseOrderRecord.GetString("job")) != "" && !kindAllowsJob {
+	hasJob := strings.TrimSpace(purchaseOrderRecord.GetString("job")) != ""
+	if hasJob && !kindAllowsJob {
 		return &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "hook error when validating purchase order",
@@ -199,6 +200,18 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				"kind": {
 					Code:    "invalid_kind_for_job",
 					Message: "selected kind does not allow job",
+				},
+			},
+		}
+	}
+	if kindRecord.GetString("name") == utilities.ExpenditureKindNameProject && !hasJob {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating purchase order",
+			Data: map[string]errs.CodeError{
+				"job": {
+					Code:    "job_required_for_kind",
+					Message: "a job is required for the project expenditure kind",
 				},
 			},
 		}

@@ -54,7 +54,9 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 		log.Println("TurboPurchaseOrders.parquet not found - will generate all PO IDs from PO numbers")
 	}
 
-	query := strings.ReplaceAll(buildPurchaseOrderQuery(turboPOsExists), "{{STANDARD_KIND_ID}}", StandardExpenditureKindID())
+	query := buildPurchaseOrderQuery(turboPOsExists)
+	query = strings.ReplaceAll(query, "{{CAPITAL_KIND_ID}}", CapitalExpenditureKindID())
+	query = strings.ReplaceAll(query, "{{PROJECT_KIND_ID}}", ProjectExpenditureKindID())
 
 	_, err = db.Exec(query)
 	if err != nil {
@@ -81,8 +83,9 @@ func prepareTurboPOsTable(db *sql.DB) error {
 	}
 
 	_, err = db.Exec(fmt.Sprintf(
-		"UPDATE turbo_pos SET kind = '%s' WHERE kind IS NULL OR TRIM(CAST(kind AS VARCHAR)) = ''",
-		StandardExpenditureKindID(),
+		"UPDATE turbo_pos SET kind = CASE WHEN job IS NOT NULL AND TRIM(CAST(job AS VARCHAR)) != '' THEN '%s' ELSE '%s' END WHERE kind IS NULL OR TRIM(CAST(kind AS VARCHAR)) = ''",
+		ProjectExpenditureKindID(),
+		CapitalExpenditureKindID(),
 	))
 	if err != nil {
 		return fmt.Errorf("backfill turbo_pos.kind values: %w", err)
@@ -308,11 +311,24 @@ func buildPurchaseOrderQuery(turboPOsExists bool) string {
 				THEN (SELECT tp.category FROM turbo_pos tp WHERE tp.number = fe.po)
 				ELSE NULL
 			END AS category,
-			-- Kind: prefer TurboPurchaseOrders kind when present, otherwise fall back to expense kind
+			-- Kind: prefer TurboPurchaseOrders kind when present, otherwise job-aware default
 			CASE
 				WHEN (SELECT COUNT(*) FROM turbo_pos tp WHERE tp.number = fe.po) = 1
-				THEN COALESCE(NULLIF((SELECT tp.kind FROM turbo_pos tp WHERE tp.number = fe.po), ''), NULLIF(fe.kind, ''), '{{STANDARD_KIND_ID}}')
-				ELSE COALESCE(NULLIF(fe.kind, ''), '{{STANDARD_KIND_ID}}')
+				THEN COALESCE(
+					NULLIF((SELECT tp.kind FROM turbo_pos tp WHERE tp.number = fe.po), ''),
+					NULLIF(fe.kind, ''),
+					CASE WHEN COALESCE(
+						(SELECT tp.job FROM turbo_pos tp WHERE tp.number = fe.po),
+						fe.pocketbase_jobid
+					) IS NOT NULL AND TRIM(CAST(COALESCE(
+						(SELECT tp.job FROM turbo_pos tp WHERE tp.number = fe.po),
+						fe.pocketbase_jobid
+					) AS VARCHAR)) != '' THEN '{{PROJECT_KIND_ID}}' ELSE '{{CAPITAL_KIND_ID}}' END
+				)
+				ELSE COALESCE(
+					NULLIF(fe.kind, ''),
+					CASE WHEN fe.pocketbase_jobid IS NOT NULL AND TRIM(CAST(fe.pocketbase_jobid AS VARCHAR)) != '' THEN '{{PROJECT_KIND_ID}}' ELSE '{{CAPITAL_KIND_ID}}' END
+				)
 			END AS kind,
 			-- Parent PO: only from TurboPurchaseOrders (PocketBase ID, no conversion needed)
 			CASE
@@ -372,7 +388,10 @@ func buildPurchaseOrderQuery(turboPOsExists bool) string {
 			(SELECT p.pocketbase_uid FROM profiles p WHERE p.id = tp.rejector) AS rejector,
 			tp.rejection_reason,
 			tp.category,
-			COALESCE(NULLIF(tp.kind, ''), '{{STANDARD_KIND_ID}}') AS kind,
+			COALESCE(
+				NULLIF(tp.kind, ''),
+				CASE WHEN tp.job IS NOT NULL AND TRIM(CAST(tp.job AS VARCHAR)) != '' THEN '{{PROJECT_KIND_ID}}' ELSE '{{CAPITAL_KIND_ID}}' END
+			) AS kind,
 			tp.parent_po,
 			tp.branch,
 			tp.attachment,
@@ -425,7 +444,10 @@ func buildPurchaseOrderQuery(turboPOsExists bool) string {
 			NULL AS rejector,
 			NULL AS rejection_reason,
 			NULL AS category,
-			COALESCE(NULLIF(fe.kind, ''), '{{STANDARD_KIND_ID}}') AS kind,
+			COALESCE(
+				NULLIF(fe.kind, ''),
+				CASE WHEN fe.pocketbase_jobid IS NOT NULL AND TRIM(CAST(fe.pocketbase_jobid AS VARCHAR)) != '' THEN '{{PROJECT_KIND_ID}}' ELSE '{{CAPITAL_KIND_ID}}' END
+			) AS kind,
 			NULL AS parent_po,
 			NULL AS branch,
 			NULL AS attachment,

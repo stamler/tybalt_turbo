@@ -173,13 +173,9 @@ When PO fields affecting eligibility change (`kind`, `division`, `job`, `total`/
 
 No silent reassignment by default.
 
-## D10. Standard kind future split
+## D10. Standard kind split (completed)
 
-Current decision: no split between standard-with-job and standard-without-job thresholds.
-
-Future-compatible note:
-
-- If needed later, split `standard` into two kinds and configure thresholds independently.
+The `standard` kind has been split into `capital` (no job, `allow_job=false`, uses `max_amount`) and `project` (requires job, `allow_job=true`, uses `project_max`). See migration `1771882747_split_standard_into_capital_project.go`.
 
 ---
 
@@ -512,7 +508,7 @@ If needed, that audit snapshot remains available in git history for this file.
 
 ## Out of Scope
 
-1. Splitting standard into two kinds now.
+1. ~~Splitting standard into two kinds~~ (completed — see D10).
 2. Introducing organizational hierarchy tables beyond current claim/limit data.
 3. Changing non-PO approval systems.
 
