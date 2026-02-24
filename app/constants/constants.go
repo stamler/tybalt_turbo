@@ -33,9 +33,9 @@ const (
 	// purchase order.
 	RECURRING_MAX_DAYS = 400
 
-	// These constants are used to determine whether an expense is within the
-	// allowed percentage or value of the total of a purchase order. The lesser
-	// of the two limits is used to determine if the expense is valid.
+	// Default values for the allowed excess on purchase order expenses.
+	// These can be overridden via the "expenses" domain in app_config under
+	// the "po_expense_allowed_excess" property.
 	MAX_PURCHASE_ORDER_EXCESS_PERCENT = 0.05
 	MAX_PURCHASE_ORDER_EXCESS_VALUE   = 100.0
 

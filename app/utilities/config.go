@@ -2,8 +2,10 @@ package utilities
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
+	"tybalt/constants"
 	"tybalt/errs"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -106,6 +108,125 @@ func GetPurchaseOrderSecondStageTimeoutHours(app core.App) float64 {
 	}
 
 	return defaultTimeoutHours
+}
+
+// POExpenseExcessConfig holds the configuration for how much expenses can
+// exceed a purchase order total.
+type POExpenseExcessConfig struct {
+	Percent float64 // fractional, e.g. 0.05 = 5%
+	Value   float64 // absolute dollar amount
+	Mode    string  // "lesser_of" or "greater_of"
+}
+
+// POExpenseLimitResult holds the computed total limit and a human-readable
+// description of the excess amount for use in error messages.
+type POExpenseLimitResult struct {
+	TotalLimit float64
+	ExcessText string // e.g. "5.00%" or "$100.00"
+}
+
+// GetPOExpenseExcessConfig reads the po_expense_allowed_excess config from the
+// "expenses" domain in app_config. Returns defaults matching the existing
+// hardcoded constants when the config is missing or invalid.
+func GetPOExpenseExcessConfig(app core.App) POExpenseExcessConfig {
+	defaults := POExpenseExcessConfig{
+		Percent: constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT,
+		Value:   constants.MAX_PURCHASE_ORDER_EXCESS_VALUE,
+		Mode:    "lesser_of",
+	}
+
+	config, err := GetConfigValue(app, "expenses")
+	if err != nil || config == nil {
+		return defaults
+	}
+
+	rawExcess, ok := config["po_expense_allowed_excess"]
+	if !ok {
+		return defaults
+	}
+
+	excessMap, ok := rawExcess.(map[string]any)
+	if !ok {
+		return defaults
+	}
+
+	result := defaults // start from defaults, override only valid fields
+
+	// "percent" is stored as a human-readable percentage (e.g. 5 means 5%)
+	// and normalized to a fraction for internal use.
+	if percent, err := coerceFloat64(excessMap["percent"]); err == nil && percent >= 0 && percent <= 100 {
+		result.Percent = percent / 100
+	}
+
+	if value, err := coerceFloat64(excessMap["value"]); err == nil && value >= 0 {
+		result.Value = value
+	}
+
+	if mode, ok := excessMap["mode"].(string); ok {
+		if mode == "lesser_of" || mode == "greater_of" {
+			result.Mode = mode
+		}
+	}
+
+	return result
+}
+
+// CalculatePOExpenseTotalLimit computes the maximum allowed expense total for a
+// purchase order, based on the excess configuration. The ExcessText field
+// describes which limit was applied (percent or absolute value).
+//
+// Note: when poTotal is 0 the percent excess is also 0, so the percent branch
+// is always selected and ExcessText will report a percentage even though the
+// effective allowed excess is $0. This is acceptable because $0 POs are not
+// expected in practice.
+func CalculatePOExpenseTotalLimit(poTotal float64, cfg POExpenseExcessConfig) POExpenseLimitResult {
+	percentLimit := poTotal * (1.0 + cfg.Percent)
+	valueLimit := poTotal + cfg.Value
+
+	var totalLimit float64
+	var excessText string
+
+	switch cfg.Mode {
+	case "greater_of":
+		if cfg.Value >= poTotal*cfg.Percent {
+			totalLimit = valueLimit
+			excessText = fmt.Sprintf("$%0.2f", cfg.Value)
+		} else {
+			totalLimit = percentLimit
+			excessText = fmt.Sprintf("%0.2f%%", cfg.Percent*100)
+		}
+	default: // "lesser_of"
+		if cfg.Value < poTotal*cfg.Percent {
+			totalLimit = valueLimit
+			excessText = fmt.Sprintf("$%0.2f", cfg.Value)
+		} else {
+			totalLimit = percentLimit
+			excessText = fmt.Sprintf("%0.2f%%", cfg.Percent*100)
+		}
+	}
+
+	return POExpenseLimitResult{
+		TotalLimit: totalLimit,
+		ExcessText: excessText,
+	}
+}
+
+// coerceFloat64 converts a JSON numeric value (which may be float64, int, or
+// int64 after json.Unmarshal) to float64.
+func coerceFloat64(v any) (float64, error) {
+	if v == nil {
+		return 0, fmt.Errorf("nil value")
+	}
+	switch n := v.(type) {
+	case float64:
+		return n, nil
+	case int:
+		return float64(n), nil
+	case int64:
+		return float64(n), nil
+	default:
+		return 0, fmt.Errorf("unsupported type %T", v)
+	}
 }
 
 // ErrExpensesEditingDisabled is returned when expense editing is disabled

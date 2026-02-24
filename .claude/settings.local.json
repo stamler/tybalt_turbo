@@ -6,8 +6,9 @@
       "Bash(npm run check:*)",
       "Bash(node -e:*)",
       "WebSearch",
-      "WebFetch(domain:github.com)",
-      "WebFetch(domain:litestream.io)"
+      "WebFetch",
+      "Bash(find:*)",
+      "Bash(go test:*)"
     ]
   }
 }

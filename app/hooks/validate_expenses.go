@@ -25,7 +25,7 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 		poDate           time.Time
 		poEndDate        time.Time
 		totalLimit       float64
-		excessErrorText  string = fmt.Sprintf("%0.2f%%", constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT*100)
+		excessErrorText  string
 		parseErr         error
 	)
 	if poRecord != nil {
@@ -61,13 +61,10 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 			}
 		}
 
-		// The maximum allowed total for all purchase_orders records is the lesser
-		// of the value and percent limits.
-		totalLimit = poTotal * (1.0 + constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
-		if constants.MAX_PURCHASE_ORDER_EXCESS_VALUE < poTotal*constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT {
-			totalLimit = poTotal + constants.MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
-			excessErrorText = fmt.Sprintf("$%0.2f", constants.MAX_PURCHASE_ORDER_EXCESS_VALUE)
-		}
+		excessCfg := utilities.GetPOExpenseExcessConfig(app)
+		limitResult := utilities.CalculatePOExpenseTotalLimit(poTotal, excessCfg)
+		totalLimit = limitResult.TotalLimit
+		excessErrorText = limitResult.ExcessText
 
 		// For Cumulative POs, we check for overflow before other validations.
 		// This is done here (rather than in the "total" validation) because:

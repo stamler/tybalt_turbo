@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"time"
-	"tybalt/constants"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -202,10 +201,9 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 						}
 						pendingExpenseTotal := record.GetFloat("total")
 
-						totalLimit := purchaseOrderRecord.GetFloat("total") * (1.0 + constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT) // initialize with percent limit
-						if constants.MAX_PURCHASE_ORDER_EXCESS_VALUE < purchaseOrderRecord.GetFloat("total")*constants.MAX_PURCHASE_ORDER_EXCESS_PERCENT {
-							totalLimit = purchaseOrderRecord.GetFloat("total") + constants.MAX_PURCHASE_ORDER_EXCESS_VALUE // use value limit instead
-						}
+						excessCfg := utilities.GetPOExpenseExcessConfig(app)
+						limitResult := utilities.CalculatePOExpenseTotalLimit(purchaseOrderRecord.GetFloat("total"), excessCfg)
+						totalLimit := limitResult.TotalLimit
 
 						if existingExpensesTotal+pendingExpenseTotal > totalLimit {
 							httpResponseStatusCode = http.StatusBadRequest
