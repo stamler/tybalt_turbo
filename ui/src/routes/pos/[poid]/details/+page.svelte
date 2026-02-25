@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { PageData } from "./$types";
+  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import Icon from "@iconify/svelte";
@@ -197,7 +198,7 @@
         <div>
           <span class="font-semibold">Attachment:</span>
           <a
-            href={data.po.attachment}
+            href={`${PUBLIC_POCKETBASE_URL}/api/files/purchase_orders/${data.po.id}/${data.po.attachment}`}
             class="text-blue-600 hover:underline"
             target="_blank"
             rel="noopener noreferrer">Download</a
