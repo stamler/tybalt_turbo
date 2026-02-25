@@ -235,6 +235,11 @@ func AddRoutes(app core.App) {
 		reportsGroup.GET("/payroll_receipts/{date_column_value}", reports.CreateReceiptsReportHandler(app, "pay_period_ending"))
 		reportsGroup.GET("/weekly_receipts/{date_column_value}", reports.CreateReceiptsReportHandler(app, "committed_week_ending"))
 
+		// Admin stats dashboard
+		statsGroup := se.Router.Group("/api/stats")
+		statsGroup.Bind(apis.RequireAuth("users"))
+		statsGroup.GET("", createGetStatsHandler(app))
+
 		// Machine secrets management (admin only)
 		machineSecretsGroup := se.Router.Group("/api/machine_secrets")
 		machineSecretsGroup.Bind(apis.RequireAuth("users"))
