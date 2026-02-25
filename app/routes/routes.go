@@ -248,9 +248,10 @@ func AddRoutes(app core.App) {
 		rateSheetsGroup.POST("/{id}/activate", createActivateRateSheetHandler(app))
 		rateSheetsGroup.POST("/{id}/deactivate", createDeactivateRateSheetHandler(app))
 
-		// Claims management (admin claim required)
+		// Claims management (detail endpoint requires admin claim)
 		claimsGroup := se.Router.Group("/api/claims")
 		claimsGroup.Bind(apis.RequireAuth("users"))
+		claimsGroup.GET("", createGetClaimsListHandler(app))
 		claimsGroup.GET("/{id}", createGetClaimDetailsHandler(app))
 
 		// Rate sheet entries management (admin claim required)

@@ -1,6 +1,6 @@
 <script lang="ts">
   import DsList from "$lib/components/DSList.svelte";
-  import type { ClaimHolder } from "./+page";
+  import type { ClaimHolder } from "$lib/svelte-types";
 
   let { data } = $props();
 </script>

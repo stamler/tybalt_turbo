@@ -1,12 +1,6 @@
 import type { PageLoad } from "./$types";
 import { pb } from "$lib/pocketbase";
-
-export interface ClaimHolder {
-  id: string;
-  admin_profile_id: string;
-  given_name: string;
-  surname: string;
-}
+import type { ClaimDetails, ClaimHolder } from "$lib/svelte-types";
 
 interface ApiClaimHolder {
   admin_profile_id: string;
@@ -21,13 +15,6 @@ interface ApiClaimDetails {
   holders: ApiClaimHolder[];
 }
 
-export interface ClaimDetails {
-  id: string;
-  name: string;
-  description: string;
-  holders: ClaimHolder[];
-}
-
 export const load: PageLoad = async ({ params }) => {
   try {
     const raw = (await pb.send(`/api/claims/${params.id}`, {
@@ -35,7 +22,7 @@ export const load: PageLoad = async ({ params }) => {
     })) as ApiClaimDetails;
     const item: ClaimDetails = {
       ...raw,
-      holders: raw.holders.map((h) => ({ ...h, id: h.admin_profile_id })),
+      holders: raw.holders.map((h): ClaimHolder => ({ ...h, id: h.admin_profile_id })),
     };
     return { item, error: null };
   } catch (error) {

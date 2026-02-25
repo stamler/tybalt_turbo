@@ -8,8 +8,18 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+//go:embed claims_list.sql
+var claimListQuery string
+
 //go:embed claims_details.sql
 var claimDetailsQuery string
+
+type ClaimListItem struct {
+	ID          string `json:"id" db:"id"`
+	Name        string `json:"name" db:"name"`
+	Description string `json:"description" db:"description"`
+	HolderCount int    `json:"holder_count" db:"holder_count"`
+}
 
 type ClaimHolder struct {
 	AdminProfileID string `json:"admin_profile_id" db:"admin_profile_id"`
@@ -57,5 +67,15 @@ func createGetClaimDetailsHandler(app core.App) func(e *core.RequestEvent) error
 			Description: claim.GetString("description"),
 			Holders:     holders,
 		})
+	}
+}
+
+func createGetClaimsListHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		var items []ClaimListItem
+		if err := app.DB().NewQuery(claimListQuery).All(&items); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to query claims", err)
+		}
+		return e.JSON(http.StatusOK, items)
 	}
 }

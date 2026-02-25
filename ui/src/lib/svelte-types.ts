@@ -101,3 +101,25 @@ export type ExpensesListData = {
   totalPages?: number;
   limit?: number;
 };
+
+// Claims types returned by custom API endpoints
+export interface ClaimListItem {
+  id: string;
+  name: string;
+  description: string;
+  holder_count: number;
+}
+
+export interface ClaimHolder {
+  id: string;
+  admin_profile_id: string;
+  given_name: string;
+  surname: string;
+}
+
+export interface ClaimDetails {
+  id: string;
+  name: string;
+  description: string;
+  holders: ClaimHolder[];
+}
