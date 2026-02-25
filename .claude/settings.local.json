@@ -10,7 +10,9 @@
       "Bash(find:*)",
       "Bash(go test:*)",
       "Bash(go build ./...)",
-      "Bash(npx svelte-check --tsconfig ./tsconfig.json)"
+      "Bash(npx svelte-check --tsconfig ./tsconfig.json)",
+      "Bash(gh auth status)",
+      "Bash(gh issue:*)"
     ]
   }
 }
