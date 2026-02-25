@@ -78,5 +78,15 @@ WHERE
         OR (approved < {:staleBefore})
       )
     )
+    OR (
+      {:scope} = 'expiring'
+      AND status = 'Active'
+      AND type = 'Recurring'
+      AND end_date != ''
+      AND end_date <= {:expiringBefore}
+    )
   )
-ORDER BY date DESC, updated DESC
+ORDER BY
+  CASE WHEN {:scope} = 'expiring' THEN end_date END ASC,
+  date DESC,
+  updated DESC

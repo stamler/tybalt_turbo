@@ -434,6 +434,34 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "visible endpoint requires expiring_before when scope is expiring",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible?scope=expiring",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"missing_expiring_before"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible expiring scope returns active recurring purchase orders before cutoff",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible?scope=expiring&expiring_before=2025-10-01",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"d8463q483f3da28"`,
+				`"type":"Recurring"`,
+				`"status":"Active"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "pending endpoint behavior remains unchanged for priority second approver",
 			Method: http.MethodGet,
 			URL:    "/api/purchase_orders/pending",
