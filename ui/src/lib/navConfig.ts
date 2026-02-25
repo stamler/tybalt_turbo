@@ -170,6 +170,7 @@ export const navSections: NavSection[] = [
       },
       { label: "Absorb Actions", href: "/absorb/actions", buttons: [] },
       { label: "Admin Profiles", href: "/admin_profiles/list", buttons: [] },
+      { label: "Claims", href: "/claims/list", buttons: [] },
     ],
   },
   {
