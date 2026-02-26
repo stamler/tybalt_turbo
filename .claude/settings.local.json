@@ -9,10 +9,13 @@
       "WebFetch",
       "Bash(find:*)",
       "Bash(go test:*)",
-      "Bash(go build ./...)",
+      "Bash(go build:*)",
+      "Bash(go vet:*)",
       "Bash(npx svelte-check --tsconfig ./tsconfig.json)",
       "Bash(gh auth status)",
-      "Bash(gh issue:*)"
+      "Bash(gh issue:*)",
+      "Bash(sqlite3 app/pb_data/data.db \"SELECT:*)",
+      "Bash(sqlite3 app/test_pb_data/data.db \"SELECT:*)"
     ]
   }
 }
