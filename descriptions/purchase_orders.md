@@ -322,7 +322,7 @@ Current canonical views:
 ## Purchase Order Types and Behaviors
 
 | PO Type    | Description                                                                  | May be Closed Manually                                              | May be Canceled if status is Active                  | Closed Automatically                     |
-| ---------- | ---------------------------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------- |
+|------------|------------------------------------------------------------------------------|---------------------------------------------------------------------|------------------------------------------------------|------------------------------------------|
 | One-Time   | Valid for a single expense                                                   | No                                                                  | Yes, by `payables_admin` if no expenses are attached | When an expense is committed             |
 | Recurring  | Valid for a fixed number of expenses not exceeding specified value           | Yes, if status is `Active` and has at least 1 **committed** expense | Yes, by `payables_admin` if no expenses are attached | When final expected expense is committed |
 | Cumulative | Valid for multiple expenses where sum of values does not exceed the PO total | Yes, if status is `Active` and has at least 1 **committed** expense | Yes, by `payables_admin` if no expenses are attached | When committed total reaches PO total    |
@@ -374,13 +374,13 @@ Read by `utilities.GetNoPOExpenseLimit(app)` in `app/utilities/config.go`.
 
 ### Combined effect
 
-| Scenario | PO Required? |
-| --- | --- |
-| Has job, payment type is `OnAccount` / `Expense` / `CorporateCreditCard` | Yes (any amount) |
-| Has job, payment type is `Mileage` / `FuelCard` / `PersonalReimbursement` / `Allowance` | No |
-| No job, total >= configured limit (default $100), not exempt type | Yes |
-| No job, total < configured limit (default $100) | No |
-| No job, total >= configured limit (default $100), `OnAccount` + `payables_admin` claim | No |
+| Scenario                                                                                | PO Required?     |
+|-----------------------------------------------------------------------------------------|------------------|
+| Has job, payment type is `OnAccount` / `Expense` / `CorporateCreditCard`                | Yes (any amount) |
+| Has job, payment type is `Mileage` / `FuelCard` / `PersonalReimbursement` / `Allowance` | No               |
+| No job, total >= configured limit (default $100), not exempt type                       | Yes              |
+| No job, total < configured limit (default $100)                                         | No               |
+| No job, total >= configured limit (default $100), `OnAccount` + `payables_admin` claim  | No               |
 
 ## Expense Validation Against PO Totals
 
@@ -503,7 +503,7 @@ Child POs: `YYMM-NNNN-XX`
 ## Pocketbase Collection Schema (`purchase_orders`)
 
 | Field                    | Type                          | Description                                                               |
-| ------------------------ | ----------------------------- | ------------------------------------------------------------------------- |
+|--------------------------|-------------------------------|---------------------------------------------------------------------------|
 | po_number                | string                        | `YYMM-NNNN` or `YYMM-NNNN-XX`; required for `Active`/`Cancelled`/`Closed` |
 | status                   | enum                          | `Unapproved`, `Active`, `Cancelled`, `Closed`                             |
 | uid                      | relation -> users             | Creator                                                                   |
@@ -540,7 +540,7 @@ Child POs: `YYMM-NNNN-XX`
 ## Pocketbase Collection Schema (`expenditure_kinds`)
 
 | Field                     | Type   | Description                                                   |
-| ------------------------- | ------ | ------------------------------------------------------------- |
+|---------------------------|--------|---------------------------------------------------------------|
 | id                        | string | PocketBase record ID                                          |
 | name                      | string | Semantic key (`capital`, `project`, `sponsorship`, etc.)      |
 | description               | string | Human-readable description                                    |
@@ -551,11 +551,11 @@ Child POs: `YYMM-NNNN-XX`
 
 ## `po_approver_props` Limit Columns
 
-| Column                 | Used for kind      | When          |
-| ---------------------- | ------------------ | ------------- |
-| `max_amount`           | `capital`          | Always        |
-| `project_max`          | `project`          | Always        |
-| `sponsorship_max`      | `sponsorship`      | Always        |
-| `staff_and_social_max` | `staff_and_social` | Always        |
-| `media_and_event_max`  | `media_and_event`  | Always        |
-| `computer_max`         | `computer`         | Always        |
+| Column                 | Used for kind      | When   |
+|------------------------|--------------------|--------|
+| `max_amount`           | `capital`          | Always |
+| `project_max`          | `project`          | Always |
+| `sponsorship_max`      | `sponsorship`      | Always |
+| `staff_and_social_max` | `staff_and_social` | Always |
+| `media_and_event_max`  | `media_and_event`  | Always |
+| `computer_max`         | `computer`         | Always |
