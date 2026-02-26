@@ -434,7 +434,7 @@ func TestSendNotifications_ErrorHandling(t *testing.T) {
 	}
 }
 
-func TestCreateNotification_SkipsWhenFeatureDisabled(t *testing.T) {
+func TestDispatchNotificationDeferred_SkipsWhenFeatureDisabled(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	defer app.Cleanup()
 
@@ -467,9 +467,15 @@ func TestCreateNotification_SkipsWhenFeatureDisabled(t *testing.T) {
 
 	beforeCount := countForTemplate("timesheet_shared")
 
-	if err := notifications.CreateNotification(app, "timesheet_shared", userRow.UID, map[string]any{
-		"WeekEnding": "2026-02-14",
-	}, true); err != nil {
+	if _, err := notifications.DispatchNotification(app, notifications.DispatchArgs{
+		TemplateCode: "timesheet_shared",
+		RecipientUID: userRow.UID,
+		Data: map[string]any{
+			"WeekEnding": "2026-02-14",
+		},
+		System: true,
+		Mode:   notifications.DeliveryDeferred,
+	}); err != nil {
 		t.Fatalf("expected no error when disabled notification is skipped, got %v", err)
 	}
 
@@ -537,10 +543,10 @@ func TestSendNotificationByID_NoOpForNonExistentID(t *testing.T) {
 	}
 }
 
-// CreateAndSendNotification()
+// DispatchNotification() with DeliveryImmediate
 
 // 1. creates a notification record and immediately sends it
-func TestCreateAndSendNotification_CreatesAndSends(t *testing.T) {
+func TestDispatchNotificationImmediate_CreatesAndSends(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	defer app.Cleanup()
 
@@ -560,10 +566,16 @@ func TestCreateAndSendNotification_CreatesAndSends(t *testing.T) {
 	}
 
 	// Create and send a notification
-	err := notifications.CreateAndSendNotification(app, "po_approval_required", userRow.UID, map[string]any{
-		"POId":      "test_po_id",
-		"ActionURL": "https://example.com/pos/test_po_id/edit",
-	}, false)
+	_, err := notifications.DispatchNotification(app, notifications.DispatchArgs{
+		TemplateCode: "po_approval_required",
+		RecipientUID: userRow.UID,
+		Data: map[string]any{
+			"POId":      "test_po_id",
+			"ActionURL": "https://example.com/pos/test_po_id/edit",
+		},
+		System: false,
+		Mode:   notifications.DeliveryImmediate,
+	})
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
@@ -599,7 +611,7 @@ func TestCreateAndSendNotification_CreatesAndSends(t *testing.T) {
 }
 
 // 2. skips send when feature is disabled
-func TestCreateAndSendNotification_SkipsWhenFeatureDisabled(t *testing.T) {
+func TestDispatchNotificationImmediate_SkipsWhenFeatureDisabled(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	defer app.Cleanup()
 
@@ -632,9 +644,15 @@ func TestCreateAndSendNotification_SkipsWhenFeatureDisabled(t *testing.T) {
 
 	beforeCount := countForTemplate("timesheet_shared")
 
-	err := notifications.CreateAndSendNotification(app, "timesheet_shared", userRow.UID, map[string]any{
-		"WeekEnding": "2026-02-14",
-	}, true)
+	_, err := notifications.DispatchNotification(app, notifications.DispatchArgs{
+		TemplateCode: "timesheet_shared",
+		RecipientUID: userRow.UID,
+		Data: map[string]any{
+			"WeekEnding": "2026-02-14",
+		},
+		System: true,
+		Mode:   notifications.DeliveryImmediate,
+	})
 	if err != nil {
 		t.Fatalf("expected no error when disabled notification is skipped, got %v", err)
 	}

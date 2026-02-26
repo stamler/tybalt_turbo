@@ -461,11 +461,18 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			// priority_second_approver alerting them that they need to approve the PO
 			// and have an exclusive window to do so before it is available for approval
 			// by all qualified approvers.
-			err := notifications.CreateAndSendNotificationWithUser(app, "po_priority_second_approval_required", updatedPO.GetString("priority_second_approver"), map[string]any{
-				"POId":          updatedPO.Id,
-				"POCreatorName": creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
-				"ActionURL":     notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/edit", updatedPO.Id)),
-			}, false, userId)
+			_, err := notifications.DispatchNotification(app, notifications.DispatchArgs{
+				TemplateCode: "po_priority_second_approval_required",
+				RecipientUID: updatedPO.GetString("priority_second_approver"),
+				Data: map[string]any{
+					"POId":          updatedPO.Id,
+					"POCreatorName": creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
+					"ActionURL":     notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/edit", updatedPO.Id)),
+				},
+				System:   false,
+				ActorUID: userId,
+				Mode:     notifications.DeliveryImmediate,
+			})
 			if err != nil {
 				return err
 			}
@@ -475,13 +482,20 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			// know that it has been approved), send a message to the creator
 			// alerting them that the PO has been approved and is available for
 			// use.
-			err := notifications.CreateAndSendNotificationWithUser(app, "po_active", updatedPO.GetString("uid"), map[string]any{
-				"POId":           updatedPO.Id,
-				"PONumber":       updatedPO.GetString("po_number"),
-				"POCreatorName":  creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
-				"POApproverName": approverProfile.GetString("given_name") + " " + approverProfile.GetString("surname"),
-				"ActionURL":      notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/details", updatedPO.Id)),
-			}, false, userId)
+			_, err := notifications.DispatchNotification(app, notifications.DispatchArgs{
+				TemplateCode: "po_active",
+				RecipientUID: updatedPO.GetString("uid"),
+				Data: map[string]any{
+					"POId":           updatedPO.Id,
+					"PONumber":       updatedPO.GetString("po_number"),
+					"POCreatorName":  creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
+					"POApproverName": approverProfile.GetString("given_name") + " " + approverProfile.GetString("surname"),
+					"ActionURL":      notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/details", updatedPO.Id)),
+				},
+				System:   false,
+				ActorUID: userId,
+				Mode:     notifications.DeliveryImmediate,
+			})
 			if err != nil {
 				return err
 			}
@@ -790,13 +804,20 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 		}
 
 		// Send notification to the creator (uid)
-		if err := notifications.CreateAndSendNotificationWithUser(app, "po_rejected", updatedPO.GetString("uid"), map[string]any{
-			"POId":            updatedPO.Id,
-			"POUrl":           fmt.Sprintf("/pos/%s/details", updatedPO.Id),
-			"PONumber":        updatedPO.GetString("po_number"),
-			"RejectionReason": updatedPO.GetString("rejection_reason"),
-			"ActionURL":       notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/details", updatedPO.Id)),
-		}, false, userId); err != nil {
+		if _, err := notifications.DispatchNotification(app, notifications.DispatchArgs{
+			TemplateCode: "po_rejected",
+			RecipientUID: updatedPO.GetString("uid"),
+			Data: map[string]any{
+				"POId":            updatedPO.Id,
+				"POUrl":           fmt.Sprintf("/pos/%s/details", updatedPO.Id),
+				"PONumber":        updatedPO.GetString("po_number"),
+				"RejectionReason": updatedPO.GetString("rejection_reason"),
+				"ActionURL":       notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/details", updatedPO.Id)),
+			},
+			System:   false,
+			ActorUID: userId,
+			Mode:     notifications.DeliveryImmediate,
+		}); err != nil {
 			// Log the error but don't fail the request, as the PO was already rejected
 			app.Logger().Error("notification not sent: error creating rejection notification", "error", err)
 		}

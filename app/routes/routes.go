@@ -3,7 +3,6 @@ package routes
 import (
 	"net/http"
 	"tybalt/constants"
-	"tybalt/notifications"
 	"tybalt/reports"
 	"tybalt/utilities"
 
@@ -66,35 +65,6 @@ func AddRoutes(app core.App) {
 				"gitBranch":      constants.GitBranch,
 				"buildTime":      constants.BuildTime,
 			})
-		})
-
-		// TODO: This is a temporary route to send a single notification for testing
-		// purposes remove this before going to production
-		notificationsGroup := se.Router.Group("/api/notifications")
-		notificationsGroup.POST("/send_one", func(e *core.RequestEvent) error {
-			remaining, err := notifications.SendNextPendingNotification(app)
-			if err != nil {
-				return e.Error(http.StatusInternalServerError, err.Error(), nil)
-			}
-			return e.JSON(200, map[string]any{
-				"remaining": remaining,
-			})
-		})
-		// TODO: this is a temporary route to send all notifications for testing
-		// purposes remove this before going to production
-		notificationsGroup.POST("/send_all", func(e *core.RequestEvent) error {
-			sentCount, err := notifications.SendNotifications(app)
-			if err != nil {
-				return e.Error(http.StatusInternalServerError, err.Error(), nil)
-			}
-			return e.JSON(http.StatusOK, map[string]any{"notificationsSent": sentCount})
-		})
-		// TODO: This is a temporary route to send the po_second_approval_required
-		// notifications for testing purposes. Remove this before going to
-		// production.
-		notificationsGroup.POST("/send_po_second_approval_notifications", func(e *core.RequestEvent) error {
-			err := notifications.QueuePoSecondApproverNotifications(app, true)
-			return e.JSON(http.StatusOK, map[string]any{"error": err})
 		})
 
 		tsGroup := se.Router.Group("/api/time_sheets")

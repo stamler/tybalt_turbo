@@ -601,10 +601,17 @@ func createPOApprovalRequiredNotification(app core.App, purchaseOrderRecord *cor
 		return "", nil
 	}
 
-	return notifications.CreateNotificationWithUser(app, "po_approval_required", approverID, map[string]any{
-		"POId":      purchaseOrderRecord.Id,
-		"ActionURL": notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/edit", purchaseOrderRecord.Id)),
-	}, false, actorID)
+	return notifications.DispatchNotification(app, notifications.DispatchArgs{
+		TemplateCode: "po_approval_required",
+		RecipientUID: approverID,
+		Data: map[string]any{
+			"POId":      purchaseOrderRecord.Id,
+			"ActionURL": notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/edit", purchaseOrderRecord.Id)),
+		},
+		System:   false,
+		ActorUID: actorID,
+		Mode:     notifications.DeliveryDeferred,
+	})
 }
 
 // ProcessPurchaseOrder validates and cleans a purchase_order record before
