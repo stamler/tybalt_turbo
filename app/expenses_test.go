@@ -1838,8 +1838,81 @@ func TestExpensesRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	ownerToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approverToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const oneTimePOID = "2plsetqdxht7esg"
+	const expenseID = "2gq9uyxmkcyopa4"
+	closeOneTimePO := func(tb testing.TB, app *tests.TestApp) {
+		tb.Helper()
+		if _, err := app.NonconcurrentDB().NewQuery(`
+			UPDATE purchase_orders
+			SET status = 'Closed',
+			    closed = '2026-01-01 00:00:00.000Z'
+			WHERE id = {:id}
+		`).Bind(dbx.Params{"id": oneTimePOID}).Execute(); err != nil {
+			tb.Fatalf("failed to close one-time purchase order fixture: %v", err)
+		}
+	}
 
 	scenarios := []tests.ApiScenario{
+		{
+			Name:   "submit fails when expense references a closed purchase order",
+			Method: http.MethodPost,
+			URL:    "/api/expenses/" + expenseID + "/submit",
+			Headers: map[string]string{
+				"Authorization": ownerToken,
+			},
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"error":"purchase order is not active"`},
+			TestAppFactory:  testutils.SetupTestApp,
+			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				closeOneTimePO(tb, app)
+				if _, err := app.NonconcurrentDB().NewQuery(`
+					UPDATE expenses
+					SET purchase_order = {:purchase_order},
+					    submitted = 0,
+					    approved = '',
+					    committed = '',
+					    rejected = ''
+					WHERE id = {:id}
+				`).Bind(dbx.Params{"id": expenseID, "purchase_order": oneTimePOID}).Execute(); err != nil {
+					tb.Fatalf("failed preparing expense fixture for submit route test: %v", err)
+				}
+			},
+		},
+		{
+			Name:   "approve fails when expense references a closed purchase order",
+			Method: http.MethodPost,
+			URL:    "/api/expenses/" + expenseID + "/approve",
+			Headers: map[string]string{
+				"Authorization": approverToken,
+			},
+			ExpectedStatus:  400,
+			ExpectedContent: []string{`"error":"purchase order is not active"`},
+			TestAppFactory:  testutils.SetupTestApp,
+			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				closeOneTimePO(tb, app)
+				if _, err := app.NonconcurrentDB().NewQuery(`
+					UPDATE expenses
+					SET purchase_order = {:purchase_order},
+					    approver = 'f2j5a8vk006baub',
+					    submitted = 1,
+					    approved = '',
+					    committed = '',
+					    rejected = ''
+					WHERE id = {:id}
+				`).Bind(dbx.Params{"id": expenseID, "purchase_order": oneTimePOID}).Execute(); err != nil {
+					tb.Fatalf("failed preparing expense fixture for approve route test: %v", err)
+				}
+			},
+		},
 		{
 			Name:            "caller with the commit claim can commit approved expenses records",
 			Method:          http.MethodPost,

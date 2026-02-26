@@ -67,6 +67,14 @@ func createSubmitRecordHandler(app core.App, collectionName string) func(e *core
 				}
 			}
 
+			if poErr := validateExpensePurchaseOrderIsActive(txApp, record); poErr != nil {
+				httpResponseStatusCode = http.StatusBadRequest
+				if poErr.Code == "purchase_order_lookup_error" {
+					httpResponseStatusCode = http.StatusInternalServerError
+				}
+				return poErr
+			}
+
 			// Set submitted to true
 			record.Set("submitted", true)
 

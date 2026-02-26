@@ -76,6 +76,14 @@ func createApproveRecordHandler(app core.App, collectionName string) func(e *cor
 				}
 			}
 
+			if poErr := validateExpensePurchaseOrderIsActive(txApp, record); poErr != nil {
+				httpResponseStatusCode = http.StatusBadRequest
+				if poErr.Code == "purchase_order_lookup_error" {
+					httpResponseStatusCode = http.StatusInternalServerError
+				}
+				return poErr
+			}
+
 			// Set the approved timestamp
 			record.Set("approved", time.Now())
 
