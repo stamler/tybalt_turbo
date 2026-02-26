@@ -315,6 +315,32 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		// payroll and figure out how to calculate the total for imported expenses
 		// that don't have the total property set.
 
+	case "PersonalReimbursement":
+		uid := expenseRecord.GetString("uid")
+		adminProfile, apErr := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
+		if apErr != nil || adminProfile == nil {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning expense",
+				Data: map[string]errs.CodeError{
+					"uid": {Code: "profile_lookup_error", Message: "error looking up admin profile for personal reimbursement check"},
+				},
+			}
+		}
+
+		if !adminProfile.GetBool("allow_personal_reimbursement") {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "personal reimbursement not allowed",
+				Data: map[string]errs.CodeError{
+					"payment_type": {
+						Code:    "personal_reimbursement_not_allowed",
+						Message: "cannot submit personal reimbursement expense: personal reimbursement is not enabled for your profile",
+					},
+				},
+			}
+		}
+
 	case "Allowance":
 		expenseRateRecord, err := utilities.GetExpenseRateRecord(app, expenseRecord)
 		if err != nil {

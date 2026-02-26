@@ -24,6 +24,10 @@ func TestExpensesCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	disallowedPersonalReimbursementToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	app := testutils.SetupTestApp(t)
 	t.Cleanup(app.Cleanup)
@@ -755,6 +759,64 @@ func TestExpensesCreate(t *testing.T) {
 						t.Fatalf("failed to save admin_profile: %v", err)
 					}
 				},
+			}
+		}(),
+		func() tests.ApiScenario {
+			// Personal reimbursement should fail when the user's admin profile disallows it.
+			b, ct, err := makeMultipart(`{
+				"uid": "u_no_claims",
+				"date": "2025-01-10",
+				"division": "vccd5fo56ctbigh",
+				"description": "personal reimbursement with disallowed profile",
+				"payment_type": "PersonalReimbursement",
+				"total": 25,
+				"vendor": "2zqxtsmymf670ha"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "personal reimbursement fails when profile flag is false",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": disallowedPersonalReimbursementToken, "Content-Type": ct},
+				ExpectedStatus: 400,
+				ExpectedContent: []string{
+					`"code":"personal_reimbursement_not_allowed"`,
+					`cannot submit personal reimbursement expense: personal reimbursement is not enabled for your profile`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreateRequest": 1},
+				TestAppFactory: testutils.SetupTestApp,
+			}
+		}(),
+		func() tests.ApiScenario {
+			// Personal reimbursement should succeed when the user's admin profile allows it.
+			b, ct, err := makeMultipart(`{
+				"uid": "rzr98oadsp9qc11",
+				"date": "2025-01-10",
+				"division": "vccd5fo56ctbigh",
+				"description": "personal reimbursement with allowed profile",
+				"payment_type": "PersonalReimbursement",
+				"total": 25,
+				"vendor": "2zqxtsmymf670ha"
+			}`)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return tests.ApiScenario{
+				Name:           "personal reimbursement succeeds when profile flag is true",
+				Method:         http.MethodPost,
+				URL:            "/api/collections/expenses/records",
+				Body:           b,
+				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				ExpectedStatus: 200,
+				ExpectedContent: []string{
+					`"payment_type":"PersonalReimbursement"`,
+					`"total":25`,
+				},
+				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
+				TestAppFactory: testutils.SetupTestApp,
 			}
 		}(),
 
