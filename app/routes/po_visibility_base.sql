@@ -26,7 +26,7 @@
       priority second approver post-first-approval).
     - Policy-based second-stage visibility (eligible second approvers).
   - Actionability (pending queue) is intentionally narrower than visibility:
-    - Stage 1 assigned-first-approver path.
+    - Stage 1 assigned-first-approver path (including assigned approver self-bypass).
     - Stage 2 priority owner path.
     - Stage 2 fallback after timeout path.
 
@@ -273,7 +273,8 @@ SELECT
   -- Flag: Actionable "pending now" semantics.
   --
   -- This encodes queue ownership paths used by /pending:
-  --  1) Stage 1 assigned approver path (including first-stage pool partition rule).
+  --  1) Stage 1 assigned approver path (including first-stage pool partition rule
+  --     and assigned-approver self-bypass for dual-stage records).
   --  2) Stage 2 priority-second-approver exclusive path.
   --  3) Stage 2 fallback path after timeout.
   CASE
@@ -305,6 +306,13 @@ SELECT
                   cpl.second_approval_threshold > 0
                   AND po.approval_total > cpl.second_approval_threshold
                   AND cpl.resolved_limit <= cpl.second_approval_threshold
+                )
+                OR (
+                  -- Dual-stage assigned-approver self-bypass path.
+                  cpl.second_approval_threshold > 0
+                  AND po.approval_total > cpl.second_approval_threshold
+                  AND cpl.resolved_limit > cpl.second_approval_threshold
+                  AND cpl.resolved_limit >= po.approval_total
                 )
                 OR (
                   -- Single-stage case: threshold not triggered.

@@ -475,6 +475,19 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "pending endpoint includes assigned approver self-bypass for dual-stage records",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/pending",
+			Headers: map[string]string{
+				"Authorization": creatorToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"01897j210v01f69"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "visible endpoint uses kind-specific approval limit columns",
 			Method: http.MethodGet,
 			URL:    "/api/purchase_orders/visible/pocompkindvis01",
