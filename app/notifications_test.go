@@ -179,8 +179,8 @@ func TestSendNextPendingNotification_ErrorOnFetch(t *testing.T) {
 	// Verify we got an error
 	if err == nil {
 		t.Error("Expected an error when notification_templates table is missing, got nil")
-	} else if !strings.Contains(err.Error(), "error fetching pending notification") {
-		t.Errorf("Expected an error containing 'error fetching pending notification', got %v", err)
+	} else if !strings.Contains(err.Error(), "error fetching notification") {
+		t.Errorf("Expected an error containing 'error fetching notification', got %v", err)
 	}
 
 	// Verify remaining count matches initial count since the operation failed
@@ -470,6 +470,172 @@ func TestCreateNotification_SkipsWhenFeatureDisabled(t *testing.T) {
 	if err := notifications.CreateNotification(app, "timesheet_shared", userRow.UID, map[string]any{
 		"WeekEnding": "2026-02-14",
 	}, true); err != nil {
+		t.Fatalf("expected no error when disabled notification is skipped, got %v", err)
+	}
+
+	afterCount := countForTemplate("timesheet_shared")
+	if afterCount != beforeCount {
+		t.Fatalf("expected notification count to remain unchanged when feature is disabled, before=%d after=%d", beforeCount, afterCount)
+	}
+}
+
+// SendNotificationByID()
+
+// 1. sends a specific pending notification identified by record ID
+func TestSendNotificationByID_SendsTargetedNotification(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Get the first pending notification ID
+	var row struct {
+		ID string `db:"id"`
+	}
+	if err := app.DB().NewQuery("SELECT id FROM notifications WHERE status = 'pending' LIMIT 1").One(&row); err != nil {
+		t.Fatalf("failed to find pending notification: %v", err)
+	}
+
+	// Send just that notification
+	if err := notifications.SendNotificationByID(app, row.ID); err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Wait for async goroutine
+	time.Sleep(100 * time.Millisecond)
+
+	// Verify exactly one email was sent
+	if count := len(app.TestMailer.Messages()); count != 1 {
+		t.Errorf("expected 1 email sent, got %d", count)
+	}
+
+	// Verify the notification status transitioned out of pending
+	var status struct {
+		Status string `db:"status"`
+	}
+	if err := app.DB().NewQuery("SELECT status FROM notifications WHERE id = {:id}").Bind(dbx.Params{
+		"id": row.ID,
+	}).One(&status); err != nil {
+		t.Fatalf("failed to query notification status: %v", err)
+	}
+	if status.Status == "pending" {
+		t.Error("expected notification status to no longer be pending")
+	}
+}
+
+// 2. is a no-op for a non-existent notification ID
+func TestSendNotificationByID_NoOpForNonExistentID(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	if err := notifications.SendNotificationByID(app, "nonexistent_id_12345"); err != nil {
+		t.Fatalf("expected no error for non-existent ID, got %v", err)
+	}
+
+	time.Sleep(50 * time.Millisecond)
+
+	if count := len(app.TestMailer.Messages()); count != 0 {
+		t.Errorf("expected 0 emails sent for non-existent ID, got %d", count)
+	}
+}
+
+// CreateAndSendNotification()
+
+// 1. creates a notification record and immediately sends it
+func TestCreateAndSendNotification_CreatesAndSends(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	// Clear all existing pending notifications first
+	if _, err := notifications.SendNotifications(app); err != nil {
+		t.Fatalf("failed to clear pending notifications: %v", err)
+	}
+	time.Sleep(100 * time.Millisecond)
+	initialMessages := len(app.TestMailer.Messages())
+
+	// Find a user to send to
+	var userRow struct {
+		UID string `db:"uid"`
+	}
+	if err := app.DB().NewQuery(`SELECT id AS uid FROM users LIMIT 1`).One(&userRow); err != nil {
+		t.Fatalf("failed to find recipient user: %v", err)
+	}
+
+	// Create and send a notification
+	err := notifications.CreateAndSendNotification(app, "po_approval_required", userRow.UID, map[string]any{
+		"POId":      "test_po_id",
+		"ActionURL": "https://example.com/pos/test_po_id/edit",
+	}, false)
+	if err != nil {
+		t.Fatalf("expected no error, got %v", err)
+	}
+
+	// Wait for async send
+	time.Sleep(200 * time.Millisecond)
+
+	// Verify exactly one new email was sent
+	newMessages := len(app.TestMailer.Messages()) - initialMessages
+	if newMessages != 1 {
+		t.Errorf("expected 1 new email sent, got %d", newMessages)
+	}
+
+	// Verify notification record exists and is no longer pending
+	var result struct {
+		Count int64 `db:"count"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT COUNT(*) AS count
+		FROM notifications n
+		JOIN notification_templates t ON n.template = t.id
+		WHERE t.code = 'po_approval_required'
+		  AND n.recipient = {:uid}
+		  AND n.status != 'pending'
+	`).Bind(dbx.Params{
+		"uid": userRow.UID,
+	}).One(&result); err != nil {
+		t.Fatalf("failed to query notification: %v", err)
+	}
+	if result.Count == 0 {
+		t.Error("expected notification to be created and no longer pending")
+	}
+}
+
+// 2. skips send when feature is disabled
+func TestCreateAndSendNotification_SkipsWhenFeatureDisabled(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	upsertNotificationsConfigRawValue(t, app, `{"timesheet_shared":false}`)
+
+	var userRow struct {
+		UID string `db:"uid"`
+	}
+	if err := app.DB().NewQuery(`SELECT id AS uid FROM users LIMIT 1`).One(&userRow); err != nil {
+		t.Fatalf("failed to find recipient user: %v", err)
+	}
+
+	countForTemplate := func(code string) int64 {
+		var result struct {
+			Count int64 `db:"count"`
+		}
+		err := app.DB().NewQuery(`
+			SELECT COUNT(*) AS count
+			FROM notifications n
+			JOIN notification_templates t ON n.template = t.id
+			WHERE t.code = {:code}
+		`).Bind(dbx.Params{
+			"code": code,
+		}).One(&result)
+		if err != nil {
+			t.Fatalf("failed to count notifications for code %s: %v", code, err)
+		}
+		return result.Count
+	}
+
+	beforeCount := countForTemplate("timesheet_shared")
+
+	err := notifications.CreateAndSendNotification(app, "timesheet_shared", userRow.UID, map[string]any{
+		"WeekEnding": "2026-02-14",
+	}, true)
+	if err != nil {
 		t.Fatalf("expected no error when disabled notification is skipped, got %v", err)
 	}
 

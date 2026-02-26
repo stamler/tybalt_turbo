@@ -591,10 +591,14 @@ func shouldResetPurchaseOrderApprovals(record *core.Record) bool {
 	return purchaseOrderHasMeaningfulChanges(record)
 }
 
-func sendPOApprovalRequiredNotification(app core.App, purchaseOrderRecord *core.Record, actorID string) error {
+// createPOApprovalRequiredNotification creates a notification record for the
+// approver but does NOT send it immediately. It returns the notification ID so
+// the caller can trigger the send after the PO save succeeds (avoiding
+// premature email delivery if the save pipeline fails).
+func createPOApprovalRequiredNotification(app core.App, purchaseOrderRecord *core.Record, actorID string) (string, error) {
 	approverID := strings.TrimSpace(purchaseOrderRecord.GetString("approver"))
 	if approverID == "" {
-		return nil
+		return "", nil
 	}
 
 	return notifications.CreateNotificationWithUser(app, "po_approval_required", approverID, map[string]any{
@@ -603,14 +607,14 @@ func sendPOApprovalRequiredNotification(app core.App, purchaseOrderRecord *core.
 	}, false, actorID)
 }
 
-// The ProcessPurchaseOrder function is used to validate the purchase_order
-// record before it is created or updated. A lot of the work is done by
-// PocketBase itself so this is for cross-field validation. If the
-// purchase_order record is invalid this function throws an error explaining
-// which field(s) are invalid and why.
-func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
+// ProcessPurchaseOrder validates and cleans a purchase_order record before
+// create or update. It returns the notification ID of a pending approval
+// notification (if one was created) so the caller can trigger the send after
+// the save pipeline succeeds. The notification record is created here (so it
+// can reference the PO ID), but actual email delivery must be deferred.
+func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) (notificationID string, err error) {
 	if err := checkExpensesEditing(app); err != nil {
-		return err
+		return "", err
 	}
 
 	record := e.Record
@@ -620,7 +624,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	// If the uid property is not equal to the authenticated user's uid, return an
 	// error.
 	if record.GetString("uid") != authRecord.Id {
-		return &errs.HookError{
+		return "", &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "hook error when validating uid",
 			Data: map[string]errs.CodeError{
@@ -636,7 +640,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	// requests. Transitioning to Active/Cancelled/Closed is only allowed via the
 	// dedicated action endpoints.
 	if record.GetString("status") != "Unapproved" {
-		return &errs.HookError{
+		return "", &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "hook error when validating status",
 			Data: map[string]errs.CodeError{
@@ -654,7 +658,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	// set properties to nil if they are not allowed to be set based on the type
 	cleanErr := cleanPurchaseOrder(app, record)
 	if cleanErr != nil {
-		return cleanErr
+		return "", cleanErr
 	}
 
 	if shouldResetApprovals {
@@ -671,7 +675,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 	// file and set the attachment_hash property on the record
 	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")
 	if hashErr != nil {
-		return hashErr
+		return "", hashErr
 	}
 	if attachmentHash != "" {
 		// New file uploaded - check for duplicate before setting hash
@@ -681,7 +685,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 			"id":   record.Id,
 		})
 		if existingPO != nil {
-			return &errs.HookError{
+			return "", &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "duplicate attachment detected",
 				Data: map[string]errs.CodeError{
@@ -702,17 +706,20 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 
 	if err := ensureActiveDivision(app, record.GetString("division"), "division"); err != nil {
 		if ve, ok := err.(validation.Errors); ok {
-			return apis.NewBadRequestError("Validation error", ve)
+			return "", apis.NewBadRequestError("Validation error", ve)
 		}
-		return err
+		return "", err
 	}
 
 	// validate the purchase_order record
 	if validationErr := validatePurchaseOrder(app, record); validationErr != nil {
-		return validationErr
+		return "", validationErr
 	}
 
-	// If this is a new record, send a notification to the approver
+	// If this is a new record, create a notification for the approver.
+	// The notification record is created now (so it can reference the PO ID),
+	// but the caller is responsible for triggering the send after the save
+	// pipeline completes successfully.
 	if record.IsNew() {
 
 		// Generate a new id for the record here so that the notification can
@@ -721,15 +728,19 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) error {
 		// https://pocketbase.io/docs/collections/#textfield
 		record.Set("id:autogenerate", "")
 
-		if err := sendPOApprovalRequiredNotification(app, record, authRecord.Id); err != nil {
-			return err
+		nid, err := createPOApprovalRequiredNotification(app, record, authRecord.Id)
+		if err != nil {
+			return "", err
 		}
+		return nid, nil
 	}
 	if shouldResetApprovals {
-		if err := sendPOApprovalRequiredNotification(app, record, authRecord.Id); err != nil {
-			return err
+		nid, err := createPOApprovalRequiredNotification(app, record, authRecord.Id)
+		if err != nil {
+			return "", err
 		}
+		return nid, nil
 	}
 
-	return nil
+	return "", nil
 }

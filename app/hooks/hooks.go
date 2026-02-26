@@ -1,6 +1,7 @@
 package hooks
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"net/http"
@@ -22,6 +23,53 @@ func AnnotateHookError(app core.App, e *core.RecordRequestEvent, err error) erro
 		e.JSON(hookErr.Status, hookErr)
 	}
 	return err
+}
+
+// sendNotificationAfterSave triggers immediate delivery of a notification that
+// was created during a pre-save hook. It is a no-op when notificationID is
+// empty (no notification was created). Send errors are logged but not returned
+// so that the already-persisted save is not rolled back.
+func sendNotificationAfterSave(app core.App, notificationID string) {
+	if notificationID == "" {
+		return
+	}
+	if err := notifications.SendNotificationByID(app, notificationID); err != nil {
+		app.Logger().Error(
+			"failed to send notification after save",
+			"notification_id", notificationID,
+			"error", err,
+		)
+	}
+}
+
+// deleteOrphanedNotification removes a notification record that was created
+// during a pre-save hook whose save pipeline subsequently failed. Without this
+// cleanup the orphaned row would sit in "pending" status and eventually be
+// delivered by the cron for a PO write that never persisted.
+func deleteOrphanedNotification(app core.App, notificationID string) {
+	if notificationID == "" {
+		return
+	}
+	record, err := app.FindRecordById("notifications", notificationID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// Already gone or never created — nothing to clean up.
+			return
+		}
+		app.Logger().Error(
+			"failed to find orphaned notification for cleanup, may be delivered by cron",
+			"notification_id", notificationID,
+			"error", err,
+		)
+		return
+	}
+	if err := app.Delete(record); err != nil {
+		app.Logger().Error(
+			"failed to delete orphaned notification after save failure",
+			"notification_id", notificationID,
+			"error", err,
+		)
+	}
 }
 
 // This file exports the hooks that are available to the PocketBase application.
@@ -123,16 +171,28 @@ func AddHooks(app core.App) {
 	})
 	// hooks for purchase_orders model
 	app.OnRecordCreateRequest("purchase_orders").BindFunc(func(e *core.RecordRequestEvent) error {
-		if err := ProcessPurchaseOrder(app, e); err != nil {
+		nid, err := ProcessPurchaseOrder(app, e)
+		if err != nil {
 			return AnnotateHookError(app, e, err)
 		}
-		return e.Next()
+		if err := e.Next(); err != nil {
+			deleteOrphanedNotification(app, nid)
+			return err
+		}
+		sendNotificationAfterSave(app, nid)
+		return nil
 	})
 	app.OnRecordUpdateRequest("purchase_orders").BindFunc(func(e *core.RecordRequestEvent) error {
-		if err := ProcessPurchaseOrder(app, e); err != nil {
+		nid, err := ProcessPurchaseOrder(app, e)
+		if err != nil {
 			return AnnotateHookError(app, e, err)
 		}
-		return e.Next()
+		if err := e.Next(); err != nil {
+			deleteOrphanedNotification(app, nid)
+			return err
+		}
+		sendNotificationAfterSave(app, nid)
+		return nil
 	})
 	// hooks for jobs model
 	app.OnRecordCreateRequest("jobs").BindFunc(func(e *core.RecordRequestEvent) error {

@@ -461,7 +461,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			// priority_second_approver alerting them that they need to approve the PO
 			// and have an exclusive window to do so before it is available for approval
 			// by all qualified approvers.
-			err := notifications.CreateNotificationWithUser(app, "po_priority_second_approval_required", updatedPO.GetString("priority_second_approver"), map[string]any{
+			err := notifications.CreateAndSendNotificationWithUser(app, "po_priority_second_approval_required", updatedPO.GetString("priority_second_approver"), map[string]any{
 				"POId":          updatedPO.Id,
 				"POCreatorName": creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
 				"ActionURL":     notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/edit", updatedPO.Id)),
@@ -475,7 +475,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 			// know that it has been approved), send a message to the creator
 			// alerting them that the PO has been approved and is available for
 			// use.
-			err := notifications.CreateNotificationWithUser(app, "po_active", updatedPO.GetString("uid"), map[string]any{
+			err := notifications.CreateAndSendNotificationWithUser(app, "po_active", updatedPO.GetString("uid"), map[string]any{
 				"POId":           updatedPO.Id,
 				"PONumber":       updatedPO.GetString("po_number"),
 				"POCreatorName":  creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
@@ -790,7 +790,7 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 		}
 
 		// Send notification to the creator (uid)
-		if err := notifications.CreateNotificationWithUser(app, "po_rejected", updatedPO.GetString("uid"), map[string]any{
+		if err := notifications.CreateAndSendNotificationWithUser(app, "po_rejected", updatedPO.GetString("uid"), map[string]any{
 			"POId":            updatedPO.Id,
 			"POUrl":           fmt.Sprintf("/pos/%s/details", updatedPO.Id),
 			"PONumber":        updatedPO.GetString("po_number"),

@@ -75,69 +75,45 @@ func WriteStatusUpdated(app core.App, e *core.RecordEvent) error {
 	return nil
 }
 
-// updateNotificationStatus handles updating the notification status after sending
+// updateNotificationStatus handles updating the notification status after sending.
+// It uses NonconcurrentDB() with raw SQL to avoid PocketBase hook side-effects
+// (this runs in an async goroutine and must not trigger model/record events) while
+// still using the serialized writer that prevents "database is locked" errors.
 func updateNotificationStatus(app core.App, notification Notification, sendErr error) {
-	// Get the notification record. We must do this rather than running UPDATE
-	// directly in an SQL statement because we depend on PocketBase's writer to
-	// handle locking and busy-waiting. A previous version used update and was
-	// causing race conditions (database was locked for writing during another
-	// update). This could probably also be solved with a mutex for notification
-	// status updates, or by using the UPDATEs but leveraging the
-	// NonconcurrentDB() rather than DB() to avoid the writer lock.
-	record, err := app.FindRecordById("notifications", notification.Id)
-	if err != nil {
-		app.Logger().Error(
-			"Failed to find notification record",
-			"notification_id", notification.Id,
-			"error", err,
-		)
-		return
-	}
-
-	// Update the status and error fields
+	status := "sent"
+	errMsg := ""
 	if sendErr != nil {
-		record.Set("status", "error")
-		record.Set("error", sendErr.Error())
-	} else {
-		record.Set("status", "sent")
-		record.Set("error", "")
+		status = "error"
+		errMsg = sendErr.Error()
 	}
 
-	// Save the record back to the database
-	if err := app.Save(record); err != nil {
+	if _, err := app.NonconcurrentDB().NewQuery(
+		"UPDATE notifications SET status = {:status}, error = {:error}, status_updated = {:status_updated} WHERE id = {:id}",
+	).Bind(dbx.Params{
+		"status":         status,
+		"error":          errMsg,
+		"status_updated": time.Now().UTC().Format("2006-01-02 15:04:05.000Z"),
+		"id":             notification.Id,
+	}).Execute(); err != nil {
 		app.Logger().Error(
 			"Failed to update notification status",
 			"notification_id", notification.Id,
-			"intended_status", map[bool]string{true: "error", false: "sent"}[sendErr != nil],
+			"intended_status", status,
 			"error", err,
 		)
 	}
 }
 
-// SendNextPendingNotification will send the next pending notification from the
-// notifications collection in a transaction. For now, the notification_type
-// will be always be "email_text" so we'll just use the text_email field of the
-// notification_templates collection as the body template of the email.
-func SendNextPendingNotification(app core.App) (remaining int64, err error) {
-	// fast return if there are no pending notifications
-	type CountResult struct {
-		Count int64 `db:"count"`
-	}
-	var countResult CountResult
-	err = app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&countResult)
-	if err != nil {
-		// report error while counting pending notifications
-		return 0, fmt.Errorf("error counting pending notifications: %v", err)
-	}
-	if countResult.Count == 0 {
-		return 0, nil
-	}
-
+// sendNotificationByID fetches a single pending notification by ID, renders its
+// template, transitions it to inflight inside a transaction, and sends the email
+// asynchronously in a goroutine. It is the shared workhorse used by both
+// SendNextPendingNotification (which picks the next pending row) and
+// SendNotificationByID (which targets a specific row).
+func sendNotificationByID(app core.App, notificationID string) error {
 	notification := Notification{}
 	message := &mailer.Message{}
-	err = app.RunInTransaction(func(txApp core.App) error {
-		// get all notifications that are pending
-		err := txApp.DB().NewQuery(`SELECT 
+	err := app.RunInTransaction(func(txApp core.App) error {
+		err := txApp.DB().NewQuery(`SELECT
 				n.*,
 				(r_profile.given_name || ' ' || r_profile.surname) AS recipient_name,
 				u.email,
@@ -151,22 +127,21 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 			LEFT JOIN profiles u_profile ON n.user = u_profile.uid
 			LEFT JOIN notification_templates nt ON n.template = nt.id
 			LEFT JOIN users u ON n.recipient = u.id
-			WHERE n.status = 'pending'
-			LIMIT 1`).One(&notification)
+			WHERE n.id = {:id}
+			  AND n.status = 'pending'`).Bind(dbx.Params{
+			"id": notificationID,
+		}).One(&notification)
 		if err != nil {
-			// if the error is that there are no more pending notifications, return nil
 			if err == sql.ErrNoRows {
 				return nil
 			}
-			return fmt.Errorf("error fetching pending notification: %v", err)
+			return fmt.Errorf("error fetching notification %s: %v", notificationID, err)
 		}
 
 		// unmarshal the json data if it exists
 		if len(notification.Data) > 0 {
 			err = json.Unmarshal(notification.Data, &notification.parsedData)
 			if err != nil {
-				// NOTE: Decide how to handle invalid JSON. Log and continue? Error out?
-				// Here, we'll log and error out the transaction.
 				app.Logger().Error(
 					"Failed to unmarshal notification data",
 					"notification_id", notification.Id,
@@ -191,7 +166,7 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 			"NotificationType":   notification.NotificationType,
 			"UserName":           notification.UserName,
 			"Subject":            notification.Subject,
-			"Template":           notification.Template, // Include template itself if needed
+			"Template":           notification.Template,
 			"Status":             notification.Status,
 			"StatusUpdated":      notification.StatusUpdated,
 			"Error":              notification.Error,
@@ -206,7 +181,7 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 
 		// execute the text template
 		var text bytes.Buffer
-		err = textTemplate.Execute(&text, templateData) // Use the combined map
+		err = textTemplate.Execute(&text, templateData)
 		if err != nil {
 			return fmt.Errorf("error executing text template for notification %s: %s", notification.Id, err)
 		}
@@ -223,7 +198,12 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 		}
 
 		// update the notification status to inflight
-		_, err = txApp.NonconcurrentDB().NewQuery(fmt.Sprintf("UPDATE notifications SET status = 'inflight' WHERE id = '%s'", notification.Id)).Execute()
+		_, err = txApp.NonconcurrentDB().NewQuery(
+			"UPDATE notifications SET status = 'inflight', status_updated = {:status_updated} WHERE id = {:id}",
+		).Bind(dbx.Params{
+			"status_updated": time.Now().UTC().Format("2006-01-02 15:04:05.000Z"),
+			"id":             notification.Id,
+		}).Execute()
 		if err != nil {
 			return fmt.Errorf("error updating notification status to inflight: %v", err)
 		}
@@ -232,27 +212,83 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 	})
 
 	if err != nil {
-		// return the total number of pending notifications, which won't change due
-		// to the error since any error from the transaction will result in the
-		// status change to 'inflight' being rolled back
+		return err
+	}
+
+	// If the notification was found and processed, send the email asynchronously.
+	// notification.Id is empty when the query returned sql.ErrNoRows (already
+	// sent or does not exist), so we skip silently.
+	if notification.Id != "" {
+		go func(app core.App, message *mailer.Message, notification Notification) {
+			// Recover from panics that can occur when the app shuts down
+			// (or a test cleans up) while this goroutine is still running.
+			defer func() {
+				if r := recover(); r != nil {
+					// Best-effort log; the logger itself may be torn down.
+					app.Logger().Error(
+						"recovered from panic while sending notification email",
+						"notification_id", notification.Id,
+						"panic", fmt.Sprintf("%v", r),
+					)
+				}
+			}()
+			err := app.NewMailClient().Send(message)
+			if err != nil {
+				app.Logger().Error(
+					"Failed to send notification email",
+					"notification_id", notification.Id,
+					"error", err,
+				)
+			}
+			updateNotificationStatus(app, notification, err)
+		}(app, message, notification)
+	}
+
+	return nil
+}
+
+// SendNotificationByID sends a single pending notification identified by its
+// record ID. It is safe to call even if the notification has already been sent
+// (the call is a no-op in that case).
+func SendNotificationByID(app core.App, notificationID string) error {
+	return sendNotificationByID(app, notificationID)
+}
+
+// SendNextPendingNotification will send the next pending notification from the
+// notifications collection in a transaction. For now, the notification_type
+// will be always be "email_text" so we'll just use the text_email field of the
+// notification_templates collection as the body template of the email.
+func SendNextPendingNotification(app core.App) (remaining int64, err error) {
+	// fast return if there are no pending notifications
+	type CountResult struct {
+		Count int64 `db:"count"`
+	}
+	var countResult CountResult
+	err = app.DB().NewQuery("SELECT COUNT(*) AS count FROM notifications WHERE status = 'pending'").One(&countResult)
+	if err != nil {
+		return 0, fmt.Errorf("error counting pending notifications: %v", err)
+	}
+	if countResult.Count == 0 {
+		return 0, nil
+	}
+
+	// Find the next pending notification ID.
+	type IDResult struct {
+		ID string `db:"id"`
+	}
+	var idResult IDResult
+	err = app.DB().NewQuery("SELECT id FROM notifications WHERE status = 'pending' LIMIT 1").One(&idResult)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return 0, nil
+		}
+		return countResult.Count, fmt.Errorf("error finding next pending notification: %v", err)
+	}
+
+	if err := sendNotificationByID(app, idResult.ID); err != nil {
 		return countResult.Count, err
 	}
 
-	// sending the email is now non-blocking. We launch it in a goroutine and
-	// update the status once it completes
-	go func(app core.App, message *mailer.Message, notification Notification) {
-		err := app.NewMailClient().Send(message)
-		if err != nil {
-			app.Logger().Error(
-				"Failed to send notification email",
-				"notification_id", notification.Id,
-				"error", err,
-			)
-		}
-		updateNotificationStatus(app, notification, err)
-	}(app, message, notification)
-
-	// return immediately with the decremented count since we've taken one notification
 	return countResult.Count - 1, nil
 }
 
@@ -277,25 +313,69 @@ func SendNotifications(app core.App) (int64, error) {
 	return sentCount, nil
 }
 
-// CreateNotification creates a notification record with the given template code, recipient, and optional data
+// CreateNotification creates a notification record with the given template code,
+// recipient, and optional data. The notification is left in pending status for
+// later delivery by a cron job or explicit SendNotifications call.
 func CreateNotification(app core.App, templateCode string, recipientUID string, data map[string]any, system bool) error {
 	_, err := createNotificationWithUser(app, templateCode, recipientUID, data, system, "")
 	return err
 }
 
-// CreateNotificationWithUser creates a notification record with the given template code,
-// recipient, optional data, system flag, and optional actor user ID.
-func CreateNotificationWithUser(app core.App, templateCode string, recipientUID string, data map[string]any, system bool, actorUID string) error {
-	_, err := createNotificationWithUser(app, templateCode, recipientUID, data, system, actorUID)
-	return err
+// CreateNotificationWithUser creates a notification record with the given
+// template code, recipient, optional data, system flag, and optional actor user
+// ID. The notification is left in pending status. Returns the notification
+// record ID on success (empty string when skipped because the feature is
+// disabled).
+func CreateNotificationWithUser(app core.App, templateCode string, recipientUID string, data map[string]any, system bool, actorUID string) (string, error) {
+	return createNotificationWithUser(app, templateCode, recipientUID, data, system, actorUID)
 }
 
-func createNotificationWithUser(app core.App, templateCode string, recipientUID string, data map[string]any, system bool, actorUID string) (bool, error) {
+// CreateAndSendNotification creates a notification and immediately sends it.
+// The send is asynchronous (fire-and-forget goroutine) so the caller is never
+// blocked by email delivery. If the notification feature is disabled or the
+// record cannot be created, the error is returned before any send attempt.
+func CreateAndSendNotification(app core.App, templateCode string, recipientUID string, data map[string]any, system bool) error {
+	return CreateAndSendNotificationWithUser(app, templateCode, recipientUID, data, system, "")
+}
+
+// CreateAndSendNotificationWithUser creates a notification and immediately
+// sends it. The record creation and template rendering are synchronous but the
+// actual email delivery happens asynchronously in a background goroutine, so
+// the caller is never blocked by SMTP.
+func CreateAndSendNotificationWithUser(app core.App, templateCode string, recipientUID string, data map[string]any, system bool, actorUID string) error {
+	notificationID, err := createNotificationWithUser(app, templateCode, recipientUID, data, system, actorUID)
+	if err != nil {
+		return err
+	}
+	if notificationID == "" {
+		// Notification was skipped (feature disabled or config error).
+		return nil
+	}
+	// sendNotificationByID runs the DB transaction synchronously (fast) and
+	// spawns a goroutine only for the actual SMTP send, so we call it inline.
+	if err := sendNotificationByID(app, notificationID); err != nil {
+		app.Logger().Error(
+			"failed to send notification immediately after creation",
+			"notification_id", notificationID,
+			"template_code", templateCode,
+			"error", err,
+		)
+		// The notification was still created; log the send error but don't
+		// propagate it so that the business operation (PO creation, etc.)
+		// is not blocked by email delivery failures.
+	}
+	return nil
+}
+
+// createNotificationWithUser is the internal implementation shared by all Create
+// variants. It returns the notification record ID on success (empty string when
+// the notification was skipped because the feature is disabled).
+func createNotificationWithUser(app core.App, templateCode string, recipientUID string, data map[string]any, system bool, actorUID string) (string, error) {
 	enabled, err := utilities.IsNotificationFeatureEnabled(app, templateCode)
 	if err != nil {
 		// Intentionally fail closed for notification features:
 		// if config cannot be read (for example DB/query error), we skip notification
-		// creation and return (created=false, err=nil). This keeps business workflows
+		// creation and return (id="", err=nil). This keeps business workflows
 		// non-blocking (PO approval/rejection, etc.) while ensuring we never send a
 		// notification unless explicitly enabled.
 		//
@@ -306,7 +386,7 @@ func createNotificationWithUser(app core.App, templateCode string, recipientUID 
 			"template_code", templateCode,
 			"error", err,
 		)
-		return false, nil
+		return "", nil
 	}
 	if !enabled {
 		app.Logger().Info(
@@ -314,7 +394,7 @@ func createNotificationWithUser(app core.App, templateCode string, recipientUID 
 			"template_code", templateCode,
 			"recipient_uid", recipientUID,
 		)
-		return false, nil
+		return "", nil
 	}
 
 	notificationCollection, err := app.FindCollectionByNameOrId("notifications")
@@ -323,7 +403,7 @@ func createNotificationWithUser(app core.App, templateCode string, recipientUID 
 			"error finding notifications collection",
 			"error", err,
 		)
-		return false, fmt.Errorf("error finding notifications collection: %v", err)
+		return "", fmt.Errorf("error finding notifications collection: %v", err)
 	}
 
 	notificationTemplate, err := app.FindFirstRecordByFilter("notification_templates", "code = {:code}", dbx.Params{
@@ -335,7 +415,7 @@ func createNotificationWithUser(app core.App, templateCode string, recipientUID 
 			"template_code", templateCode,
 			"error", err,
 		)
-		return false, fmt.Errorf("error finding notification template %s: %v", templateCode, err)
+		return "", fmt.Errorf("error finding notification template %s: %v", templateCode, err)
 	}
 
 	notificationRecord := core.NewRecord(notificationCollection)
@@ -357,7 +437,7 @@ func createNotificationWithUser(app core.App, templateCode string, recipientUID 
 				"error marshaling notification data",
 				"error", err,
 			)
-			return false, fmt.Errorf("error marshaling notification data: %v", err)
+			return "", fmt.Errorf("error marshaling notification data: %v", err)
 		}
 		notificationRecord.Set("data", string(dataJSON))
 	}
@@ -370,10 +450,10 @@ func createNotificationWithUser(app core.App, templateCode string, recipientUID 
 			"recipient_uid", recipientUID,
 			"error", err,
 		)
-		return false, fmt.Errorf("error saving notification: %v", err)
+		return "", fmt.Errorf("error saving notification: %v", err)
 	}
 
-	return true, nil
+	return notificationRecord.Id, nil
 }
 
 // QueueSecondApproverNotifications will create a notification for each user (id
@@ -400,7 +480,7 @@ func QueuePoSecondApproverNotifications(app core.App, send bool) error {
 	createdCount := 0
 	for _, record := range records {
 		recipientID := record.GetString("id")
-		created, err := createNotificationWithUser(app, "po_second_approval_required", recipientID, map[string]any{
+		notificationID, err := createNotificationWithUser(app, "po_second_approval_required", recipientID, map[string]any{
 			"ActionURL": BuildActionURL(app, "/pos/list"),
 		}, true, "")
 		if err != nil {
@@ -411,7 +491,7 @@ func QueuePoSecondApproverNotifications(app core.App, send bool) error {
 			)
 			return fmt.Errorf("error saving second approval notification: %v", err)
 		}
-		if created {
+		if notificationID != "" {
 			createdCount++
 		}
 	}
@@ -538,7 +618,7 @@ func QueueTimesheetSubmissionRemindersForWeek(app core.App, weekEnding string, s
 			"WeekEnding": weekEnding,
 			"ActionURL":  BuildActionURL(app, "/time/entries/list"),
 		}
-		created, err := createNotificationWithUser(app, "timesheet_submission_reminder", user.UID, data, true, "")
+		notificationID, err := createNotificationWithUser(app, "timesheet_submission_reminder", user.UID, data, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating timesheet submission reminder",
@@ -548,7 +628,7 @@ func QueueTimesheetSubmissionRemindersForWeek(app core.App, weekEnding string, s
 			// Continue with other users even if one fails
 			continue
 		}
-		if !created {
+		if notificationID == "" {
 			continue
 		}
 		createdCount++
@@ -645,7 +725,7 @@ func QueueTimesheetApprovalReminders(app core.App, send bool) error {
 			continue
 		}
 
-		created, err := createNotificationWithUser(app, "timesheet_approval_reminder", manager.ManagerUID, map[string]any{
+		notificationID, err := createNotificationWithUser(app, "timesheet_approval_reminder", manager.ManagerUID, map[string]any{
 			"ActionURL": BuildActionURL(app, "/time/sheets/pending"),
 		}, true, "")
 		if err != nil {
@@ -657,7 +737,7 @@ func QueueTimesheetApprovalReminders(app core.App, send bool) error {
 			// Continue with other managers even if one fails
 			continue
 		}
-		if !created {
+		if notificationID == "" {
 			continue
 		}
 		createdCount++
@@ -753,7 +833,7 @@ func QueueExpenseApprovalReminders(app core.App, send bool) error {
 			continue
 		}
 
-		created, err := createNotificationWithUser(app, "expense_approval_reminder", manager.ManagerUID, map[string]any{
+		notificationID, err := createNotificationWithUser(app, "expense_approval_reminder", manager.ManagerUID, map[string]any{
 			"ActionURL": BuildActionURL(app, "/expenses/pending"),
 		}, true, "")
 		if err != nil {
@@ -765,7 +845,7 @@ func QueueExpenseApprovalReminders(app core.App, send bool) error {
 			// Continue with other managers even if one fails
 			continue
 		}
-		if !created {
+		if notificationID == "" {
 			continue
 		}
 		createdCount++
@@ -845,10 +925,10 @@ func QueueTimesheetRejectedNotifications(app core.App, timesheet *core.Record, r
 		recipients = append(recipients, managerUID)
 	}
 
-	// Create notifications for each recipient
+	// Create and immediately send notifications for each recipient
 	createdCount := 0
 	for _, recipientUID := range recipients {
-		created, err := createNotificationWithUser(app, "timesheet_rejected", recipientUID, data, true, "")
+		notificationID, err := createNotificationWithUser(app, "timesheet_rejected", recipientUID, data, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating timesheet rejection notification",
@@ -858,13 +938,21 @@ func QueueTimesheetRejectedNotifications(app core.App, timesheet *core.Record, r
 			// Continue with other recipients even if one fails
 			continue
 		}
-		if created {
-			createdCount++
+		if notificationID == "" {
+			continue
+		}
+		createdCount++
+		if err := sendNotificationByID(app, notificationID); err != nil {
+			app.Logger().Error(
+				"failed to send timesheet rejection notification immediately after creation",
+				"notification_id", notificationID,
+				"error", err,
+			)
 		}
 	}
 
 	app.Logger().Info(
-		"queued timesheet rejection notifications",
+		"created timesheet rejection notifications",
 		"timesheet_id", timesheet.Id,
 		"created_count", createdCount,
 		"recipient_count", len(recipients),
@@ -933,10 +1021,10 @@ func QueueExpenseRejectedNotifications(app core.App, expense *core.Record, rejec
 		recipients = append(recipients, managerUID)
 	}
 
-	// Create notifications for each recipient
+	// Create and immediately send notifications for each recipient
 	createdCount := 0
 	for _, recipientUID := range recipients {
-		created, err := createNotificationWithUser(app, "expense_rejected", recipientUID, data, true, "")
+		notificationID, err := createNotificationWithUser(app, "expense_rejected", recipientUID, data, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating expense rejection notification",
@@ -946,13 +1034,21 @@ func QueueExpenseRejectedNotifications(app core.App, expense *core.Record, rejec
 			// Continue with other recipients even if one fails
 			continue
 		}
-		if created {
-			createdCount++
+		if notificationID == "" {
+			continue
+		}
+		createdCount++
+		if err := sendNotificationByID(app, notificationID); err != nil {
+			app.Logger().Error(
+				"failed to send expense rejection notification immediately after creation",
+				"notification_id", notificationID,
+				"error", err,
+			)
 		}
 	}
 
 	app.Logger().Info(
-		"queued expense rejection notifications",
+		"created expense rejection notifications",
 		"expense_id", expense.Id,
 		"created_count", createdCount,
 		"recipient_count", len(recipients),
@@ -1006,10 +1102,10 @@ func QueueTimesheetSharedNotifications(app core.App, timesheet *core.Record, sha
 		"ActionURL":    BuildActionURL(app, fmt.Sprintf("/time/sheets/%s/details", timesheet.Id)),
 	}
 
-	// Create notifications for each new viewer
+	// Create and immediately send notifications for each new viewer
 	createdCount := 0
 	for _, viewerUID := range newViewerUIDs {
-		created, err := createNotificationWithUser(app, "timesheet_shared", viewerUID, data, true, "")
+		notificationID, err := createNotificationWithUser(app, "timesheet_shared", viewerUID, data, true, "")
 		if err != nil {
 			app.Logger().Error(
 				"error creating timesheet shared notification",
@@ -1019,14 +1115,21 @@ func QueueTimesheetSharedNotifications(app core.App, timesheet *core.Record, sha
 			// Continue with other viewers even if one fails
 			continue
 		}
-		if !created {
+		if notificationID == "" {
 			continue
 		}
 		createdCount++
+		if err := sendNotificationByID(app, notificationID); err != nil {
+			app.Logger().Error(
+				"failed to send timesheet shared notification immediately after creation",
+				"notification_id", notificationID,
+				"error", err,
+			)
+		}
 	}
 
 	app.Logger().Info(
-		"queued timesheet shared notifications",
+		"created timesheet shared notifications",
 		"timesheet_id", timesheet.Id,
 		"created_count", createdCount,
 	)

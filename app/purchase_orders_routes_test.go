@@ -800,8 +800,9 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-		/*
-		   This test verifies an important aspect of the rejection authorization model:
+		/* Test: regular approver can reject PO awaiting second approval
+
+		   This test verifies
 		   that rejection permissions are intentionally simpler than approval permissions.
 
 		   Specifically, it verifies that any user with basic approval rights (po_approver)
