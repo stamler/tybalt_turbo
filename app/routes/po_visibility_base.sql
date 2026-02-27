@@ -213,12 +213,14 @@ SELECT
 
   -- Flag: Direct unapproved visibility (no policy pool computation required).
   -- Creators can always see their own unapproved records, including rejected
-  -- ones, so they can review rejection context and resubmit.
+  -- ones, so they can review rejection context and resubmit. Rejectors can
+  -- also see rejected records they acted on.
   CASE
     WHEN
       po.status = 'Unapproved'
       AND (
         po.uid = {:userId}
+        OR (po.rejected != '' AND po.rejector = {:userId})
         OR (
           po.rejected = ''
           AND (
