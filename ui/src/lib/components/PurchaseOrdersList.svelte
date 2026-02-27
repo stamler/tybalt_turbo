@@ -26,6 +26,8 @@
     realtime_source?: "visible" | "pending";
   }
 
+  const collectionId = "purchase_orders";
+
   let rejectModal: RejectModal;
 
   // Load the initial data
@@ -321,7 +323,7 @@
       {/if}
       {#if item.attachment}
         <a
-          href={`${PUBLIC_POCKETBASE_URL}/api/files/${item.collectionId}/${item.id}/${item.attachment}`}
+          href={`${PUBLIC_POCKETBASE_URL}/api/files/${collectionId}/${item.id}/${item.attachment}`}
           target="_blank"
         >
           <DsFileLink filename={item.attachment as string} />
