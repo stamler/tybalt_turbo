@@ -283,7 +283,10 @@ The `visible` endpoints use broader read semantics than `pending`:
 - `Active`: visible to any authenticated user
 - `Cancelled`/`Closed`: visible to creator, approvers, and `report` claim holders
 - `Unapproved`:
-  - direct visibility: creator, assigned first approver (pre-first-approval), priority second approver (post-first-approval)
+  - direct visibility:
+    - creator (including rejected)
+    - rejector for rejected records
+    - for non-rejected records: assigned first approver (pre/post first approval) and priority second approver (post-first-approval)
   - plus policy-based second-stage visibility for eligible second-stage approvers on first-approved/not-second-approved records (not timeout-gated)
 
 `GET /api/purchase_orders/visible` supports `scope`:
@@ -603,10 +606,10 @@ Current known mismatches:
 - `visible*` route behavior: eligible non-priority second-stage approvers can view first-approved, not-second-approved POs (not timeout-gated).
 - PocketBase collection rule behavior: direct-only for unapproved records; non-priority second-stage users do not get this broader read path.
 
-3. Rejected unapproved PO visibility for assigned approver
+3. Rejected unapproved PO visibility semantics differ
 
-- `visible*` route behavior: creator can see rejected unapproved POs; non-creator direct approver visibility is gated by `rejected = ''`.
-- PocketBase collection rule behavior: no explicit rejected guard in unapproved direct path, so assigned approver visibility can differ.
+- `visible*` route behavior: rejected unapproved POs are directly visible to creator and rejector; non-rejected direct approver/priority paths are gated by `rejected = ''`.
+- PocketBase collection rule behavior: no explicit `rejected` guard in unapproved direct path, so assigned approver/priority visibility can differ from route behavior, and rejector visibility is only incidental (when rejector also matches a direct role).
 
 4. Mixed client access paths
 
