@@ -402,8 +402,91 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	}
 
 	expenseRecord := e.Record
+	authRecord := e.Auth
+	if authRecord == nil || strings.TrimSpace(authRecord.Id) == "" {
+		return &errs.HookError{
+			Status:  http.StatusUnauthorized,
+			Message: "hook error when validating uid",
+			Data: map[string]errs.CodeError{
+				"uid": {
+					Code:    "authentication_required",
+					Message: "authentication is required",
+				},
+			},
+		}
+	}
+
+	requestUID := strings.TrimSpace(expenseRecord.GetString("uid"))
+	if expenseRecord.IsNew() {
+		if requestUID != authRecord.Id {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating uid",
+				Data: map[string]errs.CodeError{
+					"uid": {
+						Code:    "value_mismatch",
+						Message: "uid must be equal to the authenticated user's id",
+					},
+				},
+			}
+		}
+	} else {
+		original := expenseRecord.Original()
+		if original == nil {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating uid",
+				Data: map[string]errs.CodeError{
+					"uid": {
+						Code:    "missing_original_record",
+						Message: "cannot validate ownership for this expense update",
+					},
+				},
+			}
+		}
+
+		originalUID := strings.TrimSpace(original.GetString("uid"))
+		if originalUID != authRecord.Id {
+			return &errs.HookError{
+				Status:  http.StatusForbidden,
+				Message: "hook error when validating uid",
+				Data: map[string]errs.CodeError{
+					"uid": {
+						Code:    "not_owner",
+						Message: "only the creator can edit this expense",
+					},
+				},
+			}
+		}
+		if requestUID != originalUID {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating uid",
+				Data: map[string]errs.CodeError{
+					"uid": {
+						Code:    "immutable_field",
+						Message: "uid cannot be changed",
+					},
+				},
+			}
+		}
+
+		if original.GetBool("submitted") {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when processing expense",
+				Data: map[string]errs.CodeError{
+					"submitted": {
+						Code:    "is_submitted",
+						Message: "cannot edit submitted expense",
+					},
+				},
+			}
+		}
+	}
+
 	// if the expense record is submitted, return an error
-	if expenseRecord.Get("submitted") == true {
+	if expenseRecord.GetBool("submitted") {
 		return &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "hook error when processing expense",

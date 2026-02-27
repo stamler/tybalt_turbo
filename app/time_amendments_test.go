@@ -182,7 +182,7 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "a time_amendment's creator property must match the authenticated user's id",
+			Name:   "creator is server-stamped to the authenticated user",
 			Method: http.MethodPost,
 			URL:    "/api/collections/time_amendments/records",
 			Body: strings.NewReader(`{
@@ -198,13 +198,13 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 				"week_ending": "2006-01-02"
 				}`),
 			Headers:        map[string]string{"Authorization": creatorToken},
-			ExpectedStatus: 400,
+			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"data":{"creator":{"code":"creator_mismatch"`,
+				`"creator":"f2j5a8vk006baub"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
-				"OnRecordCreate":        0,
+				"OnRecordCreate":        1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -310,10 +310,7 @@ func TestTimeAmendmentsUpdate(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-		// TODO: if a person creates a time_amendments record and it is not yet
-		// committed, should only that person be allowed to edit the time_amendments
-		// record, or can any `tame` claim holder edit it as long as it hasn't been
-		// committed?
+		// Any `tame` claim holder may edit uncommitted time amendments by policy.
 
 		// TODO: write more tests
 	}

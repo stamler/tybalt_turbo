@@ -616,19 +616,85 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) (notificatio
 	record := e.Record
 	// get the auth record from the context
 	authRecord := e.Auth
-
-	// If the uid property is not equal to the authenticated user's uid, return an
-	// error.
-	if record.GetString("uid") != authRecord.Id {
+	if authRecord == nil || strings.TrimSpace(authRecord.Id) == "" {
 		return "", &errs.HookError{
-			Status:  http.StatusBadRequest,
+			Status:  http.StatusUnauthorized,
 			Message: "hook error when validating uid",
 			Data: map[string]errs.CodeError{
 				"uid": {
-					Code:    "value_mismatch",
-					Message: "uid must be equal to the authenticated user's id",
+					Code:    "authentication_required",
+					Message: "authentication is required",
 				},
 			},
+		}
+	}
+
+	requestUID := strings.TrimSpace(record.GetString("uid"))
+	if record.IsNew() {
+		if requestUID != authRecord.Id {
+			return "", &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating uid",
+				Data: map[string]errs.CodeError{
+					"uid": {
+						Code:    "value_mismatch",
+						Message: "uid must be equal to the authenticated user's id",
+					},
+				},
+			}
+		}
+	} else {
+		original := record.Original()
+		if original == nil {
+			return "", &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating uid",
+				Data: map[string]errs.CodeError{
+					"uid": {
+						Code:    "missing_original_record",
+						Message: "cannot validate ownership for this purchase order update",
+					},
+				},
+			}
+		}
+
+		originalUID := strings.TrimSpace(original.GetString("uid"))
+		if originalUID != authRecord.Id {
+			return "", &errs.HookError{
+				Status:  http.StatusForbidden,
+				Message: "hook error when validating uid",
+				Data: map[string]errs.CodeError{
+					"uid": {
+						Code:    "not_owner",
+						Message: "only the creator can edit this purchase order",
+					},
+				},
+			}
+		}
+		if requestUID != originalUID {
+			return "", &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating uid",
+				Data: map[string]errs.CodeError{
+					"uid": {
+						Code:    "immutable_field",
+						Message: "uid cannot be changed",
+					},
+				},
+			}
+		}
+
+		if original.GetString("status") != "Unapproved" {
+			return "", &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating status",
+				Data: map[string]errs.CodeError{
+					"status": {
+						Code:    "invalid_status",
+						Message: "only unapproved purchase orders can be edited",
+					},
+				},
+			}
 		}
 	}
 

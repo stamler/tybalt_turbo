@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"regexp"
+	"strings"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -140,17 +141,48 @@ func validateTimeAmendment(app core.App, timeAmendmentRecord *core.Record, requi
 func ProcessTimeAmendment(app core.App, e *core.RecordRequestEvent) error {
 	record := e.Record
 	authRecord := e.Auth
-
-	// If the creator property is not equal to the authenticated user's id, return
-	// an error.
-	if record.GetString("creator") != authRecord.Id {
-		return apis.NewApiError(400, "creator property must be equal to the authenticated user's id", map[string]validation.Error{
+	if authRecord == nil || strings.TrimSpace(authRecord.Id) == "" {
+		return apis.NewApiError(http.StatusUnauthorized, "authentication is required", map[string]validation.Error{
 			"creator": validation.NewError(
-				"creator_mismatch",
-				"creator property must be equal to the authenticated user's id",
+				"authentication_required",
+				"authentication is required",
 			),
 		})
 	}
+
+	if !record.IsNew() {
+		original := record.Original()
+		if original == nil {
+			return apis.NewApiError(http.StatusBadRequest, "cannot validate time amendment update", map[string]validation.Error{
+				"uid": validation.NewError(
+					"missing_original_record",
+					"cannot validate ownership fields for this update",
+				),
+			})
+		}
+
+		if !original.GetDateTime("committed").IsZero() {
+			return apis.NewApiError(http.StatusBadRequest, "cannot edit committed time amendment", map[string]validation.Error{
+				"committed": validation.NewError(
+					"is_committed",
+					"committed time amendments cannot be edited",
+				),
+			})
+		}
+
+		if strings.TrimSpace(record.GetString("uid")) != strings.TrimSpace(original.GetString("uid")) {
+			return apis.NewApiError(http.StatusBadRequest, "uid cannot be changed", map[string]validation.Error{
+				"uid": validation.NewError(
+					"immutable_field",
+					"uid cannot be changed",
+				),
+			})
+		}
+	}
+
+	// creator represents the effective creator of the current pre-commit version,
+	// i.e. the latest authenticated editor.
+	record.Set("creator", authRecord.Id)
 
 	// set properties to nil if they are not allowed to be set based on the
 	// time_type
