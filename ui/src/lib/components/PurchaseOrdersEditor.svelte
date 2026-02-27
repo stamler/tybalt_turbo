@@ -223,6 +223,15 @@
     "Approver eligibility is still loading. Please wait and try again.";
   const approversUnavailableMessage =
     "Could not load approver eligibility. Resolve the error and try again.";
+  const nonOwnerEditMessage =
+    "You can view this purchase order, but only its creator can edit it.";
+  const isEditingAnotherUsersPO = $derived.by(
+    () =>
+      data.editing &&
+      authUserID !== "" &&
+      item.uid !== "" &&
+      item.uid !== authUserID,
+  );
 
   onDestroy(() => {
     if (resetSuccessTimeout !== null) {
@@ -472,6 +481,16 @@
       clearTimeout(resetSuccessTimeout);
       resetSuccessTimeout = null;
     }
+    if (isEditingAnotherUsersPO) {
+      errors = {
+        ...errors,
+        global: {
+          code: "not_owner",
+          message: nonOwnerEditMessage,
+        },
+      };
+      return;
+    }
     item.uid = $authStore?.model?.id ?? "";
     const shouldShowResetFeedback = isEditingFirstApprovedPendingSecond;
 
@@ -592,9 +611,14 @@
         message.toLowerCase().includes("requested resource wasn't found")
       ) {
         try {
-          await pb.collection("purchase_orders").getOne(data.id, { requestKey: null });
+          const latestRecord = await pb.collection("purchase_orders").getOne(data.id, {
+            requestKey: null,
+          });
+          const latestOwnerId = (latestRecord?.uid ?? "").trim();
           resolvedMessage =
-            "This purchase order is no longer editable in its current approval state. Refresh and try again.";
+            latestOwnerId !== "" && latestOwnerId !== authUserID
+              ? nonOwnerEditMessage
+              : "This purchase order is no longer editable in its current approval state. Refresh and try again.";
         } catch {
           resolvedMessage =
             "This purchase order could not be loaded. It may have been removed or you may no longer have access.";
@@ -633,6 +657,12 @@
       Create Purchase Order
     {/if}
   </h1>
+
+  {#if isEditingAnotherUsersPO}
+    <div class="w-full rounded-sm border border-amber-300 bg-amber-100 p-2 text-sm text-amber-900">
+      {nonOwnerEditMessage}
+    </div>
+  {/if}
 
   {#if isEditingFirstApprovedPendingSecond}
     <div class="w-full rounded-sm border border-amber-300 bg-amber-100 p-2 text-sm text-amber-900">
@@ -887,10 +917,15 @@
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
-      <DsActionButton type="submit" disabled={approversPendingResolution || showApproverFetchError}>
-        Save
-      </DsActionButton>
-      <DsActionButton action="/pos/list">Cancel</DsActionButton>
+      {#if !isEditingAnotherUsersPO}
+        <DsActionButton
+          type="submit"
+          disabled={approversPendingResolution || showApproverFetchError}
+        >
+          Save
+        </DsActionButton>
+      {/if}
+      <DsActionButton action="/pos/list">{isEditingAnotherUsersPO ? "Back" : "Cancel"}</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

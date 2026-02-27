@@ -80,6 +80,15 @@
   const linkedCumulativeRemainingBalance = $derived.by(
     () => data.linked_purchase_order?.cumulative_remaining_balance ?? null,
   );
+  const authUserID = $derived.by(() => $authStore?.model?.id ?? "");
+  const nonOwnerEditMessage = "You can view this expense, but only its creator can edit it.";
+  const isEditingAnotherUsersExpense = $derived.by(
+    () =>
+      data.editing &&
+      authUserID !== "" &&
+      item.uid !== "" &&
+      item.uid !== authUserID,
+  );
 
   // create a local state object to hold the allowance types
   const allowanceTypes = $state({
@@ -99,6 +108,16 @@
 
   async function save(event: Event) {
     event.preventDefault();
+    if (isEditingAnotherUsersExpense) {
+      errors = {
+        ...errors,
+        global: {
+          code: "not_owner",
+          message: nonOwnerEditMessage,
+        },
+      };
+      return;
+    }
     item.uid = $authStore?.model?.id ?? "";
 
     // set a dummy value for week_ending to satisfy the schema non-empty
@@ -163,6 +182,12 @@
       Create Expense
     {/if}
   </h1>
+
+  {#if isEditingAnotherUsersExpense}
+    <div class="w-full rounded-sm border border-amber-300 bg-amber-100 p-2 text-sm text-amber-900">
+      {nonOwnerEditMessage}
+    </div>
+  {/if}
 
   <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
     <label for="date">Date</label>
@@ -368,8 +393,11 @@
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
-      <DsActionButton type="submit">Save</DsActionButton>
-      <DsActionButton action="/expenses/list">Cancel</DsActionButton>
+      {#if !isEditingAnotherUsersExpense}
+        <DsActionButton type="submit">Save</DsActionButton>
+      {/if}
+      <DsActionButton action="/expenses/list"
+        >{isEditingAnotherUsersExpense ? "Back" : "Cancel"}</DsActionButton>
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>
