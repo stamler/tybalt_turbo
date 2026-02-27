@@ -53,6 +53,35 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	tier1, tier2 := testutils.GetApprovalTiers(app)
 
+	selfFirstApproverBypassFactory := func(t testing.TB) *tests.TestApp {
+		t.Helper()
+		testApp := testutils.SetupTestApp(t)
+		if _, err := testApp.DB().NewQuery(`
+			UPDATE po_approver_props
+			SET max_amount = 1000, project_max = 1000
+			WHERE user_claim = (
+				SELECT id
+				FROM user_claims
+				WHERE uid = {:uid} AND cid = '5vh881k048bboim'
+				LIMIT 1
+			)
+		`).Bind(map[string]any{
+			"uid": "66ct66w380ob6w8",
+		}).Execute(); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := testApp.DB().NewQuery(`
+			UPDATE purchase_orders
+			SET uid = {:uid}, approver = {:uid}
+			WHERE id = 'pofirstempty001'
+		`).Bind(map[string]any{
+			"uid": "66ct66w380ob6w8",
+		}).Execute(); err != nil {
+			t.Fatal(err)
+		}
+		return testApp
+	}
+
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   fmt.Sprintf("authorized approver successfully approves PO below lowest threshold (%.0f)", tier1),
@@ -240,6 +269,23 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 				"*": 0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "first approval succeeds when caller is assigned owner with non-zero kind limit even if first-stage pool is empty",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/pofirstempty001/approve",
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": po_approver_tier3Token,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate),
+				`"status":"Unapproved"`,
+				`"approver":"66ct66w380ob6w8"`,
+				`"second_approval":""`,
+			},
+			TestAppFactory: selfFirstApproverBypassFactory,
 		},
 		{
 			Name:   "unauthorized user cannot approve purchase order",

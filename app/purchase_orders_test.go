@@ -1328,6 +1328,47 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		})
 	}
 	{
+		// Dual-required self-first assignment is allowed for owners with a non-zero
+		// kind limit, even if they are above the first-stage threshold.
+		json := fmt.Sprintf(`{
+			"uid": "etysnrlup2f6bak",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "dual required self first with non-zero limit",
+			"payment_type": "Expense",
+			"total": %.2f,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"priority_second_approver": "6bq4j0eb26631dy",
+			"status": "Unapproved",
+			"type": "One-Time",
+			"kind": "%s"
+		}`, tier1+100, capitalKindID)
+		b, ct, err := makeMultipart(json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "dual-required save allows self assignment for creator with non-zero kind limit",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": divisionApproverToken, "Content-Type": ct},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approver":"etysnrlup2f6bak"`,
+				`"priority_second_approver":"6bq4j0eb26631dy"`,
+				`"approved":""`,
+				`"second_approval":""`,
+				`"status":"Unapproved"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the approval-required notification
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+	{
 		// Dual-required self-bypass setup is allowed when creator is second-stage qualified.
 		json := fmt.Sprintf(`{
 			"uid": "66ct66w380ob6w8",

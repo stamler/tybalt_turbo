@@ -262,6 +262,8 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 
 			now := time.Now()
 			assignedApproverID := strings.TrimSpace(po.GetString("approver"))
+			ownerID := strings.TrimSpace(po.GetString("uid"))
+			assignedApproverValidForFirstStage := policy.IsFirstStageApprover(assignedApproverID) || policy.IsValidFirstStageViaBypass(assignedApproverID, ownerID)
 
 			activateRecord := func() error {
 				po.Set("status", "Active")
@@ -335,7 +337,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 						}
 					}
 
-					if recordRequiresSecondApproval && len(policy.FirstStageApprovers) == 0 {
+					if recordRequiresSecondApproval && len(policy.FirstStageApprovers) == 0 && !assignedApproverValidForFirstStage {
 						httpResponseStatusCode = http.StatusBadRequest
 						return &CodeError{
 							Code:    "first_pool_empty",
@@ -343,7 +345,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 						}
 					}
 
-					if assignedApproverID == "" || !policy.IsFirstStageApprover(assignedApproverID) {
+					if assignedApproverID == "" || !assignedApproverValidForFirstStage {
 						httpResponseStatusCode = http.StatusBadRequest
 						return &CodeError{
 							Code:    "invalid_approver_for_stage",
@@ -748,6 +750,13 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 			}
 
 			callerIsApprover := policy.IsFirstStageApprover(authRecord.Id)
+			if !callerIsApprover {
+				assignedApproverID := strings.TrimSpace(po.GetString("approver"))
+				ownerID := strings.TrimSpace(po.GetString("uid"))
+				if authRecord.Id == assignedApproverID && policy.IsValidFirstStageViaBypass(assignedApproverID, ownerID) {
+					callerIsApprover = true
+				}
+			}
 			callerIsQualifiedSecondApprover := policy.IsSecondStageApprover(authRecord.Id)
 
 			// If the caller is not an approver or a qualified second approver,
@@ -1296,7 +1305,14 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 			})
 		}
 
-		return e.JSON(http.StatusOK, policy.FirstStageApprovers)
+		approvers := policy.FirstStageApprovers
+		if auth != nil && policy.SecondApprovalRequired && !policy.IsFirstStageApprover(auth.Id) && policy.HasNonZeroLimitForKind(auth.Id) {
+			if requesterApprover, ok := policy.EligibleApprover(auth.Id); ok {
+				approvers = append(approvers, requesterApprover)
+			}
+		}
+
+		return e.JSON(http.StatusOK, approvers)
 	}
 }
 

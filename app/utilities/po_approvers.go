@@ -32,6 +32,8 @@ type POApproverPolicy struct {
 	LimitColumn             string
 	FirstStageApprovers     []Approver
 	SecondStageApprovers    []Approver
+	eligibleApprovers       map[string]Approver
+	eligibleLimits          map[string]float64
 	firstStageLimits        map[string]float64
 	secondStageLimits       map[string]float64
 }
@@ -44,6 +46,31 @@ func (p POApproverPolicy) IsFirstStageApprover(userID string) bool {
 func (p POApproverPolicy) IsSecondStageApprover(userID string) bool {
 	_, ok := p.secondStageLimits[userID]
 	return ok
+}
+
+func (p POApproverPolicy) HasNonZeroLimitForKind(userID string) bool {
+	_, ok := p.eligibleLimits[userID]
+	return ok
+}
+
+func (p POApproverPolicy) EligibleApprover(userID string) (Approver, bool) {
+	a, ok := p.eligibleApprovers[userID]
+	return a, ok
+}
+
+func (p POApproverPolicy) IsValidFirstStageViaBypass(approverID string, ownerID string) bool {
+	if !p.SecondApprovalRequired {
+		return false
+	}
+	approverID = strings.TrimSpace(approverID)
+	ownerID = strings.TrimSpace(ownerID)
+	if approverID == "" || ownerID == "" {
+		return false
+	}
+	if approverID != ownerID {
+		return false
+	}
+	return p.HasNonZeroLimitForKind(ownerID)
 }
 
 func (p POApproverPolicy) LimitForSecondStageApprover(userID string) (float64, bool) {
@@ -124,7 +151,7 @@ func GetPOApproverPolicy(
 		WHERE
 			uc.cid = {:claimId}
 			AND ap.active = 1
-			AND pap.%s IS NOT NULL
+			AND pap.%s > 0
 			AND (
 				JSON_ARRAY_LENGTH(pap.divisions) = 0
 				OR EXISTS (
@@ -150,11 +177,16 @@ func GetPOApproverPolicy(
 		LimitColumn:             limitColumn,
 		FirstStageApprovers:     make([]Approver, 0, len(eligible)),
 		SecondStageApprovers:    make([]Approver, 0, len(eligible)),
+		eligibleApprovers:       map[string]Approver{},
+		eligibleLimits:          map[string]float64{},
 		firstStageLimits:        map[string]float64{},
 		secondStageLimits:       map[string]float64{},
 	}
 
 	for _, candidate := range eligible {
+		policy.eligibleApprovers[candidate.ID] = candidate.Approver
+		policy.eligibleLimits[candidate.ID] = candidate.LimitValue
+
 		if !secondApprovalRequired {
 			// Single-stage approvals are final approvals, so the selected approver
 			// must be able to fully approve the amount.

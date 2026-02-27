@@ -127,6 +127,38 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "first approvers excludes zero-valued kind limits when second approval is required",
+			Method: http.MethodGet,
+			URL: makeApproversURLWithKindAndJob(
+				"/api/purchase_orders/approvers",
+				municipalDivision,
+				fmt.Sprintf("%d", int(tier1)+1),
+				computerKindID,
+				false,
+			),
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`[]`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "requester with non-zero kind limit appears in first approvers for dual-required amount",
+			Method: http.MethodGet,
+			URL:    makeApproversURL("/api/purchase_orders/approvers", municipalDivision, fmt.Sprintf("%d", int(tier1)+1)),
+			Headers: map[string]string{
+				"Authorization": tier3Token,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"66ct66w380ob6w8"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "invalid amount returns error",
 			Method: http.MethodGet,
 			URL:    makeApproversURL("/api/purchase_orders/approvers", municipalDivision, "invalid"),

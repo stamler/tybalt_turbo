@@ -513,25 +513,14 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 	prioritySecondApproverID := strings.TrimSpace(purchaseOrderRecord.GetString("priority_second_approver"))
 	ownerID := strings.TrimSpace(purchaseOrderRecord.GetString("uid"))
 
-	approverValidForStage := policy.IsFirstStageApprover(approverID)
-	// Narrow self-bypass setup exception for dual-required records:
-	// allow owner to set approver=self only when owner is second-stage qualified
-	// and also assigned as priority second approver.
-	if !approverValidForStage &&
-		policy.SecondApprovalRequired &&
-		approverID != "" &&
-		approverID == ownerID &&
-		prioritySecondApproverID == ownerID &&
-		policy.IsSecondStageApprover(ownerID) {
-		approverValidForStage = true
-	}
+	approverValidForStage := policy.IsFirstStageApprover(approverID) || policy.IsValidFirstStageViaBypass(approverID, ownerID)
 
 	if !approverValidForStage {
 		setValidationError("approver", "invalid_approver_for_stage", "selected approver is not valid for first-stage approval")
 	}
 
 	if policy.SecondApprovalRequired {
-		if len(policy.FirstStageApprovers) == 0 {
+		if len(policy.FirstStageApprovers) == 0 && !approverValidForStage {
 			setValidationError("approver", "first_pool_empty", "no configured first-stage approvers are available for this purchase order")
 		}
 		if len(policy.SecondStageApprovers) == 0 {
