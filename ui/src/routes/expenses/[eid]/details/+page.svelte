@@ -319,7 +319,7 @@
         <DsActionButton action={() => recallExpense()} icon="mdi:rewind" title="Recall" color="orange" />
       {/if}
 
-      {#if isOwner && expense.committed === ""}
+      {#if isOwner && !expense.submitted && expense.committed === ""}
         <DsActionButton action={() => deleteExpense()} icon="mdi:delete" title="Delete" color="red" />
       {/if}
 

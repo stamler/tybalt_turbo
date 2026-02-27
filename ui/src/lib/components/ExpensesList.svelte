@@ -275,10 +275,10 @@
         />
       {/if}
       -->
-      <!-- Delete button is disabled if the record has already been committed -->
+      <!-- Delete is only available for unsubmitted, uncommitted owner records -->
       {#if isOwner && committed !== ""}
         <DsLabel color="green">Committed</DsLabel>
-      {:else if isOwner}
+      {:else if isOwner && !submitted}
         <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
       {/if}
     {:else if uid === viewerId && committed !== ""}
