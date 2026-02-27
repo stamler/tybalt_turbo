@@ -228,6 +228,21 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "first approver can still see first-approved PO via visible API",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/2blv18f40i2q373",
+			Headers: map[string]string{
+				"Authorization": approverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2blv18f40i2q373"`,
+				`"status":"Unapproved"`,
+				`"approved":"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
 		// Holder of po_approver claim cannot see unapproved PO they are not assigned to in stage 1
 		{
 			Name:   "holder of po_approver claim cannot see unrelated unapproved PO before first approval",

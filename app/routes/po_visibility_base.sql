@@ -22,8 +22,8 @@
   - Active POs are visible to any authenticated user.
   - Closed/Cancelled are visible to creator, approvers, or report claim holders.
   - Unapproved visibility has two classes:
-    - Direct visibility (creator, assigned first approver pre-first-approval,
-      priority second approver post-first-approval).
+    - Direct visibility (creator, assigned first approver, and priority second
+      approver for post-first-approval records).
     - Policy-based second-stage visibility (eligible second approvers).
   - Actionability (pending queue) is intentionally narrower than visibility:
     - Stage 1 assigned-first-approver path (including assigned approver self-bypass).
@@ -226,7 +226,10 @@ SELECT
             OR (
               po.approved != ''
               AND po.second_approval = ''
-              AND po.priority_second_approver = {:userId}
+              AND (
+                po.approver = {:userId}
+                OR po.priority_second_approver = {:userId}
+              )
             )
           )
         )

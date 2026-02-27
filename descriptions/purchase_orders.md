@@ -581,3 +581,41 @@ Child POs: `YYMM-NNNN-XX`
 | `staff_and_social_max` | `staff_and_social` | Always |
 | `media_and_event_max`  | `media_and_event`  | Always |
 | `computer_max`         | `computer`         | Always |
+
+## Known Issues / Discrepancies
+
+The PO visibility model is currently split between:
+
+- PocketBase collection `listRule`/`viewRule` on `purchase_orders`
+- Custom SQL-backed route visibility (`/api/purchase_orders/visible*`)
+
+Those two surfaces are not fully aligned yet.
+
+Current known mismatches:
+
+1. First approver visibility after first approval (still `Unapproved`)
+
+- `visible*` route behavior: first approver can still view the PO.
+- PocketBase collection rule behavior: first approver does not match post-first-approval direct visibility (unless they are also another qualifying role).
+
+2. Non-priority second-stage approver visibility
+
+- `visible*` route behavior: eligible non-priority second-stage approvers can view first-approved, not-second-approved POs (not timeout-gated).
+- PocketBase collection rule behavior: direct-only for unapproved records; non-priority second-stage users do not get this broader read path.
+
+3. Rejected unapproved PO visibility for assigned approver
+
+- `visible*` route behavior: creator can see rejected unapproved POs; non-creator direct approver visibility is gated by `rejected = ''`.
+- PocketBase collection rule behavior: no explicit rejected guard in unapproved direct path, so assigned approver visibility can differ.
+
+4. Mixed client access paths
+
+- Most PO read/list/detail pages use `/api/purchase_orders/visible*` and `/pending*`.
+- Some UI flows still use native `pb.collection("purchase_orders")` operations (`getOne`, `create`, `update`, `delete`, realtime subscription), so rule differences can still surface in edge paths.
+
+Notes:
+
+- Tests intentionally cover some of these differences (for example, collection API denied while `visible*` allows, in second-stage cases).
+- Long-term cleanup options are either:
+  - fully align PocketBase rules to the route visibility contract, or
+  - eliminate remaining native PO reads so all PO visibility comes from one route contract.
