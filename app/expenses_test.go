@@ -1673,6 +1673,23 @@ func TestExpensesDelete(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:           "expense cannot be deleted by the creator if it is submitted",
+			Method:         http.MethodDelete,
+			URL:            "/api/collections/expenses/records/b4o6xph4ngwx4nw",
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnModelBeforeDelete":         0,
+				"OnModelAfterDelete":          0,
+				"OnRecordBeforeDeleteRequest": 0,
+				"OnRecordAfterDeleteRequest":  0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:           "expense cannot be deleted by the creator if it is committed",
 			Method:         http.MethodDelete,
 			URL:            "/api/collections/expenses/records/xg2yeucklhgbs3n",
