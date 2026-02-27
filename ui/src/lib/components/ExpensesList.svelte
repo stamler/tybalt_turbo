@@ -110,6 +110,16 @@
       globalStore.addError(error?.response.error);
     }
   }
+
+  async function approve(id: string) {
+    try {
+      await pb.send(`/api/expenses/${id}/approve`, {
+        method: "POST",
+      });
+    } catch (error: any) {
+      globalStore.addError(error?.response.error);
+    }
+  }
 </script>
 
 <DsList
@@ -212,9 +222,11 @@
       {/if}
     </span>
   {/snippet}
-  {#snippet actions({ id, uid, submitted, approved, rejected, committed }: ExpensesAugmentedResponse)}
+  {#snippet actions({ id, uid, approver, submitted, approved, rejected, committed }: ExpensesAugmentedResponse)}
     {#if $expensesEditingEnabled}
       {@const isOwner = uid === viewerId}
+      {@const isApprover = approver === viewerId}
+      {@const hasTaprAccess = $globalStore.claims.includes("tapr")}
       {#if isOwner && !submitted}
         <DsActionButton
           action={`/expenses/${id}/edit`}
@@ -226,13 +238,16 @@
       {#if isOwner && ((submitted && approved === "") || rejected !== "") && committed === ""}
         <DsActionButton action={() => recall(id)} icon="mdi:rewind" title="Recall" color="orange" />
       {/if}
+      {#if isOwner && isApprover && hasTaprAccess && submitted && approved === "" && rejected === "" && committed === ""}
+        <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+      {/if}
       {#if isOwner && !submitted}
         <DsActionButton action={() => submit(id)} icon="mdi:send" title="Submit" color="blue" />
       {/if}
       <!--
-        Review actions intentionally disabled in list views to encourage users
-        to open expense details before approve/reject/commit. Keep commented
-        for easy rollback if policy changes.
+        Most review actions remain disabled in list views to encourage users to
+        open expense details before reject/commit. Keep commented for easy
+        rollback if policy changes.
       -->
       <!--
       {#if submitted && approved === ""}
