@@ -14,7 +14,6 @@
   } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { authStore } from "$lib/stores/auth";
-  import RejectModal from "$lib/components/RejectModal.svelte";
   import { shortDate } from "$lib/utilities";
   import { onMount, onDestroy, untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
@@ -27,8 +26,6 @@
   }
 
   const collectionId = "purchase_orders";
-
-  let rejectModal: RejectModal;
 
   // Load the initial data
   let { inListHeader, data }: { inListHeader?: string; data: PurchaseOrdersListData } = $props();
@@ -155,6 +152,22 @@
     return po.status === "Unapproved" && po.uid === currentUserId;
   }
 
+  function poIsOwnedByCurrentUser(po: PurchaseOrdersAugmentedResponse): boolean {
+    if (deactivateButtonHiding) return true;
+    const currentUserId = $authStore?.model?.id ?? "";
+    return po.uid === currentUserId;
+  }
+
+  function poMayBeApprovedFromListByOwner(po: PurchaseOrdersAugmentedResponse): boolean {
+    if (deactivateButtonHiding) return true;
+    return poIsOwnedByCurrentUser(po) && poMayBeApprovedOrRejectedByUser(po);
+  }
+
+  function poMayBeEditedByOwner(po: PurchaseOrdersAugmentedResponse): boolean {
+    if (deactivateButtonHiding) return true;
+    return poIsOwnedByCurrentUser(po) && po.status === "Unapproved" && po.rejected === "";
+  }
+
   async function del(id: string): Promise<void> {
     // return immediately if items is not an array
     if (!Array.isArray(items)) return;
@@ -189,10 +202,6 @@
     }
   }
 
-  function openRejectModal(poId: string) {
-    rejectModal?.openModal(poId);
-  }
-
   async function closePurchaseOrder(id: string) {
     try {
       await pb.send(`/api/purchase_orders/${id}/close`, { method: "POST" });
@@ -220,13 +229,6 @@
   }
 </script>
 
-<RejectModal
-  collectionName="purchase_orders"
-  bind:this={rejectModal}
-  on:refresh={() => {
-    refreshPendingApprovalIds();
-  }}
-/>
 <DsList items={items as PurchaseOrdersAugmentedResponse[]} search={true} {inListHeader}>
   {#snippet anchor(item: PurchaseOrdersAugmentedResponse)}
     <span class="flex flex-col items-center gap-2">
@@ -359,24 +361,31 @@
         {/if}
       {/if}
       {#if item.status === "Unapproved"}
-        <DsActionButton
-          action={`/pos/${item.id}/edit`}
-          icon="mdi:edit-outline"
-          title={poIsRejected(item) ? "Edit and Resubmit" : "Edit"}
-          color="blue"
-        />
-        {#if poMayBeApprovedOrRejectedByUser(item)}
+        {#if poIsRejected(item)}
+          {#if poIsOwnedByCurrentUser(item)}
+            <DsActionButton
+              action={`/pos/${item.id}/edit`}
+              icon="mdi:edit-outline"
+              title="Edit and Resubmit"
+              color="blue"
+            />
+          {/if}
+        {:else}
+          {#if poMayBeEditedByOwner(item)}
+            <DsActionButton
+              action={`/pos/${item.id}/edit`}
+              icon="mdi:edit-outline"
+              title="Edit"
+              color="blue"
+            />
+          {/if}
+        {/if}
+        {#if poMayBeApprovedFromListByOwner(item)}
           <DsActionButton
             action={() => approve(item.id)}
             icon="mdi:approve"
             title="Approve"
             color="green"
-          />
-          <DsActionButton
-            action={() => openRejectModal(item.id)}
-            icon="mdi:cancel"
-            title="Reject"
-            color="orange"
           />
         {/if}
         {#if poMayBeDeletedByUser(item)}

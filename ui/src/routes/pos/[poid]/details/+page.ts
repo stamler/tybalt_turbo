@@ -5,13 +5,23 @@ import type {
   PurchaseOrdersAugmentedResponse,
   ExpensesAugmentedResponse,
 } from "$lib/pocketbase-types";
-import type { SecondApproversResponse } from "$lib/svelte-types";
+import type { PurchaseOrderDetailsPageData, SecondApproversResponse } from "$lib/svelte-types";
 import { buildPoApproverRequest, fetchPoSecondApprovers } from "$lib/poApprovers";
-import { fetchVisiblePO } from "$lib/poVisibility";
+import { fetchPendingPO, fetchVisiblePO } from "$lib/poVisibility";
 
 export const load: PageLoad = async ({ params }) => {
   try {
     const po = (await fetchVisiblePO(params.poid)) as PurchaseOrdersAugmentedResponse;
+    let canApproveOrReject = false;
+
+    try {
+      await fetchPendingPO(params.poid);
+      canApproveOrReject = true;
+    } catch (pendingErr: any) {
+      if (pendingErr?.status !== 404) {
+        console.error(`loading pending-approval state: ${pendingErr}`);
+      }
+    }
 
     let secondApproverDiagnostics: SecondApproversResponse | null = null;
     try {
@@ -38,7 +48,13 @@ export const load: PageLoad = async ({ params }) => {
     );
     const expenses = expensesRes?.data ?? [];
 
-    return { po, expenses, secondApproverDiagnostics };
+    const pageData: PurchaseOrderDetailsPageData = {
+      po,
+      expenses,
+      secondApproverDiagnostics,
+      canApproveOrReject,
+    };
+    return pageData;
   } catch (err) {
     console.error(`loading purchase order details: ${err}`);
     throw error(404, `Failed to load purchase order details`);

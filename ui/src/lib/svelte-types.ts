@@ -20,6 +20,7 @@ import type {
   ClientDetails,
   ClientNotesResponse,
   ExpensesAugmentedResponse,
+  PurchaseOrdersAugmentedResponse,
 } from "$lib/pocketbase-types";
 
 export interface PageData<T> {
@@ -51,6 +52,12 @@ export type SecondApproversResponse = {
     limit_column: string;
     second_stage_timeout_hours: number;
   };
+};
+export type PurchaseOrderDetailsPageData = {
+  po: PurchaseOrdersAugmentedResponse;
+  expenses: ExpensesAugmentedResponse[];
+  secondApproverDiagnostics: SecondApproversResponse | null;
+  canApproveOrReject: boolean;
 };
 export type LinkedPurchaseOrderSummary = {
   id: string;

@@ -3,19 +3,45 @@
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import RejectModal from "$lib/components/RejectModal.svelte";
   import Icon from "@iconify/svelte";
   import { shortDate } from "$lib/utilities";
   import DsList from "$lib/components/DSList.svelte";
   import { globalStore } from "$lib/stores/global";
+  import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { pb } from "$lib/pocketbase";
-  import { goto } from "$app/navigation";
+  import { goto, invalidateAll } from "$app/navigation";
   let { data }: { data: PageData } = $props();
+  const viewerId = pb.authStore.record?.id ?? "";
+  let rejectModal: RejectModal;
   let showSecondApproverWhy = $state(false);
   const formatAmount = (value: number) => (Number.isFinite(value) ? value.toFixed(2) : String(value));
   const secondApproverMeta = $derived(data.secondApproverDiagnostics?.meta ?? null);
   const hasSecondApproverAlert = $derived(secondApproverMeta?.status === "required_no_candidates");
   const isRejected = $derived(data.po.status === "Unapproved" && data.po.rejected !== "");
   const displayStatus = $derived(isRejected ? "Rejected" : data.po.status);
+  const isOwner = $derived(data.po.uid === viewerId);
+  const canApproveOrReject = $derived(data.canApproveOrReject);
+
+  async function refreshDetails() {
+    await invalidateAll();
+  }
+
+  async function approvePo() {
+    try {
+      await pb.send(`/api/purchase_orders/${data.po.id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      await refreshDetails();
+    } catch (e: any) {
+      globalStore.addError(e?.response?.message || "Approve failed");
+    }
+  }
+
+  function openRejectModal() {
+    rejectModal?.openModal(data.po.id);
+  }
 
   async function cancelPo() {
     try {
@@ -85,14 +111,16 @@
           {#if data.po.rejection_reason}
             <div class="mt-1"><span class="font-semibold">Reason:</span> {data.po.rejection_reason}</div>
           {/if}
-          <div class="mt-2">
-            <DsActionButton
-              action={`/pos/${data.po.id}/edit`}
-              icon="mdi:pencil"
-              title="Edit and Resubmit"
-              color="red"
-            />
-          </div>
+          {#if isOwner && $expensesEditingEnabled}
+            <div class="mt-2">
+              <DsActionButton
+                action={`/pos/${data.po.id}/edit`}
+                icon="mdi:pencil"
+                title="Edit and Resubmit"
+                color="red"
+              />
+            </div>
+          {/if}
         </div>
       {/if}
 
@@ -295,14 +323,25 @@
       {/if}
     </div>
   </div>
-  {#if data.po.status === "Unapproved"}
-    <div class="flex gap-2">
-      <DsActionButton
-        action={`/pos/${data.po.id}/edit`}
-        icon="mdi:pencil"
-        title={isRejected ? "Edit and Resubmit" : "Edit Purchase Order"}
-        color="blue"
-      />
+  {#if data.po.status === "Unapproved" && $expensesEditingEnabled}
+    <div class="flex flex-wrap gap-2">
+      {#if isOwner}
+        <DsActionButton
+          action={`/pos/${data.po.id}/edit`}
+          icon="mdi:pencil"
+          title={isRejected ? "Edit and Resubmit" : "Edit Purchase Order"}
+          color="blue"
+        />
+      {/if}
+      {#if canApproveOrReject && !isRejected}
+        <DsActionButton action={() => approvePo()} icon="mdi:approve" title="Approve" color="green" />
+        <DsActionButton
+          action={() => openRejectModal()}
+          icon="mdi:cancel"
+          title="Reject"
+          color="orange"
+        />
+      {/if}
     </div>
   {/if}
 
@@ -343,4 +382,6 @@
       {/snippet}
     </DsList>
   </section>
+
+  <RejectModal collectionName="purchase_orders" bind:this={rejectModal} on:refresh={refreshDetails} />
 </div>

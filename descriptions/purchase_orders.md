@@ -188,6 +188,27 @@ When the PO is still a draft (`approved = ""`), edits do not trigger this reset/
 - Approval only happens when the explicit approve action is executed (`POST /api/purchase_orders/{id}/approve`).
 - Therefore, managers can draft and save their own POs, review/edit them, and only lock them once they intentionally run approval.
 
+## UI Action Placement (Current)
+
+Paths:
+
+- List surfaces: `ui/src/lib/components/PurchaseOrdersList.svelte` (used by `/pos/list`, `/pos/pending`, `/pos/active`, etc.)
+- Details surface: `/pos/{id}/details`
+
+Rules:
+
+- Review actions are details-first for non-owners.
+- On list views, non-owners do not get `Approve`/`Reject` controls for `Unapproved` POs.
+- Owner exception on list views:
+  - owner may still run `Approve` when that PO is currently in the caller's pending-approval set
+  - owner may still edit directly from list (`Edit` or `Edit and Resubmit`, depending on rejection state)
+- There is no dedicated PO "recall" endpoint. Returning an in-flight PO to approval flow is done by editing/saving an editable `Unapproved` record (which resets approvals when the edit is meaningful).
+
+Details page behavior:
+
+- `Approve` and `Reject` buttons are shown on `/pos/{id}/details` when the caller can currently approve that PO (`/api/purchase_orders/pending/{id}` visibility).
+- Owner edit action remains available on details for editable `Unapproved` records.
+
 ## Approve Endpoint Behavior
 
 Route: `POST /api/purchase_orders/{id}/approve`
