@@ -140,6 +140,21 @@ For single-stage POs:
 
 - `priority_second_approver` is cleared
 
+### Validation and Approval Error Codes
+
+Machine-readable error codes returned by create/update hooks and approval endpoints:
+
+| Code | When |
+|---|---|
+| `priority_second_approver_required` | Dual-required PO saved without `priority_second_approver` |
+| `first_pool_empty` | Dual-required but no first-stage candidates configured |
+| `second_pool_empty` | Dual-required but no second-stage candidates can final-approve the amount |
+| `invalid_approver_for_stage` | Selected first approver invalid after recompute/stage check |
+| `invalid_priority_second_approver_for_stage` | Selected priority second approver invalid after recompute/stage check |
+| `insufficient_final_limit` | Caller attempted final approval without `limit >= approval_total` |
+
+Timeout config read failures are non-fatal and resolve to default `24` hours.
+
 ## Editability Rules
 
 Direct record updates are allowed only when all of the following are true:
