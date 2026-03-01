@@ -334,7 +334,9 @@ The `visible` endpoints use broader read semantics than `pending`:
 - `all` (default)
 - `mine` (where `uid = caller`)
 - `active` (status `Active`)
+- `rejected` (status `Unapproved`, `rejected != ''`, `uid = caller`)
 - `stale` (status `Active` and older than `stale_before`; uses `second_approval` when present, otherwise `approved`)
+- `expiring` (status `Active`, type `Recurring`, `end_date <= expiring_before`; requires `expiring_before` query parameter; sorted by `end_date ASC`)
 
 Note:
 
@@ -462,8 +464,9 @@ For `One-Time` and `Recurring` POs, a small overage is allowed.
 - Allowed maximum for a single expense is:
   - `po.total * (1 + MAX_PURCHASE_ORDER_EXCESS_PERCENT)`, capped by
   - `po.total + MAX_PURCHASE_ORDER_EXCESS_VALUE`
-- The lower of those two limits is used.
-- Current constants are:
+- By default, the lower of those two limits is used (`lesser_of` mode).
+- The excess calculation is configurable via `app_config` under the `"expenses"` domain with a `po_expense_allowed_excess` object supporting `percent`, `value`, and `mode` fields. `mode` can be `"lesser_of"` (default) or `"greater_of"`.
+- Default constants are:
   - `MAX_PURCHASE_ORDER_EXCESS_PERCENT = 0.05` (5%)
   - `MAX_PURCHASE_ORDER_EXCESS_VALUE = 100.0` ($100)
 - If expense total exceeds that limit, save fails with a `total` validation error:
@@ -503,6 +506,7 @@ Notes:
   - `description`
   - `vendor`
   - `kind`
+- Child POs must be of type `One-Time`.
 - Child POs use number format `YYMM-NNNN-XX` and support up to 99 children per parent.
 
 ## Cancellation
@@ -523,7 +527,9 @@ Route: `POST /api/purchase_orders/:id/close`
 
 Manual closure rules:
 
+- Caller must have `payables_admin` claim.
 - Only `Recurring` and `Cumulative` POs may be manually closed.
+- PO must be `Active`.
 - PO must have at least one associated **committed** expense.
 - On success:
   - `closer` is set
