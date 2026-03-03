@@ -19,5 +19,6 @@ export const load: PageLoad = async () => {
     };
   } catch (error) {
     console.error(`loading data: ${error}`);
+    return { items: [], realtime_source: "pending" as const };
   }
 };

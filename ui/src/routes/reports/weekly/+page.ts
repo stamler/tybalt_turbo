@@ -11,5 +11,6 @@ export const load: PageLoad = async () => {
     return { items };
   } catch (error) {
     console.error(`loading data: ${error}`);
+    return { items: [] };
   }
 };

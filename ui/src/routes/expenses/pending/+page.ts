@@ -16,5 +16,6 @@ export const load: PageLoad = async () => {
     };
   } catch (error) {
     console.error(`loading data: ${error}`);
+    return { items: [], totalPages: 0, limit: 20 };
   }
 };
