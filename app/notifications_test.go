@@ -571,7 +571,7 @@ func TestDispatchNotificationImmediate_CreatesAndSends(t *testing.T) {
 		RecipientUID: userRow.UID,
 		Data: map[string]any{
 			"POId":      "test_po_id",
-			"ActionURL": "https://example.com/pos/test_po_id/edit",
+			"ActionURL": "https://example.com/pos/test_po_id/details",
 		},
 		System: false,
 		Mode:   notifications.DeliveryImmediate,

@@ -469,7 +469,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 				Data: map[string]any{
 					"POId":          updatedPO.Id,
 					"POCreatorName": creatorProfile.GetString("given_name") + " " + creatorProfile.GetString("surname"),
-					"ActionURL":     notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/edit", updatedPO.Id)),
+					"ActionURL":     notifications.BuildActionURL(app, fmt.Sprintf("/pos/%s/details", updatedPO.Id)),
 				},
 				System:   false,
 				ActorUID: userId,

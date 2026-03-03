@@ -47,7 +47,7 @@ func QueuePoSecondApproverNotifications(app core.App, send bool) error {
 			TemplateCode: "po_second_approval_required",
 			RecipientUID: recipientID,
 			Data: map[string]any{
-				"ActionURL": BuildActionURL(app, "/pos/list"),
+				"ActionURL": BuildActionURL(app, "/pos/pending"),
 			},
 			System: true,
 			Mode:   DeliveryDeferred,
