@@ -1172,22 +1172,25 @@ func generateChildJobNumber(app core.App, base string) (string, error) {
 		return "", fmt.Errorf("invalid base number")
 	}
 
-	// Find highest child suffix for this base
-	children, err := app.FindRecordsByFilter("jobs", `number ~ {:p}`, "-number", 10, 0, dbx.Params{"p": base + "-%"})
+	// Find all existing child jobs for this base and determine the highest numeric suffix.
+	// We iterate all children rather than relying on string sort order because suffixes
+	// may have inconsistent zero-padding (e.g. "6" vs "07"), which breaks lexicographic sort.
+	children, err := app.FindRecordsByFilter("jobs", `number ~ {:p}`, "", 100, 0, dbx.Params{"p": base + "-%"})
 	if err != nil && err != sql.ErrNoRows {
 		return "", err
 	}
 	next := 1
 	if len(children) > 0 {
-		last := children[0].GetString("number")
-		// last should end with -XX
-		parts := strings.Split(last, "-")
-		if len(parts) >= 3 {
-			suf := parts[len(parts)-1]
-			if v, convErr := strconv.Atoi(suf); convErr == nil {
-				next = v + 1
+		maxSuf := 0
+		for _, child := range children {
+			parts := strings.Split(child.GetString("number"), "-")
+			if len(parts) >= 3 {
+				if v, convErr := strconv.Atoi(parts[len(parts)-1]); convErr == nil && v > maxSuf {
+					maxSuf = v
+				}
 			}
 		}
+		next = maxSuf + 1
 	}
 	if next > 99 {
 		return "", fmt.Errorf("maximum number of sub-jobs reached (99) for %s", base)
