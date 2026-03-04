@@ -26,7 +26,31 @@
     disabled?: boolean;
   } = $props();
 
-  const normalizedAction = $derived(typeof action === "string" ? () => goto(action) : action);
+  // Auto-loading: when the action returns a Promise, automatically disable the
+  // button until it resolves/rejects. This prevents double-click race conditions
+  // across the app (e.g. approving an expense twice) without requiring every
+  // call site to manage its own loading state. The explicit `loading` prop from
+  // the parent still works as an additional signal for external control.
+  let actionInFlight = $state(false);
+
+  function handleClick() {
+    if (actionInFlight) return;
+    // The action type is () => void, but callers may return a Promise in
+    // practice (async functions). Cast to unknown so we can detect Promises.
+    const result = normalizedAction?.() as unknown;
+    // If the action returns a Promise, track it and auto-disable until settled.
+    if (result instanceof Promise) {
+      actionInFlight = true;
+      result.finally(() => {
+        actionInFlight = false;
+      });
+    }
+  }
+
+  const normalizedAction = $derived(
+    typeof action === "string" ? () => goto(action) : action,
+  );
+  const isLoading = $derived(loading || actionInFlight);
   const normalizedColor = $derived(color ?? "yellow");
   const iconName = $derived(typeof icon === "string" ? icon : undefined);
   const isIconContent = $derived(
@@ -36,17 +60,17 @@
 </script>
 
 <button
-  onclick={normalizedAction}
+  onclick={handleClick}
   {type}
   {title}
-  disabled={loading || disabled}
+  disabled={isLoading || disabled}
   class="flex items-center rounded-xs {transparentBackground
     ? ''
     : 'bg-' + normalizedColor + '-200'} px-1 {isIconContent ? 'py-1' : 'py-0'} {isIconContent
     ? 'text-neutral-500'
     : 'text-black'} hover:bg-{normalizedColor}-300 hover:text-{normalizedColor}-500 active:text-{normalizedColor}-800 active:shadow-inner"
 >
-  {#if loading}
+  {#if isLoading}
     <span class="flex h-6 w-5 items-center">
       <LoadingAnimation />
     </span>
