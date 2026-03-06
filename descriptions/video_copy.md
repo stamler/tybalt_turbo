@@ -2,44 +2,72 @@
 
 Hi!
 
-Turbo is bringing a new way to get purchase order numbers and record expenses.
+Turbo now includes a new way to create purchase orders and record expenses.
 
-With the exception of FuelCard purchases, Mileage, and Daily Allowances, all purchases with a value over $100 will require a purchase order.
+In general, regular expenses over $100 require a purchase order. Job-related expenses also require a purchase order unless they are an exempt type such as Fuel Card, Mileage, or Daily Allowance.
 
-These purchase orders are created, then approved, directly in Turbo.
+Purchase orders are created and approved directly in Turbo.
 
 ## Create a purchase order
 
-To create a purchase order, click the plus icon to the right of 'My Purchase Orders'. This will open the purchase orders editor. There are 3 types of purchase orders. Most times you'll choose the default option, "One-Time". If you want a purchase order that allows several expenses to be charged against it up to a maximum amount, choose "Cumulative". If you're purchasing a subscription or something else that will have expenses that occur on a recurring basis for similar amounts, then select "Recurring".
+To create a purchase order, click the plus icon to the right of `My Purchase Orders`. This opens the purchase order editor.
 
-Next you'll select the 'Kind'. There are 6 types. Almost all purchase orders will be of kind 'Capital' or 'Project'. 'Project' purchase orders have a job number, while 'Capital' purchase orders to not.
+There are 3 types of purchase orders.
 
-When you enter the total, make sure that you include the amount including taxes and any other fees such as shipping. This is the ceiling that will be allowed for expenses charged against this purchase order. In the case of a recurring purchase order, this is the maximum amount per recurrence, rather than over the life of the purchase order. Recurring purchase orders must also specify a frequency and end date.
+Most of the time, you will choose `One-Time`. Use `One-Time` when the purchase order will be used for a single expense.
 
-The vendor field is a search box. You type in the name of the vendor and select, either using your keyboard or your mouse, the returned result that you want. You can try different options and spellings to find the exact vendor you're looking for. If the vendor isn't available in the list, you may click the green plus icon to the right of the vendor field to add a new vendor. Only add a new vendor if you're certain that the vendor you need doesn't already exist.
+Choose `Cumulative` when you need multiple expenses charged to the same purchase order up to a maximum amount.
 
-Finally, you have the option to upload a file attachment. This will help the purchase order approvers when they're making their approval decisions regarding your purchase order. You may include one file, and usually a PDF is the best choice as it allows multiple pages and is readable easily on mobile devices.
+Choose `Recurring` when the same type of expense will happen repeatedly over time. Recurring purchase orders require a frequency and an end date.
 
-The value and kind of your purchase order will determine which values you need to enter for approver and, optionally, priority second approver. The priority second approver is the second approver that will be given exclusive approval permissions for your purchase order during the first 24 hours. After this time, all qualified staff who can approve your purchase order will see it and have the opportunity to approve or reject it.
+Next, select the `Kind`. There are 6 kinds. Most purchase orders will be either `Capital` or `Project`. `Project` purchase orders are tied to a job. `Capital` purchase orders are not.
 
-When you're ready, click 'Save' and your purchase order will be created.
+When you enter the total, include taxes, shipping, and any other fees. For `One-Time` and `Cumulative` purchase orders, this is the maximum amount available on the purchase order. For `Recurring` purchase orders, this is the amount for each occurrence. Turbo still uses the full scheduled value of the recurring purchase order to determine who can approve it.
 
-## Purchase Order approval
+The vendor field is a search box. Start typing the vendor name, then choose the correct result with your mouse or keyboard. If you cannot find the vendor, you can click the green plus icon to add one. Only add a new vendor if you are sure it does not already exist.
 
-Your saved purchase order will require one or two approvals, depending on its value and kind. Approvers will be notified via email if they have pending purchase orders to approve. If you're an approver, you should periodically check the `Pending My Approval` tab under purchase orders to see if there are purchase orders requiring your approval. You click the purchase order's date to view the corresponding details page, where you'll have the opportunity to approve or reject the purchase order.
+You can also upload one attachment. A PDF is usually the best choice, especially if you need to include multiple pages such as a quote, agreement, or supporting documentation.
+
+The division, kind, total, and whether the purchase order is tied to a job determine which approvers are valid. You must choose a valid first approver. Some purchase orders also require a priority second approver. When that happens, the priority second approver is required. They are shown first in the second-stage approval queue for the first 24 hours, and after that the purchase order is visible in the broader second-stage queue as well.
+
+When you are ready, click `Save`.
+
+## Purchase order approval
+
+After you save a purchase order, it appears as `Unapproved` and enters the approval workflow.
+
+Some purchase orders need one approval. Others need two, depending on the kind and total value. Approvers are notified when they have items waiting. Approvers can also check the `Pending My Approval` tab under purchase orders.
+
+To review a purchase order, open it from the list. On the details page, the assigned approver can approve or reject it. If second approval is required, the purchase order remains unapproved until that final approval is completed. Once all required approvals are finished, the purchase order becomes active and receives a purchase order number.
 
 ## Editing a purchase order
 
-Prior to being approved, a purchase order can be edited by its creator. Click the purchase order date under 'My Purchase Orders' then click the edit button to change any values.
+The creator can edit an unapproved purchase order from `My Purchase Orders` by opening it and clicking `Edit`.
+
+If the purchase order was already first-approved but is still waiting for second approval, meaningful edits will reset the approval state and send it back through approval again.
 
 ## Charging expenses against a purchase order
 
-The majority of expenses will be charged against a purchase order. To do this, simply visit 'My Purchase Orders' (or 'All Active' to use someone else's purchase order), then click the green 'plus' icon. This will take you to the expenses editor, pre-populated with all of the data available from the purchase order.
+The majority of expenses will be charged against an active purchase order.
 
-## Approval of expenses charged against a purchase order
+To do that, open `My Purchase Orders`, or `All Active` if you are using someone else's purchase order, and click the green plus icon. This opens the expense editor with the purchase order information already filled in.
 
-Your time approver can approve all expenses charged against an active purchase order, since all required permissions were already obtained during purchase order creation.
+Review the details, add the attachment if required, and click `Save`. Saving creates the expense as a draft.
+
+After that, submit the expense. Once submitted, it goes to your assigned expense approver.
+
+## Approval and payout of expenses
+
+Expenses still have their own approval workflow, even when they are linked to a purchase order.
+
+When an expense is created, Turbo assigns its approver from the submitter's manager. That approver reviews the submitted expense and can approve or reject it.
+
+After approval, the expense still must be committed before it is ready for payout.
 
 ## Expenses without a purchase order
 
-What about FuelCard purchases, Mileage, Daily Allowances, and expenses under $100? Those don't require a purchase order, and as a result, you can enter them directly under expenses. Simply click the 'plus' icon to the right of 'My Expenses'. This will provide you a simplified input for expenses.
+For direct expenses, click the plus icon to the right of `My Expenses`.
+
+Use this path for exempt expense types such as Fuel Card, Mileage, Daily Allowance, and Personal Reimbursement. It is also used for regular non-job expenses under $100.
+
+For normal job-related expenses, a purchase order is still required even if the amount is under $100.
