@@ -2,9 +2,7 @@
 
 This document describes the current PO approval model implemented in February 2026.
 
-For implementation-level details and decision history, see:
-
-- `/Users/dean/code/tybalt_turbo/descriptions/feb26_po_mods.md`
+PO creation is open to any authenticated user; approval gates activation. Current policy also allows users to submit expenses against any `Active` PO, subject to the validation rules described later in this document.
 
 ## Core Approval Model
 
@@ -41,6 +39,33 @@ The PO `kind` determines which `po_approver_props` limit column is used:
 
 - Approver lookup endpoints default missing `kind` to `capital` (no job) or `project` (with job).
 - PO create/update validation requires a non-empty, valid `kind`; save fails if `kind` is missing or invalid.
+
+## Authority Matrix
+
+| Activity                               | All Staff   | Designated Personnel / Branch Administrators | Managers / Team Leads | Branch Managers                  | Executives |
+|----------------------------------------|-------------|----------------------------------------------|-----------------------|----------------------------------|------------|
+| Capital Expense                        | < 100$      | < 500$ w/PO                                  | < 500$ w/PO           | < 2500$ w/PO                     | w/PO       |
+| Project Expense (references a job)     | < 100$ w/PO | < 5000$ w/PO                                 | < 5000$ w/PO          | < 25000$ w/PO                    | w/PO       |
+| Sponsorships                           |             |                                              |                       | < budget<sup>1</sup> w/PO        | w/PO       |
+| Staff Appreciation or Social Committee |             |                                              |                       | < 500$ w/PO                      | w/PO       |
+| Media Advertising and Event Fees       |             |                                              |                       |                                  | w/PO       |
+| Computer and Software Acquisition      |             |                                              |                       | w/PO and IT approval<sup>2</sup> | w/PO       |
+
+- <sup>1.</sup> Turbo does not currently enforce sponsorship budget limits. The `sponsorship_max` column in `po_approver_props` caps individual PO approval authority, but there is no aggregate budget check. A branch manager could exceed the annual budget by approving multiple POs. It is the responsibility of the branch manager to manage this budget.
+- <sup>2.</sup> It will be given an approval amount for computers up to $500 and thus can act as first approver and vet computer/software purchases for branch managers.
+
+### Implementation Notes
+
+Each of the 6 activities maps to columns in `po_approver_props`. `capital` uses `max_amount` (no job allowed). `project` uses `project_max` (job required). Other kinds use dedicated columns: `sponsorship_max`, `staff_and_social_max`, `media_and_event_max`, `computer_max`.
+
+In the UI:
+
+- **Purchase Orders editor**: Kind is always selectable via toggle. If selected kind has `allow_job = false`, Job is hidden and cleared; switching back to an `allow_job = true` kind restores the in-editor Job value.
+- **Expenses editor**: Kind is never selectable. It is display-only: inherited from the linked PO when a PO is present, otherwise defaulted by job presence (`project` when job is set, `capital` otherwise).
+
+Operational dependency:
+
+- Approval eligibility depends on synchronized `po_approver_props` data. In mixed Turbo/legacy operation, authoritative values flow through `poApproverProps` writeback -> Firestore `TurboPoApproverProps` -> MySQL `TurboPoApproverProps` -> `import_data --users` (Turbo values take precedence per user, synthesis is fallback only).
 
 ## approval_total
 
@@ -114,6 +139,21 @@ For dual-required POs (`approval_total > second_approval_threshold`):
 For single-stage POs:
 
 - `priority_second_approver` is cleared
+
+### Validation and Approval Error Codes
+
+Machine-readable error codes returned by create/update hooks and approval endpoints:
+
+| Code | When |
+|---|---|
+| `priority_second_approver_required` | Dual-required PO saved without `priority_second_approver` |
+| `first_pool_empty` | Dual-required but no first-stage candidates configured |
+| `second_pool_empty` | Dual-required but no second-stage candidates can final-approve the amount |
+| `invalid_approver_for_stage` | Selected first approver invalid after recompute/stage check |
+| `invalid_priority_second_approver_for_stage` | Selected priority second approver invalid after recompute/stage check |
+| `insufficient_final_limit` | Caller attempted final approval without `limit >= approval_total` |
+
+Timeout config read failures are non-fatal and resolve to default `24` hours.
 
 ## Editability Rules
 
@@ -294,7 +334,9 @@ The `visible` endpoints use broader read semantics than `pending`:
 - `all` (default)
 - `mine` (where `uid = caller`)
 - `active` (status `Active`)
+- `rejected` (status `Unapproved`, `rejected != ''`, `uid = caller`)
 - `stale` (status `Active` and older than `stale_before`; uses `second_approval` when present, otherwise `approved`)
+- `expiring` (status `Active`, type `Recurring`, `end_date <= expiring_before`; requires `expiring_before` query parameter; sorted by `end_date ASC`)
 
 Note:
 
@@ -354,9 +396,9 @@ Current canonical views:
 
 Operational handlers:
 
-- close: `createClosePurchaseOrderHandler` (`/Users/dean/code/tybalt_turbo/app/routes/close_purchase_order.go`)
-- cancel: `createCancelPurchaseOrderHandler` (`/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go`)
-- convert one-time to cumulative: `createConvertToCumulativePurchaseOrderHandler` (`/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go`)
+- close: `createClosePurchaseOrderHandler` (`app/routes/close_purchase_order.go`)
+- cancel: `createCancelPurchaseOrderHandler` (`app/routes/purchase_orders.go`)
+- convert one-time to cumulative: `createConvertToCumulativePurchaseOrderHandler` (`app/routes/purchase_orders.go`)
 
 ## When a Purchase Order Is Required
 
@@ -422,8 +464,9 @@ For `One-Time` and `Recurring` POs, a small overage is allowed.
 - Allowed maximum for a single expense is:
   - `po.total * (1 + MAX_PURCHASE_ORDER_EXCESS_PERCENT)`, capped by
   - `po.total + MAX_PURCHASE_ORDER_EXCESS_VALUE`
-- The lower of those two limits is used.
-- Current constants are:
+- By default, the lower of those two limits is used (`lesser_of` mode).
+- The excess calculation is configurable via `app_config` under the `"expenses"` domain with a `po_expense_allowed_excess` object supporting `percent`, `value`, and `mode` fields. `mode` can be `"lesser_of"` (default) or `"greater_of"`.
+- Default constants are:
   - `MAX_PURCHASE_ORDER_EXCESS_PERCENT = 0.05` (5%)
   - `MAX_PURCHASE_ORDER_EXCESS_VALUE = 100.0` ($100)
 - If expense total exceeds that limit, save fails with a `total` validation error:
@@ -463,6 +506,7 @@ Notes:
   - `description`
   - `vendor`
   - `kind`
+- Child POs must be of type `One-Time`.
 - Child POs use number format `YYMM-NNNN-XX` and support up to 99 children per parent.
 
 ## Cancellation
@@ -483,7 +527,9 @@ Route: `POST /api/purchase_orders/:id/close`
 
 Manual closure rules:
 
+- Caller must have `payables_admin` claim.
 - Only `Recurring` and `Cumulative` POs may be manually closed.
+- PO must be `Active`.
 - PO must have at least one associated **committed** expense.
 - On success:
   - `closer` is set
@@ -500,7 +546,7 @@ Automatic close sets `closed_by_system = true`.
 
 ## API Endpoints (Non-approver-list)
 
-Implemented in `/Users/dean/code/tybalt_turbo/app/routes/purchase_orders.go` and `/Users/dean/code/tybalt_turbo/app/routes/close_purchase_order.go`, and registered in `/Users/dean/code/tybalt_turbo/app/routes/routes.go`.
+Implemented in `app/routes/purchase_orders.go` and `app/routes/close_purchase_order.go`, and registered in `app/routes/routes.go`.
 
 - `POST /api/purchase_orders/:id/approve`
 - `POST /api/purchase_orders/:id/reject`
