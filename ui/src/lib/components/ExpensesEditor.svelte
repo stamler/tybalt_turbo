@@ -16,6 +16,7 @@
   import { authStore } from "$lib/stores/auth";
   import { divisions } from "$lib/stores/divisions";
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import type { ExpensesPageData } from "$lib/svelte-types";
   import type { CategoriesResponse, ExpensesAllowanceTypesOptions } from "$lib/pocketbase-types";
   import { isExpensesResponse } from "$lib/pocketbase-types";
@@ -25,6 +26,7 @@
   import { jobs } from "$lib/stores/jobs";
   import { untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
+  import { globalStore } from "$lib/stores/global";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
 
   // initialize the stores, noop if already initialized
@@ -33,7 +35,7 @@
   expenditureKindsStore.init();
   let { data }: { data: ExpensesPageData } = $props();
 
-  let errors = $state({} as any);
+  let errors = $state({} as Record<string, { message: string; code?: string }>);
   let item = $state(untrack(() => data.item));
   const dateInputMax = dateInputMaxMonthsAhead(15);
   let overflowModal: CumulativePOOverflowModal;
@@ -83,12 +85,27 @@
   const authUserID = $derived.by(() => $authStore?.model?.id ?? "");
   const nonOwnerEditMessage = "You can view this expense, but only its creator can edit it.";
   const isEditingAnotherUsersExpense = $derived.by(
-    () =>
-      data.editing &&
-      authUserID !== "" &&
-      item.uid !== "" &&
-      item.uid !== authUserID,
+    () => data.editing && authUserID !== "" && item.uid !== "" && item.uid !== authUserID,
   );
+
+  const allPaymentTypes = [
+    { id: "OnAccount", name: "On Account" },
+    { id: "Expense", name: "Expense" },
+    { id: "CorporateCreditCard", name: "Corporate Credit Card" },
+    { id: "Allowance", name: "Allowance" },
+    { id: "FuelCard", name: "Fuel Card" },
+    { id: "Mileage", name: "Mileage" },
+    { id: "PersonalReimbursement", name: "Personal Reimbursement" },
+  ];
+  const paymentTypeOptions = $derived.by(() => {
+    if (
+      $globalStore.allow_personal_reimbursement.value ||
+      item.payment_type === "PersonalReimbursement"
+    ) {
+      return allPaymentTypes;
+    }
+    return allPaymentTypes.filter((t) => t.id !== "PersonalReimbursement");
+  });
 
   // create a local state object to hold the allowance types
   const allowanceTypes = $state({
@@ -143,20 +160,21 @@
       }
 
       errors = {};
-      goto("/expenses/list");
-    } catch (error: any) {
+      goto(resolve("/expenses/list"));
+    } catch (err: unknown) {
+      const error = err as { data?: { data?: Record<string, { message: string; code?: string; data?: Record<string, string> }> } };
       // Check if this is a cumulative PO overflow error
       if (error.data?.data?.total?.code === "cumulative_po_overflow") {
         // Show the child PO creation modal populated with relevant data
-        const errorData = error.data.data.total.data;
+        const errorData = error.data.data.total.data!;
         overflowModal?.openModal({
           parent_po: errorData.purchase_order,
           parent_po_number: errorData.po_number,
-          po_total: errorData.po_total,
+          po_total: parseFloat(errorData.po_total),
           overflow_amount: parseFloat(errorData.overflow_amount),
         });
       } else {
-        errors = error.data.data;
+        errors = error.data?.data ?? {};
       }
     }
   }
@@ -256,15 +274,7 @@
 
   <DsSelector
     bind:value={item.payment_type as string}
-    items={[
-      { id: "OnAccount", name: "On Account" },
-      { id: "Expense", name: "Expense" },
-      { id: "CorporateCreditCard", name: "Corporate Credit Card" },
-      { id: "Allowance", name: "Allowance" },
-      { id: "FuelCard", name: "Fuel Card" },
-      { id: "Mileage", name: "Mileage" },
-      { id: "PersonalReimbursement", name: "Personal Reimbursement" },
-    ]}
+    items={paymentTypeOptions}
     {errors}
     fieldName="payment_type"
     uiName="Payment Type"
@@ -321,7 +331,7 @@
     >
       <span class="flex w-full gap-4">
         <label for="allowanceTypes">Type</label>
-        {#each Object.keys(allowanceTypes) as type}
+        {#each Object.keys(allowanceTypes) as type (type)}
           <span class="flex items-center gap-1">
             <input
               type="checkbox"
@@ -397,7 +407,8 @@
         <DsActionButton type="submit">Save</DsActionButton>
       {/if}
       <DsActionButton action="/expenses/list"
-        >{isEditingAnotherUsersExpense ? "Back" : "Cancel"}</DsActionButton>
+        >{isEditingAnotherUsersExpense ? "Back" : "Cancel"}</DsActionButton
+      >
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

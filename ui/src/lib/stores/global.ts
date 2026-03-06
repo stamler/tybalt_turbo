@@ -49,6 +49,11 @@ interface StoreState {
     maxAge: number;
     lastRefresh: Date;
   };
+  allow_personal_reimbursement: {
+    value: boolean;
+    maxAge: number;
+    lastRefresh: Date;
+  };
   error: ClientResponseError | null;
   errorMessages: ErrorMessage[];
 }
@@ -69,6 +74,7 @@ const createStore = () => {
   let userClaimsSummaryPromise: Promise<void> | null = null;
   let userPoApproverProfilePromise: Promise<void> | null = null;
   let userDefaultsPromise: Promise<void> | null = null;
+  let allowPersonalReimbursementPromise: Promise<void> | null = null;
 
   const isAutoCancelled = (error: unknown): boolean => {
     const err = error as MaybeAbortError;
@@ -113,6 +119,11 @@ const createStore = () => {
       default_division: "",
       default_role: "",
       default_branch: "",
+      maxAge: 3600 * 1000,
+      lastRefresh: new Date(0),
+    },
+    allow_personal_reimbursement: {
+      value: false,
       maxAge: 3600 * 1000,
       lastRefresh: new Date(0),
     },
@@ -256,6 +267,50 @@ const createStore = () => {
     return userDefaultsPromise;
   };
 
+  const loadAllowPersonalReimbursement = async () => {
+    if (allowPersonalReimbursementPromise) return allowPersonalReimbursementPromise;
+    allowPersonalReimbursementPromise = (async () => {
+      try {
+        const userId = get(authStore)?.model?.id || "";
+        if (!userId) return;
+
+        const response = await pb
+          .collection("admin_profiles")
+          .getFirstListItem(`uid="${userId}"`, {
+            fields: "allow_personal_reimbursement",
+            requestKey: null,
+          });
+
+        update((state) => ({
+          ...state,
+          allow_personal_reimbursement: {
+            value: response.allow_personal_reimbursement ?? false,
+            lastRefresh: new Date(),
+            maxAge: state.allow_personal_reimbursement.maxAge,
+          },
+        }));
+      } catch (error: unknown) {
+        if (isAutoCancelled(error)) return;
+        const typedErr = error as ClientResponseError;
+        if (typedErr?.status === 404) {
+          update((state) => ({
+            ...state,
+            allow_personal_reimbursement: {
+              value: false,
+              lastRefresh: new Date(),
+              maxAge: state.allow_personal_reimbursement.maxAge,
+            },
+          }));
+          return;
+        }
+        console.error("Error loading allow_personal_reimbursement:", typedErr);
+      }
+    })().finally(() => {
+      allowPersonalReimbursementPromise = null;
+    });
+    return allowPersonalReimbursementPromise;
+  };
+
   const refresh = async () => {
     if (!get(authStore)?.isValid) {
       update((state) => {
@@ -266,6 +321,11 @@ const createStore = () => {
             default_role: "",
             default_branch: "",
             maxAge: state.profile.maxAge,
+            lastRefresh: new Date(0),
+          },
+          allow_personal_reimbursement: {
+            value: false,
+            maxAge: state.allow_personal_reimbursement.maxAge,
             lastRefresh: new Date(0),
           },
         };
@@ -293,6 +353,13 @@ const createStore = () => {
 
       if (now.getTime() - state.profile.lastRefresh.getTime() >= state.profile.maxAge) {
         loadUserDefaults();
+      }
+
+      if (
+        now.getTime() - state.allow_personal_reimbursement.lastRefresh.getTime() >=
+        state.allow_personal_reimbursement.maxAge
+      ) {
+        loadAllowPersonalReimbursement();
       }
 
       return newState;

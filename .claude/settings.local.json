@@ -16,7 +16,10 @@
       "Bash(gh issue:*)",
       "Bash(sqlite3 app/pb_data/data.db \"SELECT:*)",
       "Bash(sqlite3 app/test_pb_data/data.db \"SELECT:*)",
-      "Bash(sqlite3 app/pb_data/data.db \"SELECT:*)"
+      "Bash(sqlite3 app/pb_data/data.db \"SELECT:*)",
+      "Bash(npm run build)",
+      "Bash(npx eslint:*)",
+      "Bash(npm ls eslint-plugin-svelte)"
     ]
   }
 }
