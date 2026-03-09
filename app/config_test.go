@@ -11,6 +11,38 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
+func setupJobsEditingDisabledApp(t testing.TB) *tests.TestApp {
+	t.Helper()
+
+	app := testutils.SetupTestApp(t)
+	record, err := app.FindFirstRecordByData("app_config", "key", "jobs")
+	if err != nil {
+		t.Fatalf("failed to find app_config record: %v", err)
+	}
+	record.Set("value", `{"create_edit_absorb": false}`)
+	if err := app.Save(record); err != nil {
+		t.Fatalf("failed to update app_config: %v", err)
+	}
+	return app
+}
+
+func setupExpensesEditingDisabledApp(t testing.TB) *tests.TestApp {
+	t.Helper()
+
+	app := testutils.SetupTestApp(t)
+	collection, err := app.FindCollectionByNameOrId("app_config")
+	if err != nil {
+		t.Fatalf("failed to find app_config collection: %v", err)
+	}
+	record := core.NewRecord(collection)
+	record.Set("key", "expenses")
+	record.Set("value", `{"create_edit_absorb": false}`)
+	if err := app.Save(record); err != nil {
+		t.Fatalf("failed to create expenses app_config: %v", err)
+	}
+	return app
+}
+
 // TestGetConfigValue verifies the GetConfigValue function retrieves config correctly
 func TestGetConfigValue(t *testing.T) {
 	app := testutils.SetupTestApp(t)
@@ -127,24 +159,13 @@ func TestJobCreationBlockedWhenEditingDisabled(t *testing.T) {
 				},
 				"allocations": []
 			}`),
-			Headers: map[string]string{"Authorization": recordToken},
-			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				// Disable job editing by updating the config
-				record, err := app.FindFirstRecordByData("app_config", "key", "jobs")
-				if err != nil {
-					t.Fatalf("failed to find app_config record: %v", err)
-				}
-				record.Set("value", `{"create_edit_absorb": false}`)
-				if err := app.Save(record); err != nil {
-					t.Fatalf("failed to update app_config: %v", err)
-				}
-			},
+			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"jobs_editing_disabled"`,
 				`"job editing is currently disabled"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsEditingDisabledApp,
 		},
 		{
 			Name:   "job creation via PocketBase API blocked when editing disabled",
@@ -158,24 +179,13 @@ func TestJobCreationBlockedWhenEditingDisabled(t *testing.T) {
 				"project_award_date": "2025-01-15",
 				"authorizing_document": "Email"
 			}`),
-			Headers: map[string]string{"Authorization": recordToken},
-			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				// Disable job editing by updating the config
-				record, err := app.FindFirstRecordByData("app_config", "key", "jobs")
-				if err != nil {
-					t.Fatalf("failed to find app_config record: %v", err)
-				}
-				record.Set("value", `{"create_edit_absorb": false}`)
-				if err := app.Save(record); err != nil {
-					t.Fatalf("failed to update app_config: %v", err)
-				}
-			},
+			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"jobs_editing_disabled"`,
 				`"job editing is currently disabled"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsEditingDisabledApp,
 		},
 	}
 
@@ -205,23 +215,12 @@ func TestJobUpdateBlockedWhenEditingDisabled(t *testing.T) {
 				},
 				"allocations": []
 			}`),
-			Headers: map[string]string{"Authorization": recordToken},
-			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				// Disable job editing
-				record, err := app.FindFirstRecordByData("app_config", "key", "jobs")
-				if err != nil {
-					t.Fatalf("failed to find app_config record: %v", err)
-				}
-				record.Set("value", `{"create_edit_absorb": false}`)
-				if err := app.Save(record); err != nil {
-					t.Fatalf("failed to update app_config: %v", err)
-				}
-			},
+			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"jobs_editing_disabled"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsEditingDisabledApp,
 		},
 		{
 			Name:   "job update via PocketBase API blocked when editing disabled",
@@ -230,23 +229,12 @@ func TestJobUpdateBlockedWhenEditingDisabled(t *testing.T) {
 			Body: strings.NewReader(`{
 				"description": "Updated description when disabled"
 			}`),
-			Headers: map[string]string{"Authorization": recordToken},
-			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				// Disable job editing
-				record, err := app.FindFirstRecordByData("app_config", "key", "jobs")
-				if err != nil {
-					t.Fatalf("failed to find app_config record: %v", err)
-				}
-				record.Set("value", `{"create_edit_absorb": false}`)
-				if err := app.Save(record); err != nil {
-					t.Fatalf("failed to update app_config: %v", err)
-				}
-			},
+			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"jobs_editing_disabled"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsEditingDisabledApp,
 		},
 	}
 
@@ -272,23 +260,12 @@ func TestClientAbsorbBlockedWhenJobEditingDisabled(t *testing.T) {
 			Body: strings.NewReader(`{
 				"ids_to_absorb": ["eldtxi3i4h00k8r"]
 			}`),
-			Headers: map[string]string{"Authorization": recordToken},
-			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				// Disable job editing
-				record, err := app.FindFirstRecordByData("app_config", "key", "jobs")
-				if err != nil {
-					t.Fatalf("failed to find app_config record: %v", err)
-				}
-				record.Set("value", `{"create_edit_absorb": false}`)
-				if err := app.Save(record); err != nil {
-					t.Fatalf("failed to update app_config: %v", err)
-				}
-			},
+			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`Job editing is disabled`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsEditingDisabledApp,
 		},
 	}
 
@@ -331,18 +308,7 @@ func TestJobCreationAllowedWhenEditingEnabled(t *testing.T) {
 				},
 				"allocations": []
 			}`),
-			Headers: map[string]string{"Authorization": recordToken},
-			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				// Ensure job editing is enabled
-				record, err := app.FindFirstRecordByData("app_config", "key", "jobs")
-				if err != nil {
-					t.Fatalf("failed to find app_config record: %v", err)
-				}
-				record.Set("value", `{"create_edit_absorb": true}`)
-				if err := app.Save(record); err != nil {
-					t.Fatalf("failed to update app_config: %v", err)
-				}
-			},
+			Headers:         map[string]string{"Authorization": recordToken},
 			ExpectedStatus:  200,
 			ExpectedContent: []string{`"id":"`},
 			TestAppFactory:  testutils.SetupTestApp,
@@ -402,21 +368,6 @@ func TestDefaultBehaviorWhenPropertyMissing(t *testing.T) {
 	}
 	if !enabled {
 		t.Error("expected job editing to be enabled (fail-open) when property is missing")
-	}
-}
-
-// disableExpensesEditing is a BeforeTestFunc helper that creates an app_config
-// record with key="expenses" and value={"create_edit_absorb": false}.
-func disableExpensesEditing(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-	collection, err := app.FindCollectionByNameOrId("app_config")
-	if err != nil {
-		t.Fatalf("failed to find app_config collection: %v", err)
-	}
-	record := core.NewRecord(collection)
-	record.Set("key", "expenses")
-	record.Set("value", `{"create_edit_absorb": false}`)
-	if err := app.Save(record); err != nil {
-		t.Fatalf("failed to create expenses app_config: %v", err)
 	}
 }
 
@@ -521,10 +472,9 @@ func TestExpensesEditingDisabledBlocks(t *testing.T) {
 		for _, s := range g.scenarios {
 			// Apply the shared defaults so each scenario entry stays minimal.
 			s.Headers = map[string]string{"Authorization": recordToken}
-			s.BeforeTestFunc = disableExpensesEditing
 			s.ExpectedStatus = 403
 			s.ExpectedContent = []string{`"expenses_editing_disabled"`}
-			s.TestAppFactory = testutils.SetupTestApp
+			s.TestAppFactory = setupExpensesEditingDisabledApp
 			s.Test(t)
 		}
 	}
@@ -548,24 +498,22 @@ func TestVendorAbsorbBlockedWhenEditingDisabled(t *testing.T) {
 				"ids_to_absorb": ["ctswqva5onxj75q"]
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
-			BeforeTestFunc: disableExpensesEditing,
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"Expense editing is currently disabled."`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupExpensesEditingDisabledApp,
 		},
 		{
 			Name:           "vendor undo absorb blocked when editing disabled",
 			Method:         http.MethodPost,
 			URL:            "/api/vendors/undo_absorb",
 			Headers:        map[string]string{"Authorization": recordToken},
-			BeforeTestFunc: disableExpensesEditing,
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"Expense editing is currently disabled."`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupExpensesEditingDisabledApp,
 		},
 	}
 

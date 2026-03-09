@@ -7,8 +7,6 @@ import (
 	"testing"
 	"tybalt/internal/testutils"
 
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -122,7 +120,9 @@ func TestRejectTimesheet_QueuesNotifications(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var beforeCount int64
+	baselineApp := testutils.SetupTestApp(t)
+	beforeCount := testutils.CountNotificationsByTemplateCode(t, baselineApp, "timesheet_rejected")
+	baselineApp.Cleanup()
 
 	scenario := tests.ApiScenario{
 		Name:   "reject timesheet queues notifications",
@@ -139,43 +139,10 @@ func TestRejectTimesheet_QueuesNotifications(t *testing.T) {
 		TestAppFactory: testutils.SetupTestApp,
 	}
 
-	// Count notifications before the request is executed.
-	scenario.BeforeTestFunc = func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-		var result struct {
-			Count int64 `db:"count"`
-		}
-		err := app.DB().NewQuery(`
-			SELECT COUNT(*) AS count
-			FROM notifications n
-			JOIN notification_templates t ON n.template = t.id
-			WHERE t.code = {:code}
-		`).Bind(dbx.Params{
-			"code": "timesheet_rejected",
-		}).One(&result)
-		if err != nil {
-			tb.Fatalf("failed to count notifications for timesheet_rejected before request: %v", err)
-		}
-		beforeCount = result.Count
-	}
-
 	// After the request, ensure that at least one new timesheet_rejected notification was created.
 	scenario.AfterTestFunc = func(tb testing.TB, app *tests.TestApp, res *http.Response) {
-		var result struct {
-			Count int64 `db:"count"`
-		}
-		err := app.DB().NewQuery(`
-			SELECT COUNT(*) AS count
-			FROM notifications n
-			JOIN notification_templates t ON n.template = t.id
-			WHERE t.code = {:code}
-		`).Bind(dbx.Params{
-			"code": "timesheet_rejected",
-		}).One(&result)
-		if err != nil {
-			tb.Fatalf("failed to count notifications for timesheet_rejected after request: %v", err)
-		}
-		if result.Count <= beforeCount {
-			tb.Fatalf("expected timesheet_rejected notifications to be created by reject route, before=%d after=%d", beforeCount, result.Count)
+		if afterCount := testutils.CountNotificationsByTemplateCode(tb, app, "timesheet_rejected"); afterCount <= beforeCount {
+			tb.Fatalf("expected timesheet_rejected notifications to increase from seeded baseline, before=%d after=%d", beforeCount, afterCount)
 		}
 	}
 
@@ -197,7 +164,9 @@ func TestAddTimesheetReviewer_QueuesSharedNotifications(t *testing.T) {
 	// Choose a viewer different from the approver (time@test.com).
 	const viewerUID = "rzr98oadsp9qc11"
 
-	var beforeCount int64
+	baselineApp := testutils.SetupTestApp(t)
+	beforeCount := testutils.CountNotificationsByTemplateCode(t, baselineApp, "timesheet_shared")
+	baselineApp.Cleanup()
 
 	body := fmt.Sprintf(`{"time_sheet": "%s", "reviewer": "%s"}`, timesheetID, viewerUID)
 
@@ -218,43 +187,10 @@ func TestAddTimesheetReviewer_QueuesSharedNotifications(t *testing.T) {
 		TestAppFactory: testutils.SetupTestApp,
 	}
 
-	// Count notifications before the request is executed.
-	scenario.BeforeTestFunc = func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-		var result struct {
-			Count int64 `db:"count"`
-		}
-		err := app.DB().NewQuery(`
-			SELECT COUNT(*) AS count
-			FROM notifications n
-			JOIN notification_templates t ON n.template = t.id
-			WHERE t.code = {:code}
-		`).Bind(dbx.Params{
-			"code": "timesheet_shared",
-		}).One(&result)
-		if err != nil {
-			tb.Fatalf("failed to count notifications for timesheet_shared before request: %v", err)
-		}
-		beforeCount = result.Count
-	}
-
 	// After the request, ensure that at least one new timesheet_shared notification was created.
 	scenario.AfterTestFunc = func(tb testing.TB, app *tests.TestApp, res *http.Response) {
-		var result struct {
-			Count int64 `db:"count"`
-		}
-		err := app.DB().NewQuery(`
-			SELECT COUNT(*) AS count
-			FROM notifications n
-			JOIN notification_templates t ON n.template = t.id
-			WHERE t.code = {:code}
-		`).Bind(dbx.Params{
-			"code": "timesheet_shared",
-		}).One(&result)
-		if err != nil {
-			tb.Fatalf("failed to count notifications for timesheet_shared after request: %v", err)
-		}
-		if result.Count <= beforeCount {
-			tb.Fatalf("expected timesheet_shared notifications to be created by sharing route, before=%d after=%d", beforeCount, result.Count)
+		if afterCount := testutils.CountNotificationsByTemplateCode(tb, app, "timesheet_shared"); afterCount <= beforeCount {
+			tb.Fatalf("expected timesheet_shared notifications to increase from seeded baseline, before=%d after=%d", beforeCount, afterCount)
 		}
 	}
 

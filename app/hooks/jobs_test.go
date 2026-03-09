@@ -139,23 +139,13 @@ func TestGenerateTopLevelJobNumber_EmptyYearProposal(t *testing.T) {
 // rate_sheet to an inactive rate sheet returns an error.
 //
 // Test data in test_pb_data/data.db:
-//   - rate_sheets: "c41ofep525bcacj" (2025 Standard Rates)
+//   - rate_sheets: "rs_hook_inactive_001" (Hook Inactive Rate Sheet)
 func TestValidateRateSheetIsActive_InactiveRateSheet(t *testing.T) {
 	app, err := tests.NewTestApp("../test_pb_data")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer app.Cleanup()
-
-	// Ensure the test rate sheet is inactive
-	rateSheet, err := app.FindRecordById("rate_sheets", "c41ofep525bcacj")
-	if err != nil {
-		t.Fatalf("failed to find rate sheet: %v", err)
-	}
-	rateSheet.Set("active", false)
-	if err := app.Save(rateSheet); err != nil {
-		t.Fatalf("failed to deactivate rate sheet: %v", err)
-	}
 
 	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
 	if err != nil {
@@ -164,7 +154,7 @@ func TestValidateRateSheetIsActive_InactiveRateSheet(t *testing.T) {
 
 	// Create a new job record and set rate_sheet to the inactive rate sheet
 	record := core.NewRecord(jobsCollection)
-	record.Set("rate_sheet", "c41ofep525bcacj")
+	record.Set("rate_sheet", "rs_hook_inactive_001")
 
 	err = validateRateSheetIsActive(app, record, nil)
 	if err == nil {
@@ -304,8 +294,8 @@ func TestCleanJob_ClearsRateSheetForProposal(t *testing.T) {
 // changing an existing project's rate_sheet to an inactive one fails.
 //
 // Test data in test_pb_data/data.db:
-//   - jobs: "u09fwwcg07y03m7" (24-291, project)
-//   - rate_sheets: "c41ofep525bcacj" (active), "test_empty_sheet" (inactive)
+//   - jobs: "job_hook_rs_active_001" (project with active rate_sheet c41ofep525bcacj)
+//   - rate_sheets: "c41ofep525bcacj" (active), "rs_hook_inactive_001" (inactive)
 func TestValidateRateSheetIsActive_ChangeToInactiveRejected(t *testing.T) {
 	app, err := tests.NewTestApp("../test_pb_data")
 	if err != nil {
@@ -313,24 +303,13 @@ func TestValidateRateSheetIsActive_ChangeToInactiveRejected(t *testing.T) {
 	}
 	defer app.Cleanup()
 
-	// Set up: give an existing project an active rate_sheet
-	project, err := app.FindRecordById("jobs", "u09fwwcg07y03m7")
+	project, err := app.FindRecordById("jobs", "job_hook_rs_active_001")
 	if err != nil {
 		t.Fatalf("failed to fetch project: %v", err)
 	}
-	project.Set("rate_sheet", "c41ofep525bcacj") // active rate sheet
-	if err := app.Save(project); err != nil {
-		t.Fatalf("failed to save project with rate_sheet: %v", err)
-	}
-
-	// Fetch again so Original() has the active rate_sheet
-	project, err = app.FindRecordById("jobs", "u09fwwcg07y03m7")
-	if err != nil {
-		t.Fatalf("failed to re-fetch project: %v", err)
-	}
 
 	// Try to change to inactive rate_sheet
-	project.Set("rate_sheet", "test_empty_sheet")
+	project.Set("rate_sheet", "rs_hook_inactive_001")
 
 	err = validateRateSheetIsActive(app, project, nil)
 	if err == nil {

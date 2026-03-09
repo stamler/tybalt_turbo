@@ -3,8 +3,6 @@ package main
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"mime/multipart"
@@ -14,13 +12,28 @@ import (
 	"tybalt/internal/testutils"
 	"tybalt/utilities"
 
-	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
 func TestExpensesCreate(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mileageValidToken, err := testutils.GenerateRecordToken("users", "u_mileage_valid@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mileageMissingToken, err := testutils.GenerateRecordToken("users", "u_mileage_missing@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mileageExpiredToken, err := testutils.GenerateRecordToken("users", "u_mileage_expired@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	mileageSameDayToken, err := testutils.GenerateRecordToken("users", "u_mileage_same_day@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -513,7 +526,7 @@ func TestExpensesCreate(t *testing.T) {
 			// With no prior mileage in test DB for the period and distance 100,
 			// total should be 100 * 0.70 = 70.00 and vendor should be cleared.
 			b, ct, err := makeMultipart(`{
-				"uid": "rzr98oadsp9qc11",
+				"uid": "u_mileage_valid",
 				"date": "2025-01-10",
 				"division": "vccd5fo56ctbigh",
 				"description": "mileage",
@@ -530,7 +543,7 @@ func TestExpensesCreate(t *testing.T) {
 				Method:         http.MethodPost,
 				URL:            "/api/collections/expenses/records",
 				Body:           b,
-				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				Headers:        map[string]string{"Authorization": mileageValidToken, "Content-Type": ct},
 				ExpectedStatus: 200,
 				ExpectedContent: []string{
 					"\"payment_type\":\"Mileage\"",
@@ -540,24 +553,13 @@ func TestExpensesCreate(t *testing.T) {
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
-				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-					// Set valid insurance expiry for the user
-					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
-					if err != nil {
-						t.Fatalf("failed to find admin_profile: %v", err)
-					}
-					adminProfile.Set("personal_vehicle_insurance_expiry", "2025-12-31")
-					if err := app.Save(adminProfile); err != nil {
-						t.Fatalf("failed to save admin_profile: %v", err)
-					}
-				},
 			}
 		}(),
 		func() tests.ApiScenario {
 			// Period starts 2025-01-05; tiers {0:0.70, 5000:0.64}. With distance 5100
 			// and zero prior mileage, expected total is 5000*0.70 + 100*0.64 = 3564.
 			b, ct, err := makeMultipart(`{
-				"uid": "rzr98oadsp9qc11",
+				"uid": "u_mileage_valid",
 				"date": "2025-01-05",
 				"division": "vccd5fo56ctbigh",
 				"description": "mileage spanning tiers",
@@ -574,7 +576,7 @@ func TestExpensesCreate(t *testing.T) {
 				Method:         http.MethodPost,
 				URL:            "/api/collections/expenses/records",
 				Body:           b,
-				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				Headers:        map[string]string{"Authorization": mileageValidToken, "Content-Type": ct},
 				ExpectedStatus: 200,
 				ExpectedContent: []string{
 					"\"payment_type\":\"Mileage\"",
@@ -584,23 +586,12 @@ func TestExpensesCreate(t *testing.T) {
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
-				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-					// Set valid insurance expiry for the user
-					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
-					if err != nil {
-						t.Fatalf("failed to find admin_profile: %v", err)
-					}
-					adminProfile.Set("personal_vehicle_insurance_expiry", "2025-12-31")
-					if err := app.Save(adminProfile); err != nil {
-						t.Fatalf("failed to save admin_profile: %v", err)
-					}
-				},
 			}
 		}(),
 		func() tests.ApiScenario {
 			// Mileage expense should fail when insurance expiry is not set
 			b, ct, err := makeMultipart(`{
-				"uid": "rzr98oadsp9qc11",
+				"uid": "u_mileage_missing",
 				"date": "2025-01-10",
 				"division": "vccd5fo56ctbigh",
 				"description": "mileage with no insurance",
@@ -617,7 +608,7 @@ func TestExpensesCreate(t *testing.T) {
 				Method:         http.MethodPost,
 				URL:            "/api/collections/expenses/records",
 				Body:           b,
-				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				Headers:        map[string]string{"Authorization": mileageMissingToken, "Content-Type": ct},
 				ExpectedStatus: 400,
 				ExpectedContent: []string{
 					`"code":"insurance_expiry_missing"`,
@@ -625,23 +616,12 @@ func TestExpensesCreate(t *testing.T) {
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreateRequest": 1},
 				TestAppFactory: testutils.SetupTestApp,
-				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-					// Ensure insurance expiry is empty
-					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
-					if err != nil {
-						t.Fatalf("failed to find admin_profile: %v", err)
-					}
-					adminProfile.Set("personal_vehicle_insurance_expiry", "")
-					if err := app.Save(adminProfile); err != nil {
-						t.Fatalf("failed to save admin_profile: %v", err)
-					}
-				},
 			}
 		}(),
 		func() tests.ApiScenario {
 			// Mileage expense should fail when insurance has expired
 			b, ct, err := makeMultipart(`{
-				"uid": "rzr98oadsp9qc11",
+				"uid": "u_mileage_expired",
 				"date": "2025-01-10",
 				"division": "vccd5fo56ctbigh",
 				"description": "mileage with expired insurance",
@@ -658,7 +638,7 @@ func TestExpensesCreate(t *testing.T) {
 				Method:         http.MethodPost,
 				URL:            "/api/collections/expenses/records",
 				Body:           b,
-				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				Headers:        map[string]string{"Authorization": mileageExpiredToken, "Content-Type": ct},
 				ExpectedStatus: 400,
 				ExpectedContent: []string{
 					`"code":"insurance_expired"`,
@@ -666,23 +646,12 @@ func TestExpensesCreate(t *testing.T) {
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreateRequest": 1},
 				TestAppFactory: testutils.SetupTestApp,
-				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-					// Set insurance expiry to a date before the expense date
-					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
-					if err != nil {
-						t.Fatalf("failed to find admin_profile: %v", err)
-					}
-					adminProfile.Set("personal_vehicle_insurance_expiry", "2024-12-31")
-					if err := app.Save(adminProfile); err != nil {
-						t.Fatalf("failed to save admin_profile: %v", err)
-					}
-				},
 			}
 		}(),
 		func() tests.ApiScenario {
 			// Mileage expense should succeed when expense date equals insurance expiry date
 			b, ct, err := makeMultipart(`{
-				"uid": "rzr98oadsp9qc11",
+				"uid": "u_mileage_same_day",
 				"date": "2025-01-10",
 				"division": "vccd5fo56ctbigh",
 				"description": "mileage on expiry day",
@@ -699,7 +668,7 @@ func TestExpensesCreate(t *testing.T) {
 				Method:         http.MethodPost,
 				URL:            "/api/collections/expenses/records",
 				Body:           b,
-				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				Headers:        map[string]string{"Authorization": mileageSameDayToken, "Content-Type": ct},
 				ExpectedStatus: 200,
 				ExpectedContent: []string{
 					"\"payment_type\":\"Mileage\"",
@@ -708,23 +677,12 @@ func TestExpensesCreate(t *testing.T) {
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
-				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-					// Set insurance expiry to the same date as the expense
-					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
-					if err != nil {
-						t.Fatalf("failed to find admin_profile: %v", err)
-					}
-					adminProfile.Set("personal_vehicle_insurance_expiry", "2025-01-10")
-					if err := app.Save(adminProfile); err != nil {
-						t.Fatalf("failed to save admin_profile: %v", err)
-					}
-				},
 			}
 		}(),
 		func() tests.ApiScenario {
 			// Non-mileage expense should not be affected by missing insurance expiry
 			b, ct, err := makeMultipart(`{
-				"uid": "rzr98oadsp9qc11",
+				"uid": "u_mileage_missing",
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "regular expense",
@@ -740,7 +698,7 @@ func TestExpensesCreate(t *testing.T) {
 				Method:         http.MethodPost,
 				URL:            "/api/collections/expenses/records",
 				Body:           b,
-				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+				Headers:        map[string]string{"Authorization": mileageMissingToken, "Content-Type": ct},
 				ExpectedStatus: 200,
 				ExpectedContent: []string{
 					`"payment_type":"Expense"`,
@@ -748,17 +706,6 @@ func TestExpensesCreate(t *testing.T) {
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
-				BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-					// Ensure insurance expiry is empty - should not affect non-mileage expenses
-					adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": "rzr98oadsp9qc11"})
-					if err != nil {
-						t.Fatalf("failed to find admin_profile: %v", err)
-					}
-					adminProfile.Set("personal_vehicle_insurance_expiry", "")
-					if err := app.Save(adminProfile); err != nil {
-						t.Fatalf("failed to save admin_profile: %v", err)
-					}
-				},
 			}
 		}(),
 		func() tests.ApiScenario {
@@ -1097,7 +1044,9 @@ func TestRejectExpense_QueuesNotifications(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	var beforeCount int64
+	baselineApp := testutils.SetupTestApp(t)
+	t.Cleanup(baselineApp.Cleanup)
+	beforeCount := testutils.CountNotificationsByTemplateCode(t, baselineApp, "expense_rejected")
 
 	scenario := tests.ApiScenario{
 		Name:   "reject expense queues notifications",
@@ -1114,43 +1063,11 @@ func TestRejectExpense_QueuesNotifications(t *testing.T) {
 		TestAppFactory: testutils.SetupTestApp,
 	}
 
-	// Count notifications before the request is executed.
-	scenario.BeforeTestFunc = func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-		var result struct {
-			Count int64 `db:"count"`
-		}
-		err := app.DB().NewQuery(`
-			SELECT COUNT(*) AS count
-			FROM notifications n
-			JOIN notification_templates t ON n.template = t.id
-			WHERE t.code = {:code}
-		`).Bind(dbx.Params{
-			"code": "expense_rejected",
-		}).One(&result)
-		if err != nil {
-			tb.Fatalf("failed to count notifications for expense_rejected before request: %v", err)
-		}
-		beforeCount = result.Count
-	}
-
 	// After the request, ensure that at least one new expense_rejected notification was created.
 	scenario.AfterTestFunc = func(tb testing.TB, app *tests.TestApp, res *http.Response) {
-		var result struct {
-			Count int64 `db:"count"`
-		}
-		err := app.DB().NewQuery(`
-			SELECT COUNT(*) AS count
-			FROM notifications n
-			JOIN notification_templates t ON n.template = t.id
-			WHERE t.code = {:code}
-		`).Bind(dbx.Params{
-			"code": "expense_rejected",
-		}).One(&result)
-		if err != nil {
-			tb.Fatalf("failed to count notifications for expense_rejected after request: %v", err)
-		}
-		if result.Count <= beforeCount {
-			tb.Fatalf("expected expense_rejected notifications to be created by reject route, before=%d after=%d", beforeCount, result.Count)
+		resultCount := testutils.CountNotificationsByTemplateCode(tb, app, "expense_rejected")
+		if resultCount <= beforeCount {
+			tb.Fatalf("expected expense_rejected notifications to be created by reject route, before=%d after=%d", beforeCount, resultCount)
 		}
 	}
 
@@ -1864,71 +1781,28 @@ func TestExpensesRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	const oneTimePOID = "2plsetqdxht7esg"
-	const expenseID = "2gq9uyxmkcyopa4"
-	closeOneTimePO := func(tb testing.TB, app *tests.TestApp) {
-		tb.Helper()
-		if _, err := app.NonconcurrentDB().NewQuery(`
-			UPDATE purchase_orders
-			SET status = 'Closed',
-			    closed = '2026-01-01 00:00:00.000Z'
-			WHERE id = {:id}
-		`).Bind(dbx.Params{"id": oneTimePOID}).Execute(); err != nil {
-			tb.Fatalf("failed to close one-time purchase order fixture: %v", err)
-		}
-	}
-
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "submit fails when expense references a closed purchase order",
 			Method: http.MethodPost,
-			URL:    "/api/expenses/" + expenseID + "/submit",
+			URL:    "/api/expenses/exp_submit_closed_po_1/submit",
 			Headers: map[string]string{
 				"Authorization": ownerToken,
 			},
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"error":"purchase order is not active"`},
 			TestAppFactory:  testutils.SetupTestApp,
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				closeOneTimePO(tb, app)
-				if _, err := app.NonconcurrentDB().NewQuery(`
-					UPDATE expenses
-					SET purchase_order = {:purchase_order},
-					    submitted = 0,
-					    approved = '',
-					    committed = '',
-					    rejected = ''
-					WHERE id = {:id}
-				`).Bind(dbx.Params{"id": expenseID, "purchase_order": oneTimePOID}).Execute(); err != nil {
-					tb.Fatalf("failed preparing expense fixture for submit route test: %v", err)
-				}
-			},
 		},
 		{
 			Name:   "approve fails when expense references a closed purchase order",
 			Method: http.MethodPost,
-			URL:    "/api/expenses/" + expenseID + "/approve",
+			URL:    "/api/expenses/exp_approve_closed_po_1/approve",
 			Headers: map[string]string{
 				"Authorization": approverToken,
 			},
 			ExpectedStatus:  400,
 			ExpectedContent: []string{`"error":"purchase order is not active"`},
 			TestAppFactory:  testutils.SetupTestApp,
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				closeOneTimePO(tb, app)
-				if _, err := app.NonconcurrentDB().NewQuery(`
-					UPDATE expenses
-					SET purchase_order = {:purchase_order},
-					    approver = 'f2j5a8vk006baub',
-					    submitted = 1,
-					    approved = '',
-					    committed = '',
-					    rejected = ''
-					WHERE id = {:id}
-				`).Bind(dbx.Params{"id": expenseID, "purchase_order": oneTimePOID}).Execute(); err != nil {
-					tb.Fatalf("failed preparing expense fixture for approve route test: %v", err)
-				}
-			},
 		},
 		{
 			Name:            "caller with the commit claim can commit approved expenses records",
@@ -2087,12 +1961,6 @@ func TestCalculateMileageTotal(t *testing.T) {
 	})
 }
 
-// computeTestHash computes SHA256 hash of data and returns it as a hex string
-func computeTestHash(data []byte) string {
-	h := sha256.Sum256(data)
-	return hex.EncodeToString(h[:])
-}
-
 // TestExpensesCreate_DuplicateAttachmentFails verifies that creating an expense
 // with an attachment that has the same hash as an existing expense fails.
 func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
@@ -2139,10 +2007,7 @@ func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
 		return buf, contentType, nil
 	}
 
-	// Use a specific file content that will produce a consistent hash
-	// Compute its SHA256 hash to set on the existing record
 	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xDE, 0xAD, 0xBE, 0xEF}
-	duplicateHash := computeTestHash(duplicateFileContent)
 
 	scenario := tests.ApiScenario{
 		Name:           "duplicate attachment fails with field-level error",
@@ -2157,29 +2022,6 @@ func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
 			"OnRecordCreateRequest": 1,
 		},
 		TestAppFactory: testutils.SetupTestApp,
-		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			// Create an existing expense with the same attachment hash directly in DB
-			collection, err := app.FindCollectionByNameOrId("expenses")
-			if err != nil {
-				tb.Fatalf("failed to find expenses collection: %v", err)
-			}
-			record := core.NewRecord(collection)
-			record.Set("uid", "rzr98oadsp9qc11")
-			record.Set("date", "2024-08-01")
-			record.Set("division", "vccd5fo56ctbigh")
-			record.Set("description", "existing expense with attachment")
-			record.Set("pay_period_ending", "2024-08-10")
-			record.Set("payment_type", "Expense")
-			record.Set("kind", utilities.DefaultCapitalExpenditureKindID())
-			record.Set("total", 50)
-			record.Set("vendor", "2zqxtsmymf670ha")
-			record.Set("approver", "f2j5a8vk006baub")
-			record.Set("branch", "80875lm27v8wgi4")
-			record.Set("attachment_hash", duplicateHash)
-			if err := app.Save(record); err != nil {
-				tb.Fatalf("failed to create existing expense: %v", err)
-			}
-		},
 	}
 
 	// Create the request body for the duplicate attempt
@@ -2248,9 +2090,7 @@ func TestExpensesUpdate_DuplicateAttachmentFails(t *testing.T) {
 		return buf, contentType, nil
 	}
 
-	// Use a specific file content that will produce a consistent hash
 	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xCA, 0xFE, 0xBA, 0xBE}
-	duplicateHash := computeTestHash(duplicateFileContent)
 
 	scenario := tests.ApiScenario{
 		Name:           "updating expense with duplicate attachment fails",
@@ -2265,29 +2105,6 @@ func TestExpensesUpdate_DuplicateAttachmentFails(t *testing.T) {
 			"OnRecordUpdateRequest": 1,
 		},
 		TestAppFactory: testutils.SetupTestApp,
-		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			// Create an existing expense with the same attachment hash directly in DB
-			collection, err := app.FindCollectionByNameOrId("expenses")
-			if err != nil {
-				tb.Fatalf("failed to find expenses collection: %v", err)
-			}
-			record := core.NewRecord(collection)
-			record.Set("uid", "f2j5a8vk006baub") // Different user to avoid conflicts
-			record.Set("date", "2024-08-01")
-			record.Set("division", "vccd5fo56ctbigh")
-			record.Set("description", "expense with attachment for update test")
-			record.Set("pay_period_ending", "2024-08-10")
-			record.Set("payment_type", "Expense")
-			record.Set("kind", utilities.DefaultCapitalExpenditureKindID())
-			record.Set("total", 50)
-			record.Set("vendor", "2zqxtsmymf670ha")
-			record.Set("approver", "etysnrlup2f6bak")
-			record.Set("branch", "80875lm27v8wgi4")
-			record.Set("attachment_hash", duplicateHash)
-			if err := app.Save(record); err != nil {
-				tb.Fatalf("failed to create existing expense: %v", err)
-			}
-		},
 	}
 
 	// Create the request body for the update with duplicate attachment
@@ -2354,16 +2171,12 @@ func TestExpensesUpdate_SameAttachmentSucceeds(t *testing.T) {
 		return buf, contentType, nil
 	}
 
-	// Use a specific file content
 	fileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x12, 0x34, 0x56, 0x78}
-	existingHash := computeTestHash(fileContent)
-
-	// The test expense record "2gq9uyxmkcyopa4" is owned by user "rzr98oadsp9qc11"
-	// We'll set its attachment_hash to our hash, then try to update it with the same file
+	// The seeded expense fixture already has the same attachment hash as fileContent.
 	scenario := tests.ApiScenario{
 		Name:           "updating expense with its own attachment succeeds",
 		Method:         http.MethodPatch,
-		URL:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
+		URL:            "/api/collections/expenses/records/exp_same_attach_target_1",
 		ExpectedStatus: 200,
 		ExpectedContent: []string{
 			`"description":"updated description"`,
@@ -2372,17 +2185,6 @@ func TestExpensesUpdate_SameAttachmentSucceeds(t *testing.T) {
 			"OnRecordUpdate": 1,
 		},
 		TestAppFactory: testutils.SetupTestApp,
-		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			// Set the attachment_hash on the existing expense to match what we'll upload
-			expense, err := app.FindRecordById("expenses", "2gq9uyxmkcyopa4")
-			if err != nil {
-				tb.Fatalf("failed to find expense: %v", err)
-			}
-			expense.Set("attachment_hash", existingHash)
-			if err := app.Save(expense); err != nil {
-				tb.Fatalf("failed to update expense: %v", err)
-			}
-		},
 	}
 
 	// Create the request body with the same file content

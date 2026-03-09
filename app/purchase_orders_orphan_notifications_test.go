@@ -120,8 +120,7 @@ func TestPurchaseOrderRequestHooks_DeleteOrphanedNotificationOnNextFailure(t *te
 		},
 	}
 
-	var updateBeforeNotificationCount int
-	var updateBeforeDescription string
+	const updateBeforeDescription = "Higher-value unapproved PO that already has first approval "
 	var updateHookRecordID string
 	updateScenario := tests.ApiScenario{
 		Name:   "PO update request cleans up notification when downstream hook returns error",
@@ -138,23 +137,14 @@ func TestPurchaseOrderRequestHooks_DeleteOrphanedNotificationOnNextFailure(t *te
 		ExpectedContent: []string{
 			`"message":"Forced update request failure."`,
 		},
-		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			updateBeforeNotificationCount = countNotificationsForPO(tb, app, updatePOID)
-
-			po, err := app.FindRecordById("purchase_orders", updatePOID)
-			if err != nil {
-				tb.Fatalf("failed loading purchase order fixture %s: %v", updatePOID, err)
-			}
-			updateBeforeDescription = po.GetString("description")
-		},
 		AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
 			if updateHookRecordID != updatePOID {
 				tb.Fatalf("expected failing downstream update hook to run for %s, got %s", updatePOID, updateHookRecordID)
 			}
 
 			updateAfterNotificationCount := countNotificationsForPO(tb, app, updatePOID)
-			if updateAfterNotificationCount != updateBeforeNotificationCount {
-				tb.Fatalf("expected notification count to remain unchanged after failed update request, before=%d after=%d", updateBeforeNotificationCount, updateAfterNotificationCount)
+			if updateAfterNotificationCount != 0 {
+				tb.Fatalf("expected notification count to remain zero after failed update request, got %d", updateAfterNotificationCount)
 			}
 
 			po, err := app.FindRecordById("purchase_orders", updatePOID)

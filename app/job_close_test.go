@@ -7,7 +7,6 @@ import (
 	"tybalt/internal/testutils"
 
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -27,8 +26,6 @@ func TestCloseJob_ImportedBypassClosesAndCreatesProjectNote(t *testing.T) {
 	const projectID = "fcprojimpnoprop1"
 	const projectNoteText = "Project closed via imported fast close flow"
 
-	var beforeProjectNoteCount int64
-
 	scenario := tests.ApiScenario{
 		Name:   "imported project closes via bypass and writes project note",
 		Method: http.MethodPost,
@@ -44,22 +41,6 @@ func TestCloseJob_ImportedBypassClosesAndCreatesProjectNote(t *testing.T) {
 			`"project_note_created":true`,
 		},
 		TestAppFactory: testutils.SetupTestApp,
-		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-			var result struct {
-				Count int64 `db:"count"`
-			}
-			if err := app.DB().NewQuery(`
-				SELECT COUNT(*) AS count
-				FROM client_notes
-				WHERE job = {:job} AND note = {:note}
-			`).Bind(dbx.Params{
-				"job":  projectID,
-				"note": projectNoteText,
-			}).One(&result); err != nil {
-				tb.Fatalf("failed to count project notes before request: %v", err)
-			}
-			beforeProjectNoteCount = result.Count
-		},
 		AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 			project, err := app.FindRecordById("jobs", projectID)
 			if err != nil {
@@ -85,8 +66,8 @@ func TestCloseJob_ImportedBypassClosesAndCreatesProjectNote(t *testing.T) {
 			}).One(&result); err != nil {
 				tb.Fatalf("failed to count project notes after request: %v", err)
 			}
-			if result.Count <= beforeProjectNoteCount {
-				tb.Fatalf("expected project close note to be created, before=%d after=%d", beforeProjectNoteCount, result.Count)
+			if result.Count != 1 {
+				tb.Fatalf("expected exactly one project close note, got %d", result.Count)
 			}
 		},
 	}
@@ -106,9 +87,6 @@ func TestCloseJob_ImportedAutoAwardCreatesProposalNoteAndCloses(t *testing.T) {
 	const projectNoteText = "Project closed via imported fast close flow"
 	const proposalNoteText = "Proposal auto-awarded during imported fast close of project " + projectNumber + " (" + projectID + ")"
 
-	var beforeProjectNoteCount int64
-	var beforeProposalNoteCount int64
-
 	scenario := tests.ApiScenario{
 		Name:   "imported project close auto-awards imported proposal and writes both notes",
 		Method: http.MethodPost,
@@ -127,37 +105,6 @@ func TestCloseJob_ImportedAutoAwardCreatesProposalNoteAndCloses(t *testing.T) {
 			`"to_status":"Awarded"`,
 		},
 		TestAppFactory: testutils.SetupTestApp,
-		BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-			var projectNoteResult struct {
-				Count int64 `db:"count"`
-			}
-			if err := app.DB().NewQuery(`
-				SELECT COUNT(*) AS count
-				FROM client_notes
-				WHERE job = {:job} AND note = {:note}
-			`).Bind(dbx.Params{
-				"job":  projectID,
-				"note": projectNoteText,
-			}).One(&projectNoteResult); err != nil {
-				tb.Fatalf("failed to count project notes before request: %v", err)
-			}
-			beforeProjectNoteCount = projectNoteResult.Count
-
-			var proposalNoteResult struct {
-				Count int64 `db:"count"`
-			}
-			if err := app.DB().NewQuery(`
-				SELECT COUNT(*) AS count
-				FROM client_notes
-				WHERE job = {:job} AND note = {:note}
-			`).Bind(dbx.Params{
-				"job":  proposalID,
-				"note": proposalNoteText,
-			}).One(&proposalNoteResult); err != nil {
-				tb.Fatalf("failed to count proposal notes before request: %v", err)
-			}
-			beforeProposalNoteCount = proposalNoteResult.Count
-		},
 		AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 			project, err := app.FindRecordById("jobs", projectID)
 			if err != nil {
@@ -194,8 +141,8 @@ func TestCloseJob_ImportedAutoAwardCreatesProposalNoteAndCloses(t *testing.T) {
 			}).One(&projectNoteResult); err != nil {
 				tb.Fatalf("failed to count project notes after request: %v", err)
 			}
-			if projectNoteResult.Count <= beforeProjectNoteCount {
-				tb.Fatalf("expected project close note to be created, before=%d after=%d", beforeProjectNoteCount, projectNoteResult.Count)
+			if projectNoteResult.Count != 1 {
+				tb.Fatalf("expected exactly one project close note, got %d", projectNoteResult.Count)
 			}
 
 			var proposalNoteResult struct {
@@ -211,8 +158,8 @@ func TestCloseJob_ImportedAutoAwardCreatesProposalNoteAndCloses(t *testing.T) {
 			}).One(&proposalNoteResult); err != nil {
 				tb.Fatalf("failed to count proposal notes after request: %v", err)
 			}
-			if proposalNoteResult.Count <= beforeProposalNoteCount {
-				tb.Fatalf("expected proposal auto-award note to be created, before=%d after=%d", beforeProposalNoteCount, proposalNoteResult.Count)
+			if proposalNoteResult.Count != 1 {
+				tb.Fatalf("expected exactly one proposal auto-award note, got %d", proposalNoteResult.Count)
 			}
 		},
 	}

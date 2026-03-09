@@ -72,13 +72,8 @@ func TestMarkReferencingJobsNotImported_UpdatesJobs(t *testing.T) {
 	}
 	defer app.Cleanup()
 
-	const jobID = "cjf0kt0defhq480"
+	const jobID = "job_marknotimp_001"
 	const clientID = "lb0fnenkeyitsny"
-
-	if _, err := app.DB().NewQuery(`UPDATE jobs SET _imported = true WHERE id = {:id}`).
-		Bind(map[string]any{"id": jobID}).Execute(); err != nil {
-		t.Fatalf("failed to prime job import flag: %v", err)
-	}
 
 	if err := MarkReferencingJobsNotImported(app, "client", clientID); err != nil {
 		t.Fatalf("MarkReferencingJobsNotImported returned error: %v", err)

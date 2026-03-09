@@ -2,18 +2,23 @@
 
 This document lists every direct change made to `app/test_pb_data/data.db` while removing setup-time DB mutation from purchase-order tests.
 
+See also [runtime_test_db_exceptions.md](app/test_pb_data/runtime_test_db_exceptions.md) for the remaining runtime-only exceptions that a single canonical fixture DB cannot represent cleanly.
+
 ## 1) Normalized legacy PO kind values
+
 - Table: `purchase_orders`
 - Change: set `kind='l3vtlbqg529m52j'` (`standard`) for all rows where `kind=''`.
 - Reason: remove per-test kind patching and keep fixture rows valid under strict kind validation.
 
 ## 2) Enabled computer-kind second-stage test semantics in fixture
+
 - Table: `expenditure_kinds`
 - Row: `id='7jgifny7fljd9hi'` (`computer`)
 - Change: `second_approval_threshold` from `0` to `500`.
 - Reason: allow a stable fixture case for kind-specific limit-column visibility (`computer_max` vs `max_amount`) without test-time updates.
 
 ## 3) Added inactive second-approver fixture identity
+
 - Table: `users`
   - Inserted: `id='inactpoappr0001'`, `email='inactive2@poapprover.com'`, `username='inactive2tier2'`, unique `tokenKey='inactive2tier2_token_key_001'`.
 - Table: `profiles`
@@ -27,6 +32,7 @@ This document lists every direct change made to `app/test_pb_data/data.db` while
 - Reason: replace test-time `admin_profiles.active=0` mutation with a fixture-backed inactive approver user.
 
 ## 4) Added duplicate user_claim fixture for uniqueness test
+
 - Table: `user_claims`
   - Inserted: `id='dupucclaim00001'`, `uid='inactpoappr0001'`, `cid='5vh881k048bboim'` (`po_approver`).
 - Table: `po_approver_props`
@@ -34,6 +40,7 @@ This document lists every direct change made to `app/test_pb_data/data.db` while
 - Reason: remove test-time insert/delete setup in duplicate `po_approver_props.user_claim` coverage.
 
 ## 5) Added fixture POs for route edge-cases and duplicate-hash tests
+
 - Table: `purchase_orders`
 - Inserted rows:
   - `id='po1stgready0001'`
@@ -56,9 +63,10 @@ This document lists every direct change made to `app/test_pb_data/data.db` while
     - stage-2 regression fixture (already first-approved), `division='kxedrbp7vj2mtjd'`, `approved='2025-01-29 14:22:29.563Z'`, `total=approval_total=1022.69`, `approver='wegviunlyr2jjjv'`, `priority_second_approver='6bq4j0eb26631dy'`, `kind='l3vtlbqg529m52j'`.
 
 ## 6) Updated approver division fixture scope (to support deterministic first-pool-empty case)
+
 - Table: `po_approver_props`
 - Rows:
-  - `id='1ea212qef65397o'` (fakemanager@fakesite.xyz)
-  - `id='5do7ivq31u1e425'` (orphan@poapprover.com)
+  - `id='1ea212qef65397o'` (<fakemanager@fakesite.xyz>)
+  - `id='5do7ivq31u1e425'` (<orphan@poapprover.com>)
 - Change: `divisions` set to `json_group_array(divisions.id)` for all divisions except `kxedrbp7vj2mtjd`.
 - Reason: keep near-global fixture behavior while reserving one division with no low-limit first-stage approvers.

@@ -45,6 +45,11 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	poApproverSelfBypassToken, err := testutils.GenerateRecordToken("users", "u_po_bypass_001@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Get current date in UTC for approval timestamp validation
 	currentDate := time.Now().UTC().Format("2006-01-02")
 	currentPoPrefix := fmt.Sprintf("%d%02d-", time.Now().Year()%100, time.Now().Month())
@@ -52,35 +57,6 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 	// Get approval tier values from the database
 	app := testutils.SetupTestApp(t)
 	tier1, tier2 := testutils.GetApprovalTiers(app)
-
-	selfFirstApproverBypassFactory := func(t testing.TB) *tests.TestApp {
-		t.Helper()
-		testApp := testutils.SetupTestApp(t)
-		if _, err := testApp.DB().NewQuery(`
-			UPDATE po_approver_props
-			SET max_amount = 1000, project_max = 1000
-			WHERE user_claim = (
-				SELECT id
-				FROM user_claims
-				WHERE uid = {:uid} AND cid = '5vh881k048bboim'
-				LIMIT 1
-			)
-		`).Bind(map[string]any{
-			"uid": "66ct66w380ob6w8",
-		}).Execute(); err != nil {
-			t.Fatal(err)
-		}
-		if _, err := testApp.DB().NewQuery(`
-			UPDATE purchase_orders
-			SET uid = {:uid}, approver = {:uid}
-			WHERE id = 'pofirstempty001'
-		`).Bind(map[string]any{
-			"uid": "66ct66w380ob6w8",
-		}).Execute(); err != nil {
-			t.Fatal(err)
-		}
-		return testApp
-	}
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -273,19 +249,19 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		{
 			Name:   "first approval succeeds when caller is assigned owner with non-zero kind limit even if first-stage pool is empty",
 			Method: http.MethodPost,
-			URL:    "/api/purchase_orders/pofirstempty001/approve",
+			URL:    "/api/purchase_orders/poselfbypass01/approve",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
-				"Authorization": po_approver_tier3Token,
+				"Authorization": poApproverSelfBypassToken,
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				fmt.Sprintf(`"approved":"%s`, currentDate),
 				`"status":"Unapproved"`,
-				`"approver":"66ct66w380ob6w8"`,
+				`"approver":"u_po_bypass_001"`,
 				`"second_approval":""`,
 			},
-			TestAppFactory: selfFirstApproverBypassFactory,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "unauthorized user cannot approve purchase order",

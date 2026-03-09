@@ -2086,11 +2086,6 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 		t.Skip("no alternate first-stage approver available for approver-change fixture")
 	}
 
-	var meaningfulBeforeNotificationCount int
-	var approverChangeBeforeNotificationCount int
-	var noOpBeforeNotificationCount int
-	var draftBeforeNotificationCount int
-
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "approver change on first-approved unapproved PO resets approvals and re-notifies",
@@ -2112,19 +2107,6 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				"kind": "%s"
 			}`, approverChangeTarget, projectKindID)),
 			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				var row struct {
-					Count int `db:"count"`
-				}
-				if err := app.DB().NewQuery(`
-					SELECT COUNT(*) AS count
-					FROM notifications
-					WHERE json_extract(data, '$.POId') = {:poID}
-				`).Bind(dbx.Params{"poID": firstApprovedApproverChangePOID}).One(&row); err != nil {
-					tb.Fatalf("failed counting baseline notifications for approver-change PO: %v", err)
-				}
-				approverChangeBeforeNotificationCount = row.Count
-			},
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
 				var row struct {
 					Count int `db:"count"`
@@ -2136,8 +2118,8 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				`).Bind(dbx.Params{"poID": firstApprovedApproverChangePOID}).One(&row); err != nil {
 					tb.Fatalf("failed counting notifications after approver-change update: %v", err)
 				}
-				if row.Count != approverChangeBeforeNotificationCount+1 {
-					tb.Fatalf("expected notification count to increase by 1 for approver change, got before=%d after=%d", approverChangeBeforeNotificationCount, row.Count)
+				if row.Count != 1 {
+					tb.Fatalf("expected notification count to be 1 for approver change, got %d", row.Count)
 				}
 			},
 			ExpectedStatus: 200,
@@ -2173,19 +2155,6 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				"kind": "%s"
 			}`, projectKindID)),
 			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				var row struct {
-					Count int `db:"count"`
-				}
-				if err := app.DB().NewQuery(`
-					SELECT COUNT(*) AS count
-					FROM notifications
-					WHERE json_extract(data, '$.POId') = {:poID}
-				`).Bind(dbx.Params{"poID": firstApprovedPOID}).One(&row); err != nil {
-					tb.Fatalf("failed counting baseline notifications: %v", err)
-				}
-				meaningfulBeforeNotificationCount = row.Count
-			},
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
 				var row struct {
 					Count int `db:"count"`
@@ -2197,8 +2166,8 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				`).Bind(dbx.Params{"poID": firstApprovedPOID}).One(&row); err != nil {
 					tb.Fatalf("failed counting notifications after update: %v", err)
 				}
-				if row.Count != meaningfulBeforeNotificationCount+1 {
-					tb.Fatalf("expected notification count to increase by 1, got before=%d after=%d", meaningfulBeforeNotificationCount, row.Count)
+				if row.Count != 1 {
+					tb.Fatalf("expected notification count to be 1 after update, got %d", row.Count)
 				}
 			},
 			ExpectedStatus: 200,
@@ -2234,19 +2203,6 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				"kind": "%s"
 			}`, projectKindID)),
 			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				var row struct {
-					Count int `db:"count"`
-				}
-				if err := app.DB().NewQuery(`
-					SELECT COUNT(*) AS count
-					FROM notifications
-					WHERE json_extract(data, '$.POId') = {:poID}
-				`).Bind(dbx.Params{"poID": firstApprovedPOID}).One(&row); err != nil {
-					tb.Fatalf("failed counting baseline notifications: %v", err)
-				}
-				noOpBeforeNotificationCount = row.Count
-			},
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
 				var row struct {
 					Count int `db:"count"`
@@ -2258,8 +2214,8 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				`).Bind(dbx.Params{"poID": firstApprovedPOID}).One(&row); err != nil {
 					tb.Fatalf("failed counting notifications after no-op update: %v", err)
 				}
-				if row.Count != noOpBeforeNotificationCount {
-					tb.Fatalf("expected notification count to remain unchanged, got before=%d after=%d", noOpBeforeNotificationCount, row.Count)
+				if row.Count != 0 {
+					tb.Fatalf("expected notification count to remain zero, got %d", row.Count)
 				}
 			},
 			ExpectedStatus: 200,
@@ -2307,19 +2263,6 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				"kind": "l3vtlbqg529m52j"
 			}`),
 			Headers: map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-				var row struct {
-					Count int `db:"count"`
-				}
-				if err := app.DB().NewQuery(`
-					SELECT COUNT(*) AS count
-					FROM notifications
-					WHERE json_extract(data, '$.POId') = {:poID}
-				`).Bind(dbx.Params{"poID": draftPOID}).One(&row); err != nil {
-					tb.Fatalf("failed counting baseline notifications for draft PO: %v", err)
-				}
-				draftBeforeNotificationCount = row.Count
-			},
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
 				var row struct {
 					Count int `db:"count"`
@@ -2331,8 +2274,8 @@ func TestPurchaseOrdersUpdate_FirstApprovedEditBehavior(t *testing.T) {
 				`).Bind(dbx.Params{"poID": draftPOID}).One(&row); err != nil {
 					tb.Fatalf("failed counting notifications after draft update: %v", err)
 				}
-				if row.Count != draftBeforeNotificationCount {
-					tb.Fatalf("expected notification count to remain unchanged for draft edit, got before=%d after=%d", draftBeforeNotificationCount, row.Count)
+				if row.Count != 0 {
+					tb.Fatalf("expected notification count to remain zero for draft edit, got %d", row.Count)
 				}
 			},
 			ExpectedStatus: 200,
@@ -2509,19 +2452,18 @@ func TestGeneratePONumber(t *testing.T) {
 		{
 			// Test Case 2: Second Child PO
 			// This test verifies that when creating a second child PO:
-			// - The parent PO (2024-0008) is found
-			// - An existing child PO (2024-0008-01) is found
+			// - The parent PO (2024-1000) is found
+			// - An existing child PO (2024-1000-01) is found
 			// - The next sequential number (-02) is generated
 			// - The number is unique in the database
 			//
 			// The test:
-			// 1. Sets up by creating the first child PO (2024-0008-01)
+			// 1. Uses a seeded first child PO (2024-1000-01)
 			// 2. Attempts to create a second child PO
-			// 3. Cleans up by removing all child POs created during the test
-			name: "second child PO for 2024-0008",
+			name: "second child PO for 2024-1000",
 			record: func() *core.Record {
 				r := core.NewRecord(poCollection)
-				r.Set("parent_po", "2plsetqdxht7esg")
+				r.Set("parent_po", "po_parent_childseq_001")
 				r.Set("uid", "f2j5a8vk006baub")
 				r.Set("type", "One-Time")
 				r.Set("date", "2024-01-01")
@@ -2534,47 +2476,7 @@ func TestGeneratePONumber(t *testing.T) {
 				r.Set("status", "Unapproved")
 				return r
 			}(),
-			setup: func(t *testing.T, app *tests.TestApp) {
-				// Create and save the first child PO
-				firstChild := core.NewRecord(poCollection)
-				firstChild.Set("parent_po", "2plsetqdxht7esg")
-				firstChild.Set("uid", "f2j5a8vk006baub")
-				firstChild.Set("type", "One-Time")
-				firstChild.Set("po_number", "2024-0008-01")
-				firstChild.Set("date", "2024-01-01")
-				firstChild.Set("division", "ngpjzurmkrfl8fo")
-				firstChild.Set("description", "Test description")
-				firstChild.Set("total", 100.0)
-				firstChild.Set("approval_total", 100.0)
-				firstChild.Set("payment_type", "OnAccount")
-				firstChild.Set("vendor", "2zqxtsmymf670ha")
-				firstChild.Set("approver", "wegviunlyr2jjjv")
-				firstChild.Set("status", "Unapproved")
-				firstChild.Set("kind", utilities.DefaultCapitalExpenditureKindID())
-				if err := app.Save(firstChild); err != nil {
-					t.Fatalf("failed to save first child PO: %v", err)
-				}
-			},
-			cleanup: func(t *testing.T, app *tests.TestApp) {
-				// Delete any child POs we created
-				records, err := app.FindRecordsByFilter(
-					"purchase_orders",
-					"parent_po = {:parentId}",
-					"",
-					0,
-					0,
-					dbx.Params{"parentId": "2plsetqdxht7esg"},
-				)
-				if err != nil {
-					t.Fatalf("failed to find child POs to clean up: %v", err)
-				}
-				for _, record := range records {
-					if err := app.Delete(record); err != nil {
-						t.Fatalf("failed to delete child PO: %v", err)
-					}
-				}
-			},
-			expected: "2024-0008-02",
+			expected: "2024-1000-02",
 		},
 		{
 			// Test Case 3: Parent PO Number Generation (for current YYMM)
@@ -2610,13 +2512,12 @@ func TestGeneratePONumber(t *testing.T) {
 			// - An appropriate error is returned
 			//
 			// The test:
-			// 1. Sets up by creating 99 child POs
+			// 1. Uses a seeded parent with 99 child POs
 			// 2. Attempts to create the 100th child PO
-			// 3. Cleans up all created child POs
 			name: "maximum child POs reached",
 			record: func() *core.Record {
 				r := core.NewRecord(poCollection)
-				r.Set("parent_po", "2plsetqdxht7esg")
+				r.Set("parent_po", "po_parent_childmax_001")
 				r.Set("uid", "f2j5a8vk006baub")
 				r.Set("type", "One-Time")
 				r.Set("date", "2024-01-01")
@@ -2629,49 +2530,7 @@ func TestGeneratePONumber(t *testing.T) {
 				r.Set("status", "Unapproved")
 				return r
 			}(),
-			setup: func(t *testing.T, app *tests.TestApp) {
-				// Create 99 child POs
-				for i := 1; i <= 99; i++ {
-					child := core.NewRecord(poCollection)
-					child.Set("parent_po", "2plsetqdxht7esg")
-					child.Set("po_number", fmt.Sprintf("2024-0008-%02d", i))
-					child.Set("uid", "f2j5a8vk006baub")
-					child.Set("type", "One-Time")
-					child.Set("date", "2024-01-01")
-					child.Set("division", "ngpjzurmkrfl8fo")
-					child.Set("description", "Test description")
-					child.Set("total", 100.0)
-					child.Set("approval_total", 100.0)
-					child.Set("payment_type", "OnAccount")
-					child.Set("vendor", "2zqxtsmymf670ha")
-					child.Set("approver", "wegviunlyr2jjjv")
-					child.Set("status", "Unapproved")
-					child.Set("kind", utilities.DefaultCapitalExpenditureKindID())
-					if err := app.Save(child); err != nil {
-						t.Fatalf("failed to save child PO %d: %v", i, err)
-					}
-				}
-			},
-			cleanup: func(t *testing.T, app *tests.TestApp) {
-				// Delete all child POs
-				records, err := app.FindRecordsByFilter(
-					"purchase_orders",
-					"parent_po = {:parentId}",
-					"",
-					0,
-					0,
-					dbx.Params{"parentId": "2plsetqdxht7esg"},
-				)
-				if err != nil {
-					t.Fatalf("failed to find child POs to clean up: %v", err)
-				}
-				for _, record := range records {
-					if err := app.Delete(record); err != nil {
-						t.Fatalf("failed to delete child PO: %v", err)
-					}
-				}
-			},
-			expectedError: "maximum number of child POs reached (99) for parent 2024-0008",
+			expectedError: "maximum number of child POs reached (99) for parent 2024-1099",
 		},
 		{
 			// Test Case 6: First PO of the year

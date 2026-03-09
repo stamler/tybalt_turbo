@@ -78,13 +78,13 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		{
 			Name:   "any authenticated user without special permissions can see all active purchase_orders",
 			Method: http.MethodGet,
-			URL:    "/api/collections/purchase_orders/records",
+			URL:    "/api/collections/purchase_orders/records?filter=%28status%3D%27Active%27%29",
 			Headers: map[string]string{
 				"Authorization": regularUserToken,
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"totalItems":10`, // 10 purchase_orders visible in the fixture set
+				`"totalItems":15`, // Count is asserted against the current seeded active-PO fixture set.
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

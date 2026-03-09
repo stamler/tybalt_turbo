@@ -6,7 +6,6 @@ import (
 	"testing"
 	"tybalt/internal/testutils"
 
-	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -91,8 +90,6 @@ func TestCreateRateSheet_DuplicateName(t *testing.T) {
 		]
 	}`
 
-	// Use BeforeTestFunc to create the first rate sheet, then test that a duplicate fails
-	// The key behavior is that the transaction is rolled back and no partial data is created
 	scenario := tests.ApiScenario{
 		Name:   "duplicate name returns error",
 		Method: http.MethodPost,
@@ -100,21 +97,6 @@ func TestCreateRateSheet_DuplicateName(t *testing.T) {
 		Body:   strings.NewReader(requestBody),
 		Headers: map[string]string{
 			"Authorization": jobToken,
-		},
-		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			// Create the first rate sheet so the duplicate will fail
-			collection, err := app.FindCollectionByNameOrId("rate_sheets")
-			if err != nil {
-				t.Fatalf("failed to get collection: %v", err)
-			}
-			record := core.NewRecord(collection)
-			record.Set("name", "Duplicate Test Sheet")
-			record.Set("effective_date", "2026-03-01")
-			record.Set("revision", 0)
-			record.Set("active", false)
-			if err := app.Save(record); err != nil {
-				t.Fatalf("failed to create first rate sheet: %v", err)
-			}
 		},
 		ExpectedStatus:  http.StatusConflict,
 		ExpectedContent: []string{`"status":409`, `validation_not_unique`},
@@ -200,21 +182,6 @@ func TestCreateRateSheet_RevisionSucceedsWithClaim(t *testing.T) {
 		Headers: map[string]string{
 			"Authorization": reviseToken,
 		},
-		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			// Create revision 0 first
-			collection, err := app.FindCollectionByNameOrId("rate_sheets")
-			if err != nil {
-				t.Fatalf("failed to get collection: %v", err)
-			}
-			record := core.NewRecord(collection)
-			record.Set("name", "Revise Test Sheet")
-			record.Set("effective_date", "2026-01-01")
-			record.Set("revision", 0)
-			record.Set("active", false)
-			if err := app.Save(record); err != nil {
-				t.Fatalf("failed to create revision 0: %v", err)
-			}
-		},
 		ExpectedStatus: http.StatusCreated,
 		ExpectedContent: []string{
 			`"name":"Revise Test Sheet"`,
@@ -257,21 +224,6 @@ func TestCreateRateSheet_RevisionFailsWithoutClaim(t *testing.T) {
 		Body:   strings.NewReader(rev1Body),
 		Headers: map[string]string{
 			"Authorization": noClaimsToken,
-		},
-		BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
-			// Create revision 0 first
-			collection, err := app.FindCollectionByNameOrId("rate_sheets")
-			if err != nil {
-				t.Fatalf("failed to get collection: %v", err)
-			}
-			record := core.NewRecord(collection)
-			record.Set("name", "Revise Test Sheet")
-			record.Set("effective_date", "2026-01-01")
-			record.Set("revision", 0)
-			record.Set("active", false)
-			if err := app.Save(record); err != nil {
-				t.Fatalf("failed to create revision 0: %v", err)
-			}
 		},
 		ExpectedStatus:  http.StatusForbidden,
 		ExpectedContent: []string{`You do not have permission to revise rate sheets`},

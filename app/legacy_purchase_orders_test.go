@@ -12,8 +12,6 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
-const legacyPOClaimHolderUID = "wegviunlyr2jjjv"
-
 func setLegacyPOCreateUpdate(tb testing.TB, app *tests.TestApp, enabled bool) {
 	tb.Helper()
 
@@ -34,59 +32,6 @@ func setLegacyPOCreateUpdate(tb testing.TB, app *tests.TestApp, enabled bool) {
 	record.Set("value", value)
 	if err := app.Save(record); err != nil {
 		tb.Fatalf("failed to save purchase_orders config: %v", err)
-	}
-}
-
-func enableLegacyPOCreateUpdate(tb testing.TB, app *tests.TestApp) {
-	tb.Helper()
-	setLegacyPOCreateUpdate(tb, app, true)
-}
-
-func assignLegacyPOClaim(tb testing.TB, app *tests.TestApp, userClaimID string) {
-	tb.Helper()
-
-	var claimID string
-	if err := app.DB().NewQuery(`SELECT id FROM claims WHERE name = 'legacy_po_create_update' LIMIT 1`).Row(&claimID); err != nil {
-		tb.Fatalf("failed to find legacy_po_create_update claim id: %v", err)
-	}
-
-	if _, err := app.DB().NewQuery(`
-		INSERT OR IGNORE INTO user_claims (id, uid, cid, created, updated)
-		VALUES ({:id}, {:uid}, {:cid}, datetime('now'), datetime('now'))
-	`).Bind(dbx.Params{
-		"id":  userClaimID,
-		"uid": legacyPOClaimHolderUID,
-		"cid": claimID,
-	}).Execute(); err != nil {
-		tb.Fatalf("failed to insert legacy PO claim: %v", err)
-	}
-}
-
-func insertLegacyPO(tb testing.TB, app *tests.TestApp, id string, poNumber string, status string, imported bool) {
-	tb.Helper()
-
-	importedInt := 0
-	if imported {
-		importedInt = 1
-	}
-
-	if _, err := app.DB().NewQuery(`
-		INSERT INTO purchase_orders (
-			id, uid, approver, date, division, description, payment_type, total, approval_total,
-			vendor, status, type, po_number, _imported, branch, kind, legacy_manual_entry,
-			created, updated
-		) VALUES (
-			{:id}, 'f2j5a8vk006baub', 'wegviunlyr2jjjv', '2025-01-15', 'vccd5fo56ctbigh', 'Legacy fixture purchase order',
-			'OnAccount', 100.00, 100.00, 'yxhycv2ycpvsbt4', {:status}, 'One-Time', {:poNumber},
-			{:imported}, '80875lm27v8wgi4', 'l3vtlbqg529m52j', 1, datetime('now'), datetime('now')
-		)
-	`).Bind(dbx.Params{
-		"id":       id,
-		"status":   status,
-		"poNumber": poNumber,
-		"imported": importedInt,
-	}).Execute(); err != nil {
-		tb.Fatalf("failed to insert legacy PO fixture: %v", err)
 	}
 }
 
@@ -182,30 +127,20 @@ func assertLegacyPOForcedState(tb testing.TB, app *tests.TestApp, id string, req
 	}
 }
 
-func insertStandardPO(tb testing.TB, app *tests.TestApp, id string, uid string, status string) {
+func setupLegacyPOFeatureDisabledApp(tb testing.TB) *tests.TestApp {
 	tb.Helper()
 
-	if _, err := app.DB().NewQuery(`
-		INSERT INTO purchase_orders (
-			id, uid, approver, date, division, description, payment_type, total, approval_total,
-			vendor, status, type, po_number, _imported, branch, kind, legacy_manual_entry,
-			created, updated
-		) VALUES (
-			{:id}, {:uid}, {:uid}, '2025-01-15', 'vccd5fo56ctbigh', 'Standard fixture purchase order',
-			'OnAccount', 100.00, 100.00, 'yxhycv2ycpvsbt4', {:status}, 'One-Time', '',
-			0, '80875lm27v8wgi4', 'l3vtlbqg529m52j', 0, datetime('now'), datetime('now')
-		)
-	`).Bind(dbx.Params{
-		"id":     id,
-		"uid":    uid,
-		"status": status,
-	}).Execute(); err != nil {
-		tb.Fatalf("failed to insert standard PO fixture: %v", err)
-	}
+	app := testutils.SetupTestApp(tb)
+	setLegacyPOCreateUpdate(tb, app, false)
+	return app
 }
 
 func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 	claimHolderToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+	noClaimsToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -222,12 +157,7 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedContent: []string{
 				`"legacy_purchase_order_create_update_disabled"`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				setLegacyPOCreateUpdate(tb, app, false)
-				assignLegacyPOClaim(tb, app, "uclgeditoff001")
-				insertLegacyPO(tb, app, "legacyeditoff01", "2501-5000", "Active", false)
-			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupLegacyPOFeatureDisabledApp,
 		},
 		{
 			Name:   "legacy create is denied when feature flag is disabled",
@@ -255,14 +185,10 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedContent: []string{
 				`"legacy_purchase_order_create_update_disabled"`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				setLegacyPOCreateUpdate(tb, app, false)
-				assignLegacyPOClaim(tb, app, "uclgdisabled001")
-			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupLegacyPOFeatureDisabledApp,
 		},
 		{
 			Name:   "legacy create is denied without the dedicated claim",
@@ -283,15 +209,12 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 				"kind": "l3vtlbqg529m52j"
 			}`),
 			Headers: map[string]string{
-				"Authorization": claimHolderToken,
+				"Authorization": noClaimsToken,
 				"Content-Type":  "application/json",
 			},
 			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{
 				`"legacy_purchase_order_claim_required"`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,
@@ -306,16 +229,12 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 				"description": "Attempt to update without claim"
 			}`),
 			Headers: map[string]string{
-				"Authorization": claimHolderToken,
+				"Authorization": noClaimsToken,
 				"Content-Type":  "application/json",
 			},
 			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{
 				`"legacy_purchase_order_claim_required"`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				insertLegacyPO(tb, app, "legacynoclaim1", "2501-5000", "Active", false)
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 0,
@@ -352,10 +271,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 				`"uid":"f2j5a8vk006baub"`,
 				`"approver":"wegviunlyr2jjjv"`,
 				`"_imported":false`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgcreate00001")
 			},
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 				tb.Helper()
@@ -396,10 +311,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedContent: []string{
 				`"po_number":{"code":"invalid_legacy_po_number"`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclginvalid0001")
-			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,
 			},
@@ -429,10 +340,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
 				`"branch":{"code":"required"`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgmissingbranch")
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,
@@ -466,10 +373,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedContent: []string{
 				`"category":{"code":"field_not_allowed"`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgcategorydeny1")
-			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,
 			},
@@ -500,10 +403,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
 				`"type":{"code":"invalid_type"`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclginvalidtype1")
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,
@@ -537,10 +436,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedContent: []string{
 				`"_imported":{"code":"field_not_allowed"`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgdisallow001")
-			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,
 			},
@@ -559,11 +454,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 				`"legacy_manual_entry":true`,
 				`"po_number":"2502-5001"`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgeditload01")
-				insertLegacyPO(tb, app, "legacyedit0001", "2502-5001", "Active", false)
-			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
@@ -578,11 +468,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 				`"id":"legacyclosedview1"`,
 				`"legacy_manual_entry":true`,
 				`"status":"Closed"`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgclosedview01")
-				insertLegacyPO(tb, app, "legacyclosedview1", "2502-5009", "Closed", false)
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -601,11 +486,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedContent: []string{
 				`"legacy_purchase_order_only"`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgnonlegacy01")
-				insertStandardPO(tb, app, "standardupd001", legacyPOClaimHolderUID, "Unapproved")
-			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 0,
 			},
@@ -617,7 +497,7 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			URL:    "/api/purchase_orders/legacy/legacyupd00001",
 			Body: strings.NewReader(`{
 				"description": "Legacy PO updated in Turbo",
-				"po_number": "2502-5001"
+				"po_number": "2502-5011"
 			}`),
 			Headers: map[string]string{
 				"Authorization": claimHolderToken,
@@ -627,28 +507,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedContent: []string{
 				`"description":"Legacy PO updated in Turbo"`,
 				`"_imported":false`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgupdate00001")
-				insertLegacyPO(tb, app, "legacyupd00001", "2502-5001", "Active", true)
-				if _, err := app.DB().NewQuery(`
-					UPDATE purchase_orders
-					SET
-						priority_second_approver = 'wegviunlyr2jjjv',
-						second_approver = 'wegviunlyr2jjjv',
-						second_approval = datetime('now'),
-						end_date = '2025-02-15',
-						frequency = 'Monthly',
-						parent_po = 'someparentpoid',
-						attachment = 'legacy.pdf',
-						rejector = 'wegviunlyr2jjjv',
-						rejected = datetime('now'),
-						rejection_reason = 'old rejection'
-					WHERE id = 'legacyupd00001'
-				`).Execute(); err != nil {
-					tb.Fatalf("failed to seed legacy PO stale workflow state: %v", err)
-				}
 			},
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 				tb.Helper()
@@ -675,11 +533,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedContent: []string{
 				`"status":{"code":"cancelled_legacy_purchase_order"`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgcancelled0001")
-				insertLegacyPO(tb, app, "legacycancelled01", "2503-5006", "Cancelled", false)
-			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 0,
 			},
@@ -700,11 +553,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
 				`"status":{"code":"closed_legacy_purchase_order"`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgclosed00001")
-				insertLegacyPO(tb, app, "legacyclosed01", "2503-5002", "Closed", false)
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 0,
@@ -736,10 +584,6 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
 				`"uid":{"code":"validation_error","message":"the selected staff member is not an active user","data":null}`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclginactiveuid01")
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,
@@ -786,10 +630,6 @@ func TestLegacyPurchaseOrdersCollectionRegression(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"Failed to create record."`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgcollection01")
-			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,
 			},
@@ -810,11 +650,6 @@ func TestLegacyPurchaseOrdersCollectionRegression(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"The requested resource wasn't found."`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgcollection02")
-				insertLegacyPO(tb, app, "legacyviactl01", "2504-5003", "Unapproved", false)
-			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 0,
 			},
@@ -830,11 +665,6 @@ func TestLegacyPurchaseOrdersCollectionRegression(t *testing.T) {
 			ExpectedStatus: http.StatusNotFound,
 			ExpectedContent: []string{
 				`"message":"The requested resource wasn't found."`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgcollection03")
-				insertLegacyPO(tb, app, "legacyviactl02", "2508-5007", "Active", false)
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -869,11 +699,6 @@ func TestLegacyPurchaseOrdersVisibleAPI(t *testing.T) {
 				`"id":"legacyvis00001"`,
 				`"legacy_manual_entry":true`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgvisible001")
-				insertLegacyPO(tb, app, "legacyvis00001", "2505-5004", "Unapproved", false)
-			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
@@ -888,11 +713,6 @@ func TestLegacyPurchaseOrdersVisibleAPI(t *testing.T) {
 				`"id":"legacyvislist1"`,
 				`"legacy_manual_entry":true`,
 			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgvisible002")
-				insertLegacyPO(tb, app, "legacyvislist1", "2506-5005", "Unapproved", false)
-			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
@@ -905,11 +725,6 @@ func TestLegacyPurchaseOrdersVisibleAPI(t *testing.T) {
 			ExpectedStatus: http.StatusNotFound,
 			ExpectedContent: []string{
 				`"po_not_found_or_not_visible"`,
-			},
-			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				enableLegacyPOCreateUpdate(tb, app)
-				assignLegacyPOClaim(tb, app, "uclgvisible003")
-				insertLegacyPO(tb, app, "legacyvis00002", "2507-5006", "Unapproved", false)
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
