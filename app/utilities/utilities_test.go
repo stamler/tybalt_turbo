@@ -2,15 +2,11 @@ package utilities
 
 import (
 	"testing"
-
-	"github.com/pocketbase/pocketbase/tests"
+	"tybalt/internal/testseed"
 )
 
 func TestRecordHasMeaningfulChanges(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	client, err := app.FindRecordById("clients", "lb0fnenkeyitsny")
@@ -31,10 +27,7 @@ func TestRecordHasMeaningfulChanges(t *testing.T) {
 }
 
 func TestRecordHasMeaningfulChanges_OptionalImportedSkip(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	job, err := app.FindRecordById("jobs", "cjf0kt0defhq480")
@@ -54,10 +47,7 @@ func TestRecordHasMeaningfulChanges_OptionalImportedSkip(t *testing.T) {
 }
 
 func TestMarkReferencingJobsNotImported_InvalidColumn(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	if err := MarkReferencingJobsNotImported(app, "branch", "80875lm27v8wgi4"); err == nil {
@@ -66,10 +56,7 @@ func TestMarkReferencingJobsNotImported_InvalidColumn(t *testing.T) {
 }
 
 func TestMarkReferencingJobsNotImported_UpdatesJobs(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	const jobID = "job_marknotimp_001"

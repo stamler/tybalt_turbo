@@ -1,0 +1,24 @@
+created,email,emailVisibility,id,name,password,tokenKey,updated,username,verified
+2025-03-13 15:00:14.705Z,orphan@poapprover.com,0,4r70mfovf22m9uh,Orphaned PO Approver,$2a$10$6fUHIUMCctYhvcxMWHDc9OO0MRW8COJ3WmUpijWNhVM0L72VMCy3m,_T_x__d9Z356_36Qm2m567_g_LyPkds7vY6__11C_S9674_DSO,2025-03-13 15:00:14.705Z,orphanpo,1
+2025-03-13 16:17:23.898Z,noclaims@example.com,0,4ssj9f1yg250o9y,No Claims,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,nI7__JH_5nQYgw_7NAz_dGE4_P_Zc6zE4__q_a_C5_C6_6_ZoS,2025-03-13 16:17:23.898Z,noclaims,1
+2025-01-27 21:18:53.018Z,hal@2005.com,0,66ct66w380ob6w8,Shallow Hal,$2a$10$SJOimEqGHjhYSvrqQjOd6uFff83HpAlpN6ivlx8y76kYEr1UZv4xK,_A2_l5Nw8ZFswWTmTDN9_8ATRx2_9B_ODH3172_6y_4mcg1__2,2025-01-27 21:18:53.018Z,shal,0
+2025-03-13 15:52:11.616Z,tier2@poapprover.com,0,6bq4j0eb26631dy,Tier Two,$2a$10$VQ8WSAu3QftmJFzBkHJK8OxX.Ca.sC760dWxnOFriQO4WrhDnA.5W,2_1Rw9v9gTaVG_1O1_d_3OU_A__ZW6b9uG_g90ZZS___VnXp39,2025-03-13 15:52:11.616Z,tier2,1
+2024-10-30 19:11:47.744Z,francesco@mac.com,0,dkv192wxprcqmho,,$2a$12$j7NgUBH1K/NhN5iPuHXzJ.DmSnvvyGbp0lseub5Gat7t8Mp0GsFMK,2bz94POuIRI4JIq20weh6HEGoFfvWQefiooAUySiRrcaZUAGEz,2024-10-30 19:12:01.271Z,francesco,1
+2024-10-22 21:01:54.943Z,fatt@mac.com,0,etysnrlup2f6bak,,$2a$12$bXl5QK/w7/7buX0DIs516.6L6Huoh29Rw9YJpzeGEmwfAZZOmSuMK,lArZBwFTkEcT2zm5vBYumALLn3VUwf3vbIWaUqHXpE787HVxDd,2024-10-29 20:49:52.999Z,fmac,1
+2024-04-04 18:48:24.355Z,author@soup.com,0,f2j5a8vk006baub,,$2a$12$pJI2YW21.vQd0BS7kZUVAuCjhjFc/cx1piSslHL2cEBo/94dZniJi,uZMpYwdufUXBVTQ6FxJKdZB6oDnZUDLmUdyg6VgTshN1Hjsi3U,2024-10-29 20:50:13.436Z,dslydog,1
+2026-02-11 00:00:00.000Z,inactive2@poapprover.com,0,inactpoappr0001,Inactive Tier2B,a/q.XRMkyz8P2s5W,inactive2tier2_token_key_001,2026-02-11 00:00:00.000Z,inactive2tier2,1
+2024-10-29 12:25:48.150Z,time@test.com,0,rzr98oadsp9qc11,,$2a$12$MFwqOVtoQBUWoy4N7BEd2u8OBvfvRadp3sN7uCzWKz1.i6t5EfDuO,Xr9BbprGqBJ5rMpzJvaFyI2rdHlGRyBuDfFD4y2kRsBYCBaOIY,2024-10-29 12:25:48.150Z,time,1
+2025-03-13 16:16:00.569Z,tier2b@poapprover.com,0,t4g84hfvkt1v9j3,Tier TwoB,$2a$10$VB0Vpl4Dr3Rak2lIMFUzIOlmYGndnJprSk3bzQ/q.XRMkyz8P2s5W,Hh4qr1_3_c_AmqH4F04zP8h76U_0PFvU84NQv_x9Z_oNG_zp0_,2025-03-13 16:16:00.569Z,tier2b,1
+2024-11-08 15:30:50.124Z,book@keeper.com,0,tqqf7q0f3378rvp,,$2a$12$JWde60OHnRq8ok.eG.99jOGf3b3F9UQ.pjKkcTDfHlkjHB1ZGt0Ey,4V9aQX1ChiHC1l9kUhwDs6nwvwYnRq5lV39UUePQEwj9RF5Qom,2024-11-08 15:30:50.124Z,bookey,1
+2026-01-20 18:10:40,has_inactive_mgr@test.com,0,u_has_inactive_mgr,,$2a$12$pJI2YW21.vQd0BS7kZUVAuCjhjFc/cx1piSslHL2cEBo/94dZniJi,tokenkeyfortestuser1234567890123456789012345678,2026-01-20 18:10:40,has_inactive_mgr,1
+2025-06-19 19:07:23.538Z,inactive@example.com,0,u_inactive,,a.vQd0,tok_u_inactive,2025-06-19 19:07:23.538Z,u_inactive,1
+2024-10-29 12:25:48.150Z,u_mileage_expired@example.com,0,u_mileage_expired,,$2a$12$MFwqOVtoQBUWoy4N7BEd2u8OBvfvRadp3sN7uCzWKz1.i6t5EfDuO,tok_mileage_expired_20260309,2024-10-29 12:25:48.150Z,u_mileage_expired,1
+2024-10-29 12:25:48.150Z,u_mileage_missing@example.com,0,u_mileage_missing,,$2a$12$MFwqOVtoQBUWoy4N7BEd2u8OBvfvRadp3sN7uCzWKz1.i6t5EfDuO,tok_mileage_missing_20260309,2024-10-29 12:25:48.150Z,u_mileage_missing,1
+2024-10-29 12:25:48.150Z,u_mileage_same_day@example.com,0,u_mileage_same_day,,$2a$12$MFwqOVtoQBUWoy4N7BEd2u8OBvfvRadp3sN7uCzWKz1.i6t5EfDuO,tok_mileage_same_day_20260309,2024-10-29 12:25:48.150Z,u_mileage_same_day,1
+2024-10-29 12:25:48.150Z,u_mileage_valid@example.com,0,u_mileage_valid,,$2a$12$MFwqOVtoQBUWoy4N7BEd2u8OBvfvRadp3sN7uCzWKz1.i6t5EfDuO,tok_mileage_valid_20260309,2024-10-29 12:25:48.150Z,u_mileage_valid,1
+2025-06-19 19:07:23.538Z,u_no_claims@example.com,0,u_no_claims,,a.vQd0,tok_u_no_claims,2025-06-19 19:07:23.538Z,u_no_claims,1
+2025-06-19 19:07:23.538Z,u_no_ppto_claim@example.com,0,u_no_ppto_claim,,a.vQd0,tok_u_no_ppto_claim,2025-06-19 19:07:23.538Z,u_no_ppto_claim,1
+2025-01-27 21:18:53.018Z,u_po_bypass_001@example.com,0,u_po_bypass_001,Shallow Hal,$2a$10$SJOimEqGHjhYSvrqQjOd6uFff83HpAlpN6ivlx8y76kYEr1UZv4xK,tok_u_po_bypass_001,2025-01-27 21:18:53.018Z,u_po_bypass_001,0
+2025-06-19 19:07:23.538Z,u_with_claim@example.com,0,u_with_claim,,a.vQd0,tok_u_with_claim,2025-06-19 19:07:23.538Z,u_with_claim,1
+2025-06-19 19:07:23.538Z,u_with_ppto_claim@example.com,0,u_with_ppto_claim,,a.vQd0,tok_u_with_ppto_claim,2025-06-19 19:07:23.538Z,u_with_ppto_claim,1
+2024-09-04 19:22:58.152Z,fakemanager@fakesite.xyz,0,wegviunlyr2jjjv,,$2a$12$OMgb4zbBoXwInHaoBcf9Eug5Pa.2yNBUHZBILooZf8khEGOJcHODy,ukE7jwgdQC3AMYLXX6gzLGqyU6MAly9QcxPekKEdRHtkLRXkdO,2024-10-29 20:50:25.987Z,fmanager,1

@@ -2,8 +2,7 @@ package hooks
 
 import (
 	"testing"
-
-	"github.com/pocketbase/pocketbase/tests"
+	"tybalt/internal/testseed"
 )
 
 // TestValidateRateSheetComplete_NoEntries tests that a rate sheet without any entries
@@ -14,10 +13,7 @@ import (
 //   - rate_roles: 33 roles
 //   - rate_sheet_entries: none for test_empty_sheet
 func TestValidateRateSheetComplete_NoEntries(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	rateSheetId := "test_empty_sheet"
@@ -36,10 +32,7 @@ func TestValidateRateSheetComplete_NoEntries(t *testing.T) {
 // TestValidateRateSheetComplete_AllEntries tests that a rate sheet with all entries
 // returns no missing roles.
 func TestValidateRateSheetComplete_AllEntries(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	rateSheetId := "rs_complete_all_001"
@@ -58,10 +51,7 @@ func TestValidateRateSheetComplete_AllEntries(t *testing.T) {
 // TestValidateRateSheetComplete_PartialEntries tests that a rate sheet with some entries
 // returns only the missing roles.
 func TestValidateRateSheetComplete_PartialEntries(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	rateSheetId := "rs_partial_001"
@@ -91,10 +81,7 @@ func TestValidateRateSheetComplete_PartialEntries(t *testing.T) {
 // TestCheckRevisionEffectiveDate_Revision0 tests that revision 0 is always allowed
 // regardless of effective date.
 func TestCheckRevisionEffectiveDate_Revision0(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Revision 0 should always pass validation, even with any date
@@ -110,10 +97,7 @@ func TestCheckRevisionEffectiveDate_Revision0(t *testing.T) {
 // TestCheckRevisionEffectiveDate_ValidRevision tests that a revision with
 // effective_date >= previous revision's date is allowed.
 func TestCheckRevisionEffectiveDate_ValidRevision(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	sheetName := "Test Effective Date Validation"
@@ -140,10 +124,7 @@ func TestCheckRevisionEffectiveDate_ValidRevision(t *testing.T) {
 // TestCheckRevisionEffectiveDate_InvalidRevision tests that a revision with
 // effective_date < previous revision's date is rejected.
 func TestCheckRevisionEffectiveDate_InvalidRevision(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	sheetName := "Test Invalid Effective Date"
@@ -164,10 +145,7 @@ func TestCheckRevisionEffectiveDate_InvalidRevision(t *testing.T) {
 // TestCheckNewerRevisionExists_NoNewer tests that CheckNewerRevisionExists returns
 // false when no newer revision exists.
 func TestCheckNewerRevisionExists_NoNewer(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	sheetName := "Test Newer Revision Check"
@@ -185,10 +163,7 @@ func TestCheckNewerRevisionExists_NoNewer(t *testing.T) {
 // TestCheckNewerRevisionExists_NewerExists tests that CheckNewerRevisionExists
 // returns true when a newer revision exists.
 func TestCheckNewerRevisionExists_NewerExists(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	sheetName := "Test Newer Revision Exists"
@@ -215,10 +190,7 @@ func TestCheckNewerRevisionExists_NewerExists(t *testing.T) {
 // TestDeactivateOtherRevisions tests that DeactivateOtherRevisions deactivates
 // all other revisions with the same name.
 func TestDeactivateOtherRevisions(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	sheetName := "Test Deactivate Others"
@@ -251,10 +223,7 @@ func TestDeactivateOtherRevisions(t *testing.T) {
 // TestDeactivateOtherRevisions_DifferentName tests that DeactivateOtherRevisions
 // does not affect rate sheets with different names.
 func TestDeactivateOtherRevisions_DifferentName(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Deactivate other revisions of Sheet A (keeping sheetA1)

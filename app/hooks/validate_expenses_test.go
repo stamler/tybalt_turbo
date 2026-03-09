@@ -4,11 +4,11 @@ import (
 	"testing"
 	"tybalt/constants"
 	"tybalt/errs"
+	"tybalt/internal/testseed"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
 )
 
 // We need to instantiate a Collection object to be part of the Record object
@@ -18,10 +18,7 @@ var poCollection = core.NewBaseCollection("purchase_orders")
 
 func TestValidateExpense(t *testing.T) {
 	// Initialize a PocketBase TestApp for validations that require DB lookups
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 	if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
 		t.Fatalf("failed to load expenditure kinds config: %v", err)
@@ -209,10 +206,7 @@ func TestValidateExpense(t *testing.T) {
 }
 
 func TestValidateExpense_RejectsClosedJob(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	rec := core.NewRecord(expensesCollection)

@@ -1,0 +1,2778 @@
+{
+  "name": "tybalt-test-seed-data",
+  "resources": [
+    {
+      "name": "_authOrigins",
+      "path": "data/_authOrigins.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "collectionRef",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "fingerprint",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "recordRef",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "_collections",
+      "path": "data/_collections.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "createRule",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "deleteRule",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "fields",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "indexes",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "listRule",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "options",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "system",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "type",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updateRule",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "viewRule",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "_externalAuths",
+      "path": "data/_externalAuths.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "collectionRef",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "provider",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "providerId",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "recordRef",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "_mfas",
+      "path": "data/_mfas.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "collectionRef",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "recordRef",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "_otps",
+      "path": "data/_otps.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "collectionRef",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "password",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "recordRef",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "sentTo",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "_params",
+      "path": "data/_params.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "value",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "_superusers",
+      "path": "data/_superusers.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "email",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "emailVisibility",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "password",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "tokenKey",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "verified",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "absorb_actions",
+      "path": "data/absorb_actions.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "absorbed_records",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "collection_name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "target_id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated_references",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "admin_profiles",
+      "path": "data/admin_profiles.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "active",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "allow_personal_reimbursement",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "default_branch",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "default_charge_out_rate",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job_title",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "legacy_uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "mobile_phone",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "off_rotation_permitted",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "opening_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "opening_op",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "opening_ov",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "payroll_id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "personal_vehicle_insurance_expiry",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "salary",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "skip_min_time_check",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "time_sheet_expected",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "untracked_time_off",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "work_week_hours",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "app_config",
+      "path": "data/app_config.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "value",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "branches",
+      "path": "data/branches.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "code",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "categories",
+      "path": "data/categories.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "claims",
+      "path": "data/claims.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "client_contacts",
+      "path": "data/client_contacts.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "client",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "email",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "given_name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "surname",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "client_notes",
+      "path": "data/client_notes.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "client",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job_not_applicable",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "job_status_changed_to",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "clients",
+      "path": "data/clients.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "business_development_lead",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "divisions",
+      "path": "data/divisions.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "active",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "code",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "expenditure_kinds",
+      "path": "data/expenditure_kinds.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "allow_job",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "en_ui_label",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "second_approval_threshold",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "ui_order",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "expense_rates",
+      "path": "data/expense_rates.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "breakfast",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "dinner",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "effective_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "lodging",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "lunch",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "mileage",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "expenses",
+      "path": "data/expenses.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "allowance_types",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "approved",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "approver",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "attachment",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "attachment_hash",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "branch",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "cc_last_4_digits",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "committed",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "committed_week_ending",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "committer",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "distance",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "division",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "kind",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "pay_period_ending",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "payment_type",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "purchase_order",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rejected",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rejection_reason",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rejector",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "submitted",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "total",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "vendor",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "job_time_allocations",
+      "path": "data/job_time_allocations.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "division",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "hours",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "jobs",
+      "path": "data/jobs.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "alternate_manager",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "authorizing_document",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "branch",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "client",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "client_po",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "client_reference_number",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "contact",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "fn_agreement",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job_owner",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "location",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "manager",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "number",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "outstanding_balance",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "outstanding_balance_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "parent",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "project_award_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "project_value",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "proposal",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "proposal_opening_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "proposal_submission_due_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "proposal_value",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "rate_sheet",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "time_and_materials",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "machine_secrets",
+      "path": "data/machine_secrets.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "expiry",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "role",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "salt",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "sha256_hash",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "mileage_reset_dates",
+      "path": "data/mileage_reset_dates.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "notification_templates",
+      "path": "data/notification_templates.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "code",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "html_email",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "subject",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "text_email",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "notifications",
+      "path": "data/notifications.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "data",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "error",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "recipient",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "status_updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "system_notification",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "template",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "user",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "payroll_year_end_dates",
+      "path": "data/payroll_year_end_dates.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "po_approver_props",
+      "path": "data/po_approver_props.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "computer_max",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "divisions",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "max_amount",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "media_and_event_max",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "project_max",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "sponsorship_max",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "staff_and_social_max",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "user_claim",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "profiles",
+      "path": "data/profiles.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "alternate_manager",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "default_division",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "default_role",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "do_not_accept_submissions",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "given_name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "manager",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "notification_type",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "surname",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "purchase_orders",
+      "path": "data/purchase_orders.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "approval_total",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "approved",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "approver",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "attachment",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "attachment_hash",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "branch",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "cancelled",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "canceller",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "closed",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "closed_by_system",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "closer",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "division",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "end_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "frequency",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "kind",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "legacy_manual_entry",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "parent_po",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "payment_type",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "po_number",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "priority_second_approver",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rejected",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rejection_reason",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rejector",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "second_approval",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "second_approver",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "total",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "type",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "vendor",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "rate_roles",
+      "path": "data/rate_roles.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "rate_sheet_entries",
+      "path": "data/rate_sheet_entries.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "overtime_rate",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "rate",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "rate_sheet",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "role",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "rate_sheets",
+      "path": "data/rate_sheets.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "active",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "effective_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "revision",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "time_amendments",
+      "path": "data/time_amendments.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "branch",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "committed",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "committed_week_ending",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "committer",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "creator",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "division",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "hours",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "meals_hours",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "payout_request_amount",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "skip_tsid_check",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "time_type",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "tsid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "week_ending",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "work_record",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "time_entries",
+      "path": "data/time_entries.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "branch",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "category",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "division",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "hours",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "job",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "meals_hours",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "payout_request_amount",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "role",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "time_type",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "tsid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "week_ending",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "work_record",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "time_sheet_reviewers",
+      "path": "data/time_sheet_reviewers.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "reviewed",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "reviewer",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "time_sheet",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "time_sheets",
+      "path": "data/time_sheets.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "approved",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "approver",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "committed",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "committer",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "payroll_id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rejected",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rejection_reason",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rejector",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "salary",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "submitted",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "week_ending",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "work_week_hours",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "time_types",
+      "path": "data/time_types.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "allowed_fields",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "code",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "required_fields",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "user_claims",
+      "path": "data/user_claims.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "cid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "users",
+      "path": "data/users.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "email",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "emailVisibility",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "password",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "tokenKey",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "username",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "verified",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "vendors",
+      "path": "data/vendors.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "_imported",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "alias",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
+      "name": "zip_cache",
+      "path": "data/zip_cache.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "class",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "filenames",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "hashes",
+            "type": "string",
+            "x-sqlite-type": "JSON"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "key",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "zip",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    }
+  ]
+}

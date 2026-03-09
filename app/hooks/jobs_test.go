@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"tybalt/errs"
+	"tybalt/internal/testseed"
 
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
 )
 
 // TestGenerateTopLevelJobNumber_MixedFormats verifies that the job number generator
@@ -20,10 +20,7 @@ import (
 //
 // Expected: next number should be 24-0351 (max of 334 and 350 is 350, so next is 351)
 func TestGenerateTopLevelJobNumber_MixedFormats(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Test with year 24 to use our test data
@@ -44,10 +41,7 @@ func TestGenerateTopLevelJobNumber_MixedFormats(t *testing.T) {
 // Test data includes 24-334-01 (9 chars) which won't match
 // either "24-___" (6 chars) or "24-____" (7 chars).
 func TestGenerateTopLevelJobNumber_ExcludesSubjobs(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Sub-jobs like 24-334-01 are excluded because the LIKE patterns
@@ -73,10 +67,7 @@ func TestGenerateTopLevelJobNumber_ExcludesSubjobs(t *testing.T) {
 //
 // Expected: next proposal number should be P24-1000
 func TestGenerateTopLevelJobNumber_Proposals(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	number, err := generateTopLevelJobNumberForYear(app, jobTypeProposal, 24)
@@ -96,10 +87,7 @@ func TestGenerateTopLevelJobNumber_Proposals(t *testing.T) {
 // Using year 99 which has no test data.
 // Expected: first job number should be XX-0001
 func TestGenerateTopLevelJobNumber_EmptyYear(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Test with year 99 which has no existing jobs
@@ -117,10 +105,7 @@ func TestGenerateTopLevelJobNumber_EmptyYear(t *testing.T) {
 // TestGenerateTopLevelJobNumber_EmptyYearProposal verifies behavior when no proposals
 // exist for the given year.
 func TestGenerateTopLevelJobNumber_EmptyYearProposal(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Test with year 99 which has no existing proposals
@@ -141,10 +126,7 @@ func TestGenerateTopLevelJobNumber_EmptyYearProposal(t *testing.T) {
 // Test data in test_pb_data/data.db:
 //   - rate_sheets: "rs_hook_inactive_001" (Hook Inactive Rate Sheet)
 func TestValidateRateSheetIsActive_InactiveRateSheet(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
@@ -165,10 +147,7 @@ func TestValidateRateSheetIsActive_InactiveRateSheet(t *testing.T) {
 // TestValidateRateSheetIsActive_RequiredForNewProject verifies that creating
 // a new project without a rate_sheet returns an error.
 func TestValidateRateSheetIsActive_RequiredForNewProject(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
@@ -204,10 +183,7 @@ func TestValidateRateSheetIsActive_RequiredForNewProject(t *testing.T) {
 // Test data in test_pb_data/data.db:
 //   - jobs: "u09fwwcg07y03m7" (24-291, project with no rate_sheet)
 func TestValidateRateSheetIsActive_NotRequiredForExistingProject(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Use an existing project job from the test database
@@ -234,10 +210,7 @@ func TestValidateRateSheetIsActive_NotRequiredForExistingProject(t *testing.T) {
 // TestValidateRateSheetIsActive_SkippedForProposal verifies that
 // rate_sheet validation is skipped for proposals.
 func TestValidateRateSheetIsActive_SkippedForProposal(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
@@ -261,10 +234,7 @@ func TestValidateRateSheetIsActive_SkippedForProposal(t *testing.T) {
 // TestCleanJob_ClearsRateSheetForProposal verifies that cleanJob
 // clears the rate_sheet field for proposals.
 func TestCleanJob_ClearsRateSheetForProposal(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
@@ -297,10 +267,7 @@ func TestCleanJob_ClearsRateSheetForProposal(t *testing.T) {
 //   - jobs: "job_hook_rs_active_001" (project with active rate_sheet c41ofep525bcacj)
 //   - rate_sheets: "c41ofep525bcacj" (active), "rs_hook_inactive_001" (inactive)
 func TestValidateRateSheetIsActive_ChangeToInactiveRejected(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	project, err := app.FindRecordById("jobs", "job_hook_rs_active_001")
@@ -334,10 +301,7 @@ func TestValidateRateSheetIsActive_ChangeToInactiveRejected(t *testing.T) {
 //   - rate_sheets: "test_rs_alt_actv" (Test Alternative Active Rate Sheet)
 //   - users: "dkv192wxprcqmho" (francesco@mac.com, no rate_sheet_revise claim)
 func TestValidateRateSheetIsActive_ChangeRequiresClaim(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Get the test job with rate_sheet set
@@ -382,10 +346,7 @@ func TestValidateRateSheetIsActive_ChangeRequiresClaim(t *testing.T) {
 //   - user_claims: "test_uc_rs_revise" (links time@test.com to rate_sheet_revise)
 //   - users: "rzr98oadsp9qc11" (time@test.com, has rate_sheet_revise claim)
 func TestValidateRateSheetIsActive_ChangeAllowedWithClaim(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Get the test job with rate_sheet set
@@ -421,10 +382,7 @@ func TestValidateRateSheetIsActive_ChangeAllowedWithClaim(t *testing.T) {
 //   - user_claims: "test_uc_rs_revise" (links time@test.com to rate_sheet_revise)
 //   - users: "rzr98oadsp9qc11" (time@test.com, has rate_sheet_revise claim)
 func TestValidateRateSheetIsActive_ClearingNotAllowed(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Get the test job with rate_sheet set
@@ -470,10 +428,7 @@ func TestValidateRateSheetIsActive_ClearingNotAllowed(t *testing.T) {
 // Test data in test_pb_data/data.db:
 //   - jobs: "u09fwwcg07y03m7" (24-291, project with no rate_sheet)
 func TestValidateRateSheetIsActive_SetOnEmptyAllowed(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatal(err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Get an existing project without a rate_sheet

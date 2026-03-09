@@ -1,0 +1,103 @@
+allowed_fields,code,created,description,id,name,required_fields,updated
+"[
+  ""date"",
+  ""time_type"",
+  ""hours"",
+  ""description""
+]",OH,2024-06-03 16:51:58.961Z,"Time off due to cultural, nationalistic, or religious holidays that are legislated in Canada",2yvywhhustq8zx2,Statutory Holiday,"[
+  ""date"",
+  ""time_type"",
+  ""hours""
+]",2024-06-24 17:35:07.429Z
+"[
+  ""date"",
+  ""time_type""
+]",OR,2024-06-03 16:52:38.632Z,Time off for staff who are on a shift rotation schedule,4z2fmzzorinpsql,Off Rotation (Full Day),[],2024-06-24 17:43:14.075Z
+"[
+  ""date"",
+  ""time_type"",
+  ""division"",
+  ""hours"",
+  ""description"",
+  ""meals_hours"",
+  ""job"",
+  ""work_record"",
+  ""category""
+]",RT,2024-06-03 16:54:51.836Z,Regular hours worked for pay where on-the-job training took place,5pfvao4tx513g7b,Training,"[
+  ""date"",
+  ""time_type"",
+  ""division"",
+  ""hours"",
+  ""description""
+]",2024-06-24 17:37:12.013Z
+"[
+  ""date"",
+  ""time_type""
+]",OW,2024-06-03 16:53:49.770Z,Hourly staff who work 0 hours in a week create this entry to submit an empty time sheet.,89004rl64ar5s50,Full Week Off,[],2024-07-03 14:46:09.767Z
+"[
+  ""date"",
+  ""time_type"",
+  ""hours"",
+  ""description""
+]",OV,2024-06-03 16:53:29.491Z,Time off due to provincially-mandated vacation,d35auo4vawx7t9u,Vacation,"[
+  ""date"",
+  ""time_type"",
+  ""hours""
+]",2024-06-24 17:35:45.690Z
+"[
+  ""date"",
+  ""time_type"",
+  ""hours""
+]",RB,2024-06-03 16:54:37.803Z,"If an employee has worked more than 44 hours in a week, the overage can be banked by using this code. In this way the employee will not be paid for the time for this reporting period, but it will be available to use later.",ji8efjydxmug5da,Add Overtime to Bank,[],2024-06-24 17:42:59.914Z
+"[
+  ""date"",
+  ""time_type"",
+  ""hours"",
+  ""description""
+]",OP,2024-06-03 16:52:20.136Z,Personal paid time off granted by the company,mn8q8lnnqln0kt6,PPTO,"[
+  ""date"",
+  ""time_type"",
+  ""hours""
+]",2024-06-24 17:35:03.568Z
+"[
+  ""date"",
+  ""time_type"",
+  ""hours"",
+  ""description""
+]",OB,2024-06-03 16:51:38.583Z,Time off to experience losing someone important,o48dhbgrov7xd7k,Bereavement,"[
+  ""date"",
+  ""time_type"",
+  ""hours""
+]",2024-06-24 17:35:10.700Z
+"[
+  ""date"",
+  ""time_type"",
+  ""payout_request_amount""
+]",OTO,2024-06-03 16:53:17.006Z,Employees can request payout of banked overtime (in dollars) using this code. Only one entry per timesheet is allowed.,ra3lmr3ypduwqf1,Request Overtime Payout,[],2024-06-24 17:43:23.744Z
+"[
+  ""date"",
+  ""time_type"",
+  ""division"",
+  ""hours"",
+  ""description"",
+  ""meals_hours"",
+  ""job"",
+  ""work_record"",
+  ""category""
+]",R,2024-06-03 16:54:23.149Z,Regular hours worked for pay,sdyfl3q7j7ap849,Hours Worked,"[
+  ""date"",
+  ""time_type"",
+  ""division"",
+  ""hours"",
+  ""description""
+]",2024-06-24 17:37:03.273Z
+"[
+  ""date"",
+  ""time_type"",
+  ""hours"",
+  ""description""
+]",OS,2024-06-03 16:52:51.827Z,Time off due to illness,yo20602uq83mfrp,Sick,"[
+  ""date"",
+  ""time_type"",
+  ""hours""
+]",2024-06-24 17:35:22.410Z

@@ -2,6 +2,7 @@ package hooks
 
 import (
 	"testing"
+	"tybalt/internal/testseed"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -37,10 +38,7 @@ func assertJobNotImported(t *testing.T, app *tests.TestApp) {
 }
 
 func TestCategoriesCreateMarksJobNotImported(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 	AddHooks(app)
 
@@ -62,10 +60,7 @@ func TestCategoriesCreateMarksJobNotImported(t *testing.T) {
 }
 
 func TestCategoriesDeleteMarksJobNotImported(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 	AddHooks(app)
 
@@ -90,10 +85,7 @@ func TestCategoriesDeleteMarksJobNotImported(t *testing.T) {
 }
 
 func TestClientUpdateMarksReferencingJobsNotImported(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 	AddHooks(app)
 
@@ -113,10 +105,7 @@ func TestClientUpdateMarksReferencingJobsNotImported(t *testing.T) {
 }
 
 func TestContactUpdateMarksReferencingJobsNotImported(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 	AddHooks(app)
 

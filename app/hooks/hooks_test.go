@@ -4,11 +4,11 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"tybalt/internal/testseed"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
 )
 
 // We need to instantiate a Collection object to be part of the Record object
@@ -108,10 +108,7 @@ func TestValidateTimeEntry(t *testing.T) {
 	}
 
 	// Initialize a PocketBase TestApp so validateTimeEntry can perform lookups
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	// Run tests

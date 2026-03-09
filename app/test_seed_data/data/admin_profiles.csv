@@ -1,0 +1,24 @@
+_imported,active,allow_personal_reimbursement,created,default_branch,default_charge_out_rate,id,job_title,legacy_uid,mobile_phone,off_rotation_permitted,opening_date,opening_op,opening_ov,payroll_id,personal_vehicle_insurance_expiry,salary,skip_min_time_check,time_sheet_expected,uid,untracked_time_off,updated,work_week_hours
+0,1,0,2024-07-31 17:19:12.919Z,80875lm27v8wgi4,50,35i85kqy88hfsfc,Doer of things,legacy_f2j5a8vk006baub,+1 (807) 251-5555,0,2024-01-07,50,50,9999,2023-12-21,1,no,0,f2j5a8vk006baub,0,2026-02-11 00:00:00.000Z,40
+0,0,0,2026-02-11 00:00:00.000Z,,0,adpinactpo00001,,legacy_inactpoappr0001,,0,,0,0,fxpay_inactpoappr0001,,0,,0,inactpoappr0001,0,2026-02-11 00:00:00.000Z,0
+0,1,0,2026-01-20 18:10:40,,0,ap_has_inactive_mgr,,,,0,2024-01-07,0,0,,,0,,1,u_has_inactive_mgr,0,2026-01-20 18:10:40,40
+0,0,0,2025-06-19 19:07:23.538Z,80875lm27v8wgi4,0,ap_inactive,,,,0,2024-01-07,0,0,FIX_INACTIVE,,0,no,0,u_inactive,0,2025-06-19 19:07:23.538Z,40
+0,1,1,2025-09-03 16:51:01.207Z,80875lm27v8wgi4,50,ap_mileage_expired,,,,0,2025-01-01,0,0,900013,2024-12-31,0,no,0,u_mileage_expired,0,2025-09-03 16:51:01.207Z,40
+0,1,1,2025-09-03 16:51:01.207Z,80875lm27v8wgi4,50,ap_mileage_missing,,,,0,2025-01-01,0,0,900012,,0,no,0,u_mileage_missing,0,2025-09-03 16:51:01.207Z,40
+0,1,1,2025-09-03 16:51:01.207Z,80875lm27v8wgi4,50,ap_mileage_same_day,,,,0,2025-01-01,0,0,900014,2025-01-10,0,no,0,u_mileage_same_day,0,2025-09-03 16:51:01.207Z,40
+0,1,1,2025-09-03 16:51:01.207Z,80875lm27v8wgi4,50,ap_mileage_valid,,,,0,2025-01-01,0,0,900011,2025-12-31,0,no,0,u_mileage_valid,0,2025-09-03 16:51:01.207Z,40
+0,1,0,2025-06-19 19:07:23.538Z,80875lm27v8wgi4,0,ap_noclaims,,,,0,2024-01-07,0,0,FIX_NOCLAIMS,,0,no,0,4ssj9f1yg250o9y,0,2025-06-19 19:07:23.538Z,40
+0,1,0,2025-06-19 19:07:23.538Z,80875lm27v8wgi4,0,ap_orphan_poapprover,,legacy_4r70mfovf22m9uh,,0,2024-01-07,0,0,FIX_ORPHAN,,0,no,0,4r70mfovf22m9uh,0,2026-02-11 00:00:00.000Z,40
+0,1,0,2025-09-03 16:54:08.356Z,80875lm27v8wgi4,50,ap_po_bypass_001,,legacy_u_po_bypass_001,,0,2025-01-01,0,0,900099,,0,no,0,u_po_bypass_001,0,2026-02-11 00:00:00.000Z,40
+0,1,0,2026-01-20 18:19:00,,0,ap_tqqf7q0f,,,,0,,0,0,payroll_tqqf7q0f,,0,,0,tqqf7q0f3378rvp,0,2026-01-20 18:19:00,0
+0,1,0,2026-02-11 00:00:00.000Z,,0,apfxtr000000003,,legacy_6bq4j0eb26631dy,,0,,0,0,fxpay_6bq4j0eb26631dy,,0,,0,6bq4j0eb26631dy,0,2026-02-11 00:00:00.000Z,0
+0,1,0,2026-02-11 00:00:00.000Z,,0,apfxtr000000006,,legacy_t4g84hfvkt1v9j3,,0,,0,0,fxpay_t4g84hfvkt1v9j3,,0,,0,t4g84hfvkt1v9j3,0,2026-02-11 00:00:00.000Z,0
+0,1,0,2026-02-13 02:38:30,,0,apmtstamp000001,,legacy_uid_mtstamp_fx_001,,0,,0,0,payroll_mtstamp_fx_001,,0,,0,uidmtstampfx001,0,2026-02-13 02:38:30,0
+0,1,0,2024-09-04 20:14:06.407Z,80875lm27v8wgi4,100,kmpwwpbd8au6g8d,Maker of stuff,legacy_wegviunlyr2jjjv,+1 (324) 497-2556,0,2024-01-07,0,0,CMS12,1970-01-01,1,no,0,wegviunlyr2jjjv,0,2026-02-11 00:00:00.000Z,40
+0,1,0,2025-06-19 19:07:23.538Z,80875lm27v8wgi4,0,r2872943a4256ae,,,,0,2024-01-07,0,0,FIX3,,0,no,0,u_no_ppto_claim,0,2025-06-19 19:07:23.538Z,40
+0,1,0,2025-06-19 19:07:23.538Z,80875lm27v8wgi4,0,r2c33166b70c80b,,,,0,2024-01-07,0,0,FIX2,,0,no,0,u_with_claim,0,2025-06-19 19:07:23.538Z,40
+0,1,0,2025-09-03 16:54:08.356Z,80875lm27v8wgi4,50,r4eb68fd67df2e3,,legacy_66ct66w380ob6w8,,0,2025-01-01,0,0,900003,,0,no,0,66ct66w380ob6w8,0,2026-02-11 00:00:00.000Z,40
+0,1,1,2025-09-03 16:51:01.207Z,80875lm27v8wgi4,50,r568267d6ac6f0c,,,,0,2025-01-01,0,0,900001,,0,no,0,rzr98oadsp9qc11,0,2025-09-03 16:51:01.207Z,40
+0,1,0,2025-06-19 19:07:23.538Z,80875lm27v8wgi4,0,r61e7f939c18ee8,,,,0,2024-01-07,0,0,FIX1,,0,no,0,u_no_claims,0,2025-06-19 19:07:23.538Z,40
+0,1,0,2025-09-03 16:54:08.356Z,80875lm27v8wgi4,50,ra26b32ad6f29f1,,legacy_etysnrlup2f6bak,,0,2025-01-01,0,0,900002,,0,no,0,etysnrlup2f6bak,0,2026-02-11 00:00:00.000Z,40
+0,1,0,2025-06-19 19:07:23.538Z,80875lm27v8wgi4,0,rae585be7bb8f2f,,,,0,2024-01-07,0,0,FIX4,,0,no,0,u_with_ppto_claim,0,2025-06-19 19:07:23.538Z,40

@@ -3,20 +3,16 @@ package testutils
 import (
 	"testing"
 	"tybalt/hooks"
+	"tybalt/internal/testseed"
 	"tybalt/routes"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
-const testDataDir = "./test_pb_data"
-
 // setup the test ApiScenario app instance
 func SetupTestApp(t testing.TB) *tests.TestApp {
-	testApp, err := tests.NewTestApp(testDataDir)
-	if err != nil {
-		t.Fatal(err)
-	}
+	testApp := testseed.NewSeededTestApp(t)
 	// no need to cleanup since scenario.Test() will do that for us
 	// defer testApp.Cleanup()
 
@@ -30,7 +26,12 @@ func SetupTestApp(t testing.TB) *tests.TestApp {
 }
 
 func GenerateAdminToken(email string) (string, error) {
-	app, err := tests.NewTestApp(testDataDir)
+	dir, err := testseed.TemplateDir()
+	if err != nil {
+		return "", err
+	}
+
+	app, err := tests.NewTestApp(dir)
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +46,12 @@ func GenerateAdminToken(email string) (string, error) {
 }
 
 func GenerateRecordToken(collectionNameOrId string, email string) (string, error) {
-	app, err := tests.NewTestApp(testDataDir)
+	dir, err := testseed.TemplateDir()
+	if err != nil {
+		return "", err
+	}
+
+	app, err := tests.NewTestApp(dir)
 	if err != nil {
 		return "", err
 	}

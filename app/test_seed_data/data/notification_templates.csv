@@ -1,0 +1,74 @@
+code,created,description,html_email,id,subject,text_email,updated
+po_active,2025-04-02 14:23:50.020Z,Sent to creator when PO becomes active,,1kz737xtyyg191s,Your purchase order is fully approved,"Hello {{.RecipientName}}, your purchase order {{.PONumber}} is now active. You may submit expenses against it here:
+
+{{.ActionURL}}
+
+Thank you.",2025-04-09 14:55:05.759Z
+po_rejected,2025-04-08 18:57:29.046Z,Sent to the creator of a purchase order if the purchase order is rejected,,236vfe6e7b8q05r,Your purchase order was rejected,"Hello {{.RecipientName}}, your purchase order was rejected by {{.UserName}}.
+
+{{.ActionURL}}
+
+Thank you.",2025-04-09 14:54:53.424Z
+timesheet_shared,2025-11-17 19:35:22.501Z,Sent to newly added viewers when a timesheet is shared with them for review,,4sf0epmzv466m9p,A time sheet has been shared with you,"Hello {{.RecipientName}},
+
+{{.UserName}} has shared a timesheet for {{.EmployeeName}} for the week ending {{.WeekEnding}} with you for review.
+
+You can view the shared timesheet here:
+
+{{.ActionURL}}",2025-11-17 19:35:22.501Z
+po_approval_required,2025-04-02 13:24:24.102Z,Sent to purchase order approver upon purchase order creation,,5dd892s7yes1e4x,Purchase Order Approval Required,"Hello {{.RecipientName}}, {{.UserName}} has created a purchase order and specified you as the approver. You may review the purchase order then approve or reject it here:
+
+{{.ActionURL}}
+
+Thank you.",2025-04-09 14:56:22.138Z
+po_priority_second_approval_required,2025-04-02 13:28:16.112Z,Sent to purchase order priority_second_approver requesting second approval,,98rk0y43qn43mn3,A purchase order requires priority second approval.,"Hello {{.RecipientName}}, {{.POCreatorName}} has had a purchase order approved by {{.UserName}} but it requires second approval. They have requested that you be given priority to approve the purchase order. After 24 hours, the purchase order will be available for approval by all qualified approvers.
+
+You may review the purchase order here:
+
+{{.ActionURL}}
+
+Thank you.",2025-04-09 14:56:04.621Z
+expense_approval_reminder,2025-11-17 19:29:37.712Z,Sent to managers with one or more expenses awaiting their approval,,amko2j61shwcigh,Expenses await your approval,"Hello {{.RecipientName}},
+
+One or more expenses are awaiting your approval.
+
+Please review and approve or reject them here:
+
+{{.ActionURL}}",2025-11-17 19:29:37.712Z
+expense_rejected,2025-11-17 19:34:04.762Z,"Sent when an expense is rejected to the employee, the rejector, and the employee's manager (if different from the rejector)",,b21hgqw8ggr0g65,An expense was rejected,"Hello {{.RecipientName}},
+
+The expense submitted by {{.EmployeeName}} on {{.ExpenseDate}} for {{.ExpenseAmount}} was rejected by {{.RejectorName}} for the following reason:
+
+{{.RejectionReason}}
+
+You can review the expense and make any required changes here:
+
+{{.ActionURL}}",2025-11-17 19:34:04.762Z
+timesheet_submission_reminder,2025-11-17 19:26:30.175Z,Sent to users who have not submitted their timesheet for the previous week.,,bv3jwpdfcsu95mf,Please submit a timesheet for last week,"Hello {{.RecipientName}},
+
+You have not submitted your timesheet for the week ending {{.WeekEnding}}.
+
+Please review your time entries then submit here:
+
+{{.ActionURL}}",2025-11-17 19:26:54.488Z
+po_second_approval_required,2025-04-02 13:32:24.901Z,Sent to all qualified second approvers if purchase orders require second approval,,g03u4849peqg8zl,One or more purchase orders require second approval.,"Hello {{.RecipientName}}, there are one or more purchase orders awaiting second approval. Please review them then accept or reject them here:
+
+{{.ActionURL}}
+
+Thank you.",2025-04-03 20:22:34.145Z
+timesheet_rejected,2025-11-17 19:31:49.661Z,"Sent when a time sheet is rejected to the employee, the rejector, and the employee's manager (if different from the rejector)",,getu1ag8ziz8wpz,A time sheet was rejected,"Hello {{.RecipientName}},
+
+The timesheet for {{.EmployeeName}} for the week ending {{.WeekEnding}} was rejected by {{.RejectorName}} for the following reason:
+
+{{.RejectionReason}}
+
+You can review the timesheet and make any required changes here:
+
+{{.ActionURL}}",2025-11-17 19:31:49.661Z
+timesheet_approval_reminder,2025-11-17 19:30:28.346Z,Sent to managers with one or more timesheets awaiting their approval,,y7pblryxf5tanzy,Time sheets await your approval,"Hello {{.RecipientName}},
+
+One or more timesheets are awaiting your approval.
+
+Please review and approve or reject them here:
+
+{{.ActionURL}}",2025-11-17 19:30:28.346Z

@@ -1,0 +1,6 @@
+created,description,id,key,updated,value
+2026-01-15 21:12:40.452Z,"When create_edit_absorb is true, jobs can be created, edited, and absorbs can be performed. If missing or false, jobs cannot be created or edited and absorbs cannot be performed.",58lzohds2s9ho7o,jobs,2026-01-15 21:14:12.387Z,"{
+  ""create_edit_absorb"": true
+}"
+2026-02-16 20:22:15.548Z,"Controls purchase order workflow behavior, including second-stage timeout handling and the hidden legacy PO create/update flow.",8vsxgb5c0z99o4f,purchase_orders,2026-03-09 13:47:55.349Z,"{""enable_legacy_po_create_update"":true,""second_stage_timeout_hours"":24}"
+2026-03-09 00:00:00.000Z,,appcfgnotify001,notifications,2026-03-09 00:00:00.000Z,"{""expense_approval_reminder"":true,""expense_rejected"":true,""po_active"":true,""po_approval_required"":true,""po_priority_second_approval_required"":true,""po_rejected"":true,""po_second_approval_required"":true,""timesheet_approval_reminder"":true,""timesheet_rejected"":true,""timesheet_shared"":true,""timesheet_submission_reminder"":true}"

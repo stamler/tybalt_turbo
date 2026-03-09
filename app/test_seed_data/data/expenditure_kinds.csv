@@ -1,0 +1,7 @@
+allow_job,created,description,en_ui_label,id,name,second_approval_threshold,ui_order,updated
+1,2026-02-10 17:04:14.278Z,Computer and Software Acquisition,Computers/Software,7jgifny7fljd9hi,computer,500,60,2026-02-24 15:08:08.331Z
+0,2026-02-10 17:03:23.845Z,Staff Appreciation or Social Committee expenditures,Staff and Social,c4a0ze3qzz5j9ap,staff_and_social,0,30,2026-02-24 15:08:17.551Z
+0,2026-02-10 17:02:53.334Z,Gifts of money to people or organizations as sponsorships,Sponsorship,fo25j2jhtii7qe5,sponsorship,0,40,2026-02-24 15:08:22.710Z
+0,2026-02-10 17:02:26.180Z,expenses not linked to a job,Capital,l3vtlbqg529m52j,capital,500,20,2026-02-24 15:08:28.193Z
+1,,expenses linked to a job,Project,prj0kind0000001,project,500,10,2026-02-24 19:37:45.934Z
+0,2026-02-10 17:03:55.083Z,Media Advertising and Event Fees,Media/Advertising,vg1he0mxsmsv49r,media_and_event,0,50,2026-02-24 15:08:13.134Z

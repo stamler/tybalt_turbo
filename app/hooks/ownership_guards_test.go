@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"testing"
 	"tybalt/errs"
+	"tybalt/internal/testseed"
 
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
 )
 
 func assertHookErrorCode(t *testing.T, err error, expectedStatus int, expectedField string, expectedCode string) {
@@ -43,10 +43,7 @@ func makeRecordRequestEvent(app core.App, record *core.Record, auth *core.Record
 }
 
 func TestProcessPurchaseOrder_UpdateOwnershipGuards(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	ownerAuth, err := app.FindRecordById("users", "f2j5a8vk006baub")
@@ -95,10 +92,7 @@ func TestProcessPurchaseOrder_UpdateOwnershipGuards(t *testing.T) {
 }
 
 func TestProcessExpense_UpdateOwnershipGuards(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	ownerAuth, err := app.FindRecordById("users", "f2j5a8vk006baub")

@@ -3,10 +3,10 @@ package routes
 import (
 	"testing"
 	"time"
+	"tybalt/internal/testseed"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
-	"github.com/pocketbase/pocketbase/tests"
 )
 
 // helper to fetch a time_type id by code
@@ -25,10 +25,7 @@ func getTimeTypeId(t *testing.T, app core.App, code string) string {
 //
 // ──────────────────────────────────────────────────────────────────────────────
 func TestValidateTimeEntries_NegativeBalanceNoOVClaims_Passes(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	uid := "u_no_claims"
@@ -66,10 +63,7 @@ func TestValidateTimeEntries_NegativeBalanceNoOVClaims_Passes(t *testing.T) {
 //
 // ──────────────────────────────────────────────────────────────────────────────
 func TestValidateTimeEntries_ClaimOVWithNegativeBalance_Fails(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	uid := "u_with_claim"
@@ -112,10 +106,7 @@ func TestValidateTimeEntries_ClaimOVWithNegativeBalance_Fails(t *testing.T) {
 //
 // ──────────────────────────────────────────────────────────────────────────────
 func TestValidateTimeEntries_NegativeBalanceNoOPClaims_Passes(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	uid := "u_no_ppto_claim"
@@ -150,10 +141,7 @@ func TestValidateTimeEntries_NegativeBalanceNoOPClaims_Passes(t *testing.T) {
 //
 // ──────────────────────────────────────────────────────────────────────────────
 func TestValidateTimeEntries_ClaimOPWithNegativeBalance_Fails(t *testing.T) {
-	app, err := tests.NewTestApp("../test_pb_data")
-	if err != nil {
-		t.Fatalf("failed to init test app: %v", err)
-	}
+	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
 	uid := "u_with_ppto_claim"

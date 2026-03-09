@@ -1,0 +1,6 @@
+_imported,client,created,id,job,job_not_applicable,job_status_changed_to,note,uid,updated
+0,lb0fnenkeyitsny,2024-01-15 10:00:00,note_cancel_test,test_prop_with_cancel_note,0,Cancelled,Client cancelled the project,f2j5a8vk006baub,2024-01-15 10:00:00
+0,eldtxi3i4h00k8r,2024-01-02 00:00:00Z,note_eld,zke3cs3yipplwtu,0,,Absorbed client note 1,4r70mfovf22m9uh,2024-01-02 00:00:00Z
+0,lb0fnenkeyitsny,2024-01-01 00:00:00Z,note_lb0,cjf0kt0defhq480,0,,Target client note,4r70mfovf22m9uh,2024-01-01 00:00:00Z
+0,lb0fnenkeyitsny,2024-01-15 10:00:00,note_nobid_test,test_prop_with_nobid_note,0,No Bid,We decided not to bid on this project,f2j5a8vk006baub,2024-01-15 10:00:00
+0,pqpd90fqd5ohjcs,2024-01-03 00:00:00Z,note_pqp,u09fwwcg07y03m7,0,,Absorbed client note 2,4r70mfovf22m9uh,2024-01-03 00:00:00Z

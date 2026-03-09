@@ -1,0 +1,19 @@
+active,created,effective_date,id,name,revision,updated
+1,2026-01-21 22:29:10.359Z,2025-01-07,c41ofep525bcacj,2025 Standard Rates,0,2026-01-21 22:29:10.359Z
+0,2026-03-09 00:00:00.000Z,2025-01-01,rs_complete_all_001,Complete Hook Sheet,0,2026-03-09 00:00:00.000Z
+1,2026-03-09 00:00:00.000Z,2025-01-01,rs_deactivate_r0,Test Deactivate Others,0,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2025-02-01,rs_deactivate_r1,Test Deactivate Others,1,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2025-06-15,rs_effinvalid_r0,Test Invalid Effective Date,0,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2025-01-15,rs_effvalid_r0,Test Effective Date Validation,0,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2025-01-01,rs_hook_inactive_001,Hook Inactive Rate Sheet,0,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2025-01-01,rs_newercheck_r0,Test Newer Revision Check,0,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2025-01-01,rs_newerexists_r0,Test Newer Revision Exists,0,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2025-02-01,rs_newerexists_r1,Test Newer Revision Exists,1,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2025-01-01,rs_partial_001,Partial Hook Sheet,0,2026-03-09 00:00:00.000Z
+1,2026-03-09 00:00:00.000Z,2025-01-01,rs_sheeta_r0,Sheet A,0,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2025-02-01,rs_sheeta_r1,Sheet A,1,2026-03-09 00:00:00.000Z
+1,2026-03-09 00:00:00.000Z,2025-01-01,rs_sheetb_r0,Sheet B,0,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2026-03-01,rsdupbase0001,Duplicate Test Sheet,0,2026-03-09 00:00:00.000Z
+0,2026-03-09 00:00:00.000Z,2026-01-01,rsrevbase0001,Revise Test Sheet,0,2026-03-09 00:00:00.000Z
+0,2025-01-01 00:00:00,2025-01-01,test_empty_sheet,Empty Test Rate Sheet,1,2025-01-01 00:00:00
+1,,2025-01-01,test_rs_alt_actv,Test Alternative Active Rate Sheet,0,

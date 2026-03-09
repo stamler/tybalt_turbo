@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"tybalt/constants"
+	"tybalt/internal/testseed"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
@@ -119,10 +120,7 @@ func TestGetPurchaseOrderSecondStageTimeoutHours(t *testing.T) {
 
 	for _, tc := range testsTable {
 		t.Run(tc.name, func(t *testing.T) {
-			app, err := tests.NewTestApp("../test_pb_data")
-			if err != nil {
-				t.Fatalf("failed to init test app: %v", err)
-			}
+			app := testseed.NewSeededTestApp(t)
 			defer app.Cleanup()
 
 			tc.setup(t, app)
@@ -173,10 +171,7 @@ func TestIsLegacyPOCreateUpdateEnabled(t *testing.T) {
 
 	for _, tc := range testsTable {
 		t.Run(tc.name, func(t *testing.T) {
-			app, err := tests.NewTestApp("../test_pb_data")
-			if err != nil {
-				t.Fatalf("failed to init test app: %v", err)
-			}
+			app := testseed.NewSeededTestApp(t)
 			defer app.Cleanup()
 
 			tc.setup(t, app)
@@ -235,10 +230,7 @@ func TestIsNotificationFeatureEnabled(t *testing.T) {
 
 	for _, tc := range testsTable {
 		t.Run(tc.name, func(t *testing.T) {
-			app, err := tests.NewTestApp("../test_pb_data")
-			if err != nil {
-				t.Fatalf("failed to init test app: %v", err)
-			}
+			app := testseed.NewSeededTestApp(t)
 			defer app.Cleanup()
 
 			tc.setup(t, app)
@@ -370,10 +362,7 @@ func TestGetPOExpenseExcessConfig(t *testing.T) {
 
 	for _, tc := range testsTable {
 		t.Run(tc.name, func(t *testing.T) {
-			app, err := tests.NewTestApp("../test_pb_data")
-			if err != nil {
-				t.Fatalf("failed to init test app: %v", err)
-			}
+			app := testseed.NewSeededTestApp(t)
 			defer app.Cleanup()
 
 			tc.setup(t, app)
@@ -515,10 +504,7 @@ func TestGetNoPOExpenseLimit(t *testing.T) {
 
 	for _, tc := range testsTable {
 		t.Run(tc.name, func(t *testing.T) {
-			app, err := tests.NewTestApp("../test_pb_data")
-			if err != nil {
-				t.Fatalf("failed to init test app: %v", err)
-			}
+			app := testseed.NewSeededTestApp(t)
 			defer app.Cleanup()
 
 			tc.setup(t, app)
