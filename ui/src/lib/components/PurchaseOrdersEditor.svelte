@@ -22,7 +22,7 @@
   import DsFileSelect from "$lib/components/DsFileSelect.svelte";
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { authStore } from "$lib/stores/auth";
-  import { goto } from "$app/navigation";
+  import { goto, invalidateAll } from "$app/navigation";
   import { resolve } from "$app/paths";
   import type {
     PurchaseOrdersPageData,
@@ -67,7 +67,7 @@
   } = $props();
 
   let errors = $state({} as any);
-  let item = $state(untrack(() => data.item));
+  let item = $state(structuredClone(untrack(() => data.item)));
   const dateInputMax = dateInputMaxMonthsAhead(15);
   let showApprovalResetSuccess = $state(false);
   let showApprovalResetToast = $state(false);
@@ -329,6 +329,20 @@
     }
     return fallbackDefaultBranch;
   }
+
+  $effect(() => {
+    const nextRouteData = {
+      item: data.item,
+      id: data.id,
+      editing: data.editing,
+      loadError: data.loadError,
+    };
+
+    item = structuredClone(nextRouteData.item);
+    errors = {};
+    showApprovalResetSuccess = false;
+    showApprovalResetToast = false;
+  });
 
   $effect(() => {
     const branch = item.branch ?? "";
@@ -722,7 +736,12 @@
 
       errors = {};
       if (legacyMode) {
-        goto(resolve(data.editing ? `/pos/legacy/${saved.id}/edit` : "/pos/legacy/add"));
+        if (data.editing) {
+          goto(resolve(`/pos/legacy/${saved.id}/edit`));
+        } else {
+          await goto(resolve("/pos/legacy/add"), { replaceState: true });
+          await invalidateAll();
+        }
         return;
       }
       if (shouldShowResetFeedback) {
