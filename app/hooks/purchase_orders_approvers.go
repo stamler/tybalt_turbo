@@ -63,7 +63,7 @@ func ProcessPOApproverProps(app core.App, e *core.RecordRequestEvent) error {
 	}
 
 	for _, id := range divisions {
-		if err := ensureActiveDivision(app, id, "divisions"); err != nil {
+		if err := EnsureActiveDivision(app, id, "divisions"); err != nil {
 			return err
 		}
 	}

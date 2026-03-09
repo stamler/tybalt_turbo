@@ -86,9 +86,9 @@ func CalculateFileFieldHash(e *core.RecordRequestEvent, field string) (string, e
 	return hex.EncodeToString(hash.Sum(nil)), nil
 }
 
-// ensureActiveDivision verifies that the provided division id references an active
+// EnsureActiveDivision verifies that the provided division id references an active
 // division record. fieldName is used to attribute an error back to the caller.
-func ensureActiveDivision(app core.App, divisionID string, fieldName string) error {
+func EnsureActiveDivision(app core.App, divisionID string, fieldName string) error {
 	if divisionID == "" {
 		return nil
 	}

@@ -70,6 +70,9 @@
       <span>{data.po.po_number === "" ? "no po number" : data.po.po_number}</span>
       <div class="flex items-center gap-2">
         {shortDate(data.po.date, true)}
+        {#if data.po.legacy_manual_entry}
+          <DsLabel color="cyan">Manually created</DsLabel>
+        {/if}
         {#if hasSecondApproverAlert}
           <button
             type="button"
@@ -111,7 +114,7 @@
           {#if data.po.rejection_reason}
             <div class="mt-1"><span class="font-semibold">Reason:</span> {data.po.rejection_reason}</div>
           {/if}
-          {#if isOwner && $expensesEditingEnabled}
+          {#if isOwner && $expensesEditingEnabled && !data.po.legacy_manual_entry}
             <div class="mt-2">
               <DsActionButton
                 action={`/pos/${data.po.id}/edit`}
@@ -325,7 +328,7 @@
   </div>
   {#if data.po.status === "Unapproved" && $expensesEditingEnabled}
     <div class="flex flex-wrap gap-2">
-      {#if isOwner}
+      {#if isOwner && !data.po.legacy_manual_entry}
         <DsActionButton
           action={`/pos/${data.po.id}/edit`}
           icon="mdi:pencil"

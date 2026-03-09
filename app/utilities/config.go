@@ -110,6 +110,13 @@ func GetPurchaseOrderSecondStageTimeoutHours(app core.App) float64 {
 	return defaultTimeoutHours
 }
 
+// IsLegacyPOCreateUpdateEnabled checks whether the hidden legacy PO
+// create/update flow is enabled via app_config.purchase_orders.
+// Defaults to false (fail-closed).
+func IsLegacyPOCreateUpdateEnabled(app core.App) (bool, error) {
+	return GetConfigBool(app, "purchase_orders", "enable_legacy_po_create_update", false)
+}
+
 // POExpenseExcessConfig holds the configuration for how much expenses can
 // exceed a purchase order total.
 type POExpenseExcessConfig struct {

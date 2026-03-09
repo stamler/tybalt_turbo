@@ -20,13 +20,13 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-// The cleanPurchaseOrder function is used to remove properties from the
+// CleanPurchaseOrder removes properties from the
 // purchase_order record that are not allowed to be set based on the value of
 // the record's type property. It is also used to set the approval_total field,
 // which matches the total field unless the type is Recurring. It is called by
 // ProcessPurchaseOrder to reduce the number of fields that need to be
 // validated.
-func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
+func CleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	// initialize approval_total to total. This will be changed if the PO is
 	// recurring.
 	purchaseOrderRecord.Set("approval_total", purchaseOrderRecord.GetFloat("total"))
@@ -129,12 +129,13 @@ func cleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	return nil
 }
 
-// validation, including cross-field validation is performed in this function. It is expected that the
-// purchase_order record has already been cleaned by the cleanPurchaseOrder
+// ValidatePurchaseOrder performs validation, including cross-field validation.
+// It is expected that the purchase_order record has already been cleaned by the
+// CleanPurchaseOrder
 // function. This ensures that only the fields that are allowed to be set are
 // present in the record prior to validation. The function returns an error if
 // the record is invalid, otherwise it returns nil.
-func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
+func ValidatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record, legacyMode bool) error {
 	isRecurring := purchaseOrderRecord.GetString("type") == "Recurring"
 	isChild := purchaseOrderRecord.GetString("parent_po") != ""
 
@@ -380,22 +381,22 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		}
 	}
 
-	// Validate that the approver is an active user
-	approverIsActive := func(app core.App) validation.RuleFunc {
+	// Validate that a selected user is active.
+	userIsActive := func(app core.App, code string, message string) validation.RuleFunc {
 		return func(value any) error {
-			approverID, _ := value.(string)
-			if approverID == "" {
+			userID, _ := value.(string)
+			if userID == "" {
 				return nil // Let required validation handle empty
 			}
-			active, err := utilities.IsUserActive(app, approverID)
+			active, err := utilities.IsUserActive(app, userID)
 			if err != nil {
 				return &errs.HookError{
 					Status:  http.StatusInternalServerError,
-					Message: "failed to check approver active status",
+					Message: "failed to check user active status",
 				}
 			}
 			if !active {
-				return validation.NewError("approver_not_active", "the selected approver is not an active user")
+				return validation.NewError(code, message)
 			}
 			return nil
 		}
@@ -422,6 +423,10 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 	}
 
 	validationsErrors := validation.Errors{
+		"uid": validation.Validate(
+			purchaseOrderRecord.GetString("uid"),
+			validation.By(userIsActive(app, "uid_not_active", "the selected staff member is not an active user")),
+		),
 		"date": validation.Validate(
 			purchaseOrderRecord.Get("date"),
 			validation.Required.Error("date is required"),
@@ -445,7 +450,7 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 				validation.In("").Error("frequency is not permitted for non-recurring purchase orders"))),
 		"description": validation.Validate(purchaseOrderRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
 		"approver": validation.Validate(purchaseOrderRecord.GetString("approver"),
-			validation.By(approverIsActive(app))),
+			validation.By(userIsActive(app, "approver_not_active", "the selected approver is not an active user"))),
 		"total": validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.Max(constants.MAX_APPROVAL_TOTAL)),
 		"type":  validation.Validate(purchaseOrderRecord.GetString("type"), validation.When(isChild, validation.In("One-Time").Error("child POs must be of type One-Time"))),
 	}
@@ -480,59 +485,61 @@ func validatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error
 		return validationsErrors.Filter()
 	}
 
-	policy, err := utilities.GetPOApproverPolicy(
-		app,
-		purchaseOrderRecord.GetString("division"),
-		purchaseOrderRecord.GetFloat("approval_total"),
-		purchaseOrderRecord.GetString("kind"),
-		purchaseOrderRecord.GetString("job") != "",
-	)
-	if err != nil {
-		if filteredErr := validationsErrors.Filter(); filteredErr != nil {
-			return filteredErr
-		}
-		return &errs.HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when computing purchase order approval policy",
-			Data: map[string]errs.CodeError{
-				"global": {
-					Code:    "error_computing_approval_policy",
-					Message: fmt.Sprintf("error computing purchase order approval policy: %v", err),
+	if !legacyMode {
+		policy, err := utilities.GetPOApproverPolicy(
+			app,
+			purchaseOrderRecord.GetString("division"),
+			purchaseOrderRecord.GetFloat("approval_total"),
+			purchaseOrderRecord.GetString("kind"),
+			purchaseOrderRecord.GetString("job") != "",
+		)
+		if err != nil {
+			if filteredErr := validationsErrors.Filter(); filteredErr != nil {
+				return filteredErr
+			}
+			return &errs.HookError{
+				Status:  http.StatusInternalServerError,
+				Message: "hook error when computing purchase order approval policy",
+				Data: map[string]errs.CodeError{
+					"global": {
+						Code:    "error_computing_approval_policy",
+						Message: fmt.Sprintf("error computing purchase order approval policy: %v", err),
+					},
 				},
-			},
+			}
 		}
-	}
 
-	setValidationError := func(field string, code string, message string) {
-		if validationsErrors[field] == nil {
-			validationsErrors[field] = validation.NewError(code, message)
+		setValidationError := func(field string, code string, message string) {
+			if validationsErrors[field] == nil {
+				validationsErrors[field] = validation.NewError(code, message)
+			}
 		}
-	}
 
-	approverID := strings.TrimSpace(purchaseOrderRecord.GetString("approver"))
-	prioritySecondApproverID := strings.TrimSpace(purchaseOrderRecord.GetString("priority_second_approver"))
-	ownerID := strings.TrimSpace(purchaseOrderRecord.GetString("uid"))
+		approverID := strings.TrimSpace(purchaseOrderRecord.GetString("approver"))
+		prioritySecondApproverID := strings.TrimSpace(purchaseOrderRecord.GetString("priority_second_approver"))
+		ownerID := strings.TrimSpace(purchaseOrderRecord.GetString("uid"))
 
-	approverValidForStage := policy.IsFirstStageApprover(approverID) || policy.IsValidFirstStageViaBypass(approverID, ownerID)
+		approverValidForStage := policy.IsFirstStageApprover(approverID) || policy.IsValidFirstStageViaBypass(approverID, ownerID)
 
-	if !approverValidForStage {
-		setValidationError("approver", "invalid_approver_for_stage", "selected approver is not valid for first-stage approval")
-	}
-
-	if policy.SecondApprovalRequired {
-		if len(policy.FirstStageApprovers) == 0 && !approverValidForStage {
-			setValidationError("approver", "first_pool_empty", "no configured first-stage approvers are available for this purchase order")
+		if !approverValidForStage {
+			setValidationError("approver", "invalid_approver_for_stage", "selected approver is not valid for first-stage approval")
 		}
-		if len(policy.SecondStageApprovers) == 0 {
-			setValidationError("priority_second_approver", "second_pool_empty", "no configured second-stage approvers are available for this purchase order")
+
+		if policy.SecondApprovalRequired {
+			if len(policy.FirstStageApprovers) == 0 && !approverValidForStage {
+				setValidationError("approver", "first_pool_empty", "no configured first-stage approvers are available for this purchase order")
+			}
+			if len(policy.SecondStageApprovers) == 0 {
+				setValidationError("priority_second_approver", "second_pool_empty", "no configured second-stage approvers are available for this purchase order")
+			}
+			if prioritySecondApproverID == "" {
+				setValidationError("priority_second_approver", "priority_second_approver_required", "priority second approver is required when second approval is required")
+			} else if !policy.IsSecondStageApprover(prioritySecondApproverID) {
+				setValidationError("priority_second_approver", "invalid_priority_second_approver_for_stage", "selected priority second approver is not valid for second-stage approval")
+			}
+		} else if prioritySecondApproverID != "" {
+			purchaseOrderRecord.Set("priority_second_approver", "")
 		}
-		if prioritySecondApproverID == "" {
-			setValidationError("priority_second_approver", "priority_second_approver_required", "priority second approver is required when second approval is required")
-		} else if !policy.IsSecondStageApprover(prioritySecondApproverID) {
-			setValidationError("priority_second_approver", "invalid_priority_second_approver_for_stage", "selected priority second approver is not valid for second-stage approval")
-		}
-	} else if prioritySecondApproverID != "" {
-		purchaseOrderRecord.Set("priority_second_approver", "")
 	}
 
 	return validationsErrors.Filter()
@@ -609,11 +616,11 @@ func createPOApprovalRequiredNotification(app core.App, purchaseOrderRecord *cor
 // the save pipeline succeeds. The notification record is created here (so it
 // can reference the PO ID), but actual email delivery must be deferred.
 func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) (notificationID string, err error) {
+	record := e.Record
 	if err := checkExpensesEditing(app); err != nil {
 		return "", err
 	}
 
-	record := e.Record
 	// get the auth record from the context
 	authRecord := e.Auth
 	if authRecord == nil || strings.TrimSpace(authRecord.Id) == "" {
@@ -718,7 +725,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) (notificatio
 	submittedApproverID := strings.TrimSpace(record.GetString("approver"))
 
 	// set properties to nil if they are not allowed to be set based on the type
-	cleanErr := cleanPurchaseOrder(app, record)
+	cleanErr := CleanPurchaseOrder(app, record)
 	if cleanErr != nil {
 		return "", cleanErr
 	}
@@ -766,7 +773,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) (notificatio
 	}
 	// Otherwise: no new file and attachment still exists - leave hash unchanged
 
-	if err := ensureActiveDivision(app, record.GetString("division"), "division"); err != nil {
+	if err := EnsureActiveDivision(app, record.GetString("division"), "division"); err != nil {
 		if ve, ok := err.(validation.Errors); ok {
 			return "", apis.NewBadRequestError("Validation error", ve)
 		}
@@ -774,7 +781,7 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) (notificatio
 	}
 
 	// validate the purchase_order record
-	if validationErr := validatePurchaseOrder(app, record); validationErr != nil {
+	if validationErr := ValidatePurchaseOrder(app, record, false); validationErr != nil {
 		return "", validationErr
 	}
 

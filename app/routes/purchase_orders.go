@@ -81,6 +81,7 @@ type purchaseOrderVisibilityRow struct {
 	PONumber                   string  `db:"po_number" json:"po_number"`
 	Status                     string  `db:"status" json:"status"`
 	UID                        string  `db:"uid" json:"uid"`
+	LegacyManualEntry          bool    `db:"legacy_manual_entry" json:"legacy_manual_entry"`
 	Type                       string  `db:"type" json:"type"`
 	Date                       string  `db:"date" json:"date"`
 	EndDate                    string  `db:"end_date" json:"end_date"`

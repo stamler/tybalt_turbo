@@ -9,7 +9,12 @@
   import { divisions } from "$lib/stores/divisions";
   import { branches as branchesStore } from "$lib/stores/branches";
   import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
+  import { profiles } from "$lib/stores/profiles";
   import { pb } from "$lib/pocketbase";
+  import {
+    createLegacyPurchaseOrder,
+    updateLegacyPurchaseOrder,
+  } from "$lib/legacyPurchaseOrders";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
@@ -18,6 +23,7 @@
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import type {
     PurchaseOrdersPageData,
     SecondApproversResponse,
@@ -27,6 +33,9 @@
     BranchesResponse,
     CategoriesResponse,
     PoApproversResponse,
+    PurchaseOrdersRecord,
+    PurchaseOrdersStatusOptions,
+    PurchaseOrdersTypeOptions,
   } from "$lib/pocketbase-types";
   import {
     buildPoApproverRequest,
@@ -39,7 +48,7 @@
   import PoSecondApproverStatus from "./PoSecondApproverStatus.svelte";
   import VendorSelector from "./VendorSelector.svelte";
   import { onDestroy, untrack } from "svelte";
-  import { expensesEditingEnabled } from "$lib/stores/appConfig";
+  import { expensesEditingEnabled, legacyPOCreateUpdateEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
 
@@ -49,7 +58,13 @@
   branchesStore.init();
   expenditureKindsStore.init();
 
-  let { data }: { data: PurchaseOrdersPageData } = $props();
+  let {
+    data,
+    legacyMode = false,
+  }: {
+    data: PurchaseOrdersPageData;
+    legacyMode?: boolean;
+  } = $props();
 
   let errors = $state({} as any);
   let item = $state(untrack(() => data.item));
@@ -57,11 +72,25 @@
   let showApprovalResetSuccess = $state(false);
   let showApprovalResetToast = $state(false);
   let resetSuccessTimeout: ReturnType<typeof setTimeout> | null = null;
+  const legacyPoNumberPattern = /^(25|26)(0[1-9]|1[0-2])-5\d{3}$/;
+  const legacyTypeOptions = [
+    {
+      id: "One-Time",
+      label: "One-Time",
+      description: "for a single expense, closes after use",
+    },
+    {
+      id: "Cumulative",
+      label: "Cumulative",
+      description: "allows multiple expenses until the PO total is used",
+    },
+  ];
 
   const isRecurring = $derived(item.type === "Recurring");
   const isChildPO = $derived(item.parent_po !== "" && item.parent_po !== undefined);
   const isEditingFirstApprovedPendingSecond = $derived.by(
     () =>
+      !legacyMode &&
       data.editing &&
       item.status === "Unapproved" &&
       (item.approved ?? "") !== "" &&
@@ -163,7 +192,9 @@
       frequency: item.frequency,
     }),
   );
-  const canFetchApprovers = $derived.by(() => Boolean(item.division && item.total && item.kind));
+  const canFetchApprovers = $derived.by(
+    () => !legacyMode && Boolean(item.division && item.total && item.kind),
+  );
   const showApproverFetchError = $derived.by(() => canFetchApprovers && approversFetchError);
   const approversPendingResolution = $derived.by(
     () => canFetchApprovers && (approversLoading || !approversLoaded),
@@ -223,15 +254,44 @@
     "Approver eligibility is still loading. Please wait and try again.";
   const approversUnavailableMessage =
     "Could not load approver eligibility. Resolve the error and try again.";
-  const nonOwnerEditMessage =
-    "You can view this purchase order, but only its creator can edit it.";
+  const nonOwnerEditMessage = "You can view this purchase order, but only its creator can edit it.";
   const isEditingAnotherUsersPO = $derived.by(
     () =>
+      !legacyMode &&
       data.editing &&
       authUserID !== "" &&
       item.uid !== "" &&
       item.uid !== authUserID,
   );
+  const isLegacyFeatureDisabled = $derived.by(() => legacyMode && !$legacyPOCreateUpdateEnabled);
+  const isLegacyClaimMissing = $derived.by(
+    () => legacyMode && !$globalStore.claims.includes("legacy_po_create_update"),
+  );
+  const isLegacyLocked = $derived.by(
+    () =>
+      legacyMode &&
+      data.editing &&
+      ((data.item.status ?? "") === "Closed" || (data.item.status ?? "") === "Cancelled"),
+  );
+  const isLegacyLoadErrorState = $derived.by(() => legacyMode && Boolean(data.loadError));
+
+  function normalizeLegacyClientFields(): void {
+    item.status = "Active" as PurchaseOrdersStatusOptions;
+    item.priority_second_approver = "";
+    item.second_approver = "";
+    item.second_approval = "";
+    item.end_date = "";
+    item.frequency = "" as PurchaseOrdersRecord["frequency"];
+    item.parent_po = "";
+    item.category = "";
+    item.attachment = "";
+    item.rejector = "";
+    item.rejected = "";
+    item.rejection_reason = "";
+    if (item.type !== "One-Time" && item.type !== "Cumulative") {
+      item.type = "One-Time" as PurchaseOrdersTypeOptions;
+    }
+  }
 
   onDestroy(() => {
     if (resetSuccessTimeout !== null) {
@@ -339,6 +399,19 @@
   // Watch for changes to the job and fetch categories accordingly
   $effect(() => {
     syncCategoriesForJob(item.job);
+  });
+
+  $effect(() => {
+    if (legacyMode) {
+      profiles.init();
+    }
+  });
+
+  $effect(() => {
+    if (!legacyMode) {
+      return;
+    }
+    normalizeLegacyClientFields();
   });
 
   // Default division from caller's profile if creating and empty
@@ -491,7 +564,9 @@
       };
       return;
     }
-    item.uid = $authStore?.model?.id ?? "";
+    if (!legacyMode) {
+      item.uid = $authStore?.model?.id ?? "";
+    }
     const shouldShowResetFeedback = isEditingFirstApprovedPendingSecond;
 
     // if the job is empty, set the category to empty
@@ -509,99 +584,166 @@
       item.category = "";
     }
 
-    if (canFetchApprovers && approversFetchError) {
-      errors = {
-        ...errors,
-        global: {
-          code: "approvers_unavailable",
-          message: approversUnavailableMessage,
-        },
-      };
-      return;
-    }
+    if (legacyMode) {
+      item.legacy_manual_entry = true;
+      item._imported = false;
+      item.po_number = (item.po_number ?? "").trim();
+      normalizeLegacyClientFields();
 
-    if (approversPendingResolution) {
-      errors = {
-        ...errors,
-        global: {
-          code: "approvers_loading",
-          message: approversLoadingMessage,
-        },
-      };
-      return;
-    }
+      if (!item.uid || item.uid === "") {
+        errors = {
+          ...errors,
+          uid: {
+            code: "required",
+            message: "Staff member is required.",
+          },
+        };
+        return;
+      }
+      if (!item.approver || item.approver === "") {
+        errors = {
+          ...errors,
+          approver: {
+            code: "required",
+            message: "Approver is required.",
+          },
+        };
+        return;
+      }
+      if (!item.branch || item.branch === "") {
+        errors = {
+          ...errors,
+          branch: {
+            code: "required",
+            message: "Branch is required.",
+          },
+        };
+        return;
+      }
+      if (!legacyPoNumberPattern.test(item.po_number ?? "")) {
+        errors = {
+          ...errors,
+          po_number: {
+            code: "invalid_legacy_po_number",
+            message:
+              "Legacy PO number must match YYMM-NNNN with YY 25/26 and NNNN in the 5XXX range.",
+          },
+        };
+        return;
+      }
+      if (isLegacyFeatureDisabled) {
+        errors = {
+          ...errors,
+          global: {
+            code: "legacy_purchase_order_create_update_disabled",
+            message: "Legacy purchase order create/update is currently disabled.",
+          },
+        };
+        return;
+      }
+    } else {
+      if (canFetchApprovers && approversFetchError) {
+        errors = {
+          ...errors,
+          global: {
+            code: "approvers_unavailable",
+            message: approversUnavailableMessage,
+          },
+        };
+        return;
+      }
 
-    // Self-bypass mode: dual-required + requester qualifies for second stage.
-    // Hide both selectors and persist self-ownership for both stages.
-    if (isDualBypassSelfMode) {
-      item.approver = item.uid;
-      item.priority_second_approver = item.uid;
-    }
+      if (approversPendingResolution) {
+        errors = {
+          ...errors,
+          global: {
+            code: "approvers_loading",
+            message: approversLoadingMessage,
+          },
+        };
+        return;
+      }
 
-    // Auto-assign self only when requester is in the first-stage pool.
-    if (firstStageRequesterQualifies) {
-      item.approver = item.uid;
-    }
-    if (!isDualBypassSelfMode && !firstStageRequesterQualifies && approvers.length === 0) {
-      errors = {
-        ...errors,
-        approver: {
-          code: "first_pool_empty",
-          message: firstPoolEmptyMessage,
-        },
-      };
-      return;
-    }
-
-    // Block save when second approval is required but no second-stage pool exists.
-    if (secondApproverStatus === "required_no_candidates") {
-      errors = {
-        ...errors,
-        priority_second_approver: {
-          code: "second_pool_empty",
-          message: secondApproverReasonMessage || secondPoolEmptyMessage,
-        },
-      };
-      return;
-    }
-
-    // Set priority_second_approver based on second-approval status when the
-    // selector is hidden.
-    if (!showSecondApproverField) {
-      if (
-        secondApproverStatus === "not_required" ||
-        secondApproverStatus === "requester_qualifies"
-      ) {
+      // Self-bypass mode: dual-required + requester qualifies for second stage.
+      // Hide both selectors and persist self-ownership for both stages.
+      if (isDualBypassSelfMode) {
+        item.approver = item.uid;
         item.priority_second_approver = item.uid;
+      }
+
+      // Auto-assign self only when requester is in the first-stage pool.
+      if (firstStageRequesterQualifies) {
+        item.approver = item.uid;
+      }
+      if (!isDualBypassSelfMode && !firstStageRequesterQualifies && approvers.length === 0) {
+        errors = {
+          ...errors,
+          approver: {
+            code: "first_pool_empty",
+            message: firstPoolEmptyMessage,
+          },
+        };
+        return;
+      }
+
+      // Block save when second approval is required but no second-stage pool exists.
+      if (secondApproverStatus === "required_no_candidates") {
+        errors = {
+          ...errors,
+          priority_second_approver: {
+            code: "second_pool_empty",
+            message: secondApproverReasonMessage || secondPoolEmptyMessage,
+          },
+        };
+        return;
+      }
+
+      // Set priority_second_approver based on second-approval status when the
+      // selector is hidden.
+      if (!showSecondApproverField) {
+        if (
+          secondApproverStatus === "not_required" ||
+          secondApproverStatus === "requester_qualifies"
+        ) {
+          item.priority_second_approver = item.uid;
+        }
       }
     }
 
     try {
-      if (data.editing && data.id !== null) {
-        await pb.collection("purchase_orders").update(data.id, item);
-      } else {
-        await pb.collection("purchase_orders").create(item);
-      }
+      const saved =
+        legacyMode
+          ? data.editing && data.id !== null
+            ? await updateLegacyPurchaseOrder(data.id, item)
+            : await createLegacyPurchaseOrder(item)
+          : data.editing && data.id !== null
+            ? await pb.collection("purchase_orders").update(data.id, item)
+            : await pb.collection("purchase_orders").create(item);
 
       errors = {};
+      if (legacyMode) {
+        goto(resolve(`/pos/legacy/${saved.id}/edit`));
+        return;
+      }
       if (shouldShowResetFeedback) {
         showApprovalResetSuccess = true;
         showApprovalResetToast = true;
         resetSuccessTimeout = setTimeout(() => {
-          void goto("/pos/list");
+          goto(resolve("/pos/list"));
         }, 1250);
         return;
       }
-      goto("/pos/list");
+      goto(resolve("/pos/list"));
     } catch (error: any) {
-      const fieldErrors = error?.data?.data;
+      const fieldErrors = error?.response?.data ?? error?.data?.data;
       if (fieldErrors && typeof fieldErrors === "object" && Object.keys(fieldErrors).length > 0) {
         errors = fieldErrors;
         return;
       }
 
       const fallbackMessage = "Failed to save purchase order.";
-      const rawMessage = error?.data?.message ?? error?.message ?? fallbackMessage;
+      const rawMessage =
+        error?.response?.message ?? error?.data?.message ?? error?.message ?? fallbackMessage;
       const message = typeof rawMessage === "string" ? rawMessage : fallbackMessage;
       let resolvedMessage = message;
       if (
@@ -635,7 +777,7 @@
   }
 </script>
 
-{#if !$expensesEditingEnabled}
+{#if !legacyMode && !$expensesEditingEnabled}
   <DsEditingDisabledBanner
     message="Purchase order editing is currently disabled during a system transition."
   />
@@ -658,6 +800,38 @@
     {/if}
   </h1>
 
+  {#if legacyMode}
+    <div class="w-full rounded-sm border border-cyan-300 bg-cyan-100 p-2 text-sm text-cyan-950">
+      Legacy manual entry mode. This hidden screen is for transitional purchase orders only and
+      creates immediately active purchase orders with a manually selected owner and approver.
+    </div>
+  {/if}
+
+  {#if data.loadError}
+    <div class="w-full rounded-sm border border-red-300 bg-red-100 p-2 text-sm text-red-900">
+      {data.loadError}
+    </div>
+  {/if}
+
+  {#if isLegacyFeatureDisabled}
+    <div class="w-full rounded-sm border border-red-300 bg-red-100 p-2 text-sm text-red-900">
+      Legacy purchase order create/update is currently disabled by configuration.
+    </div>
+  {/if}
+
+  {#if isLegacyClaimMissing}
+    <div class="w-full rounded-sm border border-amber-300 bg-amber-100 p-2 text-sm text-amber-900">
+      Your account does not currently hold the <code>legacy_po_create_update</code> claim. The backend
+      will reject saves until that claim is assigned.
+    </div>
+  {/if}
+
+  {#if isLegacyLocked}
+    <div class="w-full rounded-sm border border-amber-300 bg-amber-100 p-2 text-sm text-amber-900">
+      Closed and cancelled legacy purchase orders are read-only.
+    </div>
+  {/if}
+
   {#if isEditingAnotherUsersPO}
     <div class="w-full rounded-sm border border-amber-300 bg-amber-100 p-2 text-sm text-amber-900">
       {nonOwnerEditMessage}
@@ -671,37 +845,91 @@
   {/if}
 
   {#if showApprovalResetSuccess}
-    <div class="w-full rounded-sm border border-emerald-300 bg-emerald-100 p-2 text-sm text-emerald-900">
+    <div
+      class="w-full rounded-sm border border-emerald-300 bg-emerald-100 p-2 text-sm text-emerald-900"
+    >
       Changes saved. Approvals were reset and the purchase order was re-sent for approval.
     </div>
   {/if}
 
-  {#if isChildPO && data.parent_po_number}
-    <span class="flex w-full gap-2 {errors.parent_po !== undefined ? 'bg-red-200' : ''}">
-      <DsLabel color="cyan">Child PO of {data.parent_po_number}</DsLabel>
-      {#if errors.parent_po !== undefined}
-        <span class="text-red-600">{errors.parent_po.message}</span>
-      {/if}
-    </span>
-  {/if}
+  {#if isLegacyLoadErrorState}
+    <div class="flex w-full gap-2">
+      <DsActionButton action="/pos/list">Back to Purchase Orders</DsActionButton>
+    </div>
+  {:else}
+    {#if isChildPO && data.parent_po_number}
+      <span class="flex w-full gap-2 {errors.parent_po !== undefined ? 'bg-red-200' : ''}">
+        <DsLabel color="cyan">Child PO of {data.parent_po_number}</DsLabel>
+        {#if errors.parent_po !== undefined}
+          <span class="text-red-600">{errors.parent_po.message}</span>
+        {/if}
+      </span>
+    {/if}
 
-  <div class="flex w-full flex-col gap-1 {errors.type !== undefined ? 'bg-red-200' : ''}">
-    {#if isChildPO}
-      <span>Type</span>
-      <DsLabel color="cyan">{selectedType?.label ?? "One-Time"}</DsLabel>
-    {:else}
-      <DSToggle
-        bind:value={item.type}
-        label="Type"
-        options={typeOptions}
-        showOptionDescriptions={true}
-        fullWidth={true}
+    {#if legacyMode}
+      {#if $profiles.index !== null}
+        <DsAutoComplete
+          bind:value={item.uid as string}
+          index={$profiles.index}
+          idField="uid"
+          {errors}
+          fieldName="uid"
+          uiName="Staff Member"
+          disabled={isLegacyLocked}
+        >
+          {#snippet resultTemplate(item)}{item.given_name} {item.surname}{/snippet}
+        </DsAutoComplete>
+      {/if}
+
+      <DsTextInput
+        bind:value={item.po_number as string}
+        {errors}
+        fieldName="po_number"
+        uiName="Legacy PO Number"
+        disabled={isLegacyLocked}
       />
+      <span class="flex w-full gap-2 text-sm text-neutral-600">
+        <span class="invisible">Legacy PO Number</span>
+        <span>Format: YYMM-NNNN where YY is 25 or 26 and NNNN is in the 5XXX range.</span>
+      </span>
+
+      {#if $profiles.index !== null}
+        <DsAutoComplete
+          bind:value={item.approver as string}
+          index={$profiles.index}
+          idField="uid"
+          {errors}
+          fieldName="approver"
+          uiName="Approver"
+          disabled={isLegacyLocked}
+        >
+          {#snippet resultTemplate(item)}{item.given_name} {item.surname}{/snippet}
+        </DsAutoComplete>
+      {/if}
+
+      <div class="flex w-full flex-col gap-1">
+        <span>Status</span>
+        <DsLabel color="cyan">Active</DsLabel>
+      </div>
     {/if}
-    {#if errors.type !== undefined}
-      <span class="text-red-600">{errors.type.message}</span>
-    {/if}
-  </div>
+
+    <div class="flex w-full flex-col gap-1 {errors.type !== undefined ? 'bg-red-200' : ''}">
+      {#if isChildPO || (legacyMode && isLegacyLocked)}
+        <span>Type</span>
+        <DsLabel color="cyan">{selectedType?.label ?? "One-Time"}</DsLabel>
+      {:else}
+        <DSToggle
+          bind:value={item.type}
+          label="Type"
+          options={legacyMode ? legacyTypeOptions : typeOptions}
+          showOptionDescriptions={true}
+          fullWidth={true}
+        />
+      {/if}
+      {#if errors.type !== undefined}
+        <span class="text-red-600">{errors.type.message}</span>
+      {/if}
+    </div>
 
   <div class="flex w-full flex-col gap-1 {errors.kind !== undefined ? 'bg-red-200' : ''}">
     <DSToggle
@@ -734,7 +962,7 @@
     {/if}
   </div>
 
-  {#if showApproverField}
+  {#if !legacyMode && showApproverField}
     <DsSelector
       bind:value={item.approver as string}
       items={approvers}
@@ -750,11 +978,11 @@
       <div class="w-full text-sm text-red-700">{firstApproverReasonMessage}</div>
     {/if}
   {/if}
-  {#if showApproverAutoAssignHint}
+  {#if !legacyMode && showApproverAutoAssignHint}
     <div class="w-full text-sm text-neutral-600">You will be set as the approver.</div>
   {/if}
 
-  {#if showSecondApproverField}
+  {#if !legacyMode && showSecondApproverField}
     <DsSelector
       bind:value={item.priority_second_approver as string}
       items={secondApprovers}
@@ -767,7 +995,7 @@
         {item.given_name} {item.surname}
       {/snippet}
     </DsSelector>
-  {:else}
+  {:else if !legacyMode}
     <PoSecondApproverStatus
       showFetchError={showApproverFetchError}
       showStatusHint={showSecondApproverStatusHint}
@@ -779,7 +1007,7 @@
       hasJob={item.job !== ""}
     />
   {/if}
-  {#if showSecondApproverAutoAssignHint}
+  {#if !legacyMode && showSecondApproverAutoAssignHint}
     <div class="w-full text-sm text-neutral-600">You will be set as the second approver.</div>
   {/if}
 
@@ -841,13 +1069,14 @@
     </DsAutoComplete>
   {/if}
 
-  {#if item.job === ""}
+  {#if legacyMode || item.job === ""}
     <DsSelector
       bind:value={item.branch as string}
       items={$branchesStore.items}
       {errors}
       fieldName="branch"
       uiName="Branch"
+      disabled={legacyMode && item.job !== ""}
     >
       {#snippet optionTemplate(item: BranchesResponse)}
         {item.name}
@@ -868,7 +1097,7 @@
     </DsAutoComplete>
   {/if}
 
-  {#if item.job !== "" && categories.length > 0}
+  {#if !legacyMode && item.job !== "" && categories.length > 0}
     <DsSelector
       bind:value={item.category as string}
       items={categories}
@@ -908,34 +1137,41 @@
 
   <VendorSelector bind:value={item.vendor as string} {errors} disabled={isChildPO} />
 
-  <!-- File upload for attachment -->
-  <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
-  <span class="flex w-full gap-2 text-sm text-neutral-600">
-    <span class="invisible">Attachment</span>
-    <span>include quotes, agreements, or any relevant supporting documentation</span>
-  </span>
-
-  <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
-    <span class="flex w-full gap-2">
-      {#if !isEditingAnotherUsersPO}
-        <DsActionButton
-          type="submit"
-          disabled={approversPendingResolution || showApproverFetchError}
-        >
-          Save
-        </DsActionButton>
-      {/if}
-      <DsActionButton action="/pos/list">{isEditingAnotherUsersPO ? "Back" : "Cancel"}</DsActionButton>
-    </span>
-    {#if errors.global !== undefined}
-      <span class="text-red-600">{errors.global.message}</span>
+    {#if !legacyMode}
+      <!-- File upload for attachment -->
+      <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
+      <span class="flex w-full gap-2 text-sm text-neutral-600">
+        <span class="invisible">Attachment</span>
+        <span>include quotes, agreements, or any relevant supporting documentation</span>
+      </span>
     {/if}
-  </div>
+
+    <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
+      <span class="flex w-full gap-2">
+        {#if !isEditingAnotherUsersPO}
+          <DsActionButton
+            type="submit"
+            disabled={legacyMode
+              ? isLegacyLocked || isLegacyFeatureDisabled || isLegacyLoadErrorState
+              : approversPendingResolution || showApproverFetchError}
+          >
+            Save
+          </DsActionButton>
+        {/if}
+        <DsActionButton action="/pos/list"
+          >{isEditingAnotherUsersPO ? "Back" : "Cancel"}</DsActionButton
+        >
+      </span>
+      {#if errors.global !== undefined}
+        <span class="text-red-600">{errors.global.message}</span>
+      {/if}
+    </div>
+  {/if}
 </form>
 
 {#if showApprovalResetToast}
   <div
-    class="pointer-events-none fixed bottom-4 right-4 z-40 rounded-sm border border-emerald-400 bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-lg"
+    class="pointer-events-none fixed right-4 bottom-4 z-40 rounded-sm border border-emerald-400 bg-emerald-600 px-3 py-2 text-sm font-semibold text-white shadow-lg"
   >
     Approval reset. PO re-submitted for approval.
   </div>

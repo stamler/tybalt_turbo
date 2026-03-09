@@ -505,7 +505,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	}
 
 	// ensure the referenced division is active
-	if err := ensureActiveDivision(app, expenseRecord.GetString("division"), "division"); err != nil {
+	if err := EnsureActiveDivision(app, expenseRecord.GetString("division"), "division"); err != nil {
 		return err
 	}
 

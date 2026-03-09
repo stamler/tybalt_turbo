@@ -50,7 +50,17 @@ WITH caller_context AS (
           AND c1.name = 'report'
       ) THEN 1
       ELSE 0
-    END AS has_report_claim
+    END AS has_report_claim,
+    CASE
+      WHEN EXISTS (
+        SELECT 1
+        FROM user_claims uc
+        JOIN claims c1 ON c1.id = uc.cid
+        WHERE uc.uid = {:userId}
+          AND c1.name = 'legacy_po_create_update'
+      ) THEN 1
+      ELSE 0
+    END AS has_legacy_po_create_update_claim
 ),
 
 -- CTE: caller_approver_props
@@ -113,6 +123,7 @@ SELECT
   po.po_number,
   po.status,
   po.uid,
+  po.legacy_manual_entry,
   po.type,
   po.date,
   po.end_date,
@@ -274,6 +285,14 @@ SELECT
     THEN 1
     ELSE 0
   END AS is_unapproved_second_stage_eligible,
+
+  CASE
+    WHEN
+      po.legacy_manual_entry = 1
+      AND caller_context.has_legacy_po_create_update_claim = 1
+    THEN 1
+    ELSE 0
+  END AS is_legacy_visible,
 
   -- Flag: Actionable "pending now" semantics.
   --

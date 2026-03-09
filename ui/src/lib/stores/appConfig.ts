@@ -150,6 +150,13 @@ export const expensesEditingEnabled = derived(store, ($store) => {
   return getConfigBool($store.items, "expenses", "create_edit_absorb", true);
 });
 
+// Derived store for hidden legacy PO create/update flow.
+// Reads from app_config where key="purchase_orders", checks
+// value.enable_legacy_po_create_update. Defaults to false (fail-closed).
+export const legacyPOCreateUpdateEnabled = derived(store, ($store) => {
+  return getConfigBool($store.items, "purchase_orders", "enable_legacy_po_create_update", false);
+});
+
 // Export the store with init and unsubscribe methods
 export const appConfig = {
   subscribe: store.subscribe,

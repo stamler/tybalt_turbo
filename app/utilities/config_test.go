@@ -135,6 +135,63 @@ func TestGetPurchaseOrderSecondStageTimeoutHours(t *testing.T) {
 	}
 }
 
+func TestIsLegacyPOCreateUpdateEnabled(t *testing.T) {
+	testsTable := []struct {
+		name  string
+		setup func(t *testing.T, app *tests.TestApp)
+		want  bool
+	}{
+		{
+			name: "returns default false when purchase_orders config is missing",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				deletePurchaseOrdersConfig(t, app)
+			},
+			want: false,
+		},
+		{
+			name: "returns default false when legacy key is missing",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertPurchaseOrdersConfig(t, app, `{"second_stage_timeout_hours":24}`)
+			},
+			want: false,
+		},
+		{
+			name: "returns configured true value",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertPurchaseOrdersConfig(t, app, `{"enable_legacy_po_create_update":true}`)
+			},
+			want: true,
+		},
+		{
+			name: "returns configured false value",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertPurchaseOrdersConfig(t, app, `{"enable_legacy_po_create_update":false}`)
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range testsTable {
+		t.Run(tc.name, func(t *testing.T) {
+			app, err := tests.NewTestApp("../test_pb_data")
+			if err != nil {
+				t.Fatalf("failed to init test app: %v", err)
+			}
+			defer app.Cleanup()
+
+			tc.setup(t, app)
+
+			got, err := IsLegacyPOCreateUpdateEnabled(app)
+			if err != nil {
+				t.Fatalf("IsLegacyPOCreateUpdateEnabled() returned error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("IsLegacyPOCreateUpdateEnabled() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestIsNotificationFeatureEnabled(t *testing.T) {
 	testsTable := []struct {
 		name        string

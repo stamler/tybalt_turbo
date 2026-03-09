@@ -6,6 +6,7 @@ SELECT
   po_number,
   status,
   uid,
+  legacy_manual_entry,
   type,
   date,
   end_date,

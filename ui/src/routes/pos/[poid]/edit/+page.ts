@@ -34,6 +34,9 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
 
   try {
     const item = await pb.collection("purchase_orders").getOne(params.poid);
+    if (item.legacy_manual_entry) {
+      throw redirect(303, `/pos/legacy/${params.poid}/edit`);
+    }
     if (item.status !== PurchaseOrdersStatusOptions.Unapproved) {
       throw redirect(303, `/pos/${params.poid}/details`);
     }

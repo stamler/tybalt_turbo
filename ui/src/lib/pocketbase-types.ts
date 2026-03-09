@@ -652,6 +652,7 @@ export type PurchaseOrdersRecord = {
   id: string;
   job: RecordIdString;
   kind: RecordIdString;
+  legacy_manual_entry: boolean;
   parent_po: RecordIdString;
   payment_type: PurchaseOrdersPaymentTypeOptions;
   po_number: string;
@@ -722,6 +723,7 @@ export type PurchaseOrdersAugmentedRecord = {
   job_description: string;
   job_number: string;
   kind: RecordIdString;
+  legacy_manual_entry: boolean;
   lower_threshold: number;
   parent_po: RecordIdString;
   parent_po_number: string;
@@ -1124,8 +1126,8 @@ export type UserClaimsResponse<Texpand = UserClaimsRecordExpands> = Required<Use
   BaseSystemFields<Texpand>;
 export type UserClaimsSummaryResponse<Texpand = unknown> = Required<UserClaimsSummaryRecord> &
   BaseSystemFields<Texpand>;
-export type UserPoApproverProfileResponse<Texpand = unknown> = Required<UserPoApproverProfileRecord> &
-  BaseSystemFields<Texpand>;
+export type UserPoApproverProfileResponse<Texpand = unknown> =
+  Required<UserPoApproverProfileRecord> & BaseSystemFields<Texpand>;
 export type UsersResponse<Texpand = UsersRecordExpands> = Required<UsersRecord> &
   AuthSystemFields<Texpand>;
 export type VendorsResponse<Texpand = unknown> = Required<VendorsRecord> &

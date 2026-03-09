@@ -145,6 +145,12 @@ func AddRoutes(app core.App) {
 		poMutations.POST("/{id}/close", createClosePurchaseOrderHandler(app))
 		poMutations.POST("/{id}/make_cumulative", createConvertToCumulativePurchaseOrderHandler(app))
 
+		poLegacy := se.Router.Group("/api/purchase_orders/legacy")
+		poLegacy.Bind(apis.RequireAuth("users"))
+		poLegacy.GET("/{id}/edit", createGetLegacyPurchaseOrderForEditHandler(app))
+		poLegacy.POST("", createCreateLegacyPurchaseOrderHandler(app))
+		poLegacy.PATCH("/{id}", createUpdateLegacyPurchaseOrderHandler(app))
+
 		clientsGroup := se.Router.Group("/api/clients")
 		clientsGroup.Bind(apis.RequireAuth("users"))
 		clientsGroup.GET("", createGetClientsHandler(app))

@@ -6,6 +6,7 @@ SELECT
   po_number,
   status,
   uid,
+  legacy_manual_entry,
   type,
   date,
   end_date,
@@ -63,6 +64,7 @@ WHERE
     OR is_closed_cancelled_visible = 1
     OR is_unapproved_direct_visible = 1
     OR is_unapproved_second_stage_eligible = 1
+    OR is_legacy_visible = 1
   )
   AND (
     {:scope} = 'all'

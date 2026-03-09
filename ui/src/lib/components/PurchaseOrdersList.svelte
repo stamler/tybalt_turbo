@@ -262,6 +262,9 @@
   {#snippet byline(item: PurchaseOrdersAugmentedResponse)}
     <span class="flex items-center gap-2">
       ${item.total}
+      {#if item.legacy_manual_entry}
+        <DsLabel color="cyan">Manually created</DsLabel>
+      {/if}
       {#if item.status !== "Active"}
         <DsLabel color={poStatusColor(item)}>
           {poDisplayStatus(item)}

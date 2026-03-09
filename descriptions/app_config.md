@@ -51,9 +51,10 @@ Controls expense, PO, and vendor editing, plus expense validation thresholds.
 
 Controls purchase order workflow behavior.
 
-| Property                     | Type   | Default | Description                                                                          |
-|------------------------------|--------|---------|--------------------------------------------------------------------------------------|
-| `second_stage_timeout_hours` | number | `24.0`  | Hours a PO waits in "pending second approver" status before timing out. Must be > 0. |
+| Property                         | Type   | Default | Description                                                                                         |
+|----------------------------------|--------|---------|-----------------------------------------------------------------------------------------------------|
+| `second_stage_timeout_hours`     | number | `24.0`  | Hours a PO waits in "pending second approver" status before timing out. Must be > 0.                |
+| `enable_legacy_po_create_update` | bool   | `false` | Enables the hidden legacy PO create/update flow for holders of the `legacy_po_create_update` claim. |
 
 ---
 
@@ -97,7 +98,10 @@ Toggles individual notification templates on/off. Each property key is a templat
 }
 
 // key: "purchase_orders"
-{ "second_stage_timeout_hours": 24 }
+{
+  "second_stage_timeout_hours": 24,
+  "enable_legacy_po_create_update": false
+}
 
 // key: "notifications"
 {

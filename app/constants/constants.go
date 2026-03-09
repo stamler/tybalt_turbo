@@ -50,6 +50,9 @@ const (
 
 	// The claim ID for the po_approver claim
 	PO_APPROVER_CLAIM_ID = "5vh881k048bboim"
+
+	// Claim name granting access to the hidden legacy PO create/update flow.
+	LEGACY_PO_CREATE_UPDATE_CLAIM_NAME = "legacy_po_create_update"
 )
 
 // The epoch date for the payroll, initialized as a variable.

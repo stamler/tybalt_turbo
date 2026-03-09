@@ -19,7 +19,8 @@
       "Bash(sqlite3 app/pb_data/data.db \"SELECT:*)",
       "Bash(npm run build)",
       "Bash(npx eslint:*)",
-      "Bash(npm ls eslint-plugin-svelte)"
+      "Bash(npm ls eslint-plugin-svelte)",
+      "Bash(git diff --cached:*)"
     ]
   }
 }

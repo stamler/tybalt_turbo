@@ -177,7 +177,7 @@ func ProcessTimeEntry(app core.App, e *core.RecordRequestEvent) error {
 		return apis.NewBadRequestError("Error cleaning time_entry record", cleanErr)
 	}
 
-	if err := ensureActiveDivision(app, record.GetString("division"), "division"); err != nil {
+	if err := EnsureActiveDivision(app, record.GetString("division"), "division"); err != nil {
 		if ve, ok := err.(validation.Errors); ok {
 			return apis.NewBadRequestError("Validation error", ve)
 		}

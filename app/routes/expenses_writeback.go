@@ -371,16 +371,26 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			return e.Error(http.StatusInternalServerError, "failed to query expenses: "+err.Error(), nil)
 		}
 
-		// Query 2: Unique vendors referenced by matched expenses
+		// Query 2: Unique vendors referenced by matched expenses or by any
+		// unimported purchase order. PO export is authoritative and ignores
+		// updatedAfter, so vendor export must also cover PO-only rows.
 		vendorsQuery := `
-			SELECT DISTINCT 
+			WITH vendor_ids AS (
+				SELECT DISTINCT e.vendor AS vendor_id
+				FROM expenses e
+				WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.committed != '' AND e.vendor IS NOT NULL AND e.vendor != ''
+				UNION
+				SELECT DISTINCT po.vendor AS vendor_id
+				FROM purchase_orders po
+				WHERE po._imported = 0 AND po.vendor IS NOT NULL AND po.vendor != ''
+			)
+			SELECT DISTINCT
 			  v.id,
 			  COALESCE(v.name, '') AS name,
 			  COALESCE(v.alias, '') AS alias,
 			  COALESCE(v.status, '') AS status
-			FROM expenses e
-			JOIN vendors v ON e.vendor = v.id
-			WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.committed != '' AND e.vendor IS NOT NULL AND e.vendor != ''
+			FROM vendor_ids ids
+			JOIN vendors v ON ids.vendor_id = v.id
 		`
 
 		var vendorRows []vendorExportDBRow
@@ -390,7 +400,8 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			return e.Error(http.StatusInternalServerError, "failed to query vendors: "+err.Error(), nil)
 		}
 
-		// Query 3: Unique purchase orders referenced by matched expenses
+		// Query 3: All locally-owned purchase orders. Unlike expenses, purchase
+		// orders ignore updatedAfter and are exported whenever _imported = false.
 		purchaseOrdersQuery := `
 			SELECT DISTINCT 
 			  po.id,
@@ -427,8 +438,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  COALESCE(po.branch, '') AS branch,
 			  COALESCE(po.attachment, '') AS attachment,
 			  COALESCE(po.attachment_hash, '') AS attachment_hash
-			FROM expenses e
-			JOIN purchase_orders po ON e.purchase_order = po.id
+			FROM purchase_orders po
 			LEFT JOIN vendors v ON po.vendor = v.id
 			LEFT JOIN admin_profiles ap_uid ON po.uid = ap_uid.uid
 			LEFT JOIN admin_profiles ap_approver ON po.approver = ap_approver.uid
@@ -439,13 +449,11 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			LEFT JOIN admin_profiles ap_rejector ON po.rejector = ap_rejector.uid
 			LEFT JOIN jobs j ON po.job = j.id
 			LEFT JOIN divisions d ON po.division = d.id
-			WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.committed != '' AND e.purchase_order IS NOT NULL AND e.purchase_order != ''
+			WHERE po._imported = 0
 		`
 
 		var poRows []purchaseOrderExportDBRow
-		if err := app.DB().NewQuery(purchaseOrdersQuery).Bind(dbx.Params{
-			"updatedAfter": updatedAfter,
-		}).All(&poRows); err != nil {
+		if err := app.DB().NewQuery(purchaseOrdersQuery).All(&poRows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to query purchase orders: "+err.Error(), nil)
 		}
 

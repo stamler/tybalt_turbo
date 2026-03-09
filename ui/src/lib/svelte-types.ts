@@ -33,6 +33,7 @@ export type TimeEntriesPageData = PageData<TimeEntriesRecord>;
 export type TimeAmendmentsPageData = PageData<TimeAmendmentsRecord>;
 export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord | PurchaseOrdersResponse> & {
   parent_po_number?: string;
+  loadError?: string;
 };
 export type SecondApproverStatus =
   | "not_required"
