@@ -43,8 +43,8 @@ The staged implementation delivers a controlled fast-close path for legacy impor
 ### 2.1 Endpoint
 
 - Route: `POST /api/jobs/{id}/close`
-- File: `/Users/dean/code/tybalt_turbo/app/routes/job_close_api.go`
-- Route registration: `/Users/dean/code/tybalt_turbo/app/routes/routes.go`
+- File: `app/routes/job_close_api.go`
+- Route registration: `app/routes/routes.go`
 
 ### 2.2 Authorization
 
@@ -132,7 +132,7 @@ Success response includes:
 
 ## 3. Hook Changes (Actual)
 
-File: `/Users/dean/code/tybalt_turbo/app/hooks/jobs.go`
+File: `app/hooks/jobs.go`
 
 - `ProcessJobCore(...)` now delegates to internal mode-aware function with normal behavior.
 - Added `ProcessJobCoreStrict(...)` to force full validation by disabling the status-only shortcut.
@@ -154,14 +154,14 @@ Fast-close button is shown only for:
 
 Files:
 
-- `/Users/dean/code/tybalt_turbo/ui/src/routes/jobs/list/+page.svelte`
-- `/Users/dean/code/tybalt_turbo/ui/src/routes/jobs/[jid]/details/+page.svelte`
+- `ui/src/routes/jobs/list/+page.svelte`
+- `ui/src/routes/jobs/[jid]/details/+page.svelte`
 
 ### 4.2 Confirmation modal
 
 Shared component:
 
-- `/Users/dean/code/tybalt_turbo/ui/src/lib/components/FastCloseConfirmPopover.svelte`
+- `ui/src/lib/components/FastCloseConfirmPopover.svelte`
 
 Behavior:
 
@@ -183,8 +183,8 @@ Behavior:
 
 Files:
 
-- `/Users/dean/code/tybalt_turbo/app/routes/jobs.sql`
-- `/Users/dean/code/tybalt_turbo/app/routes/jobs_api.go`
+- `app/routes/jobs.sql`
+- `app/routes/jobs_api.go`
 
 Added fields:
 
@@ -195,8 +195,8 @@ Added fields:
 
 Files:
 
-- `/Users/dean/code/tybalt_turbo/app/routes/job_details.sql`
-- `/Users/dean/code/tybalt_turbo/app/routes/job_details_api.go`
+- `app/routes/job_details.sql`
+- `app/routes/job_details_api.go`
 
 Added field:
 
@@ -206,7 +206,7 @@ Added field:
 
 File:
 
-- `/Users/dean/code/tybalt_turbo/ui/src/lib/stores/jobs.ts`
+- `ui/src/lib/stores/jobs.ts`
 
 - `JobApiResponse` now includes `status` and `imported`.
 - `storeFields` now includes both so action rendering logic receives them in search results.
@@ -217,7 +217,7 @@ File:
 
 ### New endpoint test file
 
-- `/Users/dean/code/tybalt_turbo/app/job_close_test.go`
+- `app/job_close_test.go`
 
 Covered scenarios include:
 
@@ -234,7 +234,7 @@ Covered scenarios include:
 
 ### API field exposure test
 
-- `/Users/dean/code/tybalt_turbo/app/jobs_test.go`
+- `app/jobs_test.go`
 - Added assertion coverage for jobs read endpoints exposing `status` and `imported`.
 
 ### Test fixtures
