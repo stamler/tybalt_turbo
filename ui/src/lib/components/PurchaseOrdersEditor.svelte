@@ -722,7 +722,7 @@
 
       errors = {};
       if (legacyMode) {
-        goto(resolve(`/pos/legacy/${saved.id}/edit`));
+        goto(resolve(data.editing ? `/pos/legacy/${saved.id}/edit` : "/pos/legacy/add"));
         return;
       }
       if (shouldShowResetFeedback) {
