@@ -11,6 +11,11 @@ primary_region = "yyz"
 [env]
   PORT = "8080"
 
+[mounts]
+  source = "pb_data"
+  destination = "/app/pb_data"
+  snapshot_retention = 14
+
 [http_service]
   internal_port = 8080
   force_https = true
@@ -23,6 +28,10 @@ primary_region = "yyz"
     path = "/api/health"
     interval = "30s"
     timeout = "10s"
+
+[metrics]
+  port = 9091
+  path = "/metrics"
 
 [[vm]]
   memory = '4gb'

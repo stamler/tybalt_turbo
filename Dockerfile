@@ -78,7 +78,7 @@ RUN CGO_ENABLED=0 go build -o tybalt main.go
 FROM alpine:latest
 
 # Install dependencies
-RUN apk add --no-cache ca-certificates tzdata
+RUN apk add --no-cache ca-certificates sqlite tzdata
 
 # Install litestream
 RUN wget https://github.com/benbjohnson/litestream/releases/download/v0.5.8/litestream-0.5.8-linux-x86_64.tar.gz -O - | tar -xzf - -C /usr/local/bin
