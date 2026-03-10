@@ -78,7 +78,11 @@ When a phase becomes authoritative in Turbo:
 ## Example Commands
 
 ```bash
+# Initialize an import-ready app DB from migrations + import-baseline seeds
+cd ../app && go run ./cmd/testseed load --profile import-baseline --out ./pb_data
+
 # Full import (all phases) - use during development/testing
+cd ../import_data
 ./tool --export --import --db ../app/pb_data/data.db --jobs --expenses --time --users
 
 # After Phase 1 (jobs) goes live in Turbo
@@ -101,15 +105,23 @@ When a phase becomes authoritative in Turbo:
 
 1. **Disable jobs editing in Turbo** (if currently enabled for testing)
 2. **Disable jobs editing in Tybalt** (set `Config/Enable.jobs = false`)
-3. **Perform full export/import** with tool.go to sync latest Tybalt data to Turbo:
+3. **Build a fresh import-ready app DB** from the app module:
 
    ```bash
+   cd ../app
+   go run ./cmd/testseed load --profile import-baseline --out ./pb_data
+   ```
+
+4. **Perform full export/import** with tool.go to sync latest Tybalt data to Turbo:
+
+   ```bash
+   cd ../import_data
    ./tool --export --import --db ../app/pb_data/data.db --jobs --expenses --time --users
    ```
 
-4. **Enable jobs editing in Turbo production**
-5. **Future `--import` runs:** `--expenses --time --users` (omit `--jobs`)
-6. Jobs writeback continues flowing Turbo → Tybalt → MySQL → Parquet (but not back into Turbo)
+5. **Enable jobs editing in Turbo production**
+6. **Future `--import` runs:** `--expenses --time --users` (omit `--jobs`)
+7. Jobs writeback continues flowing Turbo → Tybalt → MySQL → Parquet (but not back into Turbo)
 
 ### Phase 2 Deployment (Expenses/POs)
 
@@ -117,14 +129,22 @@ When a phase becomes authoritative in Turbo:
 2. **Test thoroughly**
 3. **Disable expenses/PO editing in Turbo** (end of testing)
 4. **Disable expenses/PO editing in Tybalt**
-5. **Perform full export/import** with tool.go to sync latest Tybalt data to Turbo:
+5. **Build a fresh import-ready app DB** from the app module:
 
    ```bash
+   cd ../app
+   go run ./cmd/testseed load --profile import-baseline --out ./pb_data
+   ```
+
+6. **Perform full export/import** with tool.go to sync latest Tybalt data to Turbo:
+
+   ```bash
+   cd ../import_data
    ./tool --export --import --db ../app/pb_data/data.db --expenses --time --users
    ```
 
-6. **Enable expenses/PO editing in Turbo production**
-7. **Future `--import` runs:** `--time --users`
+7. **Enable expenses/PO editing in Turbo production**
+8. **Future `--import` runs:** `--time --users`
 
 ### Phase 3 Deployment (Time)
 
@@ -132,14 +152,22 @@ When a phase becomes authoritative in Turbo:
 2. **Test thoroughly**
 3. **Disable time editing in Turbo** (end of testing)
 4. **Disable time editing in Tybalt**
-5. **Perform full export/import** with tool.go to sync latest Tybalt data to Turbo:
+5. **Build a fresh import-ready app DB** from the app module:
 
    ```bash
+   cd ../app
+   go run ./cmd/testseed load --profile import-baseline --out ./pb_data
+   ```
+
+6. **Perform full export/import** with tool.go to sync latest Tybalt data to Turbo:
+
+   ```bash
+   cd ../import_data
    ./tool --export --import --db ../app/pb_data/data.db --time --users
    ```
 
-6. **Enable time editing in Turbo production**
-7. **Future `--import` runs:** `--users`
+7. **Enable time editing in Turbo production**
+8. **Future `--import` runs:** `--users`
 
 ### Phase 4 Deployment (Users)
 
@@ -147,14 +175,22 @@ When a phase becomes authoritative in Turbo:
 2. **Test thoroughly**
 3. **Disable user/profile editing in Turbo** (end of testing)
 4. **Disable user/profile editing in Tybalt**
-5. **Perform full export/import** with tool.go to sync latest Tybalt data to Turbo:
+5. **Build a fresh import-ready app DB** from the app module:
 
    ```bash
+   cd ../app
+   go run ./cmd/testseed load --profile import-baseline --out ./pb_data
+   ```
+
+6. **Perform full export/import** with tool.go to sync latest Tybalt data to Turbo:
+
+   ```bash
+   cd ../import_data
    ./tool --export --import --db ../app/pb_data/data.db --users
    ```
 
-6. **Enable user/profile editing in Turbo production**
-7. **Future `--import` runs:** No phase flags needed (all data is authoritative in Turbo)
+7. **Enable user/profile editing in Turbo production**
+8. **Future `--import` runs:** No phase flags needed (all data is authoritative in Turbo)
 
 ## Key Principles
 
@@ -200,13 +236,15 @@ if *expensesFlag {
 }
 ```
 
-### Interaction with `--init`
+### Bootstrap the target DB explicitly
 
-The `--init` flag rebuilds the target DB from the app's current migrations plus
-the text seed package, then clears imported/test-specific data tables while
-preserving baseline lookup/config rows. It is orthogonal to `--import`:
+The import tool no longer owns DB construction. Build the target app DB from
+the app module before running `./tool`:
 
-- Use `--init` to set up a fresh database with the correct schema and seed baseline
-- Use `--import --<phases>` to populate imported business data
+```bash
+cd ../app
+go run ./cmd/testseed load --profile import-baseline --out ./pb_data
+```
 
-They can be combined: `./tool --init --import --jobs --expenses --time --users`
+Then run the desired export/import phases from `import_data/` against
+`../app/pb_data/data.db`.

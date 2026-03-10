@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"database/sql"
 	"encoding/json"
 	"flag"
@@ -9,10 +8,8 @@ import (
 	"imports/attachments"
 	"imports/extract"
 	"imports/load"
-	"io"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -55,6 +52,19 @@ func normalizeExpenditureKindID(kind string, hasJob bool) string {
 	return kind
 }
 
+func ensureTargetDatabaseExists(dbPath string) error {
+	if _, err := os.Stat(dbPath); err == nil {
+		return nil
+	} else if !os.IsNotExist(err) {
+		return fmt.Errorf("check target database %s: %w", dbPath, err)
+	}
+
+	return fmt.Errorf(
+		"target database %s does not exist; initialize it first, e.g. `cd ../app && go run ./cmd/testseed load --profile import-baseline --out ./pb_data`, or point --db at an existing PocketBase data.db",
+		dbPath,
+	)
+}
+
 // This file is used to run either an export or an import.
 
 func main() {
@@ -68,7 +78,6 @@ func main() {
 	exportFlag := flag.Bool("export", false, "Export data to Parquet files")
 	importFlag := flag.Bool("import", false, "Import data from Parquet files")
 	attachmentsFlag := flag.Bool("attachments", false, "Import attachments from GCS to S3")
-	initFlag := flag.Bool("init", false, "Initialize app database from migrations + text seed data (overwrites existing)")
 	dbFlag := flag.String("db", "../app/pb_data/data.db", "Path to the target database")
 
 	// Phase flags for selective import (opt-in, running --import with no phase flags is a no-op)
@@ -92,27 +101,11 @@ func main() {
 	// Use the database path from the flag
 	targetDatabase = *dbFlag
 
-	if *initFlag {
-		fmt.Printf("This will overwrite any existing data in %s.\n", targetDatabase)
-		fmt.Print("Proceed? [y/N]: ")
-		reader := bufio.NewReader(os.Stdin)
-		response, _ := reader.ReadString('\n')
-		response = strings.TrimSpace(strings.ToLower(response))
-		if response != "y" && response != "yes" {
-			fmt.Println("Aborted.")
-			return
-		}
-
-		if err := initializeDatabase(targetDatabase); err != nil {
-			log.Fatalf("Failed to initialize database: %v", err)
-		}
-
-		if !*exportFlag && !*importFlag && !*attachmentsFlag {
-			return
-		}
-	}
-
 	if *exportFlag || *importFlag {
+		if err := ensureTargetDatabaseExists(targetDatabase); err != nil {
+			log.Fatal(err)
+		}
+
 		// Resolve default expenditure kind IDs from target DB (for import normalize and for extract when running export)
 		capitalID, projectID, kindErr := extract.GetCapitalAndProjectKindIDs(targetDatabase)
 		if kindErr != nil {
@@ -1750,151 +1743,6 @@ func deleteAllFromTables(dbPath string, tables []string) error {
 		rowsAffected, _ := result.RowsAffected()
 		if rowsAffected > 0 {
 			fmt.Printf("  Deleted %d records from %s\n", rowsAffected, tbl)
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return fmt.Errorf("commit tx: %w", err)
-	}
-
-	return nil
-}
-
-// copyFile copies the contents and file mode from src to dst, overwriting dst if it exists
-func copyFile(src string, dst string) error {
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-
-	_, copyErr := io.Copy(out, in)
-	if syncErr := out.Sync(); syncErr != nil && copyErr == nil {
-		copyErr = syncErr
-	}
-	if closeErr := out.Close(); closeErr != nil && copyErr == nil {
-		copyErr = closeErr
-	}
-
-	if copyErr != nil {
-		return copyErr
-	}
-
-	if info, statErr := os.Stat(src); statErr == nil {
-		_ = os.Chmod(dst, info.Mode())
-	}
-
-	return nil
-}
-
-// initializeDatabase rebuilds targetDatabase from the app module's current
-// migrations plus text seed data, then removes imported/test-specific records so
-// the result is ready for import_data workflows.
-func initializeDatabase(targetDatabase string) error {
-	tempRoot, err := os.MkdirTemp("", "tybalt-import-init-*")
-	if err != nil {
-		return fmt.Errorf("create temp dir: %w", err)
-	}
-	defer os.RemoveAll(tempRoot)
-
-	appDir := filepath.Clean("../app")
-	seedDir := filepath.Join(appDir, "test_seed_data")
-	goCacheDir := filepath.Join(tempRoot, "gocache")
-	seededDataDir := filepath.Join(tempRoot, "seeded")
-	if err := os.MkdirAll(goCacheDir, 0o755); err != nil {
-		return fmt.Errorf("create go cache dir: %w", err)
-	}
-
-	cmd := exec.Command("go", "run", "./cmd/testseed", "load", "--out", seededDataDir, "--seed-dir", seedDir)
-	cmd.Dir = appDir
-	cmd.Env = append(os.Environ(), "GOCACHE="+goCacheDir)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("build seeded app db: %w", err)
-	}
-
-	if err := os.MkdirAll(filepath.Dir(targetDatabase), 0o755); err != nil {
-		return fmt.Errorf("ensure destination directory: %w", err)
-	}
-
-	seededDatabase := filepath.Join(seededDataDir, "data.db")
-	if err := copyFile(seededDatabase, targetDatabase); err != nil {
-		return fmt.Errorf("copy seeded database: %w", err)
-	}
-
-	if err := cleanupFreshDatabase(targetDatabase); err != nil {
-		return fmt.Errorf("cleanup seeded database: %w", err)
-	}
-
-	return nil
-}
-
-// cleanupFreshDatabase removes imported/test-specific data from a freshly
-// initialized app database while preserving baseline lookup and configuration
-// rows needed by import_data workflows.
-func cleanupFreshDatabase(dbPath string) error {
-	db, err := sql.Open("sqlite", dbPath)
-	if err != nil {
-		return fmt.Errorf("open db: %w", err)
-	}
-	defer db.Close()
-
-	// Disable foreign keys during bulk delete
-	_, _ = db.Exec("PRAGMA foreign_keys = OFF")
-	defer db.Exec("PRAGMA foreign_keys = ON")
-
-	tx, err := db.Begin()
-	if err != nil {
-		return fmt.Errorf("begin tx: %w", err)
-	}
-
-	tables := []string{
-		"users",
-		"absorb_actions",
-		"admin_profiles",
-		"categories",
-		"client_contacts",
-		"client_notes",
-		"clients",
-		"expenses",
-		"job_time_allocations",
-		"jobs",
-		"machine_secrets",
-		"notifications",
-		"po_approver_props",
-		"profiles",
-		"purchase_orders",
-		"time_amendments",
-		"time_entries",
-		"time_sheet_reviewers",
-		"time_sheets",
-		"user_claims",
-		"vendors",
-	}
-
-	for _, tbl := range tables {
-		if _, err := tx.Exec("DELETE FROM " + tbl); err != nil {
-			// If a table doesn't exist in this schema, skip it
-			if strings.Contains(strings.ToLower(err.Error()), "no such table") {
-				continue
-			}
-			_ = tx.Rollback()
-			return fmt.Errorf("delete from %s: %w", tbl, err)
-		}
-	}
-
-	// Remove test-only rate sheet fixture (used by rate_sheets_test.go)
-	// Keep the real rate sheet (c41ofep525bcacj) and its entries intact
-	if _, err := tx.Exec("DELETE FROM rate_sheets WHERE id = 'test_empty_sheet'"); err != nil {
-		if !strings.Contains(strings.ToLower(err.Error()), "no such table") {
-			_ = tx.Rollback()
-			return fmt.Errorf("delete test rate sheet: %w", err)
 		}
 	}
 

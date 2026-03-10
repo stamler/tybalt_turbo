@@ -32,8 +32,9 @@ import (
 	"sync"
 	"testing"
 
-	_ "modernc.org/sqlite"
 	_ "tybalt/migrations"
+
+	_ "modernc.org/sqlite"
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
@@ -41,9 +42,44 @@ import (
 
 const (
 	nullSentinel    = `\N`
-	testGroup       = "test-full"
 	migrationsTable = "_migrations"
+	// TestFullProfile is the canonical full fixture set used by tests.
+	TestFullProfile = "test-full"
+	// ImportBaselineProfile is the minimal seeded baseline used to initialize an
+	// import-ready app DB without test-only business rows.
+	ImportBaselineProfile = "import-baseline"
+
+	importBaselineRateSheetsResource = "data/rate_sheets_import_baseline.csv"
 )
+
+var testFullOnlyTables = map[string]struct{}{
+	"users":                {},
+	"absorb_actions":       {},
+	"admin_profiles":       {},
+	"categories":           {},
+	"client_contacts":      {},
+	"client_notes":         {},
+	"clients":              {},
+	"expenses":             {},
+	"job_time_allocations": {},
+	"jobs":                 {},
+	"machine_secrets":      {},
+	"notifications":        {},
+	"po_approver_props":    {},
+	"profiles":             {},
+	"purchase_orders":      {},
+	"time_amendments":      {},
+	"time_entries":         {},
+	"time_sheet_reviewers": {},
+	"time_sheets":          {},
+	"user_claims":          {},
+	"vendors":              {},
+}
+
+var validProfiles = map[string]struct{}{
+	TestFullProfile:       {},
+	ImportBaselineProfile: {},
+}
 
 // DataPackage is the top-level manifest written to datapackage.json.
 type DataPackage struct {
@@ -149,7 +185,7 @@ func TemplateDir() (string, error) {
 			return
 		}
 
-		if err := BuildSeededDataDir(dir, DefaultSeedDir()); err != nil {
+		if err := BuildSeededDataDirForProfile(dir, DefaultSeedDir(), TestFullProfile); err != nil {
 			templateErr = err
 			return
 		}
@@ -160,12 +196,14 @@ func TemplateDir() (string, error) {
 	return templateDir, templateErr
 }
 
-// BuildSeededDataDir creates a PocketBase data directory at dataDir by running
-// all app migrations against a fresh database and then loading the selected text
-// fixtures from seedDir.
-//
-// The resulting directory can be used as the source for tests.NewTestApp.
-func BuildSeededDataDir(dataDir string, seedDir string) error {
+// BuildSeededDataDirForProfile creates a PocketBase data directory at dataDir by
+// running all app migrations against a fresh database and then loading the
+// selected text fixture profile from seedDir.
+func BuildSeededDataDirForProfile(dataDir string, seedDir string, group string) error {
+	if err := ValidateProfile(group); err != nil {
+		return err
+	}
+
 	// Create the PocketBase data directory that will hold the freshly built
 	// SQLite files (data.db plus any auxiliary DBs PocketBase creates).
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
@@ -210,7 +248,7 @@ func BuildSeededDataDir(dataDir string, seedDir string) error {
 	// Bulk-load the canonical text fixtures into the migrated data.db. This
 	// produces the cached seeded template that tests later clone via
 	// tests.NewTestApp.
-	return LoadSeedData(filepath.Join(dataDir, "data.db"), seedDir, testGroup)
+	return LoadSeedData(filepath.Join(dataDir, "data.db"), seedDir, group)
 }
 
 // DumpSeedData exports every table in sourceDBPath to CSV files plus a
@@ -265,9 +303,23 @@ func DumpSeedData(sourceDBPath string, seedDir string) error {
 			Name:    table,
 			Path:    filepath.ToSlash(filepath.Join("data", table+".csv")),
 			Schema:  buildSchema(info),
-			XGroups: []string{testGroup},
+			XGroups: resourceGroupsForTable(table),
 		}
 		pkg.Resources = append(pkg.Resources, resource)
+
+		if table == "rate_sheets" {
+			baselinePath := filepath.Join(dataDir, "rate_sheets_import_baseline.csv")
+			if err := filterCSVByColumnValue(csvPath, baselinePath, "id", "test_empty_sheet"); err != nil {
+				return err
+			}
+
+			pkg.Resources = append(pkg.Resources, Resource{
+				Name:    table,
+				Path:    importBaselineRateSheetsResource,
+				Schema:  buildSchema(info),
+				XGroups: []string{ImportBaselineProfile},
+			})
+		}
 	}
 
 	pkgBytes, err := json.MarshalIndent(pkg, "", "  ")
@@ -304,6 +356,10 @@ func DumpSeedDataFromTestApp(sourceDataDir string, seedDir string) error {
 // The datapackage must not include the PocketBase migrations table; migration
 // state is owned by current code and bootstrap, not by fixture rows.
 func LoadSeedData(dbPath string, seedDir string, group string) error {
+	if err := ValidateProfile(group); err != nil {
+		return err
+	}
+
 	pkg, err := readPackage(seedDir)
 	if err != nil {
 		return err
@@ -349,7 +405,7 @@ func LoadSeedData(dbPath string, seedDir string, group string) error {
 	}
 	defer rows.Close()
 
-	for rows.Next() {
+	if rows.Next() {
 		var table string
 		var rowID sql.NullInt64
 		var parent string
@@ -381,13 +437,17 @@ func VerifySeedData(sourceDBPath string, seedDir string) error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	if err := BuildSeededDataDir(tempDir, seedDir); err != nil {
+	if err := BuildSeededDataDirForProfile(tempDir, seedDir, TestFullProfile); err != nil {
 		return err
 	}
 
 	targetDBPath := filepath.Join(tempDir, "data.db")
-	resources := filterResources(pkg.Resources, testGroup)
+	resources := filterResources(pkg.Resources, TestFullProfile)
 
+	return verifyResourceRows(sourceDBPath, targetDBPath, resources)
+}
+
+func verifyResourceRows(sourceDBPath string, targetDBPath string, resources []Resource) error {
 	sourceRows, err := collectVerifyRows(sourceDBPath, resources)
 	if err != nil {
 		return err
@@ -419,7 +479,7 @@ func VerifySeedData(sourceDBPath string, seedDir string) error {
 
 // VerifySeedDataAgainstTestApp boots a test app from sourceDataDir and verifies
 // that seedDir recreates the same migrated runtime data represented by the seed
-// package.
+// package for the canonical test-full fixture profile.
 func VerifySeedDataAgainstTestApp(sourceDataDir string, seedDir string) error {
 	app, err := tests.NewTestApp(sourceDataDir)
 	if err != nil {
@@ -428,6 +488,15 @@ func VerifySeedDataAgainstTestApp(sourceDataDir string, seedDir string) error {
 	defer app.Cleanup()
 
 	return VerifySeedData(filepath.Join(app.DataDir(), "data.db"), seedDir)
+}
+
+// ValidateProfile reports whether profile is one of the supported seed
+// profiles understood by the loader and builder.
+func ValidateProfile(profile string) error {
+	if _, ok := validProfiles[profile]; ok {
+		return nil
+	}
+	return fmt.Errorf("unknown seed profile %q (expected %q or %q)", profile, TestFullProfile, ImportBaselineProfile)
 }
 
 func readPackage(seedDir string) (*DataPackage, error) {
@@ -457,6 +526,71 @@ func filterResources(resources []Resource, group string) []Resource {
 	}
 
 	return result
+}
+
+func resourceGroupsForTable(table string) []string {
+	if table == "rate_sheets" {
+		return []string{TestFullProfile}
+	}
+	if _, ok := testFullOnlyTables[table]; ok {
+		return []string{TestFullProfile}
+	}
+	return []string{TestFullProfile, ImportBaselineProfile}
+}
+
+func filterCSVByColumnValue(sourcePath string, targetPath string, columnName string, valueToExclude string) error {
+	sourceFile, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	targetFile, err := os.Create(targetPath)
+	if err != nil {
+		return err
+	}
+	defer targetFile.Close()
+
+	reader := csv.NewReader(sourceFile)
+	writer := csv.NewWriter(targetFile)
+
+	headers, err := reader.Read()
+	if err != nil {
+		return err
+	}
+	if err := writer.Write(headers); err != nil {
+		return err
+	}
+
+	columnIndex := -1
+	for i, header := range headers {
+		if header == columnName {
+			columnIndex = i
+			break
+		}
+	}
+	if columnIndex == -1 {
+		return fmt.Errorf("column %s not found in %s", columnName, sourcePath)
+	}
+
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			return err
+		}
+		if record[columnIndex] == valueToExclude {
+			continue
+		}
+		if err := writer.Write(record); err != nil {
+			return err
+		}
+	}
+
+	writer.Flush()
+	return writer.Error()
 }
 
 func dumpTableCSV(db *sql.DB, table string, info []tableInfo, csvPath string) error {

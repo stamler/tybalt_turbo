@@ -4,7 +4,7 @@
 
 Replace the committed binary test database (`app/test_pb_data/data.db`) with text fixtures (Frictionless-style `datapackage.json` + per-table CSV files), and make tests build a fresh DB from migrations + seed data at runtime.
 
-This plan updates the test workflow to use text fixtures as the source of truth and updates `import_data/tool.go --init` so it no longer depends on copying `app/test_pb_data/data.db`.
+This plan updates the test workflow to use text fixtures as the source of truth and moves DB construction ownership into `app/cmd/testseed`, including an explicit `import-baseline` seed profile for import workflows.
 
 ## Status
 
@@ -15,10 +15,14 @@ What is already implemented:
 
 - canonical text fixtures now live under `app/test_seed_data/`
 - `app/cmd/testseed` exists with `dump`, `load`, and `verify`
+- `app/cmd/testseed load` now supports explicit seed profiles:
+  - `test-full`
+  - `import-baseline`
 - tests build from a cached migrated-and-seeded template DB instead of each test directly reading `app/test_pb_data`
 - `app/internal/testutils/testutils.go` and direct test call sites now use `app/internal/testseed`
 - the historical migration chain has been collapsed to the current snapshot baseline, so fresh blank-DB migration runs are now supported
 - the documented runtime-only DB mutation exceptions remain in place
+- `import_data/tool.go` no longer owns DB construction and no longer exposes `--init`
 
 What is still outstanding:
 
@@ -48,8 +52,8 @@ This kept the first PR focused on test-fixture migration and reduced blast radiu
 - The local generated fixture DB at `app/test_pb_data/data.db` is no longer tracked in git, but can still be created for manual inspection or `testseed dump/verify`.
 - `import_data/tool.go` currently:
   - defaults `--db` to `../app/pb_data/data.db`
-  - uses `--init` to rebuild the target DB from current migrations + text seed data
-  - then deletes imported/test-specific rows via `cleanupFreshDatabase`.
+  - requires the target DB to already exist
+  - fails with an explicit instruction to run `cd app && go run ./cmd/testseed load --profile import-baseline --out ./pb_data` when the DB is missing
 - Most additive test setup has already been pushed into the canonical fixture DB.
 - The remaining runtime-only pre-test DB mutations are now explicitly documented in:
   - `app/test_pb_data/runtime_test_db_exceptions.md`
@@ -65,7 +69,7 @@ This kept the first PR focused on test-fixture migration and reduced blast radiu
   2. applying migrations
   3. loading CSV resources from `datapackage.json`
 - `app/test_pb_data/data.db` is no longer committed.
-- `import_data --init` initializes without copying from test DB.
+- import workflows initialize app DBs via `app/cmd/testseed load --profile import-baseline`, not via `import_data/tool.go`.
 
 ## Phase 1 Result
 
@@ -80,7 +84,7 @@ Phase 1 intentionally did not include:
 
 - `import_data/tool.go` refactor
 - `import_data/README.md` updates beyond notes if absolutely needed
-- changing `--init`
+- changing import bootstrap
 - removing `app/test_pb_data/data.db` from git before parity is proven
 - additional test-behavior refactors unrelated to fixture loading
 
@@ -117,12 +121,13 @@ app/test_seed_data/
   - `schema.primaryKey` from SQLite PK columns
 - Add custom metadata key (e.g. `x-groups`) so the same package can support:
   - `test-full` (full test fixtures)
-  - `init-baseline` (minimal tables needed for `import_data --init`, if different)
+  - `import-baseline` (minimal tables needed for import bootstrap)
 
 Current implementation note:
 
-- Start with one seed group only: `test-full`.
-- Add `init-baseline` later only if `import_data --init` proves it genuinely needs a different subset.
+- The seed package now supports two explicit groups:
+  - `test-full`
+  - `import-baseline`
 
 ### CSV rules
 
@@ -146,7 +151,7 @@ Add a small Go utility in `app/cmd/testseed` (or equivalent) with subcommands:
   - input: existing `app/test_pb_data/` data directory
   - output: `app/test_seed_data/datapackage.json` + CSV files
 - `load`
-  - input: empty/fresh DB path + datapackage dir + group (`test-full` / `init-baseline`)
+  - input: empty/fresh DB path + datapackage dir + profile (`test-full` / `import-baseline`)
   - action: load CSV rows into DB inside one transaction
 - `verify` (recommended)
   - compares table counts/checksums between the current migrated test runtime and a rebuilt DB.
@@ -154,7 +159,7 @@ Add a small Go utility in `app/cmd/testseed` (or equivalent) with subcommands:
 Current bootstrap/maintenance workflow:
 
 1. Run `dump` from the current test data directory.
-2. Rebuild a scratch DB via migrations + `load --group test-full`.
+2. Rebuild a scratch DB via migrations + `load --profile test-full`.
 3. Run `verify` to confirm parity with the current migrated fixture runtime.
 4. Run `go test ./...` from `app/`.
 
@@ -213,22 +218,31 @@ Use the same migration path that actually creates the app collections in practic
 
 ---
 
-## 4) `import_data --init` Current Behavior
+## 4) Import Bootstrap Current Behavior
 
-`import_data/tool.go --init` no longer copies `../app/test_pb_data/data.db`.
+`import_data/tool.go` no longer owns DB initialization.
 
-It now:
+Import workflows now initialize a target app DB explicitly from the app module:
 
-1. Rebuilds a fresh PocketBase data directory from the current app migrations plus `app/test_seed_data`.
-2. Copies the resulting `data.db` into the requested `--db` path.
-3. Runs `cleanupFreshDatabase` so imported/test-specific rows are removed while baseline lookup/config rows remain available for import workflows.
+```bash
+cd app
+go run ./cmd/testseed load --profile import-baseline --out ./pb_data
+```
+
+That command:
+
+1. Creates a blank PocketBase data directory.
+2. Applies the current migration set.
+3. Loads only the `import-baseline` seed profile from `app/test_seed_data`.
+
+`import_data/tool.go` then operates against the resulting `../app/pb_data/data.db`.
 
 ### Concrete code/docs updates in `import_data`
 
 - In `import_data/tool.go`:
   - default `--db` now points at `../app/pb_data/data.db`
-  - `--init` shells out to `app/cmd/testseed load` to build a fresh seeded DB
-  - `cleanupFreshDatabase` still runs afterward to preserve the preexisting import baseline semantics
+  - `--init` has been removed
+  - missing target DBs now produce an actionable error that points operators at `app/cmd/testseed load --profile import-baseline`
 - CLI structure cleanup:
   - `import_data/tool.go` is a command-line program and should eventually follow normal Go `cmd/` layout
   - because `import_data/` is its own Go module, the right target is `import_data/cmd/importdata/main.go`, not the repo-level `app/cmd/`
@@ -236,10 +250,10 @@ It now:
   - recommended split:
     - `import_data/cmd/importdata/main.go` for flag parsing and process exit behavior
     - package code elsewhere in `import_data/` for `RunInit`, `RunImport`, `RunExport`, and related helpers
-  - this refactor is not required for Phase 1, but it is a good fit for the same Phase 2 pass that touches `--init`
+  - this refactor was not required for Phase 1, but it fit naturally into Phase 2
 - Update docs:
   - `import_data/README.md`
-  - `import_data/deployment_phases.md` (`--init` section)
+  - `import_data/deployment_phases.md` (bootstrap section)
 
 ---
 
@@ -253,7 +267,7 @@ This is now complete.
 
 Developers can regenerate the local scratch DB when needed with:
 
-- `cd app && go run ./cmd/testseed load --out ./test_pb_data`
+- `cd app && go run ./cmd/testseed load --profile test-full --out ./test_pb_data`
 
 That local DB is still useful for:
 
@@ -311,7 +325,7 @@ Phase 2 final-state checklist:
 - `app/test_pb_data/data.db` is not tracked in git.
 - Running `go test ./...` from `app/` passes without requiring a committed binary DB.
 - Seeded DB is created from migrations + datapackage on test startup.
-- `import_data --init` succeeds with no dependency on `app/test_pb_data/data.db`.
+- `import_data` no longer depends on a tracked binary fixture DB or on `--init`.
 - Fixture updates produce human-reviewable CSV/JSON diffs.
 
 Phase 1 completed checklist:
@@ -359,36 +373,35 @@ Alternatives to consider:
 
 If CSV remains the format, include an explicit parsing contract in code and docs so empty string and NULL remain unambiguous.
 
-### C) One seed group vs two (`test-full` and `init-baseline`)
+### C) One seed group vs two (`test-full` and `import-baseline`)
 
-The plan currently includes two seed groups. This is flexible, but it also increases complexity.
+This is now resolved.
 
-Validation gate before implementing grouping:
+The implementation uses two explicit seed groups:
 
-- Confirm whether `import_data --init` genuinely needs seed data that differs from test fixtures.
-- If not, start with one seed set and add grouping only when a concrete need appears.
+- `test-full` for the canonical test fixture runtime
+- `import-baseline` for app DB bootstrap used by import workflows
 
-Recommended answer for Phase 1:
+The two-profile split removed the earlier "seed full DB, then delete rows"
+transition path from `import_data`.
 
-- start with one seed group: `test-full`
+### D) Scope boundary for import bootstrap
 
-### D) Scope boundary for `import_data --init`
-
-`import_data --init` was a real dependency because it originally copied `app/test_pb_data/data.db`. That refactor is now complete, but the rollout sequencing note still explains why it was safer to land after the Phase 1 seed/test work.
+`import_data --init` was a real dependency because it originally copied `app/test_pb_data/data.db`. That transitional refactor has now been replaced entirely by app-owned bootstrap through `app/cmd/testseed load --profile import-baseline`, but the rollout sequencing note still explains why it was safer to land after the Phase 1 seed/test work.
 
 Two rollout options:
 
 1. Single-phase rollout: fixtures + test runtime + `--init` refactor together.
 2. Two-phase rollout:
    - Phase 1: text seed fixtures + test workflow migration.
-   - Phase 2: `import_data --init` refactor and related docs.
+   - Phase 2: import bootstrap refactor and related docs.
 
 Use the two-phase rollout if reducing blast radius and simplifying rollback is more important than completing all related changes in one PR.
 
 Recommended answer:
 
 - use the two-phase rollout
-- keep `import_data --init` out of the first implementation PR
+- keep import bootstrap changes out of the first implementation PR
 
 ### E) Suggested pre-implementation checkpoints
 
@@ -397,7 +410,7 @@ Before coding, record answers to:
 1. Which fixture packaging format is selected (Frictionless, custom manifest, or convention-only)?
 2. Which NULL strategy is selected (`\\N`, empty-field rules, or JSON fixtures)?
 3. Is one seed group enough initially?
-4. Is `import_data --init` in scope for the first implementation phase?
+4. Is import bootstrap in scope for the first implementation phase?
 
 Document these in the PR description so reviewers understand the chosen tradeoffs.
 
@@ -406,4 +419,4 @@ Recommended initial answers:
 1. Packaging format: keep the planned `datapackage.json`, but keep loader logic simple and local-first.
 2. NULL strategy: CSV with explicit `\\N` handling in loader code.
 3. Seed groups: one group initially, `test-full`.
-4. `import_data --init`: not in scope for the first implementation phase.
+4. Import bootstrap: not in scope for the first implementation phase.

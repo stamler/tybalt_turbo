@@ -42,7 +42,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -126,7 +127,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -175,7 +177,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -219,7 +222,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -268,7 +272,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -302,7 +307,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -356,7 +362,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -578,7 +585,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -617,7 +625,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -700,7 +709,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -906,7 +916,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -965,7 +976,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -1024,7 +1036,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -1484,7 +1497,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -1538,7 +1552,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -1641,7 +1656,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -2027,7 +2043,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -2076,7 +2093,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -2126,6 +2144,55 @@
       },
       "x-groups": [
         "test-full"
+      ]
+    },
+    {
+      "name": "rate_sheets",
+      "path": "data/rate_sheets_import_baseline.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "active",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "effective_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "revision",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "import-baseline"
       ]
     },
     {
@@ -2560,7 +2627,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     },
     {
@@ -2771,7 +2839,8 @@
         ]
       },
       "x-groups": [
-        "test-full"
+        "test-full",
+        "import-baseline"
       ]
     }
   ]

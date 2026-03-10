@@ -2,7 +2,7 @@
 
 ## Overview
 
-The import tool (`tool.go`) provides **unidirectional synchronization** from MySQL to SQLite/PocketBase via Parquet files. It handles data export, import, and deletion cleanup while preserving local SQLite data.
+The import tool (`tool.go`) provides **unidirectional synchronization** from MySQL to SQLite/PocketBase via Parquet files. It handles deterministic export plus phase-based import into an existing PocketBase database.
 
 ## CLI Options
 
@@ -14,12 +14,16 @@ The import tool (`tool.go`) provides **unidirectional synchronization** from MyS
 |-----------------|------------------------------------------------------------------------------------------------------|
 | `--export`      | Export MySQL data to Parquet files                                                                   |
 | `--import`      | Import Parquet files into SQLite/PocketBase                                                          |
-| `--cleanup`     | Clean up deleted MySQL records from SQLite                                                           |
 | `--attachments` | Migrate attachments from GCS to S3                                                                   |
 | `--db PATH`     | Path to target database (default: `../app/pb_data/data.db`)                                          |
-| `--init`        | Rebuild target database from app migrations + text seed data, then clear imported/test-specific rows |
 
-Options can be combined: `./tool --import --cleanup --db /path/to/custom.db`
+Options can be combined: `./tool --export --import --db /path/to/custom.db --jobs --expenses --time --users`
+
+Before using the default `../app/pb_data/data.db` on a fresh clone, initialize it from the app module:
+
+```bash
+cd ../app && go run ./cmd/testseed load --profile import-baseline --out ./pb_data
+```
 
 ## Core Concepts
 
@@ -34,7 +38,7 @@ Options can be combined: `./tool --import --cleanup --db /path/to/custom.db`
 
 - **Export**: Deterministic hash-based IDs, fixed timestamps, ordered results
 - **Import**: Uses `INSERT OR REPLACE` (upserts) to handle duplicates
-- **Cleanup**: Removes orphaned imported records safely
+- **Import**: Replaces selected phase tables deterministically from the current Parquet export
 
 ## Operations
 
@@ -63,20 +67,7 @@ Options can be combined: `./tool --import --cleanup --db /path/to/custom.db`
 
 - Sets `_imported = true` on all imported records
 - Uses upserts to handle existing records
-- Automatically runs cleanup if `--cleanup` flag included
-
-### Cleanup (`--cleanup`)
-
-**Purpose**: Remove imported records that no longer exist in MySQL export
-**Safety**: Only deletes records where `_imported = true`
-**Logic**:
-
-1. Read current IDs from each Parquet file
-2. Find SQLite records with `_imported = true` but ID not in current export
-3. Delete orphaned records
-4. Special handling for `user_claims` composite key (uid+cid)
-
-**Protection**: Local SQLite data (`_imported = false`) is never touched
+- Replaces the selected phase tables from the current Parquet export
 
 ### Attachments (`--attachments`)
 
@@ -86,8 +77,7 @@ Options can be combined: `./tool --import --cleanup --db /path/to/custom.db`
 ## Data Flow
 
 ```fixed
-MySQL → [--export] → Parquet Files → [--import] → SQLite/PocketBase
-                                   → [--cleanup] → Remove Deletions
+MySQL → [--export] → Parquet Files → [--import --<phase flags>] → SQLite/PocketBase
 ```
 
 ### po_approver_props Precedence
@@ -102,29 +92,26 @@ MySQL → [--export] → Parquet Files → [--import] → SQLite/PocketBase
 ## Usage Examples
 
 ```bash
-# Full sync: export + import + cleanup
-./tool --export && ./tool --import --cleanup
+# Initialize an import-ready app DB from migrations + import-baseline seeds
+cd ../app && go run ./cmd/testseed load --profile import-baseline --out ./pb_data
 
-# Import existing Parquet files with cleanup
-./tool --import --cleanup
+# Full sync: export + import
+cd ../import_data && ./tool --export --import --db ../app/pb_data/data.db --jobs --expenses --time --users
 
-# Only check for deletions
-./tool --cleanup
+# Import existing Parquet files
+./tool --import --db ../app/pb_data/data.db --jobs --expenses --time --users
 
 # Export only (for testing idempotency)
-./tool --export
+./tool --export --db ../app/pb_data/data.db
 
 # Migrate attachments
 ./tool --attachments
 
 # Use custom database path
-./tool --import --cleanup --db /path/to/production.db
+./tool --import --db /path/to/production.db --jobs --expenses --time --users
 
 # Export with custom sqlite database source
 ./tool --export --db /path/to/custom.db
-
-# Rebuild a fresh app DB before importing
-./tool --init --import --db ../app/pb_data/data.db --jobs --expenses --time --users
 ```
 
 ## Technical Details

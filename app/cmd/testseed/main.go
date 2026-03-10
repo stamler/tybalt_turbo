@@ -65,6 +65,7 @@ func runLoad(args []string) error {
 	fs := flag.NewFlagSet("load", flag.ContinueOnError)
 	dataDir := fs.String("out", "", "directory to build seeded pocketbase data into")
 	seedDir := fs.String("seed-dir", testseed.DefaultSeedDir(), "directory containing text seed data")
+	profile := fs.String("profile", testseed.TestFullProfile, "seed profile to load")
 	fs.SetOutput(os.Stderr)
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -74,15 +75,20 @@ func runLoad(args []string) error {
 		return fmt.Errorf("missing required --out")
 	}
 
-	if err := os.RemoveAll(*dataDir); err != nil {
+	if err := testseed.ValidateProfile(*profile); err != nil {
 		return err
 	}
 
-	return testseed.BuildSeededDataDir(*dataDir, *seedDir)
+	if err := resetGeneratedSQLiteFiles(*dataDir); err != nil {
+		return err
+	}
+
+	return testseed.BuildSeededDataDirForProfile(*dataDir, *seedDir, *profile)
 }
 
 // runVerify confirms that the text fixture set reproduces the same migrated
-// runtime data currently obtained from the source test data directory.
+// runtime data currently obtained from the source test data directory for the
+// canonical test-full fixture profile.
 func runVerify(args []string) error {
 	fs := flag.NewFlagSet("verify", flag.ContinueOnError)
 	dataDir := fs.String("data-dir", defaultDataDir(), "path to source pocketbase data directory")
@@ -95,10 +101,30 @@ func runVerify(args []string) error {
 	return testseed.VerifySeedDataAgainstTestApp(*dataDir, *seedDir)
 }
 
-// defaultDataDir returns the legacy PocketBase test data directory used as the
-// source of truth while Phase 1 is being rolled out.
+// defaultDataDir returns the conventional local scratch PocketBase data
+// directory used for manual app runs and dump/verify workflows.
 func defaultDataDir() string {
 	return filepath.Join(testseed.PackageRoot(), "test_pb_data")
+}
+
+// resetGeneratedSQLiteFiles removes the generated PocketBase SQLite artifacts
+// from dataDir while preserving any non-generated files in the directory, such
+// as checked-in documentation next to the local scratch DB.
+func resetGeneratedSQLiteFiles(dataDir string) error {
+	for _, name := range []string{
+		"data.db",
+		"data.db-shm",
+		"data.db-wal",
+		"auxiliary.db",
+		"auxiliary.db-shm",
+		"auxiliary.db-wal",
+	} {
+		if err := os.Remove(filepath.Join(dataDir, name)); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // usage prints the command synopsis for the testseed maintenance CLI.

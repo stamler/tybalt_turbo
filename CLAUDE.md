@@ -7,11 +7,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Backend (Go / PocketBase) — run from `app/`
 
 ```bash
-# Build the local fixture DB used by the dev server and testseed dump/verify
-go run ./cmd/testseed load --out ./test_pb_data
-
-# Run backend in dev mode (auto-migration enabled, uses test DB)
-go run main.go serve --dir="./test_pb_data"
+# Run backend in dev mode (auto-migration enabled, uses the normal local app DB)
+go run main.go serve
 
 # Run all tests
 go test ./...
@@ -38,12 +35,19 @@ npm run format   # Auto-format code
 
 ```bash
 # Terminal 1
-cd app && go run ./cmd/testseed load --out ./test_pb_data
-cd app && go run main.go serve --dir="./test_pb_data"
+cd app && go run main.go serve
 
 # Terminal 2
 cd ui && npm run dev
 # App available at http://localhost:5173
+```
+
+### Run against seeded fixture data
+
+```bash
+cd app
+go run ./cmd/testseed load --profile test-full --out ./test_pb_data
+go run main.go serve --dir="./test_pb_data"
 ```
 
 **Required**: Create `ui/.env` with:
@@ -99,8 +103,7 @@ SvelteKit 2 + Svelte 5 + TypeScript + Tailwind CSS 4. PocketBase SDK is used dir
 Standalone Go CLI for one-way MySQL → SQLite sync via Parquet. It runs independently from the main app and is not part of the PocketBase binary.
 
 - `--export`: MySQL → Parquet files (idempotent, deterministic IDs)
-- `--import`: Parquet → SQLite (upsert, sets `_imported=true`)
-- `--cleanup`: Remove orphaned imported records
+- `--import`: Parquet → SQLite phase import (sets `_imported=true` on imported rows)
 - `--attachments`: GCS → S3 attachment migration
 
 Records with `_imported=true` originated from MySQL. Locally-created records have no `_imported` field. Hooks that check `RecordHasMeaningfulChanges(record, "_imported")` skip propagation when only `_imported` changed.

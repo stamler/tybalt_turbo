@@ -84,17 +84,26 @@ cd ../ui && npm install
 2. Run locally:
 
 ```bash
-# Build the local fixture DB used by the dev server and testseed dump/verify
-cd app && go run ./cmd/testseed load --out ./test_pb_data
-
 # Terminal 1: Backend
-cd app && go run main.go serve --dir="./test_pb_data"
+cd app && go run main.go serve
 
 # Terminal 2: Frontend
 cd ui && npm run dev
 ```
 
 App available at `http://localhost:5173`
+
+### Run Against Seeded Fixture Data
+
+If you want to inspect or reproduce the canonical seeded app/test state locally:
+
+```bash
+# Build the full seeded fixture DB
+cd app && go run ./cmd/testseed load --profile test-full --out ./test_pb_data
+
+# Run the app against that seeded fixture DB
+cd app && go run main.go serve --dir="./test_pb_data"
+```
 
 ## Deployment
 
