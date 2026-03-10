@@ -84,6 +84,9 @@ cd ../ui && npm install
 2. Run locally:
 
 ```bash
+# Build the local fixture DB used by the dev server and testseed dump/verify
+cd app && go run ./cmd/testseed load --out ./test_pb_data
+
 # Terminal 1: Backend
 cd app && go run main.go serve --dir="./test_pb_data"
 

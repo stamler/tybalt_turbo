@@ -4,12 +4,12 @@
 
 Replace the committed binary test database (`app/test_pb_data/data.db`) with text fixtures (Frictionless-style `datapackage.json` + per-table CSV files), and make tests build a fresh DB from migrations + seed data at runtime.
 
-This plan also updates `import_data/tool.go --init` so it no longer depends on copying `app/test_pb_data/data.db`.
+This plan updates the test workflow to use text fixtures as the source of truth and updates `import_data/tool.go --init` so it no longer depends on copying `app/test_pb_data/data.db`.
 
 ## Status
 
 - Phase 1 is complete.
-- Phase 2 is still outstanding.
+- Phase 2 is complete except for the optional future `import_data/cmd/...` cleanup.
 
 What is already implemented:
 
@@ -22,9 +22,6 @@ What is already implemented:
 
 What is still outstanding:
 
-- refactor `import_data --init`
-- eventually remove the binary fixture DB from git
-- update remaining docs/defaults that still point at `app/test_pb_data/data.db`
 - optionally clean up `import_data/tool.go` into `import_data/cmd/...`
 
 ## Recommended Rollout
@@ -37,9 +34,9 @@ Do this in two phases.
   - make tests build from migrations + text seed data
   - switch test helpers and direct `tests.NewTestApp(...)` call sites over to the new seeded workflow
 - Phase 2:
-  - refactor `import_data --init`
   - remove the binary fixture DB from git
   - update remaining docs and defaults that still point at `app/test_pb_data/data.db`
+  - move `import_data/tool.go` under `import_data/cmd/...` if the CLI cleanup is still desired
 
 This kept the first PR focused on test-fixture migration and reduced blast radius.
 
@@ -48,11 +45,11 @@ This kept the first PR focused on test-fixture migration and reduced blast radiu
 - Text fixtures are now stored under `app/test_seed_data/` as `datapackage.json` plus one CSV per table.
 - Tests now build through `app/internal/testseed`, which creates a blank DB, applies the current migration set, and then loads text fixtures into the result.
 - The current seed package intentionally excludes `_migrations`; migration state comes from the code-defined migration set, not from fixture data.
-- The committed binary fixture DB at `app/test_pb_data/data.db` still exists in the repo, but it is no longer needed to create the cached test template.
+- The local generated fixture DB at `app/test_pb_data/data.db` is no longer tracked in git, but can still be created for manual inspection or `testseed dump/verify`.
 - `import_data/tool.go` currently:
-  - defaults `--db` to `../app/test_pb_data/data.db`
-  - uses `--init` to copy `../app/test_pb_data/data.db` to `../app/pb_data/data.db`
-  - then deletes many rows via `cleanupFreshDatabase`.
+  - defaults `--db` to `../app/pb_data/data.db`
+  - uses `--init` to rebuild the target DB from current migrations + text seed data
+  - then deletes imported/test-specific rows via `cleanupFreshDatabase`.
 - Most additive test setup has already been pushed into the canonical fixture DB.
 - The remaining runtime-only pre-test DB mutations are now explicitly documented in:
   - `app/test_pb_data/runtime_test_db_exceptions.md`
@@ -216,29 +213,22 @@ Use the same migration path that actually creates the app collections in practic
 
 ---
 
-## 4) `import_data --init` Refactor Plan
+## 4) `import_data --init` Current Behavior
 
-### Current issue
+`import_data/tool.go --init` no longer copies `../app/test_pb_data/data.db`.
 
-`import_data/tool.go --init` copies `../app/test_pb_data/data.db` and cleans it. This will break once the binary DB is removed.
+It now:
 
-This is a Phase 2 task unless it turns out to be trivial after Phase 1 is complete.
-
-### Proposed behavior
-
-Refactor `--init` to:
-
-1. Create/overwrite `../app/pb_data/data.db` from scratch.
-2. Apply migrations.
-3. Optionally load seed group `init-baseline` from `app/test_seed_data` (if import depends on lookup/config rows not produced by migrations alone).
+1. Rebuilds a fresh PocketBase data directory from the current app migrations plus `app/test_seed_data`.
+2. Copies the resulting `data.db` into the requested `--db` path.
+3. Runs `cleanupFreshDatabase` so imported/test-specific rows are removed while baseline lookup/config rows remain available for import workflows.
 
 ### Concrete code/docs updates in `import_data`
 
 - In `import_data/tool.go`:
-  - remove `copyFile` + `cleanupFreshDatabase` path for `--init`
-  - stop hardcoding `src := "../app/test_pb_data/data.db"`
-  - make `--init` call the new init path (fresh + migrate + optional baseline load)
-  - update default `--db` away from test DB path
+  - default `--db` now points at `../app/pb_data/data.db`
+  - `--init` shells out to `app/cmd/testseed load` to build a fresh seeded DB
+  - `cleanupFreshDatabase` still runs afterward to preserve the preexisting import baseline semantics
 - CLI structure cleanup:
   - `import_data/tool.go` is a command-line program and should eventually follow normal Go `cmd/` layout
   - because `import_data/` is its own Go module, the right target is `import_data/cmd/importdata/main.go`, not the repo-level `app/cmd/`
@@ -253,23 +243,23 @@ Refactor `--init` to:
 
 ---
 
-## 5) Remove Binary DB from Git
+## 5) Remove Binary DB From Git
 
-This is still outstanding.
+This is now complete.
 
-1. `git rm app/test_pb_data/data.db`
-2. Add ignore rule(s), e.g.:
-   - `app/test_pb_data/data.db`
-   - optionally `app/test_pb_data/*.db` (if all runtime DB artifacts should stay untracked)
-3. Keep text fixtures tracked under `app/test_seed_data/`.
+1. `app/test_pb_data/data.db` is no longer tracked in git.
+2. `.gitignore` excludes the local generated file.
+3. Text fixtures remain tracked under `app/test_seed_data/`.
 
-Also update comments/docs that explicitly say fixtures live in `test_pb_data/data.db`.
+Developers can regenerate the local scratch DB when needed with:
 
-This should happen only after:
+- `cd app && go run ./cmd/testseed load --out ./test_pb_data`
 
-- Phase 1 parity is proven
-- tests no longer read the binary DB at runtime
-- the team is comfortable regenerating fixture text deterministically
+That local DB is still useful for:
+
+- manually running the app against fixture data
+- `cmd/testseed dump`
+- `cmd/testseed verify`
 
 ---
 
@@ -331,7 +321,7 @@ Phase 1 completed checklist:
 - `go test ./...` passes
 - runtime-only exception tests still pass unchanged in behavior
 - `_migrations` is no longer part of the text fixture package
-- binary DB removal and `import_data --init` refactor are deferred
+- binary DB removal was deferred from Phase 1 and completed in Phase 2
 
 ---
 
@@ -384,7 +374,7 @@ Recommended answer for Phase 1:
 
 ### D) Scope boundary for `import_data --init`
 
-Refactoring `import_data --init` is a real dependency because it currently copies `app/test_pb_data/data.db`, but combining it with fixture-format migration increases scope and risk.
+`import_data --init` was a real dependency because it originally copied `app/test_pb_data/data.db`. That refactor is now complete, but the rollout sequencing note still explains why it was safer to land after the Phase 1 seed/test work.
 
 Two rollout options:
 

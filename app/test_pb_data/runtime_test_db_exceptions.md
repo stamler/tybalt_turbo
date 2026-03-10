@@ -1,6 +1,6 @@
 # Runtime Test DB Exceptions
 
-This document records the remaining cases where tests still create, update, or delete data at runtime instead of relying entirely on the canonical fixture DB at `app/test_pb_data/data.db`.
+This document records the remaining cases where tests still create, update, or delete data at runtime instead of relying entirely on the canonical text fixture source in `app/test_seed_data/` and the generated local DB under `app/test_pb_data/data.db`.
 
 The goal is to keep this list short and explicit. If a new test starts mutating setup data before execution, it should either:
 
@@ -9,7 +9,7 @@ The goal is to keep this list short and explicit. If a new test starts mutating 
 
 ## Principles
 
-- Prefer committed fixture rows in `data.db`.
+- Prefer committed fixture rows in `app/test_seed_data/`.
 - Do not mutate pre-existing fixture rows at test setup unless the case is inherently contradictory or fault-injection.
 - Runtime mutation is still acceptable when the mutation is the behavior under test, rather than missing fixture data.
 

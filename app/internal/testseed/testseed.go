@@ -1,7 +1,7 @@
 // Package testseed builds and manages the text-backed fixture database used by
 // tests.
 //
-// Phase 1 replaces direct per-test dependence on the committed
+// Phase 1 replaces direct per-test dependence on a tracked
 // app/test_pb_data/data.db binary with a workflow that:
 //   - dumps the current canonical test data to text files under app/test_seed_data
 //   - rebuilds a PocketBase data directory from migrations plus those text files
@@ -166,19 +166,27 @@ func TemplateDir() (string, error) {
 //
 // The resulting directory can be used as the source for tests.NewTestApp.
 func BuildSeededDataDir(dataDir string, seedDir string) error {
+	// Create the PocketBase data directory that will hold the freshly built
+	// SQLite files (data.db plus any auxiliary DBs PocketBase creates).
 	if err := os.MkdirAll(dataDir, 0o755); err != nil {
 		return err
 	}
 
+	// Construct a bare PocketBase app pointed at that directory. At this point
+	// no schema or seed data has been loaded yet.
 	app := core.NewBaseApp(core.BaseAppConfig{
 		DataDir:       dataDir,
 		EncryptionEnv: "pb_test_env",
 	})
 
+	// Bootstrap initializes the low-level PocketBase app state and opens the DB
+	// handles against the target directory.
 	if err := app.Bootstrap(); err != nil {
 		return err
 	}
 
+	// Touch both the primary and auxiliary DB connections so PocketBase creates
+	// the underlying SQLite files before migrations run.
 	if _, err := app.DB().NewQuery("SELECT 1").Execute(); err != nil {
 		return err
 	}
@@ -186,14 +194,22 @@ func BuildSeededDataDir(dataDir string, seedDir string) error {
 		return err
 	}
 
+	// Apply the current app migration set to the blank DB so the schema matches
+	// what the real app/test runtime expects.
 	if err := app.RunAllMigrations(); err != nil {
 		return err
 	}
 
+	// Release PocketBase's bootstrap state before the raw seed loader writes
+	// directly into data.db. The loader works at the SQLite level, not through
+	// the live PocketBase app instance.
 	if err := app.ResetBootstrapState(); err != nil {
 		return err
 	}
 
+	// Bulk-load the canonical text fixtures into the migrated data.db. This
+	// produces the cached seeded template that tests later clone via
+	// tests.NewTestApp.
 	return LoadSeedData(filepath.Join(dataDir, "data.db"), seedDir, testGroup)
 }
 

@@ -12,7 +12,8 @@ import (
 	"io"
 	"log"
 	"os"
-	"path"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -26,7 +27,7 @@ import (
 )
 
 var expenseCollectionId = "o1vpz1mm7qsfoyy"
-var targetDatabase = "../app/test_pb_data/data.db"
+var targetDatabase = "../app/pb_data/data.db"
 
 // defaultCapitalKindID and defaultProjectKindID are set at startup from the
 // target DB; used by normalizeExpenditureKindID during import.
@@ -67,8 +68,8 @@ func main() {
 	exportFlag := flag.Bool("export", false, "Export data to Parquet files")
 	importFlag := flag.Bool("import", false, "Import data from Parquet files")
 	attachmentsFlag := flag.Bool("attachments", false, "Import attachments from GCS to S3")
-	initFlag := flag.Bool("init", false, "Initialize app database by copying the test database (overwrites existing)")
-	dbFlag := flag.String("db", "../app/test_pb_data/data.db", "Path to the target database")
+	initFlag := flag.Bool("init", false, "Initialize app database from migrations + text seed data (overwrites existing)")
+	dbFlag := flag.String("db", "../app/pb_data/data.db", "Path to the target database")
 
 	// Phase flags for selective import (opt-in, running --import with no phase flags is a no-op)
 	jobsFlag := flag.Bool("jobs", false, "Import jobs, clients, contacts, categories, job_time_allocations")
@@ -91,16 +92,8 @@ func main() {
 	// Use the database path from the flag
 	targetDatabase = *dbFlag
 
-	// Resolve default expenditure kind IDs from target DB (for import normalize and for extract when running export)
-	capitalID, projectID, kindErr := extract.GetCapitalAndProjectKindIDs(targetDatabase)
-	if kindErr != nil {
-		log.Fatalf("Failed to resolve expenditure kind IDs from %s: %v", targetDatabase, kindErr)
-	}
-	defaultCapitalKindID = capitalID
-	defaultProjectKindID = projectID
-
 	if *initFlag {
-		fmt.Println("This will overwrite any existing data in app/pb_data/data.db.")
+		fmt.Printf("This will overwrite any existing data in %s.\n", targetDatabase)
 		fmt.Print("Proceed? [y/N]: ")
 		reader := bufio.NewReader(os.Stdin)
 		response, _ := reader.ReadString('\n')
@@ -110,22 +103,23 @@ func main() {
 			return
 		}
 
-		src := "../app/test_pb_data/data.db"
-		dst := "../app/pb_data/data.db"
-
-		if err := os.MkdirAll(path.Dir(dst), 0755); err != nil {
-			log.Fatalf("Failed to ensure destination directory: %v", err)
-		}
-
-		if err := copyFile(src, dst); err != nil {
+		if err := initializeDatabase(targetDatabase); err != nil {
 			log.Fatalf("Failed to initialize database: %v", err)
 		}
 
-		if err := cleanupFreshDatabase(dst); err != nil {
-			log.Fatalf("Failed to clean initialized database: %v", err)
+		if !*exportFlag && !*importFlag && !*attachmentsFlag {
+			return
 		}
+	}
 
-		return
+	if *exportFlag || *importFlag {
+		// Resolve default expenditure kind IDs from target DB (for import normalize and for extract when running export)
+		capitalID, projectID, kindErr := extract.GetCapitalAndProjectKindIDs(targetDatabase)
+		if kindErr != nil {
+			log.Fatalf("Failed to resolve expenditure kind IDs from %s: %v", targetDatabase, kindErr)
+		}
+		defaultCapitalKindID = capitalID
+		defaultProjectKindID = projectID
 	}
 
 	if *exportFlag {
@@ -1169,15 +1163,15 @@ func main() {
 						if item.Attachment == "" {
 							return "" // otherwise path.Base will return "."
 						}
-						return path.Base(item.Attachment)
+						return filepath.Base(item.Attachment)
 					}(),
 					"attachment_hash": func() string {
 						// Extract hash from original Firebase Storage path: Expenses/{uid}/{hash}.{ext}
 						if item.OriginalAttachment == "" {
 							return ""
 						}
-						filename := path.Base(item.OriginalAttachment)          // e.g., "8f4e2d1a...b7.pdf"
-						return strings.TrimSuffix(filename, path.Ext(filename)) // Remove extension to get hash
+						filename := filepath.Base(item.OriginalAttachment)          // e.g., "8f4e2d1a...b7.pdf"
+						return strings.TrimSuffix(filename, filepath.Ext(filename)) // Remove extension to get hash
 					}(),
 					"cc_last_4_digits":      item.CCLast4Digits,
 					"approver":              item.Approver,
@@ -1798,7 +1792,52 @@ func copyFile(src string, dst string) error {
 	return nil
 }
 
-// cleanupFreshDatabase removes test data from the freshly copied app database
+// initializeDatabase rebuilds targetDatabase from the app module's current
+// migrations plus text seed data, then removes imported/test-specific records so
+// the result is ready for import_data workflows.
+func initializeDatabase(targetDatabase string) error {
+	tempRoot, err := os.MkdirTemp("", "tybalt-import-init-*")
+	if err != nil {
+		return fmt.Errorf("create temp dir: %w", err)
+	}
+	defer os.RemoveAll(tempRoot)
+
+	appDir := filepath.Clean("../app")
+	seedDir := filepath.Join(appDir, "test_seed_data")
+	goCacheDir := filepath.Join(tempRoot, "gocache")
+	seededDataDir := filepath.Join(tempRoot, "seeded")
+	if err := os.MkdirAll(goCacheDir, 0o755); err != nil {
+		return fmt.Errorf("create go cache dir: %w", err)
+	}
+
+	cmd := exec.Command("go", "run", "./cmd/testseed", "load", "--out", seededDataDir, "--seed-dir", seedDir)
+	cmd.Dir = appDir
+	cmd.Env = append(os.Environ(), "GOCACHE="+goCacheDir)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("build seeded app db: %w", err)
+	}
+
+	if err := os.MkdirAll(filepath.Dir(targetDatabase), 0o755); err != nil {
+		return fmt.Errorf("ensure destination directory: %w", err)
+	}
+
+	seededDatabase := filepath.Join(seededDataDir, "data.db")
+	if err := copyFile(seededDatabase, targetDatabase); err != nil {
+		return fmt.Errorf("copy seeded database: %w", err)
+	}
+
+	if err := cleanupFreshDatabase(targetDatabase); err != nil {
+		return fmt.Errorf("cleanup seeded database: %w", err)
+	}
+
+	return nil
+}
+
+// cleanupFreshDatabase removes imported/test-specific data from a freshly
+// initialized app database while preserving baseline lookup and configuration
+// rows needed by import_data workflows.
 func cleanupFreshDatabase(dbPath string) error {
 	db, err := sql.Open("sqlite", dbPath)
 	if err != nil {

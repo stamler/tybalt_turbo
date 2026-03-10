@@ -7,6 +7,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Backend (Go / PocketBase) — run from `app/`
 
 ```bash
+# Build the local fixture DB used by the dev server and testseed dump/verify
+go run ./cmd/testseed load --out ./test_pb_data
+
 # Run backend in dev mode (auto-migration enabled, uses test DB)
 go run main.go serve --dir="./test_pb_data"
 
@@ -35,6 +38,7 @@ npm run format   # Auto-format code
 
 ```bash
 # Terminal 1
+cd app && go run ./cmd/testseed load --out ./test_pb_data
 cd app && go run main.go serve --dir="./test_pb_data"
 
 # Terminal 2

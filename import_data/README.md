@@ -10,13 +10,14 @@ The import tool (`tool.go`) provides **unidirectional synchronization** from MyS
 ./tool [OPTIONS]
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--export` | Export MySQL data to Parquet files |
-| `--import` | Import Parquet files into SQLite/PocketBase |
-| `--cleanup` | Clean up deleted MySQL records from SQLite |
-| `--attachments` | Migrate attachments from GCS to S3 |
-| `--db PATH` | Path to target database (default: `../app/test_pb_data/data.db`) |
+| Flag            | Description                                                                                          |
+|-----------------|------------------------------------------------------------------------------------------------------|
+| `--export`      | Export MySQL data to Parquet files                                                                   |
+| `--import`      | Import Parquet files into SQLite/PocketBase                                                          |
+| `--cleanup`     | Clean up deleted MySQL records from SQLite                                                           |
+| `--attachments` | Migrate attachments from GCS to S3                                                                   |
+| `--db PATH`     | Path to target database (default: `../app/pb_data/data.db`)                                          |
+| `--init`        | Rebuild target database from app migrations + text seed data, then clear imported/test-specific rows |
 
 Options can be combined: `./tool --import --cleanup --db /path/to/custom.db`
 
@@ -51,7 +52,7 @@ Options can be combined: `./tool --import --cleanup --db /path/to/custom.db`
 ### Import (`--import`)
 
 **Purpose**: Load Parquet data into SQLite/PocketBase
-**Target**: Configurable via `--db` flag (default: `../app/test_pb_data/data.db`)
+**Target**: Configurable via `--db` flag (default: `../app/pb_data/data.db`)
 **Collections Imported**:
 
 - Core: clients, client_contacts, jobs, categories, vendors, purchase_orders, expenses
@@ -121,6 +122,9 @@ MySQL → [--export] → Parquet Files → [--import] → SQLite/PocketBase
 
 # Export with custom sqlite database source
 ./tool --export --db /path/to/custom.db
+
+# Rebuild a fresh app DB before importing
+./tool --init --import --db ../app/pb_data/data.db --jobs --expenses --time --users
 ```
 
 ## Technical Details

@@ -202,9 +202,11 @@ if *expensesFlag {
 
 ### Interaction with `--init`
 
-The `--init` flag copies the test database schema and clears data tables. It is orthogonal to `--import`:
+The `--init` flag rebuilds the target DB from the app's current migrations plus
+the text seed package, then clears imported/test-specific data tables while
+preserving baseline lookup/config rows. It is orthogonal to `--import`:
 
-- Use `--init` to set up a fresh database with the correct schema
-- Use `--import --<phases>` to populate data
+- Use `--init` to set up a fresh database with the correct schema and seed baseline
+- Use `--import --<phases>` to populate imported business data
 
 They can be combined: `./tool --init --import --jobs --expenses --time --users`
