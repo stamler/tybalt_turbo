@@ -4,7 +4,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import Icon from "@iconify/svelte";
-  import { shortDate } from "$lib/utilities";
+  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
   import DSTabBar, { type TabItem } from "$lib/components/DSTabBar.svelte";
 
   export let data: PageData;
@@ -15,8 +15,8 @@
   <div class="flex items-center gap-2">
     <h1 class="text-2xl font-bold">
       {data.vendor.name}
-      {#if data.vendor.alias}
-        <span class="opacity-60">({data.vendor.alias})</span>
+      {#if trimmedOrEmpty(data.vendor.alias)}
+        <span class="opacity-60">({trimmedOrEmpty(data.vendor.alias)})</span>
       {/if}
     </h1>
     <DsActionButton

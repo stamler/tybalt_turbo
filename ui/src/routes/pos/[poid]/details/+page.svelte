@@ -5,7 +5,7 @@
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import Icon from "@iconify/svelte";
-  import { shortDate } from "$lib/utilities";
+  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
   import DsList from "$lib/components/DSList.svelte";
   import { globalStore } from "$lib/stores/global";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
@@ -186,8 +186,8 @@
           <span class="font-semibold">Vendor:</span>
           <a href={`/vendors/${data.po.vendor}/details`} class="text-blue-600 hover:underline">
             {data.po.vendor_name}
-            {#if data.po.vendor_alias}
-              <span class="opacity-60">({data.po.vendor_alias})</span>
+            {#if trimmedOrEmpty(data.po.vendor_alias)}
+              <span class="opacity-60">({trimmedOrEmpty(data.po.vendor_alias)})</span>
             {/if}
           </a>
         </div>

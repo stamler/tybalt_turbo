@@ -3,7 +3,7 @@
   import { globalStore } from "$lib/stores/global";
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
-  import { shortDate } from "$lib/utilities";
+  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
   import Icon from "@iconify/svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
@@ -58,8 +58,8 @@
         <span class="flex items-center gap-0">
           <Icon icon="mdi:store" width="20px" class="inline-block" />
           {r.vendor_name}
-          {#if r.vendor_alias}
-            <span class="text-xs text-gray-500">({r.vendor_alias})</span>
+          {#if trimmedOrEmpty(r.vendor_alias)}
+            <span class="text-xs text-gray-500">({trimmedOrEmpty(r.vendor_alias)})</span>
           {/if}
         </span>
       {/if}

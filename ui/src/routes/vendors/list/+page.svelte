@@ -5,6 +5,7 @@
   import { pb } from "$lib/pocketbase";
   import { vendors } from "$lib/stores/vendors";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
+  import { trimmedOrEmpty } from "$lib/utilities";
 
   // initialize the stores, noop if already initialized
   vendors.init();
@@ -23,8 +24,8 @@
         <a href={`/vendors/${id}/details`} class="text-blue-600 hover:underline">
           {name}
         </a>
-        {#if alias !== ""}
-          <span class="opacity-30">({alias})</span>
+        {#if trimmedOrEmpty(alias)}
+          <span class="opacity-30">({trimmedOrEmpty(alias)})</span>
         {/if}
       </span>
     {/snippet}

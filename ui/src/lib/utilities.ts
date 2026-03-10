@@ -176,6 +176,11 @@ export function formatDateTime(value: string) {
   const timePart = date.toLocaleTimeString();
   return `${datePart} ${timePart}`;
 }
+
+// Normalizes optional text for display by trimming whitespace and collapsing nullish values to "".
+export function trimmedOrEmpty(value: string | null | undefined): string {
+  return (value ?? "").trim();
+}
 /*
 export const hoursWorked = function (item: TimeSheetTally) {
   let workedHours = 0;

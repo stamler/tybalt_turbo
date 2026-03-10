@@ -6,7 +6,7 @@
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import Icon from "@iconify/svelte";
-  import { shortDate } from "$lib/utilities";
+  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { goto } from "$app/navigation";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
@@ -151,12 +151,19 @@
         <span class="font-semibold">Vendor:</span>
         <a href={`/vendors/${expense.vendor}/details`} class="text-blue-600 hover:underline">
           {expense.vendor_name}
-          {#if expense.vendor_alias}
-            <span class="opacity-60">({expense.vendor_alias})</span>
+          {#if trimmedOrEmpty(expense.vendor_alias)}
+            <span class="opacity-60">({trimmedOrEmpty(expense.vendor_alias)})</span>
           {/if}
         </a>
         {#if poDiffers(expense.vendor, expense.po_vendor)}
-          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_vendor_name}{#if expense.po_vendor_alias} ({expense.po_vendor_alias}){/if}</span>
+          <span
+            class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
+          >
+            PO: {expense.po_vendor_name}
+            {#if trimmedOrEmpty(expense.po_vendor_alias)}
+              ({trimmedOrEmpty(expense.po_vendor_alias)})
+            {/if}
+          </span>
         {/if}
       </div>
     {/if}

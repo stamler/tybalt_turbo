@@ -3,6 +3,7 @@
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { vendors } from "$lib/stores/vendors";
+  import { trimmedOrEmpty } from "$lib/utilities";
   import VendorCreatePopover from "./VendorCreatePopover.svelte";
   import Portal from "./Portal.svelte";
 
@@ -130,7 +131,12 @@
         uiName="Vendor"
         {disabled}
       >
-        {#snippet resultTemplate(item)}{item.name} ({item.alias}){/snippet}
+        {#snippet resultTemplate(item)}
+          {item.name}
+          {#if trimmedOrEmpty(item.alias)}
+            ({trimmedOrEmpty(item.alias)})
+          {/if}
+        {/snippet}
       </DsAutoComplete>
     </div>
     {#if canCreate && !value && !disabled}

@@ -14,7 +14,7 @@
   } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { authStore } from "$lib/stores/auth";
-  import { shortDate } from "$lib/utilities";
+  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { onMount, onDestroy, untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { fetchPendingPO, fetchVisiblePO } from "$lib/poVisibility";
@@ -253,8 +253,8 @@
   {#snippet headline({ vendor_name, vendor_alias }: PurchaseOrdersAugmentedResponse)}
     <span class="flex items-center gap-2">
       {vendor_name}
-      {#if vendor_alias}
-        ({vendor_alias})
+      {#if trimmedOrEmpty(vendor_alias)}
+        ({trimmedOrEmpty(vendor_alias)})
       {/if}
     </span>
   {/snippet}

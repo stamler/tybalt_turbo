@@ -8,7 +8,7 @@
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { shortDate } from "$lib/utilities";
+  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { onMount, onDestroy, untrack } from "svelte";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
@@ -168,8 +168,8 @@
         <span class="flex items-center gap-0">
           <Icon icon="mdi:store" width="20px" class="inline-block" />
           {vendor_name}
-          {#if vendor_alias}
-            <span class="text-xs text-gray-500">({vendor_alias})</span>
+          {#if trimmedOrEmpty(vendor_alias)}
+            <span class="text-xs text-gray-500">({trimmedOrEmpty(vendor_alias)})</span>
           {/if}
         </span>
       {/if}
@@ -222,7 +222,15 @@
       {/if}
     </span>
   {/snippet}
-  {#snippet actions({ id, uid, approver, submitted, approved, rejected, committed }: ExpensesAugmentedResponse)}
+  {#snippet actions({
+    id,
+    uid,
+    approver,
+    submitted,
+    approved,
+    rejected,
+    committed,
+  }: ExpensesAugmentedResponse)}
     {#if $expensesEditingEnabled}
       {@const isOwner = uid === viewerId}
       {@const isApprover = approver === viewerId}
@@ -239,7 +247,12 @@
         <DsActionButton action={() => recall(id)} icon="mdi:rewind" title="Recall" color="orange" />
       {/if}
       {#if isOwner && isApprover && hasTaprAccess && submitted && approved === "" && rejected === "" && committed === ""}
-        <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
+        <DsActionButton
+          action={() => approve(id)}
+          icon="mdi:approve"
+          title="Approve"
+          color="green"
+        />
       {/if}
       {#if isOwner && !submitted}
         <DsActionButton action={() => submit(id)} icon="mdi:send" title="Submit" color="blue" />
