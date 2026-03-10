@@ -145,7 +145,7 @@ flyctl secrets set \
 
 4. **Push initial database to S3:**
 
-The app requires a database backup in S3 to start. Push your local database:
+The app requires a Litestream replica in S3 when no local production database exists yet, or when a forced restore is requested. For an initial deployment, push your local database first:
 
 ```bash
 source scripts/setup-env.sh
@@ -175,6 +175,8 @@ Migrations are applied automatically on startup.
 
 Litestream continuously replicates your SQLite database to S3-compatible storage. No manual backups needed.
 
+With the Fly volume mounted at `/app/pb_data`, normal restarts and deploys reuse the on-volume database. If you want to replace production with a different database, do not restore over the live production file in place. Instead, push the replacement database to the Litestream replica and restart production with `/app/pb_data/.force-restore` set so startup performs a clean restore.
+
 ### Configuration
 
 This project uses two litestream configuration files:
@@ -196,11 +198,14 @@ litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/
 **Production:**
 
 ```bash
-# Connect to your app
-flyctl ssh console
+# Do not run litestream restore directly against the live production DB.
+# Instead, mark production for a clean restore on next boot:
+flyctl ssh console -C "touch /app/pb_data/.force-restore"
 
-# Restore from latest backup
-litestream restore -if-replica-exists /app/pb_data/data.db
+# Then restart the machine so startup clears local DB/WAL/Litestream state
+# and restores from the replica into the mounted volume.
+MACHINE_ID=$(flyctl status --json | jq -r '.Machines[0].id')
+flyctl machine restart "$MACHINE_ID"
 ```
 
 **Local:**

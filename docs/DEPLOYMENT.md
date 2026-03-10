@@ -92,9 +92,11 @@ litestream replicate -config litestream.local.yml
 
 ### Initial Database Deployment
 
-**⚠️ Important**: The production app will fail to start if no database backup exists in S3. This is intentional - it prevents the app from accidentally creating a blank database.
+**⚠️ Important**: The production app will fail to start if startup needs to restore and no Litestream replica exists in S3. This is intentional and prevents the app from accidentally creating a blank database.
 
-Before your first deployment, you must push a database to S3:
+This is the workflow for an initial deployment where production has no local database yet. On first boot, startup sees that `/app/pb_data/data.db` is missing and restores from the Litestream replica into the mounted volume.
+
+Before the first deploy, you must push a database to S3:
 
 1. **Set up environment variables:**
 
@@ -102,7 +104,7 @@ Before your first deployment, you must push a database to S3:
    source scripts/setup-env.sh
    ```
 
-2. **Clear any stale litestream state** (required for fresh deployments):
+2. **Clear any stale local Litestream state** (required before pushing from your local machine):
 
    ```bash
    rm -rf app/pb_data/.data.db-litestream
@@ -110,7 +112,7 @@ Before your first deployment, you must push a database to S3:
 
    This removes local replication metadata that may be out of sync with S3.
 
-3. **Push your local database to S3:**
+3. **Push your local database to the Litestream replica:**
 
    ```bash
    litestream replicate -config litestream.local.yml
@@ -124,11 +126,13 @@ Before your first deployment, you must push a database to S3:
    flyctl deploy
    ```
 
-The app will restore the database from S3 on first startup.
+The app will restore the database from S3 on first startup because no local production database exists yet.
 
 ### Deploying Database Changes to Production
 
-When you need to push local database changes (schema changes, data fixes, etc.) to production:
+This is the workflow for replacing an already-existing production database on the mounted Fly volume. Because normal restarts now reuse the on-volume database, replacing production requires an explicit forced restore on the next boot.
+
+When you need to push local database changes (schema changes, data fixes, rollback state, etc.) to production:
 
 1. **Set up environment variables:**
 
@@ -136,20 +140,20 @@ When you need to push local database changes (schema changes, data fixes, etc.) 
    source scripts/setup-env.sh
    ```
 
-2. **Mark production to restore from S3 on next boot** (works with Fly volumes too):
+2. **Mark production to discard the on-volume DB and restore from S3 on next boot**:
 
    ```bash
    flyctl ssh console -C "touch /app/pb_data/.force-restore"
    ```
 
-3. **Stop the production machine** (prevents conflicts):
+3. **Stop the production machine** (prevents production writes while you replace the replica contents):
 
    ```bash
    MACHINE_ID=$(flyctl status --json | jq -r '.Machines[0].id')
    flyctl machine stop $MACHINE_ID
    ```
 
-4. **Push your local database to S3:**
+4. **Push your local database to the Litestream replica:**
 
    ```bash
    litestream replicate -config litestream.local.yml
@@ -165,7 +169,9 @@ When you need to push local database changes (schema changes, data fixes, etc.) 
 
 On next boot, the app startup script will:
 
-- Restore `data.db` from S3
+- Ignore the existing on-volume database because `.force-restore` is present
+- Delete `data.db`, WAL/SHM files, and local Litestream state from the volume
+- Restore `data.db` from S3 into the mounted volume
 - Clear stale Litestream state (`/app/pb_data/.data.db-litestream`) and any SQLite WAL/SHM files
 
 This prevents common Litestream WAL verification errors after DB replacement.
@@ -178,7 +184,7 @@ Alternatively, use the script:
 
 #### Use Cases
 
-- **Initial deployment** with seed data and superuser
+- **Replacing** an existing production database with a local one
 - **Fixing corrupted production data**
 - **Rolling back** to a known good state
 
@@ -187,10 +193,13 @@ Alternatively, use the script:
 - This replaces the **entire production database** with your local one
 - Make sure your local database contains the state you want in production
 - Always test locally before deploying database changes
+- PocketBase backup restore should be treated as an offline source-generation step, not as an in-place restore on the live production machine
 
 ## Database Backups
 
 Litestream continuously replicates your SQLite database to S3-compatible storage.
+
+See [`docs/fly-litestream-runbook.md`](/Users/dean/code/tybalt_turbo/docs/fly-litestream-runbook.md) for the restart, Litestream recovery, force-restore, and volume-failure procedures.
 
 ### Monitoring Backups
 
@@ -207,7 +216,7 @@ litestream ltx -config /etc/litestream.yml /app/pb_data/data.db
 **If database is corrupted:**
 
 ```bash
-# Mark the machine to restore from S3 on next boot
+# Mark the machine to discard the on-volume DB and restore from S3 on next boot
 flyctl ssh console -C "touch /app/pb_data/.force-restore"
 
 # Restart the machine so startup performs a clean restore
@@ -220,7 +229,7 @@ flyctl machine restart $MACHINE_ID
 1. Create a new fly.io app
 2. Configure the same secrets
 3. Deploy
-4. The database will automatically restore from the latest backup
+4. The database will automatically restore from the latest backup on first boot because the local DB is missing
 
 ## Useful Commands
 

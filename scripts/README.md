@@ -30,7 +30,7 @@ source scripts/setup-env.sh
 
 ### `deploy-local-db.sh`
 
-**Purpose**: Deploys your local database to production via S3 replication.
+**Purpose**: Replaces the existing production database by pushing your local database to the Litestream replica and forcing production to restore it on next boot.
 
 **Usage**:
 
@@ -41,10 +41,11 @@ source scripts/setup-env.sh
 **What it does**:
 
 1. Validates environment variables are set
-2. Marks production to restore on next boot (`/app/pb_data/.force-restore`)
+2. Marks production to discard the on-volume DB and restore on next boot (`/app/pb_data/.force-restore`)
 3. Stops the production machine
 4. Replicates local database to S3
-5. Starts the production machine (startup restores + resets Litestream/WAL state)
+5. Starts the production machine
+6. Startup clears local DB/WAL/Litestream state from the volume and restores from the replica
 
 ---
 
@@ -84,7 +85,7 @@ source scripts/setup-env.sh
 
 ### Initial deployment (first time only)
 
-The production app requires a database in S3 to start. Push your local database before deploying:
+Use this when production does not yet have a local database on its Fly volume. Push your local database to the Litestream replica before deploying:
 
 ```bash
 source scripts/setup-env.sh
@@ -92,6 +93,8 @@ litestream replicate -config litestream.local.yml
 # Wait 30-60 seconds for sync, then Ctrl+C
 flyctl deploy
 ```
+
+On first boot, startup restores from the Litestream replica because `/app/pb_data/data.db` is missing.
 
 ### Download production database
 
@@ -105,11 +108,14 @@ litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/
 ./scripts/deploy-local-db.sh
 ```
 
+Use this when production already has a database on the mounted volume and you want to replace it. A plain restart will keep the existing on-volume DB, so replacement requires the forced-restore workflow.
+
 ## Safety Notes
 
-- **⚠️ Production requires S3 backup**: The app will fail to start if no database backup exists in S3
+- **⚠️ Startup restore requires S3 backup**: The app will fail to start if it needs to restore and no database backup exists in S3
 - **⚠️ Destructive operation**: `deploy-local-db.sh` replaces your entire production database
 - **🔒 Environment required**: Must run `setup-env.sh` first
+- **⚠️ Do not restore over the live production DB in place**: replace production by updating the replica and using `.force-restore` on next boot
 
 ## Troubleshooting
 
