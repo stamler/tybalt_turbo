@@ -14,8 +14,8 @@ This runbook documents the `po_approver_props` synchronization loop required for
 
 ## Authority Rules
 
-- Turbo rows are authoritative per `uid`.
-- Missing Turbo row for a `uid` falls back to synthesized values.
+- `PoApproverProps.parquet` is authoritative and should round-trip exactly.
+- No fallback synthesis is performed during import.
 - Missing/invalid required fields in Turbo rows are fast-fail.
 
 ## Required Contract Fields

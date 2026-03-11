@@ -83,9 +83,8 @@ MySQL → [--export] → Parquet Files → [--import --<phase flags>] → SQLite
 ### po_approver_props Precedence
 
 - `--export` includes `TurboPoApproverProps` as `parquet/PoApproverProps.parquet`.
-- `--import --users` resolves po approver props per user:
-  - Turbo row is authoritative when present.
-  - Synthesis is used only as fallback for users without Turbo rows.
+- `--import --users` imports `parquet/PoApproverProps.parquet` directly as the `po_approver_props` dataset.
+- If `parquet/PoApproverProps.parquet` is absent, no `po_approver_props` rows are synthesized.
 - Import recreates/links `user_claims` (`po_approver`) and writes `po_approver_props` against that claim.
 - Turbo rows are strict-validated (identity, limits, timestamps, and valid JSON array in `divisions`).
 
