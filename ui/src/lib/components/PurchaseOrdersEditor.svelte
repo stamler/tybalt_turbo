@@ -500,6 +500,19 @@
         requesterID !== "" && nextApprovers.some((approver) => approver.id === requesterID);
       firstApproverReasonMessage =
         !firstStageRequesterQualifies && nextApprovers.length === 0 ? firstPoolEmptyMessage : "";
+      const approverStillEligible =
+        item.approver !== "" && nextApprovers.some((approver) => approver.id === item.approver);
+      if (!firstStageRequesterQualifies && !approverStillEligible) {
+        item.approver = "";
+      }
+      if (
+        errors.approver?.code === "first_pool_empty" &&
+        (firstStageRequesterQualifies || nextApprovers.length > 0)
+      ) {
+        const nextErrors = { ...errors };
+        delete nextErrors.approver;
+        errors = nextErrors;
+      }
 
       let nextSecondApprovers: PoApproversResponse[] = [];
       let nextSecondStatus = "" as SecondApproverStatus | "";
