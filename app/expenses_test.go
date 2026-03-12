@@ -1896,6 +1896,54 @@ func TestExpensesRoutes(t *testing.T) {
 	}
 }
 
+func TestExpenseDetailsRouteIncludesPOOwnerMismatchWarningData(t *testing.T) {
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:           "expense details includes po owner mismatch data and names",
+		Method:         http.MethodGet,
+		URL:            "/api/expenses/details/eqhozipupteogp8",
+		Headers:        map[string]string{"Authorization": commitToken},
+		ExpectedStatus: 200,
+		ExpectedContent: []string{
+			`"uid_name":"Horace Silver"`,
+			`"po_uid":"rzr98oadsp9qc11"`,
+			`"po_uid_name":"Tester Time"`,
+			`"po_owner_uid_mismatch":true`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	scenario.Test(t)
+}
+
+func TestExpenseDetailsRouteDoesNotFlagPOOwnerMismatchWhenUIDsMatch(t *testing.T) {
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:           "expense details does not flag po owner mismatch when owner uids match",
+		Method:         http.MethodGet,
+		URL:            "/api/expenses/details/3yx4y19k40zun2w",
+		Headers:        map[string]string{"Authorization": commitToken},
+		ExpectedStatus: 200,
+		ExpectedContent: []string{
+			`"uid_name":"Horace Silver"`,
+			`"po_uid":"f2j5a8vk006baub"`,
+			`"po_uid_name":"Horace Silver"`,
+			`"po_owner_uid_mismatch":false`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	scenario.Test(t)
+}
+
 // TestCalculateMileageTotal verifies the standalone mileage calculation helper using
 // the rate tiers effective on 2025-01-05. For a 100 km distance on 2025-01-10 and
 // with no prior mileage in the annual period, total should be 100 * 0.70 = 70.00.

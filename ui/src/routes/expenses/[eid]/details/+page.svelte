@@ -102,6 +102,10 @@
   function attachmentHref() {
     return `${PUBLIC_POCKETBASE_URL}/api/files/expenses/${expense.id}/${expense.attachment}`;
   }
+
+  function personLabel(name: string, uid: string, fallback: string): string {
+    return trimmedOrEmpty(name) || trimmedOrEmpty(uid) || fallback;
+  }
 </script>
 
 <div class="mx-auto space-y-4 p-4">
@@ -119,6 +123,25 @@
     </div>
 
     <div><span class="font-semibold">Submitted By:</span> {expense.uid_name}</div>
+
+    {#if expense.po_owner_uid_mismatch}
+      <div class="rounded-sm border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <div class="flex items-center gap-2 font-semibold">
+          <Icon icon="mdi:alert-outline" width="18" />
+          UID mismatch with linked purchase order
+        </div>
+        <div class="mt-1">
+          This expense was submitted by
+          {personLabel(expense.uid_name, expense.uid, "unknown submitter")},
+          but the linked PO
+          {#if expense.purchase_order_number}
+            {expense.purchase_order_number}
+          {/if}
+          is owned by
+          {personLabel(expense.po_uid_name, expense.po_uid, "unknown PO owner")}.
+        </div>
+      </div>
+    {/if}
 
     <div>
       <span class="font-semibold">Description:</span>

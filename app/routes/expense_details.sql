@@ -57,7 +57,9 @@ SELECT
   COALESCE(pob.name, '') AS po_branch_name,
   COALESCE(po.kind, '') AS po_kind,
   COALESCE(poek.name, '') AS po_kind_name,
-  COALESCE(CAST(po.total AS REAL), 0) AS po_total
+  COALESCE(CAST(po.total AS REAL), 0) AS po_total,
+  COALESCE(po.uid, '') AS po_uid,
+  COALESCE(p3.given_name || ' ' || p3.surname, '') AS po_uid_name
 FROM expenses e
 LEFT JOIN jobs j ON e.job = j.id
 LEFT JOIN clients cl ON j.client = cl.id
@@ -69,6 +71,7 @@ LEFT JOIN profiles p0 ON e.uid = p0.uid
 LEFT JOIN profiles p1 ON e.approver = p1.uid
 LEFT JOIN profiles p2 ON e.rejector = p2.uid
 LEFT JOIN purchase_orders po ON e.purchase_order = po.id
+LEFT JOIN profiles p3 ON po.uid = p3.uid
 LEFT JOIN branches b ON e.branch = b.id
 LEFT JOIN vendors pov ON po.vendor = pov.id
 LEFT JOIN jobs poj ON po.job = poj.id
@@ -78,4 +81,3 @@ LEFT JOIN expenditure_kinds poek ON po.kind = poek.id
 LEFT JOIN branches pob ON po.branch = pob.id
 WHERE
   e.id = {:id}
-

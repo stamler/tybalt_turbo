@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -42,4 +43,13 @@ func validateExpensePurchaseOrderIsActive(app core.App, record *core.Record) *Co
 	}
 
 	return nil
+}
+
+// expensePurchaseOrderOwnerUIDMismatch compares the expense owner to the linked
+// purchase order owner. We only flag a mismatch when both IDs are present.
+func expensePurchaseOrderOwnerUIDMismatch(expenseUID string, purchaseOrderOwnerUID string) bool {
+	expenseUID = strings.TrimSpace(expenseUID)
+	purchaseOrderOwnerUID = strings.TrimSpace(purchaseOrderOwnerUID)
+
+	return expenseUID != "" && purchaseOrderOwnerUID != "" && expenseUID != purchaseOrderOwnerUID
 }
