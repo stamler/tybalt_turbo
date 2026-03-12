@@ -114,6 +114,8 @@ echo "WARNING: After production starts again, verify the startup logs before tru
 echo "WARNING: Good sign: a log line beginning with '[start] Restore requested:'"
 echo "WARNING: Bad sign: a log line beginning with '[start] Using existing database at'"
 echo "WARNING: If you see the bad sign, the replacement DB was not restored from the replica."
+echo "WARNING: This script temporarily disables Fly autostart during cutover and re-enables it before starting production again."
+echo "WARNING: If the script exits early, verify autostart was re-enabled before bringing production back."
 echo ""
 
 # Query Fly once up front and verify the deployment is in the single-machine
