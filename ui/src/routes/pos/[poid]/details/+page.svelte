@@ -67,7 +67,12 @@
 
   <div class="overflow-hidden rounded-sm">
     <div class="flex items-center justify-between bg-neutral-200 p-2">
-      <span>{data.po.po_number === "" ? "no po number" : data.po.po_number}</span>
+      <div class="flex items-center gap-3">
+        <span>{data.po.po_number === "" ? "no po number" : data.po.po_number}</span>
+        {#if data.po.uid_name}
+          <span class="text-sm text-slate-600">Owner: {data.po.uid_name}</span>
+        {/if}
+      </div>
       <div class="flex items-center gap-2">
         {shortDate(data.po.date, true)}
         {#if data.po.legacy_manual_entry}
@@ -321,9 +326,6 @@
         <div><span class="font-semibold">Rejector:</span> {data.po.rejector_name}</div>
       {/if}
 
-      {#if data.po.uid_name}
-        <div><span class="font-semibold">Created By:</span> {data.po.uid_name}</div>
-      {/if}
     </div>
   </div>
   {#if data.po.status === "Unapproved" && $expensesEditingEnabled}
