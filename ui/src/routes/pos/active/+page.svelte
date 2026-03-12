@@ -4,4 +4,4 @@
   let { data }: { data: PageData } = $props();
 </script>
 
-<PurchaseOrdersList inListHeader="Active Purchase Orders" {data} />
+<PurchaseOrdersList inListHeader="Active Purchase Orders" {data} showOwner={true} />

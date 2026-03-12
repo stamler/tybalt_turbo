@@ -28,7 +28,11 @@
   const collectionId = "purchase_orders";
 
   // Load the initial data
-  let { inListHeader, data }: { inListHeader?: string; data: PurchaseOrdersListData } = $props();
+  let {
+    inListHeader,
+    data,
+    showOwner = false,
+  }: { inListHeader?: string; data: PurchaseOrdersListData; showOwner?: boolean } = $props();
   let items = $state(untrack(() => data.items));
   let pendingApprovalIds = $state(new Set<string>());
 
@@ -295,6 +299,9 @@
   {/snippet}
   {#snippet line3(item: PurchaseOrdersAugmentedResponse)}
     <span class="flex items-center gap-1">
+      {#if showOwner && item.uid_name}
+        <span class="text-sm text-slate-600">Owner: {item.uid_name}</span>
+      {/if}
       {#if poIsRejected(item)}
         <DsLabel color="red" title={`${shortDate(item.rejected)}: ${item.rejection_reason}`}>
           <Icon icon="mdi:cancel" width="20px" class="inline-block" />
@@ -373,15 +380,13 @@
               color="blue"
             />
           {/if}
-        {:else}
-          {#if poMayBeEditedByOwner(item)}
-            <DsActionButton
-              action={`/pos/${item.id}/edit`}
-              icon="mdi:edit-outline"
-              title="Edit"
-              color="blue"
-            />
-          {/if}
+        {:else if poMayBeEditedByOwner(item)}
+          <DsActionButton
+            action={`/pos/${item.id}/edit`}
+            icon="mdi:edit-outline"
+            title="Edit"
+            color="blue"
+          />
         {/if}
         {#if poMayBeApprovedFromListByOwner(item)}
           <DsActionButton
