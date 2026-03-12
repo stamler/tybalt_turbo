@@ -206,7 +206,7 @@ flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=1
 # and restores from the replica into the mounted volume.
 MACHINE_ID=$(flyctl status --json | jq -r '.Machines[0].id')
 flyctl machine restart "$MACHINE_ID"
-flyctl secrets unset --stage LITESTREAM_FORCE_RESTORE
+flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=0
 ```
 
 For full database replacement from a local copy, prefer [`scripts/deploy-local-db.sh`](scripts/deploy-local-db.sh), which stages `LITESTREAM_FORCE_RESTORE=1`, resets local Litestream state, and forces a complete snapshot upload before restarting production.

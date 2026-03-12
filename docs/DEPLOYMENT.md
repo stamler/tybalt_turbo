@@ -169,7 +169,7 @@ When you need to push local database changes (schema changes, data fixes, rollba
    ```bash
    flyctl machine update "$MACHINE_ID" --autostart=true --skip-start -y
    flyctl machine start "$MACHINE_ID"
-   flyctl secrets unset --stage LITESTREAM_FORCE_RESTORE
+   flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=0
    ```
 
 On next boot, the app startup script will:

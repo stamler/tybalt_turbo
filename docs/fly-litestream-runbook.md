@@ -96,7 +96,7 @@ With `auto-recover: true`, Litestream should attempt to reset its state after LT
 ```bash
 fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=1
 fly machine restart <machine-id> -a <app-name>
-fly secrets unset -a <app-name> --stage LITESTREAM_FORCE_RESTORE
+fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=0
 ```
 
 Expected startup lines:
@@ -145,7 +145,7 @@ fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=1
 
 ```bash
 fly machine restart <machine-id> -a <app-name>
-fly secrets unset -a <app-name> --stage LITESTREAM_FORCE_RESTORE
+fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=0
 ```
 
 The startup script will perform a clean restore from the replica when `LITESTREAM_FORCE_RESTORE=1` is present at boot.

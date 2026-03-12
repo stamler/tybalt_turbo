@@ -203,8 +203,11 @@ stage_force_restore_secret() {
     flyctl secrets set -a "$APP_NAME" --stage "${FORCE_RESTORE_SECRET_NAME}=1" >/dev/null
 }
 
-clear_staged_force_restore_secret() {
-    flyctl secrets unset -a "$APP_NAME" --stage "$FORCE_RESTORE_SECRET_NAME" >/dev/null
+# We explicitly stage 0 instead of unsetting because we observed Fly machines
+# continue booting with env-triggered restores after an unset. Keeping an
+# explicit non-restore value also makes the current state easy to inspect.
+disarm_force_restore_secret() {
+    flyctl secrets set -a "$APP_NAME" --stage "${FORCE_RESTORE_SECRET_NAME}=0" >/dev/null
 }
 
 # Mark production so the next startup performs a clean restore from S3 instead
@@ -242,8 +245,8 @@ start_production_app() {
     set_machine_autostart true
     echo "🚀 Starting production app..."
     flyctl machine start "$MACHINE_ID" -a "$APP_NAME"
-    echo "🧹 Clearing staged restore secret for future boots..."
-    clear_staged_force_restore_secret
+    echo "🧹 Setting LITESTREAM_FORCE_RESTORE=0 for future boots..."
+    disarm_force_restore_secret
     echo "✅ Production app started!"
 
     echo ""
@@ -267,11 +270,11 @@ if [ "$REPLICATE_EXIT_CODE" -ne 0 ]; then
     echo "❌ Replication failed with exit code $REPLICATE_EXIT_CODE"
     echo "📋 Log contents:"
     cat "$TEMP_LOG" 2>/dev/null
-    echo "🧹 Clearing staged restore secret because cutover did not complete..."
-    clear_staged_force_restore_secret || true
+    echo "🧹 Setting LITESTREAM_FORCE_RESTORE=0 because cutover did not complete..."
+    disarm_force_restore_secret || true
     echo "❌ Production remains stopped so the existing mounted database is not overwritten by a bad restore."
     echo "💡 When you are ready to bring production back, re-enable auto-start with: flyctl machine update $MACHINE_ID -a $APP_NAME --autostart=true --skip-start -y"
-    echo "💡 If you need to bring production back on the old database, make sure LITESTREAM_FORCE_RESTORE is not staged before starting the machine."
+    echo "💡 If you need to bring production back on the old database, make sure LITESTREAM_FORCE_RESTORE is staged as 0 before starting the machine."
     exit 1
 fi
 
