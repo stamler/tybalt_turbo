@@ -108,7 +108,11 @@ uid = @request.auth.id",2024-04-03 18:24:43.543Z,\N,"[{""autogeneratePattern"":"
   uid = @request.auth.id || 
   manager = @request.auth.id || 
   @request.auth.user_claims_via_uid.cid.name ?= 'tame' ||
-  @request.auth.user_claims_via_uid.cid.name ?= 'job'
+  @request.auth.user_claims_via_uid.cid.name ?= 'job' ||
+  (
+    @request.auth.user_claims_via_uid.cid.name ?= 'legacy_po_create_update' &&
+    uid.admin_profiles_via_uid.active = true
+  )
 )",profiles,{},0,base,"@request.auth.id != """" &&
 uid = @request.auth.id &&
 @request.body.uid:changed = false",2026-03-09 15:56:46.363Z,"@request.auth.id != """""
