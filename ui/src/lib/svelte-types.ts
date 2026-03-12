@@ -110,6 +110,26 @@ export type ExpensesListData = {
   limit?: number;
 };
 
+export type ExpenseCommitQueueRow = {
+  id: string;
+  given_name: string;
+  surname: string;
+  submitted: boolean;
+  approved: string;
+  rejected: string;
+  committed?: string;
+  approver_name: string;
+  committer_name: string;
+  rejector_name: string;
+  phase: "Approved" | "Submitted" | "Committed" | "Unsubmitted";
+  date: string;
+  allowance_str: string;
+  job_number: string;
+  job_description: string;
+  client_name: string;
+  total: number;
+};
+
 // Claims types returned by custom API endpoints
 export interface ClaimListItem {
   id: string;

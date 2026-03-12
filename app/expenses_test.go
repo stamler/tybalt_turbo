@@ -1074,6 +1074,54 @@ func TestRejectExpense_QueuesNotifications(t *testing.T) {
 	scenario.Test(t)
 }
 
+func TestRejectExpense_CommitHolderCannotRejectUnapprovedExpense(t *testing.T) {
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:   "commit holder cannot reject a submitted but unapproved expense",
+		Method: http.MethodPost,
+		URL:    "/api/expenses/exp_approve_closed_po_1/reject",
+		Body:   strings.NewReader(`{"rejection_reason": "should fail for unapproved expense"}`),
+		Headers: map[string]string{
+			"Authorization": commitToken,
+		},
+		ExpectedStatus: http.StatusBadRequest,
+		ExpectedContent: []string{
+			`"code":"record_not_approved"`,
+			`"message":"only approved records can be rejected by a commit user"`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	scenario.Test(t)
+}
+
+func TestExpenseCommitQueue_RequiresCommitClaim(t *testing.T) {
+	reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:   "report holder cannot view expense commit queue",
+		Method: http.MethodGet,
+		URL:    "/api/expenses/commit_queue",
+		Headers: map[string]string{
+			"Authorization": reportToken,
+		},
+		ExpectedStatus: http.StatusForbidden,
+		ExpectedContent: []string{
+			`"message":"You are not authorized to view the expense commit queue."`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	scenario.Test(t)
+}
+
 func TestExpensesUpdate(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
 	if err != nil {

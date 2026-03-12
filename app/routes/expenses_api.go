@@ -82,22 +82,22 @@ type ExpensesAugmentedRow struct {
 // used only by the expense details endpoint.
 type ExpenseDetailsRow struct {
 	ExpensesAugmentedRow
-	POVendor       string `db:"po_vendor" json:"po_vendor"`
-	POVendorName   string `db:"po_vendor_name" json:"po_vendor_name"`
-	POVendorAlias  string `db:"po_vendor_alias" json:"po_vendor_alias"`
-	POJob          string `db:"po_job" json:"po_job"`
-	POJobNumber    string `db:"po_job_number" json:"po_job_number"`
-	POJobDesc      string `db:"po_job_description" json:"po_job_description"`
-	PODivision     string `db:"po_division" json:"po_division"`
-	PODivisionCode string `db:"po_division_code" json:"po_division_code"`
-	PODivisionName string `db:"po_division_name" json:"po_division_name"`
-	POCategory     string `db:"po_category" json:"po_category"`
-	POCategoryName string `db:"po_category_name" json:"po_category_name"`
-	PODescription  string `db:"po_description" json:"po_description"`
-	POPaymentType  string `db:"po_payment_type" json:"po_payment_type"`
-	POBranch       string `db:"po_branch" json:"po_branch"`
-	POBranchName   string `db:"po_branch_name" json:"po_branch_name"`
-	POKind         string `db:"po_kind" json:"po_kind"`
+	POVendor       string  `db:"po_vendor" json:"po_vendor"`
+	POVendorName   string  `db:"po_vendor_name" json:"po_vendor_name"`
+	POVendorAlias  string  `db:"po_vendor_alias" json:"po_vendor_alias"`
+	POJob          string  `db:"po_job" json:"po_job"`
+	POJobNumber    string  `db:"po_job_number" json:"po_job_number"`
+	POJobDesc      string  `db:"po_job_description" json:"po_job_description"`
+	PODivision     string  `db:"po_division" json:"po_division"`
+	PODivisionCode string  `db:"po_division_code" json:"po_division_code"`
+	PODivisionName string  `db:"po_division_name" json:"po_division_name"`
+	POCategory     string  `db:"po_category" json:"po_category"`
+	POCategoryName string  `db:"po_category_name" json:"po_category_name"`
+	PODescription  string  `db:"po_description" json:"po_description"`
+	POPaymentType  string  `db:"po_payment_type" json:"po_payment_type"`
+	POBranch       string  `db:"po_branch" json:"po_branch"`
+	POBranchName   string  `db:"po_branch_name" json:"po_branch_name"`
+	POKind         string  `db:"po_kind" json:"po_kind"`
 	POKindName     string  `db:"po_kind_name" json:"po_kind_name"`
 	POTotal        float64 `db:"po_total" json:"po_total"`
 }

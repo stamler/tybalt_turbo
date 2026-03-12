@@ -25,6 +25,13 @@
       init();
     }
   });
+
+  function canViewDetails(row: any) {
+    if ($globalStore.showAllUi) return true;
+    if ($globalStore.claims.includes("commit") && row.approved !== "") return true;
+    if ($globalStore.claims.includes("report") && row.committed !== "") return true;
+    return false;
+  }
 </script>
 
 <DsList items={rows} groupField="phase" inListHeader={`Expenses for ${payPeriodEnding}`}>
@@ -32,7 +39,11 @@
     <span class="text-xs tracking-wide text-neutral-600 uppercase">{label}</span>
   {/snippet}
   {#snippet anchor(r)}
-    <a href={`/expenses/${r.id}/details`} class="text-blue-600 hover:underline">{r.date}</a>
+    {#if canViewDetails(r)}
+      <a href={`/expenses/${r.id}/details`} class="text-blue-600 hover:underline">{r.date}</a>
+    {:else}
+      <span>{r.date}</span>
+    {/if}
   {/snippet}
   {#snippet headline(r)}
     <span>{r.description}</span>

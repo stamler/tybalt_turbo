@@ -103,9 +103,9 @@ func AddRoutes(app core.App) {
 		expensesGroup.GET("/details/{id}", createGetExpenseDetailsHandler(app))
 		expensesGroup.GET("/pending", createGetPendingExpensesHandler(app))
 		expensesGroup.GET("/approved", createGetApprovedExpensesHandler(app))
-		// Expense tracking endpoints for report holders
+		// Expense tracking endpoints plus the org-wide expense commit queue.
 		expensesGroup.GET("/tracking_counts", createExpenseTrackingCountsHandler(app))
-		expensesGroup.GET("/tracking", createExpenseTrackingAllHandler(app))
+		expensesGroup.GET("/commit_queue", createExpenseCommitQueueHandler(app))
 		expensesGroup.GET("/tracking/{payPeriodEnding}", createExpenseTrackingListHandler(app))
 
 		timeAmendmentsGroup := se.Router.Group("/api/time_amendments")

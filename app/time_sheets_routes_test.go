@@ -15,6 +15,10 @@ func TestTimeSheetsRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// A submitted, not committed, not approved timesheet to exercise reject path
 	// Using one of the seeded ids seen in test db query: aeyl94og4xmnpq4
@@ -36,7 +40,7 @@ func TestTimeSheetsRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "committer can view tracking list for a week",
+			Name:   "committer cannot see unapproved timesheets in tracking list for a week",
 			Method: http.MethodGet,
 			URL:    "/api/time_sheets/tracking/weeks/2024-06-29",
 			Headers: map[string]string{
@@ -44,7 +48,60 @@ func TestTimeSheetsRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"id":`,
+				`[]`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "committer can view tracking list for a week with a committed timesheet",
+			Method: http.MethodGet,
+			URL:    "/api/time_sheets/tracking/weeks/2024-09-28",
+			Headers: map[string]string{
+				"Authorization": committerToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"j1lr2oddjongtoj"`,
+				`"surname":`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "committer can read committed timesheet record",
+			Method: http.MethodGet,
+			URL:    "/api/collections/time_sheets/records/j1lr2oddjongtoj",
+			Headers: map[string]string{
+				"Authorization": committerToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"j1lr2oddjongtoj"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "committer cannot read unapproved timesheet record",
+			Method: http.MethodGet,
+			URL:    "/api/collections/time_sheets/records/aeyl94og4xmnpq4",
+			Headers: map[string]string{
+				"Authorization": committerToken,
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "report holder can view tracking list for a week",
+			Method: http.MethodGet,
+			URL:    "/api/time_sheets/tracking/weeks/2024-06-29",
+			Headers: map[string]string{
+				"Authorization": reportToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"o9ydei05shks0at"`,
 				`"surname":`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
@@ -76,16 +133,16 @@ func TestTimeSheetsRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "committer can reject a submitted timesheet",
+			Name:   "committer cannot reject an unapproved timesheet",
 			Method: http.MethodPost,
 			URL:    "/api/time_sheets/" + tsToReject + "/reject",
 			Body:   strings.NewReader(`{"rejection_reason": "Insufficient detail"}`),
 			Headers: map[string]string{
 				"Authorization": committerToken,
 			},
-			ExpectedStatus: http.StatusOK,
+			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
-				`"message":"record rejected successfully"`,
+				`"code":"record_not_approved"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -115,7 +172,7 @@ func TestRejectTimesheet_QueuesNotifications(t *testing.T) {
 	// Use the same committed user and timesheet id as the route scenarios above.
 	const tsToReject = "aeyl94og4xmnpq4"
 
-	committerToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	approverToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,7 +187,7 @@ func TestRejectTimesheet_QueuesNotifications(t *testing.T) {
 		URL:    "/api/time_sheets/" + tsToReject + "/reject",
 		Body:   strings.NewReader(`{"rejection_reason": "Route-level rejection test"}`),
 		Headers: map[string]string{
-			"Authorization": committerToken,
+			"Authorization": approverToken,
 		},
 		ExpectedStatus: http.StatusOK,
 		ExpectedContent: []string{

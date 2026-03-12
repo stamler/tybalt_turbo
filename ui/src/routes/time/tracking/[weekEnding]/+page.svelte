@@ -114,6 +114,22 @@
     rejectModal.openModal(id);
   }
 
+  function canViewDetails(row: any) {
+    if ($globalStore.showAllUi) return true;
+    if ($globalStore.claims.includes("commit") && row.approved !== "") return true;
+    if ($globalStore.claims.includes("report") && row.committed !== "") return true;
+    return false;
+  }
+
+  function canReject(row: any) {
+    return (
+      ($globalStore.showAllUi || $globalStore.claims.includes("commit")) &&
+      row.approved !== "" &&
+      row.committed === "" &&
+      row.rejected === ""
+    );
+  }
+
   // Utilities for Missing / Not Expected --------------------------------------
   function personName(p: any) {
     const gn = p?.given_name || "";
@@ -176,7 +192,11 @@
       <span class="text-xs tracking-wide text-neutral-600 uppercase">{label}</span>
     {/snippet}
     {#snippet headline(r)}
-      <a href={`/time/sheets/${r.id}/details`} class="underline">{r.surname}, {r.given_name}</a>
+      {#if canViewDetails(r)}
+        <a href={`/time/sheets/${r.id}/details`} class="underline">{r.surname}, {r.given_name}</a>
+      {:else}
+        <span>{r.surname}, {r.given_name}</span>
+      {/if}
       {#if r.rejected !== ""}
         <DsLabel
           color="red"
@@ -232,10 +252,10 @@
       {/if}
     {/snippet}
     {#snippet actions(r)}
-      {#if r.phase === "Approved" && r.rejected === ""}
+      {#if ($globalStore.showAllUi || $globalStore.claims.includes("commit")) && r.phase === "Approved" && r.rejected === ""}
         <DsActionButton action={() => commit(r.id)}>Commit</DsActionButton>
       {/if}
-      {#if r.phase !== "Committed" && r.rejected === ""}
+      {#if canReject(r)}
         <DsActionButton action={() => openReject(r.id)}>Reject</DsActionButton>
       {/if}
     {/snippet}

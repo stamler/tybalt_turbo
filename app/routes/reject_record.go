@@ -72,6 +72,16 @@ func createRejectRecordHandler(app core.App, collectionName string) func(e *core
 				}
 			}
 
+			// Commit-claim holders may only reject approved records. Approvers can
+			// still reject submitted records before approval.
+			if !isApprover && hasCommitClaim && record.GetDateTime("approved").IsZero() {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{
+					Code:    "record_not_approved",
+					Message: "only approved records can be rejected by a commit user",
+				}
+			}
+
 			// Check if the record is submitted
 			if !record.GetBool("submitted") {
 				httpResponseStatusCode = http.StatusBadRequest

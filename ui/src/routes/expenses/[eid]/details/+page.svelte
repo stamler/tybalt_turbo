@@ -3,12 +3,14 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DsExternalLinkButton from "$lib/components/DsExternalLinkButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import Icon from "@iconify/svelte";
   import { shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
 
   export let data: PageData;
@@ -61,7 +63,7 @@
   async function commitExpense() {
     try {
       await pb.send(`/api/expenses/${expense.id}/commit`, { method: "POST" });
-      await refreshExpense();
+      await goto(resolve("/reports/expense/queue"));
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Commit failed");
     }
@@ -70,14 +72,13 @@
   async function deleteExpense() {
     try {
       await pb.collection("expenses").delete(expense.id);
-      goto("/expenses/list");
+      goto(resolve("/expenses/list"));
     } catch (error: any) {
       globalStore.addError(error?.response?.message || "Delete failed");
     }
   }
 
   function openRejectModal() {
-    // @ts-ignore exported function on the component instance
     rejectModal?.openModal(expense.id);
   }
 
@@ -96,6 +97,10 @@
       default:
         return pt;
     }
+  }
+
+  function attachmentHref() {
+    return `${PUBLIC_POCKETBASE_URL}/api/files/expenses/${expense.id}/${expense.attachment}`;
   }
 </script>
 
@@ -116,16 +121,23 @@
     <div><span class="font-semibold">Submitted By:</span> {expense.uid_name}</div>
 
     <div>
-      <span class="font-semibold">Description:</span> {expense.description}
+      <span class="font-semibold">Description:</span>
+      {expense.description}
       {#if poDiffers(expense.description, expense.po_description)}
-        <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_description}</span>
+        <span
+          class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
+          >PO: {expense.po_description}</span
+        >
       {/if}
     </div>
 
     <div>
       <span class="font-semibold">Total:</span> ${expense.total}
       {#if expense.purchase_order && expense.po_total && expense.total !== expense.po_total}
-        <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: ${expense.po_total}</span>
+        <span
+          class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
+          >PO: ${expense.po_total}</span
+        >
       {/if}
     </div>
 
@@ -134,7 +146,10 @@
         <span class="font-semibold">Payment Type:</span>
         {paymentTypeLabel(expense.payment_type)}
         {#if poDiffers(expense.payment_type, expense.po_payment_type)}
-          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {paymentTypeLabel(expense.po_payment_type)}</span>
+          <span
+            class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
+            >PO: {paymentTypeLabel(expense.po_payment_type)}</span
+          >
         {/if}
       </div>
     {/if}
@@ -149,7 +164,10 @@
     {#if expense.vendor}
       <div>
         <span class="font-semibold">Vendor:</span>
-        <a href={`/vendors/${expense.vendor}/details`} class="text-blue-600 hover:underline">
+        <a
+          href={resolve(`/vendors/${expense.vendor}/details`)}
+          class="text-blue-600 hover:underline"
+        >
           {expense.vendor_name}
           {#if trimmedOrEmpty(expense.vendor_alias)}
             <span class="opacity-60">({trimmedOrEmpty(expense.vendor_alias)})</span>
@@ -171,7 +189,10 @@
     {#if expense.purchase_order}
       <div>
         <span class="font-semibold">Purchase Order:</span>
-        <a href={`/pos/${expense.purchase_order}/details`} class="text-blue-600 hover:underline">
+        <a
+          href={resolve(`/pos/${expense.purchase_order}/details`)}
+          class="text-blue-600 hover:underline"
+        >
           {expense.purchase_order_number}
         </a>
       </div>
@@ -180,14 +201,18 @@
     {#if expense.job}
       <div>
         <span class="font-semibold">Job:</span>
-        <a href={`/jobs/${expense.job}/details`} class="text-blue-600 hover:underline">
+        <a href={resolve(`/jobs/${expense.job}/details`)} class="text-blue-600 hover:underline">
           {expense.job_number}
           {#if expense.job_description}
             <span class="opacity-60">— {expense.job_description}</span>
           {/if}
         </a>
         {#if poDiffers(expense.job, expense.po_job)}
-          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_job_number}{#if expense.po_job_description} — {expense.po_job_description}{/if}</span>
+          <span
+            class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
+            >PO: {expense.po_job_number}{#if expense.po_job_description}
+              — {expense.po_job_description}{/if}</span
+          >
         {/if}
       </div>
     {/if}
@@ -201,34 +226,49 @@
         <span class="font-semibold">Division:</span>
         {expense.division_code} — {expense.division_name}
         {#if poDiffers(expense.division, expense.po_division)}
-          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_division_code} — {expense.po_division_name}</span>
+          <span
+            class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
+            >PO: {expense.po_division_code} — {expense.po_division_name}</span
+          >
         {/if}
       </div>
     {/if}
 
     {#if expense.category_name}
       <div>
-        <span class="font-semibold">Category:</span> {expense.category_name}
+        <span class="font-semibold">Category:</span>
+        {expense.category_name}
         {#if poDiffers(expense.category, expense.po_category)}
-          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_category_name}</span>
+          <span
+            class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
+            >PO: {expense.po_category_name}</span
+          >
         {/if}
       </div>
     {/if}
 
     {#if expense.kind_name}
       <div>
-        <span class="font-semibold">Kind:</span> {expense.kind_name}
+        <span class="font-semibold">Kind:</span>
+        {expense.kind_name}
         {#if poDiffers(expense.kind, expense.po_kind)}
-          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_kind_name}</span>
+          <span
+            class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
+            >PO: {expense.po_kind_name}</span
+          >
         {/if}
       </div>
     {/if}
 
     {#if expense.branch_name}
       <div>
-        <span class="font-semibold">Branch:</span> {expense.branch_name}
+        <span class="font-semibold">Branch:</span>
+        {expense.branch_name}
         {#if poDiffers(expense.branch_name, expense.po_branch_name)}
-          <span class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600">PO: {expense.po_branch_name}</span>
+          <span
+            class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
+            >PO: {expense.po_branch_name}</span
+          >
         {/if}
       </div>
     {/if}
@@ -247,18 +287,9 @@
     {#if expense.attachment}
       <div class="flex items-center gap-2">
         <span class="font-semibold">Attachment:</span>
-        <a
-          href={`${PUBLIC_POCKETBASE_URL}/api/files/expenses/${expense.id}/${expense.attachment}`}
-          target="_blank"
-          class="inline-flex items-center gap-1 rounded-sm bg-blue-600 px-2 py-1 text-sm text-white hover:bg-blue-700"
-        >
-          <Icon icon="mdi:download" width="16" />
-          Download
-        </a>
+        <DsExternalLinkButton href={attachmentHref()} label="Download" />
         {#if expense.attachment_hash}
-          <span class="font-mono text-sm opacity-70"
-            >{expense.attachment_hash.slice(0, 8)}</span
-          >
+          <span class="font-mono text-sm opacity-70">{expense.attachment_hash.slice(0, 8)}</span>
           <button
             type="button"
             class="text-neutral-500 hover:text-neutral-700"
@@ -291,7 +322,7 @@
     {/if}
 
     {#if expense.rejected}
-      <div class="rounded-sm border border-red-300 bg-red-50 p-3 space-y-1">
+      <div class="space-y-1 rounded-sm border border-red-300 bg-red-50 p-3">
         <div class="flex items-center gap-2">
           <DsLabel color="red">
             <Icon icon="mdi:cancel" width="16" class="inline-block" /> Rejected
@@ -317,29 +348,70 @@
 
   {#if $expensesEditingEnabled}
     <div class="flex flex-wrap gap-2">
+      <!-- Owner draft actions: an unsubmitted expense can still be edited and submitted. -->
       {#if isOwner && !expense.submitted}
-        <DsActionButton action={`/expenses/${expense.id}/edit`} icon="mdi:pencil" title="Edit" color="blue" />
-        <DsActionButton action={() => submitExpense()} icon="mdi:send" title="Submit" color="blue" />
+        <DsActionButton
+          action={`/expenses/${expense.id}/edit`}
+          icon="mdi:pencil"
+          title="Edit"
+          color="blue"
+        />
+        <DsActionButton
+          action={() => submitExpense()}
+          icon="mdi:send"
+          title="Submit"
+          color="blue"
+        />
       {/if}
 
+      <!-- Owner recall: allowed for submitted-but-unapproved expenses and rejected expenses until committed. -->
       {#if isOwner && ((expense.submitted && expense.approved === "") || expense.rejected !== "") && expense.committed === ""}
-        <DsActionButton action={() => recallExpense()} icon="mdi:rewind" title="Recall" color="orange" />
+        <DsActionButton
+          action={() => recallExpense()}
+          icon="mdi:rewind"
+          title="Recall"
+          color="orange"
+        />
       {/if}
 
+      <!-- Owner delete: only available while the expense is still a draft. -->
       {#if isOwner && !expense.submitted && expense.committed === ""}
-        <DsActionButton action={() => deleteExpense()} icon="mdi:delete" title="Delete" color="red" />
+        <DsActionButton
+          action={() => deleteExpense()}
+          icon="mdi:delete"
+          title="Delete"
+          color="red"
+        />
       {/if}
 
+      <!-- Approver approve: only the assigned approver can approve a submitted, unrejected, uncommitted expense. -->
       {#if isApprover && expense.submitted && expense.approved === "" && expense.rejected === "" && expense.committed === ""}
-        <DsActionButton action={() => approveExpense()} icon="mdi:approve" title="Approve" color="green" />
+        <DsActionButton
+          action={() => approveExpense()}
+          icon="mdi:approve"
+          title="Approve"
+          color="green"
+        />
       {/if}
 
-      {#if (isApprover || hasCommitAccess) && expense.submitted && expense.rejected === "" && expense.committed === ""}
-        <DsActionButton action={() => openRejectModal()} icon="mdi:cancel" title="Reject" color="orange" />
+      <!-- Reject behavior: approvers may reject before approval; commit holders may reject only after approval. -->
+      {#if ((isApprover && expense.approved === "") || (hasCommitAccess && expense.approved !== "")) && expense.submitted && expense.rejected === "" && expense.committed === ""}
+        <DsActionButton
+          action={() => openRejectModal()}
+          icon="mdi:cancel"
+          title="Reject"
+          color="orange"
+        />
       {/if}
 
+      <!-- Commit behavior: commit holders can commit only once the submitted expense has been approved. -->
       {#if hasCommitAccess && expense.submitted && expense.approved !== "" && expense.rejected === "" && expense.committed === ""}
-        <DsActionButton action={() => commitExpense()} icon="mdi:check-all" title="Commit" color="green" />
+        <DsActionButton
+          action={() => commitExpense()}
+          icon="mdi:check-all"
+          title="Commit"
+          color="green"
+        />
       {/if}
     </div>
   {/if}

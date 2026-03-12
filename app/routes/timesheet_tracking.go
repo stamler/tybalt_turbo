@@ -174,6 +174,10 @@ func createTimesheetTrackingListHandler(app core.App) func(e *core.RequestEvent)
             ) agg ON agg.tsid = ts.id
             WHERE ts.week_ending = {:week_ending}
               AND ts.submitted = 1
+              AND (
+                    {:has_report} = 1 OR
+                    ts.approved != ''
+                  )
             ORDER BY
                 CASE
                     WHEN ts.committed != '' THEN 3
@@ -186,6 +190,7 @@ func createTimesheetTrackingListHandler(app core.App) func(e *core.RequestEvent)
 		var rows []trackingListRow
 		if err := app.DB().NewQuery(query).Bind(dbx.Params{
 			"week_ending": weekEnding,
+			"has_report":  boolToInt(isReportHolder),
 		}).All(&rows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query", err)
 		}

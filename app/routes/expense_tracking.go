@@ -21,22 +21,22 @@ type expenseTrackingCountRow struct {
 func createExpenseTrackingCountsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-        // Allow either report holders or committers to view expense tracking counts
-        isReportHolder, err := utilities.HasClaim(app, auth, "report")
-        if err != nil {
-            return e.Error(http.StatusInternalServerError, "error checking claims", err)
-        }
-        isCommitter := false
-        if !isReportHolder {
-            var err2 error
-            isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
-            if err2 != nil {
-                return e.Error(http.StatusInternalServerError, "error checking claims", err2)
-            }
-        }
-        if !(isReportHolder || isCommitter) {
-            return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking counts", nil)
-        }
+		// Allow either report holders or committers to view expense tracking counts
+		isReportHolder, err := utilities.HasClaim(app, auth, "report")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "error checking claims", err)
+		}
+		isCommitter := false
+		if !isReportHolder {
+			var err2 error
+			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
+			if err2 != nil {
+				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
+			}
+		}
+		if !(isReportHolder || isCommitter) {
+			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking counts", nil)
+		}
 
 		query := `
 			SELECT
@@ -104,22 +104,22 @@ type expenseTrackingListRow struct {
 func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-        // Allow either report holders or committers to view expense tracking list
-        isReportHolder, err := utilities.HasClaim(app, auth, "report")
-        if err != nil {
-            return e.Error(http.StatusInternalServerError, "error checking claims", err)
-        }
-        isCommitter := false
-        if !isReportHolder {
-            var err2 error
-            isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
-            if err2 != nil {
-                return e.Error(http.StatusInternalServerError, "error checking claims", err2)
-            }
-        }
-        if !(isReportHolder || isCommitter) {
-            return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking list", nil)
-        }
+		// Allow either report holders or committers to view expense tracking list
+		isReportHolder, err := utilities.HasClaim(app, auth, "report")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "error checking claims", err)
+		}
+		isCommitter := false
+		if !isReportHolder {
+			var err2 error
+			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
+			if err2 != nil {
+				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
+			}
+		}
+		if !(isReportHolder || isCommitter) {
+			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking list", nil)
+		}
 
 		payPeriodEnding := e.Request.PathValue("payPeriodEnding")
 		if payPeriodEnding == "" {
@@ -187,6 +187,10 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
             LEFT JOIN categories cat ON cat.id = e.category
             WHERE e.pay_period_ending = {:pay_period_ending}
               AND e.submitted = 1
+              AND (
+                    {:has_report} = 1 OR
+                    e.approved != ''
+                  )
             ORDER BY
                 CASE
                     WHEN e.committed != '' THEN 3
@@ -199,6 +203,7 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
 		var rows []expenseTrackingListRow
 		if err := app.DB().NewQuery(query).Bind(dbx.Params{
 			"pay_period_ending": payPeriodEnding,
+			"has_report":        boolToInt(isReportHolder),
 		}).All(&rows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query", err)
 		}
@@ -207,26 +212,19 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
 	}
 }
 
-// createExpenseTrackingAllHandler returns all submitted + uncommitted expenses (org-wide) for report holders
-func createExpenseTrackingAllHandler(app core.App) func(e *core.RequestEvent) error {
+// createExpenseCommitQueueHandler returns all submitted + uncommitted expenses
+// (org-wide) for the expense commit queue.
+func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
-        // Allow either report holders or committers to view expense tracking
-        isReportHolder, err := utilities.HasClaim(app, auth, "report")
-        if err != nil {
-            return e.Error(http.StatusInternalServerError, "error checking claims", err)
-        }
-        isCommitter := false
-        if !isReportHolder {
-            var err2 error
-            isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
-            if err2 != nil {
-                return e.Error(http.StatusInternalServerError, "error checking claims", err2)
-            }
-        }
-        if !(isReportHolder || isCommitter) {
-            return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking", nil)
-        }
+		// Only commit holders may view the expense commit queue.
+		isCommitter, err := utilities.HasClaim(app, auth, "commit")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "error checking claims", err)
+		}
+		if !isCommitter {
+			return e.Error(http.StatusForbidden, "you are not authorized to view the expense commit queue", nil)
+		}
 
 		query := `
             SELECT
@@ -269,6 +267,7 @@ func createExpenseTrackingAllHandler(app core.App) func(e *core.RequestEvent) er
             LEFT JOIN clients c ON c.id = j.client
             WHERE e.submitted = 1
               AND e.committed = ''
+              AND e.approved != ''
             ORDER BY
                 CASE
                     WHEN e.committed != '' THEN 3
