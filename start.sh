@@ -34,8 +34,7 @@ set -e
 # What this script does differently than before:
 # 1) It can perform a *clean restore* not only when data.db is missing, but also
 #    when explicitly requested via:
-#      - a flag file: /app/pb_data/.force-restore
-#      - an env var:  LITESTREAM_FORCE_RESTORE=1
+#      - an env var: LITESTREAM_FORCE_RESTORE=1
 # 2) Before restoring, it deletes *all* local state that can cause WAL mismatch:
 #      - /app/pb_data/.data.db-litestream
 #      - /app/pb_data/data.db-wal
@@ -60,17 +59,12 @@ DB_PATH="/app/pb_data/data.db"
 WAL_PATH="${DB_PATH}-wal"
 SHM_PATH="${DB_PATH}-shm"
 LITESTREAM_STATE_DIR="/app/pb_data/.data.db-litestream"
-FORCE_RESTORE_FILE="/app/pb_data/.force-restore"
 
 restore_needed=0
 restore_reasons=""
 if [ ! -f "$DB_PATH" ]; then
   restore_needed=1
   restore_reasons="${restore_reasons} missing-db"
-fi
-if [ -f "$FORCE_RESTORE_FILE" ]; then
-  restore_needed=1
-  restore_reasons="${restore_reasons} force-file"
 fi
 if [ "${LITESTREAM_FORCE_RESTORE:-}" = "1" ]; then
   restore_needed=1
@@ -130,11 +124,6 @@ if [ "$restore_needed" -eq 1 ]; then
     log "Integrity check passed"
   else
     log "Skipping integrity check (sqlite3 CLI not installed in image)"
-  fi
-
-  if [ -f "$FORCE_RESTORE_FILE" ]; then
-    log "Clearing restore flag ${FORCE_RESTORE_FILE}"
-    rm -f "$FORCE_RESTORE_FILE" || true
   fi
 else
   log "Using existing database at ${DB_PATH} (no restore requested)"

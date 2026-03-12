@@ -94,8 +94,9 @@ Because the database is now on a Fly volume, a normal restart should preserve th
 With `auto-recover: true`, Litestream should attempt to reset its state after LTX/WAL mismatch errors. If it does not recover cleanly, force a fresh restore from the replica:
 
 ```bash
-fly ssh console -a <app-name> -C "touch /app/pb_data/.force-restore"
+fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=1
 fly machine restart <machine-id> -a <app-name>
+fly secrets unset -a <app-name> --stage LITESTREAM_FORCE_RESTORE
 ```
 
 Expected startup lines:
@@ -137,18 +138,19 @@ Use this when intentionally replacing production with a local database that you 
 1. Mark the machine to restore on next boot:
 
 ```bash
-fly ssh console -a <app-name> -C "mkdir -p /app/pb_data && touch /app/pb_data/.force-restore"
+fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=1
 ```
 
 2. Restart the machine:
 
 ```bash
 fly machine restart <machine-id> -a <app-name>
+fly secrets unset -a <app-name> --stage LITESTREAM_FORCE_RESTORE
 ```
 
-The startup script will perform a clean restore from the replica and clear the restore flag.
+The startup script will perform a clean restore from the replica when `LITESTREAM_FORCE_RESTORE=1` is present at boot.
 
-This is the correct replacement workflow when the production machine already has a database on the mounted Fly volume. A normal restart will keep the on-volume database, so replacing production requires `.force-restore`.
+This is the correct replacement workflow when the production machine already has a database on the mounted Fly volume. A normal restart will keep the on-volume database, so replacing production requires `LITESTREAM_FORCE_RESTORE=1`.
 
 ## Notes
 

@@ -87,7 +87,8 @@ litestream restore -config litestream.local.yml -o ~/prod-backup.db app/pb_data/
 litestream restore -config litestream.local.yml -timestamp 2025-01-08T12:00:00Z -o ~/prod-backup.db app/pb_data/data.db
 
 # Replicate local database to S3
-litestream replicate -config litestream.local.yml
+rm -rf app/pb_data/.data.db-litestream
+litestream replicate -config litestream.local.yml -once -force-snapshot
 ```
 
 ### Initial Database Deployment
@@ -115,10 +116,10 @@ Before the first deploy, you must push a database to S3:
 3. **Push your local database to the Litestream replica:**
 
    ```bash
-   litestream replicate -config litestream.local.yml
+   litestream replicate -config litestream.local.yml -once -force-snapshot
    ```
 
-   Let this run for 30-60 seconds to ensure the backup completes, then press Ctrl+C.
+   This exits when Litestream has published a complete snapshot.
 
 4. **Deploy the app:**
 
@@ -140,36 +141,40 @@ When you need to push local database changes (schema changes, data fixes, rollba
    source scripts/setup-env.sh
    ```
 
-2. **Mark production to discard the on-volume DB and restore from S3 on next boot**:
+2. **Stage production to discard the on-volume DB and restore from S3 on next boot**:
 
    ```bash
-   flyctl ssh console -C "touch /app/pb_data/.force-restore"
+   flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=1
    ```
 
-3. **Stop the production machine** (prevents production writes while you replace the replica contents):
+3. **Disable auto-start and stop the current production machine** (prevents production writes while you replace the replica contents, and avoids Fly immediately waking the machine back up on traffic):
 
    ```bash
    MACHINE_ID=$(flyctl status --json | jq -r '.Machines[0].id')
-   flyctl machine stop $MACHINE_ID
+   flyctl machine update "$MACHINE_ID" --autostart=false --skip-start -y
+   flyctl machine stop "$MACHINE_ID" --wait-timeout 2m
    ```
 
 4. **Push your local database to the Litestream replica:**
 
    ```bash
-   litestream replicate -config litestream.local.yml
+   rm -rf app/pb_data/.data.db-litestream
+   litestream replicate -config litestream.local.yml -once -force-snapshot
    ```
 
-   Let this run for 30-60 seconds, then press Ctrl+C.
+   This exits when Litestream has published a complete replacement snapshot.
 
-5. **Start the production machine**:
+5. **Re-enable auto-start and start the same machine**:
 
    ```bash
-   flyctl machine start $MACHINE_ID
+   flyctl machine update "$MACHINE_ID" --autostart=true --skip-start -y
+   flyctl machine start "$MACHINE_ID"
+   flyctl secrets unset --stage LITESTREAM_FORCE_RESTORE
    ```
 
 On next boot, the app startup script will:
 
-- Ignore the existing on-volume database because `.force-restore` is present
+- Ignore the existing on-volume database because restore was explicitly requested
 - Delete `data.db`, WAL/SHM files, and local Litestream state from the volume
 - Restore `data.db` from S3 into the mounted volume
 - Clear stale Litestream state (`/app/pb_data/.data.db-litestream`) and any SQLite WAL/SHM files
@@ -199,7 +204,7 @@ Alternatively, use the script:
 
 Litestream continuously replicates your SQLite database to S3-compatible storage.
 
-See [`docs/fly-litestream-runbook.md`](/Users/dean/code/tybalt_turbo/docs/fly-litestream-runbook.md) for the restart, Litestream recovery, force-restore, and volume-failure procedures.
+See [`docs/fly-litestream-runbook.md`](docs/fly-litestream-runbook.md) for the restart, Litestream recovery, forced restore, and volume-failure procedures.
 
 ### Monitoring Backups
 
@@ -217,7 +222,7 @@ litestream ltx -config /etc/litestream.yml /app/pb_data/data.db
 
 ```bash
 # Mark the machine to discard the on-volume DB and restore from S3 on next boot
-flyctl ssh console -C "touch /app/pb_data/.force-restore"
+flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=1
 
 # Restart the machine so startup performs a clean restore
 MACHINE_ID=$(flyctl status --json | jq -r '.Machines[0].id')
@@ -260,7 +265,7 @@ flyctl secrets list
 
 **Litestream WAL verification errors (e.g. `cannot verify wal state`)**
 
-- Mark a clean restore on next boot: `flyctl ssh console -C "touch /app/pb_data/.force-restore"`
+- Mark a clean restore on next boot: `flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=1`
 - Restart the machine: `flyctl machine restart $(flyctl status --json | jq -r '.Machines[0].id')`
 
 **App not starting:**

@@ -41,10 +41,10 @@ source scripts/setup-env.sh
 **What it does**:
 
 1. Validates environment variables are set
-2. Marks production to discard the on-volume DB and restore on next boot (`/app/pb_data/.force-restore`)
-3. Stops the production machine
-4. Replicates local database to S3
-5. Starts the production machine
+2. Stages `LITESTREAM_FORCE_RESTORE=1` so production restores on next boot
+3. Disables Fly auto-start on the current production machine and stops that machine
+4. Clears local Litestream state and forces a full replacement snapshot upload to S3
+5. Re-enables Fly auto-start and starts the same production machine
 6. Startup clears local DB/WAL/Litestream state from the volume and restores from the replica
 
 ---
@@ -89,8 +89,8 @@ Use this when production does not yet have a local database on its Fly volume. P
 
 ```bash
 source scripts/setup-env.sh
-litestream replicate -config litestream.local.yml
-# Wait 30-60 seconds for sync, then Ctrl+C
+rm -rf app/pb_data/.data.db-litestream
+litestream replicate -config litestream.local.yml -once -force-snapshot
 flyctl deploy
 ```
 
@@ -115,7 +115,7 @@ Use this when production already has a database on the mounted volume and you wa
 - **⚠️ Startup restore requires S3 backup**: The app will fail to start if it needs to restore and no database backup exists in S3
 - **⚠️ Destructive operation**: `deploy-local-db.sh` replaces your entire production database
 - **🔒 Environment required**: Must run `setup-env.sh` first
-- **⚠️ Do not restore over the live production DB in place**: replace production by updating the replica and using `.force-restore` on next boot
+- **⚠️ Do not restore over the live production DB in place**: replace production by updating the replica and staging `LITESTREAM_FORCE_RESTORE=1` on next boot
 
 ## Troubleshooting
 
