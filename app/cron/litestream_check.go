@@ -2,8 +2,8 @@ package cron
 
 import (
 	"context"
-	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"tybalt/utilities"
@@ -69,7 +69,7 @@ func checkLitestreamReplication(app core.App) {
 	}
 
 	opts := []func(*s3.Options){}
-	if endpoint != "" {
+	if endpoint != "" && strings.HasPrefix(endpoint, "http") {
 		opts = append(opts, func(o *s3.Options) {
 			o.BaseEndpoint = aws.String(endpoint)
 			o.UsePathStyle = true
@@ -112,7 +112,7 @@ func checkLitestreamReplication(app core.App) {
 	if age > staleThreshold {
 		app.Logger().Error("litestream replication stale",
 			"latest_snapshot", newestKey,
-			"age_minutes", fmt.Sprintf("%.1f", age.Minutes()),
+			"age_minutes", age.Minutes(),
 			"threshold_minutes", staleThreshold.Minutes(),
 		)
 	}
