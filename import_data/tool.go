@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"imports/attachments"
 	"imports/extract"
 	"imports/load"
 	"log"
@@ -90,7 +89,11 @@ func main() {
 	// Parse command line arguments
 	exportFlag := flag.Bool("export", false, "Export data to Parquet files")
 	importFlag := flag.Bool("import", false, "Import data from Parquet files")
-	attachmentsFlag := flag.Bool("attachments", false, "Import attachments from GCS to S3")
+	// Retired after Phase 2 because the attachment migrator can delete live S3
+	// expense attachments that are missing from a local Expenses.parquet snapshot.
+	// Keep the old flag wiring commented out so the implementation can be revived
+	// deliberately if we ever need a one-off backfill tool again.
+	// attachmentsFlag := flag.Bool("attachments", false, "Import attachments from GCS to S3")
 	dbFlag := flag.String("db", "../app/pb_data/data.db", "Path to the target database")
 
 	// Phase flags for selective import (opt-in, running --import with no phase flags is a no-op)
@@ -1221,9 +1224,12 @@ func main() {
 		}
 	}
 
-	if *attachmentsFlag {
-		attachments.MigrateAttachments("./parquet/Expenses.parquet", "attachment", "destination_attachment", expenseCollectionId)
-	}
+	// Retired after expenses became authoritative in Turbo. Leaving the old call
+	// site commented out preserves the backfill implementation without exposing a
+	// dangerous CLI entry point.
+	// if *attachmentsFlag {
+	// 	attachments.MigrateAttachments("./parquet/Expenses.parquet", "attachment", "destination_attachment", expenseCollectionId)
+	// }
 }
 
 type poApproverPropsUpsertRow struct {
