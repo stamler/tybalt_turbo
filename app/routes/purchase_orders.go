@@ -31,6 +31,9 @@ var pendingPOByIDQueryTemplate string
 //go:embed visible_pos.sql
 var visiblePOsQueryTemplate string
 
+//go:embed search_pos.sql
+var searchPOsQueryTemplate string
+
 //go:embed visible_po_by_id.sql
 var visiblePOByIDQueryTemplate string
 
@@ -38,6 +41,7 @@ var (
 	pendingPOsQuery    string
 	pendingPOByIDQuery string
 	visiblePOsQuery    string
+	searchPOsQuery     string
 	visiblePOByIDQuery string
 )
 
@@ -45,6 +49,7 @@ func init() {
 	pendingPOsQuery = strings.ReplaceAll(pendingPOsQueryTemplate, poVisibilityBaseToken, poVisibilityBaseQuery)
 	pendingPOByIDQuery = strings.ReplaceAll(pendingPOByIDQueryTemplate, poVisibilityBaseToken, poVisibilityBaseQuery)
 	visiblePOsQuery = strings.ReplaceAll(visiblePOsQueryTemplate, poVisibilityBaseToken, poVisibilityBaseQuery)
+	searchPOsQuery = strings.ReplaceAll(searchPOsQueryTemplate, poVisibilityBaseToken, poVisibilityBaseQuery)
 	visiblePOByIDQuery = strings.ReplaceAll(visiblePOByIDQueryTemplate, poVisibilityBaseToken, poVisibilityBaseQuery)
 }
 
@@ -640,6 +645,24 @@ func createGetVisiblePurchaseOrderHandler(app core.App) func(e *core.RequestEven
 		}
 
 		return e.JSON(http.StatusOK, rows[0])
+	}
+}
+
+func createGetSearchablePurchaseOrdersHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+
+		rows := []purchaseOrderVisibilityRow{}
+		if err := app.DB().NewQuery(searchPOsQuery).Bind(
+			purchaseOrderVisibilityParams(app, auth.Id, "all", "", ""),
+		).All(&rows); err != nil {
+			return e.JSON(http.StatusInternalServerError, map[string]string{
+				"code":    "error_fetching_search_pos",
+				"message": fmt.Sprintf("error fetching searchable purchase orders: %v", err),
+			})
+		}
+
+		return e.JSON(http.StatusOK, rows)
 	}
 }
 

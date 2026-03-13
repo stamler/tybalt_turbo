@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 	"tybalt/internal/testutils"
@@ -543,6 +544,110 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 				`"code":"po_not_found_or_not_visible"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestPurchaseOrdersSearchEndpoint(t *testing.T) {
+	regularUserToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	noclaimsToken, err := testutils.GenerateRecordToken("users", "noclaims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	type searchRow struct {
+		ID     string `json:"id"`
+		Status string `json:"status"`
+	}
+
+	assertHasID := func(t testing.TB, rows []searchRow, id string) {
+		t.Helper()
+		for _, row := range rows {
+			if row.ID == id {
+				return
+			}
+		}
+		t.Fatalf("expected response to contain id %s, got %#v", id, rows)
+	}
+
+	assertLacksID := func(t testing.TB, rows []searchRow, id string) {
+		t.Helper()
+		for _, row := range rows {
+			if row.ID == id {
+				t.Fatalf("did not expect response to contain id %s, got %#v", id, rows)
+			}
+		}
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "regular user search only includes visible active statuses and excludes closed cancelled and unapproved records they cannot see",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/search",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2plsetqdxht7esg"`,
+				`"status":"Active"`,
+			},
+			NotExpectedContent: []string{
+				`"status":"Unapproved"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
+				defer res.Body.Close()
+
+				var rows []searchRow
+				if err := json.NewDecoder(res.Body).Decode(&rows); err != nil {
+					t.Fatalf("failed decoding search response: %v", err)
+				}
+
+				assertHasID(t, rows, "2plsetqdxht7esg")
+				assertLacksID(t, rows, "0pia83nnprdlzf8")
+				assertLacksID(t, rows, "1cqrvp4mna33k2b")
+				assertLacksID(t, rows, "46efdq319b22480")
+			},
+		},
+		{
+			Name:   "creator search includes their visible closed and cancelled records while still excluding unapproved records",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/search",
+			Headers: map[string]string{
+				"Authorization": noclaimsToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"0pia83nnprdlzf8"`,
+				`"status":"Closed"`,
+				`"id":"1cqrvp4mna33k2b"`,
+				`"status":"Cancelled"`,
+			},
+			NotExpectedContent: []string{
+				`"status":"Unapproved"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
+				defer res.Body.Close()
+
+				var rows []searchRow
+				if err := json.NewDecoder(res.Body).Decode(&rows); err != nil {
+					t.Fatalf("failed decoding search response: %v", err)
+				}
+
+				assertHasID(t, rows, "0pia83nnprdlzf8")
+				assertHasID(t, rows, "1cqrvp4mna33k2b")
+				assertLacksID(t, rows, "46efdq319b22480")
+			},
 		},
 	}
 
