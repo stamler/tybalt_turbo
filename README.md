@@ -132,7 +132,7 @@ flyctl secrets set \
   LITESTREAM_ACCESS_KEY_ID=your-tigris-key \
   LITESTREAM_SECRET_ACCESS_KEY=your-tigris-secret \
   LITESTREAM_BUCKET=your-bucket-name \
-  LITESTREAM_REGION=us-east-1
+  LITESTREAM_REGION=ca-central-1
 
 # For AWS S3
 flyctl secrets set \

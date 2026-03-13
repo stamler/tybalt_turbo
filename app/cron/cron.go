@@ -7,6 +7,12 @@ import (
 )
 
 func AddCronJobs(app core.App) {
+	// check litestream replication health every 5 minutes by verifying the
+	// latest snapshot in S3 is not older than 35 minutes.
+	app.Cron().MustAdd("litestream_replication_check", "*/5 * * * *", func() {
+		checkLitestreamReplication(app)
+	})
+
 	// send po_second_approval_required notifications at 9pm UTC every day. These
 	// notifications are sent to the qualified second approvers when a PO is
 	// awaiting second approval but the priority_second_approver has not yet

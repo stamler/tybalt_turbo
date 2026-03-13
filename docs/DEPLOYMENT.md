@@ -32,7 +32,7 @@ flyctl secrets set \
   LITESTREAM_ACCESS_KEY_ID=your-tigris-access-key \
   LITESTREAM_SECRET_ACCESS_KEY=your-tigris-secret-key \
   LITESTREAM_BUCKET=your-bucket-name \
-  LITESTREAM_REGION=us-east-1
+  LITESTREAM_REGION=ca-central-1
 ```
 
 #### Option B: AWS S3

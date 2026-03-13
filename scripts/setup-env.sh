@@ -88,7 +88,7 @@ fi
 
 echo "✅ Environment variables set:"
 echo "   LITESTREAM_BUCKET: $LITESTREAM_BUCKET"
-echo "   LITESTREAM_REGION: ${LITESTREAM_REGION:-us-east-1}"
+echo "   LITESTREAM_REGION: ${LITESTREAM_REGION:-ca-central-1}"
 echo "   LITESTREAM_ENDPOINT: ${LITESTREAM_ENDPOINT:-https://fly.storage.tigris.dev}"
 echo ""
 echo "🚀 You can now run litestream commands:"

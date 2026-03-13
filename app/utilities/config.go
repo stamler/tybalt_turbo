@@ -161,11 +161,11 @@ func GetPOExpenseExcessConfig(app core.App) POExpenseExcessConfig {
 
 	// "percent" is stored as a human-readable percentage (e.g. 5 means 5%)
 	// and normalized to a fraction for internal use.
-	if percent, err := coerceFloat64(excessMap["percent"]); err == nil && percent >= 0 && percent <= 100 {
+	if percent, err := CoerceFloat64(excessMap["percent"]); err == nil && percent >= 0 && percent <= 100 {
 		result.Percent = percent / 100
 	}
 
-	if value, err := coerceFloat64(excessMap["value"]); err == nil && value >= 0 {
+	if value, err := CoerceFloat64(excessMap["value"]); err == nil && value >= 0 {
 		result.Value = value
 	}
 
@@ -218,9 +218,9 @@ func CalculatePOExpenseTotalLimit(poTotal float64, cfg POExpenseExcessConfig) PO
 	}
 }
 
-// coerceFloat64 converts a JSON numeric value (which may be float64, int, or
+// CoerceFloat64 converts a JSON numeric value (which may be float64, int, or
 // int64 after json.Unmarshal) to float64.
-func coerceFloat64(v any) (float64, error) {
+func CoerceFloat64(v any) (float64, error) {
 	if v == nil {
 		return 0, fmt.Errorf("nil value")
 	}
@@ -245,7 +245,7 @@ func GetNoPOExpenseLimit(app core.App) float64 {
 	if err != nil || config == nil {
 		return constants.NO_PO_EXPENSE_LIMIT
 	}
-	if limit, err := coerceFloat64(config["no_po_expense_limit"]); err == nil && limit >= 0 {
+	if limit, err := CoerceFloat64(config["no_po_expense_limit"]); err == nil && limit >= 0 {
 		return limit
 	}
 	return constants.NO_PO_EXPENSE_LIMIT

@@ -4,7 +4,7 @@ dbs:
       type: s3
       bucket: ${LITESTREAM_BUCKET}
       path: litestream
-      region: ${LITESTREAM_REGION:-us-east-1}
+      region: ${LITESTREAM_REGION:-ca-central-1}
       endpoint: ${LITESTREAM_ENDPOINT:-https://fly.storage.tigris.dev}
       access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
       secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
