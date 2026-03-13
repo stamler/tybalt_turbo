@@ -20,7 +20,13 @@
       "Bash(npm run build)",
       "Bash(npx eslint:*)",
       "Bash(npm ls eslint-plugin-svelte)",
-      "Bash(git diff --cached:*)"
+      "Bash(git diff --cached:*)",
+      "Bash(python3 -c \":*)",
+      "Bash(pip install:*)",
+      "Bash(pip3 install:*)",
+      "Bash(pip3 uninstall:*)",
+      "Bash(pip3 list:*)",
+      "Bash(pip3 show:*)"
     ]
   }
 }

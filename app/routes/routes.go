@@ -210,6 +210,9 @@ func AddRoutes(app core.App) {
 		reportsGroup.GET("/weekly_expense/{date_column_value}", reports.CreateExpenseReportHandler(app, "committed_week_ending"))
 		reportsGroup.GET("/payroll_receipts/{date_column_value}", reports.CreateReceiptsReportHandler(app, "pay_period_ending"))
 		reportsGroup.GET("/weekly_receipts/{date_column_value}", reports.CreateReceiptsReportHandler(app, "committed_week_ending"))
+		reportsGroup.GET("/payables_spreadsheet_dates", reports.CreatePayablesSpreadsheetDatesHandler(app))
+		reportsGroup.GET("/payables_spreadsheet/{date}", reports.CreatePayablesSpreadsheetHandler(app))
+		reportsGroup.GET("/payables_spreadsheet_monthly/{yymm}", reports.CreatePayablesSpreadsheetMonthlyHandler(app))
 
 		// Admin stats dashboard
 		statsGroup := se.Router.Group("/api/stats")

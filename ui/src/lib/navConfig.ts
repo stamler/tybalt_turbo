@@ -180,6 +180,11 @@ export const navSections: NavSection[] = [
       { label: "Payroll", href: "/reports/payroll", buttons: [] },
       { label: "Weekly", href: "/reports/weekly", buttons: [] },
       { label: "Time Off", href: "/time/off/all", buttons: [] },
+      {
+        label: "Payables Spreadsheet",
+        href: "/reports/payables-spreadsheet",
+        buttons: [],
+      },
     ],
   },
   {
