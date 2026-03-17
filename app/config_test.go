@@ -413,8 +413,7 @@ func TestExpensesEditingDisabledBlocks(t *testing.T) {
 						"division": "fy4i9poneukvq9u",
 						"description": "test expense blocked",
 						"payment_type": "Expense",
-						"total": 50.00,
-						"pay_period_ending": "2025-01-20"
+						"total": 50.00
 					}`),
 				},
 				{

@@ -137,32 +137,35 @@
     }
     item.uid = $authStore?.model?.id ?? "";
 
-    // set a dummy value for week_ending to satisfy the schema non-empty
-    // requirement. This will be changed in the backend to the correct
-    // value every time a record is saved
-    item.pay_period_ending = "2006-01-02";
+    // pay_period_ending is server-managed and must not be sent from the editor.
+    const payload: Partial<typeof item> = { ...item };
+    delete payload.pay_period_ending;
 
     // if the job is empty, set the category to empty
-    if (item.job === "") {
-      item.category = "";
+    if (payload.job === "") {
+      payload.category = "";
     }
     // if the payment_type is not CorporateCreditCard, then the cc_last_4_digits
     // should be empty
-    if (item.payment_type !== "CorporateCreditCard") {
-      item.cc_last_4_digits = "";
+    if (payload.payment_type !== "CorporateCreditCard") {
+      payload.cc_last_4_digits = "";
     }
 
     try {
       if (data.editing && data.id !== null) {
-        await pb.collection("expenses").update(data.id, item);
+        await pb.collection("expenses").update(data.id, payload);
       } else {
-        await pb.collection("expenses").create(item);
+        await pb.collection("expenses").create(payload);
       }
 
       errors = {};
       goto(resolve("/expenses/list"));
     } catch (err: unknown) {
-      const error = err as { data?: { data?: Record<string, { message: string; code?: string; data?: Record<string, string> }> } };
+      const error = err as {
+        data?: {
+          data?: Record<string, { message: string; code?: string; data?: Record<string, string> }>;
+        };
+      };
       // Check if this is a cumulative PO overflow error
       if (error.data?.data?.total?.code === "cumulative_po_overflow") {
         // Show the child PO creation modal populated with relevant data

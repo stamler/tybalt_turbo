@@ -109,6 +109,65 @@ func GeneratePayPeriodEnding(date string) (string, error) {
 	return weekEndingTime.AddDate(0, 0, 7).Format(time.DateOnly), nil
 }
 
+// GenerateCommittedPayPeriodEnding reproduces Tybalt's commit-time payroll
+// bucketing for expenses.
+//
+// Unlike GeneratePayPeriodEnding, which derives a bi-weekly period directly from
+// the expense date, this function determines which payroll a committed expense
+// belongs to using both:
+//   - the expense's own date
+//   - the committed week ending determined from the commit timestamp
+//
+// Tybalt's rule is:
+//  1. If committedWeekEnding is payroll week 2, the expense belongs to that
+//     payroll and the result is committedWeekEnding.
+//  2. If committedWeekEnding is payroll week 1, the expense belongs either to
+//     the payroll ending one week earlier or the payroll ending one week later:
+//     - if expenseDate is on or before the previous payroll ending, return the
+//     previous payroll ending
+//     - otherwise, return the next week's Saturday (the current payroll's
+//     week-2 ending)
+//
+// This is the same bucketing logic Tybalt uses to populate payPeriodEnding on
+// committed Expenses. It ensures every committed expense falls into exactly one
+// payroll bucket while still allowing week-1 commits to pick up expenses dated
+// before the previous payroll close.
+func GenerateCommittedPayPeriodEnding(expenseDate string, committedWeekEnding string) (string, error) {
+	// Determine whether the commit week is payroll week 2. We reuse the existing
+	// GeneratePayPeriodEnding helper on the committed week ending itself: if the
+	// result is the same date, then committedWeekEnding is already a payroll week-2
+	// ending.
+	payPeriodEnding, err := GeneratePayPeriodEnding(committedWeekEnding)
+	if err != nil {
+		return "", err
+	}
+
+	if payPeriodEnding == committedWeekEnding {
+		return committedWeekEnding, nil
+	}
+
+	// Otherwise the commit happened in payroll week 1. In that case Tybalt uses
+	// the expense date to choose between the payroll ending one week earlier and
+	// the payroll ending one week later.
+	committedWeekEndingTime, err := time.Parse(time.DateOnly, committedWeekEnding)
+	if err != nil {
+		return "", err
+	}
+	expenseDateTime, err := time.Parse(time.DateOnly, expenseDate)
+	if err != nil {
+		return "", err
+	}
+
+	previousPayPeriodEnding := committedWeekEndingTime.AddDate(0, 0, -7)
+	if !expenseDateTime.After(previousPayPeriodEnding) {
+		return previousPayPeriodEnding.Format(time.DateOnly), nil
+	}
+
+	// Expense date is after the previous payroll end, so the committed expense
+	// belongs to the current/open payroll whose week-2 ending is one week later.
+	return committedWeekEndingTime.AddDate(0, 0, 7).Format(time.DateOnly), nil
+}
+
 // DateStringLimit returns a validation.RuleFunc that validates that the value is
 // a date string that is on or after the date string passed to the function or,
 // if max is true, on or before the date string passed to the function.

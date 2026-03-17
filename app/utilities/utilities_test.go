@@ -5,6 +5,46 @@ import (
 	"tybalt/internal/testseed"
 )
 
+func TestGenerateCommittedPayPeriodEnding(t *testing.T) {
+	tests := []struct {
+		name                string
+		expenseDate         string
+		committedWeekEnding string
+		want                string
+	}{
+		{
+			name:                "week2 commit stays in same payroll",
+			expenseDate:         "2026-03-19",
+			committedWeekEnding: "2026-03-28",
+			want:                "2026-03-28",
+		},
+		{
+			name:                "week1 commit with old dated expense goes to previous payroll",
+			expenseDate:         "2026-03-14",
+			committedWeekEnding: "2026-03-21",
+			want:                "2026-03-14",
+		},
+		{
+			name:                "week1 commit with current dated expense goes to next payroll",
+			expenseDate:         "2026-03-15",
+			committedWeekEnding: "2026-03-21",
+			want:                "2026-03-28",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GenerateCommittedPayPeriodEnding(tt.expenseDate, tt.committedWeekEnding)
+			if err != nil {
+				t.Fatalf("GenerateCommittedPayPeriodEnding returned error: %v", err)
+			}
+			if got != tt.want {
+				t.Fatalf("GenerateCommittedPayPeriodEnding(%q, %q) = %q, want %q", tt.expenseDate, tt.committedWeekEnding, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestRecordHasMeaningfulChanges(t *testing.T) {
 	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()

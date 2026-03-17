@@ -39,7 +39,7 @@ The no-PO limit is configurable via `app_config` under `"expenses"` domain (`no_
 Note: "required" below means enforced in hooks/validation, not necessarily at the PocketBase schema level.
 
 - date (string, required, YYYY-MM-DD)
-- pay_period_ending (string, required, YYYY-MM-DD, saturday, derived from date)
+- pay_period_ending (string, YYYY-MM-DD, saturday, blank until commit; intended to be written by commit-time payroll bucketing logic rather than derived during normal expense create/update)
 - uid (references users collection, required, the user who created the expense)
 - payment_type (enum, required) [OnAccount, Expense, CorporateCreditCard, Allowance, FuelCard, Mileage, PersonalReimbursement]
 - kind (relation -> expenditure_kinds, inherited from PO when present, otherwise defaulted by job presence)

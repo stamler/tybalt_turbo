@@ -106,7 +106,7 @@ func AddRoutes(app core.App) {
 		// Expense tracking endpoints plus the org-wide expense commit queue.
 		expensesGroup.GET("/tracking_counts", createExpenseTrackingCountsHandler(app))
 		expensesGroup.GET("/commit_queue", createExpenseCommitQueueHandler(app))
-		expensesGroup.GET("/tracking/{payPeriodEnding}", createExpenseTrackingListHandler(app))
+		expensesGroup.GET("/tracking/{committedWeekEnding}", createExpenseTrackingListHandler(app))
 
 		timeAmendmentsGroup := se.Router.Group("/api/time_amendments")
 		timeAmendmentsGroup.Bind(apis.RequireAuth("users"))

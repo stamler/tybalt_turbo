@@ -509,23 +509,6 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		return err
 	}
 
-	// write the pay_period_ending property to the record. This is derived
-	// exclusively from the date property.
-	payPeriodEnding, ppEndErr := utilities.GeneratePayPeriodEnding(expenseRecord.GetString("date"))
-	if ppEndErr != nil {
-		return &errs.HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when processing expense",
-			Data: map[string]errs.CodeError{
-				"pay_period_ending": {
-					Code:    "error_generating",
-					Message: "error generating pay period ending",
-				},
-			},
-		}
-	}
-	expenseRecord.Set("pay_period_ending", payPeriodEnding)
-
 	// if the expense record has an attachment, calculate the sha256 hash of the
 	// file and set the attachment_hash property on the record
 	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")

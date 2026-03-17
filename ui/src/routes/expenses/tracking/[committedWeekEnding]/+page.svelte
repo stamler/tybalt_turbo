@@ -9,46 +9,90 @@
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import { page } from "$app/stores";
 
-  const payPeriodEnding = $derived.by(() => $page.params.payPeriodEnding);
-  let rows = $state([] as any[]);
+  const committedWeekEnding = $derived.by(
+    () => ($page.params as Record<string, string | undefined>).committedWeekEnding,
+  );
+
+  type Row = {
+    id: string;
+    uid: string;
+    given_name: string;
+    surname: string;
+    attachment: string;
+    date: string;
+    [key: string]: any;
+  };
+  type GroupedRow = Row & { employee_group: string };
+
+  let rows = $state([] as Row[]);
+
+  function parseIsoDate(dateString: string) {
+    return new Date(`${dateString}T12:00:00`);
+  }
+
+  const weekStart = $derived.by(() => {
+    if (!committedWeekEnding) return "";
+    const date = parseIsoDate(committedWeekEnding);
+    date.setDate(date.getDate() - 6);
+    return date.toISOString().slice(0, 10);
+  });
+
+  const attachmentCount = $derived.by(
+    () => rows.filter((row) => typeof row.attachment === "string" && row.attachment !== "").length,
+  );
+
+  const groupedRows = $derived.by((): GroupedRow[] => {
+    const counts = new Map<string, number>();
+
+    for (const row of rows) {
+      const key = row.uid || `${row.surname}, ${row.given_name}`;
+      counts.set(key, (counts.get(key) ?? 0) + 1);
+    }
+
+    return rows.map((row) => {
+      const key = row.uid || `${row.surname}, ${row.given_name}`;
+      const displayName = `${row.given_name} ${row.surname}`.trim();
+      return {
+        ...row,
+        employee_group: `${displayName} (${counts.get(key) ?? 0})`,
+      };
+    });
+  });
 
   async function init() {
     try {
-      rows = await pb.send(`/api/expenses/tracking/${payPeriodEnding}`, { method: "GET" });
+      rows = await pb.send(`/api/expenses/tracking/${committedWeekEnding}`, { method: "GET" });
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Failed to load expenses");
     }
   }
 
   $effect(() => {
-    if (payPeriodEnding) {
+    if (committedWeekEnding) {
       init();
     }
   });
-
-  function canViewDetails(row: any) {
-    if ($globalStore.showAllUi) return true;
-    if ($globalStore.claims.includes("commit") && row.approved !== "") return true;
-    if ($globalStore.claims.includes("report") && row.committed !== "") return true;
-    return false;
-  }
 </script>
 
-<DsList items={rows} groupField="phase" inListHeader={`Expenses for ${payPeriodEnding}`}>
-  {#snippet groupHeader(label)}
-    <span class="text-xs tracking-wide text-neutral-600 uppercase">{label}</span>
+<div class="mb-3 rounded-md border border-neutral-300 bg-neutral-50 px-4 py-3">
+  <div class="text-sm text-neutral-700">
+    {shortDate(weekStart || committedWeekEnding || "", true)} to
+    {shortDate(committedWeekEnding || "", true)} ({rows.length}, {attachmentCount} with attachments)
+  </div>
+</div>
+
+<DsList
+  items={groupedRows}
+  groupField="employee_group"
+  inListHeader={`Committed Expenses for ${shortDate(committedWeekEnding || "", true)}`}
+>
+  {#snippet anchor(r: GroupedRow)}
+    <a href={`/expenses/${r.id}/details`} class="text-blue-600 hover:underline">{r.date}</a>
   {/snippet}
-  {#snippet anchor(r)}
-    {#if canViewDetails(r)}
-      <a href={`/expenses/${r.id}/details`} class="text-blue-600 hover:underline">{r.date}</a>
-    {:else}
-      <span>{r.date}</span>
-    {/if}
-  {/snippet}
-  {#snippet headline(r)}
+  {#snippet headline(r: GroupedRow)}
     <span>{r.description}</span>
   {/snippet}
-  {#snippet byline(r)}
+  {#snippet byline(r: GroupedRow)}
     <span class="flex items-center gap-2 text-sm">
       {#if r.rejected !== ""}
         <DsLabel
@@ -82,14 +126,14 @@
       {/if}
     </span>
   {/snippet}
-  {#snippet line1(r)}
+  {#snippet line1(r: GroupedRow)}
     <span>
       {r.given_name}
       {r.surname} / {r.division_code}
       {r.division_name}
     </span>
   {/snippet}
-  {#snippet line2(r)}
+  {#snippet line2(r: GroupedRow)}
     {#if r.job_number !== ""}
       <span class="flex items-center gap-1">
         {r.job_number} - {r.client_name}:
@@ -100,7 +144,7 @@
       </span>
     {/if}
   {/snippet}
-  {#snippet line3(r)}
+  {#snippet line3(r: GroupedRow)}
     <span class="flex items-center gap-1 text-sm">
       {#if r.approved !== ""}
         <Icon icon="material-symbols:order-approve-outline" width="20px" class="inline-block" />

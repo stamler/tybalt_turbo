@@ -132,6 +132,15 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 				}
 				record.Set("committed_week_ending", weekEnding)
 
+				payPeriodEnding, err := utilities.GenerateCommittedPayPeriodEnding(record.GetString("date"), weekEnding)
+				if err != nil {
+					return &CodeError{
+						Code:    "error_generating_pay_period_ending",
+						Message: fmt.Sprintf("error generating pay period ending: %v", err),
+					}
+				}
+				record.Set("pay_period_ending", payPeriodEnding)
+
 				expenseRateRecord, err := utilities.GetExpenseRateRecord(app, record)
 				if err != nil {
 					return err

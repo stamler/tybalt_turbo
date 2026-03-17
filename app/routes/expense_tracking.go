@@ -10,14 +10,11 @@ import (
 )
 
 type expenseTrackingCountRow struct {
-	PayPeriodEnding string `db:"pay_period_ending" json:"pay_period_ending"`
-	SubmittedCount  int    `db:"submitted_count" json:"submitted_count"`
-	ApprovedCount   int    `db:"approved_count" json:"approved_count"`
-	CommittedCount  int    `db:"committed_count" json:"committed_count"`
-	RejectedCount   int    `db:"rejected_count" json:"rejected_count"`
+	CommittedWeekEnding string `db:"committed_week_ending" json:"committed_week_ending"`
+	CommittedCount      int    `db:"committed_count" json:"committed_count"`
 }
 
-// createExpenseTrackingCountsHandler returns pay-period grouped submitted/approved/committed counts for report holders
+// createExpenseTrackingCountsHandler returns committed expense counts grouped by committed_week_ending for report holders.
 func createExpenseTrackingCountsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
@@ -40,18 +37,12 @@ func createExpenseTrackingCountsHandler(app core.App) func(e *core.RequestEvent)
 
 		query := `
 			SELECT
-				pay_period_ending,
-				-- committed are exclusive
-				SUM(CASE WHEN committed != '' THEN 1 ELSE 0 END) AS committed_count,
-				-- approved but not committed
-				SUM(CASE WHEN approved != '' AND committed = '' THEN 1 ELSE 0 END) AS approved_count,
-				-- submitted but neither approved nor committed
-				SUM(CASE WHEN submitted = 1 AND approved = '' AND committed = '' THEN 1 ELSE 0 END) AS submitted_count,
-				-- rejected is non-exclusive (can overlap others)
-				SUM(CASE WHEN rejected != '' THEN 1 ELSE 0 END) AS rejected_count
+				committed_week_ending,
+				COUNT(*) AS committed_count
 			FROM expenses
-			GROUP BY pay_period_ending
-			ORDER BY pay_period_ending DESC
+			WHERE committed != '' AND committed_week_ending != ''
+			GROUP BY committed_week_ending
+			ORDER BY committed_week_ending DESC
 		`
 
 		var rows []expenseTrackingCountRow
@@ -78,7 +69,6 @@ type expenseTrackingListRow struct {
 	CommitterName   string  `db:"committer_name" json:"committer_name"`
 	RejectorName    string  `db:"rejector_name" json:"rejector_name"`
 	RejectionReason string  `db:"rejection_reason" json:"rejection_reason"`
-	Phase           string  `db:"phase" json:"phase"`
 	Date            string  `db:"date" json:"date"`
 	Description     string  `db:"description" json:"description"`
 	PaymentType     string  `db:"payment_type" json:"payment_type"`
@@ -100,7 +90,7 @@ type expenseTrackingListRow struct {
 	Total           float64 `db:"total" json:"total"`
 }
 
-// createExpenseTrackingListHandler returns org-wide expenses for a given pay period ending for report holders
+// createExpenseTrackingListHandler returns org-wide committed expenses for a given committed week ending for report/commit holders.
 func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
@@ -121,11 +111,11 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
 			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking list", nil)
 		}
 
-		payPeriodEnding := e.Request.PathValue("payPeriodEnding")
-		if payPeriodEnding == "" {
-			return e.Error(http.StatusBadRequest, "payPeriodEnding is required", nil)
+		committedWeekEnding := e.Request.PathValue("committedWeekEnding")
+		if committedWeekEnding == "" {
+			return e.Error(http.StatusBadRequest, "committedWeekEnding is required", nil)
 		}
-		if _, err := time.Parse("2006-01-02", payPeriodEnding); err != nil {
+		if _, err := time.Parse("2006-01-02", committedWeekEnding); err != nil {
 			return e.Error(http.StatusBadRequest, "invalid date format (YYYY-MM-DD)", nil)
 		}
 
@@ -145,12 +135,6 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
                 COALESCE(cp.given_name || ' ' || cp.surname, '') AS committer_name,
                 COALESCE(rp.given_name || ' ' || rp.surname, '') AS rejector_name,
                 e.rejection_reason,
-                CASE
-                    WHEN e.committed != '' THEN 'Committed'
-                    WHEN e.approved != '' AND e.committed = '' THEN 'Approved'
-                    WHEN e.submitted = 1 AND e.approved = '' AND e.committed = '' THEN 'Submitted'
-                    ELSE 'Unsubmitted'
-                END AS phase,
                 e.date,
                 e.description,
                 e.payment_type,
@@ -183,27 +167,16 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
             LEFT JOIN jobs j ON j.id = e.job
             LEFT JOIN clients cl ON cl.id = j.client
             LEFT JOIN divisions d ON d.id = e.division
-            LEFT JOIN vendors v ON v.id = e.vendor
-            LEFT JOIN categories cat ON cat.id = e.category
-            WHERE e.pay_period_ending = {:pay_period_ending}
-              AND e.submitted = 1
-              AND (
-                    {:has_report} = 1 OR
-                    e.approved != ''
-                  )
-            ORDER BY
-                CASE
-                    WHEN e.committed != '' THEN 3
-                    WHEN e.approved != '' AND e.committed = '' THEN 1
-                    ELSE 2
-                END,
-                p.surname, p.given_name
+                LEFT JOIN vendors v ON v.id = e.vendor
+                LEFT JOIN categories cat ON cat.id = e.category
+            WHERE e.committed_week_ending = {:committed_week_ending}
+	              AND e.committed != ''
+            ORDER BY p.surname, p.given_name, e.date
         `
 
 		var rows []expenseTrackingListRow
 		if err := app.DB().NewQuery(query).Bind(dbx.Params{
-			"pay_period_ending": payPeriodEnding,
-			"has_report":        boolToInt(isReportHolder),
+			"committed_week_ending": committedWeekEnding,
 		}).All(&rows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query", err)
 		}

@@ -88,7 +88,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
@@ -97,7 +96,7 @@ func TestExpensesCreate(t *testing.T) {
 				t.Fatal(err)
 			}
 			return tests.ApiScenario{
-				Name:           "valid expense gets a correct pay period ending and approver",
+				Name:           "valid expense leaves pay period ending blank until commit and sets approver",
 				Method:         http.MethodPost,
 				URL:            "/api/collections/expenses/records",
 				Body:           b,
@@ -106,7 +105,7 @@ func TestExpensesCreate(t *testing.T) {
 				ExpectedContent: []string{
 					`"approved":""`,
 					`"approver":"f2j5a8vk006baub"`,
-					`"pay_period_ending":"2024-09-14"`,
+					`"pay_period_ending":""`,
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
@@ -118,7 +117,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "apkev2ow1zjtm7w",
 				"description": "inactive division should fail",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
@@ -218,7 +216,7 @@ func TestExpensesCreate(t *testing.T) {
 				Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
 				ExpectedStatus: 200,
 				ExpectedContent: []string{
-					fmt.Sprintf(`"kind":"%s"`, utilities.DefaultCapitalExpenditureKindID()),
+					fmt.Sprintf(`"kind":"%s"`, capitalKindID),
 				},
 				ExpectedEvents: map[string]int{"OnRecordCreate": 1},
 				TestAppFactory: testutils.SetupTestApp,
@@ -231,7 +229,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
@@ -257,7 +254,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "ctswqva5onxj75q"
@@ -283,7 +279,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 132.10,
 				"vendor": "2zqxtsmymf670ha",
@@ -312,7 +307,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense branch override",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 132.10,
 				"vendor": "2zqxtsmymf670ha",
@@ -345,7 +339,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 132.10,
 				"vendor": "2zqxtsmymf670ha",
@@ -374,7 +367,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "po with missing branch should fail",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 132.10,
 				"vendor": "2zqxtsmymf670ha",
@@ -405,7 +397,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -437,7 +428,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -465,7 +455,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -492,7 +481,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -778,7 +766,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -805,7 +792,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -835,7 +821,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -861,7 +846,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -898,7 +882,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -932,7 +915,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -965,7 +947,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -997,7 +978,6 @@ func TestExpensesCreate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1122,6 +1102,97 @@ func TestExpenseCommitQueue_RequiresCommitClaim(t *testing.T) {
 	scenario.Test(t)
 }
 
+func TestExpenseCommitSetsCommittedWeekAndPayPeriodEnding(t *testing.T) {
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:           "committing an expense sets committed week ending and pay period ending",
+		Method:         http.MethodPost,
+		URL:            "/api/expenses/eqhozipupteogp8/commit",
+		Headers:        map[string]string{"Authorization": commitToken},
+		ExpectedStatus: 200,
+		ExpectedContent: []string{
+			`"message":"Record committed successfully"`,
+		},
+		ExpectedEvents: map[string]int{
+			"OnRecordUpdate": 1,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	scenario.AfterTestFunc = func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
+		record, err := app.FindRecordById("expenses", "eqhozipupteogp8")
+		if err != nil {
+			tb.Fatalf("failed to load committed expense: %v", err)
+		}
+
+		committedDate := record.GetDateTime("committed").Time().Format("2006-01-02")
+		expectedWeekEnding, err := utilities.GenerateWeekEnding(committedDate)
+		if err != nil {
+			tb.Fatalf("failed to generate expected committed week ending: %v", err)
+		}
+
+		expectedPayPeriodEnding, err := utilities.GenerateCommittedPayPeriodEnding(record.GetString("date"), expectedWeekEnding)
+		if err != nil {
+			tb.Fatalf("failed to generate expected pay period ending: %v", err)
+		}
+
+		if got := record.GetString("committed_week_ending"); got != expectedWeekEnding {
+			tb.Fatalf("committed_week_ending = %q, want %q", got, expectedWeekEnding)
+		}
+
+		if got := record.GetString("pay_period_ending"); got != expectedPayPeriodEnding {
+			tb.Fatalf("pay_period_ending = %q, want %q", got, expectedPayPeriodEnding)
+		}
+	}
+
+	scenario.Test(t)
+}
+
+func TestSeededExpensesNormalizePayPeriodEndingByCommitStatus(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	type expenseRow struct {
+		ID                  string `db:"id"`
+		Committed           string `db:"committed"`
+		CommittedWeekEnding string `db:"committed_week_ending"`
+		PayPeriodEnding     string `db:"pay_period_ending"`
+	}
+
+	var rows []expenseRow
+	if err := app.DB().NewQuery(`
+		SELECT
+			id,
+			COALESCE(committed, '') AS committed,
+			COALESCE(committed_week_ending, '') AS committed_week_ending,
+			COALESCE(pay_period_ending, '') AS pay_period_ending
+		FROM expenses
+		ORDER BY id
+	`).All(&rows); err != nil {
+		t.Fatalf("failed to query seeded expenses: %v", err)
+	}
+
+	for _, row := range rows {
+		if row.Committed == "" {
+			if row.PayPeriodEnding != "" {
+				t.Fatalf("uncommitted expense %s has pay_period_ending %q; expected blank", row.ID, row.PayPeriodEnding)
+			}
+			continue
+		}
+
+		if row.CommittedWeekEnding == "" {
+			t.Fatalf("committed expense %s has blank committed_week_ending", row.ID)
+		}
+		if row.PayPeriodEnding == "" {
+			t.Fatalf("committed expense %s has blank pay_period_ending", row.ID)
+		}
+	}
+}
+
 func TestExpensesUpdate(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
 	if err != nil {
@@ -1172,7 +1243,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
@@ -1181,7 +1251,7 @@ func TestExpensesUpdate(t *testing.T) {
 				t.Fatal(err)
 			}
 			return tests.ApiScenario{
-				Name:           "valid expense gets a correct pay period ending",
+				Name:           "valid expense keeps pay period ending blank until commit",
 				Method:         http.MethodPatch,
 				URL:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
 				Body:           b,
@@ -1190,7 +1260,7 @@ func TestExpensesUpdate(t *testing.T) {
 				ExpectedContent: []string{
 					`"approved":""`,
 					`"approver":"f2j5a8vk006baub"`,
-					`"pay_period_ending":"2024-09-14"`,
+					`"pay_period_ending":""`,
 				},
 				ExpectedEvents: map[string]int{"OnRecordUpdate": 1},
 				TestAppFactory: testutils.SetupTestApp,
@@ -1202,7 +1272,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
@@ -1227,7 +1296,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1258,7 +1326,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1284,7 +1351,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1310,7 +1376,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1348,7 +1413,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
@@ -1374,7 +1438,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha"
@@ -1400,7 +1463,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1429,7 +1491,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1454,7 +1515,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1480,7 +1540,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1508,7 +1567,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1535,7 +1593,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -1569,7 +1626,6 @@ func TestExpensesUpdate(t *testing.T) {
 				"date": "2024-09-01",
 				"division": "vccd5fo56ctbigh",
 				"description": "test expense",
-				"pay_period_ending": "2006-01-02",
 				"payment_type": "Expense",
 				"total": 99,
 				"vendor": "2zqxtsmymf670ha",
@@ -2126,7 +2182,6 @@ func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
 		"date": "2024-09-01",
 		"division": "vccd5fo56ctbigh",
 		"description": "second expense with same attachment",
-		"pay_period_ending": "2006-01-02",
 		"payment_type": "Expense",
 		"total": 99,
 		"vendor": "2zqxtsmymf670ha"
