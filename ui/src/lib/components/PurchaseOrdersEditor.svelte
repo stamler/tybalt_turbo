@@ -750,7 +750,7 @@
       errors = {};
       if (legacyMode) {
         if (data.editing) {
-          goto(resolve(`/pos/legacy/${saved.id}/edit`));
+          goto(resolve("/pos/active"));
         } else {
           await goto(resolve("/pos/legacy/add"), { replaceState: true });
           await invalidateAll();
