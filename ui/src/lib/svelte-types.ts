@@ -121,8 +121,9 @@ export type ExpenseCommitQueueRow = {
   approver_name: string;
   committer_name: string;
   rejector_name: string;
-  phase: "Approved" | "Submitted" | "Committed" | "Unsubmitted";
   date: string;
+  description: string;
+  attachment: string;
   allowance_str: string;
   job_number: string;
   job_description: string;

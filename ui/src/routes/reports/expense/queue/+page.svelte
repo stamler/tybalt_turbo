@@ -1,5 +1,6 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import type { ExpenseCommitQueueRow } from "$lib/svelte-types";
@@ -41,76 +42,78 @@
     rejectModal?.openModal(id);
   }
 
-  function canViewDetails(row: ExpenseCommitQueueRow) {
-    if ($globalStore.showAllUi) return true;
-    if (hasCommitAccess && row.phase === "Approved") return true;
-    return false;
-  }
-
   function canReject(row: ExpenseCommitQueueRow) {
-    return hasCommitAccess && row.phase === "Approved" && row.rejected === "";
+    return hasCommitAccess && row.rejected === "";
   }
 
   function detailsHref(id: string) {
     return resolve(`/expenses/${id}/details`);
+  }
+
+  function attachmentHref(id: string, attachment: string) {
+    return `${PUBLIC_POCKETBASE_URL}/api/files/expenses/${id}/${attachment}`;
+  }
+
+  function openAttachment(id: string, attachment: string) {
+    window.open(attachmentHref(id, attachment), "_blank", "noopener,noreferrer");
   }
 </script>
 
 <!-- No pay period selector; show all pending items -->
 <RejectModal collectionName="expenses" bind:this={rejectModal} on:refresh={() => refreshRows()} />
 
-<DsList items={rows} groupField="phase" inListHeader="Expense Commit Queue">
-  {#snippet groupHeader(label)}
-    <span class="text-xs tracking-wide text-neutral-600 uppercase">{label}</span>
-  {/snippet}
+<DsList items={rows} inListHeader="Expense Commit Queue">
   {#snippet headline(r: ExpenseCommitQueueRow)}
-    {#if canViewDetails(r)}
-      <a href={resolve(`/expenses/${r.id}/details`)} class="underline"
-        >{r.surname}, {r.given_name}</a
-      >
-    {:else}
-      <span>{r.surname}, {r.given_name}</span>
-    {/if}
+    <a href={resolve(`/expenses/${r.id}/details`)} class="underline">{r.surname}, {r.given_name}</a>
     {#if r.rejected !== ""}
       <DsLabel color="red">Rejected</DsLabel>
     {/if}
   {/snippet}
   {#snippet line1(r: ExpenseCommitQueueRow)}
     <span class="text-sm text-gray-500">
-      {#if r.phase === "Approved"}
-        Approved by {r.approver_name} on {shortDate(r.approved.split("T")[0], true)}
-      {:else if r.phase === "Submitted"}
-        Pending approval
+      Approved by {r.approver_name} on {shortDate(r.approved.split("T")[0], true)}
+      {#if r.rejected !== ""}
+        · Rejected on {shortDate(r.rejected.split("T")[0], true)}
       {/if}
     </span>
   {/snippet}
   {#snippet line2(r: ExpenseCommitQueueRow)}
     <div class="text-xs text-neutral-600">
       {#if r.allowance_str}
-        {r.allowance_str} ·
+        {r.allowance_str}
+      {:else}
+        {r.description}
       {/if}
-      {r.job_number}
-      {r.job_description}
-      {#if r.client_name}
-        &nbsp;for {r.client_name}
+      {#if r.job_number !== ""}
+        &nbsp;&middot;&nbsp;
+        {r.job_number}
+        {r.job_description}
+        {#if r.client_name}
+          &nbsp;/ {r.client_name}
+        {/if}
       {/if}
     </div>
   {/snippet}
   {#snippet line3(r: ExpenseCommitQueueRow)}
-    <div class="text-xs text-neutral-600">
-      Date: {shortDate(r.date, true)} · Total: ${r.total?.toFixed(2)}
+    <div class="flex items-center gap-2 text-xs text-neutral-600">
+      <span>Date: {shortDate(r.date, true)} · Total: ${r.total?.toFixed(2)}</span>
+      {#if r.attachment !== ""}
+        <DsActionButton
+          action={() => openAttachment(r.id, r.attachment)}
+          title="Open attachment in a new tab"
+        >
+          Attachment
+        </DsActionButton>
+      {/if}
     </div>
   {/snippet}
   {#snippet actions(r: ExpenseCommitQueueRow)}
-    {#if hasCommitAccess && r.phase === "Approved" && r.rejected === ""}
+    {#if hasCommitAccess && r.rejected === ""}
       <DsActionButton action={() => commit(r.id)}>Commit</DsActionButton>
     {/if}
     {#if canReject(r)}
       <DsActionButton action={() => openReject(r.id)}>Reject</DsActionButton>
     {/if}
-    {#if canViewDetails(r)}
-      <DsActionButton action={() => (window.location.href = detailsHref(r.id))}>View</DsActionButton
-      >
-    {/if}
+    <DsActionButton action={() => (window.location.href = detailsHref(r.id))}>View</DsActionButton>
   {/snippet}
 </DsList>

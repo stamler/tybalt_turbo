@@ -221,6 +221,8 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
                     ELSE 'Unsubmitted'
                 END AS phase,
                 e.date,
+                e.description,
+                COALESCE(e.attachment, '') AS attachment,
                 TRIM(
                     (CASE WHEN e.allowance_types LIKE '%"Breakfast"%' THEN 'Breakfast ' ELSE '' END) ||
                     (CASE WHEN e.allowance_types LIKE '%"Lunch"%' THEN 'Lunch ' ELSE '' END) ||
