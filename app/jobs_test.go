@@ -556,8 +556,8 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"code":"division_not_active"`,
-				`"error":"division is inactive:`,
+				`"data":{"allocation_division_0":{"code":"division_not_active"`,
+				`"message":"selected division is inactive"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -601,8 +601,8 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"code":"division_not_active"`,
-				`"error":"division is inactive:`,
+				`"data":{"allocation_division_0":{"code":"division_not_active"`,
+				`"message":"selected division is inactive"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

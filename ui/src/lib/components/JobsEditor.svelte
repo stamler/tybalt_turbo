@@ -483,6 +483,7 @@
       // Handle special case where backend requires setting proposal to Awarded first
       const pocket = error as {
         data?: {
+          error?: string;
           data?: Record<string, { message: string; code?: string; data?: Record<string, string> }>;
         };
       };
@@ -571,7 +572,8 @@
         }
       }
       const backendErrors = pocket?.data?.data as Record<string, { message: string }> | undefined;
-      errors = backendErrors ?? {};
+      const backendMessage = pocket?.data?.error;
+      errors = backendErrors ?? (backendMessage ? { global: { message: backendMessage } } : {});
     }
   }
 

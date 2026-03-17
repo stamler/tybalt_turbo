@@ -34,6 +34,40 @@ type existingJobAllocation struct {
 	Hours    float64 `db:"hours"`
 }
 
+func allocationDivisionFieldName(index int) string {
+	return fmt.Sprintf("allocation_division_%d", index)
+}
+
+func basicAllocationValidationError(index int, code string, message string) *errs.HookError {
+	return &errs.HookError{
+		Status:  http.StatusBadRequest,
+		Message: "allocation validation failed",
+		Data: map[string]errs.CodeError{
+			allocationDivisionFieldName(index): {
+				Code:    code,
+				Message: message,
+			},
+		},
+	}
+}
+
+func validateAllocationInputs(allocations []JobAllocationUpdate) error {
+	seen := make(map[string]int, len(allocations))
+	for idx, a := range allocations {
+		if a.Division == "" {
+			return basicAllocationValidationError(idx, "required", "division is required")
+		}
+		if a.Hours < 0 {
+			return basicAllocationValidationError(idx, "invalid_hours", "hours must be >= 0")
+		}
+		if firstIdx, ok := seen[a.Division]; ok {
+			return basicAllocationValidationError(idx, "duplicate_division", fmt.Sprintf("division is already selected on row %d", firstIdx+1))
+		}
+		seen[a.Division] = idx
+	}
+	return nil
+}
+
 func allocationsDiffer(existing []existingJobAllocation, incoming []JobAllocationUpdate) bool {
 	if len(existing) != len(incoming) {
 		return true
@@ -80,18 +114,12 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 		}
 
 		// Basic allocations validation
-		seen := make(map[string]struct{})
-		for _, a := range req.Allocations {
-			if a.Division == "" {
-				return e.Error(http.StatusBadRequest, "division is required for all allocations", nil)
+		if err := validateAllocationInputs(req.Allocations); err != nil {
+			var hookErr *errs.HookError
+			if errors.As(err, &hookErr) {
+				return e.JSON(hookErr.Status, hookErr)
 			}
-			if a.Hours < 0 {
-				return e.Error(http.StatusBadRequest, "hours must be >= 0", nil)
-			}
-			if _, ok := seen[a.Division]; ok {
-				return e.Error(http.StatusBadRequest, "duplicate division in allocations", nil)
-			}
-			seen[a.Division] = struct{}{}
+			return e.Error(http.StatusBadRequest, "allocation validation failed", err)
 		}
 
 		var httpResponseStatusCode = http.StatusOK
@@ -146,20 +174,32 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 			}
 
 			// Validate all divisions exist and are active
-			for _, a := range req.Allocations {
+			for idx, a := range req.Allocations {
 				divRec, err := txApp.FindRecordById("divisions", a.Division)
 				if err != nil {
 					httpResponseStatusCode = http.StatusBadRequest
-					return &CodeError{
-						Code:    "invalid_division",
-						Message: fmt.Sprintf("division not found: %s", a.Division),
+					return &errs.HookError{
+						Status:  http.StatusBadRequest,
+						Message: "allocation validation failed",
+						Data: map[string]errs.CodeError{
+							allocationDivisionFieldName(idx): {
+								Code:    "invalid_division",
+								Message: "selected division was not found",
+							},
+						},
 					}
 				}
 				if !divRec.GetBool("active") {
 					httpResponseStatusCode = http.StatusBadRequest
-					return &CodeError{
-						Code:    "division_not_active",
-						Message: fmt.Sprintf("division is inactive: %s", a.Division),
+					return &errs.HookError{
+						Status:  http.StatusBadRequest,
+						Message: "allocation validation failed",
+						Data: map[string]errs.CodeError{
+							allocationDivisionFieldName(idx): {
+								Code:    "division_not_active",
+								Message: "selected division is inactive",
+							},
+						},
 					}
 				}
 			}
@@ -297,18 +337,12 @@ func createCreateJobHandler(app core.App) func(e *core.RequestEvent) error {
 		}
 
 		// Validate allocations
-		seen := make(map[string]struct{})
-		for _, a := range req.Allocations {
-			if a.Division == "" {
-				return e.Error(http.StatusBadRequest, "division is required for all allocations", nil)
+		if err := validateAllocationInputs(req.Allocations); err != nil {
+			var hookErr *errs.HookError
+			if errors.As(err, &hookErr) {
+				return e.JSON(hookErr.Status, hookErr)
 			}
-			if a.Hours < 0 {
-				return e.Error(http.StatusBadRequest, "hours must be >= 0", nil)
-			}
-			if _, ok := seen[a.Division]; ok {
-				return e.Error(http.StatusBadRequest, "duplicate division in allocations", nil)
-			}
-			seen[a.Division] = struct{}{}
+			return e.Error(http.StatusBadRequest, "allocation validation failed", err)
 		}
 
 		var newJobID string
@@ -374,20 +408,32 @@ func createCreateJobHandler(app core.App) func(e *core.RequestEvent) error {
 			newJobID = jobRec.Id
 
 			// Validate all divisions exist and are active
-			for _, a := range req.Allocations {
+			for idx, a := range req.Allocations {
 				divRec, err := txApp.FindRecordById("divisions", a.Division)
 				if err != nil {
 					httpResponseStatusCode = http.StatusBadRequest
-					return &CodeError{
-						Code:    "invalid_division",
-						Message: fmt.Sprintf("division not found: %s", a.Division),
+					return &errs.HookError{
+						Status:  http.StatusBadRequest,
+						Message: "allocation validation failed",
+						Data: map[string]errs.CodeError{
+							allocationDivisionFieldName(idx): {
+								Code:    "invalid_division",
+								Message: "selected division was not found",
+							},
+						},
 					}
 				}
 				if !divRec.GetBool("active") {
 					httpResponseStatusCode = http.StatusBadRequest
-					return &CodeError{
-						Code:    "division_not_active",
-						Message: fmt.Sprintf("division is inactive: %s", a.Division),
+					return &errs.HookError{
+						Status:  http.StatusBadRequest,
+						Message: "allocation validation failed",
+						Data: map[string]errs.CodeError{
+							allocationDivisionFieldName(idx): {
+								Code:    "division_not_active",
+								Message: "selected division is inactive",
+							},
+						},
 					}
 				}
 			}
