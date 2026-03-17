@@ -372,7 +372,7 @@
 
   <!-- Expenses referencing this PO -->
   <section class="mt-6 space-y-2">
-    <h2 class="text-xl font-semibold">Expenses ({data.expenses.length})</h2>
+    <h2 class="text-xl font-semibold">Visible Expenses ({data.expenses.length})</h2>
     <DsList items={data.expenses} search={false}>
       {#snippet anchor(ex)}
         <a href={`/expenses/${ex.id}/details`} class="text-blue-600 hover:underline">

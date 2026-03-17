@@ -2161,6 +2161,67 @@ func TestExpenseDetailsRouteDoesNotFlagPOOwnerMismatchWhenUIDsMatch(t *testing.T
 	scenario.Test(t)
 }
 
+func TestPurchaseOrderExpensesRouteRespectsExpenseVisibility(t *testing.T) {
+	reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:           "report holder sees committed related expenses on purchase order details route",
+			Method:         http.MethodGet,
+			URL:            "/api/purchase_orders/visible/0pia83nnprdlzf8/expenses",
+			Headers:        map[string]string{"Authorization": reportToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"id":"6569323gg8184uh"`,
+				`"total":1`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "report holder does not see uncommitted related expenses on purchase order details route",
+			Method:         http.MethodGet,
+			URL:            "/api/purchase_orders/visible/ly8xyzpuj79upq1/expenses",
+			Headers:        map[string]string{"Authorization": reportToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"id":"su3hyft6n9rlt7d"`,
+				`"total":1`,
+			},
+			NotExpectedContent: []string{
+				`"id":"eqhozipupteogp8"`,
+				`"id":"hlqb5xdzm2xbii7"`,
+				`"id":"um1uoad5a4mhfcu"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "commit holder cannot use purchase order details route when purchase order itself is not visible",
+			Method:         http.MethodGet,
+			URL:            "/api/purchase_orders/visible/0pia83nnprdlzf8/expenses",
+			Headers:        map[string]string{"Authorization": commitToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"code":"po_not_found_or_not_visible"`,
+			},
+			NotExpectedContent: []string{
+				`"id":"6569323gg8184uh"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
 // TestCalculateMileageTotal verifies the standalone mileage calculation helper using
 // the rate tiers effective on 2025-01-05. For a 100 km distance on 2025-01-10 and
 // with no prior mileage in the annual period, total should be 100 * 0.70 = 70.00.

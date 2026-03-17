@@ -193,6 +193,27 @@ func purchaseOrderVisibilityParams(
 	}
 }
 
+// findVisiblePurchaseOrderByID returns the visible PO row for the caller or nil
+// if the PO is either missing or not visible under the PO visibility rules.
+//
+// This helper is intentionally PO-centric and should be reused by any route
+// whose URL shape or semantics imply that PO visibility has already been
+// established before any narrower resource-specific filtering happens.
+func findVisiblePurchaseOrderByID(app core.App, userID string, id string) (*purchaseOrderVisibilityRow, error) {
+	rows := []purchaseOrderVisibilityRow{}
+	params := purchaseOrderVisibilityParams(app, userID, "all", "", "")
+	params["id"] = id
+
+	if err := app.DB().NewQuery(visiblePOByIDQuery).Bind(params).All(&rows); err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+
+	return &rows[0], nil
+}
+
 func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		id := e.Request.PathValue("id")
@@ -627,24 +648,21 @@ func createGetVisiblePurchaseOrderHandler(app core.App) func(e *core.RequestEven
 			})
 		}
 
-		rows := []purchaseOrderVisibilityRow{}
-		params := purchaseOrderVisibilityParams(app, auth.Id, "all", "", "")
-		params["id"] = id
-
-		if err := app.DB().NewQuery(visiblePOByIDQuery).Bind(params).All(&rows); err != nil {
+		row, err := findVisiblePurchaseOrderByID(app, auth.Id, id)
+		if err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_visible_po",
 				"message": fmt.Sprintf("error fetching visible purchase order: %v", err),
 			})
 		}
-		if len(rows) == 0 {
+		if row == nil {
 			return e.JSON(http.StatusNotFound, map[string]string{
 				"code":    "po_not_found_or_not_visible",
 				"message": "purchase order not found or not visible",
 			})
 		}
 
-		return e.JSON(http.StatusOK, rows[0])
+		return e.JSON(http.StatusOK, row)
 	}
 }
 

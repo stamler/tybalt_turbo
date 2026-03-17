@@ -41,9 +41,19 @@ export const load: PageLoad = async ({ params }) => {
       console.error(`loading second approver diagnostics: ${diagErr}`);
     }
 
-    // fetch related expenses
+    // Fetch related expenses through the dedicated PO route.
+    //
+    // Do not use /api/expenses/list?purchase_order=... here:
+    // that endpoint is intentionally "my expenses" scoped and will hide other
+    // users' linked expenses, which previously caused PO details pages to show
+    // Expenses(0) even when PO aggregates reported committed expenses.
+    //
+    // The dedicated route still does NOT mean "all expenses on this PO".
+    // Backend policy deliberately applies expense-level visibility after PO
+    // visibility, so some callers can open a PO details page and still receive
+    // only a subset of linked expenses.
     const expensesRes: { data: ExpensesAugmentedResponse[] } = await pb.send(
-      `/api/expenses/list?purchase_order=${params.poid}`,
+      `/api/purchase_orders/visible/${params.poid}/expenses`,
       { method: "GET" },
     );
     const expenses = expensesRes?.data ?? [];

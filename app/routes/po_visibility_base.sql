@@ -34,6 +34,25 @@
   - Kind-to-limit resolution is intentionally centralized in caller_po_limits.
   - Threshold fallback uses job-based effective kind (capital when no job, project when job present).
   - Do not reintroduce duplicated limit CASE expressions elsewhere in this file.
+
+  Cross-resource discrepancy to remember
+  - This file governs PURCHASE ORDER visibility only.
+  - Visibility of EXPENSES linked to a PO is governed elsewhere by an expense-
+    specific predicate.
+  - Therefore:
+    * being able to open a PO does not automatically mean the caller can see all
+      linked expenses for that PO;
+    * PO aggregates such as committed_expenses_count may be larger than the
+      expense list a given caller can see on the PO details page;
+    * expense owners may still be able to inspect their own expense even if they
+      are not among the users who can still view the linked PO after it becomes
+      Closed/Cancelled.
+
+  The current design is intentional but not perfectly symmetrical:
+  - PO visibility answers "who may inspect or act on this purchase order?"
+  - Expense visibility answers "who may inspect this expense record?"
+  - The PO details page joins those two models rather than collapsing them into
+    a single permission rule.
   -----------------------------------------------------------------------------
 */
 
@@ -203,12 +222,20 @@ SELECT
   COALESCE(c.name, '') AS category_name,
 
   -- Flag: Active records are visible to any authenticated user.
+  --
+  -- This is broader than expense visibility. A caller can open an Active PO
+  -- details page even if the linked expenses will later be filtered out by the
+  -- expense visibility rules.
   CASE
     WHEN po.status = 'Active' THEN 1
     ELSE 0
   END AS is_active_visible,
 
   -- Flag: Closed/Cancelled visibility for direct participants + report claim.
+  --
+  -- Note that expense owners are intentionally not included here unless they
+  -- are also a PO participant or report holder. This is one source of the
+  -- "expense owner may see expense but not PO" discrepancy documented above.
   CASE
     WHEN
       po.status IN ('Cancelled', 'Closed')
@@ -226,6 +253,10 @@ SELECT
   -- Creators can always see their own unapproved records, including rejected
   -- ones, so they can review rejection context and resubmit. Rejectors can
   -- also see rejected records they acted on.
+  --
+  -- This still does not imply visibility to linked expenses. Those remain
+  -- governed by expense-specific roles such as expense owner / expense approver
+  -- / commit / report.
   CASE
     WHEN
       po.status = 'Unapproved'

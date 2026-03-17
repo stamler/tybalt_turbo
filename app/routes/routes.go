@@ -127,6 +127,7 @@ func AddRoutes(app core.App) {
 		poGroup.GET("/pending/{id}", createGetPendingPurchaseOrderHandler(app))
 		poGroup.GET("/visible", createGetVisiblePurchaseOrdersHandler(app))
 		poGroup.GET("/visible/{id}", createGetVisiblePurchaseOrderHandler(app))
+		poGroup.GET("/visible/{id}/expenses", createGetPurchaseOrderExpensesHandler(app))
 		poGroup.GET("/search", createGetSearchablePurchaseOrdersHandler(app))
 		poGroup.GET("/approvers", createGetApproversHandler(app, false))
 		poGroup.GET("/second_approvers", createGetApproversHandler(app, true))
