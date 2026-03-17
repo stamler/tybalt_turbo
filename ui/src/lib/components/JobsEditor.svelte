@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { DATE_INPUT_MIN, dateInputMaxMonthsAhead, fetchClientContacts } from "$lib/utilities";
+  import { dateInputMaxMonthsAhead, fetchClientContacts } from "$lib/utilities";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
@@ -789,7 +789,6 @@
         <DsDateInput
           class="flex-1"
           name="project_award_date"
-          min={DATE_INPUT_MIN}
           max={dateInputMax}
           bind:value={item.project_award_date}
         />
@@ -817,7 +816,6 @@
         <DsDateInput
           class="flex-1"
           name="proposal_opening_date"
-          min={DATE_INPUT_MIN}
           max={dateInputMax}
           bind:value={item.proposal_opening_date}
         />
@@ -843,7 +841,6 @@
         <DsDateInput
           class="flex-1"
           name="proposal_submission_due_date"
-          min={DATE_INPUT_MIN}
           max={dateInputMax}
           bind:value={item.proposal_submission_due_date}
         />
