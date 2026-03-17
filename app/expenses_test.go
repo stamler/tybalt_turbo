@@ -12,6 +12,7 @@ import (
 	"tybalt/internal/testutils"
 	"tybalt/utilities"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
@@ -1097,6 +1098,166 @@ func TestExpenseCommitQueue_RequiresCommitClaim(t *testing.T) {
 			`"message":"You are not authorized to view the expense commit queue."`,
 		},
 		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	scenario.Test(t)
+}
+
+type expenseCommitQueueRow struct {
+	ID          string `json:"id"`
+	Approved    string `json:"approved"`
+	Rejected    string `json:"rejected"`
+	Committed   string `json:"committed"`
+	Description string `json:"description"`
+	Attachment  string `json:"attachment"`
+}
+
+func decodeExpenseCommitQueueRows(t testing.TB, res *http.Response) []expenseCommitQueueRow {
+	t.Helper()
+	defer res.Body.Close()
+
+	var rows []expenseCommitQueueRow
+	if err := json.NewDecoder(res.Body).Decode(&rows); err != nil {
+		t.Fatalf("failed decoding expense commit queue response: %v", err)
+	}
+
+	return rows
+}
+
+func expenseCommitQueueContains(rows []expenseCommitQueueRow, id string) bool {
+	for _, row := range rows {
+		if row.ID == id {
+			return true
+		}
+	}
+	return false
+}
+
+func expenseCommitQueueRowByID(t testing.TB, rows []expenseCommitQueueRow, id string) expenseCommitQueueRow {
+	t.Helper()
+
+	for _, row := range rows {
+		if row.ID == id {
+			return row
+		}
+	}
+
+	t.Fatalf("expected expense commit queue to include row %q", id)
+	return expenseCommitQueueRow{}
+}
+
+func TestExpenseCommitQueue_ReturnsApprovedUncommittedExpenses(t *testing.T) {
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:   "commit queue only includes approved uncommitted expenses",
+		Method: http.MethodGet,
+		URL:    "/api/expenses/commit_queue",
+		Headers: map[string]string{
+			"Authorization": commitToken,
+		},
+		ExpectedStatus: http.StatusOK,
+		ExpectedContent: []string{
+			`"id":"eqhozipupteogp8"`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+		AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
+			rows := decodeExpenseCommitQueueRows(t, res)
+
+			for _, row := range rows {
+				if row.Approved == "" {
+					t.Fatalf("queue row %q unexpectedly had empty approved timestamp", row.ID)
+				}
+				if row.Committed != "" {
+					t.Fatalf("queue row %q unexpectedly had committed timestamp %q", row.ID, row.Committed)
+				}
+			}
+
+			for _, id := range []string{
+				"b4o6xph4ngwx4nw",
+				"eqhozipupteogp8",
+				"hlqb5xdzm2xbii7",
+				"um1uoad5a4mhfcu",
+			} {
+				if !expenseCommitQueueContains(rows, id) {
+					t.Fatalf("expected expense commit queue to include approved uncommitted expense %q", id)
+				}
+			}
+
+			for _, id := range []string{
+				"exp_approve_closed_po_1",
+				"su3hyft6n9rlt7d",
+			} {
+				if expenseCommitQueueContains(rows, id) {
+					t.Fatalf("expected expense commit queue to exclude %q", id)
+				}
+			}
+		},
+	}
+
+	scenario.Test(t)
+}
+
+func TestExpenseCommitQueue_ReturnsDescriptionAttachmentAndRejectedRows(t *testing.T) {
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:   "commit queue includes description attachment and rejected approved rows",
+		Method: http.MethodGet,
+		URL:    "/api/expenses/commit_queue",
+		Headers: map[string]string{
+			"Authorization": commitToken,
+		},
+		ExpectedStatus: http.StatusOK,
+		ExpectedContent: []string{
+			`"id":"eqhozipupteogp8"`,
+		},
+		TestAppFactory: func(tb testing.TB) *tests.TestApp {
+			app := testutils.SetupTestApp(tb)
+
+			_, err := app.NonconcurrentDB().NewQuery(`
+				UPDATE expenses
+				SET rejected = {:rejected},
+				    rejection_reason = {:reason},
+				    rejector = {:rejector},
+				    attachment = {:attachment}
+				WHERE id = {:id}
+			`).Bind(dbx.Params{
+				"id":         "eqhozipupteogp8",
+				"rejected":   "2024-11-08 12:34:56.000Z",
+				"reason":     "Testing rejected approved expense visibility",
+				"rejector":   "wegviunlyr2jjjv",
+				"attachment": "queue-receipt.pdf",
+			}).Execute()
+			if err != nil {
+				tb.Fatalf("failed to seed rejected expense commit queue row: %v", err)
+			}
+
+			return app
+		},
+		AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
+			rows := decodeExpenseCommitQueueRows(t, res)
+			row := expenseCommitQueueRowByID(t, rows, "eqhozipupteogp8")
+
+			if row.Description != "An approved expense against a Cumulative purchase_orders record. This should commit well because the total is less than than maximum allowed amount by the purchase_orders record." {
+				t.Fatalf("description = %q, want seeded expense description", row.Description)
+			}
+			if row.Attachment != "queue-receipt.pdf" {
+				t.Fatalf("attachment = %q, want %q", row.Attachment, "queue-receipt.pdf")
+			}
+			if row.Rejected != "2024-11-08 12:34:56.000Z" {
+				t.Fatalf("rejected = %q, want %q", row.Rejected, "2024-11-08 12:34:56.000Z")
+			}
+			if row.Approved == "" {
+				t.Fatalf("approved unexpectedly empty for row %q", row.ID)
+			}
+		},
 	}
 
 	scenario.Test(t)
