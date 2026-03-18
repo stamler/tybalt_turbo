@@ -5,9 +5,6 @@
 
   let { data } = $props();
   const isAdmin = $derived($globalStore.claims.includes("admin"));
-  const isHrOnly = $derived(
-    $globalStore.claims.includes("hr") && !$globalStore.claims.includes("admin"),
-  );
 
   const currency = new Intl.NumberFormat("en-CA", {
     style: "currency",
@@ -60,7 +57,7 @@
           {data.item.job_title || "-"}
         {/if}
       </h1>
-      {#if isAdmin && data.item.active === false}
+      {#if data.item.active === false}
         <DsLabel color="red">Inactive</DsLabel>
       {/if}
       <DsActionButton
@@ -104,26 +101,26 @@
         <span class="font-semibold">Personal Vehicle Insurance Expiry:</span>
         {data.item.personal_vehicle_insurance_expiry || "—"}
       </div>
-      {#if !isHrOnly}
-        <div class="flex gap-2">
-          <span class="font-semibold">Active:</span>
-          {data.item.active === false ? "No" : "Yes"}
-        </div>
-        <div class="flex gap-2">
-          <span class="font-semibold">Job Title:</span>
-          {data.item.job_title || "—"}
-        </div>
-        <div class="flex gap-2">
-          <span class="font-semibold">Mobile Phone:</span>
-          {data.item.mobile_phone || "—"}
-        </div>
+      <div class="flex gap-2">
+        <span class="font-semibold">Active:</span>
+        {data.item.active === false ? "No" : "Yes"}
+      </div>
+      <div class="flex gap-2">
+        <span class="font-semibold">Job Title:</span>
+        {data.item.job_title || "—"}
+      </div>
+      <div class="flex gap-2">
+        <span class="font-semibold">Mobile Phone:</span>
+        {data.item.mobile_phone || "—"}
+      </div>
+      <div class="flex gap-2">
+        <span class="font-semibold">Default Branch:</span>
+        {data.defaultBranch?.name || "—"}
+      </div>
+      {#if isAdmin}
         <div class="flex gap-2">
           <span class="font-semibold">Work Week Hours:</span>
           {data.item.work_week_hours}
-        </div>
-        <div class="flex gap-2">
-          <span class="font-semibold">Default Branch:</span>
-          {data.defaultBranch?.name || "—"}
         </div>
         <div class="flex gap-2">
           <span class="font-semibold">Untracked Time Off:</span>
@@ -210,7 +207,7 @@
           {#if normalizeDivisions(data.item.po_approver_divisions).length === 0}
             <span>All divisions</span>
           {:else}
-            {#each normalizeDivisions(data.item.po_approver_divisions) as divisionId}
+            {#each normalizeDivisions(data.item.po_approver_divisions) as divisionId (divisionId)}
               <DsLabel color="purple">{divisionLabel(divisionId)}</DsLabel>
             {/each}
           {/if}

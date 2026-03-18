@@ -27,14 +27,18 @@
 
   const PO_APPROVER_CLAIM_NAME = "po_approver";
   const HR_EDITABLE_FIELDS = [
+    "active",
     "allow_personal_reimbursement",
-    "skip_min_time_check",
-    "payroll_id",
-    "salary",
-    "personal_vehicle_insurance_expiry",
-    "time_sheet_expected",
-    "off_rotation_permitted",
+    "default_branch",
     "default_charge_out_rate",
+    "job_title",
+    "mobile_phone",
+    "off_rotation_permitted",
+    "payroll_id",
+    "personal_vehicle_insurance_expiry",
+    "salary",
+    "skip_min_time_check",
+    "time_sheet_expected",
   ] as const;
 
   let { data }: { data: AdminProfilesEditPageData & { divisions?: DivisionsResponse[] } } =
@@ -624,9 +628,9 @@
   onsubmit={save}
 >
   <div class="w/full grid grid-cols-1 gap-2 md:grid-cols-2">
-    {#if isAdmin}
-      <DsCheck bind:value={item.active as boolean} {errors} fieldName="active" uiName="Active" />
+    <DsCheck bind:value={item.active as boolean} {errors} fieldName="active" uiName="Active" />
 
+    {#if isAdmin}
       <DsTextInput
         bind:value={item.work_week_hours as number}
         {errors}
@@ -751,30 +755,28 @@
       fieldName="payroll_id"
       uiName="Payroll ID"
     />
-    {#if isAdmin}
-      <DsTextInput
-        bind:value={item.mobile_phone as string}
-        {errors}
-        fieldName="mobile_phone"
-        uiName="Mobile Phone"
-      />
-      <DsTextInput
-        bind:value={item.job_title as string}
-        {errors}
-        fieldName="job_title"
-        uiName="Job Title"
-      />
+    <DsTextInput
+      bind:value={item.mobile_phone as string}
+      {errors}
+      fieldName="mobile_phone"
+      uiName="Mobile Phone"
+    />
+    <DsTextInput
+      bind:value={item.job_title as string}
+      {errors}
+      fieldName="job_title"
+      uiName="Job Title"
+    />
 
-      <DsSelector
-        bind:value={item.default_branch as string}
-        items={$branchesStore.items}
-        {errors}
-        fieldName="default_branch"
-        uiName="Default Branch"
-      >
-        {#snippet optionTemplate(item)}{item.name}{/snippet}
-      </DsSelector>
-    {/if}
+    <DsSelector
+      bind:value={item.default_branch as string}
+      items={$branchesStore.items}
+      {errors}
+      fieldName="default_branch"
+      uiName="Default Branch"
+    >
+      {#snippet optionTemplate(item)}{item.name}{/snippet}
+    </DsSelector>
   </div>
 
   {#if isAdmin}

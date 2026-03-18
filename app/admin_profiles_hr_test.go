@@ -12,6 +12,7 @@ import (
 const (
 	hrUserEmail                         = "hr@example.com"
 	hrEditableRecordID                  = "35i85kqy88hfsfc"
+	hrEditableRecordAlternateBranchID   = "1r7r6hyp681vi15"
 	hrEditableRecordPayrollID           = "9999"
 	hrEditableRecordListExpectedName    = `"given_name":"Horace"`
 	hrEditableRecordViewExpectedPayroll = `"payroll_id":"9999"`
@@ -87,6 +88,26 @@ func TestAdminProfilesUpdateRule_HRCanUpdateAllowedFields(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "hr can update active flag",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no",
+				"active":false
+			}`),
+			Headers: map[string]string{
+				"Authorization": hrToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"active":false`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "hr can update salary",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
@@ -107,6 +128,46 @@ func TestAdminProfilesUpdateRule_HRCanUpdateAllowedFields(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "hr can update mobile phone",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no",
+				"mobile_phone":"+1 (555) 555-0100"
+			}`),
+			Headers: map[string]string{
+				"Authorization": hrToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"mobile_phone":"+1 (555) 555-0100"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "hr can update job title",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no",
+				"job_title":"HR Manager"
+			}`),
+			Headers: map[string]string{
+				"Authorization": hrToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"job_title":"HR Manager"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "hr can update default charge out rate",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
@@ -122,6 +183,26 @@ func TestAdminProfilesUpdateRule_HRCanUpdateAllowedFields(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				`"default_charge_out_rate":99.5`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "hr can update default branch",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no",
+				"default_branch":"` + hrEditableRecordAlternateBranchID + `"
+			}`),
+			Headers: map[string]string{
+				"Authorization": hrToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"default_branch":"` + hrEditableRecordAlternateBranchID + `"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -232,11 +313,15 @@ func TestAdminProfilesUpdateRule_HRCanUpdateAllowedFields(t *testing.T) {
 				"allow_personal_reimbursement": true,
 				"skip_min_time_check": "on_next_bundle",
 				"payroll_id": "2002",
+				"active": false,
 				"salary": true,
+				"mobile_phone": "+1 (555) 555-0100",
+				"job_title": "HR Lead",
 				"personal_vehicle_insurance_expiry": "2027-01-15",
 				"time_sheet_expected": true,
 				"off_rotation_permitted": true,
-				"default_charge_out_rate": 123.45
+				"default_charge_out_rate": 123.45,
+				"default_branch": "` + hrEditableRecordAlternateBranchID + `"
 			}`),
 			Headers: map[string]string{
 				"Authorization": hrToken,
@@ -247,11 +332,15 @@ func TestAdminProfilesUpdateRule_HRCanUpdateAllowedFields(t *testing.T) {
 				`"allow_personal_reimbursement":true`,
 				`"skip_min_time_check":"on_next_bundle"`,
 				`"payroll_id":"2002"`,
+				`"active":false`,
 				`"salary":true`,
+				`"mobile_phone":"+1 (555) 555-0100"`,
+				`"job_title":"HR Lead"`,
 				`"personal_vehicle_insurance_expiry":"2027-01-15"`,
 				`"time_sheet_expected":true`,
 				`"off_rotation_permitted":true`,
 				`"default_charge_out_rate":123.45`,
+				`"default_branch":"` + hrEditableRecordAlternateBranchID + `"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -270,14 +359,14 @@ func TestAdminProfilesUpdateRule_HRRejectedForDisallowedFields(t *testing.T) {
 
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "hr cannot update active flag",
+			Name:   "hr cannot update work week hours",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
 			Body: strings.NewReader(`{
 				"payroll_id":"` + hrEditableRecordPayrollID + `",
 				"default_charge_out_rate":50,
 				"skip_min_time_check":"no",
-				"active":false
+				"work_week_hours":37.5
 			}`),
 			Headers: map[string]string{
 				"Authorization": hrToken,
@@ -290,14 +379,14 @@ func TestAdminProfilesUpdateRule_HRRejectedForDisallowedFields(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "hr cannot update job title",
+			Name:   "hr cannot update opening date",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
 			Body: strings.NewReader(`{
 				"payroll_id":"` + hrEditableRecordPayrollID + `",
 				"default_charge_out_rate":50,
 				"skip_min_time_check":"no",
-				"job_title":"HR Manager"
+				"opening_date":"2026-01-01"
 			}`),
 			Headers: map[string]string{
 				"Authorization": hrToken,
@@ -310,14 +399,14 @@ func TestAdminProfilesUpdateRule_HRRejectedForDisallowedFields(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "hr cannot update mobile phone",
+			Name:   "hr cannot update uid",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
 			Body: strings.NewReader(`{
 				"payroll_id":"` + hrEditableRecordPayrollID + `",
 				"default_charge_out_rate":50,
 				"skip_min_time_check":"no",
-				"mobile_phone":"+1 (555) 555-0100"
+				"uid":"hruser000000001"
 			}`),
 			Headers: map[string]string{
 				"Authorization": hrToken,
@@ -330,14 +419,34 @@ func TestAdminProfilesUpdateRule_HRRejectedForDisallowedFields(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "hr cannot update default branch",
+			Name:   "hr cannot update legacy uid",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
 			Body: strings.NewReader(`{
 				"payroll_id":"` + hrEditableRecordPayrollID + `",
 				"default_charge_out_rate":50,
 				"skip_min_time_check":"no",
-				"default_branch":"1r7r6hyp681vi15"
+				"legacy_uid":"legacy_hr_override"
+			}`),
+			Headers: map[string]string{
+				"Authorization": hrToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "hr cannot update record id",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"id":"abc123def456ghi",
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no"
 			}`),
 			Headers: map[string]string{
 				"Authorization": hrToken,
@@ -407,6 +516,66 @@ func TestAdminProfilesAccess_AdminStillHasFullAccessAndOthersDoNot(t *testing.T)
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				`"job_title":"Admin Updated Title"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "admin cannot update immutable uid",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"uid":"hruser000000001",
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no"
+			}`),
+			Headers: map[string]string{
+				"Authorization": adminToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "admin cannot update immutable legacy uid",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"legacy_uid":"legacy_admin_override",
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no"
+			}`),
+			Headers: map[string]string{
+				"Authorization": adminToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "admin cannot update immutable record id",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"id":"abc123def456ghi",
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no"
+			}`),
+			Headers: map[string]string{
+				"Authorization": adminToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
