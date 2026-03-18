@@ -122,11 +122,7 @@
   }
 </script>
 
-<DsList
-  items={items as ExpensesAugmentedResponse[]}
-  search={true}
-  {inListHeader}
->
+<DsList items={items as ExpensesAugmentedResponse[]} search={true} {inListHeader}>
   {#snippet anchor(item: ExpensesAugmentedResponse)}
     <a href={`/expenses/${item.id}/details`} class="text-blue-600 hover:underline">
       {item.date}

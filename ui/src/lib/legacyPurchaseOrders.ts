@@ -3,7 +3,9 @@ import type { PurchaseOrdersRecord, PurchaseOrdersResponse } from "$lib/pocketba
 
 type LegacyPurchaseOrderLike = PurchaseOrdersRecord | PurchaseOrdersResponse;
 
-export function buildLegacyPurchaseOrderPayload(record: LegacyPurchaseOrderLike): Record<string, unknown> {
+export function buildLegacyPurchaseOrderPayload(
+  record: LegacyPurchaseOrderLike,
+): Record<string, unknown> {
   return {
     uid: record.uid,
     approver: record.approver,

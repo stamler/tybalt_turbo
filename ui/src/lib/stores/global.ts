@@ -140,8 +140,8 @@ const createStore = () => {
         const response = await pb
           .collection("user_claims_summary")
           .getOne<UserClaimsSummaryResponse>(userId, {
-          requestKey: null,
-        });
+            requestKey: null,
+          });
 
         update((state) => ({
           ...state,

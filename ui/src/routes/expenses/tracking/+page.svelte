@@ -55,11 +55,13 @@
     <span>{r.committed_count} committed expense(s)</span>
   {/snippet}
   {#snippet actions(r: Row)}
-    <DsActionButton action={() => fetchExpenseReport(r.committed_week_ending)} title="Expense Report"
-      >Expenses</DsActionButton
+    <DsActionButton
+      action={() => fetchExpenseReport(r.committed_week_ending)}
+      title="Expense Report">Expenses</DsActionButton
     >
-    <DsActionButton action={() => fetchReceiptsReport(r.committed_week_ending)} title="Receipts Archive"
-      >Receipts</DsActionButton
+    <DsActionButton
+      action={() => fetchReceiptsReport(r.committed_week_ending)}
+      title="Receipts Archive">Receipts</DsActionButton
     >
   {/snippet}
 </DsList>

@@ -15,7 +15,8 @@
 
   {#snippet byline(item: ClaimListItem)}
     <span class="opacity-60">
-      {item.holder_count} {item.holder_count === 1 ? "holder" : "holders"}
+      {item.holder_count}
+      {item.holder_count === 1 ? "holder" : "holders"}
     </span>
   {/snippet}
 

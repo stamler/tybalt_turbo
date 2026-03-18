@@ -56,23 +56,17 @@
         <div class="rounded-sm border border-neutral-300 bg-neutral-50 p-4">
           <div class="text-sm font-medium text-neutral-500">Qualifying POs</div>
           <div class="mt-1 text-3xl font-bold">{stats.qualifying_po_count}</div>
-          <div class="mt-1 text-xs text-neutral-400">
-            New POs that completed the approval flow
-          </div>
+          <div class="mt-1 text-xs text-neutral-400">New POs that completed the approval flow</div>
         </div>
         <div class="rounded-sm border border-neutral-300 bg-neutral-50 p-4">
           <div class="text-sm font-medium text-neutral-500">Approved Expenses</div>
           <div class="mt-1 text-3xl font-bold">{stats.approved_expense_count}</div>
-          <div class="mt-1 text-xs text-neutral-400">
-            Against qualifying POs
-          </div>
+          <div class="mt-1 text-xs text-neutral-400">Against qualifying POs</div>
         </div>
         <div class="rounded-sm border border-neutral-300 bg-neutral-50 p-4">
           <div class="text-sm font-medium text-neutral-500">Distinct Users</div>
           <div class="mt-1 text-3xl font-bold">{stats.distinct_user_count}</div>
-          <div class="mt-1 text-xs text-neutral-400">
-            Who have touched these POs and expenses
-          </div>
+          <div class="mt-1 text-xs text-neutral-400">Who have touched these POs and expenses</div>
         </div>
       </div>
     {/if}

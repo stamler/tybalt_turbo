@@ -47,9 +47,7 @@
     }
   }
 
-  const normalizedAction = $derived(
-    typeof action === "string" ? () => goto(action) : action,
-  );
+  const normalizedAction = $derived(typeof action === "string" ? () => goto(action) : action);
   const isLoading = $derived(loading || actionInFlight);
   const normalizedColor = $derived(color ?? "yellow");
   const iconName = $derived(typeof icon === "string" ? icon : undefined);

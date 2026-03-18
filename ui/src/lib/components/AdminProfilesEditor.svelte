@@ -22,8 +22,20 @@
   import type { SearchResult } from "minisearch";
   import { divisions as divisionsStore } from "$lib/stores/divisions";
   import { branches as branchesStore } from "$lib/stores/branches";
+  import { globalStore } from "$lib/stores/global";
+  import { resolve } from "$app/paths";
 
   const PO_APPROVER_CLAIM_NAME = "po_approver";
+  const HR_EDITABLE_FIELDS = [
+    "allow_personal_reimbursement",
+    "skip_min_time_check",
+    "payroll_id",
+    "salary",
+    "personal_vehicle_insurance_expiry",
+    "time_sheet_expected",
+    "off_rotation_permitted",
+    "default_charge_out_rate",
+  ] as const;
 
   let { data }: { data: AdminProfilesEditPageData & { divisions?: DivisionsResponse[] } } =
     $props();
@@ -35,6 +47,10 @@
   // Use shared divisions store for items and index
   const divisions = $derived.by(() => $divisionsStore.items as DivisionsResponse[]);
   const divisionsIndex = $derived.by(() => $divisionsStore.index);
+  const isAdmin = $derived($globalStore.claims.includes("admin"));
+  const isHrOnly = $derived(
+    $globalStore.claims.includes("hr") && !$globalStore.claims.includes("admin"),
+  );
 
   let allClaims = $state([] as ClaimsResponse[]);
   let originalUserClaims = $state([] as UserClaimsResponse[]);
@@ -92,7 +108,10 @@
   });
 
   onMount(async () => {
-    await Promise.all([reloadAllClaims(), reloadUserClaims(), branchesStore.init()]);
+    await branchesStore.init();
+    if (isAdmin) {
+      await Promise.all([reloadAllClaims(), reloadUserClaims()]);
+    }
   });
 
   function normalizeNumber(value: unknown): number {
@@ -499,14 +518,54 @@
     }
   }
 
+  function adminProfilePayload() {
+    if (!isHrOnly) return item;
+    return HR_EDITABLE_FIELDS.reduce<Record<string, unknown>>((payload, fieldName) => {
+      payload[fieldName] = item[fieldName];
+      return payload;
+    }, {});
+  }
+
+  function errorData(error: unknown): Record<string, { message: string }> {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "data" in error &&
+      typeof error.data === "object" &&
+      error.data !== null &&
+      "data" in error.data &&
+      typeof error.data.data === "object" &&
+      error.data.data !== null
+    ) {
+      return error.data.data as Record<string, { message: string }>;
+    }
+
+    return {};
+  }
+
   async function save(event: Event) {
     event.preventDefault();
     try {
+      if (isHrOnly && (!data.editing || !data.id)) {
+        errors = {
+          global: { message: "HR can only update existing admin profiles." },
+        };
+        return;
+      }
+
+      const payload = adminProfilePayload();
+
       // Save the admin_profile fields first
       if (data.editing && data.id) {
-        await pb.collection("admin_profiles").update(data.id, item);
+        await pb.collection("admin_profiles").update(data.id, payload);
       } else {
-        await pb.collection("admin_profiles").create(item);
+        await pb.collection("admin_profiles").create(payload);
+      }
+
+      if (isHrOnly) {
+        errors = {};
+        goto(resolve("/admin_profiles/list"));
+        return;
       }
 
       // Compute claim diffs and persist
@@ -542,9 +601,9 @@
       await persistPoApproverProps();
 
       errors = {};
-      goto("/admin_profiles/list");
-    } catch (error: any) {
-      errors = error?.data?.data || {};
+      goto(resolve("/admin_profiles/list"));
+    } catch (error: unknown) {
+      errors = errorData(error);
       if (!errors.global) {
         errors.global = { message: "Failed to save changes. Please try again." };
       }
@@ -565,17 +624,19 @@
   onsubmit={save}
 >
   <div class="w/full grid grid-cols-1 gap-2 md:grid-cols-2">
-    <DsCheck bind:value={item.active as boolean} {errors} fieldName="active" uiName="Active" />
+    {#if isAdmin}
+      <DsCheck bind:value={item.active as boolean} {errors} fieldName="active" uiName="Active" />
 
-    <DsTextInput
-      bind:value={item.work_week_hours as number}
-      {errors}
-      fieldName="work_week_hours"
-      uiName="Work Week Hours"
-      type="number"
-      step={1}
-      min={0}
-    />
+      <DsTextInput
+        bind:value={item.work_week_hours as number}
+        {errors}
+        fieldName="work_week_hours"
+        uiName="Work Week Hours"
+        type="number"
+        step={1}
+        min={0}
+      />
+    {/if}
 
     <DsCheck bind:value={item.salary as boolean} {errors} fieldName="salary" uiName="Salary" />
     <DsCheck
@@ -584,12 +645,14 @@
       fieldName="off_rotation_permitted"
       uiName="Off Rotation Permitted"
     />
-    <DsCheck
-      bind:value={item.untracked_time_off as boolean}
-      {errors}
-      fieldName="untracked_time_off"
-      uiName="Untracked Time Off"
-    />
+    {#if isAdmin}
+      <DsCheck
+        bind:value={item.untracked_time_off as boolean}
+        {errors}
+        fieldName="untracked_time_off"
+        uiName="Untracked Time Off"
+      />
+    {/if}
     <DsCheck
       bind:value={item.time_sheet_expected as boolean}
       {errors}
@@ -627,19 +690,21 @@
       {#snippet optionTemplate(item)}{item.name}{/snippet}
     </DsSelector>
 
-    <span class="flex w-full gap-2 {errors.opening_date !== undefined ? 'bg-red-200' : ''}">
-      <label for="opening_date">Opening Date</label>
-      <DsDateInput
-        class="flex-1"
-        name="opening_date"
-        min={DATE_INPUT_MIN}
-        max={dateInputMax}
-        bind:value={item.opening_date}
-      />
-      {#if errors.opening_date !== undefined}
-        <span class="text-red-600">{errors.opening_date.message}</span>
-      {/if}
-    </span>
+    {#if isAdmin}
+      <span class="flex w-full gap-2 {errors.opening_date !== undefined ? 'bg-red-200' : ''}">
+        <label for="opening_date">Opening Date</label>
+        <DsDateInput
+          class="flex-1"
+          name="opening_date"
+          min={DATE_INPUT_MIN}
+          max={dateInputMax}
+          bind:value={item.opening_date}
+        />
+        {#if errors.opening_date !== undefined}
+          <span class="text-red-600">{errors.opening_date.message}</span>
+        {/if}
+      </span>
+    {/if}
 
     <span
       class="flex w-full gap-2 {errors.personal_vehicle_insurance_expiry !== undefined
@@ -659,24 +724,26 @@
       {/if}
     </span>
 
-    <DsTextInput
-      bind:value={item.opening_op as number}
-      {errors}
-      fieldName="opening_op"
-      uiName="Opening OP"
-      type="number"
-      step={0.1}
-      min={0}
-    />
-    <DsTextInput
-      bind:value={item.opening_ov as number}
-      {errors}
-      fieldName="opening_ov"
-      uiName="Opening OV"
-      type="number"
-      step={0.01}
-      min={0}
-    />
+    {#if isAdmin}
+      <DsTextInput
+        bind:value={item.opening_op as number}
+        {errors}
+        fieldName="opening_op"
+        uiName="Opening OP"
+        type="number"
+        step={0.1}
+        min={0}
+      />
+      <DsTextInput
+        bind:value={item.opening_ov as number}
+        {errors}
+        fieldName="opening_ov"
+        uiName="Opening OV"
+        type="number"
+        step={0.01}
+        min={0}
+      />
+    {/if}
 
     <DsTextInput
       bind:value={item.payroll_id as string}
@@ -684,37 +751,39 @@
       fieldName="payroll_id"
       uiName="Payroll ID"
     />
-    <DsTextInput
-      bind:value={item.mobile_phone as string}
-      {errors}
-      fieldName="mobile_phone"
-      uiName="Mobile Phone"
-    />
-    <DsTextInput
-      bind:value={item.job_title as string}
-      {errors}
-      fieldName="job_title"
-      uiName="Job Title"
-    />
+    {#if isAdmin}
+      <DsTextInput
+        bind:value={item.mobile_phone as string}
+        {errors}
+        fieldName="mobile_phone"
+        uiName="Mobile Phone"
+      />
+      <DsTextInput
+        bind:value={item.job_title as string}
+        {errors}
+        fieldName="job_title"
+        uiName="Job Title"
+      />
 
-    <DsSelector
-      bind:value={item.default_branch as string}
-      items={$branchesStore.items}
-      {errors}
-      fieldName="default_branch"
-      uiName="Default Branch"
-    >
-      {#snippet optionTemplate(item)}{item.name}{/snippet}
-    </DsSelector>
+      <DsSelector
+        bind:value={item.default_branch as string}
+        items={$branchesStore.items}
+        {errors}
+        fieldName="default_branch"
+        uiName="Default Branch"
+      >
+        {#snippet optionTemplate(item)}{item.name}{/snippet}
+      </DsSelector>
+    {/if}
   </div>
 
-  <!-- Claims section -->
-  <div class="mt-4 w-full space-y-4">
-    <div class="space-y-2">
-      <h2 class="text-lg font-semibold">Claims</h2>
-      <div class="flex flex-row flex-wrap gap-2">
-        {#each stagedClaimIds as cid}
-          {#key cid}
+  {#if isAdmin}
+    <!-- Claims section -->
+    <div class="mt-4 w-full space-y-4">
+      <div class="space-y-2">
+        <h2 class="text-lg font-semibold">Claims</h2>
+        <div class="flex flex-row flex-wrap gap-2">
+          {#each stagedClaimIds as cid (cid)}
             <span class="flex items-center gap-1">
               <DsLabel color={cid === getPoApproverClaimId() ? "purple" : "cyan"}
                 >{cid === getPoApproverClaimId() ? poApproverClaimLabel() : claimNameFor(cid)}
@@ -726,135 +795,135 @@
                 >
               </DsLabel>
             </span>
-          {/key}
-        {/each}
-        {#if stagedClaimIds.length === 0}
-          <span class="text-sm text-neutral-500">No claims assigned.</span>
-        {/if}
-      </div>
-
-      <DsSelector
-        bind:value={selectedClaimId}
-        items={[{ id: "", name: "-- add claim --" }, ...availableClaims()]}
-        {errors}
-        fieldName="claim_to_add"
-        uiName="Add Claim"
-        disabled={availableClaims().length === 0}
-      >
-        {#snippet optionTemplate(item)}{item.name}{/snippet}
-      </DsSelector>
-    </div>
-
-    {#if hasPoApproverClaim}
-      <section class="space-y-3 rounded-sm border border-neutral-200 bg-neutral-50 p-3">
-        <h3 class="text-base font-semibold">PO Approver Settings</h3>
-
-        <DsTextInput
-          bind:value={poApproverMaxAmount as number}
-          {errors}
-          fieldName="po_approver_max_amount"
-          uiName="Capital Max"
-          type="number"
-          min={0}
-          step={0.01}
-        />
-
-        <DsTextInput
-          bind:value={poApproverProjectMax as number}
-          {errors}
-          fieldName="po_approver_project_max"
-          uiName="Project Max"
-          type="number"
-          min={0}
-          step={0.01}
-        />
-
-        <DsTextInput
-          bind:value={poApproverSponsorshipMax as number}
-          {errors}
-          fieldName="po_approver_sponsorship_max"
-          uiName="Sponsorship Max"
-          type="number"
-          min={0}
-          step={0.01}
-        />
-
-        <DsTextInput
-          bind:value={poApproverStaffAndSocialMax as number}
-          {errors}
-          fieldName="po_approver_staff_and_social_max"
-          uiName="Staff and Social Max"
-          type="number"
-          min={0}
-          step={0.01}
-        />
-
-        <DsTextInput
-          bind:value={poApproverMediaAndEventMax as number}
-          {errors}
-          fieldName="po_approver_media_and_event_max"
-          uiName="Media and Event Max"
-          type="number"
-          min={0}
-          step={0.01}
-        />
-
-        <DsTextInput
-          bind:value={poApproverComputerMax as number}
-          {errors}
-          fieldName="po_approver_computer_max"
-          uiName="Computer Max"
-          type="number"
-          min={0}
-          step={0.01}
-        />
-
-        <div class="space-y-2">
-          <p class="font-semibold">Divisions for PO approval</p>
-          <div class="flex flex-wrap gap-2">
-            {#each poApproverDivisions as divisionId}
-              <DsLabel color="purple">
-                {divisionLabel(divisionId)}
-                <DsActionButton
-                  transparentBackground={true}
-                  title="Remove division"
-                  color="red"
-                  action={() => removeDivision(divisionId)}
-                >
-                  x
-                </DsActionButton>
-              </DsLabel>
-            {/each}
-            {#if poApproverDivisions.length === 0}
-              <span class="text-sm text-neutral-500">All divisions</span>
-            {/if}
-          </div>
-
-          {#if divisionsIndex}
-            <DsAutoComplete
-              bind:value={poApproverDivisionsSearch}
-              index={divisionsIndex}
-              {errors}
-              fieldName="po_approver_division"
-              uiName="Add Division"
-              multi={true}
-              choose={addDivisionById}
-            >
-              {#snippet resultTemplate(option)}
-                {divisionDisplay(option)}
-              {/snippet}
-            </DsAutoComplete>
-          {:else}
-            <span class="text-sm text-neutral-500">Loading divisions…</span>
-          {/if}
-
-          {#if poApproverDivisionsError}
-            <span class="text-sm text-red-600">{poApproverDivisionsError.message}</span>
+          {/each}
+          {#if stagedClaimIds.length === 0}
+            <span class="text-sm text-neutral-500">No claims assigned.</span>
           {/if}
         </div>
-      </section>
-    {/if}
-  </div>
+
+        <DsSelector
+          bind:value={selectedClaimId}
+          items={[{ id: "", name: "-- add claim --" }, ...availableClaims()]}
+          {errors}
+          fieldName="claim_to_add"
+          uiName="Add Claim"
+          disabled={availableClaims().length === 0}
+        >
+          {#snippet optionTemplate(item)}{item.name}{/snippet}
+        </DsSelector>
+      </div>
+
+      {#if hasPoApproverClaim}
+        <section class="space-y-3 rounded-sm border border-neutral-200 bg-neutral-50 p-3">
+          <h3 class="text-base font-semibold">PO Approver Settings</h3>
+
+          <DsTextInput
+            bind:value={poApproverMaxAmount as number}
+            {errors}
+            fieldName="po_approver_max_amount"
+            uiName="Capital Max"
+            type="number"
+            min={0}
+            step={0.01}
+          />
+
+          <DsTextInput
+            bind:value={poApproverProjectMax as number}
+            {errors}
+            fieldName="po_approver_project_max"
+            uiName="Project Max"
+            type="number"
+            min={0}
+            step={0.01}
+          />
+
+          <DsTextInput
+            bind:value={poApproverSponsorshipMax as number}
+            {errors}
+            fieldName="po_approver_sponsorship_max"
+            uiName="Sponsorship Max"
+            type="number"
+            min={0}
+            step={0.01}
+          />
+
+          <DsTextInput
+            bind:value={poApproverStaffAndSocialMax as number}
+            {errors}
+            fieldName="po_approver_staff_and_social_max"
+            uiName="Staff and Social Max"
+            type="number"
+            min={0}
+            step={0.01}
+          />
+
+          <DsTextInput
+            bind:value={poApproverMediaAndEventMax as number}
+            {errors}
+            fieldName="po_approver_media_and_event_max"
+            uiName="Media and Event Max"
+            type="number"
+            min={0}
+            step={0.01}
+          />
+
+          <DsTextInput
+            bind:value={poApproverComputerMax as number}
+            {errors}
+            fieldName="po_approver_computer_max"
+            uiName="Computer Max"
+            type="number"
+            min={0}
+            step={0.01}
+          />
+
+          <div class="space-y-2">
+            <p class="font-semibold">Divisions for PO approval</p>
+            <div class="flex flex-wrap gap-2">
+              {#each poApproverDivisions as divisionId (divisionId)}
+                <DsLabel color="purple">
+                  {divisionLabel(divisionId)}
+                  <DsActionButton
+                    transparentBackground={true}
+                    title="Remove division"
+                    color="red"
+                    action={() => removeDivision(divisionId)}
+                  >
+                    x
+                  </DsActionButton>
+                </DsLabel>
+              {/each}
+              {#if poApproverDivisions.length === 0}
+                <span class="text-sm text-neutral-500">All divisions</span>
+              {/if}
+            </div>
+
+            {#if divisionsIndex}
+              <DsAutoComplete
+                bind:value={poApproverDivisionsSearch}
+                index={divisionsIndex}
+                {errors}
+                fieldName="po_approver_division"
+                uiName="Add Division"
+                multi={true}
+                choose={addDivisionById}
+              >
+                {#snippet resultTemplate(option)}
+                  {divisionDisplay(option)}
+                {/snippet}
+              </DsAutoComplete>
+            {:else}
+              <span class="text-sm text-neutral-500">Loading divisions…</span>
+            {/if}
+
+            {#if poApproverDivisionsError}
+              <span class="text-sm text-red-600">{poApproverDivisionsError.message}</span>
+            {/if}
+          </div>
+        </section>
+      {/if}
+    </div>
+  {/if}
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">

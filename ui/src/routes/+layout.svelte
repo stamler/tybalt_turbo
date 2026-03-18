@@ -61,6 +61,11 @@
                     $globalStore.claims.includes("tame") || $globalStore.claims.includes("report")
                   );
                 }
+                if (item.href === "/admin_profiles/list") {
+                  return (
+                    $globalStore.claims.includes("admin") || $globalStore.claims.includes("hr")
+                  );
+                }
                 if (
                   item.href.startsWith("/admin_profiles") ||
                   item.href.startsWith("/timetypes") ||

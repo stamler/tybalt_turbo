@@ -2,10 +2,13 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import { globalStore } from "$lib/stores/global";
+  import { resolve } from "$app/paths";
   import Icon from "@iconify/svelte";
   import type { AdminProfilesAugmentedResponse } from "$lib/pocketbase-types";
   let { data } = $props();
   const items = $derived(data.items as AdminProfilesAugmentedResponse[]);
+  const isAdmin = $derived($globalStore.claims.includes("admin"));
 
   function normalizeDivisions(value: null | string[] | undefined): string[] {
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
@@ -28,40 +31,42 @@
 
 <DsList {items} search={true} inListHeader="Staff">
   {#snippet searchBarExtra()}
-    <a
-      href="/admin_profiles/po_approvers"
-      class="flex items-center gap-1 rounded-sm bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
-    >
-      <Icon icon="mdi:edit-outline" class="text-base" /> PO Approvers
-    </a>
+    {#if isAdmin}
+      <a
+        href={resolve("/admin_profiles/po_approvers")}
+        class="flex items-center gap-1 rounded-sm bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
+      >
+        <Icon icon="mdi:edit-outline" class="text-base" /> PO Approvers
+      </a>
+    {/if}
   {/snippet}
 
   {#snippet anchor(item: AdminProfilesAugmentedResponse)}
     <div class="flex flex-col">
       <a
-        href={`/admin_profiles/${item.id}/details`}
-        class={item.active === false
+        href={resolve(`/admin_profiles/${item.id}/details`)}
+        class={isAdmin && item.active === false
           ? "text-blue-400 hover:underline"
           : "text-blue-600 hover:underline"}
       >
         {item.given_name}
         {item.surname}
       </a>
-      {#if item.active === false}
+      {#if isAdmin && item.active === false}
         <span class="self-center text-xs font-medium text-red-500">Inactive</span>
       {/if}
     </div>
   {/snippet}
 
   {#snippet headline(item: AdminProfilesAugmentedResponse)}
-    <span class={`flex items-center gap-2 ${item.active === false ? "opacity-50" : ""}`}>
+    <span class={`flex items-center gap-2 ${isAdmin && item.active === false ? "opacity-50" : ""}`}>
       {item.job_title || "-"}
     </span>
   {/snippet}
 
   {#snippet byline(item: AdminProfilesAugmentedResponse)}
-    <span class={item.active === false ? "opacity-30" : "opacity-60"}>
-      {#if item.mobile_phone && item.mobile_phone.trim() !== ""}
+    <span class={isAdmin && item.active === false ? "opacity-30" : "opacity-60"}>
+      {#if isAdmin && item.mobile_phone && item.mobile_phone.trim() !== ""}
         Mobile: {item.mobile_phone}
         {#if item.payroll_id && item.payroll_id.trim() !== ""}
           •
@@ -72,10 +77,10 @@
   {/snippet}
 
   {#snippet line1(item: AdminProfilesAugmentedResponse)}
-    <span class={`flex items-center gap-2 ${item.active === false ? "opacity-50" : ""}`}>
+    <span class={`flex items-center gap-2 ${isAdmin && item.active === false ? "opacity-50" : ""}`}>
       <span>{item.salary ? "Salary" : "Hourly"}</span>
       <span>Charge Out Rate: {item.default_charge_out_rate}</span>
-      {#if poApproverLabel(item)}
+      {#if isAdmin && poApproverLabel(item)}
         <DsLabel color="purple">{poApproverLabel(item)}</DsLabel>
       {/if}
     </span>

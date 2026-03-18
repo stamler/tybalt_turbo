@@ -1,18 +1,12 @@
 import type { PageLoad } from "./$types";
-import {
-  AdminProfilesAugmentedSkipMinTimeCheckOptions,
-  Collections,
-} from "$lib/pocketbase-types";
-import type {
-  AdminProfilesAugmentedResponse,
-  DivisionsResponse,
-} from "$lib/pocketbase-types";
+import { AdminProfilesAugmentedSkipMinTimeCheckOptions, Collections } from "$lib/pocketbase-types";
+import type { AdminProfilesAugmentedResponse, DivisionsResponse } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { AdminProfilesEditPageData } from "$lib/svelte-types";
 
-export const load: PageLoad<AdminProfilesEditPageData & { divisions: DivisionsResponse[] }> = async ({
-  params,
-}) => {
+export const load: PageLoad<
+  AdminProfilesEditPageData & { divisions: DivisionsResponse[] }
+> = async ({ params }) => {
   const defaultItem = {
     id: "",
     collectionId: "",
@@ -50,10 +44,15 @@ export const load: PageLoad<AdminProfilesEditPageData & { divisions: DivisionsRe
   } satisfies AdminProfilesAugmentedResponse;
 
   try {
-    const [item, divisions] = await Promise.all([
-      pb.collection("admin_profiles_augmented").getOne<AdminProfilesAugmentedResponse>(params.id),
-      pb.collection("divisions").getFullList<DivisionsResponse>({ sort: "code" }),
-    ]);
+    const item = await pb
+      .collection("admin_profiles_augmented")
+      .getOne<AdminProfilesAugmentedResponse>(params.id);
+    let divisions: DivisionsResponse[] = [];
+    try {
+      divisions = await pb.collection("divisions").getFullList<DivisionsResponse>({ sort: "code" });
+    } catch {
+      // noop
+    }
 
     return { item, editing: true, id: params.id, divisions };
   } catch (error) {

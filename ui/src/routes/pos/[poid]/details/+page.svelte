@@ -15,7 +15,8 @@
   const viewerId = pb.authStore.record?.id ?? "";
   let rejectModal: RejectModal;
   let showSecondApproverWhy = $state(false);
-  const formatAmount = (value: number) => (Number.isFinite(value) ? value.toFixed(2) : String(value));
+  const formatAmount = (value: number) =>
+    Number.isFinite(value) ? value.toFixed(2) : String(value);
   const secondApproverMeta = $derived(data.secondApproverDiagnostics?.meta ?? null);
   const hasSecondApproverAlert = $derived(secondApproverMeta?.status === "required_no_candidates");
   const isRejected = $derived(data.po.status === "Unapproved" && data.po.rejected !== "");
@@ -117,7 +118,10 @@
             rejected it on {shortDate(data.po.rejected)}.
           </div>
           {#if data.po.rejection_reason}
-            <div class="mt-1"><span class="font-semibold">Reason:</span> {data.po.rejection_reason}</div>
+            <div class="mt-1">
+              <span class="font-semibold">Reason:</span>
+              {data.po.rejection_reason}
+            </div>
           {/if}
           {#if isOwner && $expensesEditingEnabled && !data.po.legacy_manual_entry}
             <div class="mt-2">
@@ -151,10 +155,13 @@
               <div>reason code: {secondApproverMeta.reason_code || "n/a"}</div>
               <div>evaluated amount: ${formatAmount(secondApproverMeta.evaluated_amount)}</div>
               <div>
-                second-approval threshold:
-                ${formatAmount(secondApproverMeta.second_approval_threshold)}
+                second-approval threshold: ${formatAmount(
+                  secondApproverMeta.second_approval_threshold,
+                )}
               </div>
-              <div>second-stage timeout (hours): {secondApproverMeta.second_stage_timeout_hours}</div>
+              <div>
+                second-stage timeout (hours): {secondApproverMeta.second_stage_timeout_hours}
+              </div>
               <div>eligibility limit rule: {secondApproverMeta.limit_column || "n/a"}</div>
               <div>division: {data.po.division_code || data.po.division || "n/a"}</div>
               <div>kind: {data.po.kind || "n/a"}</div>
@@ -325,7 +332,6 @@
       {#if data.po.rejector_name}
         <div><span class="font-semibold">Rejector:</span> {data.po.rejector_name}</div>
       {/if}
-
     </div>
   </div>
   {#if data.po.status === "Unapproved" && $expensesEditingEnabled}
@@ -339,7 +345,12 @@
         />
       {/if}
       {#if canApproveOrReject && !isRejected}
-        <DsActionButton action={() => approvePo()} icon="mdi:approve" title="Approve" color="green" />
+        <DsActionButton
+          action={() => approvePo()}
+          icon="mdi:approve"
+          title="Approve"
+          color="green"
+        />
         <DsActionButton
           action={() => openRejectModal()}
           icon="mdi:cancel"
@@ -388,5 +399,9 @@
     </DsList>
   </section>
 
-  <RejectModal collectionName="purchase_orders" bind:this={rejectModal} on:refresh={refreshDetails} />
+  <RejectModal
+    collectionName="purchase_orders"
+    bind:this={rejectModal}
+    on:refresh={refreshDetails}
+  />
 </div>

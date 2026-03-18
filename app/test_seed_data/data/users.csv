@@ -10,6 +10,7 @@ created,email,emailVisibility,id,name,password,tokenKey,updated,username,verifie
 2024-10-29 12:25:48.150Z,time@test.com,0,rzr98oadsp9qc11,,$2a$12$MFwqOVtoQBUWoy4N7BEd2u8OBvfvRadp3sN7uCzWKz1.i6t5EfDuO,Xr9BbprGqBJ5rMpzJvaFyI2rdHlGRyBuDfFD4y2kRsBYCBaOIY,2024-10-29 12:25:48.150Z,time,1
 2025-03-13 16:16:00.569Z,tier2b@poapprover.com,0,t4g84hfvkt1v9j3,Tier TwoB,$2a$10$VB0Vpl4Dr3Rak2lIMFUzIOlmYGndnJprSk3bzQ/q.XRMkyz8P2s5W,Hh4qr1_3_c_AmqH4F04zP8h76U_0PFvU84NQv_x9Z_oNG_zp0_,2025-03-13 16:16:00.569Z,tier2b,1
 2024-11-08 15:30:50.124Z,book@keeper.com,0,tqqf7q0f3378rvp,,$2a$12$JWde60OHnRq8ok.eG.99jOGf3b3F9UQ.pjKkcTDfHlkjHB1ZGt0Ey,4V9aQX1ChiHC1l9kUhwDs6nwvwYnRq5lV39UUePQEwj9RF5Qom,2024-11-08 15:30:50.124Z,bookey,1
+2026-03-17 22:05:00.000Z,hr@example.com,0,hruser000000001,HR User,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,tokenkeyforhruser123456789012345678901234567890123,2026-03-17 22:05:00.000Z,hruser,1
 2026-01-20 18:10:40,has_inactive_mgr@test.com,0,u_has_inactive_mgr,,$2a$12$pJI2YW21.vQd0BS7kZUVAuCjhjFc/cx1piSslHL2cEBo/94dZniJi,tokenkeyfortestuser1234567890123456789012345678,2026-01-20 18:10:40,has_inactive_mgr,1
 2025-06-19 19:07:23.538Z,inactive@example.com,0,u_inactive,,a.vQd0,tok_u_inactive,2025-06-19 19:07:23.538Z,u_inactive,1
 2024-10-29 12:25:48.150Z,u_mileage_expired@example.com,0,u_mileage_expired,,$2a$12$MFwqOVtoQBUWoy4N7BEd2u8OBvfvRadp3sN7uCzWKz1.i6t5EfDuO,tok_mileage_expired_20260309,2024-10-29 12:25:48.150Z,u_mileage_expired,1

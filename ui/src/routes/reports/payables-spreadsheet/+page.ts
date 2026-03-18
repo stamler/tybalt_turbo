@@ -5,14 +5,9 @@ export const load: PageLoad = async () => {
   let dates: string[] = [];
 
   try {
-    const response = await fetch(
-      `${pb.baseUrl}/api/reports/payables_spreadsheet_dates`,
-      {
-        headers: pb.authStore.isValid
-          ? { Authorization: pb.authStore.token }
-          : {},
-      },
-    );
+    const response = await fetch(`${pb.baseUrl}/api/reports/payables_spreadsheet_dates`, {
+      headers: pb.authStore.isValid ? { Authorization: pb.authStore.token } : {},
+    });
     if (response.ok) {
       dates = await response.json();
     }

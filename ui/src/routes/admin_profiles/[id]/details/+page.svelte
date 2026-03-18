@@ -1,8 +1,13 @@
 <script lang="ts">
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import { globalStore } from "$lib/stores/global";
 
   let { data } = $props();
+  const isAdmin = $derived($globalStore.claims.includes("admin"));
+  const isHrOnly = $derived(
+    $globalStore.claims.includes("hr") && !$globalStore.claims.includes("admin"),
+  );
 
   const currency = new Intl.NumberFormat("en-CA", {
     style: "currency",
@@ -22,7 +27,8 @@
   function hasPoApproverDetails(): boolean {
     if (!data.item) return false;
     const hasId =
-      typeof data.item.po_approver_props_id === "string" && data.item.po_approver_props_id.trim() !== "";
+      typeof data.item.po_approver_props_id === "string" &&
+      data.item.po_approver_props_id.trim() !== "";
     const divisions = normalizeDivisions(data.item.po_approver_divisions);
     return hasId || typeof data.item.po_approver_max_amount === "number" || divisions.length > 0;
   }
@@ -54,7 +60,7 @@
           {data.item.job_title || "-"}
         {/if}
       </h1>
-      {#if data.item.active === false}
+      {#if isAdmin && data.item.active === false}
         <DsLabel color="red">Inactive</DsLabel>
       {/if}
       <DsActionButton
@@ -67,32 +73,12 @@
 
     <section class="grid grid-cols-1 gap-2 md:grid-cols-2">
       <div class="flex gap-2">
-        <span class="font-semibold">Active:</span>
-        {data.item.active === false ? "No" : "Yes"}
-      </div>
-      <div class="flex gap-2">
         <span class="font-semibold">Payroll ID:</span>
         {data.item.payroll_id || "—"}
       </div>
       <div class="flex gap-2">
-        <span class="font-semibold">Job Title:</span>
-        {data.item.job_title || "—"}
-      </div>
-      <div class="flex gap-2">
-        <span class="font-semibold">Mobile Phone:</span>
-        {data.item.mobile_phone || "—"}
-      </div>
-      <div class="flex gap-2">
-        <span class="font-semibold">Work Week Hours:</span>
-        {data.item.work_week_hours}
-      </div>
-      <div class="flex gap-2">
         <span class="font-semibold">Default Charge Out Rate:</span>
         {data.item.default_charge_out_rate}
-      </div>
-      <div class="flex gap-2">
-        <span class="font-semibold">Default Branch:</span>
-        {data.defaultBranch?.name || "—"}
       </div>
       <div class="flex gap-2">
         <span class="font-semibold">Salary:</span>
@@ -101,10 +87,6 @@
       <div class="flex gap-2">
         <span class="font-semibold">Off Rotation Permitted:</span>
         {data.item.off_rotation_permitted ? "Yes" : "No"}
-      </div>
-      <div class="flex gap-2">
-        <span class="font-semibold">Untracked Time Off:</span>
-        {data.item.untracked_time_off ? "Yes" : "No"}
       </div>
       <div class="flex gap-2">
         <span class="font-semibold">Time Sheet Expected:</span>
@@ -119,52 +101,78 @@
         {data.item.skip_min_time_check}
       </div>
       <div class="flex gap-2">
-        <span class="font-semibold">Opening Date:</span>
-        {data.item.opening_date || "—"}
-      </div>
-      <div class="flex gap-2">
-        <span class="font-semibold">Opening OP:</span>
-        {data.item.opening_op}
-      </div>
-      <div class="flex gap-2">
-        <span class="font-semibold">Opening OV:</span>
-        {data.item.opening_ov}
-      </div>
-      <div class="flex gap-2">
         <span class="font-semibold">Personal Vehicle Insurance Expiry:</span>
         {data.item.personal_vehicle_insurance_expiry || "—"}
       </div>
-      <div class="flex gap-2">
-        <span class="font-semibold">Record ID:</span>
-        {data.item.id}
-      </div>
-      <div class="flex gap-2">
-        <span class="font-semibold">UID:</span>
-        {data.item.uid}
-      </div>
-    </section>
-
-    <!-- Claims, styled like the profile page -->
-    <section class="space-y-2">
-      <h2 class="text-lg font-semibold">Claims</h2>
-      {#if data.claims && data.claims.length > 0}
-        <ul class="flex flex-row flex-wrap gap-2">
-          {#each data.claims as claim (claim.id)}
-            <li>
-              <DsLabel color={claim.name === "po_approver" ? "purple" : "cyan"}
-                >{claim.name === "po_approver"
-                  ? poApproverClaimLabel()
-                  : claim.name}</DsLabel
-              >
-            </li>
-          {/each}
-        </ul>
-      {:else}
-        <p class="text-sm text-neutral-500">No claims assigned.</p>
+      {#if !isHrOnly}
+        <div class="flex gap-2">
+          <span class="font-semibold">Active:</span>
+          {data.item.active === false ? "No" : "Yes"}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">Job Title:</span>
+          {data.item.job_title || "—"}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">Mobile Phone:</span>
+          {data.item.mobile_phone || "—"}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">Work Week Hours:</span>
+          {data.item.work_week_hours}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">Default Branch:</span>
+          {data.defaultBranch?.name || "—"}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">Untracked Time Off:</span>
+          {data.item.untracked_time_off ? "Yes" : "No"}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">Opening Date:</span>
+          {data.item.opening_date || "—"}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">Opening OP:</span>
+          {data.item.opening_op}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">Opening OV:</span>
+          {data.item.opening_ov}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">Record ID:</span>
+          {data.item.id}
+        </div>
+        <div class="flex gap-2">
+          <span class="font-semibold">UID:</span>
+          {data.item.uid}
+        </div>
       {/if}
     </section>
 
-    {#if hasPoApproverDetails()}
+    {#if isAdmin}
+      <!-- Claims, styled like the profile page -->
+      <section class="space-y-2">
+        <h2 class="text-lg font-semibold">Claims</h2>
+        {#if data.claims && data.claims.length > 0}
+          <ul class="flex flex-row flex-wrap gap-2">
+            {#each data.claims as claim (claim.id)}
+              <li>
+                <DsLabel color={claim.name === "po_approver" ? "purple" : "cyan"}
+                  >{claim.name === "po_approver" ? poApproverClaimLabel() : claim.name}</DsLabel
+                >
+              </li>
+            {/each}
+          </ul>
+        {:else}
+          <p class="text-sm text-neutral-500">No claims assigned.</p>
+        {/if}
+      </section>
+    {/if}
+
+    {#if isAdmin && hasPoApproverDetails()}
       <section class="space-y-2">
         <h2 class="text-lg font-semibold">PO Approver Limits</h2>
         <div class="grid grid-cols-1 gap-2 md:grid-cols-2">

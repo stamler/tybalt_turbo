@@ -11,10 +11,7 @@
   import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
   import { profiles } from "$lib/stores/profiles";
   import { pb } from "$lib/pocketbase";
-  import {
-    createLegacyPurchaseOrder,
-    updateLegacyPurchaseOrder,
-  } from "$lib/legacyPurchaseOrders";
+  import { createLegacyPurchaseOrder, updateLegacyPurchaseOrder } from "$lib/legacyPurchaseOrders";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
@@ -738,14 +735,13 @@
     }
 
     try {
-      const saved =
-        legacyMode
-          ? data.editing && data.id !== null
-            ? await updateLegacyPurchaseOrder(data.id, item)
-            : await createLegacyPurchaseOrder(item)
-          : data.editing && data.id !== null
-            ? await pb.collection("purchase_orders").update(data.id, item)
-            : await pb.collection("purchase_orders").create(item);
+      const saved = legacyMode
+        ? data.editing && data.id !== null
+          ? await updateLegacyPurchaseOrder(data.id, item)
+          : await createLegacyPurchaseOrder(item)
+        : data.editing && data.id !== null
+          ? await pb.collection("purchase_orders").update(data.id, item)
+          : await pb.collection("purchase_orders").create(item);
 
       errors = {};
       if (legacyMode) {
@@ -963,211 +959,211 @@
       {/if}
     </div>
 
-  <div class="flex w-full flex-col gap-1 {errors.kind !== undefined ? 'bg-red-200' : ''}">
-    <DSToggle
-      bind:value={item.kind}
-      label="Kind"
-      options={kindOptions}
-      showOptionDescriptions={true}
-      fullWidth={true}
-    />
-    {#if errors.kind !== undefined}
-      <span class="text-red-600">{errors.kind.message}</span>
-    {/if}
-  </div>
-
-  <div class="flex w-full flex-col gap-1 {errors.payment_type !== undefined ? 'bg-red-200' : ''}">
-    {#if isChildPO}
-      <span>Payment</span>
-      <DsLabel color="cyan">{selectedPaymentType?.label ?? "On Account"}</DsLabel>
-    {:else}
+    <div class="flex w-full flex-col gap-1 {errors.kind !== undefined ? 'bg-red-200' : ''}">
       <DSToggle
-        bind:value={item.payment_type}
-        label="Payment"
-        options={paymentTypeOptions}
+        bind:value={item.kind}
+        label="Kind"
+        options={kindOptions}
         showOptionDescriptions={true}
         fullWidth={true}
       />
-    {/if}
-    {#if errors.payment_type !== undefined}
-      <span class="text-red-600">{errors.payment_type.message}</span>
-    {/if}
-  </div>
+      {#if errors.kind !== undefined}
+        <span class="text-red-600">{errors.kind.message}</span>
+      {/if}
+    </div>
 
-  {#if !legacyMode && showApproverField}
-    <DsSelector
-      bind:value={item.approver as string}
-      items={approvers}
-      {errors}
-      fieldName="approver"
-      uiName="Approver"
-    >
-      {#snippet optionTemplate(item)}
-        {item.given_name} {item.surname}
-      {/snippet}
-    </DsSelector>
-    {#if firstApproverReasonMessage}
-      <div class="w-full text-sm text-red-700">{firstApproverReasonMessage}</div>
+    <div class="flex w-full flex-col gap-1 {errors.payment_type !== undefined ? 'bg-red-200' : ''}">
+      {#if isChildPO}
+        <span>Payment</span>
+        <DsLabel color="cyan">{selectedPaymentType?.label ?? "On Account"}</DsLabel>
+      {:else}
+        <DSToggle
+          bind:value={item.payment_type}
+          label="Payment"
+          options={paymentTypeOptions}
+          showOptionDescriptions={true}
+          fullWidth={true}
+        />
+      {/if}
+      {#if errors.payment_type !== undefined}
+        <span class="text-red-600">{errors.payment_type.message}</span>
+      {/if}
+    </div>
+
+    {#if !legacyMode && showApproverField}
+      <DsSelector
+        bind:value={item.approver as string}
+        items={approvers}
+        {errors}
+        fieldName="approver"
+        uiName="Approver"
+      >
+        {#snippet optionTemplate(item)}
+          {item.given_name} {item.surname}
+        {/snippet}
+      </DsSelector>
+      {#if firstApproverReasonMessage}
+        <div class="w-full text-sm text-red-700">{firstApproverReasonMessage}</div>
+      {/if}
     {/if}
-  {/if}
-  {#if !legacyMode && showApproverAutoAssignHint}
-    <div class="w-full text-sm text-neutral-600">You will be set as the approver.</div>
-  {/if}
+    {#if !legacyMode && showApproverAutoAssignHint}
+      <div class="w-full text-sm text-neutral-600">You will be set as the approver.</div>
+    {/if}
 
-  {#if !legacyMode && showSecondApproverField}
-    <DsSelector
-      bind:value={item.priority_second_approver as string}
-      items={secondApprovers}
-      {errors}
-      fieldName="priority_second_approver"
-      uiName="Priority Second Approver"
-      clear={true}
-    >
-      {#snippet optionTemplate(item)}
-        {item.given_name} {item.surname}
-      {/snippet}
-    </DsSelector>
-  {:else if !legacyMode}
-    <PoSecondApproverStatus
-      showFetchError={showApproverFetchError}
-      showStatusHint={showSecondApproverStatusHint}
-      status={secondApproverStatus}
-      reasonMessage={secondApproverReasonMessage}
-      meta={secondApproverMeta}
-      division={item.division ?? ""}
-      kindLabel={selectedKind?.en_ui_label ?? item.kind ?? "n/a"}
-      hasJob={item.job !== ""}
-    />
-  {/if}
-  {#if !legacyMode && showSecondApproverAutoAssignHint}
-    <div class="w-full text-sm text-neutral-600">You will be set as the second approver.</div>
-  {/if}
+    {#if !legacyMode && showSecondApproverField}
+      <DsSelector
+        bind:value={item.priority_second_approver as string}
+        items={secondApprovers}
+        {errors}
+        fieldName="priority_second_approver"
+        uiName="Priority Second Approver"
+        clear={true}
+      >
+        {#snippet optionTemplate(item)}
+          {item.given_name} {item.surname}
+        {/snippet}
+      </DsSelector>
+    {:else if !legacyMode}
+      <PoSecondApproverStatus
+        showFetchError={showApproverFetchError}
+        showStatusHint={showSecondApproverStatusHint}
+        status={secondApproverStatus}
+        reasonMessage={secondApproverReasonMessage}
+        meta={secondApproverMeta}
+        division={item.division ?? ""}
+        kindLabel={selectedKind?.en_ui_label ?? item.kind ?? "n/a"}
+        hasJob={item.job !== ""}
+      />
+    {/if}
+    {#if !legacyMode && showSecondApproverAutoAssignHint}
+      <div class="w-full text-sm text-neutral-600">You will be set as the second approver.</div>
+    {/if}
 
-  {#if isRecurring}
-    <span class="flex w-full gap-2 {errors.end_date !== undefined ? 'bg-red-200' : ''}">
-      <label for="end_date">End Date</label>
+    {#if isRecurring}
+      <span class="flex w-full gap-2 {errors.end_date !== undefined ? 'bg-red-200' : ''}">
+        <label for="end_date">End Date</label>
+        <DsDateInput
+          class="flex-1"
+          name="end_date"
+          min={DATE_INPUT_MIN}
+          max={dateInputMax}
+          bind:value={item.end_date}
+        />
+        {#if errors.end_date !== undefined}
+          <span class="text-red-600">{errors.end_date.message}</span>
+        {/if}
+      </span>
+
+      <DsSelector
+        bind:value={item.frequency as string}
+        items={[
+          { id: "Weekly", name: "Weekly" },
+          { id: "Biweekly", name: "Biweekly" },
+          { id: "Monthly", name: "Monthly" },
+        ]}
+        {errors}
+        fieldName="frequency"
+        uiName="Frequency"
+      >
+        {#snippet optionTemplate(item)}
+          {item.name}
+        {/snippet}
+      </DsSelector>
+    {/if}
+
+    <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
+      <label for="date">Date</label>
       <DsDateInput
         class="flex-1"
-        name="end_date"
+        name="date"
         min={DATE_INPUT_MIN}
         max={dateInputMax}
-        bind:value={item.end_date}
+        bind:value={item.date}
       />
-      {#if errors.end_date !== undefined}
-        <span class="text-red-600">{errors.end_date.message}</span>
+      {#if errors.date !== undefined}
+        <span class="text-red-600">{errors.date.message}</span>
       {/if}
     </span>
 
-    <DsSelector
-      bind:value={item.frequency as string}
-      items={[
-        { id: "Weekly", name: "Weekly" },
-        { id: "Biweekly", name: "Biweekly" },
-        { id: "Monthly", name: "Monthly" },
-      ]}
-      {errors}
-      fieldName="frequency"
-      uiName="Frequency"
-    >
-      {#snippet optionTemplate(item)}
-        {item.name}
-      {/snippet}
-    </DsSelector>
-  {/if}
-
-  <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
-    <label for="date">Date</label>
-    <DsDateInput
-      class="flex-1"
-      name="date"
-      min={DATE_INPUT_MIN}
-      max={dateInputMax}
-      bind:value={item.date}
-    />
-    {#if errors.date !== undefined}
-      <span class="text-red-600">{errors.date.message}</span>
+    {#if $divisions.index !== null}
+      <DsAutoComplete
+        bind:value={item.division as string}
+        index={$divisions.index}
+        {errors}
+        fieldName="division"
+        uiName="Division"
+      >
+        {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
+      </DsAutoComplete>
     {/if}
-  </span>
 
-  {#if $divisions.index !== null}
-    <DsAutoComplete
-      bind:value={item.division as string}
-      index={$divisions.index}
-      {errors}
-      fieldName="division"
-      uiName="Division"
-    >
-      {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
-    </DsAutoComplete>
-  {/if}
+    {#if legacyMode || item.job === ""}
+      <DsSelector
+        bind:value={item.branch as string}
+        items={$branchesStore.items}
+        {errors}
+        fieldName="branch"
+        uiName="Branch"
+        disabled={legacyMode && item.job !== ""}
+      >
+        {#snippet optionTemplate(item: BranchesResponse)}
+          {item.name}
+        {/snippet}
+      </DsSelector>
+    {/if}
 
-  {#if legacyMode || item.job === ""}
-    <DsSelector
-      bind:value={item.branch as string}
-      items={$branchesStore.items}
-      {errors}
-      fieldName="branch"
-      uiName="Branch"
-      disabled={legacyMode && item.job !== ""}
-    >
-      {#snippet optionTemplate(item: BranchesResponse)}
-        {item.name}
-      {/snippet}
-    </DsSelector>
-  {/if}
+    {#if kindAllowsJob && $jobs.index !== null}
+      <DsAutoComplete
+        bind:value={item.job as string}
+        index={$jobs.index}
+        {errors}
+        fieldName="job"
+        uiName="Job"
+        disabled={isChildPO}
+      >
+        {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+      </DsAutoComplete>
+    {/if}
 
-  {#if kindAllowsJob && $jobs.index !== null}
-    <DsAutoComplete
-      bind:value={item.job as string}
-      index={$jobs.index}
+    {#if !legacyMode && item.job !== "" && categories.length > 0}
+      <DsSelector
+        bind:value={item.category as string}
+        items={categories}
+        {errors}
+        fieldName="category"
+        uiName="Category"
+        clear={true}
+        disabled={isChildPO}
+      >
+        {#snippet optionTemplate(item: CategoriesResponse)}
+          {item.name}
+        {/snippet}
+      </DsSelector>
+    {/if}
+
+    <DsTextInput
+      bind:value={item.description as string}
       {errors}
-      fieldName="job"
-      uiName="Job"
+      fieldName="description"
+      uiName="Description"
       disabled={isChildPO}
-    >
-      {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
-    </DsAutoComplete>
-  {/if}
+    />
 
-  {#if !legacyMode && item.job !== "" && categories.length > 0}
-    <DsSelector
-      bind:value={item.category as string}
-      items={categories}
+    <DsTextInput
+      bind:value={item.total as number}
       {errors}
-      fieldName="category"
-      uiName="Category"
-      clear={true}
-      disabled={isChildPO}
-    >
-      {#snippet optionTemplate(item: CategoriesResponse)}
-        {item.name}
-      {/snippet}
-    </DsSelector>
-  {/if}
+      fieldName="total"
+      uiName="Total"
+      type="number"
+      step={0.01}
+      min={0}
+    />
+    <span class="flex w-full gap-2 text-sm text-neutral-600">
+      <span class="invisible">Total</span>
+      <span>max in CAD including all taxes and shipping</span>
+    </span>
 
-  <DsTextInput
-    bind:value={item.description as string}
-    {errors}
-    fieldName="description"
-    uiName="Description"
-    disabled={isChildPO}
-  />
-
-  <DsTextInput
-    bind:value={item.total as number}
-    {errors}
-    fieldName="total"
-    uiName="Total"
-    type="number"
-    step={0.01}
-    min={0}
-  />
-  <span class="flex w-full gap-2 text-sm text-neutral-600">
-    <span class="invisible">Total</span>
-    <span>max in CAD including all taxes and shipping</span>
-  </span>
-
-  <VendorSelector bind:value={item.vendor as string} {errors} disabled={isChildPO} />
+    <VendorSelector bind:value={item.vendor as string} {errors} disabled={isChildPO} />
 
     {#if !legacyMode}
       <!-- File upload for attachment -->

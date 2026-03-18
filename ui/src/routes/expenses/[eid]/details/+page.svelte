@@ -132,8 +132,7 @@
         </div>
         <div class="mt-1">
           This expense was submitted by
-          {personLabel(expense.uid_name, expense.uid, "unknown submitter")},
-          but the linked PO
+          {personLabel(expense.uid_name, expense.uid, "unknown submitter")}, but the linked PO
           {#if expense.purchase_order_number}
             {expense.purchase_order_number}
           {/if}
