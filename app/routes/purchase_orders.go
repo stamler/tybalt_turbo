@@ -182,6 +182,7 @@ func purchaseOrderVisibilityParams(
 	scope string,
 	staleBefore string,
 	expiringBefore string,
+	limit int,
 ) dbx.Params {
 	return dbx.Params{
 		"userId":          userID,
@@ -190,6 +191,7 @@ func purchaseOrderVisibilityParams(
 		"scope":           scope,
 		"staleBefore":     staleBefore,
 		"expiringBefore":  expiringBefore,
+		"limit":           limit,
 	}
 }
 
@@ -201,7 +203,7 @@ func purchaseOrderVisibilityParams(
 // established before any narrower resource-specific filtering happens.
 func findVisiblePurchaseOrderByID(app core.App, userID string, id string) (*purchaseOrderVisibilityRow, error) {
 	rows := []purchaseOrderVisibilityRow{}
-	params := purchaseOrderVisibilityParams(app, userID, "all", "", "")
+	params := purchaseOrderVisibilityParams(app, userID, "all", "", "", 0)
 	params["id"] = id
 
 	if err := app.DB().NewQuery(visiblePOByIDQuery).Bind(params).All(&rows); err != nil {
@@ -546,7 +548,7 @@ func createGetPendingPurchaseOrdersHandler(app core.App) func(e *core.RequestEve
 
 		rows := []purchaseOrderVisibilityRow{}
 		if err := app.DB().NewQuery(pendingPOsQuery).Bind(
-			purchaseOrderVisibilityParams(app, auth.Id, "all", "", ""),
+			purchaseOrderVisibilityParams(app, auth.Id, "all", "", "", 0),
 		).All(&rows); err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_pending_pos",
@@ -570,7 +572,7 @@ func createGetPendingPurchaseOrderHandler(app core.App) func(e *core.RequestEven
 		}
 
 		rows := []purchaseOrderVisibilityRow{}
-		params := purchaseOrderVisibilityParams(app, auth.Id, "all", "", "")
+		params := purchaseOrderVisibilityParams(app, auth.Id, "all", "", "", 0)
 		params["id"] = id
 
 		if err := app.DB().NewQuery(pendingPOByIDQuery).Bind(params).All(&rows); err != nil {
@@ -600,11 +602,11 @@ func createGetVisiblePurchaseOrdersHandler(app core.App) func(e *core.RequestEve
 		}
 
 		switch scope {
-		case "all", "mine", "active", "rejected", "stale", "expiring":
+		case "all", "mine", "active", "rejected", "stale", "expiring", "approved_by_me_awaiting_second":
 		default:
 			return e.JSON(http.StatusBadRequest, map[string]string{
 				"code":    "invalid_scope",
-				"message": "scope must be one of: all, mine, active, rejected, stale, expiring",
+				"message": "scope must be one of: all, mine, active, rejected, stale, expiring, approved_by_me_awaiting_second",
 			})
 		}
 
@@ -622,10 +624,22 @@ func createGetVisiblePurchaseOrdersHandler(app core.App) func(e *core.RequestEve
 				"message": "expiring_before is required when scope=expiring",
 			})
 		}
+		limit := 0
+		limitRaw := strings.TrimSpace(e.Request.URL.Query().Get("limit"))
+		if limitRaw != "" {
+			parsed, err := strconv.Atoi(limitRaw)
+			if err != nil || parsed <= 0 {
+				return e.JSON(http.StatusBadRequest, map[string]string{
+					"code":    "invalid_limit",
+					"message": "limit must be a positive integer",
+				})
+			}
+			limit = parsed
+		}
 
 		rows := []purchaseOrderVisibilityRow{}
 		if err := app.DB().NewQuery(visiblePOsQuery).Bind(
-			purchaseOrderVisibilityParams(app, auth.Id, scope, staleBefore, expiringBefore),
+			purchaseOrderVisibilityParams(app, auth.Id, scope, staleBefore, expiringBefore, limit),
 		).All(&rows); err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_visible_pos",
@@ -672,7 +686,7 @@ func createGetSearchablePurchaseOrdersHandler(app core.App) func(e *core.Request
 
 		rows := []purchaseOrderVisibilityRow{}
 		if err := app.DB().NewQuery(searchPOsQuery).Bind(
-			purchaseOrderVisibilityParams(app, auth.Id, "all", "", ""),
+			purchaseOrderVisibilityParams(app, auth.Id, "all", "", "", 0),
 		).All(&rows); err != nil {
 			return e.JSON(http.StatusInternalServerError, map[string]string{
 				"code":    "error_fetching_search_pos",

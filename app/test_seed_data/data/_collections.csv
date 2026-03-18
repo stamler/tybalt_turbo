@@ -177,7 +177,8 @@ uid = @request.auth.id &&
   status = ""Unapproved"" &&
   (
     @request.auth.id = uid ||
-    (approved = """" && @request.auth.id = approver) ||
+    @request.auth.id = approver ||
+    @request.auth.id = rejector ||
     (approved != """" && second_approval = """" && @request.auth.id = priority_second_approver)
   )
 )",purchase_orders,{},0,base,"legacy_manual_entry = false &&
@@ -241,7 +242,8 @@ second_approval = """" &&
   status = ""Unapproved"" &&
   (
     @request.auth.id = uid ||
-    (approved = """" && @request.auth.id = approver) ||
+    @request.auth.id = approver ||
+    @request.auth.id = rejector ||
     (approved != """" && second_approval = """" && @request.auth.id = priority_second_approver)
   )
 )"
@@ -346,7 +348,8 @@ uid = @request.auth.id &&
   status = ""Unapproved"" &&
   (
     @request.auth.id = uid ||
-    (approved = """" && @request.auth.id = approver) ||
+    @request.auth.id = approver ||
+    @request.auth.id = rejector ||
     (approved != """" && second_approval = """" && @request.auth.id = priority_second_approver)
   )
 )",purchase_orders_augmented,"{""viewQuery"":""SELECT\n  po.id,\n  po.po_number,\n  po.status,\n  po.uid,\n  po.type,\n  po.date,\n  po.end_date,\n  po.frequency,\n  po.division,\n  po.description,\n  po.total,\n  po.payment_type,\n  po.attachment,\n  po.rejector,\n  po.rejected,\n  po.rejection_reason,\n  po.approver,\n  po.approved,\n  po.second_approver,\n  po.second_approval,\n  po.canceller,\n  po.cancelled,\n  po.job,\n  po.category,\n  po.kind,\n  po.vendor,\n  po.parent_po,\n  po.created,\n  po.updated,\n  po.closer,\n  po.closed,\n  po.closed_by_system,\n  po.priority_second_approver,\n  po.approval_total,\n  (SELECT COUNT(*) FROM expenses WHERE expenses.purchase_order = po.id AND expenses.committed != \""\"") AS committed_expenses_count,\n  (p0.given_name || \"" \"" || p0.surname) AS uid_name,\n  (p1.given_name || \"" \"" || p1.surname) AS approver_name,\n  (p2.given_name || \"" \"" || p2.surname) AS second_approver_name,\n  (p3.given_name || \"" \"" || p3.surname) AS priority_second_approver_name,\n  (p4.given_name || \"" \"" || p4.surname) AS rejector_name,\n  po2.po_number AS parent_po_number,\n  v.name AS vendor_name,\n  v.alias AS vendor_alias,\n  j.number AS job_number,\n  cl.name AS client_name,\n  cl.id AS client_id,\n  j.description AS job_description,\n  d.code AS division_code,\n  d.name AS division_name,\n  c.name AS category_name\nFROM purchase_orders AS po\nLEFT JOIN profiles AS p0 ON po.uid = p0.uid\nLEFT JOIN profiles AS p1 ON po.approver = p1.uid\nLEFT JOIN profiles AS p2 ON po.second_approver = p2.uid\nLEFT JOIN profiles AS p3 ON po.priority_second_approver = p3.uid\nLEFT JOIN profiles AS p4 ON po.rejector = p4.uid\nLEFT JOIN purchase_orders AS po2 ON po.parent_po = po2.id\nLEFT JOIN vendors AS v ON po.vendor = v.id\nLEFT JOIN jobs AS j ON po.job = j.id\nLEFT JOIN divisions AS d ON po.division = d.id\nLEFT JOIN categories AS c ON po.category = c.id\nLEFT JOIN clients AS cl ON j.client = cl.id""}",0,view,\N,2026-03-09 15:56:48.164Z,"(status = ""Active"" && @request.auth.id != """") ||
@@ -363,7 +366,8 @@ uid = @request.auth.id &&
   status = ""Unapproved"" &&
   (
     @request.auth.id = uid ||
-    (approved = """" && @request.auth.id = approver) ||
+    @request.auth.id = approver ||
+    @request.auth.id = rejector ||
     (approved != """" && second_approval = """" && @request.auth.id = priority_second_approver)
   )
 )"

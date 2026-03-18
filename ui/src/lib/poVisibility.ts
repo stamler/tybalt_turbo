@@ -1,11 +1,19 @@
 import { pb } from "$lib/pocketbase";
 import type { PurchaseOrdersAugmentedResponse } from "$lib/pocketbase-types";
 
-export type VisiblePOScope = "all" | "mine" | "active" | "rejected" | "stale" | "expiring";
+export type VisiblePOScope =
+  | "all"
+  | "mine"
+  | "active"
+  | "rejected"
+  | "stale"
+  | "expiring"
+  | "approved_by_me_awaiting_second";
 
 export async function fetchVisiblePOs(
   scope: VisiblePOScope,
   beforeDate?: string,
+  limit?: number,
 ): Promise<PurchaseOrdersAugmentedResponse[]> {
   const params = new URLSearchParams({ scope });
   if (scope === "stale" && beforeDate) {
@@ -13,6 +21,9 @@ export async function fetchVisiblePOs(
   }
   if (scope === "expiring" && beforeDate) {
     params.set("expiring_before", beforeDate);
+  }
+  if (limit !== undefined) {
+    params.set("limit", String(limit));
   }
 
   return (await pb.send(`/api/purchase_orders/visible?${params.toString()}`, {

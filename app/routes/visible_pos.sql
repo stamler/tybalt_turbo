@@ -91,8 +91,18 @@ WHERE
       AND end_date != ''
       AND end_date <= {:expiringBefore}
     )
+    OR (
+      {:scope} = 'approved_by_me_awaiting_second'
+      AND status = 'Unapproved'
+      AND rejected = ''
+      AND approver = {:userId}
+      AND approved != ''
+      AND second_approval = ''
+    )
   )
 ORDER BY
   CASE WHEN {:scope} = 'expiring' THEN end_date END ASC,
+  CASE WHEN {:scope} = 'approved_by_me_awaiting_second' THEN approved END DESC,
   date DESC,
   updated DESC
+LIMIT CASE WHEN {:limit} > 0 THEN {:limit} ELSE -1 END

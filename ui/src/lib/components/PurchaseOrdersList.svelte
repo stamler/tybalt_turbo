@@ -5,6 +5,8 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
+  import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import { type UnsubscribeFunc } from "pocketbase";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
   import DsList from "$lib/components/DSList.svelte";
@@ -22,7 +24,7 @@
 
   interface PurchaseOrdersListData {
     items?: PurchaseOrdersAugmentedResponse[];
-    realtime_source?: "visible" | "pending";
+    realtime_source?: "visible" | "pending" | "none";
   }
 
   const collectionId = "purchase_orders";
@@ -32,7 +34,19 @@
     inListHeader,
     data,
     showOwner = false,
-  }: { inListHeader?: string; data: PurchaseOrdersListData; showOwner?: boolean } = $props();
+    refreshItems,
+    shouldRefreshOnEvent,
+    hideWhenEmpty = false,
+  }: {
+    inListHeader?: string;
+    data: PurchaseOrdersListData;
+    showOwner?: boolean;
+    refreshItems?: (() => Promise<PurchaseOrdersAugmentedResponse[]>) | undefined;
+    shouldRefreshOnEvent?:
+      | ((record: PurchaseOrdersResponse, currentItems: PurchaseOrdersAugmentedResponse[]) => boolean)
+      | undefined;
+    hideWhenEmpty?: boolean;
+  } = $props();
   let items = $state(untrack(() => data.items));
   let pendingApprovalIds = $state(new Set<string>());
 
@@ -70,7 +84,7 @@
           void refreshPendingApprovalIds();
         },
       );
-    } else {
+    } else if (data.realtime_source === "visible") {
       unsubscribeFunc = await proxySubscriptionWithLoader<
         PurchaseOrdersResponse,
         PurchaseOrdersAugmentedResponse
@@ -81,6 +95,22 @@
         (newItems) => {
           items = newItems;
           void refreshPendingApprovalIds();
+        },
+      );
+    } else if (data.realtime_source === "none" && refreshItems) {
+      unsubscribeFunc = await pb.collection("purchase_orders").subscribe<PurchaseOrdersResponse>(
+        "*",
+        async (e) => {
+          const currentItems = items ?? [];
+          if (shouldRefreshOnEvent && !shouldRefreshOnEvent(e.record, currentItems)) {
+            return;
+          }
+          try {
+            items = await refreshItems();
+            void refreshPendingApprovalIds();
+          } catch (error) {
+            console.error("Error refreshing purchase orders:", error);
+          }
         },
       );
     }
@@ -189,7 +219,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      await refreshPendingApprovalIds();
+      await goto(resolve(`/pos/${id}/details`));
     } catch (error: any) {
       globalStore.addError(error?.response?.message);
     }
@@ -233,7 +263,8 @@
   }
 </script>
 
-<DsList items={items as PurchaseOrdersAugmentedResponse[]} search={true} {inListHeader}>
+{#if !hideWhenEmpty || (items?.length ?? 0) > 0}
+  <DsList items={items as PurchaseOrdersAugmentedResponse[]} search={true} {inListHeader}>
   {#snippet anchor(item: PurchaseOrdersAugmentedResponse)}
     <span class="flex flex-col items-center gap-2">
       {#if item.status === "Active"}
@@ -405,6 +436,7 @@
           />
         {/if}
       {/if}
-    {/if}
-  {/snippet}
-</DsList>
+      {/if}
+    {/snippet}
+  </DsList>
+{/if}

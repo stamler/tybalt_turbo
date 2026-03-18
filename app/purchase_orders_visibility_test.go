@@ -184,6 +184,24 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "visible approved_by_me_awaiting_second scope returns first-approved purchase orders for the first approver",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible?scope=approved_by_me_awaiting_second",
+			Headers: map[string]string{
+				"Authorization": approverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2blv18f40i2q373"`,
+				`"status":"Unapproved"`,
+				`"approved":"`,
+			},
+			NotExpectedContent: []string{
+				`"id":"46efdq319b22480"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "rejector can still see rejected unapproved PO via visible API",
 			Method: http.MethodGet,
 			URL:    "/api/purchase_orders/visible/l9w1z13mm3srtoo",
@@ -227,6 +245,36 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"The requested resource wasn't found."`,
 				`"status":404`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "first approver can see first-approved PO via collection API",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/2blv18f40i2q373",
+			Headers: map[string]string{
+				"Authorization": approverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2blv18f40i2q373"`,
+				`"status":"Unapproved"`,
+				`"approver":"wegviunlyr2jjjv"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "first approver can see first-approved PO via augmented collection API",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders_augmented/records/2blv18f40i2q373",
+			Headers: map[string]string{
+				"Authorization": approverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2blv18f40i2q373"`,
+				`"status":"Unapproved"`,
+				`"approver":"wegviunlyr2jjjv"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -474,6 +522,20 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
 				`"code":"missing_expiring_before"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible endpoint rejects limit=0",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible?scope=approved_by_me_awaiting_second&limit=0",
+			Headers: map[string]string{
+				"Authorization": approverToken,
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"invalid_limit"`,
+				`"message":"limit must be a positive integer"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

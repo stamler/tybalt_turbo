@@ -120,4 +120,4 @@ Records with `_imported=true` originated from MySQL. Locally-created records hav
 
 **Writeback**: Changes to certain records (POs, expenses, user profiles) are synced to Firebase for legacy system compatibility, handled by `*_writeback.go` route files.
 
-**Migrations**: Go migration files in `app/migrations/`. PocketBase auto-generates migration stubs when schema changes are made via the admin UI while running with `go run`. Never delete or reorder migrations.
+**Migrations**: Go migration files in `app/migrations/`. PocketBase auto-generates migration stubs when schema changes are made via the admin UI while running with `go run`. Name all new migration files with a `date +%s` Unix timestamp prefix. Never invent or approximate the timestamp, and never delete or reorder migrations.
