@@ -549,6 +549,8 @@ export type NotificationsRecord<Tdata = unknown> = {
 };
 
 export type PayrollReportWeekEndingsRecord = {
+  committed_expense_count: number;
+  committed_timesheet_count: number;
   id: string;
   week_ending: string;
 };
