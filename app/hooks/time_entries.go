@@ -59,8 +59,9 @@ func cleanTimeEntry(app core.App, timeEntryRecord *core.Record) ([]string, error
 
 	// Certain fields are always allowed to be set. We add them to the list of
 	// allowed fields here. The role field is included because its requirement
-	// depends on job assignment, not the time_type.
-	allowedFields = append(allowedFields, "id", "uid", "created", "updated", "role")
+	// depends on job assignment, not the time_type. The branch field is derived
+	// from admin_profiles.default_branch below and must survive cleanup.
+	allowedFields = append(allowedFields, "id", "uid", "created", "updated", "role", "branch")
 
 	// Load the admin_profiles record and set branch from the user's default_branch
 	uid := timeEntryRecord.GetString("uid")
@@ -181,6 +182,10 @@ func ProcessTimeEntry(app core.App, e *core.RecordRequestEvent) error {
 		if ve, ok := err.(validation.Errors); ok {
 			return apis.NewBadRequestError("Validation error", ve)
 		}
+		return err
+	}
+
+	if err := utilities.EnsureUserCanUseBranch(app, record.GetString("branch"), authRecord.Id, "branch"); err != nil {
 		return err
 	}
 

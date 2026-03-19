@@ -425,6 +425,9 @@ func createCreateLegacyPurchaseOrderHandler(app core.App) func(e *core.RequestEv
 			if err := hooks.CleanPurchaseOrder(txApp, record); err != nil {
 				return err
 			}
+			if err := utilities.EnsureUserCanUseBranch(txApp, record.GetString("branch"), authRecord.Id, "branch"); err != nil {
+				return err
+			}
 			if err := hooks.EnsureActiveDivision(txApp, record.GetString("division"), "division"); err != nil {
 				return err
 			}
@@ -507,6 +510,9 @@ func createUpdateLegacyPurchaseOrderHandler(app core.App) func(e *core.RequestEv
 				return err
 			}
 			if err := hooks.CleanPurchaseOrder(txApp, record); err != nil {
+				return err
+			}
+			if err := utilities.EnsureUserCanUseBranch(txApp, record.GetString("branch"), authRecord.Id, "branch"); err != nil {
 				return err
 			}
 			if err := hooks.EnsureActiveDivision(txApp, record.GetString("division"), "division"); err != nil {

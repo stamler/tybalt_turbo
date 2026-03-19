@@ -509,6 +509,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		return err
 	}
 
+	if err := utilities.EnsureUserCanUseBranch(app, expenseRecord.GetString("branch"), authRecord.Id, "branch"); err != nil {
+		return err
+	}
+
 	// if the expense record has an attachment, calculate the sha256 hash of the
 	// file and set the attachment_hash property on the record
 	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")

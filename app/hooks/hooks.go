@@ -220,6 +220,19 @@ func AddHooks(app core.App) {
 		}
 		return e.Next()
 	})
+	// hooks for admin_profiles model
+	app.OnRecordCreateRequest("admin_profiles").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessAdminProfile(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	app.OnRecordUpdateRequest("admin_profiles").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessAdminProfile(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
 	// hooks for clients model
 	app.OnRecordCreateRequest("clients").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessClient(app, e); err != nil {

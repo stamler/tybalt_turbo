@@ -1,10 +1,13 @@
 package routes
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
+	"tybalt/errs"
+	"tybalt/hooks"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -103,6 +106,14 @@ func createCopyTimeEntryHandler(app core.App) func(e *core.RequestEvent) error {
 			newRecord.Set("week_ending", weekEnding)
 			// tsid intentionally left empty so the record is unbundled
 
+			if err := hooks.ProcessTimeEntry(txApp, &core.RecordRequestEvent{
+				RequestEvent: &core.RequestEvent{App: txApp, Auth: authRecord},
+				Record:       newRecord,
+			}); err != nil {
+				httpResponseStatusCode = http.StatusBadRequest
+				return err
+			}
+
 			// Persist the new record (triggers all hooks/validation)
 			if err := txApp.Save(newRecord); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
@@ -126,7 +137,11 @@ func createCopyTimeEntryHandler(app core.App) func(e *core.RequestEvent) error {
 					"code":  codeErr.Code,
 				})
 			}
-			return e.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
+			var hookErr *errs.HookError
+			if errors.As(err, &hookErr) {
+				return e.JSON(hookErr.Status, hookErr)
+			}
+			return err
 		}
 
 		return e.JSON(http.StatusCreated, map[string]string{

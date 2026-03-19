@@ -595,6 +595,11 @@
       "schema": {
         "fields": [
           {
+            "name": "allowed_claims",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
             "name": "code",
             "type": "string",
             "x-sqlite-type": "TEXT"

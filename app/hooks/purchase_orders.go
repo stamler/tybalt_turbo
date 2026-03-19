@@ -730,6 +730,10 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) (notificatio
 		return "", cleanErr
 	}
 
+	if err := utilities.EnsureUserCanUseBranch(app, record.GetString("branch"), authRecord.Id, "branch"); err != nil {
+		return "", err
+	}
+
 	if shouldResetApprovals {
 		// Clear approval state for meaningful edits to first-approved in-flight POs.
 		record.Set("approved", "")

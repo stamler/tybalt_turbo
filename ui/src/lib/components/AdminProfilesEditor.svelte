@@ -55,6 +55,16 @@
   const isHrOnly = $derived(
     $globalStore.claims.includes("hr") && !$globalStore.claims.includes("admin"),
   );
+  const effectiveSubjectClaimIds = $derived.by(() =>
+    isAdmin ? stagedClaimIds : originalUserClaims.map((uc) => uc.cid),
+  );
+  const availableBranches = $derived.by(() =>
+    $branchesStore.items.filter((branch) => {
+      if (branch.id === item.default_branch) return true;
+      if (!branch.allowed_claims || branch.allowed_claims.length === 0) return true;
+      return branch.allowed_claims.some((claimId) => effectiveSubjectClaimIds.includes(claimId));
+    }),
+  );
 
   let allClaims = $state([] as ClaimsResponse[]);
   let originalUserClaims = $state([] as UserClaimsResponse[]);
@@ -115,7 +125,9 @@
     await branchesStore.init();
     if (isAdmin) {
       await Promise.all([reloadAllClaims(), reloadUserClaims()]);
+      return;
     }
+    await reloadUserClaims();
   });
 
   function normalizeNumber(value: unknown): number {
@@ -559,14 +571,12 @@
 
       const payload = adminProfilePayload();
 
-      // Save the admin_profile fields first
-      if (data.editing && data.id) {
-        await pb.collection("admin_profiles").update(data.id, payload);
-      } else {
-        await pb.collection("admin_profiles").create(payload);
-      }
-
       if (isHrOnly) {
+        if (data.editing && data.id) {
+          await pb.collection("admin_profiles").update(data.id, payload);
+        } else {
+          await pb.collection("admin_profiles").create(payload);
+        }
         errors = {};
         goto(resolve("/admin_profiles/list"));
         return;
@@ -587,6 +597,25 @@
           .collection("user_claims")
           .create<UserClaimsResponse>({ uid: item.uid, cid });
         createdClaims.push(created);
+      }
+
+      try {
+        if (data.editing && data.id) {
+          await pb.collection("admin_profiles").update(data.id, payload);
+        } else {
+          await pb.collection("admin_profiles").create(payload);
+        }
+      } catch (error) {
+        await Promise.all(
+          createdClaims.map(async (claim) => {
+            try {
+              await pb.collection("user_claims").delete(claim.id);
+            } catch {
+              // noop
+            }
+          }),
+        );
+        throw error;
       }
 
       if (toRemove.length > 0) {
@@ -770,7 +799,7 @@
 
     <DsSelector
       bind:value={item.default_branch as string}
-      items={$branchesStore.items}
+      items={availableBranches}
       {errors}
       fieldName="default_branch"
       uiName="Default Branch"

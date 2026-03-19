@@ -221,6 +221,7 @@ export type AppConfigRecord<Tvalue = unknown> = {
 };
 
 export type BranchesRecord = {
+  allowed_claims: RecordIdString[];
   code: string;
   created: IsoDateString;
   id: string;

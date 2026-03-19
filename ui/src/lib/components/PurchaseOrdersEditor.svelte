@@ -29,6 +29,7 @@
   import type {
     BranchesResponse,
     CategoriesResponse,
+    ClaimsResponse,
     PoApproversResponse,
     PurchaseOrdersRecord,
     PurchaseOrdersStatusOptions,
@@ -44,7 +45,7 @@
   import DsLabel from "./DsLabel.svelte";
   import PoSecondApproverStatus from "./PoSecondApproverStatus.svelte";
   import VendorSelector from "./VendorSelector.svelte";
-  import { onDestroy, untrack } from "svelte";
+  import { onDestroy, onMount, untrack } from "svelte";
   import { expensesEditingEnabled, legacyPOCreateUpdateEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
@@ -99,6 +100,7 @@
     categories = rows;
   });
   let approvers = $state([] as PoApproversResponse[]);
+  let claims = $state([] as ClaimsResponse[]);
   let secondApprovers = $state([] as PoApproversResponse[]);
   let showApproverField = $state(false);
   let firstStageRequesterQualifies = $state(false);
@@ -177,6 +179,25 @@
     paymentTypeOptions.find((paymentType) => paymentType.id === item.payment_type),
   );
   const creatorDefaultBranch = $derived.by(() => $globalStore.profile.default_branch ?? "");
+  const currentUserClaimNames = $derived.by(() => new Set($globalStore.claims));
+  const claimNameById = $derived.by(() => {
+    const map = new Map<string, string>();
+    for (const claim of claims) {
+      map.set(claim.id, claim.name);
+    }
+    return map;
+  });
+  const branchVisibleToCurrentUser = (branch: BranchesResponse): boolean => {
+    if (branch.id === item.branch) return true;
+    if (!branch.allowed_claims || branch.allowed_claims.length === 0) return true;
+    return branch.allowed_claims.some((claimId) => {
+      const claimName = claimNameById.get(claimId);
+      return claimName !== undefined && currentUserClaimNames.has(claimName);
+    });
+  };
+  const availableBranches = $derived.by(() =>
+    $branchesStore.items.filter((branch) => branchVisibleToCurrentUser(branch)),
+  );
   const approverRequest = $derived.by(() =>
     buildPoApproverRequest({
       division: item.division,
@@ -260,6 +281,17 @@
       item.uid !== "" &&
       item.uid !== authUserID,
   );
+
+  onMount(async () => {
+    try {
+      claims = await pb.collection("claims").getFullList<ClaimsResponse>({
+        sort: "name",
+        fields: "id,name",
+      });
+    } catch {
+      claims = [];
+    }
+  });
   const isLegacyFeatureDisabled = $derived.by(() => legacyMode && !$legacyPOCreateUpdateEnabled);
   const isLegacyClaimMissing = $derived.by(
     () => legacyMode && !$globalStore.claims.includes("legacy_po_create_update"),
@@ -1100,7 +1132,7 @@
     {#if legacyMode || item.job === ""}
       <DsSelector
         bind:value={item.branch as string}
-        items={$branchesStore.items}
+        items={availableBranches}
         {errors}
         fieldName="branch"
         uiName="Branch"

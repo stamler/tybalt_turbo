@@ -1,8 +1,9 @@
-code,created,id,name,updated
-KitchenerWaterloo,2025-08-26 20:41:18.064Z,1r7r6hyp681vi15,Kitchener-Waterloo,2025-08-26 20:41:18.064Z
-Collingwood,2025-08-26 20:40:18.990Z,2b65d8161y8hx95,Collingwood,2025-08-26 20:40:18.990Z
-Kenora,2025-08-26 20:39:54.074Z,6fx2wwlgygpc59b,Kenora,2025-08-26 20:40:28.078Z
-ThunderBay,2025-08-26 20:39:15.866Z,80875lm27v8wgi4,Thunder Bay,2025-08-26 20:40:39.501Z
-FortFrances,2025-08-26 20:39:30.644Z,novgo1jxl55zt71,Fort Frances,2025-08-26 20:40:33.367Z
-Toronto,2026-01-20 14:08:18.917Z,xeq9q81q5307f70,Toronto,2026-01-20 14:08:18.917Z
-Ottawa,2025-08-26 20:40:02.999Z,y61xhc627nkue73,Ottawa,2025-08-26 20:40:23.679Z
+allowed_claims,code,created,id,name,updated
+[],KitchenerWaterloo,2025-08-26 20:41:18.064Z,1r7r6hyp681vi15,Kitchener-Waterloo,2025-08-26 20:41:18.064Z
+[],Collingwood,2025-08-26 20:40:18.990Z,2b65d8161y8hx95,Collingwood,2025-08-26 20:40:18.990Z
+[],Kenora,2025-08-26 20:39:54.074Z,6fx2wwlgygpc59b,Kenora,2025-08-26 20:40:28.078Z
+[],ThunderBay,2025-08-26 20:39:15.866Z,80875lm27v8wgi4,Thunder Bay,2025-08-26 20:40:39.501Z
+[],FortFrances,2025-08-26 20:39:30.644Z,novgo1jxl55zt71,Fort Frances,2025-08-26 20:40:33.367Z
+[],Toronto,2026-01-20 14:08:18.917Z,xeq9q81q5307f70,Toronto,2026-01-20 14:08:18.917Z
+[],Ottawa,2025-08-26 20:40:02.999Z,y61xhc627nkue73,Ottawa,2025-08-26 20:40:23.679Z
+"[""corpclaim000001""]",Corporate,2026-03-19 12:00:00.000Z,corpbranch00001,Corporate,2026-03-19 12:00:00.000Z

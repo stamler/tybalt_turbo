@@ -2,6 +2,7 @@ created,description,id,name,updated
 2024-06-21 14:20:49.903Z,Approve Time Sheets (manager),0zcz7sw4bmofzkn,tapr,2024-06-21 14:20:49.903Z
 2026-03-09 13:47:55.349Z,Can create and update legacy manually-entered purchase orders while the transition flag is enabled,1p1cj0lrno2njmw,legacy_po_create_update,2026-03-09 13:47:55.349Z
 2024-10-04 20:03:22.513Z,Can commit records,1r1kfvl2u5yt3gl,commit,2024-10-04 20:03:40.395Z
+2026-03-19 12:00:00.000Z,Allows assigning and using branches restricted to corporate workflows,corpclaim000001,corporate_branch,2026-03-19 12:00:00.000Z
 2024-10-22 19:57:51.422Z,"Holders can approve purchase_orders records. payload contains a JSON object which will restrict the type of purchase_orders record that can be approved. Properties are ""max_amount"" (required, number) and ""divisions"" (not required, list of strings that are division ids)",5vh881k048bboim,po_approver,2025-03-18 18:24:38.805Z
 2025-01-07 14:27:27.254Z,Can absorb (merge) many existing records in a collection to a single record to handle duplicates or dirty data,a03lore4ixcylzf,absorb,2025-01-07 14:27:27.254Z
 2024-06-21 17:44:38.424Z,Can delete jobs,cjna52siibr7zgq,admin,2024-06-21 17:44:38.424Z
