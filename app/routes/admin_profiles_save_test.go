@@ -13,8 +13,8 @@ const (
 	adminProfilesSaveTestRecordID = "35i85kqy88hfsfc"
 	adminProfilesSaveTestUID      = "f2j5a8vk006baub"
 	adminClaimID                  = "cjna52siibr7zgq"
-	corporateClaimID              = "corpclaim000001"
-	corporateBranchID             = "corpbranch00001"
+	corporateClaimID              = "tq5pln371m2xqrd"
+	corporateBranchID             = "kpj5jijh0if8kx8"
 	defaultBranchID               = "80875lm27v8wgi4"
 )
 

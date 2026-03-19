@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	corporateBranchID     = "corpbranch00001"
-	corporateClaimID      = "corpclaim000001"
+	corporateBranchID     = "kpj5jijh0if8kx8"
+	corporateClaimID      = "tq5pln371m2xqrd"
 	defaultBranchID       = "80875lm27v8wgi4"
 	timeUserID            = "rzr98oadsp9qc11"
 	timeUserEmail         = "time@test.com"
@@ -185,7 +185,7 @@ func TestCorporateBranchClaimGating_PurchaseOrdersCreate(t *testing.T) {
 			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"branch":"corpbranch00001"`,
+				`"branch":"kpj5jijh0if8kx8"`,
 			},
 			TestAppFactory: func(tb testing.TB) *tests.TestApp {
 				return setupCorporateBranchTestApp(tb, corporateBranchTestOptions{
@@ -256,7 +256,7 @@ func TestCorporateBranchClaimGating_ExpensesCreate(t *testing.T) {
 			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"branch":"corpbranch00001"`,
+				`"branch":"kpj5jijh0if8kx8"`,
 			},
 			TestAppFactory: func(tb testing.TB) *tests.TestApp {
 				return setupCorporateBranchTestApp(tb, corporateBranchTestOptions{
@@ -324,7 +324,7 @@ func TestCorporateBranchClaimGating_TimeEntriesCreate(t *testing.T) {
 			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"branch":"corpbranch00001"`,
+				`"branch":"kpj5jijh0if8kx8"`,
 			},
 			TestAppFactory: func(tb testing.TB) *tests.TestApp {
 				return setupCorporateBranchTestApp(tb, corporateBranchTestOptions{
@@ -409,7 +409,7 @@ func TestCorporateBranchClaimGating_LegacyPurchaseOrders(t *testing.T) {
 				"approver": "wegviunlyr2jjjv",
 				"date": "2025-01-15",
 				"division": "vccd5fo56ctbigh",
-				"branch": "corpbranch00001",
+				"branch": "kpj5jijh0if8kx8",
 				"description": "Legacy corporate purchase order",
 				"payment_type": "OnAccount",
 				"total": 321.45,
@@ -441,7 +441,7 @@ func TestCorporateBranchClaimGating_LegacyPurchaseOrders(t *testing.T) {
 				"approver": "wegviunlyr2jjjv",
 				"date": "2025-01-15",
 				"division": "vccd5fo56ctbigh",
-				"branch": "corpbranch00001",
+				"branch": "kpj5jijh0if8kx8",
 				"description": "Legacy corporate purchase order",
 				"payment_type": "OnAccount",
 				"total": 321.45,
@@ -455,7 +455,7 @@ func TestCorporateBranchClaimGating_LegacyPurchaseOrders(t *testing.T) {
 			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"branch":"corpbranch00001"`,
+				`"branch":"kpj5jijh0if8kx8"`,
 				`"po_number":"2501-5001"`,
 			},
 			TestAppFactory: func(tb testing.TB) *tests.TestApp {
@@ -487,7 +487,7 @@ func TestCorporateBranchClaimGating_AdminProfilesDefaultBranch(t *testing.T) {
 				"payroll_id":"9999",
 				"default_charge_out_rate":50,
 				"skip_min_time_check":"no",
-				"default_branch":"corpbranch00001"
+				"default_branch":"kpj5jijh0if8kx8"
 			}`),
 			Headers: map[string]string{
 				"Authorization": recordToken,
@@ -509,7 +509,7 @@ func TestCorporateBranchClaimGating_AdminProfilesDefaultBranch(t *testing.T) {
 				"payroll_id":"9999",
 				"default_charge_out_rate":50,
 				"skip_min_time_check":"no",
-				"default_branch":"corpbranch00001"
+				"default_branch":"kpj5jijh0if8kx8"
 			}`),
 			Headers: map[string]string{
 				"Authorization": recordToken,
@@ -517,7 +517,7 @@ func TestCorporateBranchClaimGating_AdminProfilesDefaultBranch(t *testing.T) {
 			},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"default_branch":"corpbranch00001"`,
+				`"default_branch":"kpj5jijh0if8kx8"`,
 			},
 			TestAppFactory: func(tb testing.TB) *tests.TestApp {
 				return setupCorporateBranchTestApp(tb, corporateBranchTestOptions{
