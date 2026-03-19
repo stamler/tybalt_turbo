@@ -448,7 +448,7 @@ func ValidatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record, legac
 				validation.Required.Error("frequency is required for recurring purchase orders"),
 			).Else(
 				validation.In("").Error("frequency is not permitted for non-recurring purchase orders"))),
-		"description": validation.Validate(purchaseOrderRecord.Get("description"), validation.Length(5, 0).Error("must be at least 5 characters")),
+		"description": validation.Validate(purchaseOrderRecord.Get("description"), validation.Length(4, 0).Error("must be at least 4 characters")),
 		"approver": validation.Validate(purchaseOrderRecord.GetString("approver"),
 			validation.By(userIsActive(app, "approver_not_active", "the selected approver is not an active user"))),
 		"total": validation.Validate(purchaseOrderRecord.GetFloat("total"), validation.Max(constants.MAX_APPROVAL_TOTAL)),

@@ -221,7 +221,7 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 			expenseRecord.Get("description"),
 			validation.When(!isAllowance,
 				validation.Required.Error("required for non-allowance expenses"),
-				validation.Length(5, 0).Error("must be at least 5 characters"),
+				validation.Length(4, 0).Error("must be at least 4 characters"),
 			),
 		),
 		"vendor": validation.Validate(
