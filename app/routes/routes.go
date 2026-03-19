@@ -121,6 +121,11 @@ func AddRoutes(app core.App) {
 		usersGroup.Bind(apis.RequireAuth("users"))
 		usersGroup.GET("/defaults", createGetUserDefaultsHandler(app))
 
+		adminProfilesGroup := se.Router.Group("/api/admin_profiles")
+		adminProfilesGroup.Bind(apis.RequireAuth("users"))
+		adminProfilesGroup.POST("/save_with_claims", createSaveAdminProfileWithClaimsHandler(app))
+		adminProfilesGroup.POST("/{id}/save_with_claims", createSaveAdminProfileWithClaimsHandler(app))
+
 		poGroup := se.Router.Group("/api/purchase_orders")
 		poGroup.Bind(apis.RequireAuth("users"))
 		poGroup.GET("/pending", createGetPendingPurchaseOrdersHandler(app))

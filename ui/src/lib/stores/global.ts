@@ -7,6 +7,7 @@ import { writable } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { authStore } from "$lib/stores/auth";
 import type {
+  UserClaimsResponse,
   UserClaimsSummaryResponse,
   UserPoApproverProfileResponse,
 } from "$lib/pocketbase-types";
@@ -22,6 +23,7 @@ interface ErrorMessage {
 interface StoreState {
   isLoading: boolean;
   claims: string[];
+  claimIds: string[];
   showAllUi: boolean;
   user_claims_summary: {
     id: string;
@@ -94,6 +96,7 @@ const createStore = () => {
   const { subscribe, update } = writable<StoreState>({
     isLoading: false,
     claims: [],
+    claimIds: [],
     showAllUi: initialShowAll,
     user_claims_summary: {
       id: "",
@@ -137,17 +140,43 @@ const createStore = () => {
         const userId = get(authStore)?.model?.id || "";
         if (!userId) return;
 
-        const response = await pb
-          .collection("user_claims_summary")
-          .getOne<UserClaimsSummaryResponse>(userId, {
+        const [summaryResult, claimIdsResult] = await Promise.allSettled([
+          pb.collection("user_claims_summary").getOne<UserClaimsSummaryResponse>(userId, {
             requestKey: null,
-          });
+          }),
+          pb.collection("user_claims").getFullList<UserClaimsResponse>({
+            filter: pb.filter("uid={:uid}", { uid: userId }),
+            fields: "cid",
+            requestKey: null,
+          }),
+        ]);
+
+        const summaryResponse =
+          summaryResult.status === "fulfilled" ? summaryResult.value : null;
+        const claimIds =
+          claimIdsResult.status === "fulfilled"
+            ? claimIdsResult.value.map((claim) => claim.cid)
+            : [];
+
+        if (summaryResult.status === "rejected") {
+          const typedErr = summaryResult.reason as ClientResponseError;
+          if (typedErr?.status !== 404 && !isAutoCancelled(typedErr)) {
+            console.error("Error loading user claims summary:", typedErr);
+          }
+        }
+        if (claimIdsResult.status === "rejected") {
+          const typedErr = claimIdsResult.reason as ClientResponseError;
+          if (!isAutoCancelled(typedErr)) {
+            console.error("Error loading user claim ids:", typedErr);
+          }
+        }
 
         update((state) => ({
           ...state,
+          claimIds,
           user_claims_summary: {
-            id: response.id ?? "",
-            claims: response.claims ?? [],
+            id: summaryResponse?.id ?? "",
+            claims: summaryResponse?.claims ?? [],
             lastRefresh: new Date(),
             maxAge: state.user_claims_summary.maxAge,
           },
@@ -158,6 +187,7 @@ const createStore = () => {
         if (typedErr?.status === 404) {
           update((state) => ({
             ...state,
+            claimIds: [],
             user_claims_summary: {
               id: "",
               claims: [],
@@ -276,6 +306,13 @@ const createStore = () => {
       update((state) => {
         return {
           ...state,
+          user_claims_summary: {
+            id: "",
+            claims: [],
+            maxAge: state.user_claims_summary.maxAge,
+            lastRefresh: new Date(0),
+          },
+          claimIds: [],
           profile: {
             default_division: "",
             default_role: "",

@@ -582,53 +582,21 @@
         return;
       }
 
-      // Compute claim diffs and persist
-      const originalIds = new Set(originalUserClaims.map((uc) => uc.cid));
-      const stagedIds = new Set(stagedClaimIds);
+      const endpoint =
+        data.editing && data.id
+          ? `/api/admin_profiles/${data.id}/save_with_claims`
+          : "/api/admin_profiles/save_with_claims";
+      await pb.send(endpoint, {
+        method: "POST",
+        body: {
+          admin_profile: payload,
+          claim_ids: stagedClaimIds,
+        },
+      });
 
-      const toAdd = [...stagedIds].filter((cid) => !originalIds.has(cid));
-      const toRemove = [...originalIds].filter((cid) => !stagedIds.has(cid));
-
-      const claimIdToRecordId = new Map(originalUserClaims.map((uc) => [uc.cid, uc.id] as const));
-      const createdClaims: UserClaimsResponse[] = [];
-
-      for (const cid of toAdd) {
-        const created = await pb
-          .collection("user_claims")
-          .create<UserClaimsResponse>({ uid: item.uid, cid });
-        createdClaims.push(created);
-      }
-
-      try {
-        if (data.editing && data.id) {
-          await pb.collection("admin_profiles").update(data.id, payload);
-        } else {
-          await pb.collection("admin_profiles").create(payload);
-        }
-      } catch (error) {
-        await Promise.all(
-          createdClaims.map(async (claim) => {
-            try {
-              await pb.collection("user_claims").delete(claim.id);
-            } catch {
-              // noop
-            }
-          }),
-        );
-        throw error;
-      }
-
-      if (toRemove.length > 0) {
-        const toDeleteIds = toRemove
-          .map((cid) => claimIdToRecordId.get(cid))
-          .filter((id): id is string => typeof id === "string" && id.length > 0);
-        await Promise.all(toDeleteIds.map((id) => pb.collection("user_claims").delete(id)));
-      }
-
-      if (createdClaims.length > 0 || toRemove.length > 0) {
-        const surviving = originalUserClaims.filter((uc) => !toRemove.includes(uc.cid));
-        originalUserClaims = [...surviving, ...createdClaims];
-        syncPoApproverUserClaimId(originalUserClaims);
+      await reloadUserClaims();
+      if (item.uid === (pb.authStore.model?.id ?? "")) {
+        await globalStore.refresh();
       }
 
       await persistPoApproverProps();

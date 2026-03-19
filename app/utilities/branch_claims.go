@@ -35,7 +35,19 @@ func EnsureUserCanUseBranch(app core.App, branchID string, userID string, fieldN
 		}
 	}
 
-	allowedClaimIDs := normalizeStringList(branch.Get("allowed_claims"))
+	allowedClaimIDs, err := normalizeStringList(branch.Get("allowed_claims"))
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "branch claim validation failed",
+			Data: map[string]errs.CodeError{
+				fieldName: {
+					Code:    "branch_claim_config_invalid",
+					Message: "branch claim requirements are misconfigured",
+				},
+			},
+		}
+	}
 	if len(allowedClaimIDs) == 0 {
 		return nil
 	}
@@ -94,37 +106,26 @@ func EnsureUserCanUseBranch(app core.App, branchID string, userID string, fieldN
 	}
 }
 
-func normalizeStringList(value any) []string {
+func normalizeStringList(value any) ([]string, error) {
 	switch v := value.(type) {
+	case nil:
+		return nil, nil
 	case []string:
 		return slices.DeleteFunc(slices.Clone(v), func(item string) bool {
 			return strings.TrimSpace(item) == ""
-		})
-	case []any:
-		result := make([]string, 0, len(v))
-		for _, item := range v {
-			str, ok := item.(string)
-			if !ok {
-				continue
-			}
-			str = strings.TrimSpace(str)
-			if str != "" {
-				result = append(result, str)
-			}
-		}
-		return result
+		}), nil
 	case string:
 		if strings.TrimSpace(v) == "" {
-			return nil
+			return nil, nil
 		}
 		var result []string
 		if err := json.Unmarshal([]byte(v), &result); err == nil {
 			return slices.DeleteFunc(result, func(item string) bool {
 				return strings.TrimSpace(item) == ""
-			})
+			}), nil
 		}
-		return nil
+		return nil, fmt.Errorf("unexpected string value for relation list")
 	default:
-		return nil
+		return nil, fmt.Errorf("unexpected relation list type %T", value)
 	}
 }
