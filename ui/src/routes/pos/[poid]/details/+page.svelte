@@ -3,6 +3,7 @@
   import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import DSPopover from "$lib/components/DSPopover.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import Icon from "@iconify/svelte";
   import { shortDate, trimmedOrEmpty } from "$lib/utilities";
@@ -15,6 +16,9 @@
   const viewerId = pb.authStore.record?.id ?? "";
   let rejectModal: RejectModal;
   let showSecondApproverWhy = $state(false);
+  let showConvertPopover = $state(false);
+  let convertError = $state<string | null>(null);
+  let isConvertingToCumulative = $state(false);
   const formatAmount = (value: number) =>
     Number.isFinite(value) ? value.toFixed(2) : String(value);
   const secondApproverMeta = $derived(data.secondApproverDiagnostics?.meta ?? null);
@@ -23,6 +27,12 @@
   const displayStatus = $derived(isRejected ? "Rejected" : data.po.status);
   const isOwner = $derived(data.po.uid === viewerId);
   const canApproveOrReject = $derived(data.canApproveOrReject);
+  const isPayablesAdmin = $derived(
+    $globalStore.showAllUi || $globalStore.claims.includes("payables_admin"),
+  );
+  const canConvertToCumulative = $derived(
+    isPayablesAdmin && data.po.status === "Active" && data.po.type === "One-Time",
+  );
 
   async function refreshDetails() {
     await invalidateAll();
@@ -59,6 +69,34 @@
       goto("/pos/list");
     } catch (e: any) {
       globalStore.addError(e);
+    }
+  }
+
+  function openConvertPopover() {
+    convertError = null;
+    showConvertPopover = true;
+  }
+
+  function closeConvertPopover() {
+    if (isConvertingToCumulative) return;
+    convertError = null;
+    showConvertPopover = false;
+  }
+
+  async function convertToCumulative() {
+    convertError = null;
+    isConvertingToCumulative = true;
+
+    try {
+      await pb.send(`/api/purchase_orders/${data.po.id}/make_cumulative`, { method: "POST" });
+      showConvertPopover = false;
+      await refreshDetails();
+    } catch (e: any) {
+      const message = e?.response?.message ?? "Failed to convert purchase order to Cumulative.";
+      convertError = message;
+      globalStore.addError(message);
+    } finally {
+      isConvertingToCumulative = false;
     }
   }
 </script>
@@ -361,10 +399,18 @@
     </div>
   {/if}
 
-  {#if $globalStore.showAllUi || $globalStore.claims.includes("payables_admin")}
+  {#if isPayablesAdmin}
     <div class="mt-4 rounded-sm border border-neutral-300 bg-neutral-50 p-4">
       <h3 class="font-bold text-neutral-800">Admin Actions</h3>
       <div class="mt-2 flex gap-2">
+        {#if canConvertToCumulative}
+          <DsActionButton
+            action={openConvertPopover}
+            icon="mdi:sigma"
+            title="Convert to Cumulative"
+            color="cyan"
+          />
+        {/if}
         <DsActionButton
           action={cancelPo}
           icon="mdi:cancel"
@@ -380,6 +426,26 @@
       </div>
     </div>
   {/if}
+
+  <DSPopover
+    bind:show={showConvertPopover}
+    title="Convert PO to Cumulative"
+    subtitle="This will change the purchase order from One-Time to Cumulative."
+    error={convertError}
+    submitting={isConvertingToCumulative}
+    submitLabel="Convert"
+    onSubmit={convertToCumulative}
+    onCancel={closeConvertPopover}
+  >
+    <div class="rounded-sm border border-cyan-300 bg-cyan-50 p-3 text-sm text-cyan-950">
+      <p class="font-semibold">Review what will change if you continue:</p>
+      <ul class="mt-2 list-disc space-y-1 pl-5">
+        <li>This purchase order will allow multiple expenses instead of a single expense.</li>
+        <li>The total PO amount stays the same and becomes the cumulative spending limit.</li>
+        <li>The updated type will display after the page refreshes.</li>
+      </ul>
+    </div>
+  </DSPopover>
 
   <!-- Expenses referencing this PO -->
   <section class="mt-6 space-y-2">
