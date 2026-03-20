@@ -219,7 +219,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      await goto(resolve(`/pos/${id}/details`));
+      await goto(resolve("/pos/pending"));
     } catch (error: any) {
       globalStore.addError(error?.response?.message);
     }

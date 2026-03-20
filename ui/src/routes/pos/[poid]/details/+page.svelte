@@ -12,6 +12,7 @@
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { pb } from "$lib/pocketbase";
   import { goto, invalidateAll } from "$app/navigation";
+  import { resolve } from "$app/paths";
   let { data }: { data: PageData } = $props();
   const viewerId = pb.authStore.record?.id ?? "";
   let rejectModal: RejectModal;
@@ -44,7 +45,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
-      await refreshDetails();
+      await goto(resolve("/pos/pending"));
     } catch (e: any) {
       globalStore.addError(e?.response?.message || "Approve failed");
     }
