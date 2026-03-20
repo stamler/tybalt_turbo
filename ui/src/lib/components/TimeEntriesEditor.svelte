@@ -11,12 +11,14 @@
   import { jobs } from "$lib/stores/jobs";
   import { rateRoles } from "$lib/stores/rateRoles";
   import { timeTypes } from "$lib/stores/time_types";
+  import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsAutoComplete from "./DSAutoComplete.svelte";
   import DsActionButton from "./DSActionButton.svelte";
+  import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
@@ -184,6 +186,9 @@
   }
 </script>
 
+{#if !$timeEditingEnabled}
+  <DsEditingDisabledBanner message={timeEditingDisabledMessage} />
+{/if}
 <form
   class="flex w-full flex-col items-center gap-2 p-2 max-lg:[&_button]:text-base max-lg:[&_input]:text-base max-lg:[&_label]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base"
 >

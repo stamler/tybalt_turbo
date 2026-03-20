@@ -165,6 +165,14 @@ func ProcessTimeEntry(app core.App, e *core.RecordRequestEvent) error {
 	// get the auth record from the context
 	authRecord := e.Auth
 
+	enabled, err := utilities.IsTimeEditingEnabled(app)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return utilities.ErrTimeEditingDisabled
+	}
+
 	// If the uid property is not equal to the authenticated user's uid, return an
 	// error.
 	if record.GetString("uid") != authRecord.Id {

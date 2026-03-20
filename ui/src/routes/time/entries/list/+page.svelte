@@ -12,6 +12,8 @@
   import { calculateTally } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
   import { onMount, onDestroy, untrack } from "svelte";
+  import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
+  import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
   let { data }: { data: PageData } = $props();
 
   // Local state for items that can be mutated by real-time subscriptions.
@@ -258,6 +260,9 @@
     />
   </div>
 {/snippet}
+{#if !$timeEditingEnabled}
+  <DsEditingDisabledBanner message={timeEditingDisabledMessage} />
+{/if}
 <DsList
   items={items as TimeEntriesResponse[]}
   search={true}

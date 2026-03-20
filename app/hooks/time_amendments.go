@@ -150,6 +150,14 @@ func ProcessTimeAmendment(app core.App, e *core.RecordRequestEvent) error {
 		})
 	}
 
+	enabled, err := utilities.IsTimeEditingEnabled(app)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return utilities.ErrTimeEditingDisabled
+	}
+
 	if !record.IsNew() {
 		original := record.Original()
 		if original == nil {

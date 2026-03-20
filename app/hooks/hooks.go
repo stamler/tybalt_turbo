@@ -156,19 +156,41 @@ func AddHooks(app core.App) {
 		}
 		return e.Next()
 	})
+	timeEntriesGateHook := func(e *core.RecordRequestEvent) error {
+		enabled, err := utilities.IsTimeEditingEnabled(app)
+		if err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		if !enabled {
+			return AnnotateHookError(app, e, utilities.ErrTimeEditingDisabled)
+		}
+		return e.Next()
+	}
+	app.OnRecordDeleteRequest("time_entries").BindFunc(timeEntriesGateHook)
 	// hooks for time_amendments model
 	app.OnRecordCreateRequest("time_amendments").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessTimeAmendment(app, e); err != nil {
-			return err
+			return AnnotateHookError(app, e, err)
 		}
 		return e.Next()
 	})
 	app.OnRecordUpdateRequest("time_amendments").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessTimeAmendment(app, e); err != nil {
-			return err
+			return AnnotateHookError(app, e, err)
 		}
 		return e.Next()
 	})
+	timeAmendmentsGateHook := func(e *core.RecordRequestEvent) error {
+		enabled, err := utilities.IsTimeEditingEnabled(app)
+		if err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		if !enabled {
+			return AnnotateHookError(app, e, utilities.ErrTimeEditingDisabled)
+		}
+		return e.Next()
+	}
+	app.OnRecordDeleteRequest("time_amendments").BindFunc(timeAmendmentsGateHook)
 	// hooks for purchase_orders model
 	app.OnRecordCreateRequest("purchase_orders").BindFunc(func(e *core.RecordRequestEvent) error {
 		nid, err := ProcessPurchaseOrder(app, e)

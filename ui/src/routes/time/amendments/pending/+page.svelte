@@ -3,6 +3,8 @@
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
+  import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
   import { goto } from "$app/navigation";
   import type { PageData } from "./$types";
   import type { TimeAmendmentsAugmentedResponse } from "$lib/pocketbase-types";
@@ -102,6 +104,9 @@
   <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
 {/snippet}
 
+{#if !$timeEditingEnabled}
+  <DsEditingDisabledBanner message={timeEditingDisabledMessage} />
+{/if}
 <DsList
   items={items as TimeAmendmentsAugmentedResponse[]}
   search={true}

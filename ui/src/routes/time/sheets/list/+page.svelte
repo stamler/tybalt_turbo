@@ -11,6 +11,8 @@
   import type { TimeSheetTallyQueryRow } from "$lib/utilities";
   import type { SvelteComponent } from "svelte";
   import { onMount } from "svelte";
+  import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
+  import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
 
   let shareModal: SvelteComponent;
   let rejectModal: SvelteComponent;
@@ -124,6 +126,10 @@
 
 <ShareModal bind:this={shareModal} collectionName="time_sheet_reviewers" />
 <RejectModal collectionName="time_sheets" bind:this={rejectModal} />
+
+{#if !$timeEditingEnabled}
+  <DsEditingDisabledBanner message={timeEditingDisabledMessage} />
+{/if}
 
 <!-- Show the list of items here -->
 <DsList

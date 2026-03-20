@@ -13,6 +13,10 @@ import (
 
 func createBundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
+		if err := requireTimeEditing(app); err != nil {
+			return err
+		}
+
 		// Validate the date
 		weekEndingTime, err := time.Parse("2006-01-02", e.Request.PathValue("weekEnding"))
 		if err != nil {

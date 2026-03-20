@@ -10,6 +10,7 @@
   import { divisions } from "$lib/stores/divisions";
   import { timeTypes } from "$lib/stores/time_types";
   import { profiles } from "$lib/stores/profiles";
+  import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
@@ -17,6 +18,7 @@
   import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsAutoComplete from "./DSAutoComplete.svelte";
   import DsActionButton from "./DSActionButton.svelte";
+  import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeAmendmentsPageData } from "$lib/svelte-types";
@@ -152,6 +154,9 @@
   }
 </script>
 
+{#if !$timeEditingEnabled}
+  <DsEditingDisabledBanner message={timeEditingDisabledMessage} />
+{/if}
 <form
   class="flex w-full flex-col items-center gap-2 p-2 max-lg:[&_button]:text-base max-lg:[&_input]:text-base max-lg:[&_label]:text-base max-lg:[&_select]:text-base max-lg:[&_textarea]:text-base"
 >

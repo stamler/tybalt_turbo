@@ -29,6 +29,18 @@ func requireExpensesEditing(app core.App, collectionName string) error {
 	return nil
 }
 
+// requireTimeEditing returns a 403 error if the time feature flag is off.
+func requireTimeEditing(app core.App) error {
+	enabled, err := utilities.IsTimeEditingEnabled(app)
+	if err != nil {
+		return err
+	}
+	if !enabled {
+		return apis.NewForbiddenError(utilities.ErrTimeEditingDisabled.Message, nil)
+	}
+	return nil
+}
+
 // Define request bodies for the handlers
 type RejectionRequest struct {
 	RejectionReason string `json:"rejection_reason"`

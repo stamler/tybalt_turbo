@@ -11,6 +11,8 @@
   import { onMount, onDestroy, untrack } from "svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import { goto } from "$app/navigation";
+  import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
+  import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
 
   let { data }: { data: PageData } = $props();
   let items = $state(untrack(() => data.items));
@@ -118,6 +120,9 @@
 
 <div class="mx-auto p-4">
   <h1 class="mb-4 text-2xl font-bold">Time Sheet Details</h1>
+  {#if !$timeEditingEnabled}
+    <DsEditingDisabledBanner message={timeEditingDisabledMessage} />
+  {/if}
   <div class="mb-4 space-y-2">
     <h2 class="text-lg font-semibold">Week Ending: {shortDate(timeSheet.week_ending, true)}</h2>
     <div class="space-y-4 rounded-lg bg-neutral-100 p-4">

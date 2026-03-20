@@ -278,6 +278,92 @@ func deleteExpensesConfig(t *testing.T, app *tests.TestApp) {
 	}
 }
 
+func upsertTimeConfig(t *testing.T, app *tests.TestApp, rawValue string) {
+	t.Helper()
+
+	collection, err := app.FindCollectionByNameOrId("app_config")
+	if err != nil {
+		t.Fatalf("failed to find app_config collection: %v", err)
+	}
+
+	record, err := app.FindFirstRecordByData("app_config", "key", "time")
+	if err != nil || record == nil {
+		record = core.NewRecord(collection)
+		record.Set("key", "time")
+	}
+
+	record.Set("value", rawValue)
+	if err := app.Save(record); err != nil {
+		t.Fatalf("failed to save time config: %v", err)
+	}
+}
+
+func deleteTimeConfig(t *testing.T, app *tests.TestApp) {
+	t.Helper()
+
+	record, err := app.FindFirstRecordByData("app_config", "key", "time")
+	if err != nil || record == nil {
+		return
+	}
+	if err := app.Delete(record); err != nil {
+		t.Fatalf("failed to delete time config: %v", err)
+	}
+}
+
+func TestIsTimeEditingEnabled(t *testing.T) {
+	testsTable := []struct {
+		name  string
+		setup func(t *testing.T, app *tests.TestApp)
+		want  bool
+	}{
+		{
+			name: "returns default true when time config is missing",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				deleteTimeConfig(t, app)
+			},
+			want: true,
+		},
+		{
+			name: "returns default true when create_edit key is missing",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertTimeConfig(t, app, `{"some_other_key":true}`)
+			},
+			want: true,
+		},
+		{
+			name: "returns configured true value",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertTimeConfig(t, app, `{"create_edit":true}`)
+			},
+			want: true,
+		},
+		{
+			name: "returns configured false value",
+			setup: func(t *testing.T, app *tests.TestApp) {
+				upsertTimeConfig(t, app, `{"create_edit":false}`)
+			},
+			want: false,
+		},
+	}
+
+	for _, tc := range testsTable {
+		t.Run(tc.name, func(t *testing.T) {
+			app := testseed.NewSeededTestApp(t)
+			defer app.Cleanup()
+
+			tc.setup(t, app)
+
+			got, err := IsTimeEditingEnabled(app)
+			if err != nil {
+				t.Fatalf("IsTimeEditingEnabled() returned error: %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("IsTimeEditingEnabled() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestGetPOExpenseExcessConfig(t *testing.T) {
 	testsTable := []struct {
 		name        string

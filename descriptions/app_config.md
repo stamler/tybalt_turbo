@@ -47,6 +47,18 @@ Controls expense, PO, and vendor editing, plus expense validation thresholds.
 
 ---
 
+## Domain: `time`
+
+Controls time-entry and time-amendment editing, plus selected timesheet workflow mutations.
+
+| Property      | Type | Default | Description                                                                                     |
+|---------------|------|---------|-------------------------------------------------------------------------------------------------|
+| `create_edit` | bool | `true`  | Enables time entry and time amendment creation/editing/deletion, time entry copy, plus timesheet bundle and approve. When `false`, these operations return HTTP 403. |
+
+**Fail mode:** open (defaults to enabled)
+
+---
+
 ## Domain: `purchase_orders`
 
 Controls purchase order workflow behavior.
@@ -111,6 +123,9 @@ Controls Litestream replica health checking and alerting.
     "mode": "lesser_of"
   }
 }
+
+// key: "time"
+{ "create_edit": true }
 
 // key: "purchase_orders"
 {

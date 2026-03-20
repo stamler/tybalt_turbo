@@ -72,6 +72,14 @@ func IsExpensesEditingEnabled(app core.App) (bool, error) {
 	return GetConfigBool(app, "expenses", "create_edit_absorb", true)
 }
 
+// IsTimeEditingEnabled checks if time entry creation/editing and selected
+// timesheet mutations are allowed.
+// Reads from app_config where key="time", checks value.create_edit.
+// Defaults to true (fail-open) if config is missing.
+func IsTimeEditingEnabled(app core.App) (bool, error) {
+	return GetConfigBool(app, "time", "create_edit", true)
+}
+
 // IsNotificationFeatureEnabled checks whether a notification feature/template is enabled.
 // Reads from app_config where key="notifications", and uses templateCode as the JSON key.
 // Defaults to false (fail-closed) when config is missing.
@@ -257,5 +265,14 @@ var ErrExpensesEditingDisabled = &errs.HookError{
 	Message: "expense editing is currently disabled",
 	Data: map[string]errs.CodeError{
 		"global": {Code: "expenses_editing_disabled", Message: "expense, purchase order, and vendor creation and editing is disabled during transition"},
+	},
+}
+
+// ErrTimeEditingDisabled is returned when time editing is disabled
+var ErrTimeEditingDisabled = &errs.HookError{
+	Status:  http.StatusForbidden,
+	Message: "time editing is currently disabled",
+	Data: map[string]errs.CodeError{
+		"global": {Code: "time_editing_disabled", Message: "time entry and time amendment creation/editing, plus timesheet submission/approval, are disabled during transition"},
 	},
 }

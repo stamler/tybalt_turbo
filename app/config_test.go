@@ -43,6 +43,27 @@ func setupExpensesEditingDisabledApp(t testing.TB) *tests.TestApp {
 	return app
 }
 
+func setupTimeEditingDisabledApp(t testing.TB) *tests.TestApp {
+	t.Helper()
+
+	app := testutils.SetupTestApp(t)
+	collection, err := app.FindCollectionByNameOrId("app_config")
+	if err != nil {
+		t.Fatalf("failed to find app_config collection: %v", err)
+	}
+
+	record, err := app.FindFirstRecordByData("app_config", "key", "time")
+	if err != nil || record == nil {
+		record = core.NewRecord(collection)
+		record.Set("key", "time")
+	}
+	record.Set("value", `{"create_edit": false}`)
+	if err := app.Save(record); err != nil {
+		t.Fatalf("failed to save time app_config: %v", err)
+	}
+	return app
+}
+
 // TestGetConfigValue verifies the GetConfigValue function retrieves config correctly
 func TestGetConfigValue(t *testing.T) {
 	app := testutils.SetupTestApp(t)
@@ -513,6 +534,206 @@ func TestVendorAbsorbBlockedWhenEditingDisabled(t *testing.T) {
 				`"Expense editing is currently disabled."`,
 			},
 			TestAppFactory: setupExpensesEditingDisabledApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestTimeEditingDisabledBlocks(t *testing.T) {
+	uNoClaimsToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	inactiveMgrToken, err := testutils.GenerateRecordToken("users", "has_inactive_mgr@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	approverToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	committerToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "time entry creation blocked when editing disabled",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "u_no_claims",
+				"time_type": "d35auo4vawx7t9u",
+				"date": "2024-01-08",
+				"description": "blocked time entry create",
+				"hours": 1
+			}`),
+			Headers:        map[string]string{"Authorization": uNoClaimsToken},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"time_editing_disabled"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:           "time entry update blocked when editing disabled",
+			Method:         http.MethodPatch,
+			URL:            "/api/collections/time_entries/records/r464ccf9b3527eb",
+			Body:           strings.NewReader(`{"description":"blocked update"}`),
+			Headers:        map[string]string{"Authorization": uNoClaimsToken},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"time_editing_disabled"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:           "time entry delete blocked when editing disabled",
+			Method:         http.MethodDelete,
+			URL:            "/api/collections/time_entries/records/r464ccf9b3527eb",
+			Headers:        map[string]string{"Authorization": uNoClaimsToken},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"time_editing_disabled"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:           "copy to tomorrow blocked when editing disabled",
+			Method:         http.MethodPost,
+			URL:            "/api/time_entries/r464ccf9b3527eb/copy_to_tomorrow",
+			Headers:        map[string]string{"Authorization": uNoClaimsToken},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"Time editing is currently disabled."`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:           "bundle timesheet blocked when editing disabled",
+			Method:         http.MethodPost,
+			URL:            "/api/time_sheets/2024-09-14/bundle",
+			Headers:        map[string]string{"Authorization": inactiveMgrToken},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"Time editing is currently disabled."`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:           "timesheet approve blocked when editing disabled",
+			Method:         http.MethodPost,
+			URL:            "/api/time_sheets/aeyl94og4xmnpq4/approve",
+			Headers:        map[string]string{"Authorization": approverToken},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"Time editing is currently disabled."`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:   "timesheet reject remains allowed when editing disabled",
+			Method: http.MethodPost,
+			URL:    "/api/time_sheets/aeyl94og4xmnpq4/reject",
+			Body:   strings.NewReader(`{"rejection_reason":"still allowed when disabled"}`),
+			Headers: map[string]string{
+				"Authorization": approverToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"message":"record rejected successfully"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:   "timesheet commit remains allowed when editing disabled",
+			Method: http.MethodPost,
+			URL:    "/api/time_sheets/aeyl94og4xmnpq4/commit",
+			Headers: map[string]string{
+				"Authorization": committerToken,
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"code":"record_not_approved"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:   "timesheet unbundle remains allowed when editing disabled",
+			Method: http.MethodPost,
+			URL:    "/api/time_sheets/aeyl94og4xmnpq4/unbundle",
+			Headers: map[string]string{
+				"Authorization": approverToken,
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"message":"Time sheet unbundled successfully"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:   "time amendment create blocked when editing disabled",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_amendments/records",
+			Body: strings.NewReader(`{
+				"creator": "f2j5a8vk006baub",
+				"time_type": "sdyfl3q7j7ap849",
+				"uid": "rzr98oadsp9qc11",
+				"date": "2024-09-02",
+				"division": "vccd5fo56ctbigh",
+				"branch": "80875lm27v8wgi4",
+				"description": "time amendment blocked",
+				"hours": 1,
+				"skip_tsid_check": true,
+				"week_ending": "2006-01-02"
+			}`),
+			Headers: map[string]string{
+				"Authorization": approverToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"time_editing_disabled"`,
+				`"time editing is currently disabled"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:   "time amendment update blocked when editing disabled",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/time_amendments/records/qn4jyrkxp3pfjom",
+			Body: strings.NewReader(`{
+				"description": "time amendment update blocked"
+			}`),
+			Headers: map[string]string{
+				"Authorization": approverToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"time_editing_disabled"`,
+				`"time editing is currently disabled"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:   "time amendment delete blocked when editing disabled",
+			Method: http.MethodDelete,
+			URL:    "/api/collections/time_amendments/records/qn4jyrkxp3pfjom",
+			Headers: map[string]string{
+				"Authorization": approverToken,
+			},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"time_editing_disabled"`,
+				`"time editing is currently disabled"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
 		},
 	}
 
