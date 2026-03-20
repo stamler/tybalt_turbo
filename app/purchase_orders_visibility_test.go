@@ -62,6 +62,13 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	// Generate token for Shallow Hal (owner self-bypass with non-zero limit but
+	// insufficient final limit for the full PO amount).
+	poApproverSelfBypassToken, err := testutils.GenerateRecordToken("users", "u_po_bypass_001@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
 	// Generate token for Fatt (max_amount=500 but computer_max=2500)
 	fattToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
 	if err != nil {
@@ -577,6 +584,19 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				`"id":"01897j210v01f69"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "pending endpoint includes owner self-bypass when caller has non-zero kind limit but cannot final-approve amount",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/pending",
+			Headers: map[string]string{
+				"Authorization": poApproverSelfBypassToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"poselfbypass01"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

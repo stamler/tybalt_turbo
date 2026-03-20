@@ -366,8 +366,8 @@ SELECT
                   -- Dual-stage assigned-approver self-bypass path.
                   cpl.second_approval_threshold > 0
                   AND po.approval_total > cpl.second_approval_threshold
-                  AND cpl.resolved_limit > cpl.second_approval_threshold
-                  AND cpl.resolved_limit >= po.approval_total
+                  AND po.uid = {:userId}
+                  AND cpl.resolved_limit > 0
                 )
                 OR (
                   -- Single-stage case: threshold not triggered.
