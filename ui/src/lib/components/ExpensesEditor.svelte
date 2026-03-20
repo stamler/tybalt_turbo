@@ -233,7 +233,7 @@
     <span
       class="w-full rounded-sm border border-amber-300 bg-amber-50 px-2 py-1 text-sm text-amber-900"
     >
-      This PO will be closed after this expense is committed.
+      This PO will be closed after any expense is committed.
     </span>
   {/if}
   {#if item.purchase_order !== "" && linkedPurchaseOrderType === "Recurring" && linkedRecurringRemainingOccurrences !== null}
