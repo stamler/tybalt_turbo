@@ -80,6 +80,21 @@ Toggles individual notification templates on/off. Each property key is a templat
 
 ---
 
+## Domain: `litestream`
+
+Controls Litestream replica health checking and alerting.
+
+| Property                  | Type   | Default              | Description                                                                                                                     |
+|---------------------------|--------|----------------------|---------------------------------------------------------------------------------------------------------------------------------|
+| `snapshot_prefix`         | string | `"litestream/0009/"` | S3 prefix checked by the cron health check when looking for the newest snapshot.                                                |
+| `stale_threshold_minutes` | number | `35.0`               | Maximum allowed age of the newest snapshot before the replica is considered stale. Must be > 0.                                 |
+| `alert_email`             | string | unset                | Email address notified when Litestream health is unhealthy: missing creds, S3 listing errors, no snapshots, or stale snapshots. |
+| `restart_on_stale`        | bool   | `false`              | When `true`, exit the process after a stale-snapshot alert so the platform restarts the app. Stale only.                        |
+
+**Fail mode:** alerting off unless `alert_email` is configured
+
+---
+
 ## Example values
 
 ```json
@@ -109,5 +124,13 @@ Toggles individual notification templates on/off. Each property key is a templat
   "po_active": true,
   "expense_rejected": true,
   "timesheet_submission_reminder": false
+}
+
+// key: "litestream"
+{
+  "snapshot_prefix": "litestream/0009/",
+  "stale_threshold_minutes": 35,
+  "alert_email": "ops@example.com",
+  "restart_on_stale": false
 }
 ```
