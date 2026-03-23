@@ -341,6 +341,7 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 	}
 
 	const activeRateSheet = "c41ofep525bcacj"
+	const divisionID = "fy4i9poneukvq9u"
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -359,7 +360,9 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 					"project_award_date": "2025-02-01",
 					"rate_sheet": "` + activeRateSheet + `"
 				},
-				"allocations": []
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
@@ -385,7 +388,9 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 					"proposal_opening_date": "2025-02-01",
 					"rate_sheet": "` + activeRateSheet + `"
 				},
-				"allocations": []
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
@@ -453,6 +458,7 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 	const inactiveUserID = "u_inactive"
 	const activeManagerID = "f2j5a8vk006baub"
 	const activeRateSheet = "c41ofep525bcacj"
+	const divisionID = "fy4i9poneukvq9u"
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -471,7 +477,9 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 					"project_award_date": "2025-02-01",
 					"rate_sheet": "` + activeRateSheet + `"
 				},
-				"allocations": []
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
@@ -497,12 +505,75 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 					"project_award_date": "2025-02-01",
 					"rate_sheet": "` + activeRateSheet + `"
 				},
-				"allocations": []
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"data":{"alternate_manager":{"code":"alternate_manager_not_active"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestJobsAPI_RequiresAtLeastOneAllocation(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const activeRateSheet = "c41ofep525bcacj"
+	const existingJobID = "cjf0kt0defhq480"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "creating job without allocations fails",
+			Method: http.MethodPost,
+			URL:    "/api/jobs",
+			Body: strings.NewReader(`{
+				"job": {
+					"description": "Test job without allocations",
+					"client": "ee3xvodl583b61o",
+					"contact": "235g6k01xx3sdjk",
+					"manager": "f2j5a8vk006baub",
+					"authorizing_document": "Unauthorized",
+					"branch": "80875lm27v8wgi4",
+					"location": "87Q8H976+2M",
+					"project_award_date": "2025-02-01",
+					"rate_sheet": "` + activeRateSheet + `"
+				},
+				"allocations": []
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"allocations":{"code":"required"`,
+				`"message":"at least one allocation is required"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "updating job without allocations fails",
+			Method: http.MethodPut,
+			URL:    "/api/jobs/" + existingJobID,
+			Body: strings.NewReader(`{
+				"job": {
+					"description": "Attempt update without allocations"
+				},
+				"allocations": []
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"data":{"allocations":{"code":"required"`,
+				`"message":"at least one allocation is required"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

@@ -52,6 +52,19 @@ func basicAllocationValidationError(index int, code string, message string) *err
 }
 
 func validateAllocationInputs(allocations []JobAllocationUpdate) error {
+	if len(allocations) == 0 {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "allocation validation failed",
+			Data: map[string]errs.CodeError{
+				"allocations": {
+					Code:    "required",
+					Message: "at least one allocation is required",
+				},
+			},
+		}
+	}
+
 	seen := make(map[string]int, len(allocations))
 	for idx, a := range allocations {
 		if a.Division == "" {

@@ -210,6 +210,7 @@
 
   function addAllocationRow() {
     allocations = [...allocations, { division: "", hours: 0 }];
+    clearFieldError("allocations");
   }
   function removeAllocationRow(index: number) {
     allocations = allocations.filter((_, i) => i !== index);
@@ -426,6 +427,10 @@
     errors = {};
     if (item.manager && item.alternate_manager && item.manager === item.alternate_manager) {
       setFieldError("alternate_manager", alternateManagerErrorMessage);
+      return;
+    }
+    if (allocations.length === 0) {
+      setFieldError("allocations", "At least one division allocation is required.");
       return;
     }
 
@@ -1147,8 +1152,11 @@
     {/if}
 
     {#if $divisions.index !== null}
-      <div class="flex w-full flex-col gap-2">
+      <div class="flex w-full flex-col gap-2" class:bg-red-200={errors.allocations !== undefined}>
         <span class="font-semibold">Divisions</span>
+        {#if errors.allocations !== undefined}
+          <span class="text-sm text-red-600">{errors.allocations.message}</span>
+        {/if}
         <div class="flex flex-col gap-2">
           {#each allocations as row, idx}
             <div class="flex items-center gap-2">
