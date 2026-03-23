@@ -164,6 +164,8 @@ func TestJobCreationBlockedWhenEditingDisabled(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	const divisionID = "fy4i9poneukvq9u"
+
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "job creation via custom API blocked when editing disabled",
@@ -178,7 +180,9 @@ func TestJobCreationBlockedWhenEditingDisabled(t *testing.T) {
 					"project_award_date": "2025-01-15",
 					"authorizing_document": "Email"
 				},
-				"allocations": []
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 403,
@@ -224,6 +228,7 @@ func TestJobUpdateBlockedWhenEditingDisabled(t *testing.T) {
 	}
 
 	const jobID = "cjf0kt0defhq480"
+	const divisionID = "fy4i9poneukvq9u"
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -234,7 +239,9 @@ func TestJobUpdateBlockedWhenEditingDisabled(t *testing.T) {
 				"job": {
 					"description": "Updated description when disabled"
 				},
-				"allocations": []
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 403,
@@ -309,6 +316,7 @@ func TestJobCreationAllowedWhenEditingEnabled(t *testing.T) {
 	const contactID = "nh5u9z3cyknjclv" // belongs to clientID
 	const managerID = "f2j5a8vk006baub" // valid manager from existing jobs
 	const activeRateSheet = "c41ofep525bcacj"
+	const divisionID = "fy4i9poneukvq9u"
 
 	scenarios := []tests.ApiScenario{
 		{
@@ -327,7 +335,9 @@ func TestJobCreationAllowedWhenEditingEnabled(t *testing.T) {
 					"authorizing_document": "PA",
 					"rate_sheet": "` + activeRateSheet + `"
 				},
-				"allocations": []
+				"allocations": [
+					{ "division": "` + divisionID + `", "hours": 10 }
+				]
 			}`),
 			Headers:         map[string]string{"Authorization": recordToken},
 			ExpectedStatus:  200,
