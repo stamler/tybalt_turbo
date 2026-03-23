@@ -22,3 +22,4 @@ app/report_testing/**/*.csv
 app/constants/version.go
 ui/src/lib/version.ts
 ui/static/version.json
+.claude/launch.json

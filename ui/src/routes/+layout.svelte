@@ -150,8 +150,13 @@
   const toggleSidebar = () => {
     isSidebarOpen = !isSidebarOpen;
   };
+
+  const isPrintRoute = $derived($page.url.pathname.endsWith("/print"));
 </script>
 
+{#if isPrintRoute}
+  {@render children()}
+{:else}
 <div class="h-screen w-screen overflow-hidden">
   <!-- Mobile header with hamburger -->
   <header
@@ -323,3 +328,4 @@
     {/if}
   </div>
 </div>
+{/if}

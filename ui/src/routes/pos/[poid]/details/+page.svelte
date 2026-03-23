@@ -58,7 +58,7 @@
   async function cancelPo() {
     try {
       await pb.send(`/api/purchase_orders/${data.po.id}/cancel`, { method: "POST" });
-      goto("/pos/list");
+      goto(resolve("/pos/list"));
     } catch (e: any) {
       globalStore.addError(e);
     }
@@ -67,7 +67,7 @@
   async function closePo() {
     try {
       await pb.send(`/api/purchase_orders/${data.po.id}/close`, { method: "POST" });
-      goto("/pos/list");
+      goto(resolve("/pos/list"));
     } catch (e: any) {
       globalStore.addError(e);
     }
@@ -235,7 +235,10 @@
       {#if data.po.vendor}
         <div>
           <span class="font-semibold">Vendor:</span>
-          <a href={`/vendors/${data.po.vendor}/details`} class="text-blue-600 hover:underline">
+          <a
+            href={resolve(`/vendors/${data.po.vendor}/details`)}
+            class="text-blue-600 hover:underline"
+          >
             {data.po.vendor_name}
             {#if trimmedOrEmpty(data.po.vendor_alias)}
               <span class="opacity-60">({trimmedOrEmpty(data.po.vendor_alias)})</span>
@@ -279,12 +282,14 @@
       {#if data.po.attachment}
         <div>
           <span class="font-semibold">Attachment:</span>
+          <!-- eslint-disable svelte/no-navigation-without-resolve -->
           <a
             href={`${PUBLIC_POCKETBASE_URL}/api/files/purchase_orders/${data.po.id}/${data.po.attachment}`}
             class="text-blue-600 hover:underline"
             target="_blank"
             rel="noopener noreferrer">Download</a
           >
+          <!-- eslint-enable svelte/no-navigation-without-resolve -->
         </div>
       {/if}
 
@@ -316,7 +321,10 @@
           {#if data.po.job}
             <div>
               <span class="font-semibold">Job:</span>
-              <a href={`/jobs/${data.po.job}/details`} class="text-blue-600 hover:underline">
+              <a
+                href={resolve(`/jobs/${data.po.job}/details`)}
+                class="text-blue-600 hover:underline"
+              >
                 {data.po.job_number}
               </a>
               {#if data.po.job_description}
@@ -333,7 +341,7 @@
             <div>
               <span class="font-semibold">Client:</span>
               <a
-                href={`/clients/${data.po.client_id}/details`}
+                href={resolve(`/clients/${data.po.client_id}/details`)}
                 class="text-blue-600 hover:underline"
               >
                 {data.po.client_name}
@@ -355,8 +363,9 @@
       {#if data.po.parent_po_number}
         <div>
           <span class="font-semibold">Parent PO:</span>
-          <a href={`/pos/${data.po.parent_po}/details`} class="text-blue-600 hover:underline"
-            >{data.po.parent_po_number}</a
+          <a
+            href={resolve(`/pos/${data.po.parent_po}/details`)}
+            class="text-blue-600 hover:underline">{data.po.parent_po_number}</a
           >
         </div>
       {/if}
@@ -397,6 +406,20 @@
           color="orange"
         />
       {/if}
+    </div>
+  {/if}
+
+  {#if data.po.status === "Active"}
+    <div class="flex flex-wrap gap-2">
+      <a
+        href={resolve(`/pos/${data.po.id}/print`)}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="inline-flex items-center gap-2 rounded-xs bg-blue-200 px-3 py-1 text-neutral-700 hover:bg-blue-300 hover:text-blue-500 active:text-blue-800 active:shadow-inner"
+      >
+        <Icon icon="mdi:printer-outline" width="20px" />
+        <span>Print</span>
+      </a>
     </div>
   {/if}
 
@@ -453,7 +476,7 @@
     <h2 class="text-xl font-semibold">Visible Expenses ({data.expenses.length})</h2>
     <DsList items={data.expenses} search={false}>
       {#snippet anchor(ex)}
-        <a href={`/expenses/${ex.id}/details`} class="text-blue-600 hover:underline">
+        <a href={resolve(`/expenses/${ex.id}/details`)} class="text-blue-600 hover:underline">
           {shortDate(ex.date)}
         </a>
       {/snippet}
