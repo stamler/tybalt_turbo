@@ -110,6 +110,12 @@ export type ExpensesListData = {
   limit?: number;
 };
 
+export type PurchaseOrdersListData = {
+  items?: PurchaseOrdersAugmentedResponse[];
+  createdItemIsVisible?: (record: PurchaseOrdersResponse) => boolean;
+  realtime_source?: "visible" | "pending" | "none";
+};
+
 export type ExpenseCommitQueueRow = {
   id: string;
   given_name: string;

@@ -14,6 +14,7 @@
     PurchaseOrdersAugmentedResponse,
     PurchaseOrdersResponse,
   } from "$lib/pocketbase-types";
+  import type { PurchaseOrdersListData } from "$lib/svelte-types";
   import { globalStore } from "$lib/stores/global";
   import { authStore } from "$lib/stores/auth";
   import { shortDate, trimmedOrEmpty } from "$lib/utilities";
@@ -21,11 +22,6 @@
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { fetchPendingPO, fetchVisiblePO } from "$lib/poVisibility";
   // import { toastStore, type ToastSettings } from "@skeletonlabs/skeleton";
-
-  interface PurchaseOrdersListData {
-    items?: PurchaseOrdersAugmentedResponse[];
-    realtime_source?: "visible" | "pending" | "none";
-  }
 
   const collectionId = "purchase_orders";
 
@@ -48,6 +44,7 @@
     hideWhenEmpty?: boolean;
   } = $props();
   let items = $state(untrack(() => data.items));
+  let createdItemIsVisible = $state(untrack(() => data.createdItemIsVisible));
   let pendingApprovalIds = $state(new Set<string>());
 
   // Subscribe to the base collection but update the items from the augmented
@@ -83,6 +80,7 @@
           items = newItems;
           void refreshPendingApprovalIds();
         },
+        createdItemIsVisible,
       );
     } else if (data.realtime_source === "visible") {
       unsubscribeFunc = await proxySubscriptionWithLoader<
@@ -96,6 +94,7 @@
           items = newItems;
           void refreshPendingApprovalIds();
         },
+        createdItemIsVisible,
       );
     } else if (data.realtime_source === "none" && refreshItems) {
       unsubscribeFunc = await pb.collection("purchase_orders").subscribe<PurchaseOrdersResponse>(
