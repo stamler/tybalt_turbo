@@ -57,6 +57,7 @@ func TestPayablesRowToRecordUsesRecordDateForDisplayColumns(t *testing.T) {
 				JobNumber:    "24-321",
 				DivisionCode: "BM",
 				BranchCode:   "TOR",
+				POType:       "Recurring",
 				RecordDate:   tc.recordDate,
 				ApprovalDate: tc.approvalDate,
 				Total:        "123.45",
@@ -69,22 +70,25 @@ func TestPayablesRowToRecordUsesRecordDateForDisplayColumns(t *testing.T) {
 			}
 
 			record := row.toRecord()
-			if got := record[4]; got != tc.wantDay {
+			if got := record[4]; got != "Recurring" {
+				t.Fatalf("type = %q, want %q", got, "Recurring")
+			}
+			if got := record[5]; got != tc.wantDay {
 				t.Fatalf("day = %q, want %q", got, tc.wantDay)
 			}
-			if got := record[5]; got != tc.wantMonth {
+			if got := record[6]; got != tc.wantMonth {
 				t.Fatalf("month = %q, want %q", got, tc.wantMonth)
 			}
-			if got := record[6]; got != tc.wantYear {
+			if got := record[7]; got != tc.wantYear {
 				t.Fatalf("year = %q, want %q", got, tc.wantYear)
 			}
-			if got := record[15]; got != "Fixture row" {
+			if got := record[16]; got != "Fixture row" {
 				t.Fatalf("description = %q, want %q", got, "Fixture row")
 			}
-			if got := record[18]; got != "Approver Name" {
+			if got := record[19]; got != "Approver Name" {
 				t.Fatalf("approved by = %q, want %q", got, "Approver Name")
 			}
-			if got := record[19]; got != "TURBO" {
+			if got := record[20]; got != "TURBO" {
 				t.Fatalf("entered by = %q, want %q", got, "TURBO")
 			}
 		})
@@ -100,6 +104,7 @@ func TestRowsToCSVAndTSV(t *testing.T) {
 			JobNumber:    "24-321",
 			DivisionCode: "BM",
 			BranchCode:   "TOR",
+			POType:       "One-Time",
 			RecordDate:   "2024-09-01",
 			ApprovalDate: "2026-03-11",
 			Total:        "123.45",
@@ -128,7 +133,7 @@ func TestRowsToCSVAndTSV(t *testing.T) {
 	if strings.Contains(tsvString, "Acct/Visa/Exp\tJob #") {
 		t.Fatalf("tsv should not include headers, got %q", tsvString)
 	}
-	if !strings.Contains(tsvString, "Expense\t24-321\tBM\tTOR\t1\tSep\t2024") {
+	if !strings.Contains(tsvString, "Expense\t24-321\tBM\tTOR\tOne-Time\t1\tSep\t2024") {
 		t.Fatalf("tsv should contain tab-separated row data, got %q", tsvString)
 	}
 	if !strings.HasSuffix(tsvString, "\n") {

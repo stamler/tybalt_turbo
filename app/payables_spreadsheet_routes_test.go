@@ -112,9 +112,10 @@ func TestPayablesSpreadsheetRoutesDataAndFiltering(t *testing.T) {
 			Headers:        map[string]string{"Authorization": reportToken},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				"Acct/Visa/Exp,Job #,Div,Branch,Date,Mon,Year",
+				"Acct/Visa/Exp,Job #,Div,Branch,type,Date,Mon,Year",
 				"Seeded payables second approval fixture",
 				"2712-0102",
+				"One-Time",
 				"TURBO",
 			},
 			NotExpectedContent: []string{
@@ -131,6 +132,7 @@ func TestPayablesSpreadsheetRoutesDataAndFiltering(t *testing.T) {
 			ExpectedContent: []string{
 				"Seeded payables second approval fixture",
 				"2712-0102",
+				"\tOne-Time\t",
 				"\tTURBO\t",
 			},
 			NotExpectedContent: []string{

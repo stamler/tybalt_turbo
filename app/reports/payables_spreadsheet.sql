@@ -3,6 +3,7 @@ SELECT
   COALESCE(j.number, '') AS job_number,
   COALESCE(d.code, '') AS division_code,
   COALESCE(b.code, '') AS branch_code,
+  COALESCE(po.type, '') AS po_type,
   po.date AS record_date,
   CASE
     WHEN po.second_approval != '' AND po.second_approval > po.approved

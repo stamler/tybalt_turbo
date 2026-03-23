@@ -18,7 +18,7 @@ import (
 var payablesSpreadsheetQuery string
 
 var payablesSpreadsheetHeaders = []string{
-	"Acct/Visa/Exp", "Job #", "Div", "Branch", "Date", "Mon", "Year",
+	"Acct/Visa/Exp", "Job #", "Div", "Branch", "type", "Date", "Mon", "Year",
 	"Subtotal", "HST", "Total", "Unit", "NC", "Meals",
 	"PO#", "Category", "Description", "Supplier", "Employee",
 	"Approved By", "Entered By", "Vendor Inv #", "Inv Date",
@@ -30,6 +30,7 @@ type payablesRow struct {
 	JobNumber    string `db:"job_number"`
 	DivisionCode string `db:"division_code"`
 	BranchCode   string `db:"branch_code"`
+	POType       string `db:"po_type"`
 	RecordDate   string `db:"record_date"`
 	ApprovalDate string `db:"approval_date"`
 	Total        string `db:"total"`
@@ -51,7 +52,7 @@ func (r payablesRow) toRecord() []string {
 		}
 	}
 	return []string{
-		r.PaymentType, r.JobNumber, r.DivisionCode, r.BranchCode,
+		r.PaymentType, r.JobNumber, r.DivisionCode, r.BranchCode, r.POType,
 		day, mon, year,
 		"", "", r.Total, "", "", "",
 		r.PONumber, "", r.Description, r.VendorName, r.Employee,
