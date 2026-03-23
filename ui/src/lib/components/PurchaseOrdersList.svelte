@@ -46,6 +46,7 @@
   let items = $state(untrack(() => data.items));
   let createdItemIsVisible = $state(untrack(() => data.createdItemIsVisible));
   let pendingApprovalIds = $state(new Set<string>());
+  let remainingInfoOpenId = $state<string | null>(null);
 
   // Subscribe to the base collection but update the items from the augmented
   // view
@@ -200,6 +201,10 @@
     return poIsOwnedByCurrentUser(po) && po.status === "Unapproved" && po.rejected === "";
   }
 
+  function toggleRemainingInfo(id: string): void {
+    remainingInfoOpenId = remainingInfoOpenId === id ? null : id;
+  }
+
   async function del(id: string): Promise<void> {
     // return immediately if items is not an array
     if (!Array.isArray(items)) return;
@@ -295,11 +300,22 @@
     {#snippet byline(item: VisiblePurchaseOrderResponse)}
       <span class="flex items-center gap-2">
         ${item.total}
-        {#if showRemaining}
-          <span
-            >Provisional Remaining: ${item.remaining_amount.toFixed(2)}
-            <span class="text-sm text-slate-500">(includes uncommitted expenses)</span></span
-          >
+        {#if showRemaining && item.status === "Active"}
+          <span class="flex items-center gap-1">
+            <span>Provisional Remaining: ${item.remaining_amount.toFixed(2)}</span>
+            <button
+              type="button"
+              class="inline-flex items-center text-slate-500 hover:text-slate-700"
+              aria-label="Explain provisional remaining"
+              aria-expanded={remainingInfoOpenId === item.id}
+              onclick={() => toggleRemainingInfo(item.id)}
+            >
+              <Icon icon="mdi:information-outline" width="16px" />
+            </button>
+            {#if remainingInfoOpenId === item.id}
+              <span class="text-sm text-slate-500">includes uncommitted expenses</span>
+            {/if}
+          </span>
         {/if}
         {#if item.legacy_manual_entry}
           <DsLabel color="cyan">Manually created</DsLabel>
