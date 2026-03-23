@@ -65,7 +65,7 @@ When a phase becomes authoritative in Turbo:
 
 **Dependencies:** Requires Phase 1 (jobs) and Phase 4 (profiles) to be imported first, as time entries reference jobs and profiles.
 
-**Writeback:** Not yet implemented
+**Writeback:** Implemented via the legacy time export endpoint, with separate `timeSheets` and `timeAmendments` payload sections keyed by export week.
 
 ### Phase 4: Users (`--users`)
 
@@ -148,7 +148,7 @@ cd ../import_data
 
 ### Phase 3 Deployment (Time)
 
-1. **Build time entry/amendment writebacks in Turbo**
+1. **Validate time entry/amendment writebacks in Turbo**
 2. **Test thoroughly**
 3. **Disable time editing in Turbo** (end of testing)
 4. **Disable time editing in Tybalt**

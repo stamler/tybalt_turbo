@@ -117,21 +117,24 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 			record.Set("committer", userId)
 			record.Set("committed", now)
 
+			weekEnding, err := utilities.GenerateWeekEnding(now.Format(time.DateOnly))
+			if err != nil {
+				return &CodeError{
+					Code:    "error_generating_week_ending",
+					Message: fmt.Sprintf("error generating week ending: %v", err),
+				}
+			}
+
+			if record.Collection().Fields.GetByName("committed_week_ending") != nil {
+				record.Set("committed_week_ending", weekEnding)
+			}
+
 			// if the record is an expense, set the committed_week_ending property to
 			// the week_ending date that corresponds to the committed timestamp. If
 			// the payment_type is "Mileage", also update the total based on the
 			// committed mileage during the annual fiscal period that corresponds to
 			// the date of the record.
 			if record.Collection().Name == "expenses" {
-				weekEnding, err := utilities.GenerateWeekEnding(now.Format(time.DateOnly))
-				if err != nil {
-					return &CodeError{
-						Code:    "error_generating_week_ending",
-						Message: fmt.Sprintf("error generating week ending: %v", err),
-					}
-				}
-				record.Set("committed_week_ending", weekEnding)
-
 				payPeriodEnding, err := utilities.GenerateCommittedPayPeriodEnding(record.GetString("date"), weekEnding)
 				if err != nil {
 					return &CodeError{

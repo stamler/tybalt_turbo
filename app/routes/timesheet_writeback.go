@@ -62,6 +62,52 @@ func (t timeEntryExport) MarshalJSON() ([]byte, error) {
 	})
 }
 
+type timeAmendmentExport struct {
+	Id                  string  `db:"id" json:"id"`
+	Uid                 string  `db:"uid" json:"uid"`
+	Job                 string  `db:"job" json:"job,omitempty"`
+	JobDescription      string  `db:"job_description" json:"jobDescription,omitempty"`
+	Division            string  `db:"division" json:"division,omitempty"`
+	DivisionName        string  `db:"division_name" json:"divisionName,omitempty"`
+	TimeType            string  `db:"time_type" json:"timetype"`
+	TimeTypeName        string  `db:"time_type_name" json:"timetypeName"`
+	Date                string  `db:"date" json:"date"`
+	Hours               float64 `db:"hours" json:"-"`
+	MealsHours          float64 `db:"meals_hours" json:"mealsHours,omitempty"`
+	PayoutRequestAmount float64 `db:"payout_request_amount" json:"payoutRequestAmount,omitempty"`
+	WorkRecord          string  `db:"work_record" json:"workrecord,omitempty"`
+	Description         string  `db:"description" json:"workDescription,omitempty"`
+	Category            string  `db:"category_name" json:"category,omitempty"`
+	WeekEnding          string  `db:"week_ending" json:"weekEnding"`
+	ClientName          string  `db:"client_name" json:"client,omitempty"`
+	Committed           string  `db:"committed" json:"committed"`
+	CommittedWeekEnding string  `db:"committed_week_ending" json:"committedWeekEnding"`
+	Committer           string  `db:"committer" json:"committer"`
+	CommitterName       string  `db:"committer_name" json:"committerName"`
+}
+
+func (t timeAmendmentExport) MarshalJSON() ([]byte, error) {
+	type Alias timeAmendmentExport
+
+	if t.Job != "" {
+		return json.Marshal(struct {
+			Alias
+			JobHours float64 `json:"jobHours"`
+		}{
+			Alias:    Alias(t),
+			JobHours: t.Hours,
+		})
+	}
+
+	return json.Marshal(struct {
+		Alias
+		Hours float64 `json:"hours"`
+	}{
+		Alias: Alias(t),
+		Hours: t.Hours,
+	})
+}
+
 type workHoursTally struct {
 	JobHours    float64 `json:"jobHours"`
 	NoJobNumber float64 `json:"noJobNumber"`
@@ -108,6 +154,11 @@ type timesheetExportRow struct {
 	PayoutRequest        float64                  `json:"payoutRequest"`
 	Timetypes            []string                 `json:"timetypes"`
 	WorkHoursTally       workHoursTally           `json:"workHoursTally"`
+}
+
+type timeExportResponse struct {
+	TimeSheets     []timesheetExportRow  `json:"timeSheets"`
+	TimeAmendments []timeAmendmentExport `json:"timeAmendments"`
 }
 
 // sortedKeys returns sorted keys from a map with string keys for deterministic output
@@ -283,6 +334,57 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			rows[i].WorkHoursTally = wht
 		}
 
-		return e.JSON(http.StatusOK, rows)
+		amendmentsQuery := `
+			SELECT ta.id, ap.legacy_uid AS uid,
+			       COALESCE(j.number, '') AS job,
+			       COALESCE(jp.number, '') AS proposal_number,
+			       COALESCE(j.description, '') AS job_description,
+			       COALESCE(d.code, '') AS division,
+			       COALESCE(d.name, '') AS division_name,
+			       tt.code AS time_type,
+			       tt.name AS time_type_name,
+			       ta.date, ta.hours, ta.meals_hours,
+			       ta.payout_request_amount,
+			       ta.work_record, ta.description,
+			       ta.week_ending,
+			       COALESCE(c.name, '') AS client_name,
+			       COALESCE(cc.given_name || ' ' || cc.surname, '') AS client_contact,
+			       COALESCE(jo.name, '') AS job_owner_name,
+			       COALESCE(ca.name, '') AS category_name,
+			       COALESCE(b.code, '') AS branch_code,
+			       COALESCE(j.status, '') AS job_status,
+			       ta.committed,
+			       ta.committed_week_ending,
+			       COALESCE(apc.legacy_uid, '') AS committer,
+			       COALESCE(pc.given_name || ' ' || pc.surname, '') AS committer_name
+			FROM time_amendments ta
+			LEFT JOIN admin_profiles ap ON ta.uid = ap.uid
+			LEFT JOIN admin_profiles apc ON ta.committer = apc.uid
+			LEFT JOIN profiles pc ON ta.committer = pc.uid
+			LEFT JOIN time_types tt ON ta.time_type = tt.id
+			LEFT JOIN divisions d ON ta.division = d.id
+			LEFT JOIN jobs j ON ta.job = j.id
+			LEFT JOIN jobs jp ON j.proposal = jp.id
+			LEFT JOIN clients c ON j.client = c.id
+			LEFT JOIN clients jo ON j.job_owner = jo.id
+			LEFT JOIN client_contacts cc ON j.contact = cc.id
+			LEFT JOIN categories ca ON ta.category = ca.id
+			LEFT JOIN branches b ON ta.branch = b.id
+			WHERE ta.committed_week_ending = {:weekEnding}
+			  AND ta.committed != ''
+			  AND ta._imported = 0
+		`
+
+		var amendments []timeAmendmentExport
+		if err := app.DB().NewQuery(amendmentsQuery).Bind(dbx.Params{
+			"weekEnding": weekEnding,
+		}).All(&amendments); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to query time amendments: "+err.Error(), nil)
+		}
+
+		return e.JSON(http.StatusOK, timeExportResponse{
+			TimeSheets:     rows,
+			TimeAmendments: amendments,
+		})
 	}
 }

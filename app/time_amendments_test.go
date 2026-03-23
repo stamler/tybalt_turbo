@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 	"tybalt/internal/testutils"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/tests"
 )
@@ -342,6 +343,22 @@ func TestTimeAmendmentsRoutes(t *testing.T) {
 				"OnRecordUpdate": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
+				record, err := app.FindRecordById("time_amendments", "qn4jyrkxp3pfjom")
+				if err != nil {
+					tb.Fatalf("failed to load committed amendment: %v", err)
+				}
+
+				committedDate := record.GetDateTime("committed").Time().Format("2006-01-02")
+				expectedWeekEnding, err := utilities.GenerateWeekEnding(committedDate)
+				if err != nil {
+					tb.Fatalf("failed to generate expected committed week ending: %v", err)
+				}
+
+				if got := record.GetString("committed_week_ending"); got != expectedWeekEnding {
+					tb.Fatalf("committed_week_ending = %q, want %q", got, expectedWeekEnding)
+				}
+			},
 		},
 		{
 			Name:            "caller without the commit claim cannot commit time_amendments records",

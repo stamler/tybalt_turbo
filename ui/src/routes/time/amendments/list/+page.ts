@@ -11,7 +11,7 @@ export const load: PageLoad = async () => {
       .collection("time_amendments_augmented")
       .getFullList<TimeAmendmentsAugmentedResponse>({
         sort: "-date",
-        filter: "committed_week_ending != ''",
+        filter: "committed != ''",
       });
     return {
       items,
