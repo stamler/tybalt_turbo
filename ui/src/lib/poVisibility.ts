@@ -10,11 +10,18 @@ export type VisiblePOScope =
   | "expiring"
   | "approved_by_me_awaiting_second";
 
+export type VisiblePurchaseOrderResponse = PurchaseOrdersAugmentedResponse & {
+  expenses_total: number;
+  recurring_expected_occurrences: number;
+  recurring_remaining_occurrences: number;
+  remaining_amount: number;
+};
+
 export async function fetchVisiblePOs(
   scope: VisiblePOScope,
   beforeDate?: string,
   limit?: number,
-): Promise<PurchaseOrdersAugmentedResponse[]> {
+): Promise<VisiblePurchaseOrderResponse[]> {
   const params = new URLSearchParams({ scope });
   if (scope === "stale" && beforeDate) {
     params.set("stale_before", beforeDate);
@@ -28,17 +35,17 @@ export async function fetchVisiblePOs(
 
   return (await pb.send(`/api/purchase_orders/visible?${params.toString()}`, {
     method: "GET",
-  })) as PurchaseOrdersAugmentedResponse[];
+  })) as VisiblePurchaseOrderResponse[];
 }
 
-export async function fetchVisiblePO(id: string): Promise<PurchaseOrdersAugmentedResponse> {
+export async function fetchVisiblePO(id: string): Promise<VisiblePurchaseOrderResponse> {
   return (await pb.send(`/api/purchase_orders/visible/${id}`, {
     method: "GET",
-  })) as PurchaseOrdersAugmentedResponse;
+  })) as VisiblePurchaseOrderResponse;
 }
 
-export async function fetchPendingPO(id: string): Promise<PurchaseOrdersAugmentedResponse> {
+export async function fetchPendingPO(id: string): Promise<VisiblePurchaseOrderResponse> {
   return (await pb.send(`/api/purchase_orders/pending/${id}`, {
     method: "GET",
-  })) as PurchaseOrdersAugmentedResponse;
+  })) as VisiblePurchaseOrderResponse;
 }

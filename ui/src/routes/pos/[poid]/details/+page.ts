@@ -1,17 +1,14 @@
 import type { PageLoad } from "./$types";
 import { pb } from "$lib/pocketbase";
 import { error } from "@sveltejs/kit";
-import type {
-  PurchaseOrdersAugmentedResponse,
-  ExpensesAugmentedResponse,
-} from "$lib/pocketbase-types";
+import type { ExpensesAugmentedResponse } from "$lib/pocketbase-types";
 import type { PurchaseOrderDetailsPageData, SecondApproversResponse } from "$lib/svelte-types";
 import { buildPoApproverRequest, fetchPoSecondApprovers } from "$lib/poApprovers";
 import { fetchPendingPO, fetchVisiblePO } from "$lib/poVisibility";
 
 export const load: PageLoad = async ({ params }) => {
   try {
-    const po = (await fetchVisiblePO(params.poid)) as PurchaseOrdersAugmentedResponse;
+    const po = await fetchVisiblePO(params.poid);
     let canApproveOrReject = false;
 
     try {

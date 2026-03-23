@@ -5,4 +5,4 @@
   const staleDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 </script>
 
-<PurchaseOrdersList inListHeader={`Stale Purchase Orders (Active before ${staleDate})`} {data} />
+<PurchaseOrdersList inListHeader={`Stale Purchase Orders (Active before ${staleDate})`} {data} showRemaining={true} />

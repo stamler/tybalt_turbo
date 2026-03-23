@@ -79,8 +79,8 @@
   const linkedRecurringRemainingOccurrences = $derived.by(
     () => data.linked_purchase_order?.recurring_remaining_occurrences ?? null,
   );
-  const linkedCumulativeRemainingBalance = $derived.by(
-    () => data.linked_purchase_order?.cumulative_remaining_balance ?? null,
+  const linkedRemainingAmount = $derived.by(
+    () => data.linked_purchase_order?.remaining_amount ?? null,
   );
   const authUserID = $derived.by(() => $authStore?.model?.id ?? "");
   const nonOwnerEditMessage = "You can view this expense, but only its creator can edit it.";
@@ -245,11 +245,11 @@
         : "s"} remaining before this PO closes.
     </span>
   {/if}
-  {#if item.purchase_order !== "" && linkedPurchaseOrderType === "Cumulative" && linkedCumulativeRemainingBalance !== null}
+  {#if item.purchase_order !== "" && linkedPurchaseOrderType === "Cumulative" && linkedRemainingAmount !== null}
     <span
       class="w-full rounded-sm border border-cyan-300 bg-cyan-50 px-2 py-1 text-sm text-cyan-900"
     >
-      Remaining cumulative balance: ${linkedCumulativeRemainingBalance.toFixed(2)}
+      Provisional Remaining: ${linkedRemainingAmount.toFixed(2)} (includes uncommitted expenses)
     </span>
   {/if}
 

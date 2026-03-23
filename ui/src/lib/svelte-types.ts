@@ -2,9 +2,6 @@ import type {
   TimeEntriesRecord,
   PurchaseOrdersRecord,
   PurchaseOrdersResponse,
-  PurchaseOrdersPaymentTypeOptions,
-  PurchaseOrdersStatusOptions,
-  PurchaseOrdersTypeOptions,
   PoApproversResponse,
   ExpensesRecord,
   ExpensesResponse,
@@ -20,8 +17,8 @@ import type {
   ClientDetails,
   ClientNotesResponse,
   ExpensesAugmentedResponse,
-  PurchaseOrdersAugmentedResponse,
 } from "$lib/pocketbase-types";
+import type { VisiblePurchaseOrderResponse } from "$lib/poVisibility";
 
 export interface PageData<T> {
   item: T;
@@ -55,7 +52,7 @@ export type SecondApproversResponse = {
   };
 };
 export type PurchaseOrderDetailsPageData = {
-  po: PurchaseOrdersAugmentedResponse;
+  po: VisiblePurchaseOrderResponse;
   expenses: ExpensesAugmentedResponse[];
   secondApproverDiagnostics: SecondApproversResponse | null;
   canApproveOrReject: boolean;
@@ -63,12 +60,12 @@ export type PurchaseOrderDetailsPageData = {
 export type LinkedPurchaseOrderSummary = {
   id: string;
   po_number: string;
-  type: PurchaseOrdersTypeOptions;
-  payment_type: PurchaseOrdersPaymentTypeOptions;
-  status: PurchaseOrdersStatusOptions;
+  type: VisiblePurchaseOrderResponse["type"];
+  payment_type: VisiblePurchaseOrderResponse["payment_type"];
+  status: VisiblePurchaseOrderResponse["status"];
   recurring_expected_occurrences?: number;
   recurring_remaining_occurrences?: number;
-  cumulative_remaining_balance?: number;
+  remaining_amount?: number;
 };
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse> & {
   linked_purchase_order?: LinkedPurchaseOrderSummary;
@@ -111,7 +108,7 @@ export type ExpensesListData = {
 };
 
 export type PurchaseOrdersListData = {
-  items?: PurchaseOrdersAugmentedResponse[];
+  items?: VisiblePurchaseOrderResponse[];
   createdItemIsVisible?: (record: PurchaseOrdersResponse) => boolean;
   realtime_source?: "visible" | "pending" | "none";
 };

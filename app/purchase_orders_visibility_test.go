@@ -2,14 +2,32 @@ package main
 
 import (
 	"encoding/json"
+	"math"
 	"net/http"
 	"testing"
 	"tybalt/internal/testutils"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
 func TestPurchaseOrdersVisibilityRules(t *testing.T) {
+	type visiblePORow struct {
+		ID              string   `json:"id"`
+		Type            string   `json:"type"`
+		Total           float64  `json:"total"`
+		ApprovalTotal   float64  `json:"approval_total"`
+		ExpensesTotal   *float64 `json:"expenses_total"`
+		RemainingAmount *float64 `json:"remaining_amount"`
+	}
+
+	assertFloatApprox := func(t testing.TB, got float64, want float64) {
+		t.Helper()
+		if math.Abs(got-want) > 0.0001 {
+			t.Fatalf("expected %.4f, got %.4f", want, got)
+		}
+	}
+
 	// Generate token for a regular user with no po-related claims
 	regularUserToken, err := testutils.GenerateRecordToken("users", "time@test.com") // Tester Time
 	if err != nil {
@@ -613,6 +631,157 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 				`"status":"Unapproved"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible by id returns remaining_amount for one-time purchase orders",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/2plsetqdxht7esg",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2plsetqdxht7esg"`,
+				`"type":"One-Time"`,
+				`"remaining_amount":`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
+				defer res.Body.Close()
+
+				var row visiblePORow
+				if err := json.NewDecoder(res.Body).Decode(&row); err != nil {
+					t.Fatalf("failed decoding visible PO response: %v", err)
+				}
+				if row.RemainingAmount == nil || row.ExpensesTotal == nil {
+					t.Fatalf("expected remaining_amount and expenses_total in response, got %#v", row)
+				}
+				assertFloatApprox(t, *row.RemainingAmount, row.Total-*row.ExpensesTotal)
+			},
+		},
+		{
+			Name:   "visible by id falls back to total when legacy one-time purchase order has zero approval_total",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/0pia83nnprdlzf8",
+			Headers: map[string]string{
+				"Authorization": noclaimsToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"0pia83nnprdlzf8"`,
+				`"type":"One-Time"`,
+				`"remaining_amount":`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
+				if _, err := app.DB().NewQuery(`
+					UPDATE purchase_orders
+					SET approval_total = 0
+					WHERE id = {:id}
+				`).Bind(map[string]any{
+					"id": "0pia83nnprdlzf8",
+				}).Execute(); err != nil {
+					t.Fatalf("failed updating purchase order fixture: %v", err)
+				}
+			},
+			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
+				defer res.Body.Close()
+
+				var row visiblePORow
+				if err := json.NewDecoder(res.Body).Decode(&row); err != nil {
+					t.Fatalf("failed decoding visible PO response: %v", err)
+				}
+				if row.RemainingAmount == nil || row.ExpensesTotal == nil {
+					t.Fatalf("expected remaining_amount and expenses_total in response, got %#v", row)
+				}
+				assertFloatApprox(t, row.ApprovalTotal, 0)
+				assertFloatApprox(t, *row.RemainingAmount, row.Total-*row.ExpensesTotal)
+				assertFloatApprox(t, *row.RemainingAmount, 0)
+			},
+		},
+		{
+			Name:   "visible by id returns provisional remaining_amount for cumulative purchase orders using all linked expenses",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/ly8xyzpuj79upq1",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"ly8xyzpuj79upq1"`,
+				`"type":"Cumulative"`,
+				`"remaining_amount":`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
+				defer res.Body.Close()
+
+				var row visiblePORow
+				if err := json.NewDecoder(res.Body).Decode(&row); err != nil {
+					t.Fatalf("failed decoding visible PO response: %v", err)
+				}
+				if row.RemainingAmount == nil || row.ExpensesTotal == nil {
+					t.Fatalf("expected remaining_amount and expenses_total in response, got %#v", row)
+				}
+				assertFloatApprox(t, *row.ExpensesTotal, 2387.12)
+				assertFloatApprox(t, *row.RemainingAmount, row.Total-*row.ExpensesTotal)
+				assertFloatApprox(t, *row.RemainingAmount, -1040)
+			},
+		},
+		{
+			Name:   "visible by id returns remaining_amount for recurring purchase orders based on approval total",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/d8463q483f3da28",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"d8463q483f3da28"`,
+				`"type":"Recurring"`,
+				`"remaining_amount":`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
+				defer res.Body.Close()
+
+				var row visiblePORow
+				if err := json.NewDecoder(res.Body).Decode(&row); err != nil {
+					t.Fatalf("failed decoding visible PO response: %v", err)
+				}
+				if row.RemainingAmount == nil || row.ExpensesTotal == nil {
+					t.Fatalf("expected remaining_amount and expenses_total in response, got %#v", row)
+				}
+				assertFloatApprox(t, *row.RemainingAmount, row.ApprovalTotal-*row.ExpensesTotal)
+				assertFloatApprox(t, *row.RemainingAmount, 22)
+			},
+		},
+		{
+			Name:   "visible mine scope includes remaining_amount on returned rows",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible?scope=mine",
+			Headers: map[string]string{
+				"Authorization": creatorToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"remaining_amount":`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
+				defer res.Body.Close()
+
+				var rows []visiblePORow
+				if err := json.NewDecoder(res.Body).Decode(&rows); err != nil {
+					t.Fatalf("failed decoding visible purchase order list: %v", err)
+				}
+				if len(rows) == 0 {
+					t.Fatal("expected at least one purchase order in mine scope")
+				}
+				if rows[0].RemainingAmount == nil {
+					t.Fatalf("expected remaining_amount on returned row, got %#v", rows[0])
+				}
+			},
 		},
 		{
 			Name:   "inactive admin profile cannot qualify second-stage visibility",

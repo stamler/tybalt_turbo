@@ -1,12 +1,11 @@
-import type { PurchaseOrdersAugmentedResponse } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
-import { fetchVisiblePOs } from "$lib/poVisibility";
+import { fetchVisiblePOs, type VisiblePurchaseOrderResponse } from "$lib/poVisibility";
 import type { PageLoad } from "./$types";
 export const load: PageLoad = async () => {
   const [pendingResult, approvedByMeResult] = await Promise.allSettled([
     pb.send("/api/purchase_orders/pending", {
       method: "GET",
-    }) as Promise<PurchaseOrdersAugmentedResponse[]>,
+    }) as Promise<VisiblePurchaseOrderResponse[]>,
     fetchVisiblePOs("approved_by_me_awaiting_second", undefined, 20),
   ]);
 

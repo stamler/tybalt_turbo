@@ -1,12 +1,11 @@
 <script lang="ts">
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import PurchaseOrdersList from "$lib/components/PurchaseOrdersList.svelte";
-  import type { PurchaseOrdersAugmentedResponse } from "$lib/pocketbase-types";
-  import { fetchVisiblePOs } from "$lib/poVisibility";
+  import { fetchVisiblePOs, type VisiblePurchaseOrderResponse } from "$lib/poVisibility";
   import { onMount } from "svelte";
 
   interface PurchaseOrdersListData {
-    items?: PurchaseOrdersAugmentedResponse[];
+    items?: VisiblePurchaseOrderResponse[];
     realtime_source?: "visible" | "pending";
   }
 
@@ -79,6 +78,7 @@
     <PurchaseOrdersList
       inListHeader={`Expiring Recurring Purchase Orders (end date on or before ${expiringBefore})`}
       data={listData}
+      showRemaining={true}
     />
   {/key}
 {/if}

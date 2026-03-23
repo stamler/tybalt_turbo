@@ -1,11 +1,11 @@
 import { pb } from "$lib/pocketbase";
-import type { PurchaseOrdersAugmentedResponse, PurchaseOrdersResponse } from "$lib/pocketbase-types";
+import type { PurchaseOrdersResponse } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
 import { fetchVisiblePOs } from "$lib/poVisibility";
 export const load: PageLoad = async () => {
   try {
     const currentUserId = pb.authStore.record?.id ?? "";
-    const result = (await fetchVisiblePOs("mine")) as PurchaseOrdersAugmentedResponse[];
+    const result = await fetchVisiblePOs("mine");
     return {
       items: result,
       createdItemIsVisible: (record: PurchaseOrdersResponse) => record.uid === currentUserId,

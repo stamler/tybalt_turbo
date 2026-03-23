@@ -10,11 +10,9 @@
   import { type UnsubscribeFunc } from "pocketbase";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
   import DsList from "$lib/components/DSList.svelte";
-  import type {
-    PurchaseOrdersAugmentedResponse,
-    PurchaseOrdersResponse,
-  } from "$lib/pocketbase-types";
+  import type { PurchaseOrdersResponse } from "$lib/pocketbase-types";
   import type { PurchaseOrdersListData } from "$lib/svelte-types";
+  import type { VisiblePurchaseOrderResponse } from "$lib/poVisibility";
   import { globalStore } from "$lib/stores/global";
   import { authStore } from "$lib/stores/auth";
   import { shortDate, trimmedOrEmpty } from "$lib/utilities";
@@ -30,6 +28,7 @@
     inListHeader,
     data,
     showOwner = false,
+    showRemaining = false,
     refreshItems,
     shouldRefreshOnEvent,
     hideWhenEmpty = false,
@@ -37,9 +36,10 @@
     inListHeader?: string;
     data: PurchaseOrdersListData;
     showOwner?: boolean;
-    refreshItems?: (() => Promise<PurchaseOrdersAugmentedResponse[]>) | undefined;
+    showRemaining?: boolean;
+    refreshItems?: (() => Promise<VisiblePurchaseOrderResponse[]>) | undefined;
     shouldRefreshOnEvent?:
-      | ((record: PurchaseOrdersResponse, currentItems: PurchaseOrdersAugmentedResponse[]) => boolean)
+      | ((record: PurchaseOrdersResponse, currentItems: VisiblePurchaseOrderResponse[]) => boolean)
       | undefined;
     hideWhenEmpty?: boolean;
   } = $props();
@@ -54,7 +54,7 @@
     try {
       const pending = (await pb.send("/api/purchase_orders/pending", {
         method: "GET",
-      })) as PurchaseOrdersAugmentedResponse[];
+      })) as VisiblePurchaseOrderResponse[];
       pendingApprovalIds = new Set((pending ?? []).map((po) => po.id));
     } catch (error) {
       // Fail closed for action buttons when pending-state sync fails.
@@ -71,7 +71,7 @@
     if (data.realtime_source === "pending") {
       unsubscribeFunc = await proxySubscriptionWithLoader<
         PurchaseOrdersResponse,
-        PurchaseOrdersAugmentedResponse
+        VisiblePurchaseOrderResponse
       >(
         items,
         "purchase_orders",
@@ -85,7 +85,7 @@
     } else if (data.realtime_source === "visible") {
       unsubscribeFunc = await proxySubscriptionWithLoader<
         PurchaseOrdersResponse,
-        PurchaseOrdersAugmentedResponse
+        VisiblePurchaseOrderResponse
       >(
         items,
         "purchase_orders",
@@ -97,9 +97,9 @@
         createdItemIsVisible,
       );
     } else if (data.realtime_source === "none" && refreshItems) {
-      unsubscribeFunc = await pb.collection("purchase_orders").subscribe<PurchaseOrdersResponse>(
-        "*",
-        async (e) => {
+      unsubscribeFunc = await pb
+        .collection("purchase_orders")
+        .subscribe<PurchaseOrdersResponse>("*", async (e) => {
           const currentItems = items ?? [];
           if (shouldRefreshOnEvent && !shouldRefreshOnEvent(e.record, currentItems)) {
             return;
@@ -110,8 +110,7 @@
           } catch (error) {
             console.error("Error refreshing purchase orders:", error);
           }
-        },
-      );
+        });
     }
   });
   onDestroy(async () => {
@@ -124,15 +123,15 @@
   // status. This is used for testing purposes.
   const deactivateButtonHiding = $state(false);
 
-  function poIsRejected(po: PurchaseOrdersAugmentedResponse): boolean {
+  function poIsRejected(po: VisiblePurchaseOrderResponse): boolean {
     return po.status === "Unapproved" && po.rejected !== "";
   }
 
-  function poDisplayStatus(po: PurchaseOrdersAugmentedResponse): string {
+  function poDisplayStatus(po: VisiblePurchaseOrderResponse): string {
     return poIsRejected(po) ? "Rejected" : po.status;
   }
 
-  function poStatusColor(po: PurchaseOrdersAugmentedResponse): "green" | "gray" | "yellow" | "red" {
+  function poStatusColor(po: VisiblePurchaseOrderResponse): "green" | "gray" | "yellow" | "red" {
     if (po.status === "Active") return "green";
     if (po.status === "Closed" || po.status === "Cancelled") return "gray";
     if (poIsRejected(po)) return "red";
@@ -145,7 +144,7 @@
     return `${trimmed.slice(0, maxLen - 1)}…`;
   }
 
-  function poMayBeApprovedOrRejectedByUser(po: PurchaseOrdersAugmentedResponse): boolean {
+  function poMayBeApprovedOrRejectedByUser(po: VisiblePurchaseOrderResponse): boolean {
     if (deactivateButtonHiding) return true;
     if (po.status !== "Unapproved" || po.rejected !== "") {
       return false;
@@ -153,7 +152,7 @@
     return pendingApprovalIds.has(po.id);
   }
 
-  function poMayBeCancelledByUser(po: PurchaseOrdersAugmentedResponse): boolean {
+  function poMayBeCancelledByUser(po: VisiblePurchaseOrderResponse): boolean {
     if (deactivateButtonHiding) return true;
     if (po.status === "Active") {
       if ($globalStore.claims.includes("payables_admin")) {
@@ -164,7 +163,7 @@
     return false;
   }
 
-  function poMayBeClosedByUser(po: PurchaseOrdersAugmentedResponse): boolean {
+  function poMayBeClosedByUser(po: VisiblePurchaseOrderResponse): boolean {
     if (deactivateButtonHiding) return true;
     if (po.status === "Active") {
       if (po.type !== "One-Time") {
@@ -179,24 +178,24 @@
     return false;
   }
 
-  function poMayBeDeletedByUser(po: PurchaseOrdersAugmentedResponse): boolean {
+  function poMayBeDeletedByUser(po: VisiblePurchaseOrderResponse): boolean {
     if (deactivateButtonHiding) return true;
     const currentUserId = $authStore?.model?.id ?? "";
     return po.status === "Unapproved" && po.uid === currentUserId;
   }
 
-  function poIsOwnedByCurrentUser(po: PurchaseOrdersAugmentedResponse): boolean {
+  function poIsOwnedByCurrentUser(po: VisiblePurchaseOrderResponse): boolean {
     if (deactivateButtonHiding) return true;
     const currentUserId = $authStore?.model?.id ?? "";
     return po.uid === currentUserId;
   }
 
-  function poMayBeApprovedFromListByOwner(po: PurchaseOrdersAugmentedResponse): boolean {
+  function poMayBeApprovedFromListByOwner(po: VisiblePurchaseOrderResponse): boolean {
     if (deactivateButtonHiding) return true;
     return poIsOwnedByCurrentUser(po) && poMayBeApprovedOrRejectedByUser(po);
   }
 
-  function poMayBeEditedByOwner(po: PurchaseOrdersAugmentedResponse): boolean {
+  function poMayBeEditedByOwner(po: VisiblePurchaseOrderResponse): boolean {
     if (deactivateButtonHiding) return true;
     return poIsOwnedByCurrentUser(po) && po.status === "Unapproved" && po.rejected === "";
   }
@@ -263,178 +262,184 @@
 </script>
 
 {#if !hideWhenEmpty || (items?.length ?? 0) > 0}
-  <DsList items={items as PurchaseOrdersAugmentedResponse[]} search={true} {inListHeader}>
-  {#snippet anchor(item: PurchaseOrdersAugmentedResponse)}
-    <span class="flex flex-col items-center gap-2">
-      {#if item.status === "Active"}
-        <DsLabel style="inverted" color="green">
-          <a href={`/pos/${item.id}/details`} class="hover:underline">
+  <DsList items={items as VisiblePurchaseOrderResponse[]} search={true} {inListHeader}>
+    {#snippet anchor(item: VisiblePurchaseOrderResponse)}
+      <span class="flex flex-col items-center gap-2">
+        {#if item.status === "Active"}
+          <DsLabel style="inverted" color="green">
+            <a href={`/pos/${item.id}/details`} class="hover:underline">
+              {item.po_number}
+            </a>
+          </DsLabel>
+        {:else if item.status === "Unapproved"}
+          <a href={`/pos/${item.id}/details`} class="text-blue-600 hover:underline">
+            {item.date}
+          </a>
+        {:else}
+          <a href={`/pos/${item.id}/details`} class="text-blue-600 hover:underline">
             {item.po_number}
           </a>
-        </DsLabel>
-      {:else if item.status === "Unapproved"}
-        <a href={`/pos/${item.id}/details`} class="text-blue-600 hover:underline">
-          {item.date}
-        </a>
-      {:else}
-        <a href={`/pos/${item.id}/details`} class="text-blue-600 hover:underline">
-          {item.po_number}
-        </a>
-      {/if}
-    </span>
-  {/snippet}
-
-  {#snippet headline({ vendor_name, vendor_alias }: PurchaseOrdersAugmentedResponse)}
-    <span class="flex items-center gap-2">
-      {vendor_name}
-      {#if trimmedOrEmpty(vendor_alias)}
-        ({trimmedOrEmpty(vendor_alias)})
-      {/if}
-    </span>
-  {/snippet}
-
-  {#snippet byline(item: PurchaseOrdersAugmentedResponse)}
-    <span class="flex items-center gap-2">
-      ${item.total}
-      {#if item.legacy_manual_entry}
-        <DsLabel color="cyan">Manually created</DsLabel>
-      {/if}
-      {#if item.status !== "Active"}
-        <DsLabel color={poStatusColor(item)}>
-          {poDisplayStatus(item)}
-        </DsLabel>
-      {/if}
-    </span>
-  {/snippet}
-
-  {#snippet line1({ description }: PurchaseOrdersAugmentedResponse)}
-    {description}
-  {/snippet}
-
-  {#snippet line2({
-    job_number,
-    client_name,
-    job_description,
-    category_name,
-  }: PurchaseOrdersAugmentedResponse)}
-    {#if job_number !== ""}
-      <span class="flex items-center gap-1">
-        {job_number} - {client_name}:
-        {job_description}
-        {#if category_name !== ""}
-          <DsLabel color="teal">{category_name}</DsLabel>
         {/if}
       </span>
-    {/if}
-  {/snippet}
-  {#snippet line3(item: PurchaseOrdersAugmentedResponse)}
-    <span class="flex items-center gap-1">
-      {#if showOwner && item.uid_name}
-        <span class="text-sm text-slate-600">Owner: {item.uid_name}</span>
-      {/if}
-      {#if poIsRejected(item)}
-        <DsLabel color="red" title={`${shortDate(item.rejected)}: ${item.rejection_reason}`}>
-          <Icon icon="mdi:cancel" width="20px" class="inline-block" />
-          {item.rejector_name} ({shortDate(item.rejected)}) - {rejectionReasonPreview(
-            item.rejection_reason,
-          )}
-        </DsLabel>
-      {/if}
-      <!-- if the item is cumulative, show the sigma icon -->
-      {#if item.type === "Cumulative"}
-        <DsLabel color="cyan">
-          <!-- <Icon icon="mdi:chart-bell-curve-cumulative" width="24px" class="inline-block" /> -->
-          <Icon icon="mdi:sigma" width="24px" class="inline-block" />
-        </DsLabel>
-      {/if}
-      <!-- if the item is recurring, show the frequency -->
-      {#if item.type === "Recurring"}
-        <DsLabel color="cyan">
-          <!-- Perhaps use Japanese character for monthly payment-->
-          <Icon icon="mdi:recurring-payment" width="24px" class="inline-block" />
-          {item.frequency} until {shortDate(item.end_date, true)}
-        </DsLabel>
-      {/if}
-      {#if item.status === "Unapproved" && item.second_approval === "" && item.approved !== ""}
-        <!-- Approved, but second approval is required -->
+    {/snippet}
+
+    {#snippet headline({ vendor_name, vendor_alias }: VisiblePurchaseOrderResponse)}
+      <span class="flex items-center gap-2">
+        {vendor_name}
+        {#if trimmedOrEmpty(vendor_alias)}
+          ({trimmedOrEmpty(vendor_alias)})
+        {/if}
+      </span>
+    {/snippet}
+
+    {#snippet byline(item: VisiblePurchaseOrderResponse)}
+      <span class="flex items-center gap-2">
+        ${item.total}
+        {#if showRemaining}
+          <span
+            >Provisional Remaining: ${item.remaining_amount.toFixed(2)}
+            <span class="text-sm text-slate-500">(includes uncommitted expenses)</span></span
+          >
+        {/if}
+        {#if item.legacy_manual_entry}
+          <DsLabel color="cyan">Manually created</DsLabel>
+        {/if}
+        {#if item.status !== "Active"}
+          <DsLabel color={poStatusColor(item)}>
+            {poDisplayStatus(item)}
+          </DsLabel>
+        {/if}
+      </span>
+    {/snippet}
+
+    {#snippet line1({ description }: VisiblePurchaseOrderResponse)}
+      {description}
+    {/snippet}
+
+    {#snippet line2({
+      job_number,
+      client_name,
+      job_description,
+      category_name,
+    }: VisiblePurchaseOrderResponse)}
+      {#if job_number !== ""}
         <span class="flex items-center gap-1">
-          /
-          <Icon icon="mdi:timer-sand" width="24px" class="inline-block" />
-          {item.priority_second_approver_name}
+          {job_number} - {client_name}:
+          {job_description}
+          {#if category_name !== ""}
+            <DsLabel color="teal">{category_name}</DsLabel>
+          {/if}
         </span>
       {/if}
-      {#if item.attachment}
-        <a
-          href={`${PUBLIC_POCKETBASE_URL}/api/files/${collectionId}/${item.id}/${item.attachment}`}
-          target="_blank"
-        >
-          <DsFileLink filename={item.attachment as string} />
-        </a>
-      {/if}
-    </span>
-  {/snippet}
-
-  {#snippet actions(item: PurchaseOrdersAugmentedResponse)}
-    {#if $expensesEditingEnabled}
-      {#if item.status === "Active"}
-        <DsActionButton
-          action={`/expenses/add/${item.id}`}
-          icon="mdi:add-bold"
-          title="Create Expense"
-          color="green"
-        />
-        {#if poMayBeCancelledByUser(item)}
-          <DsActionButton
-            action={() => cancel(item.id)}
-            icon="mdi:cancel"
-            title="Cancel"
-            color="orange"
-          />
+    {/snippet}
+    {#snippet line3(item: VisiblePurchaseOrderResponse)}
+      <span class="flex items-center gap-1">
+        {#if showOwner && item.uid_name}
+          <span class="text-sm text-slate-600">Owner: {item.uid_name}</span>
         {/if}
-        {#if poMayBeClosedByUser(item)}
-          <DsActionButton
-            action={() => closePurchaseOrder(item.id)}
-            icon="mdi:curtains-closed"
-            title="Close Purchase Order"
-            color="orange"
-          />
-        {/if}
-      {/if}
-      {#if item.status === "Unapproved"}
         {#if poIsRejected(item)}
-          {#if poIsOwnedByCurrentUser(item)}
+          <DsLabel color="red" title={`${shortDate(item.rejected)}: ${item.rejection_reason}`}>
+            <Icon icon="mdi:cancel" width="20px" class="inline-block" />
+            {item.rejector_name} ({shortDate(item.rejected)}) - {rejectionReasonPreview(
+              item.rejection_reason,
+            )}
+          </DsLabel>
+        {/if}
+        <!-- if the item is cumulative, show the sigma icon -->
+        {#if item.type === "Cumulative"}
+          <DsLabel color="cyan">
+            <!-- <Icon icon="mdi:chart-bell-curve-cumulative" width="24px" class="inline-block" /> -->
+            <Icon icon="mdi:sigma" width="24px" class="inline-block" />
+          </DsLabel>
+        {/if}
+        <!-- if the item is recurring, show the frequency -->
+        {#if item.type === "Recurring"}
+          <DsLabel color="cyan">
+            <!-- Perhaps use Japanese character for monthly payment-->
+            <Icon icon="mdi:recurring-payment" width="24px" class="inline-block" />
+            {item.frequency} until {shortDate(item.end_date, true)}
+          </DsLabel>
+        {/if}
+        {#if item.status === "Unapproved" && item.second_approval === "" && item.approved !== ""}
+          <!-- Approved, but second approval is required -->
+          <span class="flex items-center gap-1">
+            /
+            <Icon icon="mdi:timer-sand" width="24px" class="inline-block" />
+            {item.priority_second_approver_name}
+          </span>
+        {/if}
+        {#if item.attachment}
+          <a
+            href={`${PUBLIC_POCKETBASE_URL}/api/files/${collectionId}/${item.id}/${item.attachment}`}
+            target="_blank"
+          >
+            <DsFileLink filename={item.attachment as string} />
+          </a>
+        {/if}
+      </span>
+    {/snippet}
+
+    {#snippet actions(item: VisiblePurchaseOrderResponse)}
+      {#if $expensesEditingEnabled}
+        {#if item.status === "Active"}
+          <DsActionButton
+            action={`/expenses/add/${item.id}`}
+            icon="mdi:add-bold"
+            title="Create Expense"
+            color="green"
+          />
+          {#if poMayBeCancelledByUser(item)}
+            <DsActionButton
+              action={() => cancel(item.id)}
+              icon="mdi:cancel"
+              title="Cancel"
+              color="orange"
+            />
+          {/if}
+          {#if poMayBeClosedByUser(item)}
+            <DsActionButton
+              action={() => closePurchaseOrder(item.id)}
+              icon="mdi:curtains-closed"
+              title="Close Purchase Order"
+              color="orange"
+            />
+          {/if}
+        {/if}
+        {#if item.status === "Unapproved"}
+          {#if poIsRejected(item)}
+            {#if poIsOwnedByCurrentUser(item)}
+              <DsActionButton
+                action={`/pos/${item.id}/edit`}
+                icon="mdi:edit-outline"
+                title="Edit and Resubmit"
+                color="blue"
+              />
+            {/if}
+          {:else if poMayBeEditedByOwner(item)}
             <DsActionButton
               action={`/pos/${item.id}/edit`}
               icon="mdi:edit-outline"
-              title="Edit and Resubmit"
+              title="Edit"
               color="blue"
             />
           {/if}
-        {:else if poMayBeEditedByOwner(item)}
-          <DsActionButton
-            action={`/pos/${item.id}/edit`}
-            icon="mdi:edit-outline"
-            title="Edit"
-            color="blue"
-          />
+          {#if poMayBeApprovedFromListByOwner(item)}
+            <DsActionButton
+              action={() => approve(item.id)}
+              icon="mdi:approve"
+              title="Approve"
+              color="green"
+            />
+          {/if}
+          {#if poMayBeDeletedByUser(item)}
+            <DsActionButton
+              action={() => del(item.id)}
+              icon="mdi:delete"
+              title="Delete"
+              color="red"
+            />
+          {/if}
         {/if}
-        {#if poMayBeApprovedFromListByOwner(item)}
-          <DsActionButton
-            action={() => approve(item.id)}
-            icon="mdi:approve"
-            title="Approve"
-            color="green"
-          />
-        {/if}
-        {#if poMayBeDeletedByUser(item)}
-          <DsActionButton
-            action={() => del(item.id)}
-            icon="mdi:delete"
-            title="Delete"
-            color="red"
-          />
-        {/if}
-      {/if}
       {/if}
     {/snippet}
   </DsList>

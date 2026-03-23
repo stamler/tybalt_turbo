@@ -201,10 +201,13 @@ SELECT
     ELSE 0
   END AS recurring_remaining_occurrences,
   CASE
-    WHEN po.type = 'Cumulative' THEN
+    -- Many imported legacy One-Time/Cumulative rows still have approval_total = 0
+    -- even though current hooks keep approval_total aligned to total.
+    WHEN po.type = 'Recurring' THEN
+      po.approval_total - COALESCE((SELECT SUM(expenses.total) FROM expenses WHERE expenses.purchase_order = po.id), 0)
+    ELSE
       po.total - COALESCE((SELECT SUM(expenses.total) FROM expenses WHERE expenses.purchase_order = po.id), 0)
-    ELSE 0
-  END AS cumulative_remaining_balance,
+  END AS remaining_amount,
   COALESCE((p0.given_name || ' ' || p0.surname), '') AS uid_name,
   COALESCE((p1.given_name || ' ' || p1.surname), '') AS approver_name,
   COALESCE((p2.given_name || ' ' || p2.surname), '') AS second_approver_name,

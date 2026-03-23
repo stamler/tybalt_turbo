@@ -227,6 +227,11 @@
           {/if}
         </div>
         <div><span class="font-semibold">Total:</span> ${data.po.total}</div>
+        <div>
+          <span class="font-semibold">Provisional Remaining:</span>
+          ${data.po.remaining_amount.toFixed(2)}
+          <span class="text-sm text-slate-500">(includes uncommitted expenses)</span>
+        </div>
         {#if data.po.type === "Recurring"}
           <div><span class="font-semibold">Approval Total:</span> ${data.po.approval_total}</div>
         {/if}

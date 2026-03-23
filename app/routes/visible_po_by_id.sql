@@ -41,7 +41,7 @@ SELECT
   expenses_total,
   recurring_expected_occurrences,
   recurring_remaining_occurrences,
-  cumulative_remaining_balance,
+  remaining_amount,
   uid_name,
   approver_name,
   second_approver_name,

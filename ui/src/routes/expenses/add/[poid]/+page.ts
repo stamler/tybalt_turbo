@@ -1,29 +1,7 @@
-import type {
-  ExpensesRecord,
-  PurchaseOrdersPaymentTypeOptions,
-  PurchaseOrdersStatusOptions,
-  PurchaseOrdersTypeOptions,
-} from "$lib/pocketbase-types";
+import type { ExpensesRecord } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
 import type { ExpensesPageData } from "$lib/svelte-types";
-import { pb } from "$lib/pocketbase";
-
-type VisiblePurchaseOrderResponse = {
-  id: string;
-  po_number: string;
-  type: PurchaseOrdersTypeOptions;
-  payment_type: PurchaseOrdersPaymentTypeOptions;
-  status: PurchaseOrdersStatusOptions;
-  division: string;
-  description: string;
-  vendor: string;
-  job: string;
-  category: string;
-  kind: string;
-  recurring_expected_occurrences: number;
-  recurring_remaining_occurrences: number;
-  cumulative_remaining_balance: number;
-};
+import { fetchVisiblePO, type VisiblePurchaseOrderResponse } from "$lib/poVisibility";
 
 export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
   const defaultItem = {
@@ -47,9 +25,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
   // purchase_orders collection in pocketbase and use it to populate the default
   // item
   if (params.poid) {
-    const result = (await pb.send(`/api/purchase_orders/visible/${params.poid}`, {
-      method: "GET",
-    })) as VisiblePurchaseOrderResponse;
+    const result: VisiblePurchaseOrderResponse = await fetchVisiblePO(params.poid);
     defaultItem.division = result.division;
     defaultItem.description = result.description;
     defaultItem.payment_type = result.payment_type;
@@ -67,7 +43,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
       status: result.status,
       recurring_expected_occurrences: result.recurring_expected_occurrences,
       recurring_remaining_occurrences: result.recurring_remaining_occurrences,
-      cumulative_remaining_balance: result.cumulative_remaining_balance,
+      remaining_amount: result.remaining_amount,
     };
   }
 
