@@ -9,7 +9,7 @@
   import type { SvelteComponent } from "svelte";
   import { page } from "$app/stores";
   import DSTabBar, { type TabItem } from "$lib/components/DSTabBar.svelte";
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import Icon from "@iconify/svelte";
 
   const weekEnding = $derived.by(() => $page.params.weekEnding);
@@ -60,7 +60,7 @@
 
   $effect(() => {
     if (weekEnding) {
-      init();
+      void untrack(() => init());
     }
   });
 
@@ -92,8 +92,6 @@
       }
       const handler = () => setTabFromHash();
       window.addEventListener("hashchange", handler);
-      // initial data load after mount (also covered by $effect when weekEnding changes)
-      init();
       return () => {
         window.removeEventListener("hashchange", handler);
       };
