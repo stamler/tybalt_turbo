@@ -136,8 +136,8 @@ func validateTimeEntry(app core.App, timeEntryRecord *core.Record, requiredField
 		if err != nil || jobRecord == nil {
 			otherValidationsErrors["job"] = validation.Validate(jobID, validation.Required.Error("invalid job reference"))
 		} else {
-			if jobRecord.GetString("status") != "Active" {
-				otherValidationsErrors["job"] = validation.Validate(jobRecord.GetString("status"), validation.In("Active").Error("Job status must be Active"))
+			if err := validateJobAllowsTimeTracking(app, jobRecord); err != nil {
+				otherValidationsErrors["job"] = err
 			}
 			// Role is required when a job is assigned
 			if timeEntryRecord.GetString("role") == "" {

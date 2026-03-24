@@ -9,12 +9,15 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"time"
 	"tybalt/errs"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
+
+var TimeTrackingNow = time.Now
 
 // CalculateFileFieldHash computes the SHA256 hash of a file uploaded to a record field.
 // Returns empty string if no file was uploaded for the field.
@@ -210,4 +213,81 @@ func shouldValidateJobDivisionAllocationOnRecord(app core.App, record *core.Reco
 
 	return strings.TrimSpace(record.GetString("job")) != strings.TrimSpace(original.GetString("job")) ||
 		strings.TrimSpace(record.GetString("division")) != strings.TrimSpace(original.GetString("division"))
+}
+
+func validateAwardedProposalTimeTrackingWindow(app core.App, proposalRecord *core.Record, now time.Time) error {
+	var projectAwardDates []string
+	if err := app.DB().NewQuery(`
+		SELECT project_award_date
+		FROM jobs
+		WHERE proposal = {:proposal}
+		  AND project_award_date != ''
+	`).Bind(dbx.Params{
+		"proposal": proposalRecord.Id,
+	}).Column(&projectAwardDates); err != nil {
+		return validation.NewError("proposal_award_lookup_failed", "Error checking referencing project award dates")
+	}
+
+	if len(projectAwardDates) == 0 {
+		return validation.NewError(
+			"proposal_awarded_without_referencing_project",
+			"Proposal is Awarded but has no referencing project yet; you cannot charge time to the proposal",
+		)
+	}
+
+	earliestProjectAwardDate := strings.TrimSpace(slices.Min(projectAwardDates))
+
+	awardDate, err := time.Parse(time.DateOnly, earliestProjectAwardDate)
+	if err != nil {
+		return validation.NewError("invalid_project_award_date", "Referenced project has an invalid project award date")
+	}
+
+	age := now.Sub(awardDate)
+	if age < 0 {
+		return validation.NewError("invalid_project_award_date", "Referenced project has a future project award date")
+	}
+
+	if age < 30*24*time.Hour {
+		return nil
+	}
+
+	return validation.NewError(
+		"proposal_awarded_more_than_30_days_ago",
+		"Proposal was awarded more than 30 days in the past; use the referencing project instead",
+	)
+}
+
+// validateJobAllowsTimeTracking applies the status rules for records that log
+// time directly against jobs.
+//
+// Projects must be Active. Proposals are valid while they are still in flight,
+// which in the current workflow means In Progress or Submitted. Awarded
+// proposals get a short grace period based on the earliest referencing
+// project's award date. We also allow legacy Active proposals so historical
+// imports and older fixtures keep working.
+func validateJobAllowsTimeTrackingAt(app core.App, jobRecord *core.Record, now time.Time) error {
+	if jobRecord == nil {
+		return validation.NewError("invalid_reference", "invalid job reference")
+	}
+
+	status := strings.TrimSpace(jobRecord.GetString("status"))
+	if typeFromNumber(strings.TrimSpace(jobRecord.GetString("number"))) == jobTypeProposal {
+		if status == "In Progress" || status == "Submitted" || status == "Active" {
+			return nil
+		}
+		if status == "Awarded" {
+			return validateAwardedProposalTimeTrackingWindow(app, jobRecord, now)
+		}
+		return validation.NewError("invalid_proposal_status", "Proposal status must be In Progress, Submitted, or recently Awarded")
+	}
+
+	if status != "Active" {
+		return validation.NewError("not_active", "Job status must be Active")
+	}
+
+	return nil
+}
+
+func validateJobAllowsTimeTracking(app core.App, jobRecord *core.Record) error {
+	return validateJobAllowsTimeTrackingAt(app, jobRecord, TimeTrackingNow())
 }

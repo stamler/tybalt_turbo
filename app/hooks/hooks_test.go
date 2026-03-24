@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 	"tybalt/internal/testseed"
 	"tybalt/utilities"
 
@@ -137,5 +138,176 @@ func TestValidateTimeEntry(t *testing.T) {
 				t.Errorf("passed validation but expected invalid")
 			}
 		})
+	}
+}
+
+func TestValidateTimeEntry_AllowsInProgressProposal(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	record := buildRecordFromMap(timeEntriesCollection, map[string]any{
+		"time_type":             "dummy",
+		"date":                  "2024-01-22",
+		"division":              "fy4i9poneukvq9u",
+		"hours":                 1.0,
+		"job":                   "test_prop_inprog",
+		"description":           "Proposal review and edits",
+		"role":                  "tbgoiwwwfj8cvju",
+		"work_record":           "F23-137",
+		"payout_request_amount": 0.0,
+	})
+
+	if err := validateTimeEntry(app, record, []string{"date", "time_type", "division", "hours", "description"}); err != nil {
+		t.Fatalf("expected in-progress proposal to accept time entry, got: %v", err)
+	}
+}
+
+func TestValidateTimeAmendment_AllowsInProgressProposal(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	timeAmendmentsCollection, err := app.FindCollectionByNameOrId("time_amendments")
+	if err != nil {
+		t.Fatalf("failed to load time_amendments collection: %v", err)
+	}
+
+	record := buildRecordFromMap(timeAmendmentsCollection, map[string]any{
+		"time_type":             "dummy",
+		"date":                  "2024-01-22",
+		"division":              "fy4i9poneukvq9u",
+		"hours":                 1.0,
+		"job":                   "test_prop_inprog",
+		"description":           "Proposal review and edits",
+		"work_record":           "F23-137",
+		"payout_request_amount": 0.0,
+	})
+
+	if err := validateTimeAmendment(app, record, []string{"date", "time_type", "division", "hours", "description"}); err != nil {
+		t.Fatalf("expected in-progress proposal to accept time amendment, got: %v", err)
+	}
+}
+
+func TestValidateTimeAmendment_IgnoresProposalStatus(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	timeAmendmentsCollection, err := app.FindCollectionByNameOrId("time_amendments")
+	if err != nil {
+		t.Fatalf("failed to load time_amendments collection: %v", err)
+	}
+
+	record := buildRecordFromMap(timeAmendmentsCollection, map[string]any{
+		"time_type":             "dummy",
+		"date":                  "2024-01-22",
+		"division":              "fy4i9poneukvq9u",
+		"hours":                 1.0,
+		"job":                   "awpropstale0001",
+		"description":           "Proposal correction after award",
+		"work_record":           "F23-137",
+		"payout_request_amount": 0.0,
+	})
+
+	if err := validateTimeAmendment(app, record, []string{"date", "time_type", "division", "hours", "description"}); err != nil {
+		t.Fatalf("expected time amendment to ignore awarded proposal status, got: %v", err)
+	}
+}
+
+func TestValidateJobAllowsTimeTrackingAt_AllowsRecentlyAwardedProposal(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	proposal, err := app.FindRecordById("jobs", "awproprecent001")
+	if err != nil {
+		t.Fatalf("failed to load proposal: %v", err)
+	}
+
+	now := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+
+	if err := validateJobAllowsTimeTrackingAt(app, proposal, now); err != nil {
+		t.Fatalf("expected recently awarded proposal to allow time tracking, got: %v", err)
+	}
+}
+
+func TestValidateJobAllowsTimeTrackingAt_RejectsStaleAwardedProposal(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	proposal, err := app.FindRecordById("jobs", "awpropstale0001")
+	if err != nil {
+		t.Fatalf("failed to load proposal: %v", err)
+	}
+
+	now := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+
+	err = validateJobAllowsTimeTrackingAt(app, proposal, now)
+	if err == nil {
+		t.Fatal("expected awarded proposal older than 30 days to be rejected")
+	}
+
+	validationErr, ok := err.(validation.Error)
+	if !ok {
+		t.Fatalf("expected validation.Error, got %T", err)
+	}
+	if validationErr.Code() != "proposal_awarded_more_than_30_days_ago" {
+		t.Fatalf("expected proposal_awarded_more_than_30_days_ago, got %s", validationErr.Code())
+	}
+}
+
+func TestValidateJobAllowsTimeTrackingAt_RejectsAwardedProposalWithoutReferencingProject(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	proposal, err := app.FindRecordById("jobs", "awpropnoref0001")
+	if err != nil {
+		t.Fatalf("failed to load proposal: %v", err)
+	}
+
+	now := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+
+	err = validateJobAllowsTimeTrackingAt(app, proposal, now)
+	if err == nil {
+		t.Fatal("expected awarded proposal without referencing project to be rejected")
+	}
+
+	validationErr, ok := err.(validation.Error)
+	if !ok {
+		t.Fatalf("expected validation.Error, got %T", err)
+	}
+	if validationErr.Code() != "proposal_awarded_without_referencing_project" {
+		t.Fatalf("expected proposal_awarded_without_referencing_project, got %s", validationErr.Code())
+	}
+}
+
+func TestValidateJobAllowsTimeTrackingAt_RejectsFutureProjectAwardDate(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	proposal, err := app.FindRecordById("jobs", "awproprecent001")
+	if err != nil {
+		t.Fatalf("failed to load proposal: %v", err)
+	}
+
+	project, err := app.FindRecordById("jobs", "awprojrecent001")
+	if err != nil {
+		t.Fatalf("failed to load referencing project: %v", err)
+	}
+	project.Set("project_award_date", "2026-03-25")
+	if err := app.Save(project); err != nil {
+		t.Fatalf("failed to update referencing project: %v", err)
+	}
+
+	now := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+
+	err = validateJobAllowsTimeTrackingAt(app, proposal, now)
+	if err == nil {
+		t.Fatal("expected future project award date to be rejected")
+	}
+
+	validationErr, ok := err.(validation.Error)
+	if !ok {
+		t.Fatalf("expected validation.Error, got %T", err)
+	}
+	if validationErr.Code() != "invalid_project_award_date" {
+		t.Fatalf("expected invalid_project_award_date, got %s", validationErr.Code())
 	}
 }

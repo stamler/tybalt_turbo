@@ -155,7 +155,7 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "time_amendment with closed job fails with not active",
+			Name:   "time_amendment with closed job and valid allocation succeeds",
 			Method: http.MethodPost,
 			URL:    "/api/collections/time_amendments/records",
 			Body: strings.NewReader(`{
@@ -163,7 +163,7 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 				"time_type": "sdyfl3q7j7ap849",
 				"uid": "rzr98oadsp9qc11",
 				"date": "2024-09-02",
-				"division": "vccd5fo56ctbigh",
+				"division": "fy4i9poneukvq9u",
 				"job": "zke3cs3yipplwtu",
 				"branch": "80875lm27v8wgi4",
 				"description": "job amendment with closed job",
@@ -171,14 +171,14 @@ func TestTimeAmendmentsCreate(t *testing.T) {
 				"skip_tsid_check": true
 				}`),
 			Headers:        map[string]string{"Authorization": creatorToken},
-			ExpectedStatus: 400,
+			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"job":{"code":"not_active"`,
-				`Job status must be Active`,
+				`"job":"zke3cs3yipplwtu"`,
+				`"division":"fy4i9poneukvq9u"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
-				"OnRecordCreate":        0,
+				"OnRecordCreate":        1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

@@ -121,8 +121,8 @@ func validateTimeAmendment(app core.App, timeAmendmentRecord *core.Record, requi
 		jobRecord, err := app.FindRecordById("jobs", jobID)
 		if err != nil || jobRecord == nil {
 			otherValidationsErrors["job"] = validation.NewError("invalid_reference", "invalid job reference")
-		} else if jobRecord.GetString("status") != "Active" {
-			otherValidationsErrors["job"] = validation.NewError("not_active", "Job status must be Active")
+		} else if strings.TrimSpace(jobRecord.GetString("status")) == "" {
+			otherValidationsErrors["job"] = validation.NewError("missing_job_status", "job status must be set")
 		} else if shouldValidateJobDivisionAllocationOnRecord(app, timeAmendmentRecord) {
 			if field, allocErr := validateDivisionAllocatedToJob(app, jobID, timeAmendmentRecord.GetString("division")); allocErr != nil {
 				otherValidationsErrors[field] = allocErr

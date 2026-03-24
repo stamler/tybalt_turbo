@@ -4,8 +4,11 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
+	"tybalt/hooks"
 	"tybalt/internal/testutils"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -319,6 +322,146 @@ func TestTimeEntriesCreate_NoJob_ClearsRole(t *testing.T) {
 				"OnModelAfterCreateSuccess":  1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestTimeEntriesCreate_AwardedProposalWindow(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	originalNow := hooks.TimeTrackingNow
+	hooks.TimeTrackingNow = func() time.Time {
+		return time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)
+	}
+	defer func() {
+		hooks.TimeTrackingNow = originalNow
+	}()
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "time entry with recently awarded proposal succeeds",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "time entry against recent awarded proposal",
+				"hours": 1,
+				"job": "awproprecent001",
+				"role": "tbgoiwwwfj8cvju"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"job":"awproprecent001"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest":      1,
+				"OnRecordCreate":             1,
+				"OnRecordCreateExecute":      1,
+				"OnRecordAfterCreateSuccess": 1,
+				"OnModelCreate":              1,
+				"OnModelCreateExecute":       1,
+				"OnModelAfterCreateSuccess":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "time entry with stale awarded proposal fails",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "time entry against stale awarded proposal",
+				"hours": 1,
+				"job": "awpropstale0001",
+				"role": "tbgoiwwwfj8cvju"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"job":{"code":"proposal_awarded_more_than_30_days_ago"`,
+				`Proposal was awarded more than 30 days in the past; use the referencing project instead`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "time entry with awarded proposal without referencing project fails",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "time entry against awarded proposal without project",
+				"hours": 1,
+				"job": "awpropnoref0001",
+				"role": "tbgoiwwwfj8cvju"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"job":{"code":"proposal_awarded_without_referencing_project"`,
+				`Proposal is Awarded but has no referencing project yet; you cannot charge time to the proposal`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "time entry with future project award date fails",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "time entry against proposal with future project award date",
+				"hours": 1,
+				"job": "awproprecent001",
+				"role": "tbgoiwwwfj8cvju"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"job":{"code":"invalid_project_award_date"`,
+				`Referenced project has a future project award date`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
+				t.Helper()
+
+				project, err := app.FindRecordById("jobs", "awprojrecent001")
+				if err != nil {
+					t.Fatalf("failed to load referencing project: %v", err)
+				}
+
+				project.Set("project_award_date", "2026-03-25")
+				if err := app.Save(project); err != nil {
+					t.Fatalf("failed to update referencing project: %v", err)
+				}
+			},
 		},
 	}
 
