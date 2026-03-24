@@ -5,13 +5,13 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
   import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
-  import { goto } from "$app/navigation";
   import type { PageData } from "./$types";
   import type { TimeAmendmentsAugmentedResponse } from "$lib/pocketbase-types";
   import { untrack } from "svelte";
 
   let { data }: { data: PageData } = $props();
   let items = $state(untrack(() => data.items));
+  let committingIds = $state(new Set<string>());
 
   function hoursString(item: TimeAmendmentsAugmentedResponse) {
     const hoursArray = [];
@@ -31,14 +31,23 @@
   }
 
   async function commit(id: string): Promise<void> {
+    if (!Array.isArray(items) || committingIds.has(id)) return;
+    committingIds = new Set([...committingIds, id]);
     try {
       await pb.send(`/api/time_amendments/${id}/commit`, {
         method: "POST",
       });
-      goto("/time/amendments/pending");
+      items = items.filter((item) => item.id !== id);
     } catch (error: any) {
+      const next = new Set(committingIds);
+      next.delete(id);
+      committingIds = next;
       alert(error?.response?.error ?? error?.data?.message ?? "Error committing record");
+      return;
     }
+    const next = new Set(committingIds);
+    next.delete(id);
+    committingIds = next;
   }
 </script>
 
@@ -94,14 +103,16 @@
 {/snippet}
 
 {#snippet actions({ id }: TimeAmendmentsAugmentedResponse)}
-  <DsActionButton
-    action={`/time/amendments/${id}/edit`}
-    icon="mdi:edit-outline"
-    title="Edit"
-    color="blue"
-  />
-  <DsActionButton action={() => commit(id)} icon="mdi:check-all" title="Commit" color="green" />
-  <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
+  {#if !committingIds.has(id)}
+    <DsActionButton
+      action={`/time/amendments/${id}/edit`}
+      icon="mdi:edit-outline"
+      title="Edit"
+      color="blue"
+    />
+    <DsActionButton action={() => commit(id)} icon="mdi:check-all" title="Commit" color="green" />
+    <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
+  {/if}
 {/snippet}
 
 {#if !$timeEditingEnabled}
