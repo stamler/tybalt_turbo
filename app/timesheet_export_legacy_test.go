@@ -2,12 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"github.com/pocketbase/pocketbase/tests"
 	"net/http"
 	"testing"
 	"tybalt/internal/testutils"
-
-	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/tests"
 )
 
 func TestTimesheetExportLegacyAuth(t *testing.T) {
@@ -146,29 +144,9 @@ func TestTimesheetExportLegacyIncludesSeparatedTimeSheetsAndAmendments(t *testin
 			`"timeSheets"`,
 			`"timeAmendments"`,
 			`"id":"j1lr2oddjongtoj"`,
-			`"id":"qn4jyrkxp3pfjom"`,
+			`"id":"qn4jyrkxp3pfjon"`,
 		},
-		TestAppFactory: func(tb testing.TB) *tests.TestApp {
-			app := testutils.SetupTestApp(tb)
-
-			_, err := app.NonconcurrentDB().NewQuery(`
-				UPDATE time_amendments
-				SET committed = {:committed},
-				    committed_week_ending = {:committed_week_ending},
-				    committer = {:committer}
-				WHERE id = {:id}
-			`).Bind(dbx.Params{
-				"id":                    "qn4jyrkxp3pfjom",
-				"committed":             "2024-10-18 12:00:00.000Z",
-				"committed_week_ending": "2024-09-28",
-				"committer":             "wegviunlyr2jjjv",
-			}).Execute()
-			if err != nil {
-				tb.Fatalf("failed to seed committed amendment export row: %v", err)
-			}
-
-			return app
-		},
+		TestAppFactory: testutils.SetupTestApp,
 		AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
 			defer res.Body.Close()
 
@@ -188,8 +166,8 @@ func TestTimesheetExportLegacyIncludesSeparatedTimeSheetsAndAmendments(t *testin
 				tb.Fatalf("timeAmendments length = %d, want 1", len(payload.TimeAmendments))
 			}
 			amendment := payload.TimeAmendments[0]
-			if amendment.ID != "qn4jyrkxp3pfjom" {
-				tb.Fatalf("timeAmendments[0].id = %q, want %q", amendment.ID, "qn4jyrkxp3pfjom")
+			if amendment.ID != "qn4jyrkxp3pfjon" {
+				tb.Fatalf("timeAmendments[0].id = %q, want %q", amendment.ID, "qn4jyrkxp3pfjon")
 			}
 			if amendment.WeekEnding != "2024-09-28" {
 				tb.Fatalf("timeAmendments[0].weekEnding = %q, want %q", amendment.WeekEnding, "2024-09-28")
@@ -202,6 +180,82 @@ func TestTimesheetExportLegacyIncludesSeparatedTimeSheetsAndAmendments(t *testin
 			}
 			if amendment.CommitterName == "" {
 				tb.Fatalf("timeAmendments[0].committerName unexpectedly blank")
+			}
+		},
+	}
+
+	scenario.Test(t)
+}
+
+func TestTimesheetExportLegacyUsesAdminProfileLegacyUIDs(t *testing.T) {
+	validToken := "test-secret-123"
+
+	type exportResponse struct {
+		TimeSheets []struct {
+			ID         string `json:"id"`
+			UID        string `json:"uid"`
+			ManagerUID string `json:"managerUid"`
+			Entries    []struct {
+				ID  string `json:"id"`
+				UID string `json:"uid"`
+			} `json:"entries"`
+		} `json:"timeSheets"`
+		TimeAmendments []struct {
+			ID        string `json:"id"`
+			UID       string `json:"uid"`
+			Committer string `json:"committer"`
+		} `json:"timeAmendments"`
+	}
+
+	scenario := tests.ApiScenario{
+		Name:   "export uses legacy uids for time writeback user ids",
+		Method: http.MethodGet,
+		URL:    "/api/export_legacy/time_sheets/2024-09-28",
+		Headers: map[string]string{
+			"Authorization": "Bearer " + validToken,
+		},
+		ExpectedStatus: http.StatusOK,
+		ExpectedContent: []string{
+			`"timeSheets"`,
+			`"timeAmendments"`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+		AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
+			defer res.Body.Close()
+
+			var payload exportResponse
+			if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+				tb.Fatalf("failed to decode export response: %v", err)
+			}
+
+			if len(payload.TimeSheets) != 1 {
+				tb.Fatalf("timeSheets length = %d, want 1", len(payload.TimeSheets))
+			}
+
+			sheet := payload.TimeSheets[0]
+			if sheet.UID != "legacy_f2j5a8vk006baub" {
+				tb.Fatalf("timeSheets[0].uid = %q, want %q", sheet.UID, "legacy_f2j5a8vk006baub")
+			}
+			if sheet.ManagerUID != "legacy_f2j5a8vk006baub" {
+				tb.Fatalf("timeSheets[0].managerUid = %q, want %q", sheet.ManagerUID, "legacy_f2j5a8vk006baub")
+			}
+			if len(sheet.Entries) == 0 {
+				tb.Fatalf("timeSheets[0].entries unexpectedly empty")
+			}
+			if sheet.Entries[0].UID != "legacy_f2j5a8vk006baub" {
+				tb.Fatalf("timeSheets[0].entries[0].uid = %q, want %q", sheet.Entries[0].UID, "legacy_f2j5a8vk006baub")
+			}
+
+			if len(payload.TimeAmendments) != 1 {
+				tb.Fatalf("timeAmendments length = %d, want 1", len(payload.TimeAmendments))
+			}
+
+			amendment := payload.TimeAmendments[0]
+			if amendment.UID != "legacy_f2j5a8vk006baub" {
+				tb.Fatalf("timeAmendments[0].uid = %q, want %q", amendment.UID, "legacy_f2j5a8vk006baub")
+			}
+			if amendment.Committer != "legacy_wegviunlyr2jjjv" {
+				tb.Fatalf("timeAmendments[0].committer = %q, want %q", amendment.Committer, "legacy_wegviunlyr2jjjv")
 			}
 		},
 	}
