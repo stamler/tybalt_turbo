@@ -14,6 +14,7 @@
   import { onMount, onDestroy, untrack } from "svelte";
   import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
   import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
+  import { getApiErrorMessage } from "$lib/errors";
   let { data }: { data: PageData } = $props();
 
   // Local state for items that can be mutated by real-time subscriptions.
@@ -70,7 +71,7 @@
     try {
       await pb.collection("time_entries").delete(id);
     } catch (error: any) {
-      globalStore.addError(error?.response?.message);
+      globalStore.addError(getApiErrorMessage(error, "Delete failed"));
     }
   }
 
@@ -83,7 +84,7 @@
         },
       });
     } catch (error: any) {
-      globalStore.addError(error?.response?.message);
+      globalStore.addError(getApiErrorMessage(error, "Copy to tomorrow failed"));
     }
   }
 
@@ -99,7 +100,7 @@
       // navigate to the time sheets list to show the bundled time sheets
       goto(`/time/sheets/list`);
     } catch (error: any) {
-      globalStore.addError(error?.response?.message);
+      globalStore.addError(getApiErrorMessage(error, "Submit failed"));
     }
   }
 </script>

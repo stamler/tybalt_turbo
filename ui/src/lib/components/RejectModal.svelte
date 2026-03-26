@@ -4,6 +4,7 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import { createEventDispatcher } from "svelte";
+  import { getApiErrorMessage } from "$lib/errors";
 
   const dispatch = createEventDispatcher();
 
@@ -38,7 +39,7 @@
       // emit event to refresh the page to the parent
       dispatch("refresh");
     } catch (error: any) {
-      globalStore.addError(error?.response?.message);
+      globalStore.addError(getApiErrorMessage(error, "Reject failed"));
       closeModal();
     }
   }

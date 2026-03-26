@@ -7,6 +7,7 @@
   import { shortDate } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
   import { untrack } from "svelte";
+  import { getApiErrorMessage } from "$lib/errors";
 
   let { data }: { data: PageData } = $props();
   let items: TimeSheetTallyQueryRow[] = $state(untrack(() => data.items));
@@ -20,7 +21,7 @@
       // remove from list after approving
       items = items.filter((ts: TimeSheetTallyQueryRow) => ts.id !== id);
     } catch (error: any) {
-      globalStore.addError(error?.response?.message);
+      globalStore.addError(getApiErrorMessage(error, "Approve failed"));
     }
   }
 </script>
