@@ -14,6 +14,7 @@ var talliesQuery string
 
 type TimeSheetTally struct {
 	Id                  string                    `json:"id"`
+	Uid                 string                    `json:"uid"`
 	Approved            string                    `json:"approved"`
 	BankEntryDates      utilities.JsonStringSlice `json:"bank_entry_dates"`
 	DivisionNames       utilities.JsonStringSlice `json:"division_names"`
@@ -29,6 +30,7 @@ type TimeSheetTally struct {
 	OvHours             float64                   `json:"ov_hours"`
 	PayoutRequestAmount float64                   `json:"payout_request_amount"`
 	PayoutRequestDates  utilities.JsonStringSlice `json:"payout_request_dates"`
+	Submitted           bool                      `json:"submitted"`
 	Rejected            string                    `json:"rejected"`
 	RejectionReason     string                    `json:"rejection_reason"`
 	Salary              string                    `json:"salary"`

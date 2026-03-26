@@ -7,9 +7,11 @@
 -- The WHERE clause dynamically applies filters based on the above flags.
 SELECT 
   MAX(ts.id) id,
+  MAX(ts.uid) uid,
   MAX(ts.week_ending) week_ending,
   MAX(ts.salary) salary, 
   MAX(ts.work_week_hours) work_week_hours, 
+  MAX(COALESCE(ts.submitted, 0)) submitted,
   MAX(ts.rejected) rejected, 
   MAX(ts.rejection_reason) rejection_reason, 
   MAX(ts.approved) approved,

@@ -13,6 +13,13 @@
   import { goto } from "$app/navigation";
   import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
   import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
+  import {
+    canApproveTimesheet,
+    canCommitTimesheet,
+    canRecallTimesheet,
+    canRejectTimesheet,
+  } from "$lib/timesheets/actions";
+  import { getApiErrorMessage } from "$lib/errors";
 
   let { data }: { data: PageData } = $props();
   let items = $state(untrack(() => data.items));
@@ -21,6 +28,8 @@
   let approverInfo = $state(untrack(() => data.approverInfo as any));
   let committerInfo = $state(untrack(() => data.committerInfo));
   let rejectModal: RejectModal;
+  const viewerId = pb.authStore.record?.id ?? "";
+  const isCommitUser = () => $globalStore.showAllUi || $globalStore.claims.includes("commit");
 
   // Subscribe to time entries changes for this specific time sheet
   let unsubscribeFunc: UnsubscribeFunc;
@@ -70,7 +79,7 @@
     try {
       await pb.collection("time_entries").delete(id);
     } catch (error: any) {
-      globalStore.addError(error?.response?.message);
+      globalStore.addError(getApiErrorMessage(error, "Delete failed"));
     }
   }
 
@@ -85,7 +94,7 @@
       // Refresh the local timesheet data
       timeSheet = await pb.collection("time_sheets").getOne(id);
     } catch (error: any) {
-      globalStore.addError(error?.response?.message);
+      globalStore.addError(getApiErrorMessage(error, "Approve failed"));
     }
   }
 
@@ -96,7 +105,7 @@
       });
       timeSheet = await pb.collection("time_sheets").getOne(id);
     } catch (error: any) {
-      globalStore.addError(error?.response?.message);
+      globalStore.addError(getApiErrorMessage(error, "Commit failed"));
     }
   }
 
@@ -109,7 +118,7 @@
       // navigate to the time entries list to show the unbundled time entries
       goto(`/time/entries/list`);
     } catch (error: any) {
-      globalStore.addError(error?.response?.message);
+      globalStore.addError(getApiErrorMessage(error, "Recall failed"));
     }
   }
 
@@ -166,35 +175,43 @@
       <div class="flex flex-wrap gap-2 empty:hidden">
         {#if timeSheet.rejected !== ""}
           <!-- Rejected: allow recall -->
-          <DsActionButton
-            action={() => recall(timeSheet.id)}
-            icon="mdi:rewind"
-            title="Recall"
-            color="orange"
-          />
+          {#if canRecallTimesheet(timeSheet, viewerId)}
+            <DsActionButton
+              action={() => recall(timeSheet.id)}
+              icon="mdi:rewind"
+              title="Recall"
+              color="orange"
+            />
+          {/if}
         {:else if timeSheet.approved === ""}
           <!-- Pending: recall, approve, reject -->
-          <DsActionButton
-            action={() => recall(timeSheet.id)}
-            icon="mdi:rewind"
-            title="Recall"
-            color="orange"
-          />
-          <DsActionButton
-            action={() => approve(timeSheet.id)}
-            icon="mdi:approve"
-            title="Approve"
-            color="green"
-          />
-          <DsActionButton
-            action={() => openRejectModal(timeSheet.id)}
-            icon="mdi:cancel"
-            title="Reject"
-            color="orange"
-          />
+          {#if canRecallTimesheet(timeSheet, viewerId)}
+            <DsActionButton
+              action={() => recall(timeSheet.id)}
+              icon="mdi:rewind"
+              title="Recall"
+              color="orange"
+            />
+          {/if}
+          {#if canApproveTimesheet(timeSheet, viewerId)}
+            <DsActionButton
+              action={() => approve(timeSheet.id)}
+              icon="mdi:approve"
+              title="Approve"
+              color="green"
+            />
+          {/if}
+          {#if canRejectTimesheet(timeSheet, viewerId, isCommitUser())}
+            <DsActionButton
+              action={() => openRejectModal(timeSheet.id)}
+              icon="mdi:cancel"
+              title="Reject"
+              color="orange"
+            />
+          {/if}
         {:else if timeSheet.approved !== "" && timeSheet.committed === ""}
           <!-- Approved (not committed yet): commit, reject -->
-          {#if $globalStore.showAllUi || $globalStore.claims.includes("commit")}
+          {#if canCommitTimesheet(timeSheet, isCommitUser())}
             <DsActionButton
               action={() => commit(timeSheet.id)}
               icon="mdi:check-all"
@@ -202,12 +219,14 @@
               color="green"
             />
           {/if}
-          <DsActionButton
-            action={() => openRejectModal(timeSheet.id)}
-            icon="mdi:cancel"
-            title="Reject"
-            color="orange"
-          />
+          {#if canRejectTimesheet(timeSheet, viewerId, isCommitUser())}
+            <DsActionButton
+              action={() => openRejectModal(timeSheet.id)}
+              icon="mdi:cancel"
+              title="Reject"
+              color="orange"
+            />
+          {/if}
         {/if}
       </div>
     </div>

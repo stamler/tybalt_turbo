@@ -11,6 +11,7 @@
   import DSTabBar, { type TabItem } from "$lib/components/DSTabBar.svelte";
   import { onMount, untrack } from "svelte";
   import Icon from "@iconify/svelte";
+  import { canCommitTimesheet, canRejectTimesheet } from "$lib/timesheets/actions";
 
   const weekEnding = $derived.by(() => $page.params.weekEnding);
   let rows = $state([] as any[]);
@@ -18,6 +19,8 @@
   let notExpected = $state([] as any[]);
   let rejectModal: SvelteComponent;
   let isLoading = $state(false);
+  const viewerId = pb.authStore.record?.id ?? "";
+  const hasCommitAccess = () => $globalStore.showAllUi || $globalStore.claims.includes("commit");
 
   // Tabs ----------------------------------------------------------------------
   let activeTab = $state<"sheets" | "missing" | "not_expected">("sheets");
@@ -117,15 +120,6 @@
     if ($globalStore.claims.includes("commit") && row.approved !== "") return true;
     if ($globalStore.claims.includes("report") && row.committed !== "") return true;
     return false;
-  }
-
-  function canReject(row: any) {
-    return (
-      ($globalStore.showAllUi || $globalStore.claims.includes("commit")) &&
-      row.approved !== "" &&
-      row.committed === "" &&
-      row.rejected === ""
-    );
   }
 
   // Utilities for Missing / Not Expected --------------------------------------
@@ -250,10 +244,10 @@
       {/if}
     {/snippet}
     {#snippet actions(r)}
-      {#if ($globalStore.showAllUi || $globalStore.claims.includes("commit")) && r.phase === "Approved" && r.rejected === ""}
+      {#if canCommitTimesheet(r, hasCommitAccess())}
         <DsActionButton action={() => commit(r.id)}>Commit</DsActionButton>
       {/if}
-      {#if canReject(r)}
+      {#if canRejectTimesheet(r, viewerId, hasCommitAccess())}
         <DsActionButton action={() => openReject(r.id)}>Reject</DsActionButton>
       {/if}
     {/snippet}

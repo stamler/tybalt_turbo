@@ -13,9 +13,17 @@
   import { onMount } from "svelte";
   import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
   import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
+  import {
+    canApproveTimesheet,
+    canRecallTimesheet,
+    canRejectTimesheet,
+  } from "$lib/timesheets/actions";
+  import { getApiErrorMessage } from "$lib/errors";
 
   let shareModal: SvelteComponent;
   let rejectModal: SvelteComponent;
+  const viewerId = pb.authStore.record?.id ?? "";
+  const hasCommitAccess = () => $globalStore.showAllUi || $globalStore.claims.includes("commit");
 
   // Initialize the timesheets store when component mounts
   onMount(async () => {
@@ -42,7 +50,7 @@
       // navigate to the time entries list to show the unbundled time entries
       goto(`/time/entries/list`);
     } catch (error: any) {
-      globalStore.addError(error?.response?.error || "An unknown error occurred");
+      globalStore.addError(getApiErrorMessage(error, "Recall failed"));
     }
   }
 
@@ -55,7 +63,7 @@
         },
       });
     } catch (error: any) {
-      globalStore.addError(error?.response?.error || "An unknown error occurred");
+      globalStore.addError(getApiErrorMessage(error, "Approve failed"));
     }
   }
 
@@ -105,17 +113,21 @@
   <!-- TODO: implement viewers, reviewed -->
   <span>Viewers, Reviewed</span>
 {/snippet}
-{#snippet actions({ id, approved }: TimeSheetTallyQueryRow)}
-  <DsActionButton action={() => unbundle(id)} icon="mdi:rewind" title="Recall" color="orange" />
-  {#if approved === ""}
+{#snippet actions({ id, uid, submitted, approved, approver, rejected, committed }: TimeSheetTallyQueryRow)}
+  {#if canRecallTimesheet({ uid, submitted, approved, rejected, committed }, viewerId)}
+    <DsActionButton action={() => unbundle(id)} icon="mdi:rewind" title="Recall" color="orange" />
+  {/if}
+  {#if canApproveTimesheet({ approver, submitted, approved, rejected, committed }, viewerId)}
     <DsActionButton action={() => approve(id)} icon="mdi:approve" title="Approve" color="green" />
   {/if}
-  <DsActionButton
-    action={() => openRejectModal(id)}
-    icon="mdi:cancel"
-    title="Reject"
-    color="orange"
-  />
+  {#if canRejectTimesheet({ approver, submitted, approved, rejected, committed }, viewerId, hasCommitAccess())}
+    <DsActionButton
+      action={() => openRejectModal(id)}
+      icon="mdi:cancel"
+      title="Reject"
+      color="orange"
+    />
+  {/if}
   <DsActionButton
     action={() => shareModal?.openModal(id)}
     icon="mdi:ios-share"

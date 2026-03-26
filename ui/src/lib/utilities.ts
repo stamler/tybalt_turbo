@@ -29,6 +29,7 @@ export function dateInputMaxMonthsAhead(monthsAhead: number): string {
 
 export interface TimeSheetTallyQueryRow {
   id: string;
+  uid: string;
   approved: string;
   bank_entry_dates: string[];
   division_names: string[];
@@ -45,6 +46,7 @@ export interface TimeSheetTallyQueryRow {
   rb_hours: number;
   payout_request_amount: number;
   payout_request_dates: string[];
+  submitted: boolean;
   rejected: string;
   rejection_reason: string;
   salary: string;
