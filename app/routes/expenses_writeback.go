@@ -400,8 +400,10 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			return e.Error(http.StatusInternalServerError, "failed to query vendors: "+err.Error(), nil)
 		}
 
-		// Query 3: All locally-owned purchase orders. Unlike expenses, purchase
-		// orders ignore updatedAfter and are exported whenever _imported = false.
+		// Query 3: All locally-owned purchase orders eligible for writeback.
+		// Unlike expenses, purchase orders ignore updatedAfter and are exported
+		// whenever _imported = false, except for local drafts that are still
+		// Unapproved and therefore do not yet have a finalized PO number.
 		purchaseOrdersQuery := `
 			SELECT DISTINCT 
 			  po.id,
@@ -450,6 +452,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			LEFT JOIN jobs j ON po.job = j.id
 			LEFT JOIN divisions d ON po.division = d.id
 			WHERE po._imported = 0
+			  AND po.status != 'Unapproved'
 		`
 
 		var poRows []purchaseOrderExportDBRow

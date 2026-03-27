@@ -50,6 +50,9 @@ AS substr(md5(CAST(source_value AS VARCHAR)), 1, length);
 		if err := prepareTurboPOsTable(db); err != nil {
 			log.Fatalf("Failed to prepare TurboPurchaseOrders kind data: %v", err)
 		}
+		if err := validateUniqueTurboPONumbers(db); err != nil {
+			log.Fatalf("TurboPurchaseOrders number validation failed: %v", err)
+		}
 	} else {
 		log.Println("TurboPurchaseOrders.parquet not found - will generate all PO IDs from PO numbers")
 	}
@@ -89,6 +92,44 @@ func prepareTurboPOsTable(db *sql.DB) error {
 	))
 	if err != nil {
 		return fmt.Errorf("backfill turbo_pos.kind values: %w", err)
+	}
+
+	return nil
+}
+
+func validateUniqueTurboPONumbers(db *sql.DB) error {
+	rows, err := db.Query(`
+		SELECT
+			number,
+			COUNT(*) AS match_count,
+			string_agg(id, ', ' ORDER BY id) AS ids
+		FROM turbo_pos
+		WHERE number IS NOT NULL AND TRIM(CAST(number AS VARCHAR)) != ''
+		GROUP BY number
+		HAVING COUNT(*) > 1
+		ORDER BY number
+	`)
+	if err != nil {
+		return fmt.Errorf("query duplicate TurboPurchaseOrders numbers: %w", err)
+	}
+	defer rows.Close()
+
+	var duplicates []string
+	for rows.Next() {
+		var number, ids string
+		var count int
+		if err := rows.Scan(&number, &count, &ids); err != nil {
+			return fmt.Errorf("scan duplicate TurboPurchaseOrders numbers: %w", err)
+		}
+		duplicates = append(duplicates, fmt.Sprintf("%s (%d rows: %s)", number, count, ids))
+	}
+
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("iterate duplicate TurboPurchaseOrders numbers: %w", err)
+	}
+
+	if len(duplicates) > 0 {
+		return fmt.Errorf("found duplicate nonblank TurboPurchaseOrders.number values: %s", strings.Join(duplicates, "; "))
 	}
 
 	return nil

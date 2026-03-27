@@ -49,6 +49,38 @@ func setupExpensesExportMissingLegacyUIDApp(tb testing.TB) *tests.TestApp {
 	return app
 }
 
+func setupExpensesExportBlankUnapprovedPOApp(tb testing.TB) *tests.TestApp {
+	app := testutils.SetupTestApp(tb)
+
+	if _, err := app.DB().NewQuery(`
+		INSERT INTO purchase_orders (
+			id,
+			po_number,
+			status,
+			_imported,
+			date,
+			type,
+			payment_type,
+			total,
+			description
+		) VALUES (
+			'po_export_blank_unapproved',
+			'',
+			'Unapproved',
+			0,
+			'2026-03-01',
+			'One-Time',
+			'CC',
+			123.45,
+			'Draft PO should not be exported'
+		)
+	`).Execute(); err != nil {
+		tb.Fatal(err)
+	}
+
+	return app
+}
+
 func TestExpensesExportLegacyIncludesPoApproverProps(t *testing.T) {
 	validToken := "test-secret-123"
 
@@ -111,6 +143,23 @@ func TestExpensesExportLegacyIncludesPoApproverProps(t *testing.T) {
 				`"vendorId":"yxhycv2ycpvsbt4"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "does not export unapproved purchase orders with blank po numbers",
+			Method: http.MethodGet,
+			URL:    "/api/export_legacy/expenses/2000-01-01",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + validToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"purchaseOrders":[`,
+			},
+			NotExpectedContent: []string{
+				`"id":"po_export_blank_unapproved"`,
+				`"description":"Draft PO should not be exported"`,
+			},
+			TestAppFactory: setupExpensesExportBlankUnapprovedPOApp,
 		},
 	}
 
