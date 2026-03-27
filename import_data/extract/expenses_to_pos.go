@@ -80,6 +80,20 @@ func prepareTurboPOsTable(db *sql.DB) error {
 		return fmt.Errorf("create turbo_pos table: %w", err)
 	}
 
+	_, err = db.Exec("CREATE TABLE uid_replacements AS SELECT * FROM read_csv('uid_replacements.csv')")
+	if err != nil {
+		return fmt.Errorf("create uid_replacements table: %w", err)
+	}
+
+	_, err = db.Exec(`
+		UPDATE turbo_pos
+		SET uid = (SELECT currentUid FROM uid_replacements WHERE previousUid = turbo_pos.uid)
+		WHERE EXISTS (SELECT 1 FROM uid_replacements WHERE previousUid = turbo_pos.uid)
+	`)
+	if err != nil {
+		return fmt.Errorf("normalize turbo_pos uid values: %w", err)
+	}
+
 	_, err = db.Exec("ALTER TABLE turbo_pos ADD COLUMN kind TEXT")
 	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "already exists") {
 		return fmt.Errorf("add turbo_pos.kind column: %w", err)
