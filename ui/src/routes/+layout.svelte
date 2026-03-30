@@ -63,7 +63,9 @@
                 }
                 if (item.href === "/admin_profiles/list") {
                   return (
-                    $globalStore.claims.includes("admin") || $globalStore.claims.includes("hr")
+                    $globalStore.claims.includes("admin") ||
+                    $globalStore.claims.includes("hr") ||
+                    $globalStore.claims.includes("time_off_manager")
                   );
                 }
                 if (

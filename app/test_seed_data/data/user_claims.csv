@@ -29,6 +29,7 @@ _imported,cid,created,id,uid,updated
 0,rpuh5vwzvagchjd,2026-03-09 00:00:00.000Z,uc_mileage_same_day_time,u_mileage_same_day,2026-03-09 00:00:00.000Z
 0,m3kzmuowqlzuic0,2026-03-09 00:00:00.000Z,uc_mileage_valid_revise,u_mileage_valid,2026-03-09 00:00:00.000Z
 0,rpuh5vwzvagchjd,2026-03-09 00:00:00.000Z,uc_mileage_valid_time,u_mileage_valid,2026-03-09 00:00:00.000Z
+0,tmoffmgr000001x,2026-03-30 00:00:00.000Z,uctmoff000001xy,u_with_claim,2026-03-30 00:00:00.000Z
 0,5vh881k048bboim,2026-03-09 00:00:00.000Z,uc_missing_legacy_uid,uid_missing_legacy_profile,2026-03-09 00:00:00.000Z
 0,5vh881k048bboim,2026-03-09 00:00:00.000Z,uc_po_bypass_001,u_po_bypass_001,2026-03-09 00:00:00.000Z
 0,5vh881k048bboim,2026-02-11 00:00:00.000Z,ucinactpo000001,inactpoappr0001,2026-02-11 00:00:00.000Z

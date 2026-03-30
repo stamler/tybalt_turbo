@@ -5,6 +5,8 @@
 
   let { data } = $props();
   const isAdmin = $derived($globalStore.claims.includes("admin"));
+  const hasTimeOffManagerClaim = $derived($globalStore.claims.includes("time_off_manager"));
+  const canViewOpeningFields = $derived(isAdmin || hasTimeOffManagerClaim);
 
   const currency = new Intl.NumberFormat("en-CA", {
     style: "currency",
@@ -126,6 +128,8 @@
           <span class="font-semibold">Untracked Time Off:</span>
           {data.item.untracked_time_off ? "Yes" : "No"}
         </div>
+      {/if}
+      {#if canViewOpeningFields}
         <div class="flex gap-2">
           <span class="font-semibold">Opening Date:</span>
           {data.item.opening_date || "—"}
@@ -138,6 +142,8 @@
           <span class="font-semibold">Opening OV:</span>
           {data.item.opening_ov}
         </div>
+      {/if}
+      {#if isAdmin}
         <div class="flex gap-2">
           <span class="font-semibold">Record ID:</span>
           {data.item.id}

@@ -40,6 +40,7 @@
     "skip_min_time_check",
     "time_sheet_expected",
   ] as const;
+  const TIME_OFF_MANAGER_EDITABLE_FIELDS = ["opening_date", "opening_op", "opening_ov"] as const;
 
   let { data }: { data: AdminProfilesEditPageData & { divisions?: DivisionsResponse[] } } =
     $props();
@@ -52,9 +53,11 @@
   const divisions = $derived.by(() => $divisionsStore.items as DivisionsResponse[]);
   const divisionsIndex = $derived.by(() => $divisionsStore.index);
   const isAdmin = $derived($globalStore.claims.includes("admin"));
-  const isHrOnly = $derived(
-    $globalStore.claims.includes("hr") && !$globalStore.claims.includes("admin"),
-  );
+  const hasHrClaim = $derived($globalStore.claims.includes("hr"));
+  const hasTimeOffManagerClaim = $derived($globalStore.claims.includes("time_off_manager"));
+  const isLimitedEditor = $derived(!isAdmin && (hasHrClaim || hasTimeOffManagerClaim));
+  const canEditHrFields = $derived(isAdmin || hasHrClaim);
+  const canEditOpeningFields = $derived(isAdmin || hasTimeOffManagerClaim);
   const effectiveSubjectClaimIds = $derived.by(() =>
     isAdmin ? stagedClaimIds : originalUserClaims.map((uc) => uc.cid),
   );
@@ -535,8 +538,12 @@
   }
 
   function adminProfilePayload() {
-    if (!isHrOnly) return item;
-    return HR_EDITABLE_FIELDS.reduce<Record<string, unknown>>((payload, fieldName) => {
+    if (!isLimitedEditor) return item;
+    const fieldNames = [
+      ...(hasHrClaim ? HR_EDITABLE_FIELDS : []),
+      ...(hasTimeOffManagerClaim ? TIME_OFF_MANAGER_EDITABLE_FIELDS : []),
+    ];
+    return [...new Set(fieldNames)].reduce<Record<string, unknown>>((payload, fieldName) => {
       payload[fieldName] = item[fieldName];
       return payload;
     }, {});
@@ -562,16 +569,16 @@
   async function save(event: Event) {
     event.preventDefault();
     try {
-      if (isHrOnly && (!data.editing || !data.id)) {
+      if (isLimitedEditor && (!data.editing || !data.id)) {
         errors = {
-          global: { message: "HR can only update existing admin profiles." },
+          global: { message: "This role can only update existing admin profiles." },
         };
         return;
       }
 
       const payload = adminProfilePayload();
 
-      if (isHrOnly) {
+      if (isLimitedEditor) {
         if (data.editing && data.id) {
           await pb.collection("admin_profiles").update(data.id, payload);
         } else {
@@ -625,7 +632,9 @@
   onsubmit={save}
 >
   <div class="w/full grid grid-cols-1 gap-2 md:grid-cols-2">
-    <DsCheck bind:value={item.active as boolean} {errors} fieldName="active" uiName="Active" />
+    {#if canEditHrFields}
+      <DsCheck bind:value={item.active as boolean} {errors} fieldName="active" uiName="Active" />
+    {/if}
 
     {#if isAdmin}
       <DsTextInput
@@ -639,13 +648,15 @@
       />
     {/if}
 
-    <DsCheck bind:value={item.salary as boolean} {errors} fieldName="salary" uiName="Salary" />
-    <DsCheck
-      bind:value={item.off_rotation_permitted as boolean}
-      {errors}
-      fieldName="off_rotation_permitted"
-      uiName="Off Rotation Permitted"
-    />
+    {#if canEditHrFields}
+      <DsCheck bind:value={item.salary as boolean} {errors} fieldName="salary" uiName="Salary" />
+      <DsCheck
+        bind:value={item.off_rotation_permitted as boolean}
+        {errors}
+        fieldName="off_rotation_permitted"
+        uiName="Off Rotation Permitted"
+      />
+    {/if}
     {#if isAdmin}
       <DsCheck
         bind:value={item.untracked_time_off as boolean}
@@ -654,44 +665,46 @@
         uiName="Untracked Time Off"
       />
     {/if}
-    <DsCheck
-      bind:value={item.time_sheet_expected as boolean}
-      {errors}
-      fieldName="time_sheet_expected"
-      uiName="Time Sheet Expected"
-    />
-    <DsCheck
-      bind:value={item.allow_personal_reimbursement as boolean}
-      {errors}
-      fieldName="allow_personal_reimbursement"
-      uiName="Allow Personal Reimbursement"
-    />
+    {#if canEditHrFields}
+      <DsCheck
+        bind:value={item.time_sheet_expected as boolean}
+        {errors}
+        fieldName="time_sheet_expected"
+        uiName="Time Sheet Expected"
+      />
+      <DsCheck
+        bind:value={item.allow_personal_reimbursement as boolean}
+        {errors}
+        fieldName="allow_personal_reimbursement"
+        uiName="Allow Personal Reimbursement"
+      />
 
-    <DsTextInput
-      bind:value={item.default_charge_out_rate as number}
-      {errors}
-      fieldName="default_charge_out_rate"
-      uiName="Default Charge Out Rate"
-      type="number"
-      step={0.01}
-      min={0}
-    />
+      <DsTextInput
+        bind:value={item.default_charge_out_rate as number}
+        {errors}
+        fieldName="default_charge_out_rate"
+        uiName="Default Charge Out Rate"
+        type="number"
+        step={0.01}
+        min={0}
+      />
 
-    <DsSelector
-      bind:value={item.skip_min_time_check as AdminProfilesAugmentedSkipMinTimeCheckOptions}
-      items={[
-        { id: "no", name: "No" },
-        { id: "on_next_bundle", name: "On Next Bundle" },
-        { id: "yes", name: "Yes" },
-      ]}
-      {errors}
-      fieldName="skip_min_time_check"
-      uiName="Skip Min Time Check"
-    >
-      {#snippet optionTemplate(item)}{item.name}{/snippet}
-    </DsSelector>
+      <DsSelector
+        bind:value={item.skip_min_time_check as AdminProfilesAugmentedSkipMinTimeCheckOptions}
+        items={[
+          { id: "no", name: "No" },
+          { id: "on_next_bundle", name: "On Next Bundle" },
+          { id: "yes", name: "Yes" },
+        ]}
+        {errors}
+        fieldName="skip_min_time_check"
+        uiName="Skip Min Time Check"
+      >
+        {#snippet optionTemplate(item)}{item.name}{/snippet}
+      </DsSelector>
+    {/if}
 
-    {#if isAdmin}
+    {#if canEditOpeningFields}
       <span class="flex w-full gap-2 {errors.opening_date !== undefined ? 'bg-red-200' : ''}">
         <label for="opening_date">Opening Date</label>
         <DsDateInput
@@ -707,25 +720,27 @@
       </span>
     {/if}
 
-    <span
-      class="flex w-full gap-2 {errors.personal_vehicle_insurance_expiry !== undefined
-        ? 'bg-red-200'
-        : ''}"
-    >
-      <label for="personal_vehicle_insurance_expiry">Personal Vehicle Insurance Expiry</label>
-      <DsDateInput
-        class="flex-1"
-        name="personal_vehicle_insurance_expiry"
-        min={DATE_INPUT_MIN}
-        max={dateInputMax}
-        bind:value={item.personal_vehicle_insurance_expiry}
-      />
-      {#if errors.personal_vehicle_insurance_expiry !== undefined}
-        <span class="text-red-600">{errors.personal_vehicle_insurance_expiry.message}</span>
-      {/if}
-    </span>
+    {#if canEditHrFields}
+      <span
+        class="flex w-full gap-2 {errors.personal_vehicle_insurance_expiry !== undefined
+          ? 'bg-red-200'
+          : ''}"
+      >
+        <label for="personal_vehicle_insurance_expiry">Personal Vehicle Insurance Expiry</label>
+        <DsDateInput
+          class="flex-1"
+          name="personal_vehicle_insurance_expiry"
+          min={DATE_INPUT_MIN}
+          max={dateInputMax}
+          bind:value={item.personal_vehicle_insurance_expiry}
+        />
+        {#if errors.personal_vehicle_insurance_expiry !== undefined}
+          <span class="text-red-600">{errors.personal_vehicle_insurance_expiry.message}</span>
+        {/if}
+      </span>
+    {/if}
 
-    {#if isAdmin}
+    {#if canEditOpeningFields}
       <DsTextInput
         bind:value={item.opening_op as number}
         {errors}
@@ -746,34 +761,36 @@
       />
     {/if}
 
-    <DsTextInput
-      bind:value={item.payroll_id as string}
-      {errors}
-      fieldName="payroll_id"
-      uiName="Payroll ID"
-    />
-    <DsTextInput
-      bind:value={item.mobile_phone as string}
-      {errors}
-      fieldName="mobile_phone"
-      uiName="Mobile Phone"
-    />
-    <DsTextInput
-      bind:value={item.job_title as string}
-      {errors}
-      fieldName="job_title"
-      uiName="Job Title"
-    />
+    {#if canEditHrFields}
+      <DsTextInput
+        bind:value={item.payroll_id as string}
+        {errors}
+        fieldName="payroll_id"
+        uiName="Payroll ID"
+      />
+      <DsTextInput
+        bind:value={item.mobile_phone as string}
+        {errors}
+        fieldName="mobile_phone"
+        uiName="Mobile Phone"
+      />
+      <DsTextInput
+        bind:value={item.job_title as string}
+        {errors}
+        fieldName="job_title"
+        uiName="Job Title"
+      />
 
-    <DsSelector
-      bind:value={item.default_branch as string}
-      items={availableBranches}
-      {errors}
-      fieldName="default_branch"
-      uiName="Default Branch"
-    >
-      {#snippet optionTemplate(item)}{item.name}{/snippet}
-    </DsSelector>
+      <DsSelector
+        bind:value={item.default_branch as string}
+        items={availableBranches}
+        {errors}
+        fieldName="default_branch"
+        uiName="Default Branch"
+      >
+        {#snippet optionTemplate(item)}{item.name}{/snippet}
+      </DsSelector>
+    {/if}
   </div>
 
   {#if isAdmin}

@@ -420,11 +420,13 @@ uid = @request.auth.id &&
 \N,2025-08-27 21:41:40.649Z,\N,"[{""autogeneratePattern"":"""",""hidden"":false,""id"":""text3208210256"",""max"":0,""min"":0,""name"":""id"",""pattern"":""^[a-z0-9]+$"",""presentable"":false,""primaryKey"":true,""required"":true,""system"":true,""type"":""text""},{""cascadeDelete"":false,""collectionId"":""_pb_users_auth_"",""hidden"":false,""id"":""_clone_0he2"",""maxSelect"":1,""minSelect"":0,""name"":""uid"",""presentable"":false,""required"":true,""system"":false,""type"":""relation""},{""hidden"":false,""id"":""_clone_CQgR"",""name"":""active"",""presentable"":false,""required"":false,""system"":false,""type"":""bool""},{""hidden"":false,""id"":""_clone_g8IE"",""max"":40,""min"":8,""name"":""work_week_hours"",""onlyInt"":false,""presentable"":false,""required"":true,""system"":false,""type"":""number""},{""hidden"":false,""id"":""_clone_HSGf"",""name"":""salary"",""presentable"":false,""required"":false,""system"":false,""type"":""bool""},{""hidden"":false,""id"":""_clone_HFn0"",""max"":1000,""min"":50,""name"":""default_charge_out_rate"",""onlyInt"":false,""presentable"":false,""required"":true,""system"":false,""type"":""number""},{""hidden"":false,""id"":""_clone_U4Sq"",""name"":""off_rotation_permitted"",""presentable"":false,""required"":false,""system"":false,""type"":""bool""},{""hidden"":false,""id"":""_clone_HU5C"",""maxSelect"":1,""name"":""skip_min_time_check"",""presentable"":false,""required"":true,""system"":false,""type"":""select"",""values"":[""no"",""on_next_bundle"",""yes""]},{""autogeneratePattern"":"""",""hidden"":false,""id"":""_clone_gjPY"",""max"":0,""min"":0,""name"":""opening_date"",""pattern"":""^\\d{4}-\\d{2}-\\d{2}$"",""presentable"":false,""primaryKey"":false,""required"":false,""system"":false,""type"":""text""},{""hidden"":false,""id"":""_clone_NUUS"",""max"":332,""min"":0,""name"":""opening_op"",""onlyInt"":false,""presentable"":false,""required"":false,""system"":false,""type"":""number""},{""hidden"":false,""id"":""_clone_xT5g"",""max"":200,""min"":0,""name"":""opening_ov"",""onlyInt"":false,""presentable"":false,""required"":false,""system"":false,""type"":""number""},{""autogeneratePattern"":"""",""hidden"":false,""id"":""_clone_tkSK"",""max"":0,""min"":0,""name"":""payroll_id"",""pattern"":""^(?:[1-9]\\d*|CMS[0-9]{1,2})$"",""presentable"":false,""primaryKey"":false,""required"":true,""system"":false,""type"":""text""},{""hidden"":false,""id"":""_clone_FUqb"",""name"":""untracked_time_off"",""presentable"":false,""required"":false,""system"":false,""type"":""bool""},{""hidden"":false,""id"":""_clone_PSqF"",""name"":""time_sheet_expected"",""presentable"":false,""required"":false,""system"":false,""type"":""bool""},{""hidden"":false,""id"":""_clone_Ihgg"",""name"":""allow_personal_reimbursement"",""presentable"":false,""required"":false,""system"":false,""type"":""bool""},{""autogeneratePattern"":"""",""hidden"":false,""id"":""_clone_vA7K"",""max"":0,""min"":0,""name"":""mobile_phone"",""pattern"":""^\\+1 \\(\\d{3}\\) \\d{3}-\\d{4}$"",""presentable"":false,""primaryKey"":false,""required"":false,""system"":false,""type"":""text""},{""autogeneratePattern"":"""",""hidden"":false,""id"":""_clone_6IbT"",""max"":0,""min"":0,""name"":""job_title"",""pattern"":"""",""presentable"":false,""primaryKey"":false,""required"":false,""system"":false,""type"":""text""},{""autogeneratePattern"":"""",""hidden"":false,""id"":""_clone_dfuh"",""max"":0,""min"":0,""name"":""personal_vehicle_insurance_expiry"",""pattern"":""^\\d{4}-\\d{2}-\\d{2}$"",""presentable"":false,""primaryKey"":false,""required"":false,""system"":false,""type"":""text""},{""cascadeDelete"":false,""collectionId"":""pbc_2536409462"",""hidden"":false,""id"":""_clone_cOgZ"",""maxSelect"":1,""minSelect"":0,""name"":""default_branch"",""presentable"":false,""required"":true,""system"":false,""type"":""relation""},{""autogeneratePattern"":"""",""hidden"":false,""id"":""_clone_afFO"",""max"":48,""min"":2,""name"":""given_name"",""pattern"":""^[a-zA-Z]+(?:-[a-zA-Z]+)*$"",""presentable"":false,""primaryKey"":false,""required"":true,""system"":false,""type"":""text""},{""autogeneratePattern"":"""",""hidden"":false,""id"":""_clone_gaSl"",""max"":48,""min"":2,""name"":""surname"",""pattern"":""^[a-zA-Z]+(?:-[a-zA-Z]+)*$"",""presentable"":false,""primaryKey"":false,""required"":true,""system"":false,""type"":""text""},{""hidden"":false,""id"":""json122688194"",""maxSize"":1,""name"":""po_approver_props_id"",""presentable"":false,""required"":false,""system"":false,""type"":""json""},{""hidden"":false,""id"":""json2633413457"",""maxSize"":1,""name"":""po_approver_user_claim_id"",""presentable"":false,""required"":false,""system"":false,""type"":""json""},{""hidden"":false,""id"":""json1113389409"",""maxSize"":1,""name"":""po_approver_max_amount"",""presentable"":false,""required"":false,""system"":false,""type"":""json""},{""hidden"":false,""id"":""json961883861"",""maxSize"":1,""name"":""po_approver_project_max"",""presentable"":false,""required"":false,""system"":false,""type"":""json""},{""hidden"":false,""id"":""json2537532190"",""maxSize"":1,""name"":""po_approver_sponsorship_max"",""presentable"":false,""required"":false,""system"":false,""type"":""json""},{""hidden"":false,""id"":""json2452616479"",""maxSize"":1,""name"":""po_approver_staff_and_social_max"",""presentable"":false,""required"":false,""system"":false,""type"":""json""},{""hidden"":false,""id"":""json852376237"",""maxSize"":1,""name"":""po_approver_media_and_event_max"",""presentable"":false,""required"":false,""system"":false,""type"":""json""},{""hidden"":false,""id"":""json3196191314"",""maxSize"":1,""name"":""po_approver_computer_max"",""presentable"":false,""required"":false,""system"":false,""type"":""json""},{""hidden"":false,""id"":""json1126415246"",""maxSize"":1,""name"":""po_approver_divisions"",""presentable"":false,""required"":false,""system"":false,""type"":""json""}]",pbc_697077494,[],"@request.auth.id != """" &&
 (
   @request.auth.user_claims_via_uid.cid.name ?= 'admin' ||
-  @request.auth.user_claims_via_uid.cid.name ?= 'hr'
+  @request.auth.user_claims_via_uid.cid.name ?= 'hr' ||
+  @request.auth.user_claims_via_uid.cid.name ?= 'time_off_manager'
 )",admin_profiles_augmented,"{""viewQuery"":""SELECT ap.id,\n  ap.uid,\n  ap.active,\n  ap.work_week_hours,\n  ap.salary,\n  ap.default_charge_out_rate,\n  ap.off_rotation_permitted,\n  ap.skip_min_time_check,\n  ap.opening_date,\n  ap.opening_op,\n  ap.opening_ov,\n  ap.payroll_id,\n  ap.untracked_time_off,\n  ap.time_sheet_expected,\n  ap.allow_personal_reimbursement,\n  ap.mobile_phone,\n  ap.job_title,\n  ap.personal_vehicle_insurance_expiry,\n  ap.default_branch,\n  p.given_name,\n  p.surname,\n  po.po_approver_props_id,\n  po.po_approver_user_claim_id,\n  po.po_approver_max_amount,\n  po.po_approver_project_max,\n  po.po_approver_sponsorship_max,\n  po.po_approver_staff_and_social_max,\n  po.po_approver_media_and_event_max,\n  po.po_approver_computer_max,\n  COALESCE(po.po_approver_divisions, '[]') AS po_approver_divisions\nFROM admin_profiles ap\nLEFT JOIN users u ON u.id = ap.uid\nLEFT JOIN profiles p ON u.id = p.uid\nLEFT JOIN (\n  SELECT\n    uc.uid,\n    uc.id AS po_approver_user_claim_id,\n    pap.id AS po_approver_props_id,\n    pap.max_amount AS po_approver_max_amount,\n    pap.project_max AS po_approver_project_max,\n    pap.sponsorship_max AS po_approver_sponsorship_max,\n    pap.staff_and_social_max AS po_approver_staff_and_social_max,\n    pap.media_and_event_max AS po_approver_media_and_event_max,\n    pap.computer_max AS po_approver_computer_max,\n    pap.divisions AS po_approver_divisions\n  FROM user_claims uc\n  INNER JOIN claims c ON c.id = uc.cid AND c.name = 'po_approver'\n  LEFT JOIN po_approver_props pap ON pap.user_claim = uc.id\n) po ON po.uid = ap.uid;""}",0,view,\N,2026-03-09 15:56:48.527Z,"@request.auth.id != """" &&
 (
   @request.auth.user_claims_via_uid.cid.name ?= 'admin' ||
-  @request.auth.user_claims_via_uid.cid.name ?= 'hr'
+  @request.auth.user_claims_via_uid.cid.name ?= 'hr' ||
+  @request.auth.user_claims_via_uid.cid.name ?= 'time_off_manager'
 )"
 \N,2024-06-26 01:48:25.926Z,\N,"[{""autogeneratePattern"":"""",""hidden"":false,""id"":""text3208210256"",""max"":0,""min"":0,""name"":""id"",""pattern"":""^[a-z0-9]+$"",""presentable"":false,""primaryKey"":true,""required"":true,""system"":true,""type"":""text""},{""autogeneratePattern"":"""",""hidden"":false,""id"":""_clone_W758"",""max"":48,""min"":2,""name"":""surname"",""pattern"":""^[a-zA-Z]+(?:-[a-zA-Z]+)*$"",""presentable"":false,""primaryKey"":false,""required"":true,""system"":false,""type"":""text""},{""autogeneratePattern"":"""",""hidden"":false,""id"":""_clone_b2E1"",""max"":48,""min"":2,""name"":""given_name"",""pattern"":""^[a-zA-Z]+(?:-[a-zA-Z]+)*$"",""presentable"":false,""primaryKey"":false,""required"":true,""system"":false,""type"":""text""}]",phpak4pjznt98yu,[],"@request.auth.id != """"",managers,"{""viewQuery"":""SELECT p.uid AS id, p.surname AS surname, p.given_name AS given_name \nFROM profiles p\nINNER JOIN user_claims u ON p.uid = u.uid\nINNER JOIN claims c ON u.cid = c.id\nWHERE c.name = 'tapr'""}",0,view,\N,2026-03-09 15:56:48.073Z,"@request.auth.id != """""
 "@request.auth.id != """" &&
@@ -504,12 +506,39 @@ uid = @request.auth.id && tsid = """" &&
 (
 @request.auth.user_claims_via_uid.cid.name ?= 'admin' ||
   (
-    @request.auth.user_claims_via_uid.cid.name ?= 'hr' &&
+    (
+      @request.auth.user_claims_via_uid.cid.name ?= 'hr' ||
+      @request.auth.user_claims_via_uid.cid.name ?= 'time_off_manager'
+    ) &&
     @request.body.work_week_hours:changed = false &&
     @request.body.untracked_time_off:changed = false &&
-    @request.body.opening_date:changed = false &&
-    @request.body.opening_op:changed = false &&
-    @request.body.opening_ov:changed = false &&
-    @request.body._imported:changed = false
+    @request.body._imported:changed = false &&
+    (
+      (
+        @request.auth.user_claims_via_uid.cid.name ?= 'hr' &&
+        @request.auth.user_claims_via_uid.cid.name ?= 'time_off_manager'
+      ) ||
+      (
+        @request.auth.user_claims_via_uid.cid.name ?= 'hr' &&
+        @request.body.opening_date:changed = false &&
+        @request.body.opening_op:changed = false &&
+        @request.body.opening_ov:changed = false
+      ) ||
+      (
+        @request.auth.user_claims_via_uid.cid.name ?= 'time_off_manager' &&
+        @request.body.active:changed = false &&
+        @request.body.allow_personal_reimbursement:changed = false &&
+        @request.body.default_branch:changed = false &&
+        @request.body.default_charge_out_rate:changed = false &&
+        @request.body.job_title:changed = false &&
+        @request.body.mobile_phone:changed = false &&
+        @request.body.off_rotation_permitted:changed = false &&
+        @request.body.payroll_id:changed = false &&
+        @request.body.personal_vehicle_insurance_expiry:changed = false &&
+        @request.body.salary:changed = false &&
+        @request.body.skip_min_time_check:changed = false &&
+        @request.body.time_sheet_expected:changed = false
+      )
+    )
   )
 )",2026-03-09 15:56:46.679Z,\N

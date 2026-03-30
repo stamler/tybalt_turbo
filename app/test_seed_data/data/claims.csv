@@ -13,6 +13,7 @@ created,description,id,name,updated
 2024-11-18 15:54:29.070Z,Can CRUD uncommitted time_amendments records and read committed ones,moz5ks3fqn7dvt2,tame,2024-11-18 15:54:29.070Z
 2024-09-24 13:08:20.616Z,Broad read-access to data for reporting,nyt4qcvwc5l5o3o,report,2024-09-24 13:08:20.616Z
 2024-06-21 14:20:20.923Z,"CRUD for time_entries, bundling time_sheets where records belong to the user",rpuh5vwzvagchjd,time,2024-06-21 14:20:20.923Z
+2026-03-30 00:00:00.000Z,Can edit opening_date opening_op and opening_ov on admin_profiles records,tmoffmgr000001x,time_off_manager,2026-03-30 00:00:00.000Z
 2025-09-25 18:06:55.136Z,Business Development Leads. These are users that are branch managers or executives who can be responsible for business development with a client. Users with this claim can be assigned to the business_development_lead field of the clients collection,v748dp232p1onmh,busdev,2025-09-25 18:06:55.136Z
 2024-11-08 15:31:54.819Z,"Can manage purchase orders (cancel active POs with no expenses, close active Cumulative/Recurring POs with committed expenses, convert active One-Time POs to Cumulative), create OnAccount expenses above the no-PO limit without a PO, create/update/delete vendors, and edit the outstanding_balance field on jobs",z475278ext53a2n,payables_admin,2024-11-08 15:31:54.819Z
 2026-03-17 22:00:47.501Z,"Can edit specific fields on admin_profiles records",ahs37mw4sp2b59n,hr,2026-03-17 22:00:47.501Z
