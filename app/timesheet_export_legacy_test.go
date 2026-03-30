@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"github.com/pocketbase/pocketbase/tests"
+	"io"
 	"net/http"
 	"testing"
 	"tybalt/internal/testutils"
@@ -125,10 +127,21 @@ func TestTimesheetExportLegacyIncludesSeparatedTimeSheetsAndAmendments(t *testin
 		} `json:"timeSheets"`
 		TimeAmendments []struct {
 			ID                  string `json:"id"`
+			UID                 string `json:"uid"`
+			GivenName           string `json:"givenName"`
+			Surname             string `json:"surname"`
+			DisplayName         string `json:"displayName"`
+			PayrollID           string `json:"payrollId"`
+			Salary              bool   `json:"salary"`
+			Created             string `json:"created"`
+			Creator             string `json:"creator"`
+			CreatorName         string `json:"creatorName"`
 			WeekEnding          string `json:"weekEnding"`
+			Committed           bool   `json:"committed"`
+			CommitTime          string `json:"commitTime"`
 			CommittedWeekEnding string `json:"committedWeekEnding"`
-			Committer           string `json:"committer"`
-			CommitterName       string `json:"committerName"`
+			CommitUID           string `json:"commitUid"`
+			CommitName          string `json:"commitName"`
 		} `json:"timeAmendments"`
 	}
 
@@ -150,9 +163,21 @@ func TestTimesheetExportLegacyIncludesSeparatedTimeSheetsAndAmendments(t *testin
 		AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
 			defer res.Body.Close()
 
+			body, err := io.ReadAll(res.Body)
+			if err != nil {
+				tb.Fatalf("failed to read export response body: %v", err)
+			}
+
 			var payload exportResponse
-			if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+			if err := json.NewDecoder(bytes.NewReader(body)).Decode(&payload); err != nil {
 				tb.Fatalf("failed to decode export response: %v", err)
+			}
+
+			var rawPayload struct {
+				TimeAmendments []map[string]any `json:"timeAmendments"`
+			}
+			if err := json.NewDecoder(bytes.NewReader(body)).Decode(&rawPayload); err != nil {
+				tb.Fatalf("failed to decode raw export response: %v", err)
 			}
 
 			if len(payload.TimeSheets) != 1 {
@@ -172,14 +197,55 @@ func TestTimesheetExportLegacyIncludesSeparatedTimeSheetsAndAmendments(t *testin
 			if amendment.WeekEnding != "2024-09-28" {
 				tb.Fatalf("timeAmendments[0].weekEnding = %q, want %q", amendment.WeekEnding, "2024-09-28")
 			}
+			if amendment.UID != "legacy_f2j5a8vk006baub" {
+				tb.Fatalf("timeAmendments[0].uid = %q, want %q", amendment.UID, "legacy_f2j5a8vk006baub")
+			}
+			if amendment.GivenName != "Horace" {
+				tb.Fatalf("timeAmendments[0].givenName = %q, want %q", amendment.GivenName, "Horace")
+			}
+			if amendment.Surname != "Silver" {
+				tb.Fatalf("timeAmendments[0].surname = %q, want %q", amendment.Surname, "Silver")
+			}
+			if amendment.DisplayName != "Horace Silver" {
+				tb.Fatalf("timeAmendments[0].displayName = %q, want %q", amendment.DisplayName, "Horace Silver")
+			}
+			if amendment.PayrollID != "9999" {
+				tb.Fatalf("timeAmendments[0].payrollId = %q, want %q", amendment.PayrollID, "9999")
+			}
+			if !amendment.Salary {
+				tb.Fatalf("timeAmendments[0].salary = false, want true")
+			}
+			if amendment.Created == "" {
+				tb.Fatalf("timeAmendments[0].created unexpectedly blank")
+			}
+			if amendment.Creator != "legacy_f2j5a8vk006baub" {
+				tb.Fatalf("timeAmendments[0].creator = %q, want %q", amendment.Creator, "legacy_f2j5a8vk006baub")
+			}
+			if amendment.CreatorName != "Horace Silver" {
+				tb.Fatalf("timeAmendments[0].creatorName = %q, want %q", amendment.CreatorName, "Horace Silver")
+			}
+			if !amendment.Committed {
+				tb.Fatalf("timeAmendments[0].committed = false, want true")
+			}
+			if amendment.CommitTime == "" {
+				tb.Fatalf("timeAmendments[0].commitTime unexpectedly blank")
+			}
 			if amendment.CommittedWeekEnding != "2024-09-28" {
 				tb.Fatalf("timeAmendments[0].committedWeekEnding = %q, want %q", amendment.CommittedWeekEnding, "2024-09-28")
 			}
-			if amendment.Committer == "" {
-				tb.Fatalf("timeAmendments[0].committer unexpectedly blank")
+			if amendment.CommitUID != "legacy_wegviunlyr2jjjv" {
+				tb.Fatalf("timeAmendments[0].commitUid = %q, want %q", amendment.CommitUID, "legacy_wegviunlyr2jjjv")
 			}
-			if amendment.CommitterName == "" {
-				tb.Fatalf("timeAmendments[0].committerName unexpectedly blank")
+			if amendment.CommitName != "Fakesy Manjor" {
+				tb.Fatalf("timeAmendments[0].commitName = %q, want %q", amendment.CommitName, "Fakesy Manjor")
+			}
+
+			rawAmendment := rawPayload.TimeAmendments[0]
+			if _, ok := rawAmendment["committer"]; ok {
+				tb.Fatalf("timeAmendments[0].committer unexpectedly present")
+			}
+			if _, ok := rawAmendment["committerName"]; ok {
+				tb.Fatalf("timeAmendments[0].committerName unexpectedly present")
 			}
 		},
 	}
@@ -203,7 +269,7 @@ func TestTimesheetExportLegacyUsesAdminProfileLegacyUIDs(t *testing.T) {
 		TimeAmendments []struct {
 			ID        string `json:"id"`
 			UID       string `json:"uid"`
-			Committer string `json:"committer"`
+			CommitUID string `json:"commitUid"`
 		} `json:"timeAmendments"`
 	}
 
@@ -254,8 +320,8 @@ func TestTimesheetExportLegacyUsesAdminProfileLegacyUIDs(t *testing.T) {
 			if amendment.UID != "legacy_f2j5a8vk006baub" {
 				tb.Fatalf("timeAmendments[0].uid = %q, want %q", amendment.UID, "legacy_f2j5a8vk006baub")
 			}
-			if amendment.Committer != "legacy_wegviunlyr2jjjv" {
-				tb.Fatalf("timeAmendments[0].committer = %q, want %q", amendment.Committer, "legacy_wegviunlyr2jjjv")
+			if amendment.CommitUID != "legacy_wegviunlyr2jjjv" {
+				tb.Fatalf("timeAmendments[0].commitUid = %q, want %q", amendment.CommitUID, "legacy_wegviunlyr2jjjv")
 			}
 		},
 	}

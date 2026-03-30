@@ -65,6 +65,11 @@ func (t timeEntryExport) MarshalJSON() ([]byte, error) {
 type timeAmendmentExport struct {
 	Id                  string  `db:"id" json:"id"`
 	Uid                 string  `db:"uid" json:"uid"`
+	GivenName           string  `db:"given_name" json:"givenName"`
+	Surname             string  `db:"surname" json:"surname"`
+	DisplayName         string  `db:"display_name" json:"displayName"`
+	PayrollId           string  `db:"payroll_id" json:"payrollId"`
+	Salary              bool    `db:"salary" json:"salary"`
 	Job                 string  `db:"job" json:"job,omitempty"`
 	JobDescription      string  `db:"job_description" json:"jobDescription,omitempty"`
 	Division            string  `db:"division" json:"division,omitempty"`
@@ -80,10 +85,13 @@ type timeAmendmentExport struct {
 	Category            string  `db:"category_name" json:"category,omitempty"`
 	WeekEnding          string  `db:"week_ending" json:"weekEnding"`
 	ClientName          string  `db:"client_name" json:"client,omitempty"`
-	Committed           string  `db:"committed" json:"committed"`
+	Created             string  `db:"created" json:"created"`
+	Creator             string  `db:"creator" json:"creator"`
+	CreatorName         string  `db:"creator_name" json:"creatorName"`
+	CommitTime          string  `db:"commit_time" json:"commitTime"`
 	CommittedWeekEnding string  `db:"committed_week_ending" json:"committedWeekEnding"`
-	Committer           string  `db:"committer" json:"committer"`
-	CommitterName       string  `db:"committer_name" json:"committerName"`
+	CommitUid           string  `db:"commit_uid" json:"commitUid"`
+	CommitName          string  `db:"commit_name" json:"commitName"`
 }
 
 func (t timeAmendmentExport) MarshalJSON() ([]byte, error) {
@@ -92,19 +100,23 @@ func (t timeAmendmentExport) MarshalJSON() ([]byte, error) {
 	if t.Job != "" {
 		return json.Marshal(struct {
 			Alias
-			JobHours float64 `json:"jobHours"`
+			Committed bool    `json:"committed"`
+			JobHours  float64 `json:"jobHours"`
 		}{
-			Alias:    Alias(t),
-			JobHours: t.Hours,
+			Alias:     Alias(t),
+			Committed: true,
+			JobHours:  t.Hours,
 		})
 	}
 
 	return json.Marshal(struct {
 		Alias
-		Hours float64 `json:"hours"`
+		Committed bool    `json:"committed"`
+		Hours     float64 `json:"hours"`
 	}{
-		Alias: Alias(t),
-		Hours: t.Hours,
+		Alias:     Alias(t),
+		Committed: true,
+		Hours:     t.Hours,
 	})
 }
 
@@ -335,7 +347,13 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 		}
 
 		amendmentsQuery := `
-			SELECT ta.id, ap.legacy_uid AS uid,
+			SELECT ta.id,
+			       COALESCE(ap_uid.legacy_uid, '') AS uid,
+			       COALESCE(p_uid.given_name, '') AS given_name,
+			       COALESCE(p_uid.surname, '') AS surname,
+			       COALESCE(p_uid.given_name || ' ' || p_uid.surname, '') AS display_name,
+			       COALESCE(ap_uid.payroll_id, '') AS payroll_id,
+			       COALESCE(ap_uid.salary, 0) AS salary,
 			       COALESCE(j.number, '') AS job,
 			       COALESCE(jp.number, '') AS proposal_number,
 			       COALESCE(j.description, '') AS job_description,
@@ -353,14 +371,20 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			       COALESCE(ca.name, '') AS category_name,
 			       COALESCE(b.code, '') AS branch_code,
 			       COALESCE(j.status, '') AS job_status,
-			       ta.committed,
+			       ta.created,
+			       COALESCE(ap_creator.legacy_uid, '') AS creator,
+			       COALESCE(p_creator.given_name || ' ' || p_creator.surname, '') AS creator_name,
+			       ta.committed AS commit_time,
 			       ta.committed_week_ending,
-			       COALESCE(apc.legacy_uid, '') AS committer,
-			       COALESCE(pc.given_name || ' ' || pc.surname, '') AS committer_name
+			       COALESCE(ap_committer.legacy_uid, '') AS commit_uid,
+			       COALESCE(p_committer.given_name || ' ' || p_committer.surname, '') AS commit_name
 			FROM time_amendments ta
-			LEFT JOIN admin_profiles ap ON ta.uid = ap.uid
-			LEFT JOIN admin_profiles apc ON ta.committer = apc.uid
-			LEFT JOIN profiles pc ON ta.committer = pc.uid
+			LEFT JOIN admin_profiles ap_uid ON ta.uid = ap_uid.uid
+			LEFT JOIN profiles p_uid ON ta.uid = p_uid.uid
+			LEFT JOIN admin_profiles ap_creator ON ta.creator = ap_creator.uid
+			LEFT JOIN profiles p_creator ON ta.creator = p_creator.uid
+			LEFT JOIN admin_profiles ap_committer ON ta.committer = ap_committer.uid
+			LEFT JOIN profiles p_committer ON ta.committer = p_committer.uid
 			LEFT JOIN time_types tt ON ta.time_type = tt.id
 			LEFT JOIN divisions d ON ta.division = d.id
 			LEFT JOIN jobs j ON ta.job = j.id
