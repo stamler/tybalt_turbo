@@ -1,12 +1,11 @@
 <script lang="ts">
   import type { PageData } from "./$types";
-  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DSPopover from "$lib/components/DSPopover.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import Icon from "@iconify/svelte";
-  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import DsList from "$lib/components/DSList.svelte";
   import { globalStore } from "$lib/stores/global";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
@@ -289,7 +288,7 @@
           <span class="font-semibold">Attachment:</span>
           <!-- eslint-disable svelte/no-navigation-without-resolve -->
           <a
-            href={`${PUBLIC_POCKETBASE_URL}/api/files/purchase_orders/${data.po.id}/${data.po.attachment}`}
+            href={pocketBaseFileHref("purchase_orders", data.po.id, data.po.attachment)}
             class="text-blue-600 hover:underline"
             target="_blank"
             rel="noopener noreferrer">Download</a

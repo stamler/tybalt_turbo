@@ -3,9 +3,8 @@
   import { globalStore } from "$lib/stores/global";
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
-  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import Icon from "@iconify/svelte";
-  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import { page } from "$app/stores";
 
@@ -152,10 +151,7 @@
         ({shortDate(r.approved.split("T")[0], true)})
       {/if}
       {#if r.attachment}
-        <a
-          href={`${PUBLIC_POCKETBASE_URL}/api/files/expenses/${r.id}/${r.attachment}`}
-          target="_blank"
-        >
+        <a href={pocketBaseFileHref("expenses", r.id, r.attachment)} target="_blank">
           <DsFileLink filename={r.attachment as string} />
         </a>
       {/if}

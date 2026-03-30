@@ -19,6 +19,19 @@ import (
 
 var TimeTrackingNow = time.Now
 
+var storageUnsafeFileNameChars = strings.NewReplacer(
+	"#", "_",
+	"?", "_",
+)
+
+// NormalizePendingFileNames rewrites uploaded file names for a field so the
+// resulting storage keys don't contain URL fragment/query characters.
+func NormalizePendingFileNames(record *core.Record, field string) {
+	for _, file := range record.GetUnsavedFiles(field) {
+		file.Name = storageUnsafeFileNameChars.Replace(file.Name)
+	}
+}
+
 // CalculateFileFieldHash computes the SHA256 hash of a file uploaded to a record field.
 // Returns empty string if no file was uploaded for the field.
 // Returns error if multiple files were uploaded or if there was an error reading the file.

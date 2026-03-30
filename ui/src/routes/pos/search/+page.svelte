@@ -1,6 +1,5 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
-  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
@@ -11,7 +10,7 @@
   import { poSearch } from "$lib/stores/poSearch";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
-  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
 
   const collectionId = "purchase_orders";
   type SearchStatus = POSearchApiResponse["status"];
@@ -175,10 +174,7 @@
           </DsLabel>
         {/if}
         {#if item.attachment}
-          <a
-            href={`${PUBLIC_POCKETBASE_URL}/api/files/${collectionId}/${item.id}/${item.attachment}`}
-            target="_blank"
-          >
+          <a href={pocketBaseFileHref(collectionId, item.id, item.attachment)} target="_blank">
             <DsFileLink filename={item.attachment} />
           </a>
         {/if}

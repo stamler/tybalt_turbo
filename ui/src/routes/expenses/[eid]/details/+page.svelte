@@ -7,8 +7,7 @@
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import Icon from "@iconify/svelte";
-  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
-  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
+  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
@@ -100,7 +99,7 @@
   }
 
   function attachmentHref() {
-    return `${PUBLIC_POCKETBASE_URL}/api/files/expenses/${expense.id}/${expense.attachment}`;
+    return pocketBaseFileHref("expenses", expense.id, expense.attachment);
   }
 
   function personLabel(name: string, uid: string, fallback: string): string {

@@ -183,6 +183,16 @@ export function formatDateTime(value: string) {
 export function trimmedOrEmpty(value: string | null | undefined): string {
   return (value ?? "").trim();
 }
+
+export function pocketBaseFileHref(
+  collectionId: string,
+  recordId: string,
+  filename: string,
+): string {
+  return `${pb.baseURL}/api/files/${encodeURIComponent(collectionId)}/${encodeURIComponent(
+    recordId,
+  )}/${encodeURIComponent(filename)}`;
+}
 /*
 export const hoursWorked = function (item: TimeSheetTally) {
   let workedHours = 0;

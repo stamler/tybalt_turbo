@@ -1,6 +1,5 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
-  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import type { ExpenseCommitQueueRow } from "$lib/svelte-types";
@@ -8,7 +7,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
-  import { shortDate } from "$lib/utilities";
+  import { pocketBaseFileHref, shortDate } from "$lib/utilities";
   import type { PageData } from "./$types";
   import { untrack } from "svelte";
 
@@ -51,7 +50,7 @@
   }
 
   function attachmentHref(id: string, attachment: string) {
-    return `${PUBLIC_POCKETBASE_URL}/api/files/expenses/${id}/${attachment}`;
+    return pocketBaseFileHref("expenses", id, attachment);
   }
 
   function openAttachment(id: string, attachment: string) {

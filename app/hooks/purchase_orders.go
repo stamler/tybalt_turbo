@@ -744,6 +744,8 @@ func ProcessPurchaseOrder(app core.App, e *core.RecordRequestEvent) (notificatio
 		record.Set("approver", submittedApproverID)
 	}
 
+	NormalizePendingFileNames(record, "attachment")
+
 	// if the purchase order has a new attachment, calculate the sha256 hash of the
 	// file and set the attachment_hash property on the record
 	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")

@@ -3,7 +3,6 @@
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
-  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import { pb } from "$lib/pocketbase";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
@@ -15,7 +14,7 @@
   import type { VisiblePurchaseOrderResponse } from "$lib/poVisibility";
   import { globalStore } from "$lib/stores/global";
   import { authStore } from "$lib/stores/auth";
-  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { onMount, onDestroy, untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { fetchPendingPO, fetchVisiblePO } from "$lib/poVisibility";
@@ -385,10 +384,7 @@
           </span>
         {/if}
         {#if item.attachment}
-          <a
-            href={`${PUBLIC_POCKETBASE_URL}/api/files/${collectionId}/${item.id}/${item.attachment}`}
-            target="_blank"
-          >
+          <a href={pocketBaseFileHref(collectionId, item.id, item.attachment)} target="_blank">
             <DsFileLink filename={item.attachment as string} />
           </a>
         {/if}

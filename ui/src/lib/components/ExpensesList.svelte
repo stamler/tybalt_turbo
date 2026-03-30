@@ -4,11 +4,10 @@
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
-  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { onMount, onDestroy, untrack } from "svelte";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
@@ -205,10 +204,7 @@
         ({shortDate(approved)})
       {/if}
       {#if attachment}
-        <a
-          href={`${PUBLIC_POCKETBASE_URL}/api/files/${collectionId}/${id}/${attachment}`}
-          target="_blank"
-        >
+        <a href={pocketBaseFileHref(collectionId, id, attachment)} target="_blank">
           <DsFileLink filename={attachment as string} />
         </a>
       {/if}

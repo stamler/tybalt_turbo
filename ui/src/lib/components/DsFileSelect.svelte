@@ -4,8 +4,8 @@
 
 <script lang="ts" generics="T">
   import Icon from "@iconify/svelte";
-  import { PUBLIC_POCKETBASE_URL } from "$env/static/public";
   import type { BaseSystemFields } from "$lib/pocketbase-types";
+  import { pocketBaseFileHref } from "$lib/utilities";
   import DsFileLink from "./DsFileLink.svelte";
   import DsActionButton from "./DSActionButton.svelte";
 
@@ -47,7 +47,11 @@
         which happens when the user changes the file -->
         <span>
           <a
-            href={`${PUBLIC_POCKETBASE_URL}/api/files/${record.collectionId}/${record.id}/${record[fieldName as keyof T]}`}
+            href={pocketBaseFileHref(
+              record.collectionId,
+              record.id,
+              record[fieldName as keyof T] as string,
+            )}
             target="_blank"
           >
             <DsFileLink filename={record[fieldName as keyof T] as string} />

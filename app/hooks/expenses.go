@@ -513,6 +513,8 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		return err
 	}
 
+	NormalizePendingFileNames(expenseRecord, "attachment")
+
 	// if the expense record has an attachment, calculate the sha256 hash of the
 	// file and set the attachment_hash property on the record
 	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")
