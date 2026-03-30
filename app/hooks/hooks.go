@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"strings"
 	"tybalt/absorb"
-	"tybalt/constants"
 	"tybalt/errs"
 	"tybalt/notifications"
 	"tybalt/utilities"
@@ -93,14 +92,158 @@ func checkExpensesEditing(app core.App) error {
 }
 
 func AddHooks(app core.App) {
+	// PocketBase's OAuth flow gives us one hook that runs around the provider
+	// login handshake and record creation/update. We use that hook to "shape"
+	// Microsoft users before PocketBase persists them and then to finish the
+	// parts PocketBase cannot infer on its own after the record exists.
+	//
+	// The onboarding rules here are intentionally narrow:
+	// - only Microsoft logins are customized
+	// - first-time users get name/username/email derived from Microsoft data
+	// - verified is repaired after save when we had to fall back to
+	//   userPrincipalName for email
+	// - admin_profiles is ensured for every successful Microsoft auth
+	//
+	// Sync policy for later logins:
+	// - users.name is currently treated as a first-login seed value only
+	// - users.username is treated as app-owned once created and is not renamed
+	//   from changing Microsoft data on later logins
+	// - users.email is only backfilled when blank; we do not overwrite an
+	//   existing app email on each login
+	// - admin_profiles is treated as app-owned operational data, so it is only
+	//   created if missing and never refreshed from Microsoft
+	//
+	// Planned follow-up:
+	// - users.name and users.username should eventually be synced from Microsoft
+	//   on login so later directory changes are reflected in PocketBase too
+	// - when that happens, callers that currently fall back to users.name, such
+	//   as timesheet_reviewers.go, should be revisited with that sync behavior in
+	//   mind rather than assuming users.name is only a one-time seed value
+	//
+	// We wrap the whole flow in one transaction so a failed admin_profiles
+	// creation or post-save user update doesn't leave a partially onboarded user.
+	app.OnRecordAuthWithOAuth2Request("users").BindFunc(func(e *core.RecordAuthWithOAuth2RequestEvent) error {
+		if !strings.EqualFold(e.ProviderName, "microsoft") {
+			return e.Next()
+		}
+
+		data := microsoftOnboardingDataFromAuthUser(e.OAuth2User)
+		originalApp := e.App
+
+		return e.App.RunInTransaction(func(txApp core.App) error {
+			e.App = txApp
+			defer func() {
+				e.App = originalApp
+			}()
+
+			if e.IsNewRecord {
+				if e.CreateData == nil {
+					e.CreateData = map[string]any{}
+				}
+
+				// PocketBase will build the initial auth record from CreateData.
+				// This is our chance to override its Microsoft defaults for brand-new
+				// users:
+				// - email: use `mail`, or fall back to `userPrincipalName`
+				// - name: prefer `givenName + surname`, then displayName
+				// - username: derive from the email local-part instead of letting
+				//   PocketBase generate `usersNNNNNN`
+				//
+				// We only do this inside the new-record branch. For existing users we
+				// intentionally do not overwrite name or username from Microsoft on
+				// every login yet. That is a deliberate temporary policy, not a claim
+				// that these fields should never sync in the future.
+				if fallbackEmail := data.fallbackEmail(); fallbackEmail != "" {
+					if currentEmail, _ := e.CreateData["email"].(string); strings.TrimSpace(currentEmail) == "" {
+						e.CreateData["email"] = fallbackEmail
+					}
+				}
+				if strings.TrimSpace(data.fullName()) != "" {
+					if currentName, _ := e.CreateData["name"].(string); strings.TrimSpace(currentName) == "" {
+						e.CreateData["name"] = data.fullName()
+					}
+				}
+
+				if currentUsername, _ := e.CreateData["username"].(string); strings.TrimSpace(currentUsername) == "" {
+					username, err := buildUniqueMicrosoftUsername(txApp, e.Collection, data, "")
+					if err != nil {
+						return apis.NewBadRequestError("failed to prepare Microsoft username", err)
+					}
+					e.CreateData["username"] = username
+				}
+			}
+
+			if err := e.Next(); err != nil {
+				return err
+			}
+
+			// After PocketBase creates or updates the auth record, we repair the
+			// parts of its built-in OAuth behavior that only know about
+			// OAuth2User.Email. Microsoft often leaves `mail` blank, so when we
+			// fall back to `userPrincipalName` we need to store that email
+			// ourselves and mark the record verified if the record's email matches
+			// the Microsoft identity we just trusted.
+			//
+			// This remains intentionally conservative for returning users:
+			// - if email is already populated, we leave it alone
+			// - we only flip verified when the stored email matches the Microsoft
+			//   identity we just accepted
+			// - we do not treat later Microsoft profile changes as authoritative for
+			//   every field in the users table
+			//
+			// Planned follow-up: once we decide to sync users.name/users.username on
+			// later Microsoft logins, that logic should live alongside this
+			// post-auth repair step so the behavior is explicit and transactional.
+			if fallbackEmail := data.fallbackEmail(); fallbackEmail != "" {
+				needSave := false
+				if e.Record.Email() == "" {
+					e.Record.SetEmail(fallbackEmail)
+					needSave = true
+				}
+				if !e.Record.Verified() && strings.EqualFold(e.Record.Email(), fallbackEmail) {
+					e.Record.SetVerified(true)
+					needSave = true
+				}
+				if needSave {
+					if err := txApp.Save(e.Record); err != nil {
+						return apis.NewBadRequestError("failed to store Microsoft email", err)
+					}
+				}
+			}
+
+			// Successful Microsoft auth should always leave the user with an
+			// admin_profiles row. We intentionally do not create a `profiles`
+			// record here because required business fields such as `manager` are
+			// not available from Microsoft and must be collected later in-app.
+			if err := ensureMicrosoftUserOnboarded(txApp, e.Record); err != nil {
+				return apis.NewBadRequestError("failed to complete Microsoft user onboarding", err)
+			}
+
+			return nil
+		})
+	})
+
 	// OnRecordAuthRequest fires after successful credential verification but before
 	// returning the auth token to the client. We use it to:
 	// 1. Block inactive accounts from logging in
-	// 2. Auto-create admin_profiles for first-time users
+	// 2. Repair missing admin_profiles for OAuth2 users that have successfully
+	//    authenticated but were only partially onboarded
 	//
 	// Control flow: returning an error aborts the auth flow and sends the error to
 	// the client (no token issued). Calling e.Next() continues the chain and
 	// completes the login (token issued).
+	//
+	// This hook is now a backstop rather than the primary onboarding path. The
+	// Microsoft-specific OAuth hook above does the normal first-login work. This
+	// one exists so that:
+	// - inactive users are still blocked on every login
+	// - any older partially-onboarded OAuth2 user can self-heal if they have a
+	//   users row but somehow missed admin_profiles
+	//
+	// It does not perform any broader Microsoft-to-user resync. By the time this
+	// hook runs, the goal is only "allow or deny login safely" plus "repair the
+	// missing admin_profiles edge case". Non-OAuth logins with no admin_profiles
+	// are treated as an account setup problem rather than silently recreated.
 	app.OnRecordAuthRequest("users").BindFunc(func(e *core.RecordAuthRequestEvent) error {
 		uid := e.Record.Id
 
@@ -114,30 +257,16 @@ func AddHooks(app core.App) {
 			}
 			return e.Next()
 		}
-
-		// No admin_profiles record exists - create one with sensible defaults
-		adminProfiles, err := e.App.FindCollectionByNameOrId("admin_profiles")
-		if err != nil {
+		if !errors.Is(err, sql.ErrNoRows) {
 			return err
 		}
-		rec := core.NewRecord(adminProfiles)
-		rec.Set("uid", uid)
-		rec.Set("active", true) // New users are active by default
-		rec.Set("work_week_hours", constants.DEFAULT_WORK_WEEK_HOURS)
-		rec.Set("default_charge_out_rate", constants.DEFAULT_CHARGE_OUT_RATE)
-		rec.Set("skip_min_time_check", "no")
-		rec.Set("salary", false)
-		rec.Set("untracked_time_off", false)
-		rec.Set("time_sheet_expected", false)
-		rec.Set("default_branch", constants.DEFAULT_BRANCH_ID)
-		// payroll_id must match ^(?:[1-9]\d*|CMS[0-9]{1,2})$
-		rec.Set("payroll_id", "999999")
 
-		if err := e.App.Save(rec); err != nil {
-			// ignore race where another process created it first
-			if !strings.Contains(err.Error(), "UNIQUE constraint failed") {
-				return fmt.Errorf("failed to create admin_profile for %s: %w", uid, err)
-			}
+		if e.AuthMethod != core.MFAMethodOAuth2 {
+			return apis.NewBadRequestError("account setup incomplete", errors.New("missing admin profile for non-oauth login"))
+		}
+
+		if err := ensureUserAdminProfile(e.App, uid); err != nil {
+			return apis.NewBadRequestError("failed to complete user onboarding", err)
 		}
 
 		return e.Next()
