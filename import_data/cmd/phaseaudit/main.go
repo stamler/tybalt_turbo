@@ -54,6 +54,9 @@ type tableDiff struct {
 	err          error
 	rowCountA    int64
 	rowCountB    int64
+	missingCount int64
+	addedCount   int64
+	changedCount int64
 	missingKeys  []string
 	addedKeys    []string
 	changedKeys  []string
@@ -63,9 +66,9 @@ type tableDiff struct {
 func (d tableDiff) changed() bool {
 	return d.err != nil ||
 		d.rowCountA != d.rowCountB ||
-		len(d.missingKeys) > 0 ||
-		len(d.addedKeys) > 0 ||
-		len(d.changedKeys) > 0 ||
+		d.missingCount > 0 ||
+		d.addedCount > 0 ||
+		d.changedCount > 0 ||
 		d.fallbackNote != ""
 }
 
@@ -112,14 +115,14 @@ func run(args []string, stdout, stderr io.Writer) int {
 			}
 
 			fmt.Fprintf(stdout, "  CHANGED %s: before=%d after=%d\n", table, diff.rowCountA, diff.rowCountB)
-			if len(diff.missingKeys) > 0 {
-				fmt.Fprintf(stdout, "    missing in after: %s\n", strings.Join(diff.missingKeys, ", "))
+			if diff.missingCount > 0 {
+				fmt.Fprintf(stdout, "    missing in after (%d): %s\n", diff.missingCount, strings.Join(diff.missingKeys, ", "))
 			}
-			if len(diff.addedKeys) > 0 {
-				fmt.Fprintf(stdout, "    added in after: %s\n", strings.Join(diff.addedKeys, ", "))
+			if diff.addedCount > 0 {
+				fmt.Fprintf(stdout, "    added in after (%d): %s\n", diff.addedCount, strings.Join(diff.addedKeys, ", "))
 			}
-			if len(diff.changedKeys) > 0 {
-				fmt.Fprintf(stdout, "    changed rows: %s\n", strings.Join(diff.changedKeys, ", "))
+			if diff.changedCount > 0 {
+				fmt.Fprintf(stdout, "    changed rows (%d): %s\n", diff.changedCount, strings.Join(diff.changedKeys, ", "))
 			}
 			if diff.fallbackNote != "" {
 				fmt.Fprintf(stdout, "    note: %s\n", diff.fallbackNote)
@@ -246,12 +249,27 @@ func diffTable(db *sql.DB, table string) tableDiff {
 		return diff
 	}
 
+	diff.missingCount, err = countMissingKeys(db, table, keyCols, "main", "afterdb")
+	if err != nil {
+		diff.err = err
+		return diff
+	}
 	diff.missingKeys, err = sampleMissingKeys(db, table, keyCols, "main", "afterdb")
 	if err != nil {
 		diff.err = err
 		return diff
 	}
+	diff.addedCount, err = countMissingKeys(db, table, keyCols, "afterdb", "main")
+	if err != nil {
+		diff.err = err
+		return diff
+	}
 	diff.addedKeys, err = sampleMissingKeys(db, table, keyCols, "afterdb", "main")
+	if err != nil {
+		diff.err = err
+		return diff
+	}
+	diff.changedCount, err = countChangedKeys(db, table, beforeCols, keyCols)
 	if err != nil {
 		diff.err = err
 		return diff
@@ -420,7 +438,48 @@ LIMIT 5
 	return scanKeyRows(db, query, keyCols)
 }
 
+func countMissingKeys(db *sql.DB, table string, keyCols []string, fromSchema, againstSchema string) (int64, error) {
+	keyExpr := joinIdentifiers(keyCols)
+	query := fmt.Sprintf(`
+SELECT COUNT(*)
+FROM (
+	SELECT %s
+	FROM %s.%s
+	EXCEPT
+	SELECT %s
+	FROM %s.%s
+)
+`, keyExpr, quoteIdent(fromSchema), quoteIdent(table), keyExpr, quoteIdent(againstSchema), quoteIdent(table))
+
+	var n int64
+	err := db.QueryRow(query).Scan(&n)
+	return n, err
+}
+
 func sampleChangedKeys(db *sql.DB, table string, allCols, keyCols []string) ([]string, error) {
+	query, err := changedKeysQuery(table, allCols, keyCols, true)
+	if err != nil {
+		return nil, err
+	}
+	if query == "" {
+		return nil, nil
+	}
+
+	return scanKeyRows(db, query, keyCols)
+}
+
+func countChangedKeys(db *sql.DB, table string, allCols, keyCols []string) (int64, error) {
+	query, err := changedKeysQuery(table, allCols, keyCols, false)
+	if err != nil {
+		return 0, err
+	}
+
+	var n int64
+	err = db.QueryRow(query).Scan(&n)
+	return n, err
+}
+
+func changedKeysQuery(table string, allCols, keyCols []string, includeKeys bool) (string, error) {
 	nonKeyCols := make([]string, 0, len(allCols))
 	keySet := make(map[string]struct{}, len(keyCols))
 	for _, col := range keyCols {
@@ -432,21 +491,26 @@ func sampleChangedKeys(db *sql.DB, table string, allCols, keyCols []string) ([]s
 		}
 	}
 	if len(nonKeyCols) == 0 {
-		return nil, nil
+		if includeKeys {
+			return "", nil
+		}
+		return "SELECT 0", nil
 	}
 
-	selectKeys := qualifiedColumns("b", keyCols)
+	selectClause := "COUNT(*)"
+	limitClause := ""
+	if includeKeys {
+		selectClause = qualifiedColumns("b", keyCols)
+		limitClause = "\nLIMIT 5"
+	}
 	onClause := joinConditions("b", "a", keyCols)
 	diffClause := joinDifferencePredicates("b", "a", nonKeyCols)
-	query := fmt.Sprintf(`
+	return fmt.Sprintf(`
 SELECT %s
 FROM main.%s b
 JOIN afterdb.%s a ON %s
-WHERE %s
-LIMIT 5
-`, selectKeys, quoteIdent(table), quoteIdent(table), onClause, diffClause)
-
-	return scanKeyRows(db, query, keyCols)
+WHERE %s%s
+`, selectClause, quoteIdent(table), quoteIdent(table), onClause, diffClause, limitClause), nil
 }
 
 func scanKeyRows(db *sql.DB, query string, keyCols []string) ([]string, error) {

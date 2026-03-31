@@ -40,14 +40,19 @@ func TestRunDetectsChangedSelectedPhase(t *testing.T) {
 	before := filepath.Join(t.TempDir(), "before.db")
 	after := filepath.Join(t.TempDir(), "after.db")
 
-	writeFixtureDB(t, before, baseFixtureStatements())
+	beforeStatements := append(baseFixtureStatements(),
+		`INSERT INTO expenses (id, amount) VALUES ('exp-2', 200)`,
+		`INSERT INTO expenses (id, amount) VALUES ('exp-3', 300)`,
+	)
+	writeFixtureDB(t, before, beforeStatements)
 
-	statements := baseFixtureStatements()
-	statements = append(statements,
+	afterStatements := append(baseFixtureStatements(),
 		`UPDATE expenses SET amount = 999 WHERE id = 'exp-1'`,
+		`INSERT INTO expenses (id, amount) VALUES ('exp-3', 300)`,
+		`INSERT INTO expenses (id, amount) VALUES ('exp-4', 400)`,
 		`UPDATE jobs SET value = 'job-mutated-but-unselected' WHERE id = 'job-1'`,
 	)
-	writeFixtureDB(t, after, statements)
+	writeFixtureDB(t, after, afterStatements)
 
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
@@ -57,7 +62,13 @@ func TestRunDetectsChangedSelectedPhase(t *testing.T) {
 	}
 
 	output := stdout.String()
-	if !strings.Contains(output, `changed rows: id="exp-1"`) {
+	if !strings.Contains(output, `missing in after (1): id="exp-2"`) {
+		t.Fatalf("expected missing expense count in output, got: %s", output)
+	}
+	if !strings.Contains(output, `added in after (1): id="exp-4"`) {
+		t.Fatalf("expected added expense count in output, got: %s", output)
+	}
+	if !strings.Contains(output, `changed rows (1): id="exp-1"`) {
 		t.Fatalf("expected changed expense row in output, got: %s", output)
 	}
 	if strings.Contains(output, "jobs") {
