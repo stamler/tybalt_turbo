@@ -69,7 +69,7 @@
 
 {#snippet actions({ committed }: TimeAmendmentsAugmentedResponse)}
   {#if committed}
-    <DsLabel color="green">Committed</DsLabel>
+    <DsLabel color="blue">Committed</DsLabel>
   {/if}
 {/snippet}
 

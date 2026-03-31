@@ -486,6 +486,9 @@
       {/snippet}
       {#snippet headline(ex)}
         {ex.description || "Expense"}
+        {#if ex.committed}
+          <DsLabel color="blue">Committed</DsLabel>
+        {/if}
       {/snippet}
       {#snippet byline({ total })}
         <span>${total}</span>

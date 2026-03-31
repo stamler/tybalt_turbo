@@ -278,12 +278,12 @@
       -->
       <!-- Delete is only available for unsubmitted, uncommitted owner records -->
       {#if isOwner && committed !== ""}
-        <DsLabel color="green">Committed</DsLabel>
+        <DsLabel color="blue">Committed</DsLabel>
       {:else if isOwner && !submitted}
         <DsActionButton action={() => del(id)} icon="mdi:delete" title="Delete" color="red" />
       {/if}
     {:else if uid === viewerId && committed !== ""}
-      <DsLabel color="green">Committed</DsLabel>
+      <DsLabel color="blue">Committed</DsLabel>
     {/if}
   {/snippet}
 </DsList>
