@@ -46,7 +46,7 @@
 
   // Clear selectedJob if it's no longer in the jobs list
   $effect(() => {
-    if (selectedJob && !jobs.some((job) => job.id === selectedJob)) {
+    if (selectedJob && selectedJob !== preselectedJobId && !jobs.some((job) => job.id === selectedJob)) {
       selectedJob = "";
     }
   });
