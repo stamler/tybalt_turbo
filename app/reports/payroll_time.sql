@@ -75,6 +75,7 @@ FROM (
   -- Ensure the time entry belongs to a committed timesheet
   AND te.tsid != ''
   AND ts.committed != ''
+  AND NOT ({:placeholder_payroll_id_condition})
 
   UNION ALL
 
@@ -122,6 +123,7 @@ FROM (
   ) y ON ta.uid = y.uid AND ta.committed_week_ending = y.committed_week_ending
   WHERE ta.committed_week_ending = {:weekEnding}
   AND ta.committed != ''
+  AND NOT ({:placeholder_payroll_id_condition})
 )
 GROUP BY payrollId
 ORDER BY LENGTH(payrollId), payrollId

@@ -56,7 +56,7 @@
     {submitted_count} submitted & pending approval
   {/if}
 {/snippet}
-{#snippet actions({ week_ending }: TimeTrackingResponse)}
+{#snippet actions({ week_ending, placeholder_payroll_id_expense_count }: TimeTrackingResponse)}
   <DsActionButton
     action={() => {
       fetchTimeReport(week_ending);
@@ -71,13 +71,21 @@
     title="Time Summary by Employee"
     color="orange">Time Summary</DsActionButton
   >
-  <DsActionButton
-    action={() => {
-      fetchExpenseReport(week_ending);
-    }}
-    title="Expense Report"
-    color="orange">Expenses</DsActionButton
-  >
+  <div class="flex items-center gap-2">
+    <DsActionButton
+      action={() => {
+        fetchExpenseReport(week_ending);
+      }}
+      title="Expense Report"
+      color="orange">Expenses</DsActionButton
+    >
+    {#if placeholder_payroll_id_expense_count > 0}
+      <span
+        class="inline-block rounded-sm bg-red-100 px-2 py-1 text-sm text-red-800"
+        title="Excludes rows for temporary placeholder payroll IDs">Incomplete</span
+      >
+    {/if}
+  </div>
   <DsActionButton
     action={() => {
       fetchReceiptsReport(week_ending);

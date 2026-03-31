@@ -553,6 +553,9 @@ export type PayrollReportWeekEndingsRecord = {
   committed_expense_count: number;
   committed_timesheet_count: number;
   id: string;
+  placeholder_payroll_id_expense_count: number;
+  placeholder_payroll_id_week1_time_count: number;
+  placeholder_payroll_id_week2_time_count: number;
   week_ending: string;
 };
 
@@ -887,6 +890,7 @@ export type TimeTrackingRecord = {
   approved_count: number;
   committed_count: number;
   id: string;
+  placeholder_payroll_id_expense_count: number;
   submitted_count: number;
   week_ending: string;
 };

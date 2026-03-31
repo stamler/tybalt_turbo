@@ -41,28 +41,59 @@
 {#snippet line1({ committed_expense_count }: PayrollReportWeekEndingsResponse)}
   <span>{committed_expense_count} committed expense(s)</span>
 {/snippet}
-{#snippet actions({ week_ending }: PayrollReportWeekEndingsResponse)}
-  <DsActionButton
-    action={() => {
-      fetchTimeReport(week_ending, 1);
-    }}
-    title="Week 1"
-    color="orange">Week 1</DsActionButton
-  >
-  <DsActionButton
-    action={() => {
-      fetchTimeReport(week_ending, 2);
-    }}
-    title="Week 2"
-    color="orange">Week 2</DsActionButton
-  >
-  <DsActionButton
-    action={() => {
-      fetchExpenseReport(week_ending);
-    }}
-    title="Expense Report"
-    color="orange">Expenses</DsActionButton
-  >
+{#snippet actions(
+  {
+    week_ending,
+    placeholder_payroll_id_week1_time_count,
+    placeholder_payroll_id_week2_time_count,
+    placeholder_payroll_id_expense_count,
+  }: PayrollReportWeekEndingsResponse,
+)}
+  <div class="flex items-center gap-2">
+    <DsActionButton
+      action={() => {
+        fetchTimeReport(week_ending, 1);
+      }}
+      title="Week 1"
+      color="orange">Week 1</DsActionButton
+    >
+    {#if placeholder_payroll_id_week1_time_count > 0}
+      <span
+        class="inline-block rounded-sm bg-red-100 px-2 py-1 text-sm text-red-800"
+        title="Excludes rows for temporary placeholder payroll IDs">Incomplete</span
+      >
+    {/if}
+  </div>
+  <div class="flex items-center gap-2">
+    <DsActionButton
+      action={() => {
+        fetchTimeReport(week_ending, 2);
+      }}
+      title="Week 2"
+      color="orange">Week 2</DsActionButton
+    >
+    {#if placeholder_payroll_id_week2_time_count > 0}
+      <span
+        class="inline-block rounded-sm bg-red-100 px-2 py-1 text-sm text-red-800"
+        title="Excludes rows for temporary placeholder payroll IDs">Incomplete</span
+      >
+    {/if}
+  </div>
+  <div class="flex items-center gap-2">
+    <DsActionButton
+      action={() => {
+        fetchExpenseReport(week_ending);
+      }}
+      title="Expense Report"
+      color="orange">Expenses</DsActionButton
+    >
+    {#if placeholder_payroll_id_expense_count > 0}
+      <span
+        class="inline-block rounded-sm bg-red-100 px-2 py-1 text-sm text-red-800"
+        title="Excludes rows for temporary placeholder payroll IDs">Incomplete</span
+      >
+    {/if}
+  </div>
   <DsActionButton
     action={() => {
       fetchReceiptsReport(week_ending);

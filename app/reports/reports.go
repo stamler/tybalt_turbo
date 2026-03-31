@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 	"tybalt/constants"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -41,6 +42,16 @@ var weeklyTimeQueryTemplate string
 //go:embed job_report.sql
 var jobTimeQueryTemplate string
 
+const placeholderPayrollIDConditionToken = "{:placeholder_payroll_id_condition}"
+
+func withPlaceholderPayrollIDCondition(query string, columnExpr string) string {
+	return strings.ReplaceAll(
+		query,
+		placeholderPayrollIDConditionToken,
+		utilities.GeneratedPayrollPlaceholderSQLCondition(columnExpr),
+	)
+}
+
 // CreatePayrollTimeReportHandler returns a function that creates a payroll time report for a given week
 func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -63,7 +74,8 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 
 		// Execute the query
 		var report []dbx.NullStringMap
-		err = app.DB().NewQuery(payrollTimeQuery).Bind(dbx.Params{
+		query := withPlaceholderPayrollIDCondition(payrollTimeQuery, "ap.payroll_id")
+		err = app.DB().NewQuery(query).Bind(dbx.Params{
 			"weekEnding": dateColumnValue.Format("2006-01-02"),
 		}).All(&report)
 		if err != nil {
@@ -191,6 +203,7 @@ func CreateExpenseReportHandler(app core.App, dateColumnName string) func(e *cor
 		// quoted by Bind() for SQLite (it will be enclosed in single quotes which
 		// SQL will interpret as a string literal rather than as an identifier).
 		expensesQuery := strings.ReplaceAll(expensesQueryTemplate, "{:date_column}", dateColumnName)
+		expensesQuery = withPlaceholderPayrollIDCondition(expensesQuery, "ap.payroll_id")
 
 		// Execute the query
 		var report []dbx.NullStringMap

@@ -231,4 +231,5 @@ LEFT JOIN jobs j ON j.id = e2.job
 LEFT JOIN clients c ON c.id = j.client
 LEFT JOIN purchase_orders po ON po.id = e2.purchase_order
 LEFT JOIN vendors v ON v.id = e2.vendor
+WHERE NOT ({:placeholder_payroll_id_condition})
 ORDER BY e2.date, ap.payroll_id, e2.merged_total

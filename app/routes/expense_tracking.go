@@ -10,8 +10,9 @@ import (
 )
 
 type expenseTrackingCountRow struct {
-	CommittedWeekEnding string `db:"committed_week_ending" json:"committed_week_ending"`
-	CommittedCount      int    `db:"committed_count" json:"committed_count"`
+	CommittedWeekEnding              string `db:"committed_week_ending" json:"committed_week_ending"`
+	CommittedCount                   int    `db:"committed_count" json:"committed_count"`
+	PlaceholderPayrollIDExpenseCount int    `db:"placeholder_payroll_id_expense_count" json:"placeholder_payroll_id_expense_count"`
 }
 
 // createExpenseTrackingCountsHandler returns committed expense counts grouped by committed_week_ending for report holders.
@@ -37,12 +38,14 @@ func createExpenseTrackingCountsHandler(app core.App) func(e *core.RequestEvent)
 
 		query := `
 			SELECT
-				committed_week_ending,
-				COUNT(*) AS committed_count
-			FROM expenses
+				e.committed_week_ending,
+				COUNT(*) AS committed_count,
+				SUM(CASE WHEN ` + utilities.GeneratedPayrollPlaceholderSQLCondition(`ap.payroll_id`) + ` THEN 1 ELSE 0 END) AS placeholder_payroll_id_expense_count
+			FROM expenses e
+			LEFT JOIN admin_profiles ap ON ap.uid = e.uid
 			WHERE committed != '' AND committed_week_ending != ''
-			GROUP BY committed_week_ending
-			ORDER BY committed_week_ending DESC
+			GROUP BY e.committed_week_ending
+			ORDER BY e.committed_week_ending DESC
 		`
 
 		var rows []expenseTrackingCountRow

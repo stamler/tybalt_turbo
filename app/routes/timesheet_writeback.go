@@ -226,7 +226,13 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			WHERE ts.week_ending = {:weekEnding}
 			  AND ts.committed != ''
 			  AND ts._imported = 0
+			  AND NOT (` + generatedPayrollPlaceholderConditionToken + `)
 		`
+		query = strings.ReplaceAll(
+			query,
+			generatedPayrollPlaceholderConditionToken,
+			utilities.GeneratedPayrollPlaceholderSQLCondition("ap.payroll_id"),
+		)
 
 		var rows []timesheetExportRow
 		if err := app.DB().NewQuery(query).Bind(dbx.Params{
@@ -397,7 +403,13 @@ func createTimesheetExportLegacyHandler(app core.App) func(e *core.RequestEvent)
 			WHERE ta.committed_week_ending = {:weekEnding}
 			  AND ta.committed != ''
 			  AND ta._imported = 0
+			  AND NOT (` + generatedPayrollPlaceholderConditionToken + `)
 		`
+		amendmentsQuery = strings.ReplaceAll(
+			amendmentsQuery,
+			generatedPayrollPlaceholderConditionToken,
+			utilities.GeneratedPayrollPlaceholderSQLCondition("ap_uid.payroll_id"),
+		)
 
 		var amendments []timeAmendmentExport
 		if err := app.DB().NewQuery(amendmentsQuery).Bind(dbx.Params{

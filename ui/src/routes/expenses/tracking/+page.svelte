@@ -10,6 +10,7 @@
     id: string; // DSList requires id
     committed_week_ending: string;
     committed_count: number;
+    placeholder_payroll_id_expense_count: number;
   };
 
   let rows: Row[] = [];
@@ -55,10 +56,18 @@
     <span>{r.committed_count} committed expense(s)</span>
   {/snippet}
   {#snippet actions(r: Row)}
-    <DsActionButton
-      action={() => fetchExpenseReport(r.committed_week_ending)}
-      title="Expense Report">Expenses</DsActionButton
-    >
+    <div class="flex items-center gap-2">
+      <DsActionButton
+        action={() => fetchExpenseReport(r.committed_week_ending)}
+        title="Expense Report">Expenses</DsActionButton
+      >
+      {#if r.placeholder_payroll_id_expense_count > 0}
+        <span
+          class="inline-block rounded-sm bg-red-100 px-2 py-1 text-sm text-red-800"
+          title="Excludes rows for temporary placeholder payroll IDs">Incomplete</span
+        >
+      {/if}
+    </div>
     <DsActionButton
       action={() => fetchReceiptsReport(r.committed_week_ending)}
       title="Receipts Archive">Receipts</DsActionButton

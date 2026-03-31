@@ -361,8 +361,16 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			LEFT JOIN purchase_orders po ON e.purchase_order = po.id
 			-- Category join
 			LEFT JOIN categories cat ON e.category = cat.id
-			WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.committed != ''
+			WHERE e.updated >= {:updatedAfter}
+			  AND e._imported = 0
+			  AND e.committed != ''
+			  AND NOT (` + generatedPayrollPlaceholderConditionToken + `)
 		`
+		expensesQuery = strings.ReplaceAll(
+			expensesQuery,
+			generatedPayrollPlaceholderConditionToken,
+			utilities.GeneratedPayrollPlaceholderSQLCondition("ap_uid.payroll_id"),
+		)
 
 		var expenseRows []expenseExportDBRow
 		if err := app.DB().NewQuery(expensesQuery).Bind(dbx.Params{
@@ -378,7 +386,13 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			WITH vendor_ids AS (
 				SELECT DISTINCT e.vendor AS vendor_id
 				FROM expenses e
-				WHERE e.updated >= {:updatedAfter} AND e._imported = 0 AND e.committed != '' AND e.vendor IS NOT NULL AND e.vendor != ''
+				LEFT JOIN admin_profiles ap_uid ON e.uid = ap_uid.uid
+				WHERE e.updated >= {:updatedAfter}
+				  AND e._imported = 0
+				  AND e.committed != ''
+				  AND e.vendor IS NOT NULL
+				  AND e.vendor != ''
+				  AND NOT (` + generatedPayrollPlaceholderConditionToken + `)
 				UNION
 				SELECT DISTINCT po.vendor AS vendor_id
 				FROM purchase_orders po
@@ -392,6 +406,11 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			FROM vendor_ids ids
 			JOIN vendors v ON ids.vendor_id = v.id
 		`
+		vendorsQuery = strings.ReplaceAll(
+			vendorsQuery,
+			generatedPayrollPlaceholderConditionToken,
+			utilities.GeneratedPayrollPlaceholderSQLCondition("ap_uid.payroll_id"),
+		)
 
 		var vendorRows []vendorExportDBRow
 		if err := app.DB().NewQuery(vendorsQuery).Bind(dbx.Params{
