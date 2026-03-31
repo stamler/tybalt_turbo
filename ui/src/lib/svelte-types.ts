@@ -132,6 +132,7 @@ export type ExpenseCommitQueueRow = {
   job_description: string;
   client_name: string;
   total: number;
+  po_number: string;
 };
 
 // Claims types returned by custom API endpoints

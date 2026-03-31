@@ -91,6 +91,7 @@ type expenseTrackingListRow struct {
 	VendorName      string  `db:"vendor_name" json:"vendor_name"`
 	VendorAlias     string  `db:"vendor_alias" json:"vendor_alias"`
 	Total           float64 `db:"total" json:"total"`
+	PONumber        string  `db:"po_number" json:"po_number"`
 }
 
 // createExpenseTrackingListHandler returns org-wide committed expenses for a given committed week ending for report/commit holders.
@@ -161,7 +162,8 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
                 e.vendor,
                 COALESCE(v.name, '') AS vendor_name,
                 COALESCE(v.alias, '') AS vendor_alias,
-                CAST(e.total AS REAL) AS total
+                CAST(e.total AS REAL) AS total,
+                COALESCE(po.po_number, '') AS po_number
             FROM expenses e
             LEFT JOIN profiles p ON p.uid = e.uid
             LEFT JOIN profiles ap ON ap.uid = e.approver
@@ -172,6 +174,7 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
             LEFT JOIN divisions d ON d.id = e.division
                 LEFT JOIN vendors v ON v.id = e.vendor
                 LEFT JOIN categories cat ON cat.id = e.category
+                LEFT JOIN purchase_orders po ON po.id = e.purchase_order
             WHERE e.committed_week_ending = {:committed_week_ending}
 	              AND e.committed != ''
             ORDER BY p.surname, p.given_name, e.date
@@ -235,7 +238,8 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
                 COALESCE(j.number, '') AS job_number,
                 COALESCE(j.description, '') AS job_description,
                 COALESCE(c.name, '') AS client_name,
-                CAST(e.total AS REAL) AS total
+                CAST(e.total AS REAL) AS total,
+                COALESCE(po.po_number, '') AS po_number
             FROM expenses e
             LEFT JOIN profiles p ON p.uid = e.uid
             LEFT JOIN profiles ap ON ap.uid = e.approver
@@ -243,6 +247,7 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
             LEFT JOIN profiles rp ON rp.uid = e.rejector
             LEFT JOIN jobs j ON j.id = e.job
             LEFT JOIN clients c ON c.id = j.client
+            LEFT JOIN purchase_orders po ON po.id = e.purchase_order
             WHERE e.submitted = 1
               AND e.committed = ''
               AND e.approved != ''

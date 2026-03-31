@@ -61,7 +61,7 @@
 <!-- No pay period selector; show all pending items -->
 <RejectModal collectionName="expenses" bind:this={rejectModal} on:refresh={() => refreshRows()} />
 
-<DsList items={rows} inListHeader="Expense Commit Queue">
+<DsList items={rows} search={true} inListHeader="Expense Commit Queue">
   {#snippet headline(r: ExpenseCommitQueueRow)}
     <a href={resolve(`/expenses/${r.id}/details`)} class="underline">{r.surname}, {r.given_name}</a>
     {#if r.rejected !== ""}
@@ -82,6 +82,9 @@
         {r.allowance_str}
       {:else}
         {r.description}
+      {/if}
+      {#if r.po_number !== ""}
+        &nbsp;&middot;&nbsp;PO {r.po_number}
       {/if}
       {#if r.job_number !== ""}
         &nbsp;&middot;&nbsp;
