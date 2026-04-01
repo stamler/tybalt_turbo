@@ -105,17 +105,18 @@ func AddHooks(app core.App) {
 	// - admin_profiles is ensured for every successful Microsoft auth
 	//
 	// Sync policy for later logins:
-	// - users.name is currently treated as a first-login seed value only
+	// - users.name is synced from Microsoft on each successful login when
+	//   Microsoft provides a usable full name
 	// - users.username is treated as app-owned once created and is not renamed
 	//   from changing Microsoft data on later logins
-	// - users.email is only backfilled when blank; we do not overwrite an
-	//   existing app email on each login
+	// - users.email is synced from Microsoft on each successful login when the
+	//   target email is not already claimed by another user
 	// - admin_profiles is treated as app-owned operational data, so it is only
 	//   created if missing and never refreshed from Microsoft
 	//
 	// Planned follow-up:
-	// - users.name and users.username should eventually be synced from Microsoft
-	//   on login so later directory changes are reflected in PocketBase too
+	// - users.username should eventually be synced from Microsoft on login so
+	//   later directory changes are reflected in PocketBase too
 	// - when that happens, callers that currently fall back to users.name, such
 	//   as timesheet_reviewers.go, should be revisited with that sync behavior in
 	//   mind rather than assuming users.name is only a one-time seed value
@@ -137,6 +138,20 @@ func AddHooks(app core.App) {
 			}()
 
 			if e.IsNewRecord {
+				existingUser, err := findMicrosoftRelinkCandidate(txApp, e.Collection, data)
+				if err != nil {
+					return apis.NewBadRequestError("failed to look up existing Microsoft user", err)
+				}
+				if existingUser != nil {
+					if err := relinkMicrosoftExternalAuth(txApp, e.Collection, existingUser, data.ProviderID); err != nil {
+						return apis.NewBadRequestError("failed to relink Microsoft account", err)
+					}
+					e.Record = existingUser
+					e.IsNewRecord = false
+				}
+			}
+
+			if e.IsNewRecord {
 				if e.CreateData == nil {
 					e.CreateData = map[string]any{}
 				}
@@ -150,9 +165,9 @@ func AddHooks(app core.App) {
 				//   PocketBase generate `usersNNNNNN`
 				//
 				// We only do this inside the new-record branch. For existing users we
-				// intentionally do not overwrite name or username from Microsoft on
-				// every login yet. That is a deliberate temporary policy, not a claim
-				// that these fields should never sync in the future.
+				// intentionally keep the creation-time username logic separate from
+				// the later-login sync policy. Returning Microsoft users may update
+				// name/email after auth, but username remains stable for now.
 				if fallbackEmail := data.fallbackEmail(); fallbackEmail != "" {
 					if currentEmail, _ := e.CreateData["email"].(string); strings.TrimSpace(currentEmail) == "" {
 						e.CreateData["email"] = fallbackEmail
@@ -179,36 +194,27 @@ func AddHooks(app core.App) {
 
 			// After PocketBase creates or updates the auth record, we repair the
 			// parts of its built-in OAuth behavior that only know about
-			// OAuth2User.Email. Microsoft often leaves `mail` blank, so when we
-			// fall back to `userPrincipalName` we need to store that email
-			// ourselves and mark the record verified if the record's email matches
-			// the Microsoft identity we just trusted.
+			// OAuth2User.Email. We also sync the returning-user identity fields this
+			// app currently treats as Microsoft-owned: `users.name` and `users.email`.
+			// Microsoft often leaves `mail` blank, so when we fall back to
+			// `userPrincipalName` we need to store that email ourselves and mark the
+			// record verified if the record's email matches the Microsoft identity we
+			// just trusted.
 			//
 			// This remains intentionally conservative for returning users:
-			// - if email is already populated, we leave it alone
+			// - users.username is still treated as stable once created
+			// - users.email is only updated when the Microsoft email is not already
+			//   used by a different auth record
 			// - we only flip verified when the stored email matches the Microsoft
 			//   identity we just accepted
 			// - we do not treat later Microsoft profile changes as authoritative for
-			//   every field in the users table
+			//   every field in the users/profile tables
 			//
-			// Planned follow-up: once we decide to sync users.name/users.username on
-			// later Microsoft logins, that logic should live alongside this
-			// post-auth repair step so the behavior is explicit and transactional.
-			if fallbackEmail := data.fallbackEmail(); fallbackEmail != "" {
-				needSave := false
-				if e.Record.Email() == "" {
-					e.Record.SetEmail(fallbackEmail)
-					needSave = true
-				}
-				if !e.Record.Verified() && strings.EqualFold(e.Record.Email(), fallbackEmail) {
-					e.Record.SetVerified(true)
-					needSave = true
-				}
-				if needSave {
-					if err := txApp.Save(e.Record); err != nil {
-						return apis.NewBadRequestError("failed to store Microsoft email", err)
-					}
-				}
+			// Planned follow-up: once we decide to sync users.username on later
+			// Microsoft logins, that logic should live alongside this post-auth
+			// repair step so the behavior is explicit and transactional.
+			if err := syncMicrosoftUserIdentity(txApp, e.Record, data); err != nil {
+				return apis.NewBadRequestError("failed to sync Microsoft identity", err)
 			}
 
 			// Successful Microsoft auth should always leave the user with an

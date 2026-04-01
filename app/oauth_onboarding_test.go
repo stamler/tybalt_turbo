@@ -183,6 +183,21 @@ func profileExists(app *tests.TestApp, uid string) (bool, error) {
 	return false, err
 }
 
+func externalAuthExists(app *tests.TestApp, collectionID string, provider string, providerID string) (bool, error) {
+	_, err := app.FindFirstExternalAuthByExpr(dbx.HashExp{
+		"collectionRef": collectionID,
+		"provider":      provider,
+		"providerId":    providerID,
+	})
+	if err == nil {
+		return true, nil
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	return false, err
+}
+
 // Happy-path first login:
 // - name comes from givenName + surname
 // - username comes from the email local-part
@@ -300,6 +315,480 @@ func TestMicrosoftFirstLoginUsesUsernameSuffixAndUniquePayrollID(t *testing.T) {
 	secondAdmin := findAdminProfileByUID(t, app, secondUser.Id)
 	if firstAdmin.GetString("payroll_id") == secondAdmin.GetString("payroll_id") {
 		t.Fatalf("expected unique payroll placeholders, got %q for both users", firstAdmin.GetString("payroll_id"))
+	}
+}
+
+// When a migrated Microsoft user later logs in with a new provider id and a
+// newer corporate email alias, we should relink the existing user rather than
+// minting a second PocketBase auth record.
+func TestMicrosoftLoginRelinksExistingUserWhenProviderIDChanges(t *testing.T) {
+	app := setupMicrosoftOAuthTestApp(t)
+	defer app.Cleanup()
+
+	users, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatalf("failed to load users collection: %v", err)
+	}
+
+	existingUser := core.NewRecord(users)
+	existingUser.SetEmail("apicard@tbte.onmicrosoft.com")
+	existingUser.Set("username", "apicard")
+	existingUser.Set("name", "Aaron Picard")
+	existingUser.SetRandomPassword()
+	existingUser.SetVerified(true)
+	if err := app.Save(existingUser); err != nil {
+		t.Fatalf("failed to create existing user: %v", err)
+	}
+
+	oldExternalAuth := core.NewExternalAuth(app)
+	oldExternalAuth.SetCollectionRef(existingUser.Collection().Id)
+	oldExternalAuth.SetRecordRef(existingUser.Id)
+	oldExternalAuth.SetProvider(pbauth.NameMicrosoft)
+	oldExternalAuth.SetProviderId("provider-aaron-old")
+	if err := app.Save(oldExternalAuth); err != nil {
+		t.Fatalf("failed to create old external auth: %v", err)
+	}
+
+	setMockUser := installMicrosoftOAuthMock(t)
+	setMockUser(&pbauth.AuthUser{
+		Id:    "provider-aaron-new",
+		Name:  "Aaron Picard",
+		Email: "apicard@tbte.ca",
+		RawUser: map[string]any{
+			"givenName":         "Aaron",
+			"surname":           "Picard",
+			"mail":              "apicard@tbte.ca",
+			"userPrincipalName": "apicard@tbte.ca",
+		},
+	})
+
+	res := performMicrosoftAuthRequest(t, app)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	relinkedUser, err := app.FindAuthRecordByEmail("users", "apicard@tbte.ca")
+	if err != nil {
+		t.Fatalf("failed to load relinked user: %v", err)
+	}
+	if relinkedUser.Id != existingUser.Id {
+		t.Fatalf("expected login to reuse user %s, got %s", existingUser.Id, relinkedUser.Id)
+	}
+	if got := relinkedUser.GetString("username"); got != "apicard" {
+		t.Fatalf("username = %q, want %q", got, "apicard")
+	}
+
+	auths, err := app.FindAllExternalAuthsByRecord(relinkedUser)
+	if err != nil {
+		t.Fatalf("failed to list external auths: %v", err)
+	}
+	if len(auths) != 1 {
+		t.Fatalf("expected exactly one external auth after relink, got %d", len(auths))
+	}
+	if got := auths[0].ProviderId(); got != "provider-aaron-new" {
+		t.Fatalf("providerId = %q, want %q", got, "provider-aaron-new")
+	}
+
+	oldExists, err := externalAuthExists(app, users.Id, pbauth.NameMicrosoft, "provider-aaron-old")
+	if err != nil {
+		t.Fatalf("failed checking old external auth: %v", err)
+	}
+	if oldExists {
+		t.Fatal("expected stale external auth row to be removed during relink")
+	}
+
+	newExists, err := externalAuthExists(app, users.Id, pbauth.NameMicrosoft, "provider-aaron-new")
+	if err != nil {
+		t.Fatalf("failed checking new external auth: %v", err)
+	}
+	if !newExists {
+		t.Fatal("expected new external auth row to exist after relink")
+	}
+}
+
+// If an unsafe exact-email match is found first, relink should keep searching
+// and still allow the username/name heuristic to recover the intended older
+// user.
+func TestMicrosoftRelinkFallsBackPastUnsafeEmailMatch(t *testing.T) {
+	app := setupMicrosoftOAuthTestApp(t)
+	defer app.Cleanup()
+
+	users, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatalf("failed to load users collection: %v", err)
+	}
+
+	intendedUser := core.NewRecord(users)
+	intendedUser.SetEmail("apicard@tbte.onmicrosoft.com")
+	intendedUser.Set("username", "apicard")
+	intendedUser.Set("name", "Aaron Picard")
+	intendedUser.SetRandomPassword()
+	intendedUser.SetVerified(true)
+	if err := app.Save(intendedUser); err != nil {
+		t.Fatalf("failed to create intended user: %v", err)
+	}
+
+	oldExternalAuth := core.NewExternalAuth(app)
+	oldExternalAuth.SetCollectionRef(intendedUser.Collection().Id)
+	oldExternalAuth.SetRecordRef(intendedUser.Id)
+	oldExternalAuth.SetProvider(pbauth.NameMicrosoft)
+	oldExternalAuth.SetProviderId("provider-aaron-old")
+	if err := app.Save(oldExternalAuth); err != nil {
+		t.Fatalf("failed to create old external auth: %v", err)
+	}
+
+	wrongUser := core.NewRecord(users)
+	wrongUser.SetEmail("apicard@tbte.ca")
+	wrongUser.Set("username", "apicard-2")
+	wrongUser.Set("name", "Wrong Person")
+	wrongUser.SetRandomPassword()
+	wrongUser.SetVerified(true)
+	if err := app.Save(wrongUser); err != nil {
+		t.Fatalf("failed to create wrong duplicate user: %v", err)
+	}
+
+	wrongExternalAuth := core.NewExternalAuth(app)
+	wrongExternalAuth.SetCollectionRef(wrongUser.Collection().Id)
+	wrongExternalAuth.SetRecordRef(wrongUser.Id)
+	wrongExternalAuth.SetProvider(pbauth.NameMicrosoft)
+	wrongExternalAuth.SetProviderId("provider-wrong-current")
+	if err := app.Save(wrongExternalAuth); err != nil {
+		t.Fatalf("failed to create wrong external auth: %v", err)
+	}
+
+	setMockUser := installMicrosoftOAuthMock(t)
+	setMockUser(&pbauth.AuthUser{
+		Id:    "provider-aaron-new",
+		Name:  "Aaron Picard",
+		Email: "",
+		RawUser: map[string]any{
+			"givenName":         "Aaron",
+			"surname":           "Picard",
+			"mail":              "apicard@tbte.ca",
+			"userPrincipalName": "apicard@tbte.ca",
+		},
+	})
+
+	res := performMicrosoftAuthRequest(t, app)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	relinkedUser, err := app.FindRecordById("users", intendedUser.Id)
+	if err != nil {
+		t.Fatalf("failed to reload intended user: %v", err)
+	}
+	if got := relinkedUser.GetString("username"); got != "apicard" {
+		t.Fatalf("username = %q, want %q", got, "apicard")
+	}
+	if got := relinkedUser.Email(); got != "apicard@tbte.onmicrosoft.com" {
+		t.Fatalf("expected relinked user email to remain unchanged while duplicate still owns canonical email, got %q", got)
+	}
+
+	auths, err := app.FindAllExternalAuthsByRecord(relinkedUser)
+	if err != nil {
+		t.Fatalf("failed to list external auths: %v", err)
+	}
+	if len(auths) != 1 {
+		t.Fatalf("expected exactly one external auth after fallback relink, got %d", len(auths))
+	}
+	if got := auths[0].ProviderId(); got != "provider-aaron-new" {
+		t.Fatalf("providerId = %q, want %q", got, "provider-aaron-new")
+	}
+
+	newExists, err := externalAuthExists(app, users.Id, pbauth.NameMicrosoft, "provider-aaron-new")
+	if err != nil {
+		t.Fatalf("failed checking new external auth: %v", err)
+	}
+	if !newExists {
+		t.Fatal("expected new external auth row to exist after fallback relink")
+	}
+}
+
+// Returning Microsoft users should have app-owned identity fields refreshed
+// from the directory on login, while keeping the existing username stable.
+func TestMicrosoftReturningLoginSyncsNameAndEmail(t *testing.T) {
+	app := setupMicrosoftOAuthTestApp(t)
+	defer app.Cleanup()
+
+	users, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatalf("failed to load users collection: %v", err)
+	}
+
+	existingUser := core.NewRecord(users)
+	existingUser.SetEmail("apicard@tbte.onmicrosoft.com")
+	existingUser.Set("username", "apicard")
+	existingUser.Set("name", "Aaron Picard")
+	existingUser.SetRandomPassword()
+	existingUser.SetVerified(true)
+	if err := app.Save(existingUser); err != nil {
+		t.Fatalf("failed to create existing user: %v", err)
+	}
+
+	externalAuth := core.NewExternalAuth(app)
+	externalAuth.SetCollectionRef(existingUser.Collection().Id)
+	externalAuth.SetRecordRef(existingUser.Id)
+	externalAuth.SetProvider(pbauth.NameMicrosoft)
+	externalAuth.SetProviderId("provider-aaron-current")
+	if err := app.Save(externalAuth); err != nil {
+		t.Fatalf("failed to create Microsoft external auth: %v", err)
+	}
+
+	setMockUser := installMicrosoftOAuthMock(t)
+	setMockUser(&pbauth.AuthUser{
+		Id:    "provider-aaron-current",
+		Name:  "Aaron J. Picard",
+		Email: "apicard@tbte.ca",
+		RawUser: map[string]any{
+			"givenName":         "Aaron",
+			"surname":           "J. Picard",
+			"mail":              "apicard@tbte.ca",
+			"userPrincipalName": "apicard@tbte.ca",
+		},
+	})
+
+	res := performMicrosoftAuthRequest(t, app)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	syncedUser, err := app.FindRecordById("users", existingUser.Id)
+	if err != nil {
+		t.Fatalf("failed to reload synced user: %v", err)
+	}
+	if got := syncedUser.GetString("name"); got != "Aaron J. Picard" {
+		t.Fatalf("users.name = %q, want %q", got, "Aaron J. Picard")
+	}
+	if got := syncedUser.Email(); got != "apicard@tbte.ca" {
+		t.Fatalf("users.email = %q, want %q", got, "apicard@tbte.ca")
+	}
+	if got := syncedUser.GetString("username"); got != "apicard" {
+		t.Fatalf("users.username = %q, want %q", got, "apicard")
+	}
+}
+
+// Returning Microsoft logins should not steal an email address that already
+// belongs to a different PocketBase auth record.
+func TestMicrosoftReturningLoginSkipsEmailSyncWhenTargetEmailClaimed(t *testing.T) {
+	app := setupMicrosoftOAuthTestApp(t)
+	defer app.Cleanup()
+
+	users, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatalf("failed to load users collection: %v", err)
+	}
+
+	existingUser := core.NewRecord(users)
+	existingUser.SetEmail("apicard@tbte.onmicrosoft.com")
+	existingUser.Set("username", "apicard")
+	existingUser.Set("name", "Aaron Picard")
+	existingUser.SetRandomPassword()
+	existingUser.SetVerified(true)
+	if err := app.Save(existingUser); err != nil {
+		t.Fatalf("failed to create existing user: %v", err)
+	}
+
+	otherUser := core.NewRecord(users)
+	otherUser.SetEmail("shared.target@tbte.ca")
+	otherUser.Set("username", "shared.target")
+	otherUser.Set("name", "Other User")
+	otherUser.SetRandomPassword()
+	otherUser.SetVerified(true)
+	if err := app.Save(otherUser); err != nil {
+		t.Fatalf("failed to create colliding user: %v", err)
+	}
+
+	externalAuth := core.NewExternalAuth(app)
+	externalAuth.SetCollectionRef(existingUser.Collection().Id)
+	externalAuth.SetRecordRef(existingUser.Id)
+	externalAuth.SetProvider(pbauth.NameMicrosoft)
+	externalAuth.SetProviderId("provider-aaron-current")
+	if err := app.Save(externalAuth); err != nil {
+		t.Fatalf("failed to create Microsoft external auth: %v", err)
+	}
+
+	setMockUser := installMicrosoftOAuthMock(t)
+	setMockUser(&pbauth.AuthUser{
+		Id:    "provider-aaron-current",
+		Name:  "Aaron J. Picard",
+		Email: "shared.target@tbte.ca",
+		RawUser: map[string]any{
+			"givenName":         "Aaron",
+			"surname":           "J. Picard",
+			"mail":              "shared.target@tbte.ca",
+			"userPrincipalName": "shared.target@tbte.ca",
+		},
+	})
+
+	res := performMicrosoftAuthRequest(t, app)
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+
+	syncedUser, err := app.FindRecordById("users", existingUser.Id)
+	if err != nil {
+		t.Fatalf("failed to reload synced user: %v", err)
+	}
+	if got := syncedUser.GetString("name"); got != "Aaron J. Picard" {
+		t.Fatalf("users.name = %q, want %q", got, "Aaron J. Picard")
+	}
+	if got := syncedUser.Email(); got != "apicard@tbte.onmicrosoft.com" {
+		t.Fatalf("users.email = %q, want unchanged %q", got, "apicard@tbte.onmicrosoft.com")
+	}
+
+	collidingUser, err := app.FindRecordById("users", otherUser.Id)
+	if err != nil {
+		t.Fatalf("failed to reload colliding user: %v", err)
+	}
+	if got := collidingUser.Email(); got != "shared.target@tbte.ca" {
+		t.Fatalf("colliding users.email = %q, want %q", got, "shared.target@tbte.ca")
+	}
+}
+
+// An exact email fallback match is not enough to relink over an already-linked
+// Microsoft user when the incoming identity data does not match that user.
+func TestMicrosoftRelinkDeclinesEmailMatchedUserWithDifferentIdentity(t *testing.T) {
+	app := setupMicrosoftOAuthTestApp(t)
+	defer app.Cleanup()
+
+	users, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatalf("failed to load users collection: %v", err)
+	}
+
+	existingUser := core.NewRecord(users)
+	existingUser.SetEmail("shared.target@tbte.ca")
+	existingUser.Set("username", "alice.smith")
+	existingUser.Set("name", "Alice Smith")
+	existingUser.SetRandomPassword()
+	existingUser.SetVerified(true)
+	if err := app.Save(existingUser); err != nil {
+		t.Fatalf("failed to create existing user: %v", err)
+	}
+
+	existingAuth := core.NewExternalAuth(app)
+	existingAuth.SetCollectionRef(existingUser.Collection().Id)
+	existingAuth.SetRecordRef(existingUser.Id)
+	existingAuth.SetProvider(pbauth.NameMicrosoft)
+	existingAuth.SetProviderId("provider-alice-current")
+	if err := app.Save(existingAuth); err != nil {
+		t.Fatalf("failed to create Microsoft external auth: %v", err)
+	}
+
+	setMockUser := installMicrosoftOAuthMock(t)
+	setMockUser(&pbauth.AuthUser{
+		Id:    "provider-bob-new",
+		Name:  "Bob Jones",
+		Email: "",
+		RawUser: map[string]any{
+			"givenName":         "Bob",
+			"surname":           "Jones",
+			"mail":              "shared.target@tbte.ca",
+			"userPrincipalName": "shared.target@tbte.ca",
+		},
+	})
+
+	res := performMicrosoftAuthRequest(t, app)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when email fallback collides, got %d: %s", res.Code, res.Body.String())
+	}
+
+	reloadedUser, err := app.FindRecordById("users", existingUser.Id)
+	if err != nil {
+		t.Fatalf("failed to reload existing user: %v", err)
+	}
+	if got := reloadedUser.GetString("name"); got != "Alice Smith" {
+		t.Fatalf("users.name = %q, want unchanged %q", got, "Alice Smith")
+	}
+
+	oldExists, err := externalAuthExists(app, users.Id, pbauth.NameMicrosoft, "provider-alice-current")
+	if err != nil {
+		t.Fatalf("failed checking existing external auth: %v", err)
+	}
+	if !oldExists {
+		t.Fatal("expected existing external auth to remain untouched")
+	}
+
+	newExists, err := externalAuthExists(app, users.Id, pbauth.NameMicrosoft, "provider-bob-new")
+	if err != nil {
+		t.Fatalf("failed checking unexpected external auth: %v", err)
+	}
+	if newExists {
+		t.Fatal("expected relink safety check to prevent creating new external auth on the matched user")
+	}
+}
+
+// A candidate that already has a different Microsoft external auth must be
+// rejected even when the incoming identity data matches by human name.
+func TestMicrosoftRelinkDeclinesEmailMatchedUserWithDifferentProviderEvenWhenIdentityMatches(t *testing.T) {
+	app := setupMicrosoftOAuthTestApp(t)
+	defer app.Cleanup()
+
+	users, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatalf("failed to load users collection: %v", err)
+	}
+
+	existingUser := core.NewRecord(users)
+	existingUser.SetEmail("shared.target@tbte.ca")
+	existingUser.Set("username", "aaron.picard")
+	existingUser.Set("name", "Aaron Picard")
+	existingUser.SetRandomPassword()
+	existingUser.SetVerified(true)
+	if err := app.Save(existingUser); err != nil {
+		t.Fatalf("failed to create existing user: %v", err)
+	}
+
+	existingAuth := core.NewExternalAuth(app)
+	existingAuth.SetCollectionRef(existingUser.Collection().Id)
+	existingAuth.SetRecordRef(existingUser.Id)
+	existingAuth.SetProvider(pbauth.NameMicrosoft)
+	existingAuth.SetProviderId("provider-aaron-current")
+	if err := app.Save(existingAuth); err != nil {
+		t.Fatalf("failed to create Microsoft external auth: %v", err)
+	}
+
+	setMockUser := installMicrosoftOAuthMock(t)
+	setMockUser(&pbauth.AuthUser{
+		Id:    "provider-aaron-new",
+		Name:  "Aaron Picard",
+		Email: "",
+		RawUser: map[string]any{
+			"givenName":         "Aaron",
+			"surname":           "Picard",
+			"mail":              "shared.target@tbte.ca",
+			"userPrincipalName": "shared.target@tbte.ca",
+		},
+	})
+
+	res := performMicrosoftAuthRequest(t, app)
+	if res.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 when email fallback collides with already-linked user, got %d: %s", res.Code, res.Body.String())
+	}
+
+	reloadedUser, err := app.FindRecordById("users", existingUser.Id)
+	if err != nil {
+		t.Fatalf("failed to reload existing user: %v", err)
+	}
+	if got := reloadedUser.GetString("name"); got != "Aaron Picard" {
+		t.Fatalf("users.name = %q, want unchanged %q", got, "Aaron Picard")
+	}
+
+	oldExists, err := externalAuthExists(app, users.Id, pbauth.NameMicrosoft, "provider-aaron-current")
+	if err != nil {
+		t.Fatalf("failed checking existing external auth: %v", err)
+	}
+	if !oldExists {
+		t.Fatal("expected existing external auth to remain untouched")
+	}
+
+	newExists, err := externalAuthExists(app, users.Id, pbauth.NameMicrosoft, "provider-aaron-new")
+	if err != nil {
+		t.Fatalf("failed checking unexpected external auth: %v", err)
+	}
+	if newExists {
+		t.Fatal("expected relink safety check to reject already-linked candidate even when names match")
 	}
 }
 

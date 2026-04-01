@@ -77,6 +77,234 @@ func (d microsoftOnboardingData) fallbackEmail() string {
 	return firstNonEmpty(d.Mail, d.UserPrincipalName)
 }
 
+// findMicrosoftRelinkCandidate looks for an existing users record that should
+// be reused when Microsoft presents a "new" provider id for the same person.
+//
+// PocketBase already falls back to authUser.Email before our hook runs, so this
+// helper only handles the narrower cases PocketBase can't infer:
+// - Microsoft changed the object id backing an already-linked user
+// - the current Microsoft email/UPN no longer matches the migrated app email
+//
+// The heuristic is intentionally conservative:
+//   - first, try an exact app-email match using the Microsoft mail/UPN fallback
+//   - otherwise, try the derived username local-part, but only when the
+//     candidate's name or profile name matches the Microsoft payload
+func findMicrosoftRelinkCandidate(app core.App, collection *core.Collection, data microsoftOnboardingData) (*core.Record, error) {
+	if collection == nil {
+		return nil, fmt.Errorf("missing users collection for Microsoft relink")
+	}
+
+	if fallbackEmail := data.fallbackEmail(); fallbackEmail != "" {
+		record, err := app.FindAuthRecordByEmail(collection.Id, fallbackEmail)
+		if err == nil {
+			safe, err := isSafeMicrosoftEmailMatchCandidate(app, collection, record, data)
+			if err != nil {
+				return nil, err
+			}
+			if safe {
+				return record, nil
+			}
+		}
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+	}
+
+	username := normalizeUsernameBase(localPart(firstNonEmpty(data.Mail, data.UserPrincipalName)), 150)
+	if username == "" {
+		return nil, nil
+	}
+
+	record, err := app.FindFirstRecordByFilter("users", "username={:username}", dbx.Params{"username": username})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	matches, err := microsoftIdentityMatchesUser(app, record, data)
+	if err != nil {
+		return nil, err
+	}
+	if !matches {
+		return nil, nil
+	}
+
+	safe, err := isSafeMicrosoftRelinkCandidate(app, collection, record, data)
+	if err != nil {
+		return nil, err
+	}
+	if !safe {
+		return nil, nil
+	}
+
+	return record, nil
+}
+
+func microsoftIdentityMatchesUser(app core.App, userRecord *core.Record, data microsoftOnboardingData) (bool, error) {
+	if userRecord == nil {
+		return false, nil
+	}
+
+	if fullName := strings.TrimSpace(data.fullName()); fullName != "" && strings.EqualFold(strings.TrimSpace(userRecord.GetString("name")), fullName) {
+		return true, nil
+	}
+
+	if data.GivenName == "" || data.Surname == "" {
+		return false, nil
+	}
+
+	profile, err := app.FindFirstRecordByFilter("profiles", "uid={:uid}", dbx.Params{"uid": userRecord.Id})
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return strings.EqualFold(strings.TrimSpace(profile.GetString("given_name")), data.GivenName) &&
+		strings.EqualFold(strings.TrimSpace(profile.GetString("surname")), data.Surname), nil
+}
+
+func findMicrosoftExternalAuthForUser(app core.App, collection *core.Collection, userRecord *core.Record) (*core.ExternalAuth, error) {
+	if collection == nil {
+		return nil, fmt.Errorf("missing users collection for Microsoft relink")
+	}
+	if userRecord == nil {
+		return nil, fmt.Errorf("missing user record for Microsoft relink")
+	}
+
+	existingAuth, err := app.FindFirstExternalAuthByExpr(dbx.HashExp{
+		"collectionRef": collection.Id,
+		"recordRef":     userRecord.Id,
+		"provider":      pbauth.NameMicrosoft,
+	})
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return nil, err
+	}
+	return existingAuth, nil
+}
+
+func isSafeMicrosoftEmailMatchCandidate(app core.App, collection *core.Collection, userRecord *core.Record, data microsoftOnboardingData) (bool, error) {
+	if userRecord == nil {
+		return false, nil
+	}
+
+	existingAuth, err := findMicrosoftExternalAuthForUser(app, collection, userRecord)
+	if err != nil {
+		return false, err
+	}
+	if existingAuth == nil || strings.EqualFold(existingAuth.ProviderId(), data.ProviderID) {
+		return true, nil
+	}
+
+	return false, nil
+}
+
+func isSafeMicrosoftRelinkCandidate(app core.App, collection *core.Collection, userRecord *core.Record, data microsoftOnboardingData) (bool, error) {
+	if userRecord == nil {
+		return false, nil
+	}
+
+	existingAuth, err := findMicrosoftExternalAuthForUser(app, collection, userRecord)
+	if err != nil {
+		return false, err
+	}
+	if existingAuth == nil || strings.EqualFold(existingAuth.ProviderId(), data.ProviderID) {
+		return true, nil
+	}
+
+	return microsoftIdentityMatchesUser(app, userRecord, data)
+}
+
+// relinkMicrosoftExternalAuth rotates an existing user's Microsoft ExternalAuth
+// row so PocketBase can attach the current provider id to that user inside the
+// same OAuth transaction.
+func relinkMicrosoftExternalAuth(app core.App, collection *core.Collection, userRecord *core.Record, providerID string) error {
+	if strings.TrimSpace(providerID) == "" {
+		return fmt.Errorf("missing provider id for Microsoft relink")
+	}
+
+	existingAuth, err := findMicrosoftExternalAuthForUser(app, collection, userRecord)
+	if err != nil {
+		return err
+	}
+
+	if existingAuth != nil {
+		if strings.EqualFold(existingAuth.ProviderId(), providerID) {
+			return nil
+		}
+		if err := app.Delete(existingAuth); err != nil {
+			return fmt.Errorf("failed deleting stale Microsoft external auth for %s: %w", userRecord.Id, err)
+		}
+	}
+
+	return nil
+}
+
+func emailExists(app core.App, collectionID string, email string, excludeRecordID string) (bool, error) {
+	email = strings.TrimSpace(email)
+	if email == "" {
+		return false, nil
+	}
+
+	record, err := app.FindAuthRecordByEmail(collectionID, email)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return false, nil
+		}
+		return false, err
+	}
+
+	return excludeRecordID == "" || record.Id != excludeRecordID, nil
+}
+
+// syncMicrosoftUserIdentity applies the returning-login sync policy for the
+// currently authenticated Microsoft user. We intentionally update the
+// user-facing identity fields that Microsoft owns for this app (`name`,
+// `email`) while leaving `username` stable for now. Email and verification are
+// resolved in the same pass so the record is saved at most once.
+func syncMicrosoftUserIdentity(app core.App, userRecord *core.Record, data microsoftOnboardingData) error {
+	if userRecord == nil {
+		return fmt.Errorf("missing user record for Microsoft sync")
+	}
+
+	needSave := false
+
+	if fullName := strings.TrimSpace(data.fullName()); fullName != "" &&
+		!strings.EqualFold(strings.TrimSpace(userRecord.GetString("name")), fullName) {
+		userRecord.Set("name", fullName)
+		needSave = true
+	}
+
+	if fallbackEmail := strings.TrimSpace(data.fallbackEmail()); fallbackEmail != "" {
+		currentEmail := strings.TrimSpace(userRecord.Email())
+		shouldSyncEmail := currentEmail == "" || !strings.EqualFold(currentEmail, fallbackEmail)
+		if shouldSyncEmail {
+			exists, err := emailExists(app, userRecord.Collection().Id, fallbackEmail, userRecord.Id)
+			if err != nil {
+				return err
+			}
+			if !exists {
+				userRecord.SetEmail(fallbackEmail)
+				needSave = true
+			}
+		}
+
+		if !userRecord.Verified() && strings.EqualFold(strings.TrimSpace(userRecord.Email()), fallbackEmail) {
+			userRecord.SetVerified(true)
+			needSave = true
+		}
+	}
+
+	if !needSave {
+		return nil
+	}
+
+	return app.Save(userRecord)
+}
+
 // ensureMicrosoftUserOnboarded performs the automatic post-auth work that is
 // safe to do from Microsoft identity data alone.
 //
@@ -88,13 +316,14 @@ func (d microsoftOnboardingData) fallbackEmail() string {
 //
 // This helper also defines the boundary between Microsoft-owned identity data
 // and app-owned business data:
-// - Microsoft may seed users.name / users.email / users.username at first login
+// - Microsoft seeds users.username at first login and keeps it stable later
+// - Microsoft seeds and later syncs users.name / users.email on login
 // - profiles is user/business-owned and not inferred here
 // - admin_profiles is app-owned and only ensured to exist
 //
-// Planned follow-up: users.name and users.username should likely move from
-// "seed on first login" to "sync on Microsoft login" so later directory
-// changes are reflected in the PocketBase auth record as well.
+// Planned follow-up: revisit whether users.username should also sync from
+// Microsoft on login, together with any downstream code that currently treats
+// username as stable once created.
 func ensureMicrosoftUserOnboarded(app core.App, userRecord *core.Record) error {
 	if userRecord == nil {
 		return fmt.Errorf("missing user record for onboarding")
@@ -125,7 +354,7 @@ func ensureUserAdminProfile(app core.App, uid string) error {
 	if err == nil {
 		return nil
 	}
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return fmt.Errorf("failed checking admin profile for %s: %w", uid, err)
 	}
 
