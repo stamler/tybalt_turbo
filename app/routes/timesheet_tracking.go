@@ -207,6 +207,11 @@ type trackingBasicUserRow struct {
 	Email     string `db:"email" json:"email"`
 }
 
+func isValidWeekEnding(weekEnding string) bool {
+	_, err := time.Parse("2006-01-02", weekEnding)
+	return err == nil
+}
+
 // createTimesheetMissingHandler returns users expected to have a timesheet but missing for the week
 func createTimesheetMissingHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -231,7 +236,7 @@ func createTimesheetMissingHandler(app core.App) func(e *core.RequestEvent) erro
 		if weekEnding == "" {
 			return e.Error(http.StatusBadRequest, "weekEnding is required", nil)
 		}
-		if _, err := time.Parse("2006-01-02", weekEnding); err != nil {
+		if !isValidWeekEnding(weekEnding) {
 			return e.Error(http.StatusBadRequest, "invalid date format (YYYY-MM-DD)", nil)
 		}
 
@@ -243,9 +248,11 @@ func createTimesheetMissingHandler(app core.App) func(e *core.RequestEvent) erro
                 COALESCE(u.email, '') AS email
             FROM users u
             LEFT JOIN time_sheets ts ON ts.uid = u.id AND ts.week_ending = {:week_ending}
+            LEFT JOIN time_sheet_missing_exceptions ex ON ex.uid = u.id AND ex.week_ending = {:week_ending}
             LEFT JOIN profiles p ON p.uid = u.id
             LEFT JOIN admin_profiles ap ON ap.uid = u.id
             WHERE ts.id IS NULL
+              AND ex.id IS NULL
               AND COALESCE(ap.time_sheet_expected, 0) = 1
             ORDER BY p.surname, p.given_name
         `
@@ -285,7 +292,7 @@ func createTimesheetNotExpectedHandler(app core.App) func(e *core.RequestEvent) 
 		if weekEnding == "" {
 			return e.Error(http.StatusBadRequest, "weekEnding is required", nil)
 		}
-		if _, err := time.Parse("2006-01-02", weekEnding); err != nil {
+		if !isValidWeekEnding(weekEnding) {
 			return e.Error(http.StatusBadRequest, "invalid date format (YYYY-MM-DD)", nil)
 		}
 

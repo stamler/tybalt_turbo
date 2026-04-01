@@ -16,6 +16,7 @@
   const weekEnding = $derived.by(() => $page.params.weekEnding);
   let rows = $state([] as any[]);
   let missing = $state([] as any[]);
+  let ignored = $state([] as any[]);
   let notExpected = $state([] as any[]);
   let rejectModal: SvelteComponent;
   let isLoading = $state(false);
@@ -23,7 +24,7 @@
   const hasCommitAccess = () => $globalStore.showAllUi || $globalStore.claims.includes("commit");
 
   // Tabs ----------------------------------------------------------------------
-  let activeTab = $state<"sheets" | "missing" | "not_expected">("sheets");
+  let activeTab = $state<"sheets" | "missing" | "ignored" | "not_expected">("sheets");
   let tabs: TabItem[] = $derived([
     {
       label: `Sheets (${rows.length})`,
@@ -36,6 +37,11 @@
       active: activeTab === "missing",
     },
     {
+      label: `Ignored (${ignored.length})`,
+      href: "#ignored",
+      active: activeTab === "ignored",
+    },
+    {
       label: `Not Expected (${notExpected.length})`,
       href: "#not_expected",
       active: activeTab === "not_expected",
@@ -46,13 +52,15 @@
     if (isLoading) return;
     isLoading = true;
     try {
-      const [listRes, missingRes, notExpectedRes] = await Promise.all([
+      const [listRes, missingRes, ignoredRes, notExpectedRes] = await Promise.all([
         pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}`, { method: "GET" }),
         pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}/missing`, { method: "GET" }),
+        pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}/ignored`, { method: "GET" }),
         pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}/not_expected`, { method: "GET" }),
       ]);
       rows = listRes;
       missing = missingRes;
+      ignored = ignoredRes;
       notExpected = notExpectedRes;
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Failed to load timesheets");
@@ -71,6 +79,7 @@
   function setTabFromHash() {
     const hash = typeof window !== "undefined" ? window.location.hash : "";
     if (hash === "#missing") activeTab = "missing";
+    else if (hash === "#ignored") activeTab = "ignored";
     else if (hash === "#not_expected") activeTab = "not_expected";
     else activeTab = "sheets";
     try {
@@ -110,8 +119,29 @@
     }
   }
 
+  async function ignoreThisWeek(uid: string) {
+    try {
+      await pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}/missing_exceptions/${uid}`, {
+        method: "POST",
+      });
+      await init();
+    } catch (error: any) {
+      globalStore.addError(error?.response?.message || "Failed to ignore this week");
+    }
+  }
+
+  async function restoreThisWeek(uid: string) {
+    try {
+      await pb.send(`/api/time_sheets/tracking/weeks/${weekEnding}/missing_exceptions/${uid}`, {
+        method: "DELETE",
+      });
+      await init();
+    } catch (error: any) {
+      globalStore.addError(error?.response?.message || "Failed to restore this week");
+    }
+  }
+
   function openReject(id: string) {
-    // @ts-ignore exported function on the component instance
     rejectModal.openModal(id);
   }
 
@@ -273,6 +303,25 @@
         title="Copy email"
         action={() => copy(m.email)}
       />
+      {#if hasCommitAccess()}
+        <DsActionButton action={() => ignoreThisWeek(m.id)}>
+          Ignore This Week
+        </DsActionButton>
+      {/if}
+    {/snippet}
+  </DsList>
+</div>
+
+<!-- Ignored Tab -->
+<div class:hidden={activeTab !== "ignored"} class="space-y-2">
+  <DsList search={true} items={ignored} inListHeader="Ignored This Week">
+    {#snippet headline(i)}
+      <span class="hover:underline">{personName(i) || i.email}</span>
+    {/snippet}
+    {#snippet actions(i)}
+      {#if hasCommitAccess()}
+        <DsActionButton action={() => restoreThisWeek(i.id)}>Expect This Week</DsActionButton>
+      {/if}
     {/snippet}
   </DsList>
 </div>

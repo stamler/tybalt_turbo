@@ -97,6 +97,9 @@ func AddRoutes(app core.App) {
 		tsGroup.GET("/tracking_counts", createTimesheetTrackingCountsHandler(app))
 		tsGroup.GET("/tracking/weeks/{weekEnding}", createTimesheetTrackingListHandler(app))
 		tsGroup.GET("/tracking/weeks/{weekEnding}/missing", createTimesheetMissingHandler(app))
+		tsGroup.GET("/tracking/weeks/{weekEnding}/ignored", createTimesheetIgnoredHandler(app))
+		tsGroup.POST("/tracking/weeks/{weekEnding}/missing_exceptions/{uid}", createMissingTimesheetExceptionHandler(app))
+		tsGroup.DELETE("/tracking/weeks/{weekEnding}/missing_exceptions/{uid}", createDeleteMissingTimesheetExceptionHandler(app))
 		tsGroup.GET("/tracking/weeks/{weekEnding}/not_expected", createTimesheetNotExpectedHandler(app))
 
 		// Legacy writeback endpoints (custom auth via machine_secrets)
