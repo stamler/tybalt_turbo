@@ -19,6 +19,8 @@
   import DsAutoComplete from "./DSAutoComplete.svelte";
   import DsActionButton from "./DSActionButton.svelte";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
+  import Icon from "@iconify/svelte";
+  import { globalStore } from "$lib/stores/global";
   import { authStore } from "$lib/stores/auth";
   import { goto } from "$app/navigation";
   import type { TimeEntriesPageData } from "$lib/svelte-types";
@@ -129,6 +131,9 @@
       })
       .includes(item.time_type);
   }
+
+  const hasNoDefaultRole = $derived(!$globalStore.profile.default_role);
+  let showRoleInfo = $state(false);
 
   let categories = $state([] as CategoriesResponse[]);
   const syncCategoriesForJob = createJobCategoriesSync((rows) => {
@@ -260,15 +265,60 @@
       </span>
     {/if}
     {#if item.job && item.job !== "" && $rateRoles.index !== null}
-      <DsAutoComplete
-        bind:value={item.role as string}
-        index={$rateRoles.index}
-        {errors}
-        fieldName="role"
-        uiName="Role"
-      >
-        {#snippet resultTemplate(item)}{item.name}{/snippet}
-      </DsAutoComplete>
+      <div class="relative flex w-full items-center gap-1">
+        {#if hasNoDefaultRole}
+          <button
+            type="button"
+            class="shrink-0 text-blue-500 hover:text-blue-700"
+            aria-label="Role info"
+            onclick={() => (showRoleInfo = !showRoleInfo)}
+          >
+            <Icon icon="mdi:information-outline" width="18px" />
+          </button>
+        {/if}
+        <div class="flex-1">
+          <DsAutoComplete
+            bind:value={item.role as string}
+            index={$rateRoles.index}
+            {errors}
+            fieldName="role"
+            uiName="Role"
+          >
+            {#snippet resultTemplate(item)}{item.name}{/snippet}
+          </DsAutoComplete>
+        </div>
+      </div>
+      {#if showRoleInfo}
+        <div
+          class="fixed inset-0 z-50"
+          role="button"
+          tabindex="-1"
+          onclick={() => (showRoleInfo = false)}
+          onkeydown={(e) => e.key === "Escape" && (showRoleInfo = false)}
+        >
+          <div
+            class="mx-auto mt-32 max-w-sm rounded-md border border-blue-200 bg-blue-50 p-4 text-sm text-blue-800 shadow-lg"
+            role="presentation"
+            onclick={(e) => e.stopPropagation()}
+          >
+            <p class="font-semibold">Rate Sheet Role</p>
+            <p class="mt-1">
+              This is the rate sheet role you are using to charge against the job for this time
+              entry. If you do not know your role, speak with your manager or the project manager
+              for this job. You may also set a default role in your profile so this field is
+              automatically populated. Set the default role by clicking on your email address at the
+              bottom of the navigation menu to access your profile settings.
+            </p>
+            <button
+              type="button"
+              class="mt-2 text-xs font-medium text-blue-600 hover:text-blue-800"
+              onclick={() => (showRoleInfo = false)}
+            >
+              Got it
+            </button>
+          </div>
+        </div>
+      {/if}
     {/if}
   {/if}
 
