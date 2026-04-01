@@ -23,6 +23,53 @@ type microsoftOnboardingData struct {
 	Mail              string
 	UserPrincipalName string
 	ProviderID        string
+	TraceLogging      bool
+}
+
+func logMicrosoftOAuthInfo(app core.App, message string, data microsoftOnboardingData, extra ...any) {
+	if app == nil || !data.TraceLogging {
+		return
+	}
+	app.Logger().Info("microsoft_oauth "+message, microsoftOAuthLogArgs(data, extra...)...)
+}
+
+func logMicrosoftOAuthWarn(app core.App, message string, data microsoftOnboardingData, extra ...any) {
+	if app == nil {
+		return
+	}
+	app.Logger().Warn("microsoft_oauth "+message, microsoftOAuthLogArgs(data, extra...)...)
+}
+
+func logMicrosoftOAuthError(app core.App, message string, data microsoftOnboardingData, extra ...any) {
+	if app == nil {
+		return
+	}
+	app.Logger().Error("microsoft_oauth "+message, microsoftOAuthLogArgs(data, extra...)...)
+}
+
+func microsoftOAuthLogArgs(data microsoftOnboardingData, extra ...any) []any {
+	args := []any{
+		"provider_id", strings.TrimSpace(data.ProviderID),
+		"fallback_email", strings.TrimSpace(data.fallbackEmail()),
+		"derived_username", microsoftRelinkLookupUsername(data),
+	}
+	if fullName := strings.TrimSpace(data.fullName()); fullName != "" {
+		args = append(args, "full_name", fullName)
+	}
+	return append(args, extra...)
+}
+
+func microsoftCandidateLogArgs(userRecord *core.Record, extra ...any) []any {
+	if userRecord == nil {
+		return extra
+	}
+
+	args := []any{
+		"candidate_user_id", userRecord.Id,
+		"candidate_email", strings.TrimSpace(userRecord.Email()),
+		"candidate_username", strings.TrimSpace(userRecord.GetString("username")),
+	}
+	return append(args, extra...)
 }
 
 // microsoftOnboardingDataFromAuthUser extracts the specific Microsoft values we
@@ -77,6 +124,10 @@ func (d microsoftOnboardingData) fallbackEmail() string {
 	return firstNonEmpty(d.Mail, d.UserPrincipalName)
 }
 
+func microsoftRelinkLookupUsername(data microsoftOnboardingData) string {
+	return normalizeUsernameBase(localPart(firstNonEmpty(data.Mail, data.UserPrincipalName)), 150)
+}
+
 // findMicrosoftRelinkCandidate looks for an existing users record that should
 // be reused when Microsoft presents a "new" provider id for the same person.
 //
@@ -94,40 +145,55 @@ func findMicrosoftRelinkCandidate(app core.App, collection *core.Collection, dat
 		return nil, fmt.Errorf("missing users collection for Microsoft relink")
 	}
 
+	logMicrosoftOAuthInfo(app, "searching relink candidate", data)
+
 	if fallbackEmail := data.fallbackEmail(); fallbackEmail != "" {
+		logMicrosoftOAuthInfo(app, "checking fallback email for relink candidate", data, "lookup_email", fallbackEmail)
 		record, err := app.FindAuthRecordByEmail(collection.Id, fallbackEmail)
 		if err == nil {
+			logMicrosoftOAuthInfo(app, "found fallback-email relink candidate", data, microsoftCandidateLogArgs(record)...)
 			safe, err := isSafeMicrosoftEmailMatchCandidate(app, collection, record, data)
 			if err != nil {
 				return nil, err
 			}
 			if safe {
+				logMicrosoftOAuthInfo(app, "accepted fallback-email relink candidate", data, microsoftCandidateLogArgs(record)...)
 				return record, nil
 			}
 		}
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return nil, err
 		}
+		if errors.Is(err, sql.ErrNoRows) {
+			logMicrosoftOAuthInfo(app, "no user matched fallback email", data, "lookup_email", fallbackEmail)
+		}
+	} else {
+		logMicrosoftOAuthInfo(app, "no fallback email available for relink lookup", data)
 	}
 
-	username := normalizeUsernameBase(localPart(firstNonEmpty(data.Mail, data.UserPrincipalName)), 150)
+	username := microsoftRelinkLookupUsername(data)
 	if username == "" {
+		logMicrosoftOAuthInfo(app, "no derived username available for relink lookup", data)
 		return nil, nil
 	}
 
+	logMicrosoftOAuthInfo(app, "checking derived username for relink candidate", data, "lookup_username", username)
 	record, err := app.FindFirstRecordByFilter("users", "username={:username}", dbx.Params{"username": username})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			logMicrosoftOAuthInfo(app, "no user matched derived username", data, "lookup_username", username)
 			return nil, nil
 		}
 		return nil, err
 	}
+	logMicrosoftOAuthInfo(app, "found username relink candidate", data, microsoftCandidateLogArgs(record)...)
 
 	matches, err := microsoftIdentityMatchesUser(app, record, data)
 	if err != nil {
 		return nil, err
 	}
 	if !matches {
+		logMicrosoftOAuthWarn(app, "rejected username relink candidate because identity did not match", data, microsoftCandidateLogArgs(record)...)
 		return nil, nil
 	}
 
@@ -136,9 +202,11 @@ func findMicrosoftRelinkCandidate(app core.App, collection *core.Collection, dat
 		return nil, err
 	}
 	if !safe {
+		logMicrosoftOAuthWarn(app, "rejected username relink candidate because relink was unsafe", data, microsoftCandidateLogArgs(record)...)
 		return nil, nil
 	}
 
+	logMicrosoftOAuthInfo(app, "accepted username relink candidate", data, microsoftCandidateLogArgs(record)...)
 	return record, nil
 }
 
@@ -148,23 +216,43 @@ func microsoftIdentityMatchesUser(app core.App, userRecord *core.Record, data mi
 	}
 
 	if fullName := strings.TrimSpace(data.fullName()); fullName != "" && strings.EqualFold(strings.TrimSpace(userRecord.GetString("name")), fullName) {
+		logMicrosoftOAuthInfo(app, "identity matched candidate by users.name", data, microsoftCandidateLogArgs(userRecord)...)
 		return true, nil
 	}
 
 	if data.GivenName == "" || data.Surname == "" {
+		logMicrosoftOAuthInfo(app, "identity did not match candidate because Microsoft payload lacked split names", data, microsoftCandidateLogArgs(userRecord)...)
 		return false, nil
 	}
 
 	profile, err := app.FindFirstRecordByFilter("profiles", "uid={:uid}", dbx.Params{"uid": userRecord.Id})
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
+			logMicrosoftOAuthInfo(app, "identity did not match candidate because profile record was missing", data, microsoftCandidateLogArgs(userRecord)...)
 			return false, nil
 		}
 		return false, err
 	}
 
-	return strings.EqualFold(strings.TrimSpace(profile.GetString("given_name")), data.GivenName) &&
-		strings.EqualFold(strings.TrimSpace(profile.GetString("surname")), data.Surname), nil
+	matches := strings.EqualFold(strings.TrimSpace(profile.GetString("given_name")), data.GivenName) &&
+		strings.EqualFold(strings.TrimSpace(profile.GetString("surname")), data.Surname)
+	if matches {
+		logMicrosoftOAuthInfo(app, "identity matched candidate by profile name", data, microsoftCandidateLogArgs(userRecord, "profile_id", profile.Id)...)
+	} else {
+		logMicrosoftOAuthInfo(
+			app,
+			"identity did not match candidate profile name",
+			data,
+			microsoftCandidateLogArgs(
+				userRecord,
+				"profile_id", profile.Id,
+				"profile_given_name", strings.TrimSpace(profile.GetString("given_name")),
+				"profile_surname", strings.TrimSpace(profile.GetString("surname")),
+			)...,
+		)
+	}
+
+	return matches, nil
 }
 
 func findMicrosoftExternalAuthForUser(app core.App, collection *core.Collection, userRecord *core.Record) (*core.ExternalAuth, error) {
@@ -195,10 +283,26 @@ func isSafeMicrosoftEmailMatchCandidate(app core.App, collection *core.Collectio
 	if err != nil {
 		return false, err
 	}
-	if existingAuth == nil || strings.EqualFold(existingAuth.ProviderId(), data.ProviderID) {
+	if existingAuth == nil {
+		logMicrosoftOAuthInfo(app, "fallback-email candidate is safe because no Microsoft external auth exists yet", data, microsoftCandidateLogArgs(userRecord)...)
+		return true, nil
+	}
+	if strings.EqualFold(existingAuth.ProviderId(), data.ProviderID) {
+		logMicrosoftOAuthInfo(
+			app,
+			"fallback-email candidate is safe because provider id already matches",
+			data,
+			microsoftCandidateLogArgs(userRecord, "existing_provider_id", existingAuth.ProviderId())...,
+		)
 		return true, nil
 	}
 
+	logMicrosoftOAuthWarn(
+		app,
+		"fallback-email candidate is unsafe because a different Microsoft provider id is already linked",
+		data,
+		microsoftCandidateLogArgs(userRecord, "existing_provider_id", existingAuth.ProviderId())...,
+	)
 	return false, nil
 }
 
@@ -211,18 +315,36 @@ func isSafeMicrosoftRelinkCandidate(app core.App, collection *core.Collection, u
 	if err != nil {
 		return false, err
 	}
-	if existingAuth == nil || strings.EqualFold(existingAuth.ProviderId(), data.ProviderID) {
+	if existingAuth == nil {
+		logMicrosoftOAuthInfo(app, "username candidate is safe because no Microsoft external auth exists yet", data, microsoftCandidateLogArgs(userRecord)...)
+		return true, nil
+	}
+	if strings.EqualFold(existingAuth.ProviderId(), data.ProviderID) {
+		logMicrosoftOAuthInfo(
+			app,
+			"username candidate is safe because provider id already matches",
+			data,
+			microsoftCandidateLogArgs(userRecord, "existing_provider_id", existingAuth.ProviderId())...,
+		)
 		return true, nil
 	}
 
+	logMicrosoftOAuthWarn(
+		app,
+		"username candidate has a different linked provider id, verifying identity before relink",
+		data,
+		microsoftCandidateLogArgs(userRecord, "existing_provider_id", existingAuth.ProviderId())...,
+	)
 	return microsoftIdentityMatchesUser(app, userRecord, data)
 }
 
 // relinkMicrosoftExternalAuth rotates an existing user's Microsoft ExternalAuth
 // row so PocketBase can attach the current provider id to that user inside the
 // same OAuth transaction.
-func relinkMicrosoftExternalAuth(app core.App, collection *core.Collection, userRecord *core.Record, providerID string) error {
-	if strings.TrimSpace(providerID) == "" {
+func relinkMicrosoftExternalAuth(app core.App, collection *core.Collection, userRecord *core.Record, data microsoftOnboardingData) error {
+	providerID := strings.TrimSpace(data.ProviderID)
+	if providerID == "" {
+		logMicrosoftOAuthWarn(app, "cannot relink external auth because provider id was empty", data, microsoftCandidateLogArgs(userRecord)...)
 		return fmt.Errorf("missing provider id for Microsoft relink")
 	}
 
@@ -233,11 +355,16 @@ func relinkMicrosoftExternalAuth(app core.App, collection *core.Collection, user
 
 	if existingAuth != nil {
 		if strings.EqualFold(existingAuth.ProviderId(), providerID) {
+			logMicrosoftOAuthInfo(app, "existing external auth already uses current provider id", data, microsoftCandidateLogArgs(userRecord, "existing_provider_id", existingAuth.ProviderId())...)
 			return nil
 		}
+		logMicrosoftOAuthWarn(app, "deleting stale Microsoft external auth before relink", data, microsoftCandidateLogArgs(userRecord, "existing_provider_id", existingAuth.ProviderId(), "external_auth_id", existingAuth.Id)...)
 		if err := app.Delete(existingAuth); err != nil {
 			return fmt.Errorf("failed deleting stale Microsoft external auth for %s: %w", userRecord.Id, err)
 		}
+		logMicrosoftOAuthInfo(app, "deleted stale Microsoft external auth", data, microsoftCandidateLogArgs(userRecord, "deleted_provider_id", existingAuth.ProviderId(), "external_auth_id", existingAuth.Id)...)
+	} else {
+		logMicrosoftOAuthInfo(app, "no existing Microsoft external auth found for relink candidate", data, microsoftCandidateLogArgs(userRecord)...)
 	}
 
 	return nil
@@ -271,11 +398,13 @@ func syncMicrosoftUserIdentity(app core.App, userRecord *core.Record, data micro
 	}
 
 	needSave := false
+	logMicrosoftOAuthInfo(app, "syncing Microsoft identity onto user record", data, "user_id", userRecord.Id, "current_email", strings.TrimSpace(userRecord.Email()), "current_name", strings.TrimSpace(userRecord.GetString("name")), "current_username", strings.TrimSpace(userRecord.GetString("username")))
 
 	if fullName := strings.TrimSpace(data.fullName()); fullName != "" &&
 		!strings.EqualFold(strings.TrimSpace(userRecord.GetString("name")), fullName) {
 		userRecord.Set("name", fullName)
 		needSave = true
+		logMicrosoftOAuthInfo(app, "updating users.name from Microsoft", data, "user_id", userRecord.Id, "new_name", fullName)
 	}
 
 	if fallbackEmail := strings.TrimSpace(data.fallbackEmail()); fallbackEmail != "" {
@@ -289,12 +418,16 @@ func syncMicrosoftUserIdentity(app core.App, userRecord *core.Record, data micro
 			if !exists {
 				userRecord.SetEmail(fallbackEmail)
 				needSave = true
+				logMicrosoftOAuthInfo(app, "updating users.email from Microsoft", data, "user_id", userRecord.Id, "new_email", fallbackEmail)
+			} else {
+				logMicrosoftOAuthWarn(app, "skipping email sync because another user already owns the Microsoft email", data, "user_id", userRecord.Id, "target_email", fallbackEmail)
 			}
 		}
 
 		if !userRecord.Verified() && strings.EqualFold(strings.TrimSpace(userRecord.Email()), fallbackEmail) {
 			userRecord.SetVerified(true)
 			needSave = true
+			logMicrosoftOAuthInfo(app, "marking user verified because stored email matches trusted Microsoft email", data, "user_id", userRecord.Id, "verified_email", fallbackEmail)
 		}
 	}
 
@@ -302,6 +435,7 @@ func syncMicrosoftUserIdentity(app core.App, userRecord *core.Record, data micro
 		return nil
 	}
 
+	logMicrosoftOAuthInfo(app, "saving synced Microsoft identity fields", data, "user_id", userRecord.Id, "final_email", strings.TrimSpace(userRecord.Email()), "final_name", strings.TrimSpace(userRecord.GetString("name")), "verified", userRecord.Verified())
 	return app.Save(userRecord)
 }
 

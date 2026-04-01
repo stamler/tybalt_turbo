@@ -129,6 +129,7 @@ func AddHooks(app core.App) {
 		}
 
 		data := microsoftOnboardingDataFromAuthUser(e.OAuth2User)
+		data.TraceLogging = e.IsNewRecord
 		originalApp := e.App
 
 		return e.App.RunInTransaction(func(txApp core.App) error {
@@ -137,17 +138,41 @@ func AddHooks(app core.App) {
 				e.App = originalApp
 			}()
 
+			oauthEmail := ""
+			if e.OAuth2User != nil {
+				oauthEmail = strings.TrimSpace(e.OAuth2User.Email)
+			}
+			existingRecordID := ""
+			if e.Record != nil {
+				existingRecordID = e.Record.Id
+			}
+
 			if e.IsNewRecord {
+				logMicrosoftOAuthInfo(
+					txApp,
+					"received Microsoft OAuth login event without a provider-id match",
+					data,
+					"is_new_record", e.IsNewRecord,
+					"existing_record_id", existingRecordID,
+					"oauth_email", oauthEmail,
+				)
+				logMicrosoftOAuthWarn(txApp, "PocketBase did not find an existing user by provider id before the hook; tracing relink and new-user paths", data)
 				existingUser, err := findMicrosoftRelinkCandidate(txApp, e.Collection, data)
 				if err != nil {
+					logMicrosoftOAuthError(txApp, "relink candidate lookup failed", data, "error", err)
 					return apis.NewBadRequestError("failed to look up existing Microsoft user", err)
 				}
 				if existingUser != nil {
-					if err := relinkMicrosoftExternalAuth(txApp, e.Collection, existingUser, data.ProviderID); err != nil {
+					logMicrosoftOAuthInfo(txApp, "reusing existing user after relink candidate lookup", data, "relinked_user_id", existingUser.Id)
+					if err := relinkMicrosoftExternalAuth(txApp, e.Collection, existingUser, data); err != nil {
+						logMicrosoftOAuthError(txApp, "external auth relink failed", data, "relinked_user_id", existingUser.Id, "error", err)
 						return apis.NewBadRequestError("failed to relink Microsoft account", err)
 					}
 					e.Record = existingUser
 					e.IsNewRecord = false
+					logMicrosoftOAuthInfo(txApp, "hook converted Microsoft login from new-record flow to existing-user relink", data, "relinked_user_id", existingUser.Id)
+				} else {
+					logMicrosoftOAuthInfo(txApp, "no relink candidate found; continuing through new-user creation path", data)
 				}
 			}
 
@@ -182,15 +207,28 @@ func AddHooks(app core.App) {
 				if currentUsername, _ := e.CreateData["username"].(string); strings.TrimSpace(currentUsername) == "" {
 					username, err := buildUniqueMicrosoftUsername(txApp, e.Collection, data, "")
 					if err != nil {
+						logMicrosoftOAuthError(txApp, "failed building unique username for new Microsoft user", data, "error", err)
 						return apis.NewBadRequestError("failed to prepare Microsoft username", err)
 					}
 					e.CreateData["username"] = username
 				}
+
+				logMicrosoftOAuthInfo(
+					txApp,
+					"prepared Microsoft create data for new user",
+					data,
+					"create_email", e.CreateData["email"],
+					"create_name", e.CreateData["name"],
+					"create_username", e.CreateData["username"],
+				)
 			}
 
 			if err := e.Next(); err != nil {
+				logMicrosoftOAuthError(txApp, "PocketBase OAuth continuation failed", data, "is_new_record", e.IsNewRecord, "error", err)
 				return err
 			}
+
+			logMicrosoftOAuthInfo(txApp, "PocketBase OAuth continuation completed", data, "record_id", e.Record.Id, "is_new_record", e.IsNewRecord)
 
 			// After PocketBase creates or updates the auth record, we repair the
 			// parts of its built-in OAuth behavior that only know about
@@ -214,16 +252,20 @@ func AddHooks(app core.App) {
 			// Microsoft logins, that logic should live alongside this post-auth
 			// repair step so the behavior is explicit and transactional.
 			if err := syncMicrosoftUserIdentity(txApp, e.Record, data); err != nil {
+				logMicrosoftOAuthError(txApp, "Microsoft identity sync failed", data, "record_id", e.Record.Id, "error", err)
 				return apis.NewBadRequestError("failed to sync Microsoft identity", err)
 			}
+			logMicrosoftOAuthInfo(txApp, "Microsoft identity sync finished", data, "record_id", e.Record.Id)
 
 			// Successful Microsoft auth should always leave the user with an
 			// admin_profiles row. We intentionally do not create a `profiles`
 			// record here because required business fields such as `manager` are
 			// not available from Microsoft and must be collected later in-app.
 			if err := ensureMicrosoftUserOnboarded(txApp, e.Record); err != nil {
+				logMicrosoftOAuthError(txApp, "Microsoft onboarding completion failed", data, "record_id", e.Record.Id, "error", err)
 				return apis.NewBadRequestError("failed to complete Microsoft user onboarding", err)
 			}
+			logMicrosoftOAuthInfo(txApp, "Microsoft OAuth flow completed successfully", data, "record_id", e.Record.Id, "final_email", e.Record.Email(), "final_username", e.Record.GetString("username"))
 
 			return nil
 		})
