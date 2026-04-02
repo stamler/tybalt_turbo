@@ -37,6 +37,7 @@ export const navSections: NavSection[] = [
       { label: "Approved By Me", href: "/time/sheets/approved", buttons: [] },
       { label: "Shared with Me", href: "/time/sheets/shared", buttons: [] },
       { label: "Tracking", href: "/time/tracking", buttons: [] },
+      { label: "Work Records", href: "/time/work-records", buttons: [] },
       {
         label: "Amendments",
         href: "/time/amendments/pending",

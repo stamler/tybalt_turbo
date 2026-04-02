@@ -263,6 +263,11 @@ func AddRoutes(app core.App) {
 		claimsGroup.GET("", createGetClaimsListHandler(app))
 		claimsGroup.GET("/{id}", createGetClaimDetailsHandler(app))
 
+		workRecordsGroup := se.Router.Group("/api/work_records")
+		workRecordsGroup.Bind(apis.RequireAuth("users"))
+		workRecordsGroup.GET("", createGetWorkRecordsHandler(app))
+		workRecordsGroup.GET("/{workRecord}", createGetWorkRecordDetailsHandler(app))
+
 		// Rate sheet entries management (admin claim required)
 		rateSheetEntriesGroup := se.Router.Group("/api/rate_sheet_entries")
 		rateSheetEntriesGroup.Bind(apis.RequireAuth("users"))

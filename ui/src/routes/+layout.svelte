@@ -38,6 +38,12 @@
                 ) {
                   return $globalStore.claims.includes("report") || $globalStore.claims.includes("admin");
                 }
+                if (item.href.startsWith("/time/work-records")) {
+                  return (
+                    $globalStore.claims.includes("report") ||
+                    $globalStore.claims.includes("work_record")
+                  );
+                }
                 if (
                   item.href.startsWith("/time/sheets/pending") ||
                   item.href.startsWith("/time/sheets/approved") ||

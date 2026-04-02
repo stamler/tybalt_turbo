@@ -12,6 +12,8 @@
     // a function applied to each value in the specified column to format it
     columnFormatters: Record<string, (<T>(value: T) => string | T) | "dollars" | "percent">;
     omitColumns?: string[];
+    columnLabels?: Record<string, string>;
+    columnLinks?: Record<string, (row: Record<string, any>) => string | null | undefined>;
   }
 
   let {
@@ -164,7 +166,7 @@
                     sort(col);
                   }}
                 >
-                  {col}
+                  {tableConfig.columnLabels?.[col] ?? col}
                 </button>
                 <span class="inline-block h-5 w-4">
                   {#if sortColumn === col}
@@ -189,9 +191,18 @@
             <tr>
               {#each columns as col}
                 <td class="pr-4" class:text-right={columnAlignments[col] === "text-right"}>
-                  <button class="hover:underline" onclick={() => addFilter(col, row[col])}>
-                    {formatCell(col, row[col])}
-                  </button>
+                  {#if tableConfig.columnLinks?.[col]?.(row)}
+                    <a
+                      class="text-blue-600 hover:underline"
+                      href={tableConfig.columnLinks?.[col]?.(row)}
+                    >
+                      {formatCell(col, row[col])}
+                    </a>
+                  {:else}
+                    <button class="hover:underline" onclick={() => addFilter(col, row[col])}>
+                      {formatCell(col, row[col])}
+                    </button>
+                  {/if}
                 </td>
               {/each}
               {#if rowActions}

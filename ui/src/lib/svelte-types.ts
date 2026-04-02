@@ -156,3 +156,24 @@ export interface ClaimDetails {
   description: string;
   holders: ClaimHolder[];
 }
+
+export interface WorkRecordSearchRow {
+  work_record: string;
+  prefix: "K" | "Q" | "F";
+  entry_count: number;
+  search_text: string;
+}
+
+export interface WorkRecordEntryRow {
+  id: string;
+  work_record: string;
+  week_ending: string;
+  uid: string;
+  hours: number;
+  job_number: string;
+  job_id: string;
+  description: string;
+  surname: string;
+  given_name: string;
+  timesheet_id: string;
+}
