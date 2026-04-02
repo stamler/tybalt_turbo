@@ -10,6 +10,7 @@
   import { type UnsubscribeFunc } from "pocketbase";
   import { onMount, onDestroy, untrack } from "svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
+  import UncommitConfirmPopover from "$lib/components/UncommitConfirmPopover.svelte";
   import { goto } from "$app/navigation";
   import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
   import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
@@ -27,6 +28,9 @@
   let timeSheet = $state(untrack(() => data.timeSheet));
   let approverInfo = $state(untrack(() => data.approverInfo as any));
   let committerInfo = $state(untrack(() => data.committerInfo));
+  let showUncommitConfirm = $state(false);
+  let uncommitSubmitting = $state(false);
+  let uncommitError = $state<string | null>(null);
   let rejectModal: RejectModal;
   const viewerId = pb.authStore.record?.id ?? "";
   const isCommitUser = () => $globalStore.showAllUi || $globalStore.claims.includes("commit");
@@ -126,13 +130,18 @@
   }
 
   async function uncommit(id: string) {
+    uncommitSubmitting = true;
+    uncommitError = null;
     try {
       await pb.send(`/api/time_sheets/${id}/uncommit`, {
         method: "POST",
       });
+      showUncommitConfirm = false;
       await refreshDetails(id);
     } catch (error: any) {
-      globalStore.addError(getApiErrorMessage(error, "Uncommit failed"));
+      uncommitError = getApiErrorMessage(error, "Uncommit failed");
+    } finally {
+      uncommitSubmitting = false;
     }
   }
 
@@ -151,6 +160,16 @@
 
   function openRejectModal(recordId: string) {
     rejectModal?.openModal(recordId);
+  }
+
+  function openUncommitConfirm() {
+    uncommitError = null;
+    showUncommitConfirm = true;
+  }
+
+  function closeUncommitConfirm() {
+    uncommitError = null;
+    showUncommitConfirm = false;
   }
 </script>
 
@@ -202,7 +221,7 @@
       <div class="flex flex-wrap gap-2 empty:hidden">
         {#if timeSheet.committed !== "" && isAdminUser()}
           <DsActionButton
-            action={() => uncommit(timeSheet.id)}
+            action={openUncommitConfirm}
             icon="mdi:undo"
             title="Uncommit"
             color="orange"
@@ -399,5 +418,13 @@
     on:refresh={() => {
       refreshDetails(timeSheet.id);
     }}
+  />
+  <UncommitConfirmPopover
+    bind:show={showUncommitConfirm}
+    recordLabel="time sheet"
+    submitting={uncommitSubmitting}
+    error={uncommitError}
+    onSubmit={() => uncommit(timeSheet.id)}
+    onCancel={closeUncommitConfirm}
   />
 </div>

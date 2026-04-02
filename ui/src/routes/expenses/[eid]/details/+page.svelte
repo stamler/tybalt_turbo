@@ -6,6 +6,7 @@
   import DsExternalLinkButton from "$lib/components/DsExternalLinkButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
+  import UncommitConfirmPopover from "$lib/components/UncommitConfirmPopover.svelte";
   import Icon from "@iconify/svelte";
   import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { goto } from "$app/navigation";
@@ -20,6 +21,9 @@
   let hasAdminAccess = false;
   let isOwner = false;
   let isApprover = false;
+  let showUncommitConfirm = false;
+  let uncommitSubmitting = false;
+  let uncommitError: string | null = null;
 
   $: hasCommitAccess = $globalStore.showAllUi || $globalStore.claims.includes("commit");
   $: hasAdminAccess = $globalStore.showAllUi || $globalStore.claims.includes("admin");
@@ -71,11 +75,16 @@
   }
 
   async function uncommitExpense() {
+    uncommitSubmitting = true;
+    uncommitError = null;
     try {
       await pb.send(`/api/expenses/${expense.id}/uncommit`, { method: "POST" });
+      showUncommitConfirm = false;
       await refreshExpense();
     } catch (error: any) {
-      globalStore.addError(error?.response?.error || "Uncommit failed");
+      uncommitError = error?.response?.error || "Uncommit failed";
+    } finally {
+      uncommitSubmitting = false;
     }
   }
 
@@ -90,6 +99,16 @@
 
   function openRejectModal() {
     rejectModal?.openModal(expense.id);
+  }
+
+  function openUncommitConfirm() {
+    uncommitError = null;
+    showUncommitConfirm = true;
+  }
+
+  function closeUncommitConfirm() {
+    uncommitError = null;
+    showUncommitConfirm = false;
   }
 
   function poDiffers(expenseVal: string, poVal: string): boolean {
@@ -382,7 +401,7 @@
     <div class="flex flex-wrap gap-2">
       {#if hasAdminAccess && expense.committed !== ""}
         <DsActionButton
-          action={() => uncommitExpense()}
+          action={() => openUncommitConfirm()}
           icon="mdi:undo"
           title="Uncommit"
           color="orange"
@@ -458,4 +477,12 @@
   {/if}
 
   <RejectModal collectionName="expenses" bind:this={rejectModal} on:refresh={refreshExpense} />
+  <UncommitConfirmPopover
+    bind:show={showUncommitConfirm}
+    recordLabel="expense"
+    submitting={uncommitSubmitting}
+    error={uncommitError}
+    onSubmit={uncommitExpense}
+    onCancel={closeUncommitConfirm}
+  />
 </div>
