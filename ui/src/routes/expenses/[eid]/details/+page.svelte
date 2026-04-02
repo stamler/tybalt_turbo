@@ -415,8 +415,8 @@
         />
       {/if}
 
-      <!-- Reject behavior: approvers may reject before approval; commit holders may reject only after approval. -->
-      {#if ((isApprover && expense.approved === "") || (hasCommitAccess && expense.approved !== "")) && expense.submitted && expense.rejected === "" && expense.committed === ""}
+      <!-- Reject behavior: approvers may reject any submitted, uncommitted expense; commit holders may reject approved ones. -->
+      {#if (isApprover || (hasCommitAccess && expense.approved !== "")) && expense.submitted && expense.rejected === "" && expense.committed === ""}
         <DsActionButton
           action={() => openRejectModal()}
           icon="mdi:cancel"
