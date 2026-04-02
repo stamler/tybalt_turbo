@@ -190,7 +190,7 @@
       <span class="flex items-center gap-1">
         {job_number} - {client_name}:
         {job_description}
-        {#if category !== undefined}
+        {#if category !== undefined && category_name}
           <DsLabel color="teal">{category_name}</DsLabel>
         {/if}
       </span>

@@ -12,6 +12,7 @@
     groupSort, // optional sorting order for group keys: 'ASC' | 'DESC'
     groupFooter,
     processorFn,
+    stripeKey,
     anchor,
     headline,
     byline,
@@ -36,6 +37,7 @@
     line2?: Snippet<[T]>;
     line3?: Snippet<[T]>;
     actions?: Snippet<[T]>;
+    stripeKey?: (item: T) => string;
     searchBarExtra?: Snippet;
   } = $props();
 
@@ -121,15 +123,52 @@
     const sorted = keys.slice().sort(cmp);
     return groupSort === "DESC" ? sorted.reverse() : sorted;
   });
+
+  // When stripeKey is provided, compute a map of item.id -> background class
+  // based on the key's position among unique keys (not run order), so items
+  // with the same key always share a color even if they aren't contiguous.
+  const stripeMap = $derived.by(() => {
+    if (!stripeKey) return null;
+    const map = new Map<string, string>();
+
+    const applyStripe = (list: T[]) => {
+      // Build ordered set of unique keys (preserving first-occurrence order)
+      const uniqueKeys: string[] = [];
+      const seen = new Set<string>();
+      for (const item of list) {
+        const key = stripeKey(item);
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueKeys.push(key);
+        }
+      }
+      // Assign color by key position
+      const keyIndex = new Map(uniqueKeys.map((k, i) => [k, i]));
+      for (const item of list) {
+        const idx = keyIndex.get(stripeKey(item))!;
+        map.set(item.id, idx % 2 === 0 ? "bg-neutral-100" : "bg-neutral-200");
+      }
+    };
+
+    if (groupField !== undefined) {
+      for (const group of groupKeys) {
+        applyStripe((processedItems as Record<string, T[]>)[group]);
+      }
+    } else {
+      applyStripe(processedItems as T[]);
+    }
+    return map;
+  });
 </script>
 
 <ul
-  class="grid grid-cols-[auto_1fr_auto] [&>li:not(.inlistheader):nth-child(even)]:bg-neutral-100 [&>li:not(.inlistheader):nth-child(odd)]:bg-neutral-200"
+  class="grid grid-cols-[auto_1fr_auto] {stripeMap ? '' : '[&>li:not(.inlistheader):nth-child(even)]:bg-neutral-100 [&>li:not(.inlistheader):nth-child(odd)]:bg-neutral-200'}"
 >
   {#if search && processorFn === undefined}
     <li
       id="listbar"
       class="col-span-3 flex items-center gap-x-2 p-2 max-[639px]:flex-wrap max-[639px]:gap-2"
+      class:bg-neutral-200={!!stripeMap}
     >
       <input
         id="searchbox"
@@ -157,7 +196,7 @@
 
   {#snippet itemList(_processedItems: T[])}
     {#each _processedItems as item}
-      <li class="contents">
+      <li class="contents" class:bg-neutral-100={stripeMap?.get(item.id) === "bg-neutral-100"} class:bg-neutral-200={stripeMap?.get(item.id) === "bg-neutral-200"}>
         <div class="col-span-3 grid grid-cols-subgrid items-center bg-inherit">
           {#if anchor !== undefined}
             <div class="flex min-w-24 items-center justify-center p-2">
@@ -201,7 +240,7 @@
       {@render itemList(processedItems[group])}
       {#if groupFooter !== undefined}
         <li class="contents">
-          <div class="col-span-3 grid grid-cols-subgrid items-center bg-inherit">
+          <div class="col-span-3 grid grid-cols-subgrid items-center bg-inherit" class:!bg-neutral-200={!!stripeMap}>
             {@render groupFooter(group, processedItems[group])}
           </div>
         </li>

@@ -40,10 +40,10 @@
         if (!Array.isArray(items)) return;
         switch (e.action) {
           case "create":
-            items = [e.record, ...items];
+            items = [e.record, ...items].sort((a, b) => b.date.localeCompare(a.date));
             break;
           case "update":
-            items = items.map((item) => (item.id === e.record.id ? e.record : item));
+            items = items.map((item) => (item.id === e.record.id ? e.record : item)).sort((a, b) => b.date.localeCompare(a.date));
             break;
           case "delete":
             items = items.filter((item) => item.id !== e.record.id);
@@ -271,6 +271,7 @@
   groupField="week_ending"
   {groupHeader}
   {groupFooter}
+  stripeKey={(item) => item.date}
   {anchor}
   {headline}
   {byline}

@@ -137,7 +137,7 @@
       <span class="flex items-center gap-1">
         {r.job_number} - {r.client_name}:
         {r.job_description}
-        {#if r.category !== ""}
+        {#if r.category !== "" && r.category_name}
           <DsLabel color="teal">{r.category_name}</DsLabel>
         {/if}
       </span>
