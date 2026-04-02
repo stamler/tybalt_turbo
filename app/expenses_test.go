@@ -17,6 +17,43 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
+func setupAdminOnlyExpenseViewerApp(tb testing.TB) *tests.TestApp {
+	tb.Helper()
+
+	app := testutils.SetupTestApp(tb)
+	claim, err := app.FindFirstRecordByFilter("claims", "name = 'admin'")
+	if err != nil {
+		tb.Fatalf("failed to load admin claim: %v", err)
+	}
+
+	_, err = app.NonconcurrentDB().NewQuery(`
+		INSERT OR IGNORE INTO user_claims (
+			_imported,
+			cid,
+			created,
+			id,
+			uid,
+			updated
+		) VALUES (
+			0,
+			{:cid},
+			strftime('%Y-%m-%d %H:%M:%fZ', 'now'),
+			{:id},
+			{:uid},
+			strftime('%Y-%m-%d %H:%M:%fZ', 'now')
+		)
+	`).Bind(dbx.Params{
+		"cid": claim.Id,
+		"id":  "test_admin_only_expense_claim_u_no_claims",
+		"uid": "u_no_claims",
+	}).Execute()
+	if err != nil {
+		tb.Fatalf("failed to grant admin claim in test setup: %v", err)
+	}
+
+	return app
+}
+
 func TestExpensesCreate(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
 	if err != nil {
@@ -1095,7 +1132,7 @@ func TestExpenseCommitQueue_RequiresCommitClaim(t *testing.T) {
 		},
 		ExpectedStatus: http.StatusForbidden,
 		ExpectedContent: []string{
-			`"message":"You are not authorized to view the expense commit queue."`,
+			`"message":"you are not authorized to view the expense commit queue"`,
 		},
 		TestAppFactory: testutils.SetupTestApp,
 	}
@@ -2105,6 +2142,293 @@ func TestExpensesRoutes(t *testing.T) {
 				"OnAfterApiError":  0,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func setupClosedPurchaseOrderForUncommit(t testing.TB, poID string) *tests.TestApp {
+	t.Helper()
+
+	app := testutils.SetupTestApp(t)
+	po, err := app.FindRecordById("purchase_orders", poID)
+	if err != nil {
+		t.Fatalf("failed to load purchase order %s: %v", poID, err)
+	}
+
+	po.Set("status", "Closed")
+	po.Set("closed", "2026-04-02 12:00:00.000Z")
+	po.Set("closer", "tqqf7q0f3378rvp")
+	po.Set("closed_by_system", true)
+
+	if err := app.Save(po); err != nil {
+		t.Fatalf("failed to close purchase order %s in test setup: %v", poID, err)
+	}
+
+	return app
+}
+
+func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
+	adminToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:           "admin can read committed expense details through custom route",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/details/xg2yeucklhgbs3n",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"id":"xg2yeucklhgbs3n"`,
+				`"committed":"2024-09-20 12:00:00.000Z"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+		},
+		{
+			Name:           "admin cannot read uncommitted expense details through custom route",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/details/eqhozipupteogp8",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"Expense not found or not authorized."`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+		},
+		{
+			Name:           "admin can uncommit a committed expense",
+			Method:         http.MethodPost,
+			URL:            "/api/expenses/xg2yeucklhgbs3n/uncommit",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"message":"Record uncommitted successfully"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
+				record, err := app.FindRecordById("expenses", "xg2yeucklhgbs3n")
+				if err != nil {
+					tb.Fatalf("failed to load expense after uncommit: %v", err)
+				}
+				if got := record.GetString("committed"); got != "" {
+					tb.Fatalf("committed = %q, want blank", got)
+				}
+				if got := record.GetString("committed_week_ending"); got != "" {
+					tb.Fatalf("committed_week_ending = %q, want blank", got)
+				}
+				if got := record.GetString("committer"); got != "" {
+					tb.Fatalf("committer = %q, want blank", got)
+				}
+				if got := record.GetString("pay_period_ending"); got != "" {
+					tb.Fatalf("pay_period_ending = %q, want blank", got)
+				}
+				if got := record.GetString("approved"); got == "" {
+					tb.Fatalf("approved unexpectedly blank after uncommit")
+				}
+			},
+		},
+		{
+			Name:           "commit holder cannot uncommit a committed expense",
+			Method:         http.MethodPost,
+			URL:            "/api/expenses/xg2yeucklhgbs3n/uncommit",
+			Headers:        map[string]string{"Authorization": commitToken},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+		},
+		{
+			Name:           "admin cannot uncommit an uncommitted expense",
+			Method:         http.MethodPost,
+			URL:            "/api/expenses/eqhozipupteogp8/uncommit",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"record_not_committed"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+		},
+		{
+			Name:           "uncommitting a committed expense reopens a closed one-time purchase order",
+			Method:         http.MethodPost,
+			URL:            "/api/expenses/6569323gg8184uh/uncommit",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"message":"Record uncommitted successfully"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
+				po, err := app.FindRecordById("purchase_orders", "0pia83nnprdlzf8")
+				if err != nil {
+					tb.Fatalf("failed to load purchase order after uncommit: %v", err)
+				}
+				if got := po.GetString("status"); got != "Active" {
+					tb.Fatalf("status = %q, want Active", got)
+				}
+			},
+		},
+		{
+			Name:           "uncommitting a committed expense reopens a closed recurring purchase order when it is no longer exhausted",
+			Method:         http.MethodPost,
+			URL:            "/api/expenses/3yx4y19k40zun2w/uncommit",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"message":"Record uncommitted successfully"`,
+			},
+			TestAppFactory: func(tb testing.TB) *tests.TestApp {
+				app := setupClosedPurchaseOrderForUncommit(tb, "d8463q483f3da28")
+				claim, err := app.FindFirstRecordByFilter("claims", "name = 'admin'")
+				if err != nil {
+					tb.Fatalf("failed to load admin claim: %v", err)
+				}
+				_, err = app.NonconcurrentDB().NewQuery(`
+					INSERT OR IGNORE INTO user_claims (_imported, cid, created, id, uid, updated)
+					VALUES (0, {:cid}, strftime('%Y-%m-%d %H:%M:%fZ', 'now'), {:id}, {:uid}, strftime('%Y-%m-%d %H:%M:%fZ', 'now'))
+				`).Bind(dbx.Params{
+					"cid": claim.Id,
+					"id":  "test_admin_only_expense_claim_u_no_claims",
+					"uid": "u_no_claims",
+				}).Execute()
+				if err != nil {
+					tb.Fatalf("failed to grant admin claim in test setup: %v", err)
+				}
+				return app
+			},
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
+				po, err := app.FindRecordById("purchase_orders", "d8463q483f3da28")
+				if err != nil {
+					tb.Fatalf("failed to load recurring purchase order after uncommit: %v", err)
+				}
+				if got := po.GetString("status"); got != "Active" {
+					tb.Fatalf("status = %q, want Active", got)
+				}
+			},
+		},
+		{
+			Name:           "uncommitting a committed expense reopens a closed cumulative purchase order when committed total drops below the po total",
+			Method:         http.MethodPost,
+			URL:            "/api/expenses/su3hyft6n9rlt7d/uncommit",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"message":"Record uncommitted successfully"`,
+			},
+			TestAppFactory: func(tb testing.TB) *tests.TestApp {
+				app := setupClosedPurchaseOrderForUncommit(tb, "ly8xyzpuj79upq1")
+				claim, err := app.FindFirstRecordByFilter("claims", "name = 'admin'")
+				if err != nil {
+					tb.Fatalf("failed to load admin claim: %v", err)
+				}
+				_, err = app.NonconcurrentDB().NewQuery(`
+					INSERT OR IGNORE INTO user_claims (_imported, cid, created, id, uid, updated)
+					VALUES (0, {:cid}, strftime('%Y-%m-%d %H:%M:%fZ', 'now'), {:id}, {:uid}, strftime('%Y-%m-%d %H:%M:%fZ', 'now'))
+				`).Bind(dbx.Params{
+					"cid": claim.Id,
+					"id":  "test_admin_only_expense_claim_u_no_claims",
+					"uid": "u_no_claims",
+				}).Execute()
+				if err != nil {
+					tb.Fatalf("failed to grant admin claim in test setup: %v", err)
+				}
+				return app
+			},
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
+				po, err := app.FindRecordById("purchase_orders", "ly8xyzpuj79upq1")
+				if err != nil {
+					tb.Fatalf("failed to load cumulative purchase order after uncommit: %v", err)
+				}
+				if got := po.GetString("status"); got != "Active" {
+					tb.Fatalf("status = %q, want Active", got)
+				}
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestExpenseAdminDiscoveryRoutes(t *testing.T) {
+	adminToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:           "admin-only user can view expense tracking counts",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/tracking_counts",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"committed_week_ending":"2024-09-21"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+		},
+		{
+			Name:           "admin-only user can view committed expense tracking list",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/tracking/2024-09-21",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"xg2yeucklhgbs3n"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+		},
+		{
+			Name:           "admin-only user cannot view org-wide expenses list",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/list",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"data":[]`,
+			},
+			NotExpectedContent: []string{
+				`"id":"2gq9uyxmkcyopa4"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+		},
+		{
+			Name:           "admin-only user cannot view pending expenses list",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/pending",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"data":[]`,
+			},
+			NotExpectedContent: []string{
+				`"id":"exp_approve_closed_po_1"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+		},
+		{
+			Name:           "admin-only user cannot view expense commit queue",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/commit_queue",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized"`,
+			},
+			TestAppFactory: setupAdminOnlyExpenseViewerApp,
 		},
 	}
 

@@ -36,7 +36,7 @@
                   item.href.startsWith("/time/tracking") ||
                   item.href.startsWith("/expenses/tracking")
                 ) {
-                  return $globalStore.claims.includes("report");
+                  return $globalStore.claims.includes("report") || $globalStore.claims.includes("admin");
                 }
                 if (
                   item.href.startsWith("/time/sheets/pending") ||

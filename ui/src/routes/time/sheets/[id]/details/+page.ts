@@ -6,24 +6,13 @@ import { error } from "@sveltejs/kit";
 
 export const load: PageLoad = async ({ params }) => {
   try {
-    // Prepare holders
-    const committerInfo = { committer_name: "" };
-
-    // Load time entries for the specific time sheet
-    const items = await pb.collection("time_entries").getFullList<TimeEntriesResponse>({
-      filter: pb.filter("tsid={:tsid}", { tsid: params.id }),
-      expand: "job,time_type,division,category",
-      sort: "-date",
+    const response = await pb.send(`/api/time_sheets/${params.id}/details`, {
+      method: "GET",
     });
 
-    // Calculate tallies for this specific time sheet
+    const items = (response.items || []) as TimeEntriesResponse[];
     const tallies = calculateTally(items);
-
-    // Get the time sheet record for additional info
-    const timeSheet = await pb.collection("time_sheets").getOne(params.id);
-
-    // Get approver information via custom API endpoint
-    let approverInfo = {
+    const approverInfo = response.approverInfo || {
       approver_name: "",
       approved_date: "",
       committer_name: "",
@@ -31,32 +20,14 @@ export const load: PageLoad = async ({ params }) => {
       rejector_name: "",
       rejected_date: "",
     };
-    try {
-      const approverResponse = await pb.send(`/api/time_sheets/${params.id}/approver`, {
-        method: "GET",
-      });
-      approverInfo = approverResponse;
-      committerInfo.committer_name = approverResponse.committer_name || "";
-      const committedDate = approverResponse.committed_date || "";
-      if (committedDate !== "") {
-        timeSheet.committed = committedDate; // ensure field present
-      }
-      // Propagate rejection details so the UI can display them consistently
-      const rejectedDate = approverResponse.rejected_date || "";
-      if (rejectedDate !== "") {
-        timeSheet.rejected = rejectedDate;
-      }
-      // Ensure rejector_name is present in approverInfo (for type safety)
-      approverInfo.rejector_name = approverResponse.rejector_name || "";
-      approverInfo.rejected_date = rejectedDate;
-    } catch (err) {
-      console.log("Could not fetch approver info:", err);
-    }
+    const committerInfo = {
+      committer_name: approverInfo.committer_name || "",
+    };
 
     return {
       items,
       tallies,
-      timeSheet,
+      timeSheet: response.timeSheet,
       timesheetId: params.id,
       approverInfo,
       committerInfo,

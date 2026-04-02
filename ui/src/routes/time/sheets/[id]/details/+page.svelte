@@ -30,38 +30,55 @@
   let rejectModal: RejectModal;
   const viewerId = pb.authStore.record?.id ?? "";
   const isCommitUser = () => $globalStore.showAllUi || $globalStore.claims.includes("commit");
+  const isAdminUser = () => $globalStore.showAllUi || $globalStore.claims.includes("admin");
+
+  async function refreshDetails(id: string) {
+    try {
+      const response = await pb.send(`/api/time_sheets/${id}/details`, {
+        method: "GET",
+      });
+      timeSheet = response.timeSheet;
+      items = response.items;
+      approverInfo = response.approverInfo;
+      committerInfo = { committer_name: response.approverInfo?.committer_name || "" };
+    } catch (error: any) {
+      globalStore.addError(getApiErrorMessage(error, "Refresh failed"));
+    }
+  }
 
   // Subscribe to time entries changes for this specific time sheet
-  let unsubscribeFunc: UnsubscribeFunc;
+  let unsubscribeFunc: UnsubscribeFunc | undefined;
   onMount(async () => {
     if (items === undefined) {
       return;
     }
-    unsubscribeFunc = await pb.collection("time_entries").subscribe<TimeEntriesResponse>(
-      "*",
-      async (e) => {
-        // return immediately if items is not an array
-        if (!Array.isArray(items)) return;
-        switch (e.action) {
-          case "create":
-            // Only add if it belongs to this time sheet
-            if (e.record.tsid === data.timesheetId) {
-              items = [e.record, ...items];
-            }
-            break;
-          case "update":
-            items = items.map((item) => (item.id === e.record.id ? e.record : item));
-            break;
-          case "delete":
-            items = items.filter((item) => item.id !== e.record.id);
-            break;
-        }
-      },
-      {
-        filter: pb.filter("tsid={:tsid}", { tsid: data.timesheetId }),
-        expand: "job,time_type,division,category",
-      },
-    );
+    try {
+      unsubscribeFunc = await pb.collection("time_entries").subscribe<TimeEntriesResponse>(
+        "*",
+        async (e) => {
+          if (!Array.isArray(items)) return;
+          switch (e.action) {
+            case "create":
+              if (e.record.tsid === data.timesheetId) {
+                items = [e.record, ...items];
+              }
+              break;
+            case "update":
+              items = items.map((item) => (item.id === e.record.id ? e.record : item));
+              break;
+            case "delete":
+              items = items.filter((item) => item.id !== e.record.id);
+              break;
+          }
+        },
+        {
+          filter: pb.filter("tsid={:tsid}", { tsid: data.timesheetId }),
+          expand: "job,time_type,division,category",
+        },
+      );
+    } catch {
+      unsubscribeFunc = undefined;
+    }
   });
 
   onDestroy(async () => {
@@ -91,8 +108,7 @@
           "Content-Type": "application/json",
         },
       });
-      // Refresh the local timesheet data
-      timeSheet = await pb.collection("time_sheets").getOne(id);
+      await refreshDetails(id);
     } catch (error: any) {
       globalStore.addError(getApiErrorMessage(error, "Approve failed"));
     }
@@ -103,9 +119,20 @@
       await pb.send(`/api/time_sheets/${id}/commit`, {
         method: "POST",
       });
-      timeSheet = await pb.collection("time_sheets").getOne(id);
+      await refreshDetails(id);
     } catch (error: any) {
       globalStore.addError(getApiErrorMessage(error, "Commit failed"));
+    }
+  }
+
+  async function uncommit(id: string) {
+    try {
+      await pb.send(`/api/time_sheets/${id}/uncommit`, {
+        method: "POST",
+      });
+      await refreshDetails(id);
+    } catch (error: any) {
+      globalStore.addError(getApiErrorMessage(error, "Uncommit failed"));
     }
   }
 
@@ -173,7 +200,14 @@
       </div>
       <!-- Action Buttons -->
       <div class="flex flex-wrap gap-2 empty:hidden">
-        {#if timeSheet.rejected !== ""}
+        {#if timeSheet.committed !== "" && isAdminUser()}
+          <DsActionButton
+            action={() => uncommit(timeSheet.id)}
+            icon="mdi:undo"
+            title="Uncommit"
+            color="orange"
+          />
+        {:else if timeSheet.rejected !== ""}
           <!-- Rejected: allow recall -->
           {#if canRecallTimesheet(timeSheet, viewerId)}
             <DsActionButton
@@ -363,10 +397,7 @@
     collectionName="time_sheets"
     bind:this={rejectModal}
     on:refresh={() => {
-      // refresh the page data when a reject action occurs inside the modal
-      pb.collection("time_sheets")
-        .getOne(timeSheet.id)
-        .then((ts) => (timeSheet = ts));
+      refreshDetails(timeSheet.id);
     }}
   />
 </div>

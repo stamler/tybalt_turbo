@@ -17,10 +17,12 @@
   let rejectModal: RejectModal;
   let expense = data.expense;
   let hasCommitAccess = false;
+  let hasAdminAccess = false;
   let isOwner = false;
   let isApprover = false;
 
   $: hasCommitAccess = $globalStore.showAllUi || $globalStore.claims.includes("commit");
+  $: hasAdminAccess = $globalStore.showAllUi || $globalStore.claims.includes("admin");
   $: isOwner = expense.uid === viewerId;
   $: isApprover = expense.approver === viewerId;
 
@@ -65,6 +67,15 @@
       await goto(resolve("/reports/expense/queue"));
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Commit failed");
+    }
+  }
+
+  async function uncommitExpense() {
+    try {
+      await pb.send(`/api/expenses/${expense.id}/uncommit`, { method: "POST" });
+      await refreshExpense();
+    } catch (error: any) {
+      globalStore.addError(error?.response?.error || "Uncommit failed");
     }
   }
 
@@ -369,6 +380,15 @@
 
   {#if $expensesEditingEnabled}
     <div class="flex flex-wrap gap-2">
+      {#if hasAdminAccess && expense.committed !== ""}
+        <DsActionButton
+          action={() => uncommitExpense()}
+          icon="mdi:undo"
+          title="Uncommit"
+          color="orange"
+        />
+      {/if}
+
       <!-- Owner draft actions: an unsubmitted expense can still be edited and submitted. -->
       {#if isOwner && !expense.submitted}
         <DsActionButton

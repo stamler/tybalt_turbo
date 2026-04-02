@@ -508,6 +508,24 @@ func TestExpensesEditingDisabledBlocks(t *testing.T) {
 			s.Test(t)
 		}
 	}
+
+	adminToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expenseUncommitScenario := tests.ApiScenario{
+		Name:           "expense uncommit blocked when editing disabled",
+		Method:         http.MethodPost,
+		URL:            "/api/expenses/xg2yeucklhgbs3n/uncommit",
+		Headers:        map[string]string{"Authorization": adminToken},
+		ExpectedStatus: 403,
+		ExpectedContent: []string{
+			`"Expense editing is currently disabled."`,
+		},
+		TestAppFactory: setupExpensesEditingDisabledApp,
+	}
+	expenseUncommitScenario.Test(t)
 }
 
 // TestVendorAbsorbBlockedWhenEditingDisabled verifies that absorbing vendors fails
@@ -683,6 +701,17 @@ func TestTimeEditingDisabledBlocks(t *testing.T) {
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
 				`"message":"Time sheet unbundled successfully"`,
+			},
+			TestAppFactory: setupTimeEditingDisabledApp,
+		},
+		{
+			Name:           "timesheet uncommit blocked when editing disabled",
+			Method:         http.MethodPost,
+			URL:            "/api/time_sheets/j1lr2oddjongtoj/uncommit",
+			Headers:        map[string]string{"Authorization": approverToken},
+			ExpectedStatus: 403,
+			ExpectedContent: []string{
+				`"Time editing is currently disabled."`,
 			},
 			TestAppFactory: setupTimeEditingDisabledApp,
 		},

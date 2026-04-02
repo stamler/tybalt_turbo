@@ -147,6 +147,7 @@
 
   function canViewDetails(row: any) {
     if ($globalStore.showAllUi) return true;
+    if ($globalStore.claims.includes("admin")) return true;
     if ($globalStore.claims.includes("commit") && row.approved !== "") return true;
     if ($globalStore.claims.includes("report") && row.committed !== "") return true;
     return false;

@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 	"time"
+	"tybalt/errs"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -17,25 +18,56 @@ type trackingCountRow struct {
 	RejectedCount  int    `db:"rejected_count" json:"rejected_count"`
 }
 
-// createTimesheetTrackingCountsHandler returns weekly submitted/approved/committed counts for committers
+type committedTimesheetTrackingAccess struct {
+	IsReportHolder bool
+	IsCommitHolder bool
+	HasAdminClaim  bool
+}
+
+func getCommittedTimesheetTrackingAccess(app core.App, auth *core.Record) (committedTimesheetTrackingAccess, error) {
+	isReportHolder, err := utilities.HasClaim(app, auth, "report")
+	if err != nil {
+		return committedTimesheetTrackingAccess{}, err
+	}
+	if isReportHolder {
+		return committedTimesheetTrackingAccess{IsReportHolder: true}, nil
+	}
+
+	isCommitter, err := utilities.HasClaim(app, auth, "commit")
+	if err != nil {
+		return committedTimesheetTrackingAccess{}, err
+	}
+	if isCommitter {
+		return committedTimesheetTrackingAccess{IsCommitHolder: true}, nil
+	}
+
+	hasAdmin, err := utilities.HasClaim(app, auth, "admin")
+	if err != nil {
+		return committedTimesheetTrackingAccess{}, err
+	}
+	if hasAdmin {
+		return committedTimesheetTrackingAccess{HasAdminClaim: true}, nil
+	}
+
+	return committedTimesheetTrackingAccess{}, &errs.HookError{
+		Status:  http.StatusForbidden,
+		Message: "you are not authorized to view time tracking",
+		Data: map[string]errs.CodeError{
+			"global": {
+				Code:    "unauthorized",
+				Message: "you are not authorized to view time tracking",
+			},
+		},
+	}
+}
+
+// createTimesheetTrackingCountsHandler returns weekly submitted/approved/committed counts for
+// viewers of the committed tracking surfaces.
 func createTimesheetTrackingCountsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		auth := e.Auth
-		// Allow either report holders or committers to view tracking
-		isReportHolder, err := utilities.HasClaim(app, auth, "report")
+		access, err := getCommittedTimesheetTrackingAccess(app, e.Auth)
 		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		isCommitter := false
-		if !isReportHolder { // only check commit if needed
-			var err2 error
-			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
-			if err2 != nil {
-				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
-			}
-		}
-		if !(isReportHolder || isCommitter) {
-			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
+			return writeHookError(e, err)
 		}
 
 		query := `
@@ -44,18 +76,20 @@ func createTimesheetTrackingCountsHandler(app core.App) func(e *core.RequestEven
                 -- committed are exclusive
                 SUM(CASE WHEN committed != '' THEN 1 ELSE 0 END) AS committed_count,
                 -- approved but not committed
-                SUM(CASE WHEN approved != '' AND committed = '' THEN 1 ELSE 0 END) AS approved_count,
+                SUM(CASE WHEN {:has_admin} = 0 AND approved != '' AND committed = '' THEN 1 ELSE 0 END) AS approved_count,
                 -- submitted but neither approved nor committed
-                SUM(CASE WHEN submitted = 1 AND approved = '' AND committed = '' THEN 1 ELSE 0 END) AS submitted_count,
+                SUM(CASE WHEN {:has_admin} = 0 AND submitted = 1 AND approved = '' AND committed = '' THEN 1 ELSE 0 END) AS submitted_count,
                 -- rejected is non-exclusive (can overlap others)
-                SUM(CASE WHEN rejected != '' THEN 1 ELSE 0 END) AS rejected_count
+                SUM(CASE WHEN {:has_admin} = 0 AND rejected != '' THEN 1 ELSE 0 END) AS rejected_count
             FROM time_sheets
             GROUP BY week_ending
             ORDER BY week_ending DESC
         `
 
 		var rows []trackingCountRow
-		if err := app.DB().NewQuery(query).All(&rows); err != nil {
+		if err := app.DB().NewQuery(query).Bind(dbx.Params{
+			"has_admin": boolToInt(access.HasAdminClaim),
+		}).All(&rows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query", err)
 		}
 
@@ -94,22 +128,9 @@ type trackingListRow struct {
 // createTimesheetTrackingListHandler returns org-wide timesheets for a given week ending
 func createTimesheetTrackingListHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		auth := e.Auth
-		// Allow either report holders or committers to view tracking
-		isReportHolder, err := utilities.HasClaim(app, auth, "report")
+		access, err := getCommittedTimesheetTrackingAccess(app, e.Auth)
 		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		isCommitter := false
-		if !isReportHolder { // only check commit if needed
-			var err2 error
-			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
-			if err2 != nil {
-				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
-			}
-		}
-		if !(isReportHolder || isCommitter) {
-			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
+			return writeHookError(e, err)
 		}
 
 		weekEnding := e.Request.PathValue("weekEnding")
@@ -176,7 +197,8 @@ func createTimesheetTrackingListHandler(app core.App) func(e *core.RequestEvent)
               AND ts.submitted = 1
               AND (
                     {:has_report} = 1 OR
-                    ts.approved != ''
+                    ({:has_admin} = 1 AND ts.committed != '') OR
+                    ({:has_admin} = 0 AND ts.approved != '')
                   )
             ORDER BY
                 CASE
@@ -190,7 +212,8 @@ func createTimesheetTrackingListHandler(app core.App) func(e *core.RequestEvent)
 		var rows []trackingListRow
 		if err := app.DB().NewQuery(query).Bind(dbx.Params{
 			"week_ending": weekEnding,
-			"has_report":  boolToInt(isReportHolder),
+			"has_report":  boolToInt(access.IsReportHolder),
+			"has_admin":   boolToInt(access.HasAdminClaim),
 		}).All(&rows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query", err)
 		}
@@ -215,21 +238,8 @@ func isValidWeekEnding(weekEnding string) bool {
 // createTimesheetMissingHandler returns users expected to have a timesheet but missing for the week
 func createTimesheetMissingHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		auth := e.Auth
-		isReportHolder, err := utilities.HasClaim(app, auth, "report")
-		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		isCommitter := false
-		if !isReportHolder {
-			var err2 error
-			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
-			if err2 != nil {
-				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
-			}
-		}
-		if !(isReportHolder || isCommitter) {
-			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
+		if err := requireTimeTrackingViewer(app, e.Auth); err != nil {
+			return writeHookError(e, err)
 		}
 
 		weekEnding := e.Request.PathValue("weekEnding")
@@ -271,21 +281,8 @@ func createTimesheetMissingHandler(app core.App) func(e *core.RequestEvent) erro
 // createTimesheetNotExpectedHandler returns users not expected to have a timesheet and missing for the week
 func createTimesheetNotExpectedHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		auth := e.Auth
-		isReportHolder, err := utilities.HasClaim(app, auth, "report")
-		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		isCommitter := false
-		if !isReportHolder {
-			var err2 error
-			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
-			if err2 != nil {
-				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
-			}
-		}
-		if !(isReportHolder || isCommitter) {
-			return e.Error(http.StatusForbidden, "you are not authorized to view time tracking", nil)
+		if err := requireTimeTrackingViewer(app, e.Auth); err != nil {
+			return writeHookError(e, err)
 		}
 
 		weekEnding := e.Request.PathValue("weekEnding")

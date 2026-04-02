@@ -7,8 +7,46 @@ import (
 	"testing"
 	"tybalt/internal/testutils"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
 )
+
+func setupAdminOnlyViewerApp(tb testing.TB) *tests.TestApp {
+	tb.Helper()
+
+	app := testutils.SetupTestApp(tb)
+	claim, err := app.FindFirstRecordByFilter("claims", "name = 'admin'")
+	if err != nil {
+		tb.Fatalf("failed to load admin claim: %v", err)
+	}
+
+	_, err = app.NonconcurrentDB().NewQuery(`
+		INSERT OR IGNORE INTO user_claims (
+			_imported,
+			cid,
+			created,
+			id,
+			uid,
+			updated
+		) VALUES (
+			0,
+			{:cid},
+			strftime('%Y-%m-%d %H:%M:%fZ', 'now'),
+			{:id},
+			{:uid},
+			strftime('%Y-%m-%d %H:%M:%fZ', 'now')
+		)
+	`).Bind(dbx.Params{
+		"cid": claim.Id,
+		"id":  "test_admin_only_claim_u_no_claims",
+		"uid": "u_no_claims",
+	}).Execute()
+	if err != nil {
+		tb.Fatalf("failed to grant admin claim in test setup: %v", err)
+	}
+
+	return app
+}
 
 func TestTimeSheetsRoutes(t *testing.T) {
 	committerToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
@@ -158,6 +196,144 @@ func TestTimeSheetsRoutes(t *testing.T) {
 				`"code":"record_already_committed"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestTimeSheetDetailsAndUncommitRoutes(t *testing.T) {
+	adminToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	committerToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:           "admin can read committed time sheet details through custom route",
+			Method:         http.MethodGet,
+			URL:            "/api/time_sheets/j1lr2oddjongtoj/details",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"timeSheet":{"`,
+				`"id":"j1lr2oddjongtoj"`,
+				`"items":[`,
+				`"approverInfo":{"`,
+			},
+			TestAppFactory: setupAdminOnlyViewerApp,
+		},
+		{
+			Name:           "admin cannot read uncommitted time sheet details through custom route",
+			Method:         http.MethodGet,
+			URL:            "/api/time_sheets/aeyl94og4xmnpq4/details",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"message":"Time sheet not found or not authorized."`,
+			},
+			TestAppFactory: setupAdminOnlyViewerApp,
+		},
+		{
+			Name:           "admin can uncommit a committed time sheet",
+			Method:         http.MethodPost,
+			URL:            "/api/time_sheets/j1lr2oddjongtoj/uncommit",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"message":"Record uncommitted successfully"`,
+			},
+			TestAppFactory: setupAdminOnlyViewerApp,
+			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
+				record, err := app.FindRecordById("time_sheets", "j1lr2oddjongtoj")
+				if err != nil {
+					tb.Fatalf("failed to load timesheet after uncommit: %v", err)
+				}
+				if got := record.GetString("committed"); got != "" {
+					tb.Fatalf("committed = %q, want blank", got)
+				}
+				if got := record.GetString("committer"); got != "" {
+					tb.Fatalf("committer = %q, want blank", got)
+				}
+				if got := record.GetString("approved"); got == "" {
+					tb.Fatalf("approved unexpectedly blank after uncommit")
+				}
+			},
+		},
+		{
+			Name:           "committer cannot uncommit a committed time sheet",
+			Method:         http.MethodPost,
+			URL:            "/api/time_sheets/j1lr2oddjongtoj/uncommit",
+			Headers:        map[string]string{"Authorization": committerToken},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized"`,
+			},
+			TestAppFactory: setupAdminOnlyViewerApp,
+		},
+		{
+			Name:           "admin cannot uncommit an uncommitted time sheet",
+			Method:         http.MethodPost,
+			URL:            "/api/time_sheets/aeyl94og4xmnpq4/uncommit",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"record_not_committed"`,
+			},
+			TestAppFactory: setupAdminOnlyViewerApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestTimeSheetAdminDiscoveryRoutes(t *testing.T) {
+	adminToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:           "admin-only user can view timesheet tracking counts",
+			Method:         http.MethodGet,
+			URL:            "/api/time_sheets/tracking_counts",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"week_ending":"2024-09-28"`,
+			},
+			TestAppFactory: setupAdminOnlyViewerApp,
+		},
+		{
+			Name:           "admin-only user can view committed timesheet tracking list",
+			Method:         http.MethodGet,
+			URL:            "/api/time_sheets/tracking/weeks/2024-09-28",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"j1lr2oddjongtoj"`,
+			},
+			TestAppFactory: setupAdminOnlyViewerApp,
+		},
+		{
+			Name:           "admin-only user cannot view missing timesheet list",
+			Method:         http.MethodGet,
+			URL:            "/api/time_sheets/tracking/weeks/2024-06-29/missing",
+			Headers:        map[string]string{"Authorization": adminToken},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized"`,
+			},
+			TestAppFactory: setupAdminOnlyViewerApp,
 		},
 	}
 

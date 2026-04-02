@@ -21,14 +21,14 @@ var expenseDetailsQuery string
 // Predefined WHERE clauses to minimize inline query building.
 //
 // Important policy note:
-// - These clauses model EXPENSE visibility, not PURCHASE ORDER visibility.
-// - That distinction matters because some callers can legitimately view a PO
-//   details page without being allowed to view every linked expense.
-// - In particular, PO creator / PO approver / PO second approver visibility is
-//   broader in some cases than expense visibility, while expense owners can in
-//   some cases still view their own expense even if they no longer qualify to
-//   view the linked PO (for example after the PO reaches a terminal state and
-//   they are not a PO participant).
+//   - These clauses model EXPENSE visibility, not PURCHASE ORDER visibility.
+//   - That distinction matters because some callers can legitimately view a PO
+//     details page without being allowed to view every linked expense.
+//   - In particular, PO creator / PO approver / PO second approver visibility is
+//     broader in some cases than expense visibility, while expense owners can in
+//     some cases still view their own expense even if they no longer qualify to
+//     view the linked PO (for example after the PO reaches a terminal state and
+//     they are not a PO participant).
 //
 // The shared expense visibility predicate below currently allows:
 // - expense owner: always
@@ -261,20 +261,20 @@ func createGetExpensesListHandler(app core.App) func(e *core.RequestEvent) error
 // therefore incorrectly hid other users' expenses from report/commit holders.
 //
 // Current policy for this route:
-// - backend first proves the PO itself is visible through the PO visibility
-//   layer; the frontend also reaches this route only from that page
-// - returned expenses are then filtered again using EXPENSE visibility
-// - therefore this route can legitimately return fewer rows than PO-level
-//   aggregates such as committed_expenses_count suggest
+//   - backend first proves the PO itself is visible through the PO visibility
+//     layer; the frontend also reaches this route only from that page
+//   - returned expenses are then filtered again using EXPENSE visibility
+//   - therefore this route can legitimately return fewer rows than PO-level
+//     aggregates such as committed_expenses_count suggest
 //
 // This is intentional as of now. We are fixing a concrete bug for report and
 // commit holders without broadening access for all PO participants.
 //
 // Known discrepancy to preserve/document:
-// - PO creator / PO approver / PO second approver may be able to view a PO but
-//   not every linked expense unless they also satisfy expense visibility
-// - expense owner may be able to view their expense even when they cannot view
-//   the linked PO under terminal-state PO visibility rules
+//   - PO creator / PO approver / PO second approver may be able to view a PO but
+//     not every linked expense unless they also satisfy expense visibility
+//   - expense owner may be able to view their expense even when they cannot view
+//     the linked PO under terminal-state PO visibility rules
 //
 // If policy later changes, this route is the place to decide whether PO
 // participant visibility should be unioned with expense visibility.
@@ -391,10 +391,14 @@ func createGetExpenseDetailsHandler(app core.App) func(e *core.RequestEvent) err
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "error checking expense visibility claims", err)
 		}
+		hasAdmin, err := utilities.HasClaim(app, auth, "admin")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "error checking expense visibility claims", err)
+		}
 		params["id"] = id
+		params["has_admin"] = boolToInt(hasAdmin)
 
-		// Append allowed predicate to the details query
-		query := expenseDetailsQuery + "\nAND (\n" + expenseVisibilityPredicate + "\n)"
+		query := expenseDetailsQuery + "\nAND (\n" + expenseVisibilityPredicate + "\nOR ({:has_admin} = 1 AND e.committed != '')\n)"
 
 		var row ExpenseDetailsRow
 		if err := app.DB().NewQuery(query).Bind(params).One(&row); err != nil {

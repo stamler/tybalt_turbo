@@ -3,6 +3,7 @@ package routes
 import (
 	"net/http"
 	"time"
+	"tybalt/errs"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -15,25 +16,69 @@ type expenseTrackingCountRow struct {
 	PlaceholderPayrollIDExpenseCount int    `db:"placeholder_payroll_id_expense_count" json:"placeholder_payroll_id_expense_count"`
 }
 
-// createExpenseTrackingCountsHandler returns committed expense counts grouped by committed_week_ending for report holders.
+func requireExpenseTrackingViewer(app core.App, auth *core.Record) error {
+	isReportHolder, err := utilities.HasClaim(app, auth, "report")
+	if err != nil {
+		return err
+	}
+	if isReportHolder {
+		return nil
+	}
+
+	isCommitter, err := utilities.HasClaim(app, auth, "commit")
+	if err != nil {
+		return err
+	}
+	if isCommitter {
+		return nil
+	}
+
+	hasAdmin, err := utilities.HasClaim(app, auth, "admin")
+	if err != nil {
+		return err
+	}
+	if hasAdmin {
+		return nil
+	}
+
+	return &errs.HookError{
+		Status:  http.StatusForbidden,
+		Message: "you are not authorized to view expense tracking",
+		Data: map[string]errs.CodeError{
+			"global": {
+				Code:    "unauthorized",
+				Message: "you are not authorized to view expense tracking",
+			},
+		},
+	}
+}
+
+func requireExpenseCommitQueueViewer(app core.App, auth *core.Record) error {
+	isCommitter, err := utilities.HasClaim(app, auth, "commit")
+	if err != nil {
+		return err
+	}
+	if isCommitter {
+		return nil
+	}
+
+	return &errs.HookError{
+		Status:  http.StatusForbidden,
+		Message: "you are not authorized to view the expense commit queue",
+		Data: map[string]errs.CodeError{
+			"global": {
+				Code:    "unauthorized",
+				Message: "you are not authorized to view the expense commit queue",
+			},
+		},
+	}
+}
+
+// createExpenseTrackingCountsHandler returns committed expense counts grouped by committed_week_ending for report/commit/admin viewers.
 func createExpenseTrackingCountsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		auth := e.Auth
-		// Allow either report holders or committers to view expense tracking counts
-		isReportHolder, err := utilities.HasClaim(app, auth, "report")
-		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		isCommitter := false
-		if !isReportHolder {
-			var err2 error
-			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
-			if err2 != nil {
-				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
-			}
-		}
-		if !(isReportHolder || isCommitter) {
-			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking counts", nil)
+		if err := requireExpenseTrackingViewer(app, e.Auth); err != nil {
+			return writeHookError(e, err)
 		}
 
 		query := `
@@ -94,25 +139,11 @@ type expenseTrackingListRow struct {
 	PONumber        string  `db:"po_number" json:"po_number"`
 }
 
-// createExpenseTrackingListHandler returns org-wide committed expenses for a given committed week ending for report/commit holders.
+// createExpenseTrackingListHandler returns org-wide committed expenses for a given committed week ending for report/commit/admin viewers.
 func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		auth := e.Auth
-		// Allow either report holders or committers to view expense tracking list
-		isReportHolder, err := utilities.HasClaim(app, auth, "report")
-		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		isCommitter := false
-		if !isReportHolder {
-			var err2 error
-			isCommitter, err2 = utilities.HasClaim(app, auth, "commit")
-			if err2 != nil {
-				return e.Error(http.StatusInternalServerError, "error checking claims", err2)
-			}
-		}
-		if !(isReportHolder || isCommitter) {
-			return e.Error(http.StatusForbidden, "you are not authorized to view expense tracking list", nil)
+		if err := requireExpenseTrackingViewer(app, e.Auth); err != nil {
+			return writeHookError(e, err)
 		}
 
 		committedWeekEnding := e.Request.PathValue("committedWeekEnding")
@@ -195,14 +226,8 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
 // (org-wide) for the expense commit queue.
 func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		auth := e.Auth
-		// Only commit holders may view the expense commit queue.
-		isCommitter, err := utilities.HasClaim(app, auth, "commit")
-		if err != nil {
-			return e.Error(http.StatusInternalServerError, "error checking claims", err)
-		}
-		if !isCommitter {
-			return e.Error(http.StatusForbidden, "you are not authorized to view the expense commit queue", nil)
+		if err := requireExpenseCommitQueueViewer(app, e.Auth); err != nil {
+			return writeHookError(e, err)
 		}
 
 		query := `
