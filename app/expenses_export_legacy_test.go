@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"net/http"
 	"testing"
 	"tybalt/internal/testutils"
@@ -42,6 +43,40 @@ func setupExpensesExportMissingLegacyUIDApp(tb testing.TB) *tests.TestApp {
 			'2025-01-01 00:00:00.000Z',
 			'2025-01-01 00:00:00.000Z'
 		)
+	`).Execute(); err != nil {
+		tb.Fatal(err)
+	}
+
+	return app
+}
+
+func setupExpensesExportCurrencyFieldsApp(tb testing.TB) *tests.TestApp {
+	app := testutils.SetupTestApp(tb)
+
+	if _, err := app.DB().NewQuery(`
+		UPDATE expenses
+		SET currency = 'usdcurr00000001',
+		    settled_total = 91.11,
+		    committed = '2026-04-05 12:00:00.000Z',
+		    committed_week_ending = '2026-04-11',
+		    pay_period_ending = '2026-04-11',
+		    updated = '2026-04-05 12:00:00.000Z',
+		    _imported = 0
+		WHERE id = '77i1224mudailrb'
+	`).Execute(); err != nil {
+		tb.Fatal(err)
+	}
+
+	if _, err := app.DB().NewQuery(`
+		UPDATE expenses
+		SET currency = '',
+		    settled_total = 88.88,
+		    committed = '2026-04-05 12:00:00.000Z',
+		    committed_week_ending = '2026-04-11',
+		    pay_period_ending = '2026-04-11',
+		    updated = '2026-04-05 12:00:00.000Z',
+		    _imported = 0
+		WHERE id = '2gq9uyxmkcyopa4'
 	`).Execute(); err != nil {
 		tb.Fatal(err)
 	}
@@ -160,6 +195,74 @@ func TestExpensesExportLegacyIncludesPoApproverProps(t *testing.T) {
 				`"description":"Draft PO should not be exported"`,
 			},
 			TestAppFactory: setupExpensesExportBlankUnapprovedPOApp,
+		},
+		{
+			Name:   "includes currency code and settled_total only when expense currency is explicitly set",
+			Method: http.MethodGet,
+			URL:    "/api/export_legacy/expenses/2000-01-01",
+			Headers: map[string]string{
+				"Authorization": "Bearer " + validToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"currency":"USD"`,
+				`"settled_total":91.11`,
+			},
+			TestAppFactory: setupExpensesExportCurrencyFieldsApp,
+			AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
+				defer res.Body.Close()
+
+				var payload struct {
+					Expenses []struct {
+						ImmutableID  string   `json:"immutableID"`
+						Currency     string   `json:"currency,omitempty"`
+						SettledTotal *float64 `json:"settled_total,omitempty"`
+					} `json:"expenses"`
+				}
+				if err := json.NewDecoder(res.Body).Decode(&payload); err != nil {
+					tb.Fatalf("failed to decode expenses export response: %v", err)
+				}
+
+				var withCurrency *struct {
+					ImmutableID  string   `json:"immutableID"`
+					Currency     string   `json:"currency,omitempty"`
+					SettledTotal *float64 `json:"settled_total,omitempty"`
+				}
+				var blankCurrency *struct {
+					ImmutableID  string   `json:"immutableID"`
+					Currency     string   `json:"currency,omitempty"`
+					SettledTotal *float64 `json:"settled_total,omitempty"`
+				}
+
+				for i := range payload.Expenses {
+					switch payload.Expenses[i].ImmutableID {
+					case "77i1224mudailrb":
+						withCurrency = &payload.Expenses[i]
+					case "2gq9uyxmkcyopa4":
+						blankCurrency = &payload.Expenses[i]
+					}
+				}
+
+				if withCurrency == nil {
+					tb.Fatal("expected exported expense with explicit currency")
+				}
+				if withCurrency.Currency != "USD" {
+					tb.Fatalf("expected explicit currency code USD, got %q", withCurrency.Currency)
+				}
+				if withCurrency.SettledTotal == nil || *withCurrency.SettledTotal != 91.11 {
+					tb.Fatalf("expected settled_total 91.11 when currency is set, got %+v", withCurrency.SettledTotal)
+				}
+
+				if blankCurrency == nil {
+					tb.Fatal("expected exported expense with blank legacy currency")
+				}
+				if blankCurrency.Currency != "" {
+					tb.Fatalf("expected blank legacy currency to omit currency code, got %q", blankCurrency.Currency)
+				}
+				if blankCurrency.SettledTotal != nil {
+					tb.Fatalf("expected blank legacy currency to omit settled_total, got %+v", *blankCurrency.SettledTotal)
+				}
+			},
 		},
 	}
 

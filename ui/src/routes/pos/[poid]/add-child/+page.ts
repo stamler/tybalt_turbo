@@ -47,5 +47,6 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     editing: false,
     id: null,
     parent_po_number: parentPo.po_number,
+    parent_currency: parentPo.currency,
   };
 };

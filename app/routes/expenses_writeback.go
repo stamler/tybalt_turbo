@@ -86,8 +86,10 @@ type expenseExportDBRow struct {
 	Date                string  `db:"date"`
 	Description         string  `db:"description"`
 	Total               float64 `db:"total"`
+	SettledTotal        float64 `db:"settled_total"`
 	Distance            float64 `db:"distance"`
 	PaymentType         string  `db:"payment_type"`
+	Currency            string  `db:"currency"`
 	AllowanceTypesJSON  string  `db:"allowance_types_json"`
 	CcLast4Digits       string  `db:"cc_last_4_digits"`
 	Attachment          string  `db:"attachment"`
@@ -205,7 +207,9 @@ type expenseExportOutput struct {
 	Date           string   `json:"date"`
 	Description    string   `json:"description,omitempty"`
 	Total          *float64 `json:"total,omitempty"`
+	SettledTotal   *float64 `json:"settled_total,omitempty"`
 	Distance       float64  `json:"distance,omitempty"`
+	Currency       string   `json:"currency,omitempty"`
 	PaymentType    string   `json:"paymentType"`
 	CcLast4Digits  string   `json:"ccLast4digits,omitempty"`
 	Attachment     string   `json:"attachment,omitempty"`
@@ -296,8 +300,13 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  COALESCE(e.date, '') AS date,
 			  COALESCE(e.description, '') AS description,
 			  COALESCE(e.total, 0) AS total,
+			  COALESCE(e.settled_total, 0) AS settled_total,
 			  COALESCE(e.distance, 0) AS distance,
 			  COALESCE(e.payment_type, '') AS payment_type,
+			  CASE
+			    WHEN COALESCE(e.currency, '') = '' THEN ''
+			    ELSE COALESCE(cur.code, '')
+			  END AS currency,
 			  COALESCE(e.allowance_types, '[]') AS allowance_types_json,
 			  COALESCE(e.cc_last_4_digits, '') AS cc_last_4_digits,
 			  COALESCE(e.attachment, '') AS attachment,
@@ -359,6 +368,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			-- Vendor/PO joins
 			LEFT JOIN vendors v ON e.vendor = v.id
 			LEFT JOIN purchase_orders po ON e.purchase_order = po.id
+			LEFT JOIN currencies cur ON e.currency = cur.id
 			-- Category join
 			LEFT JOIN categories cat ON e.category = cat.id
 			WHERE e.updated >= {:updatedAfter}
@@ -526,6 +536,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 				Date:           r.Date,
 				Description:    r.Description,
 				Distance:       r.Distance,
+				Currency:       r.Currency,
 				PaymentType:    r.PaymentType,
 				CcLast4Digits:  r.CcLast4Digits,
 				Attachment:     r.Attachment,
@@ -580,6 +591,13 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			// Only include total if payment type is not Allowance or Mileage
 			if r.PaymentType != "Allowance" && r.PaymentType != "Mileage" && r.PaymentType != "Meals" {
 				expenses[i].Total = &r.Total
+			}
+
+			// Only include the new writeback currency fields when the source row
+			// has an explicit currency relation set. This preserves legacy payload
+			// behavior for blank/null legacy currency rows.
+			if strings.TrimSpace(r.Currency) != "" {
+				expenses[i].SettledTotal = &r.SettledTotal
 			}
 		}
 

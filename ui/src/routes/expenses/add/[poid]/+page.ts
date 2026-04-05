@@ -38,6 +38,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     linkedPurchaseOrder = {
       id: result.id,
       po_number: result.po_number,
+      currency: result.currency ?? "",
       type: result.type,
       payment_type: result.payment_type,
       status: result.status,

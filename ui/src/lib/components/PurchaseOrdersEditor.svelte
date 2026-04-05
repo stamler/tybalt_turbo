@@ -456,10 +456,32 @@
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
 
   $effect(() => {
+    const homeCurrencyId = $currencies.items.find((row) => row.code === "CAD")?.id ?? "";
+    const parentCurrencyId = data.parent_currency ?? "";
+
+    // Child POs always mirror the parent PO currency in the editor.
+    if (isChildPO) {
+      if (parentCurrencyId !== "" && item.currency !== parentCurrencyId) {
+        item.currency = parentCurrencyId;
+      }
+      return;
+    }
+
+    if (item.currency !== "") {
+      return;
+    }
+
+    // New records should persist an explicit CAD relation once currencies are
+    // loaded, while legacy edited rows may continue to rely on blank=CAD.
+    if (!data.editing && homeCurrencyId !== "") {
+      item.currency = homeCurrencyId;
+      return;
+    }
+
     if (!currencySelectionDisabled) {
       return;
     }
-    item.currency = $currencies.items.find((row) => row.code === "CAD")?.id ?? item.currency ?? "";
+    item.currency = homeCurrencyId;
   });
 
   // Default kind once kinds are loaded.

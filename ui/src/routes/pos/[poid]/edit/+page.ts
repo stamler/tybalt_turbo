@@ -42,7 +42,18 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     if (item.status !== PurchaseOrdersStatusOptions.Unapproved) {
       throw redirect(303, `/pos/${params.poid}/details`);
     }
-    return { item, editing: true, id: params.poid };
+
+    let parentCurrency = "";
+    if (item.parent_po) {
+      try {
+        const parentPo = await pb.collection("purchase_orders").getOne(item.parent_po);
+        parentCurrency = parentPo.currency ?? "";
+      } catch (parentError) {
+        console.error(`error loading parent PO currency for ${params.poid}: ${parentError}`);
+      }
+    }
+
+    return { item, editing: true, id: params.poid, parent_currency: parentCurrency };
   } catch (error) {
     if (isRedirect(error)) {
       throw error;

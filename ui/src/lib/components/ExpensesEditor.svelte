@@ -107,6 +107,15 @@
       item.payment_type === "Mileage" ||
       item.payment_type === "PersonalReimbursement",
   );
+  const linkedPurchaseOrderCurrency = $derived.by(() => {
+    if (data.linked_purchase_order?.currency) {
+      return data.linked_purchase_order.currency;
+    }
+    if (isExpensesResponse(item) && item.purchase_order !== "") {
+      return item.expand.purchase_order.currency ?? "";
+    }
+    return "";
+  });
   const currencySelectionDisabled = $derived.by(
     () => item.purchase_order !== "" || fixedHomePaymentType,
   );
@@ -154,10 +163,25 @@
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
 
   $effect(() => {
-    if (!currencySelectionDisabled) {
+    if (item.purchase_order !== "") {
+      if (linkedPurchaseOrderCurrency !== "" && item.currency !== linkedPurchaseOrderCurrency) {
+        item.currency = linkedPurchaseOrderCurrency;
+      }
       return;
     }
-    if (item.purchase_order !== "") {
+
+    if (item.currency !== "") {
+      return;
+    }
+
+    // New records should persist an explicit CAD relation once currencies are
+    // loaded, while legacy edited rows may continue to rely on blank=CAD.
+    if (!data.editing && homeCurrency?.id) {
+      item.currency = homeCurrency.id;
+      return;
+    }
+
+    if (!currencySelectionDisabled) {
       return;
     }
     item.currency = homeCurrency?.id ?? "";

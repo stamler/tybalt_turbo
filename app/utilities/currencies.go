@@ -9,6 +9,9 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+// HomeCurrencyCode is intentionally fixed to CAD. The current exchange-rate
+// provider and reporting/settlement semantics are CAD-based, so configurable
+// home currency is out of scope for this system.
 const HomeCurrencyCode = "CAD"
 
 var ErrCurrencyNotFound = errors.New("currency not found")
@@ -20,22 +23,20 @@ type CurrencyInfo struct {
 	Icon     string
 	Rate     float64
 	RateDate string
-	Implicit bool
 }
 
-func ImplicitHomeCurrency() CurrencyInfo {
+func fallbackHomeCurrencyInfo() CurrencyInfo {
 	return CurrencyInfo{
 		Code:     HomeCurrencyCode,
 		Symbol:   HomeCurrencyCode,
 		Rate:     1,
 		RateDate: "",
-		Implicit: true,
 	}
 }
 
 func currencyInfoFromRecord(record *core.Record) CurrencyInfo {
 	if record == nil {
-		return ImplicitHomeCurrency()
+		return fallbackHomeCurrencyInfo()
 	}
 
 	return CurrencyInfo{
@@ -87,7 +88,7 @@ func ResolveCurrencyInfo(app core.App, currencyID string) (CurrencyInfo, error) 
 	if currencyID == "" {
 		home, err := FindHomeCurrency(app)
 		if err != nil {
-			return ImplicitHomeCurrency(), nil
+			return fallbackHomeCurrencyInfo(), nil
 		}
 		info := currencyInfoFromRecord(home)
 		if info.Code == "" {

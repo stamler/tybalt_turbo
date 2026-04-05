@@ -31,6 +31,7 @@ export type TimeEntriesPageData = PageData<TimeEntriesRecord>;
 export type TimeAmendmentsPageData = PageData<TimeAmendmentsRecord>;
 export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord | PurchaseOrdersResponse> & {
   parent_po_number?: string;
+  parent_currency?: string;
   loadError?: string;
 };
 export type SecondApproverStatus =
@@ -61,6 +62,7 @@ export type PurchaseOrderDetailsPageData = {
 export type LinkedPurchaseOrderSummary = {
   id: string;
   po_number: string;
+  currency: string;
   type: VisiblePurchaseOrderResponse["type"];
   payment_type: VisiblePurchaseOrderResponse["payment_type"];
   status: VisiblePurchaseOrderResponse["status"];

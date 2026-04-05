@@ -56,6 +56,9 @@
       items.find((item) => item.id === currency) ??
       items.find((item) => item.code === normalizeCurrencyCode(currency)),
   );
+  const selectCurrencyValue = $derived.by(() =>
+    items.length === 0 ? currency : (selectedCurrency?.id ?? currency),
+  );
   const previewCode = $derived.by(() =>
     selectedCurrency?.code ?? (displayCode.trim() !== "" ? displayCode : normalizeCurrencyCode(currency)),
   );
@@ -88,14 +91,20 @@
     {/if}
     <select
       name={currencyFieldName}
-      bind:value={currency}
+      value={selectCurrencyValue}
+      onchange={(event) => {
+        currency = (event.currentTarget as HTMLSelectElement).value;
+      }}
       class="border-none bg-transparent py-1 pl-2 pr-1 text-sm font-semibold focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
       disabled={disabledCurrency}
     >
-      <option value="">CAD</option>
-      {#each items as item (item.id)}
-        <option value={item.id}>{item.code}</option>
-      {/each}
+      {#if items.length === 0}
+        <option value={currency}>{previewCode}</option>
+      {:else}
+        {#each items as item (item.id)}
+          <option value={item.id}>{item.code}</option>
+        {/each}
+      {/if}
     </select>
 
     <!-- Divider -->

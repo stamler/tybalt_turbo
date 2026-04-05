@@ -15,6 +15,11 @@ PO spending caps on expenses are enforced in the PO's stated currency. This ensu
 that forex fluctuations after approval do not invalidate a user's ability to spend
 against an approved PO.
 
+Architectural note: the home currency is intentionally fixed to CAD in this system.
+Exchange rates come from the Bank of Canada CAD-anchored feed, and settlement/reporting
+semantics are defined in CAD. Supporting configurable home currency is out of scope
+unless the FX provider, derived-field semantics, and migration strategy are redesigned.
+
 ---
 
 ## 1. New Collection: `currencies`
@@ -225,6 +230,7 @@ Manages settlement of non-home-currency `OnAccount` and `CorporateCreditCard` ex
 ### Entry criteria
 
 An expense appears in the settlement queue when ALL of the following are true:
+
 - Payment type is `OnAccount` or `CorporateCreditCard`
 - Currency ≠ CAD (non-home currency)
 - Approved (`approved` is non-blank, `rejected` is blank)
@@ -235,6 +241,7 @@ An expense appears in the settlement queue when ALL of the following are true:
 Lists expenses matching entry criteria where `settled` is blank.
 
 **Columns displayed:**
+
 - Date
 - Creator name
 - Vendor
@@ -248,6 +255,7 @@ Lists expenses matching entry criteria where `settled` is blank.
 **Per-row action:** CAD amount input + **Save** button.
 
 **Save action** (API route, runs in a database transaction):
+
 1. Re-read the expense record inside the transaction.
 2. Verify the expense is still approved, uncommitted, and unsettled.
 3. If state has changed (committed, rejected, or already settled), abort with error.
@@ -263,6 +271,7 @@ Lists expenses matching entry criteria where `settled` is non-blank.
 This tab is **read-only** — no in-place editing of settled amounts.
 
 **Columns displayed:** Same as unsettled tab, plus:
+
 - Settled total (CAD)
 - Settler name
 - Settled timestamp
@@ -270,6 +279,7 @@ This tab is **read-only** — no in-place editing of settled amounts.
 **Per-row action:** **Clear Settlement** button only.
 
 **Clear Settlement** (API route, runs in a database transaction):
+
 1. Re-read the expense record inside the transaction.
 2. Verify the expense is still uncommitted.
 3. If already committed, abort with error.
@@ -299,7 +309,80 @@ races with concurrent commit, reject, or settlement actions:
 
 ---
 
-## 7. API Changes
+## 7. Reporting and Writeback Gap (Stakeholder Decision Required)
+
+This rollout intentionally leaves one important area unresolved: downstream reporting
+and legacy writeback semantics become ambiguous once foreign-currency POs and expenses
+exist.
+
+The ambiguity is:
+
+- `total` is stored in the PO/expense's stated currency
+- `settled_total` is stored in CAD
+- `approval_total_home` is stored in CAD
+- existing exports, writebacks, and downstream reports may assume a single amount field
+  always represents CAD or always represents the operational amount, which is no longer
+  true once multi-currency records exist
+
+This is a priority topic to review with stakeholders before the feature is considered
+fully complete for downstream accounting/reporting workflows.
+
+### Why this matters
+
+- Aggregated reporting can accidentally mix source-currency and CAD-settled amounts.
+- Legacy consumers may continue reading `total` as if it were a CAD amount.
+- Writeback targets may need both the original foreign amount and the CAD-settled amount,
+  with explicit currency labels, to remain auditable.
+- Without a defined contract, two reports can both be "correct" internally while still
+  disagreeing because they are using different money fields for different purposes.
+
+### Options to discuss with stakeholders
+
+#### Option A: Keep legacy writebacks unchanged for now
+
+- Lowest implementation cost.
+- Acceptable only as a temporary measure.
+- Requires clear documentation that foreign-currency records are not fully represented
+  in downstream reporting/export semantics yet.
+
+#### Option B: Add explicit currency-labeled export fields
+
+- Recommended long-term direction.
+- Every exported/writeback amount field should clearly indicate whether it is:
+  - source-currency amount (`total`, plus `currency_code`)
+  - CAD/home-settled amount (`settled_total`)
+  - CAD/home-approval amount (`approval_total_home`)
+- Preserves auditability and avoids hidden unit mixing.
+
+#### Option C: Standardize all downstream reporting on CAD/home-currency amounts
+
+- Simplifies roll-up reporting and accounting summaries.
+- Still requires carrying the original source-currency amount and code somewhere for
+  audit/reference.
+- Best fit if stakeholder priority is consolidated financial reporting over preserving
+  source-currency operational amounts in downstream systems.
+
+#### Option D: Split operational writebacks from accounting/reporting exports
+
+- Operational systems receive source-currency fields.
+- Accounting/reporting systems receive CAD/home-normalized fields.
+- Cleanest semantically, but highest coordination and implementation cost.
+
+### Minimum decision needed
+
+Stakeholders should explicitly choose:
+
+- which amount is authoritative for downstream accounting
+- whether writebacks must include both source-currency and CAD/home-normalized amounts
+- whether existing legacy consumers must remain backward-compatible, or can be changed
+- which reports are operational views versus accounting views
+
+Until this decision is made, multi-currency behavior inside the app can be considered
+correct, but the external reporting/writeback contract should be treated as incomplete.
+
+---
+
+## 8. API Changes
 
 ### New routes
 
@@ -319,7 +402,7 @@ races with concurrent commit, reject, or settlement actions:
 
 ---
 
-## 8. Existing Logic Impact
+## 9. Existing Logic Impact
 
 | Area                          | Impact                                                                 |
 |-------------------------------|------------------------------------------------------------------------|
@@ -336,7 +419,7 @@ races with concurrent commit, reject, or settlement actions:
 
 ---
 
-## 9. Migration Plan
+## 10. Migration Plan
 
 1. Create `currencies` collection with fields: `code`, `symbol`, `icon`, `rate`,
    `rate_date`, `ui_sort`.
@@ -350,7 +433,7 @@ races with concurrent commit, reject, or settlement actions:
 
 ---
 
-## 10. Implementation Order
+## 11. Implementation Order
 
 1. **Migration**: Create `currencies` collection, seed data, add new fields to
    POs and expenses, backfill existing records.
