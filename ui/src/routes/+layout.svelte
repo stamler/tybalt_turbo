@@ -62,6 +62,9 @@
                 if (item.href.startsWith("/reports/expense/queue")) {
                   return $globalStore.claims.includes("commit");
                 }
+                if (item.href.startsWith("/expenses/settlement")) {
+                  return $globalStore.claims.includes("payables_admin");
+                }
                 if (item.href.startsWith("/reports/")) {
                   return $globalStore.claims.includes("report");
                 }
@@ -79,6 +82,7 @@
                 }
                 if (
                   item.href.startsWith("/admin_profiles") ||
+                  item.href.startsWith("/currencies") ||
                   item.href.startsWith("/timetypes") ||
                   item.href.startsWith("/divisions") ||
                   item.href.startsWith("/machine_secrets")

@@ -282,6 +282,18 @@ export type ClientsRecord = {
   updated: IsoDateString;
 };
 
+export type CurrenciesRecord = {
+  code: string;
+  created: IsoDateString;
+  icon: string;
+  id: string;
+  rate: number;
+  rate_date: string;
+  symbol: string;
+  ui_sort: number;
+  updated: IsoDateString;
+};
+
 export type DivisionsRecord = {
   active: boolean;
   code: string;
@@ -387,6 +399,7 @@ export type ExpensesRecord = {
   committed_week_ending: string;
   committer: RecordIdString;
   created: IsoDateString;
+  currency: RecordIdString;
   date: string;
   description: string;
   distance: number;
@@ -399,6 +412,9 @@ export type ExpensesRecord = {
   rejected: IsoDateString;
   rejection_reason: string;
   rejector: RecordIdString;
+  settled: IsoDateString;
+  settled_total: number;
+  settler: RecordIdString;
   submitted: boolean;
   total: number;
   uid: RecordIdString;
@@ -436,6 +452,12 @@ export type ExpensesAugmentedRecord = {
   committed: IsoDateString;
   committed_week_ending: string;
   committer: RecordIdString;
+  currency: RecordIdString;
+  currency_code: string;
+  currency_icon: string;
+  currency_rate: number;
+  currency_rate_date: string;
+  currency_symbol: string;
   date: string;
   description: string;
   distance: number;
@@ -454,6 +476,10 @@ export type ExpensesAugmentedRecord = {
   rejection_reason: string;
   rejector: RecordIdString;
   rejector_name: string;
+  settled: IsoDateString;
+  settled_total: number;
+  settler: RecordIdString;
+  settler_name: string;
   submitted: boolean;
   total: number;
   uid: RecordIdString;
@@ -639,6 +665,7 @@ export enum PurchaseOrdersPaymentTypeOptions {
 export type PurchaseOrdersRecord = {
   _imported: boolean;
   approval_total: number;
+  approval_total_home: number;
   approved: IsoDateString;
   approver: RecordIdString;
   attachment: string;
@@ -650,6 +677,7 @@ export type PurchaseOrdersRecord = {
   closed_by_system: boolean;
   closer: RecordIdString;
   created: IsoDateString;
+  currency: RecordIdString;
   date: string;
   description: string;
   division: RecordIdString;
@@ -702,6 +730,7 @@ export enum PurchaseOrdersAugmentedPaymentTypeOptions {
 }
 export type PurchaseOrdersAugmentedRecord = {
   approval_total: number;
+  approval_total_home: number;
   approved: IsoDateString;
   approver: RecordIdString;
   approver_name: string;
@@ -717,6 +746,12 @@ export type PurchaseOrdersAugmentedRecord = {
   closer: RecordIdString;
   committed_expenses_count: number;
   created: IsoDateString;
+  currency: RecordIdString;
+  currency_code: string;
+  currency_icon: string;
+  currency_rate: number;
+  currency_rate_date: string;
+  currency_symbol: string;
   date: string;
   description: string;
   division: RecordIdString;
@@ -1069,6 +1104,8 @@ export type ClientNotesResponse<Texpand = unknown> = Required<ClientNotesRecord>
   BaseSystemFields<Texpand>;
 export type ClientsResponse<Texpand = unknown> = Required<ClientsRecord> &
   BaseSystemFields<Texpand>;
+export type CurrenciesResponse<Texpand = unknown> = Required<CurrenciesRecord> &
+  BaseSystemFields<Texpand>;
 export type DivisionsResponse<Texpand = unknown> = Required<DivisionsRecord> &
   BaseSystemFields<Texpand>;
 export type ExpenditureKindsResponse<Texpand = unknown> = Required<ExpenditureKindsRecord> &
@@ -1162,6 +1199,7 @@ export type CollectionRecords = {
   client_contacts: ClientContactsRecord;
   client_notes: ClientNotesRecord;
   clients: ClientsRecord;
+  currencies: CurrenciesRecord;
   divisions: DivisionsRecord;
   expenditure_kinds: ExpenditureKindsRecord;
   expense_allowance_totals: ExpenseAllowanceTotalsRecord;
@@ -1215,6 +1253,7 @@ export type CollectionResponses = {
   client_contacts: ClientContactsResponse;
   client_notes: ClientNotesResponse;
   clients: ClientsResponse;
+  currencies: CurrenciesResponse;
   divisions: DivisionsResponse;
   expenditure_kinds: ExpenditureKindsResponse;
   expense_allowance_totals: ExpenseAllowanceTotalsResponse;
@@ -1271,6 +1310,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "client_contacts"): RecordService<ClientContactsResponse>;
   collection(idOrName: "client_notes"): RecordService<ClientNotesResponse>;
   collection(idOrName: "clients"): RecordService<ClientsResponse>;
+  collection(idOrName: "currencies"): RecordService<CurrenciesResponse>;
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
   collection(idOrName: "expense_allowance_totals"): RecordService<ExpenseAllowanceTotalsResponse>;
   collection(idOrName: "expense_mileage_totals"): RecordService<ExpenseMileageTotalsResponse>;

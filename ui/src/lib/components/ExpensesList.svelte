@@ -7,7 +7,7 @@
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { formatCurrencyAmount, pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { onMount, onDestroy, untrack } from "svelte";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
@@ -136,6 +136,7 @@
     rejection_reason,
     distance,
     total,
+    currency_code,
     payment_type,
     vendor,
     vendor_name,
@@ -151,9 +152,9 @@
       {/if}
 
       {#if payment_type === "Mileage"}
-        {distance} km / ${total}
+        {distance} km / {formatCurrencyAmount(total, currency_code)}
       {:else}
-        ${total}
+        {formatCurrencyAmount(total, currency_code)}
       {/if}
       {#if vendor}
         <span class="flex items-center gap-0">

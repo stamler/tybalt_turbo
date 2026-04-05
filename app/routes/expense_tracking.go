@@ -103,40 +103,47 @@ func createExpenseTrackingCountsHandler(app core.App) func(e *core.RequestEvent)
 }
 
 type expenseTrackingListRow struct {
-	ID              string  `db:"id" json:"id"`
-	Uid             string  `db:"uid" json:"uid"`
-	GivenName       string  `db:"given_name" json:"given_name"`
-	Surname         string  `db:"surname" json:"surname"`
-	Submitted       bool    `db:"submitted" json:"submitted"`
-	Approved        string  `db:"approved" json:"approved"`
-	Rejected        string  `db:"rejected" json:"rejected"`
-	Committed       string  `db:"committed" json:"committed"`
-	Approver        string  `db:"approver" json:"approver"`
-	Committer       string  `db:"committer" json:"committer"`
-	ApproverName    string  `db:"approver_name" json:"approver_name"`
-	CommitterName   string  `db:"committer_name" json:"committer_name"`
-	RejectorName    string  `db:"rejector_name" json:"rejector_name"`
-	RejectionReason string  `db:"rejection_reason" json:"rejection_reason"`
-	Date            string  `db:"date" json:"date"`
-	Description     string  `db:"description" json:"description"`
-	PaymentType     string  `db:"payment_type" json:"payment_type"`
-	Distance        float64 `db:"distance" json:"distance"`
-	CCLast4Digits   string  `db:"cc_last_4_digits" json:"cc_last_4_digits"`
-	Attachment      string  `db:"attachment" json:"attachment"`
-	AllowanceStr    string  `db:"allowance_str" json:"allowance_str"`
-	JobNumber       string  `db:"job_number" json:"job_number"`
-	JobDescription  string  `db:"job_description" json:"job_description"`
-	ClientName      string  `db:"client_name" json:"client_name"`
-	Division        string  `db:"division" json:"division"`
-	DivisionCode    string  `db:"division_code" json:"division_code"`
-	DivisionName    string  `db:"division_name" json:"division_name"`
-	Category        string  `db:"category" json:"category"`
-	CategoryName    string  `db:"category_name" json:"category_name"`
-	Vendor          string  `db:"vendor" json:"vendor"`
-	VendorName      string  `db:"vendor_name" json:"vendor_name"`
-	VendorAlias     string  `db:"vendor_alias" json:"vendor_alias"`
-	Total           float64 `db:"total" json:"total"`
-	PONumber        string  `db:"po_number" json:"po_number"`
+	ID               string  `db:"id" json:"id"`
+	Uid              string  `db:"uid" json:"uid"`
+	GivenName        string  `db:"given_name" json:"given_name"`
+	Surname          string  `db:"surname" json:"surname"`
+	Submitted        bool    `db:"submitted" json:"submitted"`
+	Approved         string  `db:"approved" json:"approved"`
+	Rejected         string  `db:"rejected" json:"rejected"`
+	Committed        string  `db:"committed" json:"committed"`
+	Approver         string  `db:"approver" json:"approver"`
+	Committer        string  `db:"committer" json:"committer"`
+	ApproverName     string  `db:"approver_name" json:"approver_name"`
+	CommitterName    string  `db:"committer_name" json:"committer_name"`
+	RejectorName     string  `db:"rejector_name" json:"rejector_name"`
+	RejectionReason  string  `db:"rejection_reason" json:"rejection_reason"`
+	Date             string  `db:"date" json:"date"`
+	Description      string  `db:"description" json:"description"`
+	PaymentType      string  `db:"payment_type" json:"payment_type"`
+	Distance         float64 `db:"distance" json:"distance"`
+	CCLast4Digits    string  `db:"cc_last_4_digits" json:"cc_last_4_digits"`
+	Attachment       string  `db:"attachment" json:"attachment"`
+	AllowanceStr     string  `db:"allowance_str" json:"allowance_str"`
+	JobNumber        string  `db:"job_number" json:"job_number"`
+	JobDescription   string  `db:"job_description" json:"job_description"`
+	ClientName       string  `db:"client_name" json:"client_name"`
+	Division         string  `db:"division" json:"division"`
+	DivisionCode     string  `db:"division_code" json:"division_code"`
+	DivisionName     string  `db:"division_name" json:"division_name"`
+	Category         string  `db:"category" json:"category"`
+	CategoryName     string  `db:"category_name" json:"category_name"`
+	Vendor           string  `db:"vendor" json:"vendor"`
+	VendorName       string  `db:"vendor_name" json:"vendor_name"`
+	VendorAlias      string  `db:"vendor_alias" json:"vendor_alias"`
+	Total            float64 `db:"total" json:"total"`
+	SettledTotal     float64 `db:"settled_total" json:"settled_total"`
+	Currency         string  `db:"currency" json:"currency"`
+	CurrencyCode     string  `db:"currency_code" json:"currency_code"`
+	CurrencySymbol   string  `db:"currency_symbol" json:"currency_symbol"`
+	CurrencyIcon     string  `db:"currency_icon" json:"currency_icon"`
+	CurrencyRate     float64 `db:"currency_rate" json:"currency_rate"`
+	CurrencyRateDate string  `db:"currency_rate_date" json:"currency_rate_date"`
+	PONumber         string  `db:"po_number" json:"po_number"`
 }
 
 // createExpenseTrackingListHandler returns org-wide committed expenses for a given committed week ending for report/commit/admin viewers.
@@ -194,6 +201,13 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
                 COALESCE(v.name, '') AS vendor_name,
                 COALESCE(v.alias, '') AS vendor_alias,
                 CAST(e.total AS REAL) AS total,
+                CAST(COALESCE(e.settled_total, 0) AS REAL) AS settled_total,
+                COALESCE(e.currency, '') AS currency,
+                COALESCE(cur.code, 'CAD') AS currency_code,
+                COALESCE(cur.symbol, 'CAD') AS currency_symbol,
+                COALESCE(cur.icon, '') AS currency_icon,
+                COALESCE(CAST(cur.rate AS REAL), 1) AS currency_rate,
+                COALESCE(cur.rate_date, '') AS currency_rate_date,
                 COALESCE(po.po_number, '') AS po_number
             FROM expenses e
             LEFT JOIN profiles p ON p.uid = e.uid
@@ -204,6 +218,7 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
             LEFT JOIN clients cl ON cl.id = j.client
             LEFT JOIN divisions d ON d.id = e.division
                 LEFT JOIN vendors v ON v.id = e.vendor
+                LEFT JOIN currencies cur ON cur.id = e.currency
                 LEFT JOIN categories cat ON cat.id = e.category
                 LEFT JOIN purchase_orders po ON po.id = e.purchase_order
             WHERE e.committed_week_ending = {:committed_week_ending}
@@ -264,6 +279,13 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
                 COALESCE(j.description, '') AS job_description,
                 COALESCE(c.name, '') AS client_name,
                 CAST(e.total AS REAL) AS total,
+                CAST(COALESCE(e.settled_total, 0) AS REAL) AS settled_total,
+                COALESCE(e.currency, '') AS currency,
+                COALESCE(cur.code, 'CAD') AS currency_code,
+                COALESCE(cur.symbol, 'CAD') AS currency_symbol,
+                COALESCE(cur.icon, '') AS currency_icon,
+                COALESCE(CAST(cur.rate AS REAL), 1) AS currency_rate,
+                COALESCE(cur.rate_date, '') AS currency_rate_date,
                 COALESCE(po.po_number, '') AS po_number
             FROM expenses e
             LEFT JOIN profiles p ON p.uid = e.uid
@@ -272,10 +294,16 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
             LEFT JOIN profiles rp ON rp.uid = e.rejector
             LEFT JOIN jobs j ON j.id = e.job
             LEFT JOIN clients c ON c.id = j.client
+            LEFT JOIN currencies cur ON cur.id = e.currency
             LEFT JOIN purchase_orders po ON po.id = e.purchase_order
             WHERE e.submitted = 1
               AND e.committed = ''
               AND e.approved != ''
+              AND NOT (
+                COALESCE(cur.code, 'CAD') != 'CAD'
+                AND e.payment_type IN ('OnAccount', 'CorporateCreditCard')
+                AND COALESCE(e.settled, '') = ''
+              )
             ORDER BY
                 CASE
                     WHEN e.committed != '' THEN 3

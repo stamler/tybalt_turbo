@@ -110,8 +110,30 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 	isMileage := paymentType == "Mileage"
 	isCorporateCreditCard := paymentType == "CorporateCreditCard"
 	isFuelCard := paymentType == "FuelCard"
+	isOutOfPocketExpense := paymentType == "Expense"
 
 	noPOExpenseLimit := utilities.GetNoPOExpenseLimit(app)
+	currencyInfo, err := utilities.ResolveCurrencyInfo(app, expenseRecord.GetString("currency"))
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating expense",
+			Data: map[string]errs.CodeError{
+				"currency": {
+					Code:    "not_found",
+					Message: "referenced currency not found",
+				},
+			},
+		}
+	}
+	isHomeCurrency := utilities.IsHomeCurrencyInfo(currencyInfo)
+	comparableSettledTotal := expenseRecord.GetFloat("settled_total")
+	if comparableSettledTotal <= 0 && isHomeCurrency {
+		comparableSettledTotal = expenseRecord.GetFloat("total")
+	}
+	if comparableSettledTotal <= 0 {
+		comparableSettledTotal = expenseRecord.GetFloat("total")
+	}
 
 	// Require an attachment for all types except Allowance, Mileage, and PersonalReimbursement.
 	// Accept either an already stored filename or a new uploaded file in the current multipart request.
@@ -159,6 +181,21 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 					"job": {
 						Code:    "must_match_purchase_order",
 						Message: "job must match purchase order job",
+					},
+				},
+			}
+		}
+
+		poCurrencyCode := utilities.EffectiveCurrencyCode(app, poRecord.GetString("currency"))
+		expenseCurrencyCode := utilities.EffectiveCurrencyCode(app, expenseRecord.GetString("currency"))
+		if expenseCurrencyCode != poCurrencyCode {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating expense",
+				Data: map[string]errs.CodeError{
+					"currency": {
+						Code:    "must_match_purchase_order",
+						Message: "currency must match purchase order currency",
 					},
 				},
 			}
@@ -244,9 +281,6 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 			expenseRecord.GetFloat("total"),
 			validation.Required.Error("must be greater than 0"),
 			validation.Min(0.01).Error("must be greater than 0"),
-			validation.When(!(byPassTotalLimit && paymentType == "OnAccount") && constants.LIMIT_NON_PO_AMOUNTS && !hasPurchaseOrder && !isMileage && !isFuelCard && !isPersonalReimbursement && !isAllowance,
-				validation.Max(noPOExpenseLimit).Exclusive().Error(fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", noPOExpenseLimit)),
-			),
 			validation.When(hasPurchaseOrder && (poType == "One-Time" || poType == "Recurring"),
 				validation.Max(totalLimit).Error(fmt.Sprintf("expense exceeds purchase order total of $%0.2f by more than %s", poTotal, excessErrorText)),
 			),
@@ -274,6 +308,24 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 				validation.Required.Error("required for allowance expenses"),
 			),
 		),
+	}
+
+	if !(byPassTotalLimit && paymentType == "OnAccount") &&
+		constants.LIMIT_NON_PO_AMOUNTS &&
+		!hasPurchaseOrder &&
+		!isMileage &&
+		!isFuelCard &&
+		!isPersonalReimbursement &&
+		!isAllowance &&
+		comparableSettledTotal >= noPOExpenseLimit {
+		validationsErrors["total"] = validation.NewError(
+			"max",
+			fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", noPOExpenseLimit),
+		)
+	}
+
+	if !hasPurchaseOrder && !isHomeCurrency && isOutOfPocketExpense && expenseRecord.GetFloat("settled_total") < 0 {
+		validationsErrors["settled_total"] = validation.NewError("min", "settled total must be greater than 0")
 	}
 
 	// Job-aware validation for expenses:

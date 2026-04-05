@@ -56,6 +56,7 @@ func init() {
 type poApproversRequest struct {
 	Division  string  `json:"division"`
 	Amount    float64 `json:"amount"`
+	Currency  string  `json:"currency"`
 	Kind      string  `json:"kind"`
 	HasJob    bool    `json:"has_job"`
 	Type      string  `json:"type"`
@@ -117,6 +118,13 @@ type purchaseOrderVisibilityRow struct {
 	ClosedBySystem             bool    `db:"closed_by_system" json:"closed_by_system"`
 	PrioritySecondApprover     string  `db:"priority_second_approver" json:"priority_second_approver"`
 	ApprovalTotal              float64 `db:"approval_total" json:"approval_total"`
+	ApprovalTotalHome          float64 `db:"approval_total_home" json:"approval_total_home"`
+	Currency                   string  `db:"currency" json:"currency"`
+	CurrencyCode               string  `db:"currency_code" json:"currency_code"`
+	CurrencySymbol             string  `db:"currency_symbol" json:"currency_symbol"`
+	CurrencyIcon               string  `db:"currency_icon" json:"currency_icon"`
+	CurrencyRate               float64 `db:"currency_rate" json:"currency_rate"`
+	CurrencyRateDate           string  `db:"currency_rate_date" json:"currency_rate_date"`
 	CommittedExpensesCount     int     `db:"committed_expenses_count" json:"committed_expenses_count"`
 	ExpensesTotal              float64 `db:"expenses_total" json:"expenses_total"`
 	RecurringExpectedCount     int     `db:"recurring_expected_occurrences" json:"recurring_expected_occurrences"`
@@ -260,7 +268,7 @@ func createApprovePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) 
 
 			hasJob := strings.TrimSpace(po.GetString("job")) != ""
 			kindID := utilities.NormalizeExpenditureKindID(po.GetString("kind"), hasJob)
-			approvalTotal := po.GetFloat("approval_total")
+			approvalTotal := utilities.EffectiveApprovalTotalHome(po)
 
 			policy, err := utilities.GetPOApproverPolicy(
 				txApp,
@@ -786,7 +794,7 @@ func createRejectPurchaseOrderHandler(app core.App) func(e *core.RequestEvent) e
 			policy, err := utilities.GetPOApproverPolicy(
 				txApp,
 				po.GetString("division"),
-				po.GetFloat("approval_total"),
+				utilities.EffectiveApprovalTotalHome(po),
 				kindID,
 				hasJob,
 			)
@@ -1244,6 +1252,7 @@ func parseApproversRequest(e *core.RequestEvent) (poApproversRequest, error) {
 		return req, fmt.Errorf("invalid amount")
 	}
 	req.Amount = amount
+	req.Currency = q.Get("currency")
 	req.Type = q.Get("type")
 	req.StartDate = q.Get("start_date")
 	req.EndDate = q.Get("end_date")
@@ -1318,6 +1327,21 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 				})
 			}
 		}
+
+		currencyInfo, err := utilities.ResolveCurrencyInfo(app, req.Currency)
+		if err != nil {
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "invalid_currency",
+				"message": "currency is invalid or no longer exists",
+			})
+		}
+		if !utilities.IsHomeCurrencyInfo(currencyInfo) && currencyInfo.Rate <= 0 {
+			return e.JSON(http.StatusBadRequest, map[string]string{
+				"code":    "missing_currency_rate",
+				"message": "selected foreign currency is missing an exchange rate",
+			})
+		}
+		req.Amount = req.Amount * utilities.CurrencyRateOrOne(currencyInfo)
 
 		policy, err := utilities.GetPOApproverPolicy(
 			app,

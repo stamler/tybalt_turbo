@@ -14,6 +14,13 @@ export interface POSearchApiResponse {
   frequency: string;
   description: string;
   total: number;
+  approval_total_home: number;
+  currency: string;
+  currency_code: string;
+  currency_symbol: string;
+  currency_icon: string;
+  currency_rate: number;
+  currency_rate_date: string;
   attachment: string;
   committed_expenses_count: number;
   vendor_name: string;
@@ -76,6 +83,13 @@ export const poSearch = createCollectionStore<any>(
       "frequency",
       "description",
       "total",
+      "approval_total_home",
+      "currency",
+      "currency_code",
+      "currency_symbol",
+      "currency_icon",
+      "currency_rate",
+      "currency_rate_date",
       "attachment",
       "committed_expenses_count",
       "vendor_name",

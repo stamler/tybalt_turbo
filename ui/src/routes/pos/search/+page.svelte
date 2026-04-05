@@ -10,7 +10,7 @@
   import { poSearch } from "$lib/stores/poSearch";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
-  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { formatCurrencyAmount, pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
 
   const collectionId = "purchase_orders";
   type SearchStatus = POSearchApiResponse["status"];
@@ -124,7 +124,7 @@
 
     {#snippet byline(item: POSearchApiResponse)}
       <span class="flex items-center gap-2">
-        ${item.total}
+        {formatCurrencyAmount(item.total, item.currency_code)}
         {#if item.legacy_manual_entry}
           <DsLabel color="cyan">Manually created</DsLabel>
         {/if}

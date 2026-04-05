@@ -60,6 +60,7 @@ var testFullOnlyTables = map[string]struct{}{
 	"client_contacts":      {},
 	"client_notes":         {},
 	"clients":              {},
+	"currencies":           {},
 	"expenses":             {},
 	"job_time_allocations": {},
 	"jobs":                 {},
@@ -360,6 +361,10 @@ func LoadSeedData(dbPath string, seedDir string, group string) error {
 		return err
 	}
 
+	if err := os.RemoveAll(filepath.Join(filepath.Dir(dbPath), "storage")); err != nil {
+		return err
+	}
+
 	pkg, err := readPackage(seedDir)
 	if err != nil {
 		return err
@@ -416,7 +421,11 @@ func LoadSeedData(dbPath string, seedDir string, group string) error {
 		return fmt.Errorf("foreign key check failed: table=%s rowid=%v parent=%s fk=%v", table, rowID, parent, fkID)
 	}
 
-	return rows.Err()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	return copySeedFiles(db, dbPath, seedDir)
 }
 
 // VerifySeedData rebuilds a fresh PocketBase data directory from seedDir and
@@ -966,4 +975,88 @@ func quoteIdent(value string) string {
 
 func quoteLiteral(value string) string {
 	return `'` + strings.ReplaceAll(value, `'`, `''`) + `'`
+}
+
+func copySeedFiles(db *sql.DB, dbPath string, seedDir string) error {
+	filesDir := filepath.Join(seedDir, "files")
+	if _, err := os.Stat(filesDir); err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+
+	rows, err := db.Query(`SELECT id, name FROM _collections`)
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	collectionIDs := map[string]string{}
+	for rows.Next() {
+		var id string
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return err
+		}
+		collectionIDs[name] = id
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+
+	storageRoot := filepath.Join(filepath.Dir(dbPath), "storage")
+	if err := filepath.Walk(filesDir, func(path string, info os.FileInfo, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel(filesDir, path)
+		if err != nil {
+			return err
+		}
+		parts := strings.Split(filepath.ToSlash(rel), "/")
+		if len(parts) != 3 {
+			return fmt.Errorf("seed file path must match files/<collection>/<record>/<filename>: %s", rel)
+		}
+
+		collectionID, ok := collectionIDs[parts[0]]
+		if !ok {
+			return fmt.Errorf("unknown collection in seed files: %s", parts[0])
+		}
+
+		targetPath := filepath.Join(storageRoot, collectionID, parts[1], parts[2])
+		if err := os.MkdirAll(filepath.Dir(targetPath), 0o755); err != nil {
+			return err
+		}
+
+		return copyFile(path, targetPath)
+	}); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func copyFile(sourcePath string, targetPath string) error {
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return err
+	}
+	defer source.Close()
+
+	target, err := os.Create(targetPath)
+	if err != nil {
+		return err
+	}
+	defer target.Close()
+
+	if _, err := io.Copy(target, source); err != nil {
+		return err
+	}
+
+	return target.Close()
 }

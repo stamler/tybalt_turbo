@@ -173,6 +173,16 @@ SELECT
   po.closed_by_system,
   po.priority_second_approver,
   po.approval_total,
+  COALESCE(
+    NULLIF(po.approval_total_home, 0),
+    po.approval_total
+  ) AS approval_total_home,
+  COALESCE(po.currency, '') AS currency,
+  COALESCE(cur.code, 'CAD') AS currency_code,
+  COALESCE(cur.symbol, 'CAD') AS currency_symbol,
+  COALESCE(cur.icon, '') AS currency_icon,
+  COALESCE(CAST(cur.rate AS REAL), 1) AS currency_rate,
+  COALESCE(cur.rate_date, '') AS currency_rate_date,
   (SELECT COUNT(*) FROM expenses WHERE expenses.purchase_order = po.id AND expenses.committed != '') AS committed_expenses_count,
   COALESCE((SELECT SUM(expenses.total) FROM expenses WHERE expenses.purchase_order = po.id), 0) AS expenses_total,
   CASE
@@ -312,9 +322,9 @@ SELECT
           AND cpl.resolved_limit IS NOT NULL
           -- Dual-stage eligibility requires thresholded PO and fully sufficient limit.
           AND cpl.second_approval_threshold > 0
-          AND po.approval_total > cpl.second_approval_threshold
+          AND COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total) > cpl.second_approval_threshold
           AND cpl.resolved_limit > cpl.second_approval_threshold
-          AND cpl.resolved_limit >= po.approval_total
+          AND cpl.resolved_limit >= COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total)
       )
     THEN 1
     ELSE 0
@@ -362,13 +372,13 @@ SELECT
                 (
                   -- Dual-stage case: first-stage pool is <= threshold.
                   cpl.second_approval_threshold > 0
-                  AND po.approval_total > cpl.second_approval_threshold
+                  AND COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total) > cpl.second_approval_threshold
                   AND cpl.resolved_limit <= cpl.second_approval_threshold
                 )
                 OR (
                   -- Dual-stage assigned-approver self-bypass path.
                   cpl.second_approval_threshold > 0
-                  AND po.approval_total > cpl.second_approval_threshold
+                  AND COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total) > cpl.second_approval_threshold
                   AND po.uid = {:userId}
                   AND cpl.resolved_limit > 0
                 )
@@ -376,7 +386,7 @@ SELECT
                   -- Single-stage case: threshold not triggered.
                   NOT (
                     cpl.second_approval_threshold > 0
-                    AND po.approval_total > cpl.second_approval_threshold
+                    AND COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total) > cpl.second_approval_threshold
                   )
                 )
               )
@@ -408,9 +418,9 @@ SELECT
               )
               AND cpl.resolved_limit IS NOT NULL
               AND cpl.second_approval_threshold > 0
-              AND po.approval_total > cpl.second_approval_threshold
+              AND COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total) > cpl.second_approval_threshold
               AND cpl.resolved_limit > cpl.second_approval_threshold
-              AND cpl.resolved_limit >= po.approval_total
+              AND cpl.resolved_limit >= COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total)
           )
         )
       )
@@ -429,4 +439,5 @@ LEFT JOIN jobs AS j ON po.job = j.id
 LEFT JOIN divisions AS d ON po.division = d.id
 LEFT JOIN categories AS c ON po.category = c.id
 LEFT JOIN clients AS cl ON j.client = cl.id
+LEFT JOIN currencies AS cur ON po.currency = cur.id
 CROSS JOIN caller_context

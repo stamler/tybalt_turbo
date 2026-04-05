@@ -5,13 +5,16 @@
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
   } from "$lib/utilities";
+  import { formatCurrencyEquivalent } from "$lib/utilities";
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
   import { branches as branchesStore } from "$lib/stores/branches";
+  import { currencies } from "$lib/stores/currencies";
   import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
   import { profiles } from "$lib/stores/profiles";
   import { pb } from "$lib/pocketbase";
   import { createLegacyPurchaseOrder, updateLegacyPurchaseOrder } from "$lib/legacyPurchaseOrders";
+  import DSCurrencyInput from "$lib/components/DSCurrencyInput.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
@@ -53,6 +56,7 @@
   jobs.init();
   divisions.init();
   branchesStore.init();
+  currencies.init();
   expenditureKindsStore.init();
 
   let {
@@ -190,6 +194,7 @@
     buildPoApproverRequest({
       division: item.division,
       total: item.total,
+      currency: item.currency,
       kind: item.kind,
       job: item.job,
       type: isRecurring ? "Recurring" : item.type,
@@ -261,6 +266,18 @@
   const approversUnavailableMessage =
     "Could not load approver eligibility. Resolve the error and try again.";
   const nonOwnerEditMessage = "You can view this purchase order, but only its creator can edit it.";
+  const selectedCurrency = $derived.by(() => $currencies.items.find((row) => row.id === item.currency));
+  const currencyEquivalentText = $derived.by(() => {
+    if (!selectedCurrency || selectedCurrency.code === "CAD") {
+      return "";
+    }
+    return formatCurrencyEquivalent(
+      Number(item.total ?? 0) * Number(selectedCurrency.rate ?? 1),
+      selectedCurrency.rate,
+      selectedCurrency.rate_date,
+    );
+  });
+  const currencySelectionDisabled = $derived.by(() => isChildPO || legacyMode);
   const isEditingAnotherUsersPO = $derived.by(
     () =>
       !legacyMode &&
@@ -437,6 +454,13 @@
 
   // Default division from caller's profile if creating and empty
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
+
+  $effect(() => {
+    if (!currencySelectionDisabled) {
+      return;
+    }
+    item.currency = $currencies.items.find((row) => row.code === "CAD")?.id ?? item.currency ?? "";
+  });
 
   // Default kind once kinds are loaded.
   $effect(() => {
@@ -1159,19 +1183,26 @@
       disabled={isChildPO}
     />
 
-    <DsTextInput
-      bind:value={item.total as number}
+    <DSCurrencyInput
+      bind:amount={item.total}
+      bind:currency={item.currency}
+      items={$currencies.items}
       {errors}
-      fieldName="total"
+      amountFieldName="total"
+      currencyFieldName="currency"
       uiName="Total"
-      type="number"
-      step={0.01}
-      min={0}
+      disabledCurrency={currencySelectionDisabled}
+      helperText={legacyMode
+        ? "Legacy entries remain CAD-only in this rollout."
+        : currencyEquivalentText
+          ? "Approval checks use the CAD equivalent."
+          : `Max in ${selectedCurrency?.code ?? "CAD"} including all taxes and shipping.`}
+      homeEquivalent={selectedCurrency && selectedCurrency.code !== "CAD"
+        ? Number(item.total ?? 0) * Number(selectedCurrency.rate ?? 1)
+        : null}
+      rate={selectedCurrency?.rate}
+      rateDate={selectedCurrency?.rate_date}
     />
-    <span class="flex w-full gap-2 text-sm text-neutral-600">
-      <span class="invisible">Total</span>
-      <span>max in CAD including all taxes and shipping</span>
-    </span>
 
     <VendorSelector bind:value={item.vendor as string} {errors} disabled={isChildPO} />
 

@@ -124,4 +124,23 @@ func TestProcessExpense_UpdateOwnershipGuards(t *testing.T) {
 		err = ProcessExpense(app, makeRecordRequestEvent(app, record, ownerAuth))
 		assertHookErrorCode(t, err, http.StatusBadRequest, "uid", "immutable_field")
 	})
+
+	t.Run("submitted expense cannot be edited", func(t *testing.T) {
+		if _, err := app.NonconcurrentDB().NewQuery(`
+			UPDATE expenses
+			SET submitted = 1
+			WHERE id = '77i1224mudailrb'
+		`).Execute(); err != nil {
+			t.Fatalf("failed to mark expense submitted: %v", err)
+		}
+
+		reloaded, err := app.FindRecordById("expenses", "77i1224mudailrb")
+		if err != nil {
+			t.Fatalf("failed to reload submitted expense: %v", err)
+		}
+		reloaded.Set("description", "Trying to edit after submit")
+
+		err = ProcessExpense(app, makeRecordRequestEvent(app, reloaded, ownerAuth))
+		assertHookErrorCode(t, err, http.StatusBadRequest, "submitted", "is_submitted")
+	})
 }

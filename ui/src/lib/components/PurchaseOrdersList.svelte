@@ -14,7 +14,12 @@
   import type { VisiblePurchaseOrderResponse } from "$lib/poVisibility";
   import { globalStore } from "$lib/stores/global";
   import { authStore } from "$lib/stores/auth";
-  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import {
+    formatCurrencyAmount,
+    pocketBaseFileHref,
+    shortDate,
+    trimmedOrEmpty,
+  } from "$lib/utilities";
   import { onMount, onDestroy, untrack } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { fetchPendingPO, fetchVisiblePO } from "$lib/poVisibility";
@@ -298,10 +303,12 @@
 
     {#snippet byline(item: VisiblePurchaseOrderResponse)}
       <span class="flex items-center gap-2">
-        ${item.total}
+        {formatCurrencyAmount(item.total, item.currency_code)}
         {#if showRemaining && item.status === "Active"}
           <span class="flex items-center gap-1">
-            <span>Provisional Remaining: ${item.remaining_amount.toFixed(2)}</span>
+            <span>
+              Provisional Remaining: {formatCurrencyAmount(item.remaining_amount, item.currency_code)}
+            </span>
             <button
               type="button"
               class="inline-flex items-center text-slate-500 hover:text-slate-700"

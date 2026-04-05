@@ -123,6 +123,24 @@ func createRejectRecordHandler(app core.App, collectionName string) func(e *core
 			record.Set("rejection_reason", req.RejectionReason)
 			record.Set("rejector", userId)
 
+			if collectionName == "expenses" {
+				currencyInfo, err := utilities.ResolveCurrencyInfo(txApp, record.GetString("currency"))
+				if err != nil {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "invalid_currency",
+						Message: "referenced currency not found",
+					}
+				}
+
+				if !utilities.IsHomeCurrencyInfo(currencyInfo) &&
+					(record.GetString("payment_type") == "OnAccount" || record.GetString("payment_type") == "CorporateCreditCard") {
+					record.Set("settled_total", 0)
+					record.Set("settler", "")
+					record.Set("settled", "")
+				}
+			}
+
 			// Save the updated record
 			if err := txApp.Save(record); err != nil {
 				httpResponseStatusCode = http.StatusInternalServerError

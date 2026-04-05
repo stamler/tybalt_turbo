@@ -5,8 +5,11 @@
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
   } from "$lib/utilities";
+  import { formatCurrencyEquivalent } from "$lib/utilities";
   import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
+  import { currencies } from "$lib/stores/currencies";
   import { pb } from "$lib/pocketbase";
+  import DSCurrencyInput from "$lib/components/DSCurrencyInput.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
@@ -32,6 +35,7 @@
   // initialize the stores, noop if already initialized
   jobs.init();
   divisions.init();
+  currencies.init();
   expenditureKindsStore.init();
   let { data }: { data: ExpensesPageData } = $props();
 
@@ -83,6 +87,32 @@
     () => data.linked_purchase_order?.remaining_amount ?? null,
   );
   const authUserID = $derived.by(() => $authStore?.model?.id ?? "");
+  const selectedCurrency = $derived.by(() => $currencies.items.find((row) => row.id === item.currency));
+  const selectedCurrencyCode = $derived.by(() => selectedCurrency?.code ?? "CAD");
+  const homeCurrency = $derived.by(() => $currencies.items.find((row) => row.code === "CAD"));
+  const foreignExpenseEquivalent = $derived.by(() => {
+    if (!selectedCurrency || selectedCurrency.code === "CAD") {
+      return "";
+    }
+    return formatCurrencyEquivalent(
+      Number(item.total ?? 0) * Number(selectedCurrency.rate ?? 1),
+      selectedCurrency.rate,
+      selectedCurrency.rate_date,
+    );
+  });
+  const fixedHomePaymentType = $derived.by(
+    () =>
+      item.payment_type === "Allowance" ||
+      item.payment_type === "FuelCard" ||
+      item.payment_type === "Mileage" ||
+      item.payment_type === "PersonalReimbursement",
+  );
+  const currencySelectionDisabled = $derived.by(
+    () => item.purchase_order !== "" || fixedHomePaymentType,
+  );
+  const showSettledTotalInput = $derived.by(
+    () => selectedCurrencyCode !== "CAD" && item.payment_type === "Expense",
+  );
   const nonOwnerEditMessage = "You can view this expense, but only its creator can edit it.";
   const isEditingAnotherUsersExpense = $derived.by(
     () => data.editing && authUserID !== "" && item.uid !== "" && item.uid !== authUserID,
@@ -122,6 +152,16 @@
 
   // Default division from caller's profile if creating and empty
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
+
+  $effect(() => {
+    if (!currencySelectionDisabled) {
+      return;
+    }
+    if (item.purchase_order !== "") {
+      return;
+    }
+    item.currency = homeCurrency?.id ?? "";
+  });
 
   async function save(event: Event) {
     event.preventDefault();
@@ -377,15 +417,36 @@
     />
 
     {#if item.payment_type !== "Mileage"}
-      <DsTextInput
-        bind:value={item.total as number}
+      <DSCurrencyInput
+        bind:amount={item.total}
+        bind:currency={item.currency}
+        items={$currencies.items}
         {errors}
-        fieldName="total"
+        amountFieldName="total"
+        currencyFieldName="currency"
         uiName="Total"
-        type="number"
-        step={0.01}
-        min={0}
+        disabledCurrency={currencySelectionDisabled}
+        homeEquivalent={selectedCurrency && selectedCurrency.code !== "CAD"
+          ? Number(item.total ?? 0) * Number(selectedCurrency.rate ?? 1)
+          : null}
+        rate={selectedCurrency?.rate}
+        rateDate={selectedCurrency?.rate_date}
       />
+      {#if showSettledTotalInput}
+        <DSCurrencyInput
+          bind:amount={item.settled_total}
+          currency={homeCurrency?.id ?? ""}
+          items={$currencies.items}
+          {errors}
+          amountFieldName="settled_total"
+          currencyFieldName="settled_total_currency"
+          uiName="Settled CAD Total"
+          disabledCurrency={true}
+          helperText="Enter the final CAD settlement amount before submitting."
+        />
+      {:else if foreignExpenseEquivalent}
+        <div class="text-sm text-neutral-600">Indicative CAD equivalent: {foreignExpenseEquivalent}</div>
+      {/if}
       <VendorSelector bind:value={item.vendor as string} {errors} />
     {:else}
       <DsTextInput

@@ -103,6 +103,7 @@ export const navSections: NavSection[] = [
       { label: "Pending My Approval", href: "/expenses/pending", buttons: [] },
       { label: "Approved By Me", href: "/expenses/approved", buttons: [] },
       { label: "Tracking", href: "/expenses/tracking", buttons: [] },
+      { label: "Settlement", href: "/expenses/settlement", buttons: [] },
       { label: "Commit Queue", href: "/reports/expense/queue", buttons: [] },
     ],
   },
@@ -207,6 +208,7 @@ export const navSections: NavSection[] = [
   {
     title: "Settings",
     items: [
+      { label: "Currencies", href: "/currencies", buttons: [] },
       { label: "Time Types", href: "/timetypes", buttons: [] },
       { label: "Divisions", href: "/divisions", buttons: [] },
       { label: "Machine Secrets", href: "/machine_secrets", buttons: [] },

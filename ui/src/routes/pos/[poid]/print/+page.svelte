@@ -1,19 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import type { PageData } from "./$types";
-  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { formatCurrencyAmount, shortDate, trimmedOrEmpty } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
 
   const po = $derived(data.po);
-  const currencyFormatter = new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: "CAD",
-  });
-
-  function formatCurrency(value: number): string {
-    return currencyFormatter.format(value);
-  }
 
   function displayValue(value: string | null | undefined, fallback = "Not specified"): string {
     return trimmedOrEmpty(value) || fallback;
@@ -34,8 +26,8 @@
   const recurringPeriodLabel = $derived(trimmedOrEmpty(po.frequency) || "period");
   const authorizedAmountText = $derived(
     po.type === "Recurring"
-      ? `${formatCurrency(po.total)} / ${recurringPeriodLabel}`
-      : formatCurrency(po.total),
+      ? `${formatCurrencyAmount(po.total, po.currency_code)} / ${recurringPeriodLabel}`
+      : formatCurrencyAmount(po.total, po.currency_code),
   );
 
   onMount(() => {
@@ -145,7 +137,7 @@
                 <tr>
                   <td colspan="2" style="padding: 0.25rem 0; vertical-align: top;">
                     <div class="font-semibold">Maximum Authorized Total</div>
-                    <div>{formatCurrency(po.approval_total)}</div>
+                    <div>{formatCurrencyAmount(po.approval_total, po.currency_code)}</div>
                   </td>
                 </tr>
               {/if}

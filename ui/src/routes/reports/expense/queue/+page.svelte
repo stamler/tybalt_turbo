@@ -7,7 +7,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
-  import { pocketBaseFileHref, shortDate } from "$lib/utilities";
+  import { formatCurrencyAmount, pocketBaseFileHref, shortDate } from "$lib/utilities";
   import type { PageData } from "./$types";
   import { untrack } from "svelte";
 
@@ -98,7 +98,10 @@
   {/snippet}
   {#snippet line3(r: ExpenseCommitQueueRow)}
     <div class="flex items-center gap-2 text-xs text-neutral-600">
-      <span>Date: {shortDate(r.date, true)} · Total: ${r.total?.toFixed(2)}</span>
+      <span>Date: {shortDate(r.date, true)} · Total: {formatCurrencyAmount(r.total, r.currency_code)}</span>
+      {#if r.currency_code !== "CAD"}
+        <span>Settled CAD: {formatCurrencyAmount(r.settled_total, "CAD")}</span>
+      {/if}
       {#if r.attachment !== ""}
         <DsActionButton
           action={() => openAttachment(r.id, r.attachment)}

@@ -23,6 +23,7 @@ import type { SecondApproversResponse } from "$lib/svelte-types";
 export type PoApproverRequest = {
   division: string;
   amount: string;
+  currency: string;
   kind: string;
   has_job: string;
   type: string;
@@ -34,6 +35,7 @@ export type PoApproverRequest = {
 export function buildPoApproverRequest(params: {
   division?: string;
   total?: number | string;
+  currency?: string;
   kind?: string;
   job?: string;
   type?: string;
@@ -44,6 +46,7 @@ export function buildPoApproverRequest(params: {
   return {
     division: params.division ?? "",
     amount: String(Number(params.total ?? 0)),
+    currency: params.currency ?? "",
     kind: params.kind ?? "",
     has_job: String((params.job ?? "") !== ""),
     type: params.type ?? "",

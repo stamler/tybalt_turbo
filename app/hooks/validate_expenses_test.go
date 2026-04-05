@@ -233,3 +233,239 @@ func TestValidateExpense_RejectsClosedJob(t *testing.T) {
 		}
 	}
 }
+
+func TestValidateExpense_ForeignNoPOLimitUsesSettledTotal(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
+		t.Fatalf("failed to load expenditure kinds config: %v", err)
+	}
+
+	usdCurrency, err := app.FindFirstRecordByFilter("currencies", "code = {:code}", map[string]any{"code": "USD"})
+	if err != nil {
+		t.Fatalf("failed to load USD currency: %v", err)
+	}
+
+	failing := buildRecordFromMap(expensesCollection, map[string]any{
+		"allowance_types": []string{},
+		"date":            "2024-01-22",
+		"description":     "Foreign expense over CAD limit",
+		"job":             "",
+		"payment_type":    "Expense",
+		"purchase_order":  "",
+		"total":           10.0,
+		"settled_total":   constants.NO_PO_EXPENSE_LIMIT,
+		"currency":        usdCurrency.Id,
+		"vendor":          "2zqxtsmymf670ha",
+		"attachment":      "dummy.pdf",
+	})
+
+	err = validateExpense(app, failing, nil, 0, false)
+	if err == nil {
+		t.Fatal("expected foreign expense at the CAD no-PO limit to require a purchase order")
+	}
+	errsMap, ok := err.(validation.Errors)
+	if !ok {
+		t.Fatalf("expected validation.Errors, got %T: %v", err, err)
+	}
+	if _, ok := errsMap["total"]; !ok {
+		t.Fatalf("expected total error for foreign no-PO limit, got %v", errsMap)
+	}
+
+	passing := buildRecordFromMap(expensesCollection, map[string]any{
+		"allowance_types": []string{},
+		"date":            "2024-01-22",
+		"description":     "Foreign expense under CAD limit",
+		"job":             "",
+		"payment_type":    "Expense",
+		"purchase_order":  "",
+		"total":           10.0,
+		"settled_total":   constants.NO_PO_EXPENSE_LIMIT - 0.01,
+		"currency":        usdCurrency.Id,
+		"vendor":          "2zqxtsmymf670ha",
+		"attachment":      "dummy.pdf",
+	})
+
+	if err := validateExpense(app, passing, nil, 0, false); err != nil {
+		t.Fatalf("expected foreign expense below CAD no-PO limit to validate, got %v", err)
+	}
+}
+
+func TestValidateExpense_CurrencyMustMatchPurchaseOrder(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
+		t.Fatalf("failed to load expenditure kinds config: %v", err)
+	}
+
+	usdCurrency, err := app.FindFirstRecordByFilter("currencies", "code = {:code}", map[string]any{"code": "USD"})
+	if err != nil {
+		t.Fatalf("failed to load USD currency: %v", err)
+	}
+	cadCurrency, err := app.FindFirstRecordByFilter("currencies", "code = {:code}", map[string]any{"code": "CAD"})
+	if err != nil {
+		t.Fatalf("failed to load CAD currency: %v", err)
+	}
+
+	po := buildRecordFromMap(poCollection, map[string]any{
+		"date":     "2024-01-22",
+		"total":    constants.NO_PO_EXPENSE_LIMIT - 0.01,
+		"type":     "One-Time",
+		"currency": usdCurrency.Id,
+		"job":      "mg0sp9iyjzo4zw9",
+	})
+	record := buildRecordFromMap(expensesCollection, map[string]any{
+		"allowance_types": []string{},
+		"date":            "2024-01-22",
+		"description":     "Currency mismatch test",
+		"job":             "mg0sp9iyjzo4zw9",
+		"payment_type":    "OnAccount",
+		"purchase_order":  "recordId",
+		"total":           25.0,
+		"currency":        cadCurrency.Id,
+		"vendor":          "2zqxtsmymf670ha",
+		"attachment":      "dummy.pdf",
+	})
+
+	err = validateExpense(app, record, po, 0, false)
+	if err == nil {
+		t.Fatal("expected currency mismatch against PO to fail validation")
+	}
+	hookErr, ok := err.(*errs.HookError)
+	if !ok {
+		t.Fatalf("expected HookError, got %T: %v", err, err)
+	}
+	if fieldErr, ok := hookErr.Data["currency"]; !ok || fieldErr.Code != "must_match_purchase_order" {
+		t.Fatalf("expected must_match_purchase_order currency error, got %+v", hookErr.Data)
+	}
+}
+
+func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
+		t.Fatalf("failed to load expenditure kinds config: %v", err)
+	}
+
+	homeCurrency, err := utilities.FindHomeCurrency(app)
+	if err != nil {
+		t.Fatalf("failed to load home currency: %v", err)
+	}
+	usdCurrency, err := app.FindFirstRecordByFilter("currencies", "code = {:code}", map[string]any{"code": "USD"})
+	if err != nil {
+		t.Fatalf("failed to load USD currency: %v", err)
+	}
+	standardUser, err := app.FindAuthRecordByEmail("users", "time@test.com")
+	if err != nil {
+		t.Fatalf("failed to load standard user: %v", err)
+	}
+	mileageUser, err := app.FindAuthRecordByEmail("users", "u_mileage_valid@example.com")
+	if err != nil {
+		t.Fatalf("failed to load mileage-valid user: %v", err)
+	}
+
+	t.Run("po_linked_expense_inherits_po_currency", func(t *testing.T) {
+		parentPO, err := app.FindRecordById("purchase_orders", "standardupd001")
+		if err != nil {
+			t.Fatalf("failed to load purchase order: %v", err)
+		}
+		if _, err := app.NonconcurrentDB().NewQuery(`
+			UPDATE purchase_orders
+			SET currency = {:currencyId}
+			WHERE id = {:id}
+		`).Bind(map[string]any{"currencyId": usdCurrency.Id, "id": parentPO.Id}).Execute(); err != nil {
+			t.Fatalf("failed updating purchase order currency: %v", err)
+		}
+
+		record := buildRecordFromMap(expensesCollection, map[string]any{
+			"uid":            standardUser.Id,
+			"date":           "2024-01-22",
+			"description":    "PO-linked foreign expense",
+			"payment_type":   "OnAccount",
+			"purchase_order": parentPO.Id,
+			"total":          25.0,
+			"vendor":         "2zqxtsmymf670ha",
+			"currency":       homeCurrency.Id,
+		})
+
+		if err := cleanExpense(app, record); err != nil {
+			t.Fatalf("expected cleanExpense to succeed, got %v", err)
+		}
+		if got := record.GetString("currency"); got != usdCurrency.Id {
+			t.Fatalf("expected expense to inherit PO currency %s, got %q", usdCurrency.Id, got)
+		}
+	})
+
+	t.Run("mileage_forces_home_currency_and_auto_sets_settled_total", func(t *testing.T) {
+		record := buildRecordFromMap(expensesCollection, map[string]any{
+			"uid":          mileageUser.Id,
+			"date":         "2024-01-22",
+			"description":  "Mileage to remote site",
+			"payment_type": "Mileage",
+			"distance":     10.0,
+			"currency":     usdCurrency.Id,
+		})
+
+		if err := cleanExpense(app, record); err != nil {
+			t.Fatalf("expected cleanExpense to succeed for mileage, got %v", err)
+		}
+		if got := record.GetString("currency"); got != homeCurrency.Id {
+			t.Fatalf("expected mileage expense currency to be forced to home currency %s, got %q", homeCurrency.Id, got)
+		}
+		if record.GetFloat("settled_total") != record.GetFloat("total") {
+			t.Fatalf("expected mileage settled_total to match total, got %v vs %v", record.GetFloat("settled_total"), record.GetFloat("total"))
+		}
+	})
+
+	t.Run("foreign_onaccount_clears_settlement_fields_for_queue_workflow", func(t *testing.T) {
+		record := buildRecordFromMap(expensesCollection, map[string]any{
+			"uid":          standardUser.Id,
+			"date":         "2024-01-22",
+			"description":  "Foreign on-account expense",
+			"payment_type": "OnAccount",
+			"total":        25.0,
+			"vendor":       "2zqxtsmymf670ha",
+			"attachment":   "dummy.pdf",
+			"currency":     usdCurrency.Id,
+			"settled_total": 88.0,
+			"settler":       "tqqf7q0f3378rvp",
+			"settled":       "2026-04-03 12:00:00.000Z",
+		})
+
+		if err := cleanExpense(app, record); err != nil {
+			t.Fatalf("expected cleanExpense to succeed for foreign on-account, got %v", err)
+		}
+		if record.GetFloat("settled_total") != 0 {
+			t.Fatalf("expected foreign on-account settled_total to reset to 0, got %v", record.GetFloat("settled_total"))
+		}
+		if record.GetString("settler") != "" || !record.GetDateTime("settled").IsZero() {
+			t.Fatalf("expected foreign on-account settlement actor fields to clear, got settler=%q settled=%v", record.GetString("settler"), record.GetDateTime("settled"))
+		}
+	})
+
+	t.Run("foreign_out_of_pocket_keeps_user_settled_total_but_clears_actor_fields", func(t *testing.T) {
+		record := buildRecordFromMap(expensesCollection, map[string]any{
+			"uid":           standardUser.Id,
+			"date":          "2024-01-22",
+			"description":   "Foreign reimbursement expense",
+			"payment_type":  "Expense",
+			"total":         25.0,
+			"vendor":        "2zqxtsmymf670ha",
+			"attachment":    "dummy.pdf",
+			"currency":      usdCurrency.Id,
+			"settled_total": 91.25,
+			"settler":       "tqqf7q0f3378rvp",
+			"settled":       "2026-04-03 12:00:00.000Z",
+		})
+
+		if err := cleanExpense(app, record); err != nil {
+			t.Fatalf("expected cleanExpense to succeed for foreign Expense, got %v", err)
+		}
+		if record.GetFloat("settled_total") != 91.25 {
+			t.Fatalf("expected foreign Expense settled_total to remain user-provided, got %v", record.GetFloat("settled_total"))
+		}
+		if record.GetString("settler") != "" || !record.GetDateTime("settled").IsZero() {
+			t.Fatalf("expected foreign Expense settlement actor fields to clear, got settler=%q settled=%v", record.GetString("settler"), record.GetDateTime("settled"))
+		}
+	})
+}

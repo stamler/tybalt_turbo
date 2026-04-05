@@ -36,6 +36,17 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	}
 
 	purchaseOrderID := strings.TrimSpace(expenseRecord.GetString("purchase_order"))
+	homeCurrencyID := ""
+	if homeCurrency, err := utilities.FindHomeCurrency(app); err == nil && homeCurrency != nil {
+		homeCurrencyID = homeCurrency.Id
+	}
+	setHomeCurrency := func() {
+		if homeCurrencyID != "" {
+			expenseRecord.Set("currency", homeCurrencyID)
+			return
+		}
+		expenseRecord.Set("currency", "")
+	}
 
 	// No-PO expenses default to capital (no job) or project (with job).
 	if purchaseOrderID == "" {
@@ -136,6 +147,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 			}
 		}
 		expenseRecord.Set("branch", poBranchID)
+		expenseRecord.Set("currency", purchaseOrderRecord.GetString("currency"))
 	} else {
 		// Set branch from job if provided; otherwise from user's default branch.
 		jobId := expenseRecord.GetString("job")
@@ -389,6 +401,49 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		// Allowance expenses do not have attachments, so we set the attachment
 		// property to an empty string
 		expenseRecord.Set("attachment", "")
+	}
+
+	if purchaseOrderID == "" {
+		switch paymentType {
+		case "Allowance", "FuelCard", "Mileage", "PersonalReimbursement":
+			setHomeCurrency()
+		}
+	}
+
+	currencyInfo, err := utilities.ResolveCurrencyInfo(app, expenseRecord.GetString("currency"))
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"currency": {Code: "not_found", Message: "referenced currency not found"},
+			},
+		}
+	}
+	if !utilities.IsHomeCurrencyInfo(currencyInfo) && currencyInfo.Rate <= 0 {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"currency": {
+					Code:    "missing_rate",
+					Message: "selected foreign currency is missing an exchange rate",
+				},
+			},
+		}
+	}
+
+	if utilities.IsHomeCurrencyInfo(currencyInfo) {
+		expenseRecord.Set("settled_total", expenseRecord.GetFloat("total"))
+		expenseRecord.Set("settler", "")
+		expenseRecord.Set("settled", "")
+	} else if paymentType == "Expense" {
+		expenseRecord.Set("settler", "")
+		expenseRecord.Set("settled", "")
+	} else {
+		expenseRecord.Set("settled_total", 0)
+		expenseRecord.Set("settler", "")
+		expenseRecord.Set("settled", "")
 	}
 	return nil
 }

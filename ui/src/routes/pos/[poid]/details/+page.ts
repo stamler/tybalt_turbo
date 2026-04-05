@@ -25,6 +25,7 @@ export const load: PageLoad = async ({ params }) => {
       const request = buildPoApproverRequest({
         division: po.division,
         total: po.total,
+        currency: po.currency,
         kind: po.kind,
         job: po.job,
         type: po.type,

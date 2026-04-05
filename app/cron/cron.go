@@ -41,4 +41,10 @@ func AddCronJobs(app core.App) {
 	app.Cron().MustAdd("timesheet_approval_reminders", "0 12 * * 2-4", func() {
 		notifications.QueueTimesheetApprovalReminders(app, true)
 	})
+
+	// Refresh foreign-exchange rates on weekday evenings after the Bank of Canada
+	// business-day feed is expected to be published.
+	app.Cron().MustAdd("currency_rate_sync", "0 22 * * 1-5", func() {
+		syncCurrencyRates(app)
+	})
 }

@@ -1,4 +1,5 @@
 import type {
+  CurrenciesResponse,
   TimeEntriesRecord,
   PurchaseOrdersRecord,
   PurchaseOrdersResponse,
@@ -107,6 +108,19 @@ export type ExpensesListData = {
   limit?: number;
 };
 
+export type CurrencyListRow = CurrenciesResponse & {
+  used_by_purchase_orders: boolean;
+  used_by_expenses: boolean;
+};
+
+export type CurrencyInitStatus = {
+  home_currency_id: string;
+  home_currency_exists: boolean;
+  home_currency_ready: boolean;
+  blank_purchase_orders: number;
+  blank_expenses: number;
+};
+
 export type PurchaseOrdersListData = {
   items?: VisiblePurchaseOrderResponse[];
   createdItemIsVisible?: (record: PurchaseOrdersResponse) => boolean;
@@ -132,7 +146,42 @@ export type ExpenseCommitQueueRow = {
   job_description: string;
   client_name: string;
   total: number;
+  settled_total: number;
+  currency: string;
+  currency_code: string;
+  currency_symbol: string;
+  currency_icon: string;
+  currency_rate: number;
+  currency_rate_date: string;
   po_number: string;
+};
+
+export type ExpenseSettlementRow = {
+  id: string;
+  uid: string;
+  uid_name: string;
+  date: string;
+  description: string;
+  payment_type: string;
+  total: number;
+  settled_total: number;
+  settled: string;
+  settler: string;
+  settler_name: string;
+  purchase_order: string;
+  po_number: string;
+  vendor_name: string;
+  vendor_alias: string;
+  job_number: string;
+  client_name: string;
+  currency: string;
+  currency_code: string;
+  currency_symbol: string;
+  currency_icon: string;
+  currency_rate: number;
+  currency_rate_date: string;
+  indicative_home_total: number;
+  age_days: number;
 };
 
 // Claims types returned by custom API endpoints

@@ -62,6 +62,30 @@ func CleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 		purchaseOrderRecord.Set("approval_total", calculatedTotal)
 	}
 
+	currencyInfo, err := utilities.ResolveCurrencyInfo(app, purchaseOrderRecord.GetString("currency"))
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when cleaning purchase order",
+			Data: map[string]errs.CodeError{
+				"currency": {Code: "not_found", Message: "referenced currency not found"},
+			},
+		}
+	}
+	if !utilities.IsHomeCurrencyInfo(currencyInfo) && currencyInfo.Rate <= 0 {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when cleaning purchase order",
+			Data: map[string]errs.CodeError{
+				"currency": {
+					Code:    "missing_rate",
+					Message: "selected foreign currency is missing an exchange rate",
+				},
+			},
+		}
+	}
+	purchaseOrderRecord.Set("approval_total_home", purchaseOrderRecord.GetFloat("approval_total")*utilities.CurrencyRateOrOne(currencyInfo))
+
 	// Clear all rejection fields here. ProcessPurchaseOrder, which calls
 	// cleanPurchaseOrder, is only ever called when a user is creating or
 	// updating a PO. POs cannot be rejected upon creation, so clearing rejection
@@ -317,6 +341,10 @@ func ValidatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record, legac
 			}
 		}
 
+		if strings.TrimSpace(purchaseOrderRecord.GetString("currency")) == "" && strings.TrimSpace(parentPO.GetString("currency")) != "" {
+			purchaseOrderRecord.Set("currency", parentPO.GetString("currency"))
+		}
+
 		// Validate that other child POs with status "Unapproved" do not exist
 		otherChildPOs, err := app.FindRecordsByFilter("purchase_orders", "parent_po = {:parentId} && status != 'Closed' && status != 'Cancelled'", "", 0, 0, dbx.Params{
 			"parentId": parentPO.Id,
@@ -363,6 +391,21 @@ func ValidatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record, legac
 						},
 					},
 				}
+			}
+		}
+
+		parentCurrencyCode := utilities.EffectiveCurrencyCode(app, parentPO.GetString("currency"))
+		childCurrencyCode := utilities.EffectiveCurrencyCode(app, purchaseOrderRecord.GetString("currency"))
+		if parentCurrencyCode != childCurrencyCode {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating parent PO",
+				Data: map[string]errs.CodeError{
+					"currency": {
+						Code:    "value_mismatch",
+						Message: "child PO currency must match parent PO currency",
+					},
+				},
 			}
 		}
 	}
@@ -489,7 +532,7 @@ func ValidatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record, legac
 		policy, err := utilities.GetPOApproverPolicy(
 			app,
 			purchaseOrderRecord.GetString("division"),
-			purchaseOrderRecord.GetFloat("approval_total"),
+			utilities.EffectiveApprovalTotalHome(purchaseOrderRecord),
 			purchaseOrderRecord.GetString("kind"),
 			purchaseOrderRecord.GetString("job") != "",
 		)

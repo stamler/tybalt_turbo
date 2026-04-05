@@ -250,6 +250,10 @@ export function pocketBaseFileHref(
     recordId,
   )}/${encodeURIComponent(filename)}`;
 }
+
+export function currencyIconHref(recordId: string, filename: string): string {
+  return pocketBaseFileHref("currencies", recordId, filename);
+}
 /*
 export const hoursWorked = function (item: TimeSheetTally) {
   let workedHours = 0;
@@ -320,15 +324,52 @@ export const formatDollars = function <T>(value: T) {
 };
 
 export const formatCurrency = (value: number | null | undefined) => {
+  return formatCurrencyAmount(value, "CAD");
+};
+
+export const normalizeCurrencyCode = (code: string | null | undefined) => {
+  const normalized = (code ?? "").trim().toUpperCase();
+  return normalized === "" ? "CAD" : normalized;
+};
+
+export const formatCurrencyAmount = (
+  value: number | null | undefined,
+  currencyCode: string | null | undefined = "CAD",
+) => {
   if (value === undefined || value === null || Number.isNaN(value)) {
     return "$0.00";
   }
-  return new Intl.NumberFormat("en-CA", {
-    style: "currency",
-    currency: "CAD",
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  }).format(value);
+  const normalizedCode = normalizeCurrencyCode(currencyCode);
+  try {
+    return new Intl.NumberFormat("en-CA", {
+      style: "currency",
+      currency: normalizedCode,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    return `${normalizedCode} ${value.toFixed(2)}`;
+  }
+};
+
+export const formatCurrencyEquivalent = (
+  homeAmount: number | null | undefined,
+  rate: number | null | undefined,
+  rateDate: string | null | undefined,
+) => {
+  if (homeAmount === undefined || homeAmount === null || Number.isNaN(homeAmount)) {
+    return "";
+  }
+
+  const parts = [formatCurrencyAmount(homeAmount, "CAD")];
+  if (rate !== undefined && rate !== null && Number.isFinite(rate) && rate > 0) {
+    parts.push(`rate ${rate.toFixed(4)}`);
+  }
+  if ((rateDate ?? "").trim() !== "") {
+    parts.push(`as of ${rateDate!.slice(0, 10)}`);
+  }
+
+  return parts.join(" · ");
 };
 
 export const formatPercent = function <T>(value: T) {

@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -73,6 +74,40 @@ func createSubmitRecordHandler(app core.App, collectionName string) func(e *core
 					httpResponseStatusCode = http.StatusInternalServerError
 				}
 				return poErr
+			}
+
+			if collectionName == "expenses" {
+				currencyInfo, err := utilities.ResolveCurrencyInfo(txApp, record.GetString("currency"))
+				if err != nil {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "invalid_currency",
+						Message: "referenced currency not found",
+					}
+				}
+
+				if !utilities.IsHomeCurrencyInfo(currencyInfo) && record.GetString("payment_type") == "Expense" && record.GetFloat("settled_total") <= 0 {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "settled_total_required",
+						Message: "settled total is required before submitting a foreign-currency expense",
+					}
+				}
+
+				if !utilities.IsHomeCurrencyInfo(currencyInfo) &&
+					record.GetString("purchase_order") == "" &&
+					record.GetString("payment_type") != "Mileage" &&
+					record.GetString("payment_type") != "FuelCard" &&
+					record.GetString("payment_type") != "PersonalReimbursement" &&
+					record.GetString("payment_type") != "Allowance" &&
+					utilities.GetNoPOExpenseLimit(txApp) > 0 &&
+					record.GetFloat("settled_total") >= utilities.GetNoPOExpenseLimit(txApp) {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "purchase_order_required",
+						Message: fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", utilities.GetNoPOExpenseLimit(txApp)),
+					}
+				}
 			}
 
 			// Set submitted to true

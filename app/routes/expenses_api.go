@@ -129,6 +129,16 @@ type ExpensesAugmentedRow struct {
 	CommittedWeekEnding string  `db:"committed_week_ending" json:"committed_week_ending"`
 	Distance            float64 `db:"distance" json:"distance"`
 	CCLast4Digits       string  `db:"cc_last_4_digits" json:"cc_last_4_digits"`
+	Currency            string  `db:"currency" json:"currency"`
+	CurrencyCode        string  `db:"currency_code" json:"currency_code"`
+	CurrencySymbol      string  `db:"currency_symbol" json:"currency_symbol"`
+	CurrencyIcon        string  `db:"currency_icon" json:"currency_icon"`
+	CurrencyRate        float64 `db:"currency_rate" json:"currency_rate"`
+	CurrencyRateDate    string  `db:"currency_rate_date" json:"currency_rate_date"`
+	SettledTotal        float64 `db:"settled_total" json:"settled_total"`
+	Settler             string  `db:"settler" json:"settler"`
+	Settled             string  `db:"settled" json:"settled"`
+	SettlerName         string  `db:"settler_name" json:"settler_name"`
 	PurchaseOrder       string  `db:"purchase_order" json:"purchase_order"`
 	Vendor              string  `db:"vendor" json:"vendor"`
 	PurchaseOrderNumber string  `db:"purchase_order_number" json:"purchase_order_number"`
@@ -169,6 +179,12 @@ type ExpenseDetailsRow struct {
 	POKind             string  `db:"po_kind" json:"po_kind"`
 	POKindName         string  `db:"po_kind_name" json:"po_kind_name"`
 	POTotal            float64 `db:"po_total" json:"po_total"`
+	POCurrency         string  `db:"po_currency" json:"po_currency"`
+	POCurrencyCode     string  `db:"po_currency_code" json:"po_currency_code"`
+	POCurrencySymbol   string  `db:"po_currency_symbol" json:"po_currency_symbol"`
+	POCurrencyIcon     string  `db:"po_currency_icon" json:"po_currency_icon"`
+	POCurrencyRate     float64 `db:"po_currency_rate" json:"po_currency_rate"`
+	POCurrencyRateDate string  `db:"po_currency_rate_date" json:"po_currency_rate_date"`
 	POUID              string  `db:"po_uid" json:"po_uid"`
 	POUIDName          string  `db:"po_uid_name" json:"po_uid_name"`
 	POOwnerUIDMismatch bool    `json:"po_owner_uid_mismatch"`

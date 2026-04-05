@@ -112,6 +112,37 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 				}
 			}
 
+			if collectionName == "expenses" {
+				currencyInfo, err := utilities.ResolveCurrencyInfo(txApp, record.GetString("currency"))
+				if err != nil {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "invalid_currency",
+						Message: "referenced currency not found",
+					}
+				}
+
+				if !utilities.IsHomeCurrencyInfo(currencyInfo) &&
+					record.GetString("payment_type") == "Expense" &&
+					record.GetFloat("settled_total") <= 0 {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "settled_total_required",
+						Message: "settled total must be greater than 0 before commit",
+					}
+				}
+
+				if !utilities.IsHomeCurrencyInfo(currencyInfo) &&
+					(record.GetString("payment_type") == "OnAccount" || record.GetString("payment_type") == "CorporateCreditCard") &&
+					record.GetDateTime("settled").IsZero() {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{
+						Code:    "settlement_required",
+						Message: "foreign-currency on-account and corporate card expenses must be settled before commit",
+					}
+				}
+			}
+
 			// Set commit properties
 			now := time.Now()
 			record.Set("committer", userId)

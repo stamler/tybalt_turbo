@@ -124,6 +124,10 @@ func AddRoutes(app core.App) {
 		// Expense tracking endpoints plus the org-wide expense commit queue.
 		expensesGroup.GET("/tracking_counts", createExpenseTrackingCountsHandler(app))
 		expensesGroup.GET("/commit_queue", createExpenseCommitQueueHandler(app))
+		expensesGroup.GET("/unsettled", createExpenseSettlementListHandler(app, false))
+		expensesGroup.GET("/settled", createExpenseSettlementListHandler(app, true))
+		expensesGroup.POST("/{id}/settle", createSettleExpenseHandler(app))
+		expensesGroup.POST("/{id}/clear_settlement", createClearExpenseSettlementHandler(app))
 		expensesGroup.GET("/tracking/{committedWeekEnding}", createExpenseTrackingListHandler(app))
 
 		timeAmendmentsGroup := se.Router.Group("/api/time_amendments")
@@ -251,6 +255,13 @@ func AddRoutes(app core.App) {
 		machineSecretsGroup.Bind(apis.RequireAuth("users"))
 		machineSecretsGroup.GET("/list", listMachineSecretsHandler(app))
 		machineSecretsGroup.POST("/create", createMachineSecretHandler(app))
+
+		currenciesGroup := se.Router.Group("/api/currencies")
+		currenciesGroup.Bind(apis.RequireAuth("users"))
+		currenciesGroup.GET("", createGetCurrenciesHandler(app))
+		currenciesGroup.GET("/init_status", createCurrencyInitStatusHandler(app))
+		currenciesGroup.POST("/{id}/initialize_backfill", createCurrencyInitializeBackfillHandler(app))
+		currenciesGroup.DELETE("/{id}", createDeleteCurrencyHandler(app))
 
 		// Rate sheets management (job claim required)
 		rateSheetsGroup := se.Router.Group("/api/rate_sheets")

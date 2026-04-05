@@ -8,7 +8,13 @@
   import RejectModal from "$lib/components/RejectModal.svelte";
   import UncommitConfirmPopover from "$lib/components/UncommitConfirmPopover.svelte";
   import Icon from "@iconify/svelte";
-  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import {
+    formatCurrencyAmount,
+    formatCurrencyEquivalent,
+    pocketBaseFileHref,
+    shortDate,
+    trimmedOrEmpty,
+  } from "$lib/utilities";
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
@@ -183,14 +189,32 @@
     </div>
 
     <div>
-      <span class="font-semibold">Total:</span> ${expense.total}
+      <span class="font-semibold">Total:</span> {formatCurrencyAmount(expense.total, expense.currency_code)}
       {#if expense.purchase_order && expense.po_total && expense.total !== expense.po_total}
         <span
           class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
-          >PO: ${expense.po_total}</span
+          >PO: {formatCurrencyAmount(expense.po_total, expense.po_currency_code || expense.currency_code)}</span
         >
       {/if}
     </div>
+
+    {#if expense.currency_code !== "CAD"}
+      <div>
+        <span class="font-semibold">CAD Equivalent:</span>
+        {formatCurrencyEquivalent(
+          expense.settled_total || expense.total * expense.currency_rate,
+          expense.currency_rate,
+          expense.currency_rate_date,
+        )}
+      </div>
+    {/if}
+
+    {#if expense.settled_total}
+      <div>
+        <span class="font-semibold">Settled Total:</span>
+        {formatCurrencyAmount(expense.settled_total, "CAD")}
+      </div>
+    {/if}
 
     {#if expense.payment_type}
       <div>

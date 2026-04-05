@@ -237,8 +237,7 @@ func SendNextPendingNotification(app core.App) (remaining int64, err error) {
 // SendNotifications drains the pending notification queue by repeatedly calling
 // SendNextPendingNotification until none remain.
 //
-// It returns the number of loop iterations that completed without error. The
-// actual SMTP delivery happens asynchronously inside SendNotificationByID.
+// It returns the number of loop iterations that completed without error.
 func SendNotifications(app core.App) (int64, error) {
 	sentCount := int64(0)
 	remaining := int64(1)

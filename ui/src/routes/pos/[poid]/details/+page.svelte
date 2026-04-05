@@ -5,7 +5,13 @@
   import DSPopover from "$lib/components/DSPopover.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import Icon from "@iconify/svelte";
-  import { pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import {
+    formatCurrencyAmount,
+    formatCurrencyEquivalent,
+    pocketBaseFileHref,
+    shortDate,
+    trimmedOrEmpty,
+  } from "$lib/utilities";
   import DsList from "$lib/components/DSList.svelte";
   import { globalStore } from "$lib/stores/global";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
@@ -225,14 +231,30 @@
             {/if}
           {/if}
         </div>
-        <div><span class="font-semibold">Total:</span> ${data.po.total}</div>
+        <div>
+          <span class="font-semibold">Total:</span>
+          {formatCurrencyAmount(data.po.total, data.po.currency_code)}
+        </div>
         <div>
           <span class="font-semibold">Provisional Remaining:</span>
-          ${data.po.remaining_amount.toFixed(2)}
+          {formatCurrencyAmount(data.po.remaining_amount, data.po.currency_code)}
           <span class="text-sm text-slate-500">(includes uncommitted expenses)</span>
         </div>
         {#if data.po.type === "Recurring"}
-          <div><span class="font-semibold">Approval Total:</span> ${data.po.approval_total}</div>
+          <div>
+            <span class="font-semibold">Approval Total:</span>
+            {formatCurrencyAmount(data.po.approval_total, data.po.currency_code)}
+          </div>
+        {/if}
+        {#if data.po.currency_code !== "CAD"}
+          <div>
+            <span class="font-semibold">CAD Equivalent:</span>
+            {formatCurrencyEquivalent(
+              data.po.approval_total_home || data.po.total * data.po.currency_rate,
+              data.po.currency_rate,
+              data.po.currency_rate_date,
+            )}
+          </div>
         {/if}
       </div>
 

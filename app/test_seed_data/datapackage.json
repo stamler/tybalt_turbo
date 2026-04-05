@@ -597,7 +597,7 @@
           {
             "name": "allowed_claims",
             "type": "string",
-            "x-sqlite-type": "TEXT"
+            "x-sqlite-type": "JSON"
           },
           {
             "name": "code",
@@ -881,6 +881,65 @@
       ]
     },
     {
+      "name": "currencies",
+      "path": "data/currencies.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "code",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "icon",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "rate",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "rate_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "symbol",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "ui_sort",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full"
+      ]
+    },
+    {
       "name": "divisions",
       "path": "data/divisions.csv",
       "schema": {
@@ -1116,6 +1175,11 @@
             "x-sqlite-type": "TEXT"
           },
           {
+            "name": "currency",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
             "name": "date",
             "type": "string",
             "x-sqlite-type": "TEXT"
@@ -1177,6 +1241,21 @@
           },
           {
             "name": "rejector",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "settled",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "settled_total",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
+            "name": "settler",
             "type": "string",
             "x-sqlite-type": "TEXT"
           },
@@ -1829,6 +1908,11 @@
             "x-sqlite-type": "NUMERIC"
           },
           {
+            "name": "approval_total_home",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
             "name": "approved",
             "type": "string",
             "x-sqlite-type": "TEXT"
@@ -1885,6 +1969,11 @@
           },
           {
             "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "currency",
             "type": "string",
             "x-sqlite-type": "TEXT"
           },
@@ -2439,6 +2528,51 @@
       ]
     },
     {
+      "name": "time_sheet_missing_exceptions",
+      "path": "data/time_sheet_missing_exceptions.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created_by",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "uid",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "week_ending",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full",
+        "import-baseline"
+      ]
+    },
+    {
       "name": "time_sheet_reviewers",
       "path": "data/time_sheet_reviewers.csv",
       "schema": {
@@ -2685,6 +2819,11 @@
       "path": "data/users.csv",
       "schema": {
         "fields": [
+          {
+            "name": "avatar",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
           {
             "name": "created",
             "type": "string",
