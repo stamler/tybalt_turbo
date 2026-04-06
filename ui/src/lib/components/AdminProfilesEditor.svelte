@@ -6,7 +6,13 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
-  import { DATE_INPUT_MIN, dateInputMaxMonthsAhead } from "$lib/utilities";
+  import {
+    DATE_INPUT_MIN,
+    dateInputMaxMonthsAhead,
+    isValidPayrollOpeningDate,
+    payrollOpeningDatesInRange,
+    shortDate,
+  } from "$lib/utilities";
   import { pb } from "$lib/pocketbase";
   import type {
     AdminProfilesAugmentedSkipMinTimeCheckOptions,
@@ -15,6 +21,7 @@
     UserClaimsResponse,
     DivisionsResponse,
     PoApproverPropsResponse,
+    SelectOption,
   } from "$lib/pocketbase-types";
   import type { AdminProfilesEditPageData } from "$lib/svelte-types";
   import { goto } from "$app/navigation";
@@ -41,6 +48,11 @@
     "time_sheet_expected",
   ] as const;
   const TIME_OFF_MANAGER_EDITABLE_FIELDS = ["opening_date", "opening_op", "opening_ov"] as const;
+  const OPENING_DATE_ERROR_MESSAGE = "Opening date must be a payroll Sunday.";
+  const OPENING_DATE_REQUIRED_MESSAGE =
+    "Opening date is required when opening OP or OV is non-zero.";
+
+  type OpeningDateOption = SelectOption & { id: string; name: string; invalid?: boolean };
 
   let { data }: { data: AdminProfilesEditPageData & { divisions?: DivisionsResponse[] } } =
     $props();
@@ -48,6 +60,32 @@
   let errors = $state({} as Record<string, { message: string }>);
   let item = $state(untrack(() => ({ ...data.item })));
   const dateInputMax = dateInputMaxMonthsAhead(15);
+  const validOpeningDates = payrollOpeningDatesInRange(DATE_INPUT_MIN, dateInputMax);
+  const openingBalancesRequireDate = $derived.by(() => {
+    const openingOP = Number(item.opening_op ?? 0);
+    const openingOV = Number(item.opening_ov ?? 0);
+    return openingOP !== 0 || openingOV !== 0;
+  });
+  const openingDateOptions = $derived.by<OpeningDateOption[]>(() => {
+    const options: OpeningDateOption[] = [
+      { id: "", name: "— None —" },
+      ...validOpeningDates.map((date) => ({
+        id: date,
+        name: `${shortDate(date, true)} (${date})`,
+      })),
+    ];
+
+    const currentOpeningDate = item.opening_date?.trim() ?? "";
+    if (currentOpeningDate !== "" && !isValidPayrollOpeningDate(currentOpeningDate)) {
+      options.splice(1, 0, {
+        id: currentOpeningDate,
+        name: `${currentOpeningDate} (invalid existing value)`,
+        invalid: true,
+      });
+    }
+
+    return options;
+  });
 
   // Use shared divisions store for items and index
   const divisions = $derived.by(() => $divisionsStore.items as DivisionsResponse[]);
@@ -421,6 +459,35 @@
     errors = nextErrors;
   }
 
+  function syncOpeningDateError() {
+    const openingDate = item.opening_date?.trim() ?? "";
+    if (!openingDate) {
+      if (openingBalancesRequireDate) {
+        setFieldError("opening_date", OPENING_DATE_REQUIRED_MESSAGE);
+        return;
+      }
+      if (
+        errors.opening_date?.message === OPENING_DATE_ERROR_MESSAGE ||
+        errors.opening_date?.message === OPENING_DATE_REQUIRED_MESSAGE
+      ) {
+        clearFieldError("opening_date");
+      }
+      return;
+    }
+
+    if (isValidPayrollOpeningDate(openingDate)) {
+      if (
+        errors.opening_date?.message === OPENING_DATE_ERROR_MESSAGE ||
+        errors.opening_date?.message === OPENING_DATE_REQUIRED_MESSAGE
+      ) {
+        clearFieldError("opening_date");
+      }
+      return;
+    }
+
+    setFieldError("opening_date", OPENING_DATE_ERROR_MESSAGE);
+  }
+
   function resetPoApproverPropsState() {
     poApproverMaxAmount = 0;
     originalApproverMaxAmount = 0;
@@ -576,6 +643,14 @@
         return;
       }
 
+      syncOpeningDateError();
+      if (
+        errors.opening_date?.message === OPENING_DATE_ERROR_MESSAGE ||
+        errors.opening_date?.message === OPENING_DATE_REQUIRED_MESSAGE
+      ) {
+        return;
+      }
+
       const payload = adminProfilePayload();
 
       if (isLimitedEditor) {
@@ -617,6 +692,11 @@
       }
     }
   }
+
+  $effect(() => {
+    if (!canEditOpeningFields) return;
+    syncOpeningDateError();
+  });
 </script>
 
 <svelte:head>
@@ -705,19 +785,23 @@
     {/if}
 
     {#if canEditOpeningFields}
-      <span class="flex w-full gap-2 {errors.opening_date !== undefined ? 'bg-red-200' : ''}">
-        <label for="opening_date">Opening Date</label>
-        <DsDateInput
-          class="flex-1"
-          name="opening_date"
-          min={DATE_INPUT_MIN}
-          max={dateInputMax}
-          bind:value={item.opening_date}
-        />
-        {#if errors.opening_date !== undefined}
-          <span class="text-red-600">{errors.opening_date.message}</span>
-        {/if}
+      <DsSelector
+        bind:value={item.opening_date}
+        items={openingDateOptions}
+        {errors}
+        fieldName="opening_date"
+        uiName="Opening Date"
+      >
+        {#snippet optionTemplate(option)}{option.name}{/snippet}
+      </DsSelector>
+      <span class="w-full text-sm text-neutral-600">
+        Leave blank only when both opening balances are zero.
       </span>
+      {#if item.opening_date && !isValidPayrollOpeningDate(item.opening_date)}
+        <span class="w-full text-sm text-amber-700">
+          This profile has an invalid existing opening date. Choose a payroll Sunday before saving.
+        </span>
+      {/if}
     {/if}
 
     {#if canEditHrFields}

@@ -68,7 +68,7 @@ func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing
 				"payroll_id":"` + hrEditableRecordPayrollID + `",
 				"default_charge_out_rate":50,
 				"skip_min_time_check":"no",
-				"opening_date":"2026-01-01"
+				"opening_date":"2026-01-04"
 			}`),
 			Headers: map[string]string{
 				"Authorization": timeOffManagerToken,
@@ -76,7 +76,74 @@ func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"opening_date":"2026-01-01"`,
+				`"opening_date":"2026-01-04"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "time off manager cannot update opening date to non payroll boundary",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no",
+				"opening_date":"2026-01-01"
+			}`),
+			Headers: map[string]string{
+				"Authorization": timeOffManagerToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"data":{"opening_date":{"code":"invalid_opening_date"`,
+				`"message":"opening_date must be the Sunday after a pay period ending date"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "time off manager can clear opening date when opening balances are zero",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no",
+				"opening_date":"",
+				"opening_op":0,
+				"opening_ov":0
+			}`),
+			Headers: map[string]string{
+				"Authorization": timeOffManagerToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"opening_date":""`,
+				`"opening_op":0`,
+				`"opening_ov":0`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "time off manager cannot set non zero opening op with blank opening date",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Body: strings.NewReader(`{
+				"payroll_id":"` + hrEditableRecordPayrollID + `",
+				"default_charge_out_rate":50,
+				"skip_min_time_check":"no",
+				"opening_date":"",
+				"opening_op":12.5
+			}`),
+			Headers: map[string]string{
+				"Authorization": timeOffManagerToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"data":{"opening_date":{"code":"invalid_opening_date"`,
+				`"message":"opening_date is required when opening balances are non-zero"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

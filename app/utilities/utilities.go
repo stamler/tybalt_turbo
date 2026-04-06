@@ -14,6 +14,7 @@ import (
 	"sort"
 	"strconv"
 	"time"
+	"tybalt/constants"
 	"tybalt/errs"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -81,22 +82,15 @@ func GeneratePayPeriodEnding(date string) (string, error) {
 		return "", err
 	}
 
-	// check if the day difference between the weekEnding and the epoch pay period
-	// ending (August 31, 2024) has a remainder of 0 when divided by 14 (modulo
-	// 14). If the remainder is zero, return the week ending. If not, return the
-	// week ending plus 7 days. Remember date is a string in the format
-	// "YYYY-MM-DD" and we don't want to worry about time zones and such.
-	epochPayPeriodEnding, err := time.Parse(time.DateOnly, "2024-08-31")
-	if err != nil {
-		return "", err
-	}
-
 	weekEndingTime, err := time.Parse(time.DateOnly, weekEnding)
 	if err != nil {
 		return "", err
 	}
 
-	intervalHours := weekEndingTime.Sub(epochPayPeriodEnding).Hours()
+	// Check if the day difference between the weekEnding and the configured
+	// payroll epoch has a remainder of 0 when divided by 14. If the remainder is
+	// zero, return the week ending. If not, return the week ending plus 7 days.
+	intervalHours := weekEndingTime.Sub(constants.PAYROLL_EPOCH).Hours()
 	if int(intervalHours/24)%14 == 0 {
 		return weekEnding, nil
 	}
@@ -107,6 +101,34 @@ func GeneratePayPeriodEnding(date string) (string, error) {
 	}
 
 	return weekEndingTime.AddDate(0, 0, 7).Format(time.DateOnly), nil
+}
+
+// ValidateTimeOffOpeningDate ensures opening_date uses Turbo's canonical
+// representation for Tybalt's legacy openingDateTimeOff semantics: the Sunday
+// immediately after a payroll week-2 ending Saturday.
+func ValidateTimeOffOpeningDate(openingDate string) error {
+	if openingDate == "" {
+		return nil
+	}
+
+	openingDateTime, err := time.Parse(time.DateOnly, openingDate)
+	if err != nil {
+		return err
+	}
+	if openingDateTime.Weekday() != time.Sunday {
+		return fmt.Errorf("opening_date must be a Sunday")
+	}
+
+	previousDay := openingDateTime.AddDate(0, 0, -1).Format(time.DateOnly)
+	payPeriodEnding, err := GeneratePayPeriodEnding(previousDay)
+	if err != nil {
+		return err
+	}
+	if payPeriodEnding != previousDay {
+		return fmt.Errorf("opening_date must follow a pay period ending date")
+	}
+
+	return nil
 }
 
 // GenerateCommittedPayPeriodEnding reproduces Tybalt's commit-time payroll

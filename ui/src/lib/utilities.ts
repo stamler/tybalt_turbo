@@ -12,19 +12,76 @@ import { get } from "svelte/store";
 import { globalStore } from "$lib/stores/global";
 
 export const DATE_INPUT_MIN = "2024-06-01";
+// Keep this aligned with the backend payroll cadence in app/constants/constants.go:
+// opening dates are the Sunday immediately after PAYROLL_EPOCH.
+export const PAYROLL_OPENING_DATE_EPOCH = "2025-03-02";
+export const PAYROLL_OPENING_DATE_INTERVAL_DAYS = 14;
+
+function parseIsoDate(value: string): Date {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1));
+}
+
+function addUtcDays(date: Date, days: number): Date {
+  const next = new Date(date.getTime());
+  next.setUTCDate(next.getUTCDate() + days);
+  return next;
+}
+
+function compareIsoDateStrings(left: string, right: string): number {
+  return parseIsoDate(left).getTime() - parseIsoDate(right).getTime();
+}
 
 function toIsoDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
+  const year = date.getUTCFullYear();
+  const month = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(date.getUTCDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
 }
 
 export function dateInputMaxMonthsAhead(monthsAhead: number): string {
   const today = new Date();
-  const target = new Date(today);
-  target.setMonth(target.getMonth() + monthsAhead);
+  const target = new Date(
+    Date.UTC(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0),
+  );
+  target.setUTCMonth(target.getUTCMonth() + monthsAhead);
   return toIsoDate(target);
+}
+
+export function isValidPayrollOpeningDate(value: string): boolean {
+  if (!value) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+
+  const openingDate = parseIsoDate(value);
+  if (Number.isNaN(openingDate.getTime()) || toIsoDate(openingDate) !== value) return false;
+  if (openingDate.getUTCDay() !== 0) return false;
+
+  const epoch = parseIsoDate(PAYROLL_OPENING_DATE_EPOCH);
+  const diffDays = Math.round((openingDate.getTime() - epoch.getTime()) / (24 * 60 * 60 * 1000));
+  return diffDays % PAYROLL_OPENING_DATE_INTERVAL_DAYS === 0;
+}
+
+export function payrollOpeningDatesInRange(min: string, max: string): string[] {
+  if (compareIsoDateStrings(min, max) > 0) return [];
+
+  const epoch = parseIsoDate(PAYROLL_OPENING_DATE_EPOCH);
+  const minDate = parseIsoDate(min);
+  const maxDate = parseIsoDate(max);
+  const diffDays = Math.floor((minDate.getTime() - epoch.getTime()) / (24 * 60 * 60 * 1000));
+  const intervals = Math.floor(diffDays / PAYROLL_OPENING_DATE_INTERVAL_DAYS);
+
+  let cursor = addUtcDays(epoch, intervals * PAYROLL_OPENING_DATE_INTERVAL_DAYS);
+  while (cursor.getTime() < minDate.getTime()) {
+    cursor = addUtcDays(cursor, PAYROLL_OPENING_DATE_INTERVAL_DAYS);
+  }
+
+  const results: string[] = [];
+  while (cursor.getTime() <= maxDate.getTime()) {
+    results.push(toIsoDate(cursor));
+    cursor = addUtcDays(cursor, PAYROLL_OPENING_DATE_INTERVAL_DAYS);
+  }
+
+  return results;
 }
 
 export interface TimeSheetTallyQueryRow {

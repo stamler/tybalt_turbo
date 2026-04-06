@@ -45,6 +45,49 @@ func TestGenerateCommittedPayPeriodEnding(t *testing.T) {
 	}
 }
 
+func TestValidateTimeOffOpeningDate(t *testing.T) {
+	tests := []struct {
+		name        string
+		openingDate string
+		wantErr     bool
+	}{
+		{
+			name:        "blank opening date allowed",
+			openingDate: "",
+			wantErr:     false,
+		},
+		{
+			name:        "valid sunday after pay period ending",
+			openingDate: "2026-01-04",
+			wantErr:     false,
+		},
+		{
+			name:        "weekday rejected",
+			openingDate: "2026-01-01",
+			wantErr:     true,
+		},
+		{
+			name:        "sunday not after pay period ending rejected",
+			openingDate: "2026-01-11",
+			wantErr:     true,
+		},
+		{
+			name:        "invalid calendar date rejected",
+			openingDate: "2026-02-30",
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateTimeOffOpeningDate(tt.openingDate)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("ValidateTimeOffOpeningDate(%q) error = %v, wantErr %v", tt.openingDate, err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestRecordHasMeaningfulChanges(t *testing.T) {
 	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
