@@ -446,6 +446,7 @@
   }
 
   function setFieldError(fieldName: string, message: string) {
+    if (errors[fieldName]?.message === message) return;
     errors = {
       ...errors,
       [fieldName]: { message },
