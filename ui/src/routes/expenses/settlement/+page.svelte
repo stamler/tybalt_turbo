@@ -112,15 +112,15 @@
         {#if activeTab === "unsettled"}
           <DSCurrencyInput
             bind:amount={draftValues[row.id]}
-            currency={row.currency}
+            currency=""
             items={[]}
             amountFieldName={`settled_total_${row.id}`}
             currencyFieldName={`currency_${row.id}`}
             uiName="Settled CAD Total"
             disabledCurrency={true}
             helperText={`Original amount: ${formatCurrencyAmount(row.total, row.currency_code)}`}
-            displayCode={row.currency_code}
-            displaySymbol={row.currency_symbol}
+            displayCode="CAD"
+            displaySymbol="CAD"
           />
         {:else}
           Settled {formatCurrencyAmount(row.settled_total, "CAD")}

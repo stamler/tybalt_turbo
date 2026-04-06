@@ -1,10 +1,19 @@
 <script lang="ts">
   import DsList from "$lib/components/DSList.svelte";
+  import {
+    currencyIconHref,
+    formatCurrencyAmount,
+    normalizeCurrencyCode,
+  } from "$lib/utilities";
 
   interface JobExpenseEntry {
     id: string;
     date: string;
     total: number;
+    currency: string;
+    currency_code: string;
+    currency_symbol: string;
+    currency_icon: string;
     description: string;
     committed_week_ending: string;
     division_code: string;
@@ -31,7 +40,10 @@
     <span class="text-sm text-gray-500">
       Expenses referencing a job belong to the branch of the job they reference.
     </span>
-    <div><span class="font-semibold">Total:</span> {summary.total_amount ?? 0}</div>
+    <div>
+      <span class="font-semibold">Total Settled (CAD):</span>
+      {formatCurrencyAmount(summary.total_amount ?? 0, "CAD")}
+    </div>
     {#if summary.earliest_expense}
       <div>
         <span class="font-semibold">Date Range:</span>
@@ -52,7 +64,18 @@
           href={`/expenses/${item.id}/details`}
           class="text-blue-600 hover:underline">{item.date}</a
         >{/snippet}
-      {#snippet headline(item: JobExpenseEntry)}{item.total}{/snippet}
+      {#snippet headline(item: JobExpenseEntry)}
+        <span class="inline-flex items-center gap-2">
+          {#if normalizeCurrencyCode(item.currency_code) !== "CAD" && item.currency_icon}
+            <img
+              src={currencyIconHref(item.currency, item.currency_icon)}
+              alt={`${item.currency_code} icon`}
+              class="h-5 w-5 rounded-full border border-neutral-200 object-cover"
+            />
+          {/if}
+          <span>{formatCurrencyAmount(item.total, item.currency_code)}</span>
+        </span>
+      {/snippet}
       {#snippet byline(item: JobExpenseEntry)}{item.given_name} {item.surname}{/snippet}
       {#snippet line1(item: JobExpenseEntry)}
         <span class="font-bold">{item.division_code}</span>

@@ -19,6 +19,10 @@ var jobExpensesCountQuery string
 type JobExpenseEntry struct {
 	Description         string  `db:"description" json:"description"`
 	Total               float64 `db:"total" json:"total"`
+	Currency            string  `db:"currency" json:"currency"`
+	CurrencyCode        string  `db:"currency_code" json:"currency_code"`
+	CurrencySymbol      string  `db:"currency_symbol" json:"currency_symbol"`
+	CurrencyIcon        string  `db:"currency_icon" json:"currency_icon"`
 	ID                  string  `db:"id" json:"id"`
 	Date                string  `db:"date" json:"date"`
 	CommittedWeekEnding string  `db:"committed_week_ending" json:"committed_week_ending"`

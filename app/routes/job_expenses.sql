@@ -2,6 +2,10 @@
 -- by division id, payment_type, uid, and category id similar to job_time_entries.sql
 SELECT e.description,
        e.total,
+       COALESCE(e.currency, '') AS currency,
+       COALESCE(cur.code, 'CAD') AS currency_code,
+       COALESCE(cur.symbol, 'CAD') AS currency_symbol,
+       COALESCE(cur.icon, '') AS currency_icon,
        e.id,
        e.date,
        e.committed_week_ending,
@@ -16,6 +20,7 @@ LEFT   JOIN branches  b ON e.branch  = b.id
 LEFT   JOIN divisions  d ON e.division = d.id
 LEFT   JOIN profiles   p ON e.uid      = p.uid
 LEFT   JOIN categories c ON e.category = c.id
+LEFT   JOIN currencies cur ON e.currency = cur.id
 WHERE  e.committed != ''
   AND  e.job = {:id}
   AND  ({:branch}      IS NULL OR {:branch}      = '' OR e.branch      = {:branch})

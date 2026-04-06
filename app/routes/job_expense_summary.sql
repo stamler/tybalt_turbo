@@ -1,7 +1,7 @@
 -- top-level summary for expenses associated with a job. Accepts optional filters
 -- by division id, payment_type, uid, and category id similar to job_time_summary.sql.
 SELECT
-  SUM(e.total)                   total_amount,
+  SUM(COALESCE(NULLIF(e.settled_total, 0), e.total)) total_amount,
   MIN(e.date)                    earliest_expense,
   MAX(e.date)                    latest_expense,
   json_group_array(
