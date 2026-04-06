@@ -421,6 +421,9 @@ func AddHooks(app core.App) {
 	})
 	// hooks for admin_profiles model
 	app.OnRecordCreateRequest("admin_profiles").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := EnforceAdminProfileRequestPermissions(app, e); err != nil {
+			return err
+		}
 		if err := ProcessAdminProfile(app, e); err != nil {
 			return AnnotateHookError(app, e, err)
 		}

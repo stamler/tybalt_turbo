@@ -53,7 +53,7 @@ func TestAdminProfilesAugmentedAccess_TimeOffManagerCanListAndView(t *testing.T)
 	}
 }
 
-func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing.T) {
+func TestAdminProfilesUpdateRule_TimeOffManagerDirectUpdatesAreForbidden(t *testing.T) {
 	timeOffManagerToken, err := testutils.GenerateRecordToken("users", timeOffManagerUserEmail)
 	if err != nil {
 		t.Fatal(err)
@@ -61,7 +61,7 @@ func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing
 
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "time off manager can update opening date",
+			Name:   "time off manager cannot update opening date directly",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
 			Body: strings.NewReader(`{
@@ -74,21 +74,79 @@ func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing
 				"Authorization": timeOffManagerToken,
 				"Content-Type":  "application/json",
 			},
-			ExpectedStatus: http.StatusOK,
+			ExpectedStatus: http.StatusNotFound,
 			ExpectedContent: []string{
-				`"opening_date":"2026-01-04"`,
+				`"message":"The requested resource wasn't found."`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "time off manager cannot update opening date to non payroll boundary",
+			Name:   "time off manager cannot update opening op directly",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
 			Body: strings.NewReader(`{
 				"payroll_id":"` + hrEditableRecordPayrollID + `",
 				"default_charge_out_rate":50,
 				"skip_min_time_check":"no",
-				"opening_date":"2026-01-01"
+				"opening_op":12.5
+			}`),
+			Headers: map[string]string{
+				"Authorization": timeOffManagerToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestAdminProfilesLimitedSave_TimeOffManagerCanUpdateOpeningFields(t *testing.T) {
+	timeOffManagerToken, err := testutils.GenerateRecordToken("users", timeOffManagerUserEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "time off manager can update opening date",
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
+			Body: strings.NewReader(`{
+				"admin_profile":{
+					"opening_date":"2026-01-04"
+				}
+			}`),
+			Headers: map[string]string{
+				"Authorization": timeOffManagerToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"opening_date":"2026-01-04"`,
+			},
+			NotExpectedContent: []string{
+				`"uid":"`,
+				`"legacy_uid":"`,
+				`"default_branch":`,
+				`"payroll_id":"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "time off manager cannot update opening date to non payroll boundary",
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
+			Body: strings.NewReader(`{
+				"admin_profile":{
+					"opening_date":"2026-01-01"
+				}
 			}`),
 			Headers: map[string]string{
 				"Authorization": timeOffManagerToken,
@@ -103,15 +161,14 @@ func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing
 		},
 		{
 			Name:   "time off manager can clear opening date when opening balances are zero",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
 			Body: strings.NewReader(`{
-				"payroll_id":"` + hrEditableRecordPayrollID + `",
-				"default_charge_out_rate":50,
-				"skip_min_time_check":"no",
-				"opening_date":"",
-				"opening_op":0,
-				"opening_ov":0
+				"admin_profile":{
+					"opening_date":"",
+					"opening_op":0,
+					"opening_ov":0
+				}
 			}`),
 			Headers: map[string]string{
 				"Authorization": timeOffManagerToken,
@@ -123,18 +180,23 @@ func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing
 				`"opening_op":0`,
 				`"opening_ov":0`,
 			},
+			NotExpectedContent: []string{
+				`"uid":"`,
+				`"legacy_uid":"`,
+				`"default_branch":`,
+				`"payroll_id":"`,
+			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "time off manager cannot set non zero opening op with blank opening date",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
 			Body: strings.NewReader(`{
-				"payroll_id":"` + hrEditableRecordPayrollID + `",
-				"default_charge_out_rate":50,
-				"skip_min_time_check":"no",
-				"opening_date":"",
-				"opening_op":12.5
+				"admin_profile":{
+					"opening_date":"",
+					"opening_op":12.5
+				}
 			}`),
 			Headers: map[string]string{
 				"Authorization": timeOffManagerToken,
@@ -149,13 +211,12 @@ func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing
 		},
 		{
 			Name:   "time off manager can update opening op without changing opening date",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
 			Body: strings.NewReader(`{
-				"payroll_id":"` + hrEditableRecordPayrollID + `",
-				"default_charge_out_rate":50,
-				"skip_min_time_check":"no",
-				"opening_op":12.5
+				"admin_profile":{
+					"opening_op":12.5
+				}
 			}`),
 			Headers: map[string]string{
 				"Authorization": timeOffManagerToken,
@@ -166,17 +227,22 @@ func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing
 				`"opening_op":12.5`,
 				`"opening_date":"2024-01-07"`,
 			},
+			NotExpectedContent: []string{
+				`"uid":"`,
+				`"legacy_uid":"`,
+				`"default_branch":`,
+				`"payroll_id":"`,
+			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "time off manager can update opening ov without changing opening date",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
 			Body: strings.NewReader(`{
-				"payroll_id":"` + hrEditableRecordPayrollID + `",
-				"default_charge_out_rate":50,
-				"skip_min_time_check":"no",
-				"opening_ov":18.75
+				"admin_profile":{
+					"opening_ov":18.75
+				}
 			}`),
 			Headers: map[string]string{
 				"Authorization": timeOffManagerToken,
@@ -187,70 +253,48 @@ func TestAdminProfilesUpdateRule_TimeOffManagerCanUpdateOpeningFields(t *testing
 				`"opening_ov":18.75`,
 				`"opening_date":"2024-01-07"`,
 			},
+			NotExpectedContent: []string{
+				`"uid":"`,
+				`"legacy_uid":"`,
+				`"default_branch":`,
+				`"payroll_id":"`,
+			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
-	}
-
-	for _, scenario := range scenarios {
-		scenario.Test(t)
-	}
-}
-
-func TestAdminProfilesUpdateRule_TimeOffManagerCannotUpdateRestrictedFields(t *testing.T) {
-	timeOffManagerToken, err := testutils.GenerateRecordToken("users", timeOffManagerUserEmail)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	scenarios := []tests.ApiScenario{
 		{
-			Name:   "time off manager cannot update payroll id",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Name:   "time off manager cannot use limited save as a read endpoint",
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
 			Body: strings.NewReader(`{
-				"payroll_id":"1001"
+				"admin_profile":{}
 			}`),
 			Headers: map[string]string{
 				"Authorization": timeOffManagerToken,
 				"Content-Type":  "application/json",
 			},
-			ExpectedStatus: http.StatusNotFound,
+			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
-				`"message":"The requested resource wasn't found."`,
+				`"code":"missing_admin_profile_changes"`,
+				`"message":"at least one admin profile field change is required"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "time off manager cannot update default charge out rate",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Name:   "time off manager cannot update restricted fields through limited save endpoint",
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
 			Body: strings.NewReader(`{
-				"default_charge_out_rate":75
+				"admin_profile":{
+					"payroll_id":"1001"
+				}
 			}`),
 			Headers: map[string]string{
 				"Authorization": timeOffManagerToken,
 				"Content-Type":  "application/json",
 			},
-			ExpectedStatus: http.StatusNotFound,
+			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{
-				`"message":"The requested resource wasn't found."`,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		},
-		{
-			Name:   "time off manager cannot update skip min time check",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
-			Body: strings.NewReader(`{
-				"skip_min_time_check":"yes"
-			}`),
-			Headers: map[string]string{
-				"Authorization": timeOffManagerToken,
-				"Content-Type":  "application/json",
-			},
-			ExpectedStatus: http.StatusNotFound,
-			ExpectedContent: []string{
-				`"message":"The requested resource wasn't found."`,
+				`"message":"You do not have permission to edit one or more admin profile fields."`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

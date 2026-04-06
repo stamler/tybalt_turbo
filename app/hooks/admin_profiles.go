@@ -6,8 +6,23 @@ import (
 	"tybalt/errs"
 	"tybalt/utilities"
 
+	"github.com/pocketbase/pocketbase/apis"
 	"github.com/pocketbase/pocketbase/core"
 )
+
+// EnforceAdminProfileRequestPermissions keeps direct collection creates
+// admin-only. Limited editors update through the custom route layer.
+func EnforceAdminProfileRequestPermissions(app core.App, e *core.RecordRequestEvent) error {
+	hasAdminClaim, err := utilities.HasClaim(app, e.Auth, "admin")
+	if err != nil {
+		return err
+	}
+	if hasAdminClaim {
+		return nil
+	}
+
+	return apis.NewForbiddenError("you do not have permission to edit admin profiles directly", nil)
+}
 
 // ProcessAdminProfile enforces business rules for admin_profiles create/update.
 func ProcessAdminProfile(app core.App, e *core.RecordRequestEvent) error {

@@ -481,13 +481,12 @@ func TestCorporateBranchClaimGating_AdminProfilesDefaultBranch(t *testing.T) {
 	scenarios := []tests.ApiScenario{
 		{
 			Name:   "hr cannot assign corporate default branch when subject user lacks claim",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
 			Body: strings.NewReader(`{
-				"payroll_id":"9999",
-				"default_charge_out_rate":50,
-				"skip_min_time_check":"no",
-				"default_branch":"kpj5jijh0if8kx8"
+				"admin_profile":{
+					"default_branch":"kpj5jijh0if8kx8"
+				}
 			}`),
 			Headers: map[string]string{
 				"Authorization": recordToken,
@@ -503,13 +502,12 @@ func TestCorporateBranchClaimGating_AdminProfilesDefaultBranch(t *testing.T) {
 		},
 		{
 			Name:   "hr can assign corporate default branch when subject user already holds claim",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/admin_profiles/records/" + hrEditableRecordID,
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
 			Body: strings.NewReader(`{
-				"payroll_id":"9999",
-				"default_charge_out_rate":50,
-				"skip_min_time_check":"no",
-				"default_branch":"kpj5jijh0if8kx8"
+				"admin_profile":{
+					"default_branch":"kpj5jijh0if8kx8"
+				}
 			}`),
 			Headers: map[string]string{
 				"Authorization": recordToken,

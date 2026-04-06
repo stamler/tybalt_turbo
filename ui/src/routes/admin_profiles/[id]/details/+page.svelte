@@ -5,8 +5,9 @@
 
   let { data } = $props();
   const isAdmin = $derived($globalStore.claims.includes("admin"));
+  const hasHrClaim = $derived($globalStore.claims.includes("hr"));
   const hasTimeOffManagerClaim = $derived($globalStore.claims.includes("time_off_manager"));
-  const canViewOpeningFields = $derived(isAdmin || hasTimeOffManagerClaim);
+  const canViewOpeningFields = $derived(isAdmin || hasHrClaim || hasTimeOffManagerClaim);
 
   const currency = new Intl.NumberFormat("en-CA", {
     style: "currency",

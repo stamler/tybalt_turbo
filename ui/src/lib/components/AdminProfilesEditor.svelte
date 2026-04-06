@@ -95,7 +95,7 @@
   const hasTimeOffManagerClaim = $derived($globalStore.claims.includes("time_off_manager"));
   const isLimitedEditor = $derived(!isAdmin && (hasHrClaim || hasTimeOffManagerClaim));
   const canEditHrFields = $derived(isAdmin || hasHrClaim);
-  const canEditOpeningFields = $derived(isAdmin || hasTimeOffManagerClaim);
+  const canEditOpeningFields = $derived(isAdmin || hasHrClaim || hasTimeOffManagerClaim);
   const effectiveSubjectClaimIds = $derived.by(() =>
     isAdmin ? stagedClaimIds : originalUserClaims.map((uc) => uc.cid),
   );
@@ -609,7 +609,7 @@
     if (!isLimitedEditor) return item;
     const fieldNames = [
       ...(hasHrClaim ? HR_EDITABLE_FIELDS : []),
-      ...(hasTimeOffManagerClaim ? TIME_OFF_MANAGER_EDITABLE_FIELDS : []),
+      ...(canEditOpeningFields ? TIME_OFF_MANAGER_EDITABLE_FIELDS : []),
     ];
     return [...new Set(fieldNames)].reduce<Record<string, unknown>>((payload, fieldName) => {
       payload[fieldName] = item[fieldName];
@@ -655,11 +655,12 @@
       const payload = adminProfilePayload();
 
       if (isLimitedEditor) {
-        if (data.editing && data.id) {
-          await pb.collection("admin_profiles").update(data.id, payload);
-        } else {
-          await pb.collection("admin_profiles").create(payload);
-        }
+        await pb.send(`/api/admin_profiles/${data.id}/save_limited`, {
+          method: "POST",
+          body: {
+            admin_profile: payload,
+          },
+        });
         errors = {};
         goto(resolve("/admin_profiles/list"));
         return;

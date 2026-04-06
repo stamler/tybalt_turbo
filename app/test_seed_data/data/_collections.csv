@@ -503,42 +503,4 @@ uid = @request.auth.id && tsid = """" &&
 @request.body.id:changed = false &&
 @request.body.uid:changed = false &&
 @request.body.legacy_uid:changed = false &&
-(
-@request.auth.user_claims_via_uid.cid.name ?= 'admin' ||
-  (
-    (
-      @request.auth.user_claims_via_uid.cid.name ?= 'hr' ||
-      @request.auth.user_claims_via_uid.cid.name ?= 'time_off_manager'
-    ) &&
-    @request.body.work_week_hours:changed = false &&
-    @request.body.untracked_time_off:changed = false &&
-    @request.body._imported:changed = false &&
-    (
-      (
-        @request.auth.user_claims_via_uid.cid.name ?= 'hr' &&
-        @request.auth.user_claims_via_uid.cid.name ?= 'time_off_manager'
-      ) ||
-      (
-        @request.auth.user_claims_via_uid.cid.name ?= 'hr' &&
-        @request.body.opening_date:changed = false &&
-        @request.body.opening_op:changed = false &&
-        @request.body.opening_ov:changed = false
-      ) ||
-      (
-        @request.auth.user_claims_via_uid.cid.name ?= 'time_off_manager' &&
-        @request.body.active:changed = false &&
-        @request.body.allow_personal_reimbursement:changed = false &&
-        @request.body.default_branch:changed = false &&
-        @request.body.default_charge_out_rate:changed = false &&
-        @request.body.job_title:changed = false &&
-        @request.body.mobile_phone:changed = false &&
-        @request.body.off_rotation_permitted:changed = false &&
-        @request.body.payroll_id:changed = false &&
-        @request.body.personal_vehicle_insurance_expiry:changed = false &&
-        @request.body.salary:changed = false &&
-        @request.body.skip_min_time_check:changed = false &&
-        @request.body.time_sheet_expected:changed = false
-      )
-    )
-  )
-)",2026-03-09 15:56:46.679Z,\N
+@request.auth.user_claims_via_uid.cid.name ?= 'admin'",2026-04-04 01:52:36.628Z,\N

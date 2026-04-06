@@ -19,6 +19,30 @@ type saveAdminProfileWithClaimsRequest struct {
 	ClaimIDs     []string       `json:"claim_ids"`
 }
 
+var hrLimitedEditableFields = map[string]struct{}{
+	"active":                            {},
+	"allow_personal_reimbursement":      {},
+	"default_branch":                    {},
+	"default_charge_out_rate":           {},
+	"job_title":                         {},
+	"mobile_phone":                      {},
+	"off_rotation_permitted":            {},
+	"opening_date":                      {},
+	"opening_op":                        {},
+	"opening_ov":                        {},
+	"payroll_id":                        {},
+	"personal_vehicle_insurance_expiry": {},
+	"salary":                            {},
+	"skip_min_time_check":               {},
+	"time_sheet_expected":               {},
+}
+
+var timeOffManagerLimitedEditableFields = map[string]struct{}{
+	"opening_date": {},
+	"opening_op":   {},
+	"opening_ov":   {},
+}
+
 func createSaveAdminProfileWithClaimsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		hasAdminClaim, err := utilities.HasClaim(app, e.Auth, "admin")
@@ -63,6 +87,76 @@ func createSaveAdminProfileWithClaimsHandler(app core.App) func(e *core.RequestE
 			status = http.StatusCreated
 		}
 		return e.JSON(status, savedRecord)
+	}
+}
+
+func createSaveLimitedAdminProfileHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		hasHRClaim, err := utilities.HasClaim(app, e.Auth, "hr")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to check hr claim", err)
+		}
+		hasTimeOffManagerClaim, err := utilities.HasClaim(app, e.Auth, "time_off_manager")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to check time off manager claim", err)
+		}
+		if !hasHRClaim && !hasTimeOffManagerClaim {
+			return apis.NewForbiddenError("you do not have permission to save limited admin profile fields", nil)
+		}
+
+		recordID := strings.TrimSpace(e.Request.PathValue("id"))
+		if recordID == "" {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"code":    "missing_record_id",
+				"message": "record id is required",
+			})
+		}
+
+		var req saveAdminProfileWithClaimsRequest
+		if err := e.BindBody(&req); err != nil {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"code":    "invalid_request_body",
+				"message": "invalid request body",
+			})
+		}
+		if req.AdminProfile == nil {
+			req.AdminProfile = map[string]any{}
+		}
+		if len(req.AdminProfile) == 0 {
+			return e.JSON(http.StatusBadRequest, map[string]any{
+				"code":    "missing_admin_profile_changes",
+				"message": "at least one admin profile field change is required",
+			})
+		}
+
+		if err := validateLimitedAdminProfileFields(req.AdminProfile, hasHRClaim, hasTimeOffManagerClaim); err != nil {
+			return err
+		}
+
+		var savedRecord *core.Record
+		err = app.RunInTransaction(func(txApp core.App) error {
+			record, saveErr := saveLimitedAdminProfile(txApp, e.Auth, recordID, req.AdminProfile)
+			if saveErr != nil {
+				return saveErr
+			}
+			savedRecord = record
+			return nil
+		})
+		if err != nil {
+			var hookErr *errs.HookError
+			if errors.As(err, &hookErr) {
+				return e.JSON(hookErr.Status, hookErr)
+			}
+			if ve, ok := asValidationErrors(err); ok {
+				return apis.NewBadRequestError("Validation error", ve)
+			}
+			return e.Error(http.StatusInternalServerError, "failed to save limited admin profile fields", err)
+		}
+
+		return e.JSON(http.StatusOK, map[string]any{
+			"id":            savedRecord.Id,
+			"admin_profile": limitedAdminProfileResponse(savedRecord, hasHRClaim, hasTimeOffManagerClaim),
+		})
 	}
 }
 
@@ -149,6 +243,82 @@ func saveAdminProfileWithClaims(
 	}
 
 	return record, nil
+}
+
+func saveLimitedAdminProfile(
+	app core.App,
+	authRecord *core.Record,
+	recordID string,
+	changes map[string]any,
+) (*core.Record, error) {
+	record, err := app.FindRecordById("admin_profiles", recordID)
+	if err != nil {
+		return nil, &errs.HookError{
+			Status:  http.StatusNotFound,
+			Message: "admin profile not found",
+			Data: map[string]errs.CodeError{
+				"id": {
+					Code:    "not_found",
+					Message: "admin profile not found",
+				},
+			},
+		}
+	}
+
+	for fieldName, value := range changes {
+		record.Set(fieldName, value)
+	}
+
+	if err := hooks.ProcessAdminProfile(app, &core.RecordRequestEvent{
+		RequestEvent: &core.RequestEvent{App: app, Auth: authRecord},
+		Record:       record,
+	}); err != nil {
+		return nil, err
+	}
+
+	if err := app.Save(record); err != nil {
+		if ve, ok := asValidationErrors(err); ok {
+			return nil, ve
+		}
+		return nil, err
+	}
+
+	return record, nil
+}
+
+func limitedAdminProfileResponse(record *core.Record, hasHRClaim bool, hasTimeOffManagerClaim bool) map[string]any {
+	response := make(map[string]any)
+	for fieldName := range limitedEditableFieldSet(hasHRClaim, hasTimeOffManagerClaim) {
+		response[fieldName] = record.Get(fieldName)
+	}
+	return response
+}
+
+func validateLimitedAdminProfileFields(changes map[string]any, hasHRClaim bool, hasTimeOffManagerClaim bool) error {
+	allowedFields := limitedEditableFieldSet(hasHRClaim, hasTimeOffManagerClaim)
+	for fieldName := range changes {
+		if _, ok := allowedFields[fieldName]; ok {
+			continue
+		}
+		return apis.NewForbiddenError("you do not have permission to edit one or more admin profile fields", nil)
+	}
+
+	return nil
+}
+
+func limitedEditableFieldSet(hasHRClaim bool, hasTimeOffManagerClaim bool) map[string]struct{} {
+	allowedFields := make(map[string]struct{}, len(hrLimitedEditableFields)+len(timeOffManagerLimitedEditableFields))
+	if hasHRClaim {
+		for fieldName := range hrLimitedEditableFields {
+			allowedFields[fieldName] = struct{}{}
+		}
+	}
+	if hasTimeOffManagerClaim {
+		for fieldName := range timeOffManagerLimitedEditableFields {
+			allowedFields[fieldName] = struct{}{}
+		}
+	}
+	return allowedFields
 }
 
 func normalizeDistinctRecordIDs(ids []string) []string {
