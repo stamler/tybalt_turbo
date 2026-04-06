@@ -46,8 +46,8 @@
       class="rounded-sm border border-neutral-300 px-1 {disabled ? 'opacity-50' : ''}"
       {disabled}
     >
-      {#each items as item}
-        <option value={item.id} selected={item.id === value}>{@render optionTemplate(item)}</option>
+      {#each items as item (item.id)}
+        <option value={item.id}>{@render optionTemplate(item)}</option>
       {/each}
     </select>
     {#if clear === true && value !== undefined && value !== "" && !disabled}
