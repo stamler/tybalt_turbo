@@ -2,6 +2,7 @@ package cron
 
 import (
 	"tybalt/notifications"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -45,6 +46,8 @@ func AddCronJobs(app core.App) {
 	// Refresh foreign-exchange rates on weekday evenings after the Bank of Canada
 	// business-day feed is expected to be published.
 	app.Cron().MustAdd("currency_rate_sync", "0 22 * * 1-5", func() {
-		syncCurrencyRates(app)
+		if err := utilities.SyncCurrencyRates(app); err != nil {
+			app.Logger().Error("currency rate sync failed", "error", err)
+		}
 	})
 }

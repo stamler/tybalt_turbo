@@ -25,6 +25,8 @@
   let initStatus = $state<CurrencyInitStatus | null>(null);
   let loading = $state(true);
   let saving = $state(false);
+  let reloadingRates = $state(false);
+  let reloadMessage = $state("");
   let errors = $state({} as Record<string, { message: string }>);
   let item = $state({ ...defaultItem } as Partial<CurrenciesResponse> & { icon: File | string });
   let editingId = $state("");
@@ -103,6 +105,7 @@
   }
 
   async function initializeCadBackfill(id: string) {
+    errors = {};
     try {
       await pb.send(`/api/currencies/${id}/initialize_backfill`, { method: "POST" });
       await refreshPage();
@@ -112,22 +115,36 @@
       };
     }
   }
+
+  async function reloadRates() {
+    reloadingRates = true;
+    errors = {};
+    reloadMessage = "";
+    try {
+      const result = await pb.send("/api/currencies/reload_rates", {
+        method: "POST",
+      }) as {
+        ok: boolean;
+        updated: number;
+        skipped_newer: number;
+      };
+      if (result.skipped_newer > 0) {
+        reloadMessage =
+          "One or more stored currency values are already newer than the Bank of Canada feed, so they were left unchanged.";
+      }
+      await currencies.refresh();
+      await refreshPage();
+    } catch (error: any) {
+      errors = {
+        global: { message: error?.response?.message ?? "Currency reload failed" },
+      };
+    } finally {
+      reloadingRates = false;
+    }
+  }
 </script>
 
-<div class="space-y-4 p-4">
-  <h1 class="text-2xl font-bold">Currencies</h1>
-
-  {#if initStatus}
-    <div class="rounded-sm border border-neutral-300 bg-neutral-50 p-3 text-sm">
-      <div>Home currency ready: {initStatus.home_currency_ready ? "Yes" : "No"}</div>
-      <div>Blank purchase orders: {initStatus.blank_purchase_orders}</div>
-      <div>Blank expenses: {initStatus.blank_expenses}</div>
-      <div class="text-neutral-600">
-        Create `CAD`, then run the CAD initialization action once to backfill legacy rows.
-      </div>
-    </div>
-  {/if}
-
+<div class="space-y-4">
   {#if loading}
     <div class="text-neutral-500">Loading currencies…</div>
   {:else}
@@ -177,6 +194,32 @@
     </DSList>
   {/if}
 
+  {#if initStatus}
+    <div class="rounded-sm border border-neutral-300 bg-neutral-50 p-3 text-sm">
+      <div class="flex items-start justify-between gap-3 max-[639px]:flex-col">
+        <div class="space-y-1">
+          <div>Home currency ready: {initStatus.home_currency_ready ? "Yes" : "No"}</div>
+          <div>Blank purchase orders: {initStatus.blank_purchase_orders}</div>
+          <div>Blank expenses: {initStatus.blank_expenses}</div>
+          <div class="text-neutral-600">
+            Create `CAD`, then run the CAD initialization action once to backfill legacy rows.
+          </div>
+        </div>
+        <DsActionButton action={reloadRates} loading={reloadingRates} color="blue">
+          Reload Rates
+        </DsActionButton>
+      </div>
+    </div>
+  {/if}
+
+  {#if errors.global}
+    <div class="text-red-600">{errors.global.message}</div>
+  {/if}
+
+  {#if reloadMessage}
+    <div class="text-sm text-neutral-600">{reloadMessage}</div>
+  {/if}
+
   <form class="flex w-full flex-col gap-2 rounded-sm border border-neutral-300 bg-neutral-50 p-4">
     <h2 class="text-lg font-semibold">{editingId ? "Edit Currency" : "Add Currency"}</h2>
     <DSTextInput bind:value={item.code as string} {errors} fieldName="code" uiName="ISO Code" />
@@ -215,8 +258,5 @@
       <DsActionButton action={save} loading={saving} color="green">Save</DsActionButton>
       <DsActionButton action={clearForm}>Clear</DsActionButton>
     </div>
-    {#if errors.global}
-      <div class="text-red-600">{errors.global.message}</div>
-    {/if}
   </form>
 </div>

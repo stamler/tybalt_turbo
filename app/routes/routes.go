@@ -260,6 +260,7 @@ func AddRoutes(app core.App) {
 		currenciesGroup.Bind(apis.RequireAuth("users"))
 		currenciesGroup.GET("", createGetCurrenciesHandler(app))
 		currenciesGroup.GET("/init_status", createCurrencyInitStatusHandler(app))
+		currenciesGroup.POST("/reload_rates", createCurrencyRatesReloadHandler(app))
 		currenciesGroup.POST("/{id}/initialize_backfill", createCurrencyInitializeBackfillHandler(app))
 		currenciesGroup.DELETE("/{id}", createDeleteCurrencyHandler(app))
 

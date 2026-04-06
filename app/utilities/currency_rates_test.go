@@ -1,4 +1,4 @@
-package cron
+package utilities
 
 import (
 	"fmt"
@@ -102,8 +102,15 @@ func TestRefreshCurrencyRate_SkipsStaleObservation(t *testing.T) {
 		}`)
 	})
 
-	if err := refreshCurrencyRate(app, usd.Id, "USD"); err != nil {
+	updated, skippedNewer, err := refreshCurrencyRateWithStatus(app, usd.Id, "USD")
+	if err != nil {
 		t.Fatalf("expected refreshCurrencyRate to succeed, got %v", err)
+	}
+	if updated {
+		t.Fatal("expected stale response not to update the stored rate")
+	}
+	if !skippedNewer {
+		t.Fatal("expected stale response to be counted as skipped_newer")
 	}
 
 	reloaded, err := app.FindRecordById("currencies", usd.Id)
@@ -181,7 +188,9 @@ func TestSyncCurrencyRates_UpdatesNonHomeCurrenciesOnly(t *testing.T) {
 		}
 	})
 
-	syncCurrencyRates(app)
+	if err := SyncCurrencyRates(app); err != nil {
+		t.Fatalf("expected SyncCurrencyRates to succeed, got %v", err)
+	}
 
 	reloadedUSD, err := app.FindRecordById("currencies", usd.Id)
 	if err != nil {

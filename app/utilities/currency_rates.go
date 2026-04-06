@@ -1,22 +1,19 @@
-package cron
+package utilities
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
-	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 )
 
-var (
-	currencyRatesHTTPClient = &http.Client{Timeout: 15 * time.Second}
-	currencyRatesNow        = func() time.Time { return time.Now().UTC() }
-)
+var currencyRatesHTTPClient = &http.Client{Timeout: 15 * time.Second}
 
 type bankOfCanadaObservation struct {
 	Date string                       `json:"d"`
@@ -31,12 +28,23 @@ type bankOfCanadaObservationsResponse struct {
 	Observations []map[string]json.RawMessage `json:"observations"`
 }
 
-func syncCurrencyRates(app core.App) {
+type CurrencyRateSyncResult struct {
+	Updated      int `json:"updated"`
+	SkippedNewer int `json:"skipped_newer"`
+}
+
+func SyncCurrencyRates(app core.App) error {
+	_, err := SyncCurrencyRatesWithResult(app)
+	return err
+}
+
+func SyncCurrencyRatesWithResult(app core.App) (CurrencyRateSyncResult, error) {
 	type currencyRow struct {
 		ID   string `db:"id"`
 		Code string `db:"code"`
 	}
 
+	result := CurrencyRateSyncResult{}
 	var rows []currencyRow
 	if err := app.DB().NewQuery(`
 		SELECT id, code
@@ -44,49 +52,61 @@ func syncCurrencyRates(app core.App) {
 		WHERE UPPER(COALESCE(code, '')) != {:homeCode}
 		ORDER BY COALESCE(ui_sort, 999999), code
 	`).Bind(dbx.Params{
-		"homeCode": utilities.HomeCurrencyCode,
+		"homeCode": HomeCurrencyCode,
 	}).All(&rows); err != nil {
-		app.Logger().Error("failed listing currencies for rate sync", "error", err)
-		return
+		return result, fmt.Errorf("failed listing currencies for rate sync: %w", err)
 	}
 
+	var syncErrors []error
 	for _, row := range rows {
-		if err := refreshCurrencyRate(app, row.ID, row.Code); err != nil {
-			app.Logger().Error(
-				"failed refreshing currency rate",
-				"currency_id", row.ID,
-				"currency_code", row.Code,
-				"error", err,
-			)
+		updated, skippedNewer, err := refreshCurrencyRateWithStatus(app, row.ID, row.Code)
+		if updated {
+			result.Updated++
+		}
+		if skippedNewer {
+			result.SkippedNewer++
+		}
+		if err != nil {
+			syncErrors = append(syncErrors, fmt.Errorf("%s: %w", row.Code, err))
 		}
 	}
+
+	return result, errors.Join(syncErrors...)
 }
 
 func refreshCurrencyRate(app core.App, currencyID string, code string) error {
+	_, _, err := refreshCurrencyRateWithStatus(app, currencyID, code)
+	return err
+}
+
+func refreshCurrencyRateWithStatus(app core.App, currencyID string, code string) (bool, bool, error) {
 	code = strings.ToUpper(strings.TrimSpace(code))
-	if code == "" || code == utilities.HomeCurrencyCode {
-		return nil
+	if code == "" || code == HomeCurrencyCode {
+		return false, false, nil
 	}
 
 	rate, rateDate, err := fetchLatestBankOfCanadaRate(code)
 	if err != nil {
-		return err
+		return false, false, err
 	}
 	if rate <= 0 || strings.TrimSpace(rateDate) == "" {
-		return nil
+		return false, false, nil
 	}
 
 	record, err := app.FindRecordById("currencies", currencyID)
 	if err != nil {
-		return err
+		return false, false, err
 	}
 	if existingRateDate := strings.TrimSpace(record.GetString("rate_date")); existingRateDate != "" && rateDate <= existingRateDate {
-		return nil
+		return false, true, nil
 	}
 
 	record.Set("rate", rate)
 	record.Set("rate_date", rateDate)
-	return app.Save(record)
+	if err := app.Save(record); err != nil {
+		return false, false, err
+	}
+	return true, false, nil
 }
 
 func fetchLatestBankOfCanadaRate(code string) (float64, string, error) {

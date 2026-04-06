@@ -31,6 +31,14 @@ type currencyListRow struct {
 	UsedByExpenses       bool    `db:"used_by_expenses" json:"used_by_expenses"`
 }
 
+type currencyRatesReloadResponse struct {
+	OK           bool `json:"ok"`
+	Updated      int  `json:"updated"`
+	SkippedNewer int  `json:"skipped_newer"`
+}
+
+var runCurrencyRateSync = utilities.SyncCurrencyRatesWithResult
+
 func requireAdmin(app core.App, auth *core.Record) error {
 	if auth == nil {
 		return &errs.HookError{
@@ -99,6 +107,25 @@ func createCurrencyInitStatusHandler(app core.App) func(e *core.RequestEvent) er
 		}
 
 		return e.JSON(http.StatusOK, status)
+	}
+}
+
+func createCurrencyRatesReloadHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if err := requireAdmin(app, e.Auth); err != nil {
+			return writeHookError(e, err)
+		}
+
+		result, err := runCurrencyRateSync(app)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to reload currency rates", err)
+		}
+
+		return e.JSON(http.StatusOK, currencyRatesReloadResponse{
+			OK:           true,
+			Updated:      result.Updated,
+			SkippedNewer: result.SkippedNewer,
+		})
 	}
 }
 
