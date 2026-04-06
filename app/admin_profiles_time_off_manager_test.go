@@ -135,7 +135,6 @@ func TestAdminProfilesLimitedSave_TimeOffManagerCanUpdateOpeningFields(t *testin
 				`"uid":"`,
 				`"legacy_uid":"`,
 				`"default_branch":`,
-				`"payroll_id":"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -184,7 +183,6 @@ func TestAdminProfilesLimitedSave_TimeOffManagerCanUpdateOpeningFields(t *testin
 				`"uid":"`,
 				`"legacy_uid":"`,
 				`"default_branch":`,
-				`"payroll_id":"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -231,7 +229,6 @@ func TestAdminProfilesLimitedSave_TimeOffManagerCanUpdateOpeningFields(t *testin
 				`"uid":"`,
 				`"legacy_uid":"`,
 				`"default_branch":`,
-				`"payroll_id":"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -257,7 +254,6 @@ func TestAdminProfilesLimitedSave_TimeOffManagerCanUpdateOpeningFields(t *testin
 				`"uid":"`,
 				`"legacy_uid":"`,
 				`"default_branch":`,
-				`"payroll_id":"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -280,12 +276,36 @@ func TestAdminProfilesLimitedSave_TimeOffManagerCanUpdateOpeningFields(t *testin
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "time off manager cannot update restricted fields through limited save endpoint",
+			Name:   "time off manager can update payroll id through limited save endpoint",
 			Method: http.MethodPost,
 			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
 			Body: strings.NewReader(`{
 				"admin_profile":{
 					"payroll_id":"1001"
+				}
+			}`),
+			Headers: map[string]string{
+				"Authorization": timeOffManagerToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"payroll_id":"1001"`,
+			},
+			NotExpectedContent: []string{
+				`"uid":"`,
+				`"legacy_uid":"`,
+				`"default_branch":`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "time off manager cannot update restricted fields through limited save endpoint",
+			Method: http.MethodPost,
+			URL:    "/api/admin_profiles/" + hrEditableRecordID + "/save_limited",
+			Body: strings.NewReader(`{
+				"admin_profile":{
+					"default_charge_out_rate":75
 				}
 			}`),
 			Headers: map[string]string{

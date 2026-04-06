@@ -41,6 +41,7 @@ var timeOffManagerLimitedEditableFields = map[string]struct{}{
 	"opening_date": {},
 	"opening_op":   {},
 	"opening_ov":   {},
+	"payroll_id":   {},
 }
 
 func createSaveAdminProfileWithClaimsHandler(app core.App) func(e *core.RequestEvent) error {

@@ -47,7 +47,12 @@
     "skip_min_time_check",
     "time_sheet_expected",
   ] as const;
-  const TIME_OFF_MANAGER_EDITABLE_FIELDS = ["opening_date", "opening_op", "opening_ov"] as const;
+  const TIME_OFF_MANAGER_EDITABLE_FIELDS = [
+    "opening_date",
+    "opening_op",
+    "opening_ov",
+    "payroll_id",
+  ] as const;
   const OPENING_DATE_ERROR_MESSAGE = "Opening date must be a payroll Sunday.";
   const OPENING_DATE_REQUIRED_MESSAGE =
     "Opening date is required when opening OP or OV is non-zero.";
@@ -96,6 +101,7 @@
   const isLimitedEditor = $derived(!isAdmin && (hasHrClaim || hasTimeOffManagerClaim));
   const canEditHrFields = $derived(isAdmin || hasHrClaim);
   const canEditOpeningFields = $derived(isAdmin || hasHrClaim || hasTimeOffManagerClaim);
+  const canEditPayrollId = $derived(isAdmin || hasHrClaim || hasTimeOffManagerClaim);
   const effectiveSubjectClaimIds = $derived.by(() =>
     isAdmin ? stagedClaimIds : originalUserClaims.map((uc) => uc.cid),
   );
@@ -847,13 +853,16 @@
       />
     {/if}
 
-    {#if canEditHrFields}
+    {#if canEditPayrollId}
       <DsTextInput
         bind:value={item.payroll_id as string}
         {errors}
         fieldName="payroll_id"
         uiName="Payroll ID"
       />
+    {/if}
+
+    {#if canEditHrFields}
       <DsTextInput
         bind:value={item.mobile_phone as string}
         {errors}
