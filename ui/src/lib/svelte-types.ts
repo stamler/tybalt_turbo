@@ -140,6 +140,7 @@ export type ExpenseCommitQueueRow = {
   approver_name: string;
   committer_name: string;
   rejector_name: string;
+  settler_name: string;
   date: string;
   description: string;
   attachment: string;

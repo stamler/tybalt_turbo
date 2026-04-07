@@ -100,7 +100,10 @@
     <div class="flex items-center gap-2 text-xs text-neutral-600">
       <span>Date: {shortDate(r.date, true)} · Total: {formatCurrencyAmount(r.total, r.currency_code)}</span>
       {#if r.currency_code !== "CAD"}
-        <span>Settled CAD: {formatCurrencyAmount(r.settled_total, "CAD")}</span>
+        <span>
+          Settled CAD: {formatCurrencyAmount(r.settled_total, "CAD")}{#if r.settler_name}
+            by {r.settler_name}{/if}
+        </span>
       {/if}
       {#if r.attachment !== ""}
         <DsActionButton

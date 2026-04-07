@@ -116,6 +116,7 @@ type expenseTrackingListRow struct {
 	ApproverName     string  `db:"approver_name" json:"approver_name"`
 	CommitterName    string  `db:"committer_name" json:"committer_name"`
 	RejectorName     string  `db:"rejector_name" json:"rejector_name"`
+	SettlerName      string  `db:"settler_name" json:"settler_name"`
 	RejectionReason  string  `db:"rejection_reason" json:"rejection_reason"`
 	Date             string  `db:"date" json:"date"`
 	Description      string  `db:"description" json:"description"`
@@ -260,6 +261,7 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
                 COALESCE(ap.given_name || ' ' || ap.surname, '') AS approver_name,
                 COALESCE(cp.given_name || ' ' || cp.surname, '') AS committer_name,
                 COALESCE(rp.given_name || ' ' || rp.surname, '') AS rejector_name,
+                COALESCE(sp.given_name || ' ' || sp.surname, '') AS settler_name,
                 CASE
                     WHEN e.committed != '' THEN 'Committed'
                     WHEN e.approved != '' AND e.committed = '' THEN 'Approved'
@@ -292,6 +294,7 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
             LEFT JOIN profiles ap ON ap.uid = e.approver
             LEFT JOIN profiles cp ON cp.uid = e.committer
             LEFT JOIN profiles rp ON rp.uid = e.rejector
+            LEFT JOIN profiles sp ON sp.uid = e.settler
             LEFT JOIN jobs j ON j.id = e.job
             LEFT JOIN clients c ON c.id = j.client
             LEFT JOIN currencies cur ON cur.id = e.currency
