@@ -28,6 +28,7 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 	openingOP := admin_profile.GetFloat("opening_op")
 	openingOV := admin_profile.GetFloat("opening_ov")
 	offRotationPermitted := admin_profile.GetBool("off_rotation_permitted")
+	untrackedTimeOff := admin_profile.GetBool("untracked_time_off")
 	skipMinTimeCheck := admin_profile.GetString("skip_min_time_check")
 	workWeekHours := admin_profile.GetFloat("work_week_hours")
 	workRecordsSet := map[string]bool{}
@@ -208,10 +209,11 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 	}
 
 	// require salaried employees to have at least workWeekHours hours on a
-	// timesheet unless skipMinTimeCheck is set to "yes" or "on_next_bundle"
+	// timesheet unless untracked time off is enabled or skipMinTimeCheck is set
+	// to "yes" or "on_next_bundle"
 	offRotationHours := float64(len(offRotationDateSet)) * 8
 	if salary && nonJobHours+jobHours+nonWorkHoursTotal+offRotationHours < workWeekHours {
-		if skipMinTimeCheck == "no" {
+		if skipMinTimeCheck == "no" && !untrackedTimeOff {
 			return &CodeError{
 				Code:    "too_few_hours_on_timesheet",
 				Message: fmt.Sprintf("you must have a minimum of %v hours on your time sheet", workWeekHours),
@@ -228,12 +230,16 @@ func validateTimeEntries(txApp core.App, admin_profile *core.Record, payrollYear
 		}
 	}
 
-	// prevent salaried employees w/ skipMinTimeCheck: "yes" from claiming OB, OH,
-	// OP, OV
-	if salary && skipMinTimeCheck == "yes" && nonWorkHoursTotal > 0 {
-		return &CodeError{
-			Code:    "untracked_time_off_restricted",
-			Message: "staff with untracked time off are only permitted to create R or RT entries",
+	// prevent salaried employees with untracked time off from claiming OB, OH,
+	// OP, or OV. This matches the legacy Tybalt behavior.
+	if salary && untrackedTimeOff {
+		for _, code := range []string{"OB", "OH", "OP", "OV"} {
+			if _, ok := nonWorkHoursTally[code]; ok {
+				return &CodeError{
+					Code:    "untracked_time_off_restricted",
+					Message: "staff with untracked time off are only permitted to create R or RT entries",
+				}
+			}
 		}
 	}
 
