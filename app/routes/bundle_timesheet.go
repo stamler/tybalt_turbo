@@ -183,6 +183,13 @@ func createBundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error
 			newTimeSheet.Set("approver", approver)
 			newTimeSheet.Set("submitted", true)
 
+			// If the user is their own manager (and thus the approver), auto-approve
+			// the timesheet at bundle time. The tapr-claim check above already
+			// guarantees that a self-approver holds the tapr claim.
+			if approverUID == userId {
+				newTimeSheet.Set("approved", time.Now())
+			}
+
 			// set values in the new time sheet
 			newTimeSheet.Set("work_week_hours", admin_profile.Get("work_week_hours"))
 			newTimeSheet.Set("salary", admin_profile.Get("salary"))

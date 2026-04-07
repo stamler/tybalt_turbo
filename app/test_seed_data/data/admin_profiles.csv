@@ -22,3 +22,5 @@ _imported,active,allow_personal_reimbursement,created,default_branch,default_cha
 0,1,0,2025-06-19 19:07:23.538Z,80875lm27v8wgi4,0,r61e7f939c18ee8,,,,0,2024-01-07,0,0,FIX1,,0,no,0,u_no_claims,0,2025-06-19 19:07:23.538Z,40
 0,1,0,2025-09-03 16:54:08.356Z,80875lm27v8wgi4,50,ra26b32ad6f29f1,,legacy_etysnrlup2f6bak,,0,2025-01-01,0,0,900002,,0,no,0,etysnrlup2f6bak,0,2026-02-11 00:00:00.000Z,40
 0,1,0,2025-06-19 19:07:23.538Z,80875lm27v8wgi4,0,rae585be7bb8f2f,,,,0,2024-01-07,0,0,FIX4,,0,no,0,u_with_ppto_claim,0,2025-06-19 19:07:23.538Z,40
+0,1,0,2026-04-07 12:00:00.000Z,80875lm27v8wgi4,50,ap_self_apv_yes,Tester,,,0,2024-01-07,0,0,900201,,0,no,1,u_self_apv_yes,0,2026-04-07 12:00:00.000Z,40
+0,1,0,2026-04-07 12:00:00.000Z,80875lm27v8wgi4,50,ap_self_apv_no,Tester,,,0,2024-01-07,0,0,900202,,0,no,1,u_self_apv_no,0,2026-04-07 12:00:00.000Z,40
