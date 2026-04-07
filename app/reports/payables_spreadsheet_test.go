@@ -61,6 +61,7 @@ func TestPayablesRowToRecordUsesRecordDateForDisplayColumns(t *testing.T) {
 				RecordDate:   tc.recordDate,
 				ApprovalDate: tc.approvalDate,
 				Total:        "123.45",
+				CurrencyCode: "CAD",
 				PONumber:     "2603-0001",
 				Description:  "Fixture row",
 				VendorName:   "Vendor Name",
@@ -82,13 +83,16 @@ func TestPayablesRowToRecordUsesRecordDateForDisplayColumns(t *testing.T) {
 			if got := record[7]; got != tc.wantYear {
 				t.Fatalf("year = %q, want %q", got, tc.wantYear)
 			}
-			if got := record[16]; got != "Fixture row" {
+			if got := record[11]; got != "CAD" {
+				t.Fatalf("currency = %q, want %q", got, "CAD")
+			}
+			if got := record[17]; got != "Fixture row" {
 				t.Fatalf("description = %q, want %q", got, "Fixture row")
 			}
-			if got := record[19]; got != "Approver Name" {
+			if got := record[20]; got != "Approver Name" {
 				t.Fatalf("approved by = %q, want %q", got, "Approver Name")
 			}
-			if got := record[20]; got != "TURBO" {
+			if got := record[21]; got != "TURBO" {
 				t.Fatalf("entered by = %q, want %q", got, "TURBO")
 			}
 		})
@@ -108,6 +112,7 @@ func TestRowsToCSVAndTSV(t *testing.T) {
 			RecordDate:   "2024-09-01",
 			ApprovalDate: "2026-03-11",
 			Total:        "123.45",
+			CurrencyCode: "USD",
 			PONumber:     "2603-0001",
 			Description:  `Fixture "quoted", row`,
 			VendorName:   "Vendor Name",
@@ -135,6 +140,9 @@ func TestRowsToCSVAndTSV(t *testing.T) {
 	}
 	if !strings.Contains(tsvString, "Expense\t24-321\tBM\tTOR\tOne-Time\t1\tSep\t2024") {
 		t.Fatalf("tsv should contain tab-separated row data, got %q", tsvString)
+	}
+	if !strings.Contains(tsvString, "\t123.45\tUSD\t\t\t\t2603-0001\t") {
+		t.Fatalf("tsv should place currency immediately after total, got %q", tsvString)
 	}
 	if !strings.HasSuffix(tsvString, "\n") {
 		t.Fatalf("tsv should end with newline, got %q", tsvString)

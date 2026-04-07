@@ -6,9 +6,15 @@ package notifications
 
 import (
 	"fmt"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
 )
+
+func formatExpenseNotificationAmount(app core.App, expense *core.Record) string {
+	sourceCurrencyCode := utilities.EffectiveCurrencyCode(app, expense.GetString("currency"))
+	return fmt.Sprintf("%s %.2f", sourceCurrencyCode, expense.GetFloat("total"))
+}
 
 // QueueTimesheetRejectedNotifications creates immediate notifications for a
 // rejected timesheet.
@@ -87,8 +93,7 @@ func QueueTimesheetRejectedNotifications(app core.App, timesheet *core.Record, r
 func QueueExpenseRejectedNotifications(app core.App, expense *core.Record, rejectorUID, reason string) error {
 	employeeUID := expense.GetString("uid")
 	expenseDate := expense.GetString("date")
-	expenseTotal := expense.GetFloat("total")
-	expenseAmount := fmt.Sprintf("$%.2f", expenseTotal)
+	expenseAmount := formatExpenseNotificationAmount(app, expense)
 
 	employeeName, employeeProfile, err := getProfileDisplayName(app, employeeUID)
 	if err != nil {

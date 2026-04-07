@@ -11,6 +11,7 @@ SELECT
     ELSE po.approved
   END AS approval_date,
   po.total,
+  COALESCE(cur.code, 'CAD') AS currency_code,
   po.po_number,
   po.description,
   COALESCE(v.name, '') AS vendor_name,
@@ -26,6 +27,7 @@ LEFT JOIN jobs j ON po.job = j.id
 LEFT JOIN divisions d ON po.division = d.id
 LEFT JOIN branches b ON po.branch = b.id
 LEFT JOIN vendors v ON po.vendor = v.id
+LEFT JOIN currencies cur ON po.currency = cur.id
 LEFT JOIN profiles owner ON po.uid = owner.uid
 LEFT JOIN profiles ap ON po.approver = ap.uid
 LEFT JOIN profiles sa ON po.second_approver = sa.uid

@@ -308,8 +308,9 @@ func CreateExpenseReportHandler(app core.App, dateColumnName string) func(e *cor
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 
-		// convert the report to a csv string
-		headers := []string{"payrollId", "Acct/Visa/Exp", "Job #", "Client", "Job Description", "Div", "Date", "Month", "Year", "calculatedSubtotal", "calculatedOntarioHST", "Total", "PO#", "Description", "Company", "Employee", "Approved By"}
+		// Keep the legacy columns and order intact. Total remains the CAD amount;
+		// additive currency columns come last so downstream consumers can opt in.
+		headers := []string{"payrollId", "Acct/Visa/Exp", "Job #", "Client", "Job Description", "Div", "Date", "Month", "Year", "calculatedSubtotal", "calculatedOntarioHST", "Total", "PO#", "Description", "Company", "Employee", "Approved By", "currency", "foreign_currency_total"}
 		csvString, err := convertToCSV(report, headers)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to generate CSV report: "+err.Error(), err)

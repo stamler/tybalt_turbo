@@ -3,6 +3,7 @@
 package main
 
 import (
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -961,33 +962,13 @@ func TestQueueExpenseRejectedNotifications_CreatesNotifications(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	defer app.Cleanup()
 
-	// Find an expense whose employee has a manager so we exercise the manager path.
-	var expRow struct {
-		ExpenseID   string `db:"eid"`
-		EmployeeUID string `db:"employee_uid"`
-		ManagerUID  string `db:"manager_uid"`
-	}
-	if err := app.DB().NewQuery(`
-		SELECT
-			e.id      AS eid,
-			e.uid     AS employee_uid,
-			p.manager AS manager_uid
-		FROM expenses e
-		JOIN profiles p ON p.uid = e.uid
-		WHERE COALESCE(p.manager, '') != ''
-		LIMIT 1
-	`).One(&expRow); err != nil {
-		t.Skipf("no suitable expenses record with manager in test data: %v", err)
-	}
-
-	// Use the manager as the rejector for this happy-path test.
-	rejectorUID := expRow.ManagerUID
-
-	// Load the expense record to pass to the helper.
-	expense, err := app.FindRecordById("expenses", expRow.ExpenseID)
+	// Use the seeded foreign-currency fixture so the notification must make the
+	// source currency explicit in its payload/template data.
+	expense, err := app.FindRecordById("expenses", "rptcurusd000001")
 	if err != nil {
-		t.Fatalf("failed to load expense %s: %v", expRow.ExpenseID, err)
+		t.Fatalf("failed to load seeded foreign expense fixture: %v", err)
 	}
+	rejectorUID := "tqqf7q0f3378rvp"
 
 	// Helper to count notifications for a given template code
 	countForTemplate := func(code string) int64 {
@@ -1021,6 +1002,34 @@ func TestQueueExpenseRejectedNotifications_CreatesNotifications(t *testing.T) {
 
 	if afterCount <= beforeCount {
 		t.Fatalf("expected expense_rejected notifications to be created, before=%d after=%d", beforeCount, afterCount)
+	}
+
+	var latest struct {
+		Data      string `db:"data"`
+		TextEmail string `db:"text_email"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT n.data, t.text_email
+		FROM notifications n
+		JOIN notification_templates t ON n.template = t.id
+		WHERE t.code = 'expense_rejected'
+		ORDER BY n.created DESC
+		LIMIT 1
+	`).One(&latest); err != nil {
+		t.Fatalf("failed to load latest expense_rejected notification: %v", err)
+	}
+
+	var payload struct {
+		ExpenseAmount string `json:"ExpenseAmount"`
+	}
+	if err := json.Unmarshal([]byte(latest.Data), &payload); err != nil {
+		t.Fatalf("failed to decode notification payload: %v", err)
+	}
+	if payload.ExpenseAmount != "USD 100.00" {
+		t.Fatalf("expected foreign source amount in payload, got %q", payload.ExpenseAmount)
+	}
+	if strings.Contains(latest.TextEmail, "ExpenseAmountCAD") {
+		t.Fatalf("expected copied notification template to omit ExpenseAmountCAD conditional, got %q", latest.TextEmail)
 	}
 }
 

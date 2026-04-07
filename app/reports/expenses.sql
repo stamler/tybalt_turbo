@@ -17,7 +17,9 @@ SELECT ap.payroll_id payrollId,
   e2.merged_description Description,
   v.name Company,
   p.given_name || ' ' || p.surname Employee,
-  p2.given_name || ' ' || p2.surname "Approved By"
+  p2.given_name || ' ' || p2.surname "Approved By",
+  e2.currency_code currency,
+  e2.foreign_currency_total foreign_currency_total
 FROM (
 SELECT e.id,
   e.uid,
@@ -35,9 +37,18 @@ SELECT e.id,
   e.cc_last_4_digits,
   e.purchase_order,
   e.vendor,
+  COALESCE(cur.code, 'CAD') currency_code,
+  CASE
+    WHEN COALESCE(cur.code, 'CAD') = 'CAD' THEN NULL
+    ELSE CAST(e.total AS REAL)
+  END foreign_currency_total,
   CAST(CASE
     WHEN e.payment_type = 'Mileage' THEN m.mileage_total
     WHEN e.payment_type = 'Allowance' OR e.payment_type = 'Meals' THEN a.allowance_total
+    -- Keep Total in CAD for backward-compatible reports. For foreign-currency
+    -- expenses, fall back to settled_total (CAD) and expose the original
+    -- foreign amount in foreign_currency_total. CAD rows always use e.total.
+    WHEN COALESCE(cur.code, 'CAD') != 'CAD' THEN COALESCE(NULLIF(e.settled_total, 0), e.total)
     ELSE e.total
   END AS REAL) merged_total,
   CASE
@@ -45,6 +56,7 @@ SELECT e.id,
     ELSE e.description
   END merged_description
 FROM Expenses e
+LEFT JOIN currencies cur ON e.currency = cur.id
 LEFT JOIN (
   /* This is the exact query from the expense_mileage_totals view except that it
   includes a filter on pay_period_ending which massively speeds up the entire
