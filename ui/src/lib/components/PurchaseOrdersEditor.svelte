@@ -5,7 +5,6 @@
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
   } from "$lib/utilities";
-  import { formatCurrencyEquivalent } from "$lib/utilities";
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
   import { branches as branchesStore } from "$lib/stores/branches";
@@ -267,16 +266,6 @@
     "Could not load approver eligibility. Resolve the error and try again.";
   const nonOwnerEditMessage = "You can view this purchase order, but only its creator can edit it.";
   const selectedCurrency = $derived.by(() => $currencies.items.find((row) => row.id === item.currency));
-  const currencyEquivalentText = $derived.by(() => {
-    if (!selectedCurrency || selectedCurrency.code === "CAD") {
-      return "";
-    }
-    return formatCurrencyEquivalent(
-      Number(item.total ?? 0) * Number(selectedCurrency.rate ?? 1),
-      selectedCurrency.rate,
-      selectedCurrency.rate_date,
-    );
-  });
   const currencySelectionDisabled = $derived.by(() => isChildPO || legacyMode);
   const isEditingAnotherUsersPO = $derived.by(
     () =>
@@ -1216,9 +1205,7 @@
       disabledCurrency={currencySelectionDisabled}
       helperText={legacyMode
         ? "Legacy entries remain CAD-only in this rollout."
-        : currencyEquivalentText
-          ? "Approval checks use the CAD equivalent."
-          : `Max in ${selectedCurrency?.code ?? "CAD"} including all taxes and shipping.`}
+        : `Max in ${selectedCurrency?.code ?? "CAD"} including all taxes and shipping.`}
       homeEquivalent={selectedCurrency && selectedCurrency.code !== "CAD"
         ? Number(item.total ?? 0) * Number(selectedCurrency.rate ?? 1)
         : null}

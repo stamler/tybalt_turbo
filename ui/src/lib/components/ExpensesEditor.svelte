@@ -5,7 +5,6 @@
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
   } from "$lib/utilities";
-  import { formatCurrencyEquivalent } from "$lib/utilities";
   import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
   import { currencies } from "$lib/stores/currencies";
   import { pb } from "$lib/pocketbase";
@@ -90,16 +89,6 @@
   const selectedCurrency = $derived.by(() => $currencies.items.find((row) => row.id === item.currency));
   const selectedCurrencyCode = $derived.by(() => selectedCurrency?.code ?? "CAD");
   const homeCurrency = $derived.by(() => $currencies.items.find((row) => row.code === "CAD"));
-  const foreignExpenseEquivalent = $derived.by(() => {
-    if (!selectedCurrency || selectedCurrency.code === "CAD") {
-      return "";
-    }
-    return formatCurrencyEquivalent(
-      Number(item.total ?? 0) * Number(selectedCurrency.rate ?? 1),
-      selectedCurrency.rate,
-      selectedCurrency.rate_date,
-    );
-  });
   const fixedHomePaymentType = $derived.by(
     () =>
       item.payment_type === "Allowance" ||
@@ -468,8 +457,6 @@
           disabledCurrency={true}
           helperText="Enter the final CAD settlement amount before submitting."
         />
-      {:else if foreignExpenseEquivalent}
-        <div class="text-sm text-neutral-600">Indicative CAD equivalent: {foreignExpenseEquivalent}</div>
       {/if}
       <VendorSelector bind:value={item.vendor as string} {errors} />
     {:else}
