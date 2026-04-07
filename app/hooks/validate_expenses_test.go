@@ -417,6 +417,25 @@ func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
 		}
 	})
 
+	t.Run("blank_no_po_onaccount_currency_persists_home_currency_when_available", func(t *testing.T) {
+		record := buildRecordFromMap(expensesCollection, map[string]any{
+			"uid":          standardUser.Id,
+			"date":         "2024-01-22",
+			"description":  "On-account expense with implicit home currency",
+			"payment_type": "OnAccount",
+			"total":        25.0,
+			"vendor":       "2zqxtsmymf670ha",
+			"attachment":   "dummy.pdf",
+		})
+
+		if err := cleanExpense(app, record); err != nil {
+			t.Fatalf("expected cleanExpense to succeed for blank home-currency expense, got %v", err)
+		}
+		if got := record.GetString("currency"); got != homeCurrency.Id {
+			t.Fatalf("expected blank expense currency to persist home currency %s, got %q", homeCurrency.Id, got)
+		}
+	})
+
 	t.Run("foreign_onaccount_clears_settlement_fields_for_queue_workflow", func(t *testing.T) {
 		record := buildRecordFromMap(expensesCollection, map[string]any{
 			"uid":          standardUser.Id,

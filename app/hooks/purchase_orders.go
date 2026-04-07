@@ -30,6 +30,10 @@ func CleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	// initialize approval_total to total. This will be changed if the PO is
 	// recurring.
 	purchaseOrderRecord.Set("approval_total", purchaseOrderRecord.GetFloat("total"))
+	homeCurrencyID := ""
+	if homeCurrency, err := utilities.FindHomeCurrency(app); err == nil && homeCurrency != nil {
+		homeCurrencyID = homeCurrency.Id
+	}
 
 	typeString := purchaseOrderRecord.GetString("type")
 
@@ -60,6 +64,20 @@ func CleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 			}
 		}
 		purchaseOrderRecord.Set("approval_total", calculatedTotal)
+	}
+
+	if strings.TrimSpace(purchaseOrderRecord.GetString("currency")) == "" {
+		parentPOID := strings.TrimSpace(purchaseOrderRecord.GetString("parent_po"))
+		if parentPOID != "" {
+			if parentPO, err := app.FindRecordById("purchase_orders", parentPOID); err == nil && parentPO != nil {
+				if parentCurrencyID := strings.TrimSpace(parentPO.GetString("currency")); parentCurrencyID != "" {
+					purchaseOrderRecord.Set("currency", parentCurrencyID)
+				}
+			}
+		}
+	}
+	if strings.TrimSpace(purchaseOrderRecord.GetString("currency")) == "" && homeCurrencyID != "" {
+		purchaseOrderRecord.Set("currency", homeCurrencyID)
 	}
 
 	currencyInfo, err := utilities.ResolveCurrencyInfo(app, purchaseOrderRecord.GetString("currency"))

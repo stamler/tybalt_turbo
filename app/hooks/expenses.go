@@ -410,6 +410,10 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		}
 	}
 
+	if strings.TrimSpace(expenseRecord.GetString("currency")) == "" && homeCurrencyID != "" {
+		expenseRecord.Set("currency", homeCurrencyID)
+	}
+
 	currencyInfo, err := utilities.ResolveCurrencyInfo(app, expenseRecord.GetString("currency"))
 	if err != nil {
 		return &errs.HookError{
