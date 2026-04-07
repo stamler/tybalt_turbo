@@ -3,6 +3,7 @@
 </script>
 
 <script lang="ts">
+  import Icon from "@iconify/svelte";
   import type { CurrenciesResponse } from "$lib/pocketbase-types";
   import {
     currencyIconHref,
@@ -70,14 +71,64 @@
       ? formatCurrencyEquivalent(homeEquivalent, rate, rateDate)
       : "",
   );
+  const shouldShowCurrencyInfo = $derived.by(
+    () => normalizeCurrencyCode(previewCode) !== "CAD",
+  );
 
   const hasError = $derived(
     errors[amountFieldName] !== undefined || errors[currencyFieldName] !== undefined,
   );
+
+  const currencyInfoId = `currency-input-info-${thisId}`;
+  let showCurrencyInfo = $state(false);
+
+  $effect(() => {
+    if (!shouldShowCurrencyInfo && showCurrencyInfo) {
+      showCurrencyInfo = false;
+    }
+  });
 </script>
 
 <div class="flex w-full flex-col gap-2 {hasError ? 'bg-red-200' : ''}">
-  <label for={`currency-input-${thisId}`}>{uiName}</label>
+  <div class="flex items-center gap-1">
+    <label for={`currency-input-${thisId}`}>{uiName}</label>
+    {#if shouldShowCurrencyInfo}
+      <div class="relative">
+        <button
+          type="button"
+          class="inline-flex items-center text-slate-500 transition-colors hover:text-slate-700"
+          aria-label={`Foreign currency guidance for ${uiName}`}
+          aria-controls={currencyInfoId}
+          aria-expanded={showCurrencyInfo}
+          aria-haspopup="dialog"
+          onclick={() => (showCurrencyInfo = !showCurrencyInfo)}
+        >
+          <Icon icon="mdi:information-outline" width="15px" />
+        </button>
+
+        {#if showCurrencyInfo}
+          <div
+            id={currencyInfoId}
+            class="absolute top-full left-0 z-20 mt-2 w-80 max-w-[calc(100vw-2rem)] rounded-md border border-sky-200 bg-sky-50 p-3 text-sm text-slate-700 shadow-lg"
+            role="dialog"
+            aria-label="Foreign currency guidance"
+          >
+            <p class="font-semibold text-slate-800">Foreign currency basics</p>
+            <ul class="mt-2 list-disc space-y-1 pl-4">
+              <li>Enter the original amount in the currency shown on the quote, receipt, or invoice.</li>
+              <li>Purchase orders can be issued in a foreign currency when the vendor is billing that way.</li>
+              <li>PO approvals are based on the CAD equivalent, not only the foreign amount.</li>
+              <li>Expenses can be submitted in a foreign currency, but settlement and reimbursement must be finalized in CAD.</li>
+              <li>Corporate Credit Card and On Account expenses are settled to CAD by payables admins.</li>
+              <li>Expense payment types must be settled to CAD by the person who created the expense before submission.</li>
+              <li>The CAD equivalent shown here is indicative. Final card or bank settlement can change with rate timing or fees.</li>
+              <li>Keep support that shows both the foreign amount and the settled CAD amount for reconciliation.</li>
+            </ul>
+          </div>
+        {/if}
+      </div>
+    {/if}
+  </div>
   <div
     class="flex items-center overflow-hidden rounded border border-neutral-300 bg-white focus-within:ring-2 focus-within:ring-blue-500"
   >
@@ -144,5 +195,14 @@
         <div>CAD equivalent: {previewEquivalent}</div>
       {/if}
     </div>
+  {/if}
+
+  {#if shouldShowCurrencyInfo && showCurrencyInfo}
+    <button
+      type="button"
+      class="fixed inset-0 z-10 cursor-default"
+      aria-label="Close foreign currency guidance"
+      onclick={() => (showCurrencyInfo = false)}
+    ></button>
   {/if}
 </div>

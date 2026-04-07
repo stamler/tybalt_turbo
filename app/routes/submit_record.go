@@ -86,11 +86,24 @@ func createSubmitRecordHandler(app core.App, collectionName string) func(e *core
 					}
 				}
 
-				if !utilities.IsHomeCurrencyInfo(currencyInfo) && record.GetString("payment_type") == "Expense" && record.GetFloat("settled_total") <= 0 {
-					httpResponseStatusCode = http.StatusBadRequest
-					return &CodeError{
-						Code:    "settled_total_required",
-						Message: "settled total is required before submitting a foreign-currency expense",
+				if !utilities.IsHomeCurrencyInfo(currencyInfo) && record.GetString("payment_type") == "Expense" {
+					if record.GetFloat("settled_total") <= 0 {
+						httpResponseStatusCode = http.StatusBadRequest
+						return &CodeError{
+							Code:    "settled_total_required",
+							Message: "settled total is required before submitting a foreign-currency expense",
+						}
+					}
+					if !utilities.IsSettledTotalWithinTolerance(
+						record.GetFloat("total"),
+						record.GetFloat("settled_total"),
+						currencyInfo,
+					) {
+						httpResponseStatusCode = http.StatusBadRequest
+						return &CodeError{
+							Code:    "settled_total_out_of_range",
+							Message: utilities.SettledTotalToleranceMessage(record.GetFloat("total"), currencyInfo),
+						}
 					}
 				}
 

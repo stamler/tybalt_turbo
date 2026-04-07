@@ -4,7 +4,13 @@
   import DSCurrencyInput from "$lib/components/DSCurrencyInput.svelte";
   import type { ExpenseSettlementRow } from "$lib/svelte-types";
   import { pb } from "$lib/pocketbase";
-  import { formatCurrencyAmount, formatCurrencyEquivalent, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import {
+    formatCurrencyAmount,
+    formatCurrencyEquivalent,
+    settlementToleranceBounds,
+    shortDate,
+    trimmedOrEmpty,
+  } from "$lib/utilities";
   import { resolve } from "$app/paths";
   import { onMount } from "svelte";
 
@@ -25,7 +31,9 @@
       ]);
       unsettledRows = unsettled;
       settledRows = settled;
-      draftValues = Object.fromEntries(unsettled.map((row) => [row.id, row.settled_total || 0]));
+      draftValues = Object.fromEntries(
+        unsettled.map((row) => [row.id, row.settled_total || 0]),
+      );
     } catch (error: any) {
       errorMessage = error?.response?.message ?? "Failed to load settlement queue";
     } finally {
@@ -110,6 +118,7 @@
       {/snippet}
       {#snippet line3(row: ExpenseSettlementRow)}
         {#if activeTab === "unsettled"}
+          {@const toleranceBounds = settlementToleranceBounds(row.indicative_home_total)}
           <DSCurrencyInput
             bind:amount={draftValues[row.id]}
             currency=""
@@ -118,7 +127,7 @@
             currencyFieldName={`currency_${row.id}`}
             uiName="Settled CAD Total"
             disabledCurrency={true}
-            helperText={`Original amount: ${formatCurrencyAmount(row.total, row.currency_code)}`}
+            helperText={`Original amount: ${formatCurrencyAmount(row.total, row.currency_code)} · latest CAD equivalent ${formatCurrencyAmount(row.indicative_home_total, "CAD")} · allowed range ${formatCurrencyAmount(toleranceBounds.min, "CAD")} to ${formatCurrencyAmount(toleranceBounds.max, "CAD")}`}
             displayCode="CAD"
             displaySymbol="CAD"
           />

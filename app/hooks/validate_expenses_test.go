@@ -245,6 +245,8 @@ func TestValidateExpense_ForeignNoPOLimitUsesSettledTotal(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load USD currency: %v", err)
 	}
+	usdRate := usdCurrency.GetFloat("rate")
+	sourceTotal := utilities.RoundCurrencyAmount((constants.NO_PO_EXPENSE_LIMIT - 0.01) / usdRate)
 
 	failing := buildRecordFromMap(expensesCollection, map[string]any{
 		"allowance_types": []string{},
@@ -253,7 +255,7 @@ func TestValidateExpense_ForeignNoPOLimitUsesSettledTotal(t *testing.T) {
 		"job":             "",
 		"payment_type":    "Expense",
 		"purchase_order":  "",
-		"total":           10.0,
+		"total":           sourceTotal,
 		"settled_total":   constants.NO_PO_EXPENSE_LIMIT,
 		"currency":        usdCurrency.Id,
 		"vendor":          "2zqxtsmymf670ha",
@@ -279,7 +281,7 @@ func TestValidateExpense_ForeignNoPOLimitUsesSettledTotal(t *testing.T) {
 		"job":             "",
 		"payment_type":    "Expense",
 		"purchase_order":  "",
-		"total":           10.0,
+		"total":           sourceTotal,
 		"settled_total":   constants.NO_PO_EXPENSE_LIMIT - 0.01,
 		"currency":        usdCurrency.Id,
 		"vendor":          "2zqxtsmymf670ha",
@@ -337,6 +339,49 @@ func TestValidateExpense_CurrencyMustMatchPurchaseOrder(t *testing.T) {
 	}
 	if fieldErr, ok := hookErr.Data["currency"]; !ok || fieldErr.Code != "must_match_purchase_order" {
 		t.Fatalf("expected must_match_purchase_order currency error, got %+v", hookErr.Data)
+	}
+}
+
+func TestValidateExpense_ForeignExpenseSettlementTolerance(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
+		t.Fatalf("failed to load expenditure kinds config: %v", err)
+	}
+
+	usdCurrency, err := app.FindFirstRecordByFilter("currencies", "code = {:code}", map[string]any{"code": "USD"})
+	if err != nil {
+		t.Fatalf("failed to load USD currency: %v", err)
+	}
+
+	expectedSettledTotal := utilities.IndicativeHomeAmount(100, utilities.CurrencyInfo{
+		Rate: usdCurrency.GetFloat("rate"),
+	})
+	record := buildRecordFromMap(expensesCollection, map[string]any{
+		"allowance_types": []string{},
+		"date":            "2024-01-22",
+		"description":     "Foreign expense tolerance check",
+		"job":             "",
+		"payment_type":    "Expense",
+		"purchase_order":  "",
+		"total":           100.0,
+		"settled_total":   utilities.RoundCurrencyAmount(expectedSettledTotal * 1.25),
+		"currency":        usdCurrency.Id,
+		"vendor":          "2zqxtsmymf670ha",
+		"attachment":      "dummy.pdf",
+	})
+
+	err = validateExpense(app, record, nil, 0, false)
+	if err == nil {
+		t.Fatal("expected out-of-range foreign settled_total to fail validation")
+	}
+
+	errMap, ok := err.(validation.Errors)
+	if !ok {
+		t.Fatalf("expected validation.Errors, got %T: %v", err, err)
+	}
+	if _, ok := errMap["settled_total"]; !ok {
+		t.Fatalf("expected settled_total validation error, got %v", errMap)
 	}
 }
 
@@ -438,14 +483,14 @@ func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
 
 	t.Run("foreign_onaccount_clears_settlement_fields_for_queue_workflow", func(t *testing.T) {
 		record := buildRecordFromMap(expensesCollection, map[string]any{
-			"uid":          standardUser.Id,
-			"date":         "2024-01-22",
-			"description":  "Foreign on-account expense",
-			"payment_type": "OnAccount",
-			"total":        25.0,
-			"vendor":       "2zqxtsmymf670ha",
-			"attachment":   "dummy.pdf",
-			"currency":     usdCurrency.Id,
+			"uid":           standardUser.Id,
+			"date":          "2024-01-22",
+			"description":   "Foreign on-account expense",
+			"payment_type":  "OnAccount",
+			"total":         25.0,
+			"vendor":        "2zqxtsmymf670ha",
+			"attachment":    "dummy.pdf",
+			"currency":      usdCurrency.Id,
 			"settled_total": 88.0,
 			"settler":       "tqqf7q0f3378rvp",
 			"settled":       "2026-04-03 12:00:00.000Z",
@@ -485,6 +530,27 @@ func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
 		}
 		if record.GetString("settler") != "" || !record.GetDateTime("settled").IsZero() {
 			t.Fatalf("expected foreign Expense settlement actor fields to clear, got settler=%q settled=%v", record.GetString("settler"), record.GetDateTime("settled"))
+		}
+	})
+
+	t.Run("foreign_out_of_pocket_zero_settled_total_remains_zero_during_cleaning", func(t *testing.T) {
+		record := buildRecordFromMap(expensesCollection, map[string]any{
+			"uid":           standardUser.Id,
+			"date":          "2024-01-22",
+			"description":   "Foreign reimbursement expense with blank settlement",
+			"payment_type":  "Expense",
+			"total":         25.0,
+			"vendor":        "2zqxtsmymf670ha",
+			"attachment":    "dummy.pdf",
+			"currency":      usdCurrency.Id,
+			"settled_total": 0,
+		})
+
+		if err := cleanExpense(app, record); err != nil {
+			t.Fatalf("expected cleanExpense to succeed for foreign Expense, got %v", err)
+		}
+		if record.GetFloat("settled_total") != 0 {
+			t.Fatalf("expected foreign Expense settled_total to remain user-provided at 0 during cleaning, got %v", record.GetFloat("settled_total"))
 		}
 	})
 }

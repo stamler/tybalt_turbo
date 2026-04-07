@@ -4,6 +4,9 @@
     applyDefaultDivisionOnce,
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
+    formatCurrencyAmount,
+    indicativeCadAmount,
+    settlementToleranceBounds,
   } from "$lib/utilities";
   import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
   import { currencies } from "$lib/stores/currencies";
@@ -111,6 +114,19 @@
   const showSettledTotalInput = $derived.by(
     () => selectedCurrencyCode !== "CAD" && item.payment_type === "Expense",
   );
+  const suggestedSettledTotal = $derived.by(() =>
+    showSettledTotalInput
+      ? indicativeCadAmount(Number(item.total ?? 0), selectedCurrency?.rate)
+      : 0,
+  );
+  const settledTotalBounds = $derived.by(() => settlementToleranceBounds(suggestedSettledTotal));
+  const settledTotalHelperText = $derived.by(() => {
+    if (!showSettledTotalInput || suggestedSettledTotal <= 0) {
+      return "Enter the final CAD settlement amount before submitting.";
+    }
+
+    return `Latest CAD equivalent: ${formatCurrencyAmount(suggestedSettledTotal, "CAD")} · allowed range ${formatCurrencyAmount(settledTotalBounds.min, "CAD")} to ${formatCurrencyAmount(settledTotalBounds.max, "CAD")}. Enter a settled CAD total in this range.`;
+  });
   const nonOwnerEditMessage = "You can view this expense, but only its creator can edit it.";
   const isEditingAnotherUsersExpense = $derived.by(
     () => data.editing && authUserID !== "" && item.uid !== "" && item.uid !== authUserID,
@@ -455,7 +471,7 @@
           currencyFieldName="settled_total_currency"
           uiName="Settled CAD Total"
           disabledCurrency={true}
-          helperText="Enter the final CAD settlement amount before submitting."
+          helperText={settledTotalHelperText}
         />
       {/if}
       <VendorSelector bind:value={item.vendor as string} {errors} />

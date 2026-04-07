@@ -177,12 +177,28 @@ func createSettleExpenseHandler(app core.App) func(e *core.RequestEvent) error {
 			if err := validateExpenseSettlementCandidate(txApp, record, false); err != nil {
 				return err
 			}
+			currencyInfo, err := utilities.ResolveCurrencyInfo(txApp, record.GetString("currency"))
+			if err != nil {
+				return err
+			}
+			if !utilities.IsSettledTotalWithinTolerance(record.GetFloat("total"), req.SettledTotal, currencyInfo) {
+				return &CodeError{
+					Code:    "settled_total_out_of_range",
+					Message: utilities.SettledTotalToleranceMessage(record.GetFloat("total"), currencyInfo),
+				}
+			}
 
 			record.Set("settled_total", req.SettledTotal)
 			record.Set("settler", e.Auth.Id)
 			record.Set("settled", time.Now())
 			return txApp.Save(record)
 		}); err != nil {
+			if codeErr, ok := err.(*CodeError); ok {
+				return e.JSON(http.StatusBadRequest, map[string]any{
+					"code":    codeErr.Code,
+					"message": codeErr.Message,
+				})
+			}
 			return e.Error(http.StatusBadRequest, "failed to settle expense", err)
 		}
 

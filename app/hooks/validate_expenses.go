@@ -324,8 +324,20 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 		)
 	}
 
-	if !hasPurchaseOrder && !isHomeCurrency && isOutOfPocketExpense && expenseRecord.GetFloat("settled_total") < 0 {
-		validationsErrors["settled_total"] = validation.NewError("min", "settled total must be greater than 0")
+	if !isHomeCurrency && isOutOfPocketExpense {
+		settledTotal := expenseRecord.GetFloat("settled_total")
+		if settledTotal <= 0 {
+			validationsErrors["settled_total"] = validation.NewError("min", "settled total must be greater than 0")
+		} else if !utilities.IsSettledTotalWithinTolerance(
+			expenseRecord.GetFloat("total"),
+			settledTotal,
+			currencyInfo,
+		) {
+			validationsErrors["settled_total"] = validation.NewError(
+				"out_of_range",
+				utilities.SettledTotalToleranceMessage(expenseRecord.GetFloat("total"), currencyInfo),
+			)
+		}
 	}
 
 	// Job-aware validation for expenses:

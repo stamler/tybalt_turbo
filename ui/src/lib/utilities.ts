@@ -372,6 +372,47 @@ export const formatCurrencyEquivalent = (
   return parts.join(" · ");
 };
 
+export const roundCurrencyAmount = (value: number) => Math.round(value * 100) / 100;
+
+export const indicativeCadAmount = (
+  sourceAmount: number | null | undefined,
+  rate: number | null | undefined,
+) => {
+  if (
+    sourceAmount === undefined ||
+    sourceAmount === null ||
+    Number.isNaN(sourceAmount) ||
+    rate === undefined ||
+    rate === null ||
+    !Number.isFinite(rate) ||
+    rate <= 0
+  ) {
+    return 0;
+  }
+
+  return roundCurrencyAmount(sourceAmount * rate);
+};
+
+export const settlementToleranceBounds = (
+  indicativeCadTotal: number | null | undefined,
+  toleranceRatio = 0.2,
+) => {
+  if (
+    indicativeCadTotal === undefined ||
+    indicativeCadTotal === null ||
+    Number.isNaN(indicativeCadTotal) ||
+    !Number.isFinite(indicativeCadTotal) ||
+    indicativeCadTotal <= 0
+  ) {
+    return { min: 0, max: 0 };
+  }
+
+  return {
+    min: roundCurrencyAmount(indicativeCadTotal * (1 - toleranceRatio)),
+    max: roundCurrencyAmount(indicativeCadTotal * (1 + toleranceRatio)),
+  };
+};
+
 export const formatPercent = function <T>(value: T) {
   if (typeof value !== "number") {
     return value;

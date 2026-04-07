@@ -2,9 +2,11 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"strings"
 	"testing"
 	"tybalt/internal/testutils"
+	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 )
@@ -199,6 +201,12 @@ func TestExpenseSettlementRoutes_ListSettleAndClear(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	defer app.Cleanup()
 
+	usdCurrency, err := app.FindRecordById("currencies", testUSDCurrencyID)
+	if err != nil {
+		t.Fatalf("failed loading USD currency fixture: %v", err)
+	}
+	usdRate := usdCurrency.GetFloat("rate")
+
 	if _, err := app.NonconcurrentDB().NewQuery(`
 		UPDATE expenses
 		SET currency = {:currencyId}, settled_total = 0, settler = '', settled = ''
@@ -250,12 +258,26 @@ func TestExpenseSettlementRoutes_ListSettleAndClear(t *testing.T) {
 		t.Fatalf("expected settled list to exclude unsettled row, body=%s", body)
 	}
 
+	unsettledExpenseRecord, err := app.FindRecordById("expenses", "b4o6xph4ngwx4nw")
+	if err != nil {
+		t.Fatalf("failed loading unsettled expense fixture: %v", err)
+	}
+	acceptableSettledTotal := utilities.IndicativeHomeAmount(
+		unsettledExpenseRecord.GetFloat("total"),
+		utilities.CurrencyInfo{Rate: usdRate},
+	)
+
 	unauthorizedSettle := performTestAPIRequest(t, app, "POST", "/api/expenses/b4o6xph4ngwx4nw/settle", strings.NewReader(`{"settled_total":95.55}`), map[string]string{
 		"Authorization": regularUserToken,
 	})
 	mustStatus(t, unauthorizedSettle, 403)
 
-	settleRes := performTestAPIRequest(t, app, "POST", "/api/expenses/b4o6xph4ngwx4nw/settle", strings.NewReader(`{"settled_total":95.55}`), map[string]string{
+	outOfRangeSettle := performTestAPIRequest(t, app, "POST", "/api/expenses/b4o6xph4ngwx4nw/settle", strings.NewReader(fmt.Sprintf(`{"settled_total":%.2f}`, utilities.RoundCurrencyAmount(acceptableSettledTotal*1.25))), map[string]string{
+		"Authorization": payablesAdminToken,
+	})
+	mustStatus(t, outOfRangeSettle, 400)
+
+	settleRes := performTestAPIRequest(t, app, "POST", "/api/expenses/b4o6xph4ngwx4nw/settle", strings.NewReader(fmt.Sprintf(`{"settled_total":%.2f}`, acceptableSettledTotal)), map[string]string{
 		"Authorization": payablesAdminToken,
 	})
 	mustStatus(t, settleRes, 200)
@@ -264,8 +286,8 @@ func TestExpenseSettlementRoutes_ListSettleAndClear(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed loading newly settled expense: %v", err)
 	}
-	if got := settledExpense.GetFloat("settled_total"); got != 95.55 {
-		t.Fatalf("expected settled_total 95.55, got %v", got)
+	if got := settledExpense.GetFloat("settled_total"); got != acceptableSettledTotal {
+		t.Fatalf("expected settled_total %v, got %v", acceptableSettledTotal, got)
 	}
 	if got := settledExpense.GetString("settler"); got != "tqqf7q0f3378rvp" {
 		t.Fatalf("expected settler to be bookkeeper, got %q", got)
@@ -325,9 +347,15 @@ func TestForeignExpenseRoutes_SubmitCommitAndRejectRules(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	defer app.Cleanup()
 
+	usdCurrency, err := app.FindRecordById("currencies", testUSDCurrencyID)
+	if err != nil {
+		t.Fatalf("failed loading USD currency fixture: %v", err)
+	}
+	usdRate := usdCurrency.GetFloat("rate")
+
 	if _, err := app.NonconcurrentDB().NewQuery(`
 		UPDATE expenses
-		SET currency = {:currencyId}, submitted = 0, approved = '', rejected = '', settled_total = 0, settled = '', settler = ''
+		SET currency = {:currencyId}, total = 25, submitted = 0, approved = '', rejected = '', settled_total = 0, settled = '', settler = ''
 		WHERE id = '77i1224mudailrb'
 	`).Bind(dbx.Params{"currencyId": testUSDCurrencyID}).Execute(); err != nil {
 		t.Fatalf("failed preparing foreign expense row: %v", err)
@@ -341,12 +369,30 @@ func TestForeignExpenseRoutes_SubmitCommitAndRejectRules(t *testing.T) {
 		t.Fatalf("expected submit to require settled_total, body=%s", submitBlocked.Body.String())
 	}
 
+	expectedSettledTotal := utilities.IndicativeHomeAmount(25, utilities.CurrencyInfo{Rate: usdRate})
+
 	if _, err := app.NonconcurrentDB().NewQuery(`
 		UPDATE expenses
-		SET settled_total = 99
+		SET submitted = 0, approved = '', settled_total = {:settledTotal}
 		WHERE id = '77i1224mudailrb'
-	`).Execute(); err != nil {
+	`).Bind(dbx.Params{"settledTotal": utilities.RoundCurrencyAmount(expectedSettledTotal * 1.25)}).Execute(); err != nil {
 		t.Fatalf("failed setting foreign expense settled_total: %v", err)
+	}
+
+	submitOutOfRange := performTestAPIRequest(t, app, "POST", "/api/expenses/77i1224mudailrb/submit", strings.NewReader(`{}`), map[string]string{
+		"Authorization": ownerToken,
+	})
+	mustStatus(t, submitOutOfRange, 400)
+	if !strings.Contains(mustReadBody(t, submitOutOfRange), "settled total must be within 20% of the current CAD equivalent") {
+		t.Fatalf("expected submit to enforce settlement tolerance, body=%s", submitOutOfRange.Body.String())
+	}
+
+	if _, err := app.NonconcurrentDB().NewQuery(`
+		UPDATE expenses
+		SET settled_total = {:settledTotal}
+		WHERE id = '77i1224mudailrb'
+	`).Bind(dbx.Params{"settledTotal": expectedSettledTotal}).Execute(); err != nil {
+		t.Fatalf("failed restoring foreign expense settled_total: %v", err)
 	}
 
 	submitAllowed := performTestAPIRequest(t, app, "POST", "/api/expenses/77i1224mudailrb/submit", strings.NewReader(`{}`), map[string]string{

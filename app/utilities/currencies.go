@@ -3,6 +3,7 @@ package utilities
 import (
 	"errors"
 	"fmt"
+	"math"
 	"strings"
 
 	"github.com/pocketbase/dbx"
@@ -13,6 +14,7 @@ import (
 // provider and reporting/settlement semantics are CAD-based, so configurable
 // home currency is out of scope for this system.
 const HomeCurrencyCode = "CAD"
+const ForeignSettlementToleranceRatio = 0.20
 
 var ErrCurrencyNotFound = errors.New("currency not found")
 
@@ -126,6 +128,37 @@ func CurrencyRateOrOne(info CurrencyInfo) float64 {
 		return info.Rate
 	}
 	return 1
+}
+
+func RoundCurrencyAmount(value float64) float64 {
+	return math.Round(value*100) / 100
+}
+
+func IndicativeHomeAmount(amount float64, info CurrencyInfo) float64 {
+	return RoundCurrencyAmount(amount * CurrencyRateOrOne(info))
+}
+
+func SettlementToleranceBounds(amount float64, info CurrencyInfo) (expected float64, min float64, max float64) {
+	expected = IndicativeHomeAmount(amount, info)
+	min = RoundCurrencyAmount(expected * (1 - ForeignSettlementToleranceRatio))
+	max = RoundCurrencyAmount(expected * (1 + ForeignSettlementToleranceRatio))
+	return expected, min, max
+}
+
+func IsSettledTotalWithinTolerance(amount float64, settledTotal float64, info CurrencyInfo) bool {
+	_, min, max := SettlementToleranceBounds(amount, info)
+	const epsilon = 0.000001
+	return settledTotal >= min-epsilon && settledTotal <= max+epsilon
+}
+
+func SettledTotalToleranceMessage(amount float64, info CurrencyInfo) string {
+	expected, min, max := SettlementToleranceBounds(amount, info)
+	return fmt.Sprintf(
+		"settled total must be within 20%% of the current CAD equivalent ($%.2f; allowed range $%.2f to $%.2f)",
+		expected,
+		min,
+		max,
+	)
 }
 
 func CurrencyCodeOrHome(info CurrencyInfo) string {
