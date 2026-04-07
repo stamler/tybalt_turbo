@@ -30,7 +30,10 @@
       "Bash(gh search:*)",
       "Bash(go get:*)",
       "Bash(go mod:*)",
-      "Bash(git show:*)"
+      "Bash(git show:*)",
+      "Bash(/usr/local/go/bin/go test:*)",
+      "Bash(sed -n '2p' profiles.csv)",
+      "Bash(sed -n '2p' users.csv)"
     ]
   }
 }
