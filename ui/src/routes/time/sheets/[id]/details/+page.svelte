@@ -77,7 +77,7 @@
         },
         {
           filter: pb.filter("tsid={:tsid}", { tsid: data.timesheetId }),
-          expand: "job,time_type,division,category",
+          expand: "job,time_type,division,category,role",
         },
       );
     } catch {
@@ -393,6 +393,9 @@
             {expand?.job.number} - {expand?.job.description}
             {#if expand?.category !== undefined}
               <DsLabel color="teal">{expand?.category.name}</DsLabel>
+            {/if}
+            {#if expand?.role !== undefined}
+              <DsLabel color="purple">{expand?.role.name}</DsLabel>
             {/if}
           </span>
         {/if}

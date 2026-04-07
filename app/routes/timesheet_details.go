@@ -46,7 +46,7 @@ func createGetTimeSheetDetailsHandler(app core.App) func(e *core.RequestEvent) e
 			return e.Error(http.StatusInternalServerError, "failed to load time entries", err)
 		}
 
-		if errs := app.ExpandRecords(items, []string{"job", "time_type", "division", "category"}, nil); len(errs) > 0 {
+		if errs := app.ExpandRecords(items, []string{"job", "time_type", "division", "category", "role"}, nil); len(errs) > 0 {
 			return e.Error(http.StatusInternalServerError, "failed to expand time entries", nil)
 		}
 
