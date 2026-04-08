@@ -28,6 +28,7 @@ package routes
 import (
 	"encoding/csv"
 	"net/http"
+	"strconv"
 	"strings"
 	"tybalt/errs"
 	"tybalt/utilities"
@@ -36,21 +37,22 @@ import (
 )
 
 type timeEntryBranchMismatchRow struct {
-	TimeEntryID         string `db:"time_entry_id" json:"time_entry_id"`
-	Date                string `db:"date" json:"date"`
-	WeekEnding          string `db:"week_ending" json:"week_ending"`
-	UID                 string `db:"uid" json:"uid"`
-	EmployeeName        string `db:"employee_name" json:"employee_name"`
-	JobID               string `db:"job_id" json:"job_id"`
-	JobNumber           string `db:"job_number" json:"job_number"`
-	JobDescription      string `db:"job_description" json:"job_description"`
-	TimeEntryBranchID   string `db:"time_entry_branch_id" json:"time_entry_branch_id"`
-	TimeEntryBranchCode string `db:"time_entry_branch_code" json:"time_entry_branch_code"`
-	TimeEntryBranchName string `db:"time_entry_branch_name" json:"time_entry_branch_name"`
-	JobBranchID         string `db:"job_branch_id" json:"job_branch_id"`
-	JobBranchCode       string `db:"job_branch_code" json:"job_branch_code"`
-	JobBranchName       string `db:"job_branch_name" json:"job_branch_name"`
-	Description         string `db:"description" json:"description"`
+	TimeEntryID         string  `db:"time_entry_id" json:"time_entry_id"`
+	Date                string  `db:"date" json:"date"`
+	WeekEnding          string  `db:"week_ending" json:"week_ending"`
+	Hours               float64 `db:"hours" json:"hours"`
+	UID                 string  `db:"uid" json:"uid"`
+	EmployeeName        string  `db:"employee_name" json:"employee_name"`
+	JobID               string  `db:"job_id" json:"job_id"`
+	JobNumber           string  `db:"job_number" json:"job_number"`
+	JobDescription      string  `db:"job_description" json:"job_description"`
+	TimeEntryBranchID   string  `db:"time_entry_branch_id" json:"time_entry_branch_id"`
+	TimeEntryBranchCode string  `db:"time_entry_branch_code" json:"time_entry_branch_code"`
+	TimeEntryBranchName string  `db:"time_entry_branch_name" json:"time_entry_branch_name"`
+	JobBranchID         string  `db:"job_branch_id" json:"job_branch_id"`
+	JobBranchCode       string  `db:"job_branch_code" json:"job_branch_code"`
+	JobBranchName       string  `db:"job_branch_name" json:"job_branch_name"`
+	Description         string  `db:"description" json:"description"`
 }
 
 func requireTimeEntryBranchMismatchReportViewer(app core.App, auth *core.Record) error {
@@ -81,13 +83,14 @@ func createTimeEntryBranchMismatchesReportHandler(app core.App) func(e *core.Req
 		}
 
 		query := `
-			SELECT
-				te.id AS time_entry_id,
-				te.date,
-				te.week_ending,
-				te.uid,
-				TRIM(COALESCE(p.given_name, '') || ' ' || COALESCE(p.surname, '')) AS employee_name,
-				j.id AS job_id,
+				SELECT
+					te.id AS time_entry_id,
+					te.date,
+					te.week_ending,
+					COALESCE(te.hours, 0) AS hours,
+					te.uid,
+					TRIM(COALESCE(p.given_name, '') || ' ' || COALESCE(p.surname, '')) AS employee_name,
+					j.id AS job_id,
 				COALESCE(j.number, '') AS job_number,
 				COALESCE(j.description, '') AS job_description,
 				COALESCE(teb.id, '') AS time_entry_branch_id,
@@ -120,6 +123,7 @@ func createTimeEntryBranchMismatchesReportHandler(app core.App) func(e *core.Req
 			"time_entry_id",
 			"date",
 			"week_ending",
+			"hours",
 			"uid",
 			"employee_name",
 			"job_id",
@@ -141,6 +145,7 @@ func createTimeEntryBranchMismatchesReportHandler(app core.App) func(e *core.Req
 				row.TimeEntryID,
 				row.Date,
 				row.WeekEnding,
+				strconv.FormatFloat(row.Hours, 'f', -1, 64),
 				row.UID,
 				row.EmployeeName,
 				row.JobID,

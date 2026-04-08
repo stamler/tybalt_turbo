@@ -94,8 +94,8 @@ func TestTimeEntryBranchMismatchesReport(t *testing.T) {
 			Headers:        map[string]string{"Authorization": reportToken},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`time_entry_id,date,week_ending,uid,employee_name,job_id,job_number,job_description,time_entry_branch_id,time_entry_branch_code,time_entry_branch_name,job_branch_id,job_branch_code,job_branch_name,description`,
-				`tebrmismatch001,2024-09-02,2024-09-07,rzr98oadsp9qc11,Tester Time,test_job_w_rs,98-8001,Test Job With Rate Sheet,80875lm27v8wgi4,ThunderBay,Thunder Bay,xeq9q81q5307f70,Toronto,Toronto,mismatched branch`,
+				`time_entry_id,date,week_ending,hours,uid,employee_name,job_id,job_number,job_description,time_entry_branch_id,time_entry_branch_code,time_entry_branch_name,job_branch_id,job_branch_code,job_branch_name,description`,
+				`tebrmismatch001,2024-09-02,2024-09-07,1,rzr98oadsp9qc11,Tester Time,test_job_w_rs,98-8001,Test Job With Rate Sheet,80875lm27v8wgi4,ThunderBay,Thunder Bay,xeq9q81q5307f70,Toronto,Toronto,mismatched branch`,
 			},
 			NotExpectedContent: []string{
 				`tebranchokay001,`,
