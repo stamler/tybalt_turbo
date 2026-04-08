@@ -62,6 +62,9 @@
                 if (item.href.startsWith("/reports/expense/queue")) {
                   return $globalStore.claims.includes("commit");
                 }
+                if (item.href.startsWith("/reports/")) {
+                  return $globalStore.claims.includes("report");
+                }
                 if (item.href.startsWith("/time/amendments")) {
                   return (
                     $globalStore.claims.includes("tame") || $globalStore.claims.includes("report")
@@ -236,26 +239,32 @@
           </button>
         </div>
         <nav class="mt-2 px-1">
-          {#each navSections as section}
+          {#each navSections as section (section.title)}
             <div class="mt-2">
               <p class="p-2 text-lg font-semibold text-neutral-400 uppercase lg:text-xs">
                 {section.title}
               </p>
-              {#each section.items as item}
+              {#each section.items as item (item.href || item.label)}
                 <div
                   class="flex h-12 items-center pr-4 lg:h-8 lg:pr-2"
                   class:justify-between={item.buttons}
                 >
-                  <a
-                    href={item.href}
-                    class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
-                    >{item.label}</a
-                  >
+                  {#if item.href}
+                    <a
+                      href={item.href}
+                      class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
+                      >{item.label}</a
+                    >
+                  {:else}
+                    <span class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl lg:text-sm">
+                      {item.label}
+                    </span>
+                  {/if}
                   {#if item.buttons}
                     <div
                       class="flex items-center gap-1 [&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6"
                     >
-                      {#each item.buttons as btn}
+                      {#each item.buttons as btn (btn.title)}
                         <DsActionButton
                           action={btn.action}
                           icon={btn.icon}

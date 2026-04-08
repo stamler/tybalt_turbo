@@ -1,5 +1,7 @@
+import { downloadTimeEntryBranchMismatchesCsv } from "$lib/navActions";
+
 export interface NavButton {
-  action: string;
+  action: string | (() => void | Promise<void>);
   icon: string;
   title: string;
   color?: string;
@@ -187,6 +189,18 @@ export const navSections: NavSection[] = [
         label: "Payables Spreadsheet",
         href: "/reports/payables-spreadsheet",
         buttons: [],
+      },
+      {
+        label: "Branch Mismatches CSV",
+        href: "",
+        buttons: [
+          {
+            action: downloadTimeEntryBranchMismatchesCsv,
+            icon: "mdi:file-download-outline",
+            title: "Download CSV",
+            color: "blue",
+          },
+        ],
       },
     ],
   },
