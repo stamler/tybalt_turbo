@@ -14,6 +14,25 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+const payablesSpreadsheetNowStoreKey = "tybalt.reports.payablesSpreadsheetNow"
+
+func currentPayablesSpreadsheetTime(app core.App) time.Time {
+	if override, ok := app.Store().Get(payablesSpreadsheetNowStoreKey).(func() time.Time); ok && override != nil {
+		return override().UTC()
+	}
+	return time.Now().UTC()
+}
+
+// SetPayablesSpreadsheetNowForTest overrides the clock used by the payables
+// spreadsheet handlers for a specific app instance.
+func SetPayablesSpreadsheetNowForTest(app core.App, now func() time.Time) {
+	if now == nil {
+		app.Store().Remove(payablesSpreadsheetNowStoreKey)
+		return
+	}
+	app.Store().Set(payablesSpreadsheetNowStoreKey, now)
+}
+
 //go:embed payables_spreadsheet.sql
 var payablesSpreadsheetQuery string
 
@@ -123,7 +142,7 @@ func CreatePayablesSpreadsheetDatesHandler(app core.App) func(e *core.RequestEve
 			return err
 		}
 
-		nowUTC := time.Now().UTC()
+		nowUTC := currentPayablesSpreadsheetTime(app)
 		fourWeeksAgo := nowUTC.AddDate(0, 0, -28).Format("2006-01-02")
 		latestAvailableDate := nowUTC.AddDate(0, 0, -1).Format("2006-01-02")
 
@@ -172,7 +191,7 @@ func CreatePayablesSpreadsheetHandler(app core.App) func(e *core.RequestEvent) e
 		if err != nil {
 			return e.Error(http.StatusBadRequest, "date must be in YYYY-MM-DD format", nil)
 		}
-		if !dateValue.Before(time.Now().UTC().Truncate(24 * time.Hour)) {
+		if !dateValue.Before(currentPayablesSpreadsheetTime(app).Truncate(24 * time.Hour)) {
 			return e.Error(http.StatusBadRequest, "date must be at least one UTC day old", nil)
 		}
 

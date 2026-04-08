@@ -369,7 +369,7 @@ func TestRejectTimesheet_QueuesNotifications(t *testing.T) {
 		ExpectedContent: []string{
 			`"message":"record rejected successfully"`,
 		},
-		TestAppFactory: testutils.SetupTestApp,
+		TestAppFactory: setupTestAppWithSynchronousImmediateNotifications,
 	}
 
 	// After the request, ensure that at least one new timesheet_rejected notification was created.
@@ -417,7 +417,7 @@ func TestAddTimesheetReviewer_QueuesSharedNotifications(t *testing.T) {
 			`"time_sheet":"` + timesheetID + `"`,
 			`"reviewer":"` + viewerUID + `"`,
 		},
-		TestAppFactory: testutils.SetupTestApp,
+		TestAppFactory: setupTestAppWithSynchronousImmediateNotifications,
 	}
 
 	// After the request, ensure that at least one new timesheet_shared notification was created.

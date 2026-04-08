@@ -27,6 +27,7 @@ type corporateBranchTestOptions struct {
 	corporateClaimUsers  []string
 	enableLegacyPO       bool
 	seedCopySource       bool
+	copySourceBranchID   string
 }
 
 func setupCorporateBranchTestApp(tb testing.TB, opts corporateBranchTestOptions) *tests.TestApp {
@@ -44,7 +45,7 @@ func setupCorporateBranchTestApp(tb testing.TB, opts corporateBranchTestOptions)
 		addUserClaim(tb, app, uid, corporateClaimID)
 	}
 	if opts.seedCopySource {
-		seedCopySourceTimeEntry(tb, app, timeUserID)
+		seedCopySourceTimeEntry(tb, app, timeUserID, opts.copySourceBranchID)
 	}
 
 	return app
@@ -63,6 +64,20 @@ func setUserDefaultBranch(tb testing.TB, app *tests.TestApp, uid string, branchI
 	adminProfile.Set("default_branch", branchID)
 	if err := app.Save(adminProfile); err != nil {
 		tb.Fatalf("failed to save admin profile for %s: %v", uid, err)
+	}
+}
+
+func setJobBranch(tb testing.TB, app *tests.TestApp, jobID string, branchID string) {
+	tb.Helper()
+
+	job, err := app.FindRecordById("jobs", jobID)
+	if err != nil {
+		tb.Fatalf("failed to load job %s: %v", jobID, err)
+	}
+
+	job.Set("branch", branchID)
+	if err := app.Save(job); err != nil {
+		tb.Fatalf("failed to save job %s: %v", jobID, err)
 	}
 }
 
@@ -91,7 +106,7 @@ func addUserClaim(tb testing.TB, app *tests.TestApp, uid string, claimID string)
 	}
 }
 
-func seedCopySourceTimeEntry(tb testing.TB, app *tests.TestApp, uid string) {
+func seedCopySourceTimeEntry(tb testing.TB, app *tests.TestApp, uid string, branchID string) {
 	tb.Helper()
 
 	weekEnding, err := utilities.GenerateWeekEnding("2024-09-02")
@@ -107,7 +122,10 @@ func seedCopySourceTimeEntry(tb testing.TB, app *tests.TestApp, uid string) {
 	record := core.NewRecord(collection)
 	record.Set("id", copySourceTimeEntryID)
 	record.Set("uid", uid)
-	record.Set("branch", defaultBranchID)
+	if branchID == "" {
+		branchID = defaultBranchID
+	}
+	record.Set("branch", branchID)
 	record.Set("date", "2024-09-02")
 	record.Set("week_ending", weekEnding)
 	record.Set("time_type", "sdyfl3q7j7ap849")
@@ -340,6 +358,80 @@ func TestCorporateBranchClaimGating_TimeEntriesCreate(t *testing.T) {
 	}
 }
 
+func TestCorporateBranchClaimGating_TimeEntriesCreate_WithJobBranch(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", timeUserEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "time entry create fails when job branch is corporate and caller lacks claim",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "test time entry",
+				"hours": 1,
+				"job": "test_job_w_rs",
+				"role": "tbgoiwwwfj8cvju"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`branch claim requirement not met`,
+				`corporate_branch`,
+			},
+			TestAppFactory: func(tb testing.TB) *tests.TestApp {
+				app := setupCorporateBranchTestApp(tb, corporateBranchTestOptions{})
+				setJobBranch(tb, app, "test_job_w_rs", corporateBranchID)
+				return app
+			},
+		},
+		{
+			Name:   "time entry create succeeds when job branch is corporate and caller holds claim",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "test time entry",
+				"hours": 1,
+				"job": "test_job_w_rs",
+				"role": "tbgoiwwwfj8cvju"
+			}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+				"Content-Type":  "application/json",
+			},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"branch":"kpj5jijh0if8kx8"`,
+				`"job":"test_job_w_rs"`,
+			},
+			TestAppFactory: func(tb testing.TB) *tests.TestApp {
+				app := setupCorporateBranchTestApp(tb, corporateBranchTestOptions{
+					corporateClaimUsers: []string{timeUserID},
+				})
+				setJobBranch(tb, app, "test_job_w_rs", corporateBranchID)
+				return app
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
 func TestCorporateBranchClaimGating_TimeEntriesCopyToTomorrow(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", timeUserEmail)
 	if err != nil {
@@ -348,7 +440,7 @@ func TestCorporateBranchClaimGating_TimeEntriesCopyToTomorrow(t *testing.T) {
 
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "copy to tomorrow fails when destination branch is corporate and caller lacks claim",
+			Name:   "copy to tomorrow fails when preserved source branch is corporate and caller lacks claim",
 			Method: http.MethodPost,
 			URL:    "/api/time_entries/" + copySourceTimeEntryID + "/copy_to_tomorrow",
 			Headers: map[string]string{
@@ -360,8 +452,28 @@ func TestCorporateBranchClaimGating_TimeEntriesCopyToTomorrow(t *testing.T) {
 			},
 			TestAppFactory: func(tb testing.TB) *tests.TestApp {
 				return setupCorporateBranchTestApp(tb, corporateBranchTestOptions{
+					seedCopySource:     true,
+					copySourceBranchID: corporateBranchID,
+				})
+			},
+		},
+		{
+			Name:   "copy to tomorrow preserves explicit non-job branch when caller default branch is corporate",
+			Method: http.MethodPost,
+			URL:    "/api/time_entries/" + copySourceTimeEntryID + "/copy_to_tomorrow",
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus: 201,
+			ExpectedContent: []string{
+				`"message":"Time entry copied to tomorrow"`,
+				`"new_record_id":"`,
+			},
+			TestAppFactory: func(tb testing.TB) *tests.TestApp {
+				return setupCorporateBranchTestApp(tb, corporateBranchTestOptions{
 					corporateBranchUsers: []string{timeUserID},
 					seedCopySource:       true,
+					copySourceBranchID:   defaultBranchID,
 				})
 			},
 		},
@@ -382,6 +494,7 @@ func TestCorporateBranchClaimGating_TimeEntriesCopyToTomorrow(t *testing.T) {
 					corporateBranchUsers: []string{timeUserID},
 					corporateClaimUsers:  []string{timeUserID},
 					seedCopySource:       true,
+					copySourceBranchID:   corporateBranchID,
 				})
 			},
 		},

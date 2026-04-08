@@ -8,6 +8,7 @@ import (
 	"tybalt/hooks"
 	"tybalt/internal/testutils"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
@@ -175,6 +176,185 @@ func TestTimeEntriesCreate_JobRequiresRole(t *testing.T) {
 				"OnModelAfterCreateSuccess":  1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestTimeEntriesCreate_BranchResolutionMatchesPurchaseOrders(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "branch defaults from creator profile when omitted and no job is set",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "default branch assignment",
+				"hours": 1
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"branch":"80875lm27v8wgi4"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest":      1,
+				"OnRecordCreate":             1,
+				"OnRecordCreateExecute":      1,
+				"OnRecordAfterCreateSuccess": 1,
+				"OnModelCreate":              1,
+				"OnModelCreateExecute":       1,
+				"OnModelAfterCreateSuccess":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "explicit branch survives when no job is set",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "manual branch assignment",
+				"hours": 1,
+				"branch": "xeq9q81q5307f70"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"branch":"xeq9q81q5307f70"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest":      1,
+				"OnRecordCreate":             1,
+				"OnRecordCreateExecute":      1,
+				"OnRecordAfterCreateSuccess": 1,
+				"OnModelCreate":              1,
+				"OnModelCreateExecute":       1,
+				"OnModelAfterCreateSuccess":  1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "job branch overrides explicit branch when job is set",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "job branch assignment",
+				"hours": 1,
+				"job": "test_job_w_rs",
+				"role": "tbgoiwwwfj8cvju",
+				"branch": "80875lm27v8wgi4"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"job":"test_job_w_rs"`,
+				`"branch":"xeq9q81q5307f70"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest":      1,
+				"OnRecordCreate":             1,
+				"OnRecordCreateExecute":      1,
+				"OnRecordAfterCreateSuccess": 1,
+				"OnModelCreate":              1,
+				"OnModelCreateExecute":       1,
+				"OnModelAfterCreateSuccess":  1,
+			},
+			TestAppFactory: func(tb testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(tb)
+				setJobBranch(tb, app, "test_job_w_rs", "xeq9q81q5307f70")
+				return app
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestTimeEntriesCreate_InvalidJobBranchResolutionErrorsRemainFieldScoped(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "invalid job id returns job not_found error",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "invalid job branch lookup",
+				"hours": 1,
+				"job": "does_not_exist",
+				"role": "tbgoiwwwfj8cvju"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"message":"hook error when cleaning time entry"`,
+				`"job":{"code":"not_found","message":"referenced job not found"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "job without branch returns job missing_branch error",
+			Method: http.MethodPost,
+			URL:    "/api/collections/time_entries/records",
+			Body: strings.NewReader(`{
+				"uid": "rzr98oadsp9qc11",
+				"time_type": "sdyfl3q7j7ap849",
+				"date": "2024-09-02",
+				"division": "fy4i9poneukvq9u",
+				"description": "job missing branch",
+				"hours": 1,
+				"job": "test_job_w_rs",
+				"role": "tbgoiwwwfj8cvju"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"message":"hook error when cleaning time entry"`,
+				`"job":{"code":"missing_branch","message":"referenced job is missing a branch"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: func(tb testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(tb)
+				if _, err := app.DB().NewQuery("UPDATE jobs SET branch = '' WHERE id = {:id}").Bind(dbx.Params{
+					"id": "test_job_w_rs",
+				}).Execute(); err != nil {
+					tb.Fatalf("failed to blank branch on job test_job_w_rs: %v", err)
+				}
+				return app
+			},
 		},
 	}
 

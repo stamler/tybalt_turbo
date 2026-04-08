@@ -5,9 +5,20 @@ import (
 	"testing"
 	"time"
 	"tybalt/internal/testutils"
+	"tybalt/reports"
 
 	"github.com/pocketbase/pocketbase/tests"
 )
+
+func setupTestAppWithFixedPayablesSpreadsheetNow(tb testing.TB) *tests.TestApp {
+	tb.Helper()
+
+	app := testutils.SetupTestApp(tb)
+	reports.SetPayablesSpreadsheetNowForTest(app, func() time.Time {
+		return time.Date(2026, time.March, 13, 12, 0, 0, 0, time.UTC)
+	})
+	return app
+}
 
 func TestPayablesSpreadsheetRoutesAuthAndValidation(t *testing.T) {
 	reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
@@ -29,7 +40,7 @@ func TestPayablesSpreadsheetRoutesAuthAndValidation(t *testing.T) {
 			ExpectedContent: []string{
 				`"status":401`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
 		},
 		{
 			Name:           "dates endpoint requires report claim",
@@ -40,7 +51,7 @@ func TestPayablesSpreadsheetRoutesAuthAndValidation(t *testing.T) {
 			ExpectedContent: []string{
 				`You are not authorized to view this report.`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
 		},
 		{
 			Name:           "daily endpoint validates date format",
@@ -51,18 +62,18 @@ func TestPayablesSpreadsheetRoutesAuthAndValidation(t *testing.T) {
 			ExpectedContent: []string{
 				`Date must be in YYYY-MM-DD format.`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
 		},
 		{
 			Name:           "daily endpoint requires a completed utc day",
 			Method:         http.MethodGet,
-			URL:            "/api/reports/payables_spreadsheet/" + time.Now().UTC().Format("2006-01-02"),
+			URL:            "/api/reports/payables_spreadsheet/2026-03-13",
 			Headers:        map[string]string{"Authorization": reportToken},
 			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
 				`Date must be at least one UTC day old.`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
 		},
 		{
 			Name:           "monthly endpoint validates yymm format",
@@ -73,7 +84,7 @@ func TestPayablesSpreadsheetRoutesAuthAndValidation(t *testing.T) {
 			ExpectedContent: []string{
 				`Yymm must be a 4-digit string (e.g. 2603).`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
 		},
 	}
 
@@ -103,7 +114,7 @@ func TestPayablesSpreadsheetRoutesDataAndFiltering(t *testing.T) {
 				`"2026-03-11"`,
 				`"2026-03-09"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
 		},
 		{
 			Name:           "daily csv includes header and matching row",
@@ -121,7 +132,7 @@ func TestPayablesSpreadsheetRoutesDataAndFiltering(t *testing.T) {
 			NotExpectedContent: []string{
 				"Seeded payables excluded control-range fixture",
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
 		},
 		{
 			Name:           "daily tsv omits header",
@@ -138,7 +149,7 @@ func TestPayablesSpreadsheetRoutesDataAndFiltering(t *testing.T) {
 			NotExpectedContent: []string{
 				"Acct/Visa/Exp\tJob #\tDiv",
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
 		},
 		{
 			Name:           "monthly report filters by po number prefix",
@@ -156,7 +167,7 @@ func TestPayablesSpreadsheetRoutesDataAndFiltering(t *testing.T) {
 				"Seeded payables excluded control-range fixture",
 				"2712-8001",
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
 		},
 	}
 

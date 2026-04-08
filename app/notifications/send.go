@@ -20,6 +20,21 @@ import (
 	"github.com/pocketbase/pocketbase/tools/mailer"
 )
 
+const sendNotificationAsyncStoreKey = "tybalt.notifications.sendAsync"
+
+func sendNotificationAsyncForApp(app core.App) bool {
+	if async, ok := app.Store().Get(sendNotificationAsyncStoreKey).(bool); ok {
+		return async
+	}
+	return true
+}
+
+// SetSendNotificationAsyncForTest overrides whether SendNotificationByID sends
+// on a background goroutine for a specific app instance.
+func SetSendNotificationAsyncForTest(app core.App, async bool) {
+	app.Store().Set(sendNotificationAsyncStoreKey, async)
+}
+
 func updateNotificationStatus(app core.App, notification Notification, sendErr error) {
 	status := "sent"
 	errMsg := ""
@@ -151,7 +166,7 @@ func SendNotificationByID(app core.App, notificationID string) error {
 	}
 
 	if notification.Id != "" {
-		go func(app core.App, message *mailer.Message, notification Notification) {
+		deliver := func(app core.App, message *mailer.Message, notification Notification) {
 			defer func() {
 				if r := recover(); r != nil {
 					app.Logger().Error(
@@ -170,7 +185,13 @@ func SendNotificationByID(app core.App, notificationID string) error {
 				)
 			}
 			updateNotificationStatus(app, notification, err)
-		}(app, message, notification)
+		}
+
+		if sendNotificationAsyncForApp(app) {
+			go deliver(app, message, notification)
+		} else {
+			deliver(app, message, notification)
+		}
 	}
 
 	return nil

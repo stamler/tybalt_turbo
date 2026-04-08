@@ -4,9 +4,13 @@ package hooks
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"net/http"
 	"regexp"
+	"strings"
+	"tybalt/errs"
 	"tybalt/utilities"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
@@ -59,21 +63,9 @@ func cleanTimeEntry(app core.App, timeEntryRecord *core.Record) ([]string, error
 
 	// Certain fields are always allowed to be set. We add them to the list of
 	// allowed fields here. The role field is included because its requirement
-	// depends on job assignment, not the time_type. The branch field is derived
-	// from admin_profiles.default_branch below and must survive cleanup.
+	// depends on job assignment, not the time_type. The branch field is resolved
+	// below and must survive cleanup.
 	allowedFields = append(allowedFields, "id", "uid", "created", "updated", "role", "branch")
-
-	// Load the admin_profiles record and set branch from the user's default_branch
-	uid := timeEntryRecord.GetString("uid")
-	adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
-	if err != nil {
-		return nil, err
-	}
-	defaultBranchId := adminProfile.GetString("default_branch")
-	if defaultBranchId == "" {
-		return nil, fmt.Errorf("your admin_profiles record is missing a default_branch")
-	}
-	timeEntryRecord.Set("branch", defaultBranchId)
 
 	// remove any fields from the time_entry record that are not in allowedFields.
 	// I'm not sure if this is the best way to do this but let's try it.
@@ -88,6 +80,47 @@ func cleanTimeEntry(app core.App, timeEntryRecord *core.Record) ([]string, error
 	// Clear role if no job is assigned
 	if timeEntryRecord.GetString("job") == "" {
 		timeEntryRecord.Set("role", nil)
+	}
+
+	// Match purchase order branch resolution:
+	// - when a job is set, branch must always match the job's branch
+	// - without a job, derive from the creator's default branch only when blank
+	jobId := strings.TrimSpace(timeEntryRecord.GetString("job"))
+	if jobId != "" {
+		jobRecord, err := app.FindRecordById("jobs", jobId)
+		if err != nil || jobRecord == nil {
+			return nil, &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning time entry",
+				Data: map[string]errs.CodeError{
+					"job": {Code: "not_found", Message: "referenced job not found"},
+				},
+			}
+		}
+		jobBranchID := strings.TrimSpace(jobRecord.GetString("branch"))
+		if jobBranchID == "" {
+			return nil, &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when cleaning time entry",
+				Data: map[string]errs.CodeError{
+					"job": {Code: "missing_branch", Message: "referenced job is missing a branch"},
+				},
+			}
+		}
+		timeEntryRecord.Set("branch", jobBranchID)
+	} else {
+		uid := timeEntryRecord.GetString("uid")
+		adminProfile, err := app.FindFirstRecordByFilter("admin_profiles", "uid={:uid}", dbx.Params{"uid": uid})
+		if err != nil {
+			return nil, err
+		}
+		defaultBranchID := strings.TrimSpace(adminProfile.GetString("default_branch"))
+		if defaultBranchID == "" {
+			return nil, fmt.Errorf("your admin_profiles record is missing a default_branch")
+		}
+		if strings.TrimSpace(timeEntryRecord.GetString("branch")) == "" {
+			timeEntryRecord.Set("branch", defaultBranchID)
+		}
 	}
 
 	return requiredFields, nil
@@ -183,6 +216,10 @@ func ProcessTimeEntry(app core.App, e *core.RecordRequestEvent) error {
 	// time_type
 	requiredFields, cleanErr := cleanTimeEntry(app, record)
 	if cleanErr != nil {
+		var hookErr *errs.HookError
+		if errors.As(cleanErr, &hookErr) {
+			return hookErr
+		}
 		return apis.NewBadRequestError("Error cleaning time_entry record", cleanErr)
 	}
 
