@@ -1,6 +1,7 @@
 package reports
 
 import (
+	"database/sql"
 	_ "embed" // Needed for //go:embed
 	"net/http"
 	"strings"
@@ -27,6 +28,9 @@ type Attachment struct {
 //go:embed payroll_time.sql
 var payrollTimeQuery string
 
+//go:embed payroll_time_branch_hours.sql
+var payrollTimeBranchHoursQuery string
+
 //go:embed expenses.sql
 var expensesQueryTemplate string
 
@@ -43,6 +47,19 @@ var weeklyTimeQueryTemplate string
 var jobTimeQueryTemplate string
 
 const placeholderPayrollIDConditionToken = "{:placeholder_payroll_id_condition}"
+const payrollUnassignedBranchHeader = "Unassigned"
+
+var payrollTimeBaseHeaders = []string{"payrollId", "weekEnding", "surname", "givenName", "name", "manager", "meals", "days off rotation", "hours worked", "salaryHoursOver44", "adjustedHoursWorked", "total overtime hours", "overtime hours to pay", "Bereavement", "Stat Holiday", "PPTO", "Sick", "Vacation", "overtime hours to bank", "Overtime Payout Requested", "hasAmendmentsForWeeksEnding", "salary"}
+
+type branchNameRow struct {
+	Name string `db:"name"`
+}
+
+type payrollBranchHoursRow struct {
+	PayrollID  string `db:"payrollId"`
+	BranchName string `db:"branchName"`
+	TotalHours string `db:"totalHours"`
+}
 
 func withPlaceholderPayrollIDCondition(query string, columnExpr string) string {
 	return strings.ReplaceAll(
@@ -50,6 +67,71 @@ func withPlaceholderPayrollIDCondition(query string, columnExpr string) string {
 		placeholderPayrollIDConditionToken,
 		utilities.GeneratedPayrollPlaceholderSQLCondition(columnExpr),
 	)
+}
+
+func getOrderedPayrollBranchHeaders(app core.App) ([]string, error) {
+	var rows []branchNameRow
+	if err := app.DB().NewQuery("SELECT name FROM branches ORDER BY name").All(&rows); err != nil {
+		return nil, err
+	}
+
+	headers := make([]string, 0, len(rows))
+	for _, row := range rows {
+		if strings.TrimSpace(row.Name) == "" {
+			continue
+		}
+		headers = append(headers, row.Name)
+	}
+
+	hasUnassigned := false
+	for _, header := range headers {
+		if header == payrollUnassignedBranchHeader {
+			hasUnassigned = true
+			break
+		}
+	}
+	if !hasUnassigned {
+		headers = append(headers, payrollUnassignedBranchHeader)
+	}
+
+	return headers, nil
+}
+
+func getPayrollBranchHours(app core.App, weekEnding string) (map[string]map[string]string, error) {
+	var rows []payrollBranchHoursRow
+	query := withPlaceholderPayrollIDCondition(payrollTimeBranchHoursQuery, "ap.payroll_id")
+	if err := app.DB().NewQuery(query).Bind(dbx.Params{
+		"weekEnding": weekEnding,
+	}).All(&rows); err != nil {
+		return nil, err
+	}
+
+	branchHours := make(map[string]map[string]string, len(rows))
+	for _, row := range rows {
+		if _, ok := branchHours[row.PayrollID]; !ok {
+			branchHours[row.PayrollID] = map[string]string{}
+		}
+		branchHours[row.PayrollID][row.BranchName] = row.TotalHours
+	}
+
+	return branchHours, nil
+}
+
+func applyPayrollBranchHours(report []dbx.NullStringMap, branchHeaders []string, branchHours map[string]map[string]string) {
+	for _, row := range report {
+		for _, header := range branchHeaders {
+			row[header] = sql.NullString{String: "0", Valid: true}
+		}
+
+		payrollIDValue, ok := row["payrollId"]
+		if !ok || !payrollIDValue.Valid {
+			continue
+		}
+
+		for branchName, totalHours := range branchHours[payrollIDValue.String] {
+			row[branchName] = sql.NullString{String: totalHours, Valid: true}
+		}
+	}
 }
 
 // CreatePayrollTimeReportHandler returns a function that creates a payroll time report for a given week
@@ -82,8 +164,20 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 
+		branchHeaders, err := getOrderedPayrollBranchHeaders(app)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to load payroll branch headers: "+err.Error(), err)
+		}
+
+		branchHours, err := getPayrollBranchHours(app, dateColumnValue.Format("2006-01-02"))
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to execute payroll branch query: "+err.Error(), err)
+		}
+
+		applyPayrollBranchHours(report, branchHeaders, branchHours)
+
 		// convert the report to a csv string
-		headers := []string{"payrollId", "weekEnding", "surname", "givenName", "name", "manager", "meals", "days off rotation", "hours worked", "salaryHoursOver44", "adjustedHoursWorked", "total overtime hours", "overtime hours to pay", "Bereavement", "Stat Holiday", "PPTO", "Sick", "Vacation", "overtime hours to bank", "Overtime Payout Requested", "hasAmendmentsForWeeksEnding", "salary"}
+		headers := append(append([]string{}, payrollTimeBaseHeaders...), branchHeaders...)
 		csvString, err := convertToCSV(report, headers)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to generate CSV report: "+err.Error(), err)
