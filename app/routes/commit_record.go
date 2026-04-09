@@ -141,6 +141,16 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 						Message: "foreign-currency on-account and corporate card expenses must be settled before commit",
 					}
 				}
+
+				if limitErr := validateExpenseNoPurchaseOrderLimit(
+					txApp,
+					record,
+					currencyInfo,
+					record.GetFloat("settled_total"),
+				); limitErr != nil {
+					httpResponseStatusCode = http.StatusBadRequest
+					return limitErr
+				}
 			}
 
 			// Set commit properties

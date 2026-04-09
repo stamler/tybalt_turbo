@@ -187,6 +187,14 @@ func createSettleExpenseHandler(app core.App) func(e *core.RequestEvent) error {
 					Message: utilities.SettledTotalToleranceMessage(record.GetFloat("total"), currencyInfo),
 				}
 			}
+			if limitErr := validateExpenseNoPurchaseOrderLimit(
+				txApp,
+				record,
+				currencyInfo,
+				req.SettledTotal,
+			); limitErr != nil {
+				return limitErr
+			}
 
 			record.Set("settled_total", req.SettledTotal)
 			record.Set("settler", e.Auth.Id)

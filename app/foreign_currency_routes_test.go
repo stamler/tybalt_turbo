@@ -12,8 +12,12 @@ import (
 )
 
 const (
-	testCADCurrencyID = "cadcurr00000001"
-	testUSDCurrencyID = "usdcurr00000001"
+	testCADCurrencyID                = "cadcurr00000001"
+	testUSDCurrencyID                = "usdcurr00000001"
+	testForeignNoPOSettleExpenseID   = "fxnoposettle001"
+	testForeignNoPOCommitExpenseID   = "fxnopocommit001"
+	testForeignNoPOSettleOKExpenseID = "fxnoposettleok01"
+	testForeignNoPOCommitOKExpenseID = "fxnopocommitok01"
 )
 
 func TestCurrenciesRoutes_ListPermissionsAndBackfill(t *testing.T) {
@@ -238,12 +242,36 @@ func TestExpenseSettlementRoutes_ListSettleAndClear(t *testing.T) {
 		"Authorization": payablesAdminToken,
 	})
 	mustStatus(t, unsettledRes, 200)
+	var unsettledRows []struct {
+		ID                 string  `json:"id"`
+		CreatorName        string  `json:"creator_name"`
+		IndicativeCADTotal float64 `json:"indicative_cad_total"`
+	}
+	if err := json.Unmarshal(unsettledRes.Body.Bytes(), &unsettledRows); err != nil {
+		t.Fatalf("failed decoding unsettled settlement queue response: %v", err)
+	}
 	body := mustReadBody(t, unsettledRes)
 	if !strings.Contains(body, `"id":"b4o6xph4ngwx4nw"`) {
 		t.Fatalf("expected unsettled list to include unsettled foreign corp card expense, body=%s", body)
 	}
 	if strings.Contains(body, `"id":"eqhozipupteogp8"`) || strings.Contains(body, `"id":"77i1224mudailrb"`) {
 		t.Fatalf("expected unsettled list to exclude settled or Expense payment type rows, body=%s", body)
+	}
+	foundUnsettledRow := false
+	for _, row := range unsettledRows {
+		if row.ID != "b4o6xph4ngwx4nw" {
+			continue
+		}
+		foundUnsettledRow = true
+		if row.CreatorName == "" {
+			t.Fatal("expected unsettled settlement row to include creator_name")
+		}
+		if row.IndicativeCADTotal <= 0 {
+			t.Fatalf("expected unsettled settlement row to include indicative_cad_total, got %v", row.IndicativeCADTotal)
+		}
+	}
+	if !foundUnsettledRow {
+		t.Fatal("expected to decode unsettled settlement row for b4o6xph4ngwx4nw")
 	}
 
 	settledRes := performTestAPIRequest(t, app, "GET", "/api/expenses/settled", nil, map[string]string{
@@ -493,5 +521,100 @@ func TestForeignExpenseRoutes_SubmitCommitAndRejectRules(t *testing.T) {
 	}
 	if got := rejectedExpense.GetFloat("settled_total"); got != 123.45 {
 		t.Fatalf("expected rejection to preserve user-entered settled_total for foreign Expense, got %v", got)
+	}
+}
+
+func TestForeignExpenseSettlementRoute_RequiresPOWhenSettledTotalExceedsNoPOLimit(t *testing.T) {
+	payablesAdminToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	settleRes := performTestAPIRequest(t, app, "POST", "/api/expenses/"+testForeignNoPOSettleExpenseID+"/settle", strings.NewReader(`{"settled_total":101.25}`), map[string]string{
+		"Authorization": payablesAdminToken,
+	})
+	mustStatus(t, settleRes, 400)
+
+	body := mustReadBody(t, settleRes)
+	if !strings.Contains(body, "purchase order is required") {
+		t.Fatalf("expected settle route to require a purchase order once settled CAD exceeds the limit, body=%s", body)
+	}
+}
+
+func TestForeignExpenseCommitRoute_RequiresPOWhenSettledTotalExceedsNoPOLimit(t *testing.T) {
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	commitRes := performTestAPIRequest(t, app, "POST", "/api/expenses/"+testForeignNoPOCommitExpenseID+"/commit", strings.NewReader(`{}`), map[string]string{
+		"Authorization": commitToken,
+	})
+	mustStatus(t, commitRes, 400)
+
+	body := mustReadBody(t, commitRes)
+	if !strings.Contains(body, "purchase order is required") {
+		t.Fatalf("expected commit route to require a purchase order once settled CAD exceeds the limit, body=%s", body)
+	}
+}
+
+func TestForeignExpenseSettlementRoute_AllowsSettlementWhenSettledTotalStaysBelowNoPOLimit(t *testing.T) {
+	payablesAdminToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	settleRes := performTestAPIRequest(t, app, "POST", "/api/expenses/"+testForeignNoPOSettleOKExpenseID+"/settle", strings.NewReader(`{"settled_total":94.50}`), map[string]string{
+		"Authorization": payablesAdminToken,
+	})
+	mustStatus(t, settleRes, 200)
+
+	record, err := app.FindRecordById("expenses", testForeignNoPOSettleOKExpenseID)
+	if err != nil {
+		t.Fatalf("failed loading settled fixture: %v", err)
+	}
+	if got := record.GetFloat("settled_total"); got != 94.5 {
+		t.Fatalf("expected settled_total to be updated to 94.5, got %v", got)
+	}
+	if got := record.GetString("settler"); got != "tqqf7q0f3378rvp" {
+		t.Fatalf("expected settler to be bookkeeper, got %q", got)
+	}
+	if record.GetDateTime("settled").IsZero() {
+		t.Fatal("expected settled timestamp to be populated")
+	}
+}
+
+func TestForeignExpenseCommitRoute_AllowsCommitWhenSettledTotalStaysBelowNoPOLimit(t *testing.T) {
+	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	commitRes := performTestAPIRequest(t, app, "POST", "/api/expenses/"+testForeignNoPOCommitOKExpenseID+"/commit", strings.NewReader(`{}`), map[string]string{
+		"Authorization": commitToken,
+	})
+	mustStatus(t, commitRes, 200)
+
+	record, err := app.FindRecordById("expenses", testForeignNoPOCommitOKExpenseID)
+	if err != nil {
+		t.Fatalf("failed loading committed fixture: %v", err)
+	}
+	if record.GetDateTime("committed").IsZero() {
+		t.Fatal("expected committed timestamp to be populated")
+	}
+	if got := record.GetString("committer"); got != "wegviunlyr2jjjv" {
+		t.Fatalf("expected committer to be fakemanager, got %q", got)
 	}
 }

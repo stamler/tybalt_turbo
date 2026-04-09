@@ -96,7 +96,7 @@
         </a>
       {/snippet}
       {#snippet headline(row: ExpenseSettlementRow)}
-        {row.uid_name} · {row.description}
+        {row.creator_name} · {row.description}
       {/snippet}
       {#snippet line1(row: ExpenseSettlementRow)}
         {formatCurrencyAmount(row.total, row.currency_code)}
@@ -108,17 +108,11 @@
         {/if}
       {/snippet}
       {#snippet line2(row: ExpenseSettlementRow)}
-        {formatCurrencyEquivalent(row.indicative_home_total, row.currency_rate, row.currency_rate_date)}
-        {#if trimmedOrEmpty(row.job_number)}
-          · {row.job_number}
-          {#if trimmedOrEmpty(row.client_name)}
-            / {row.client_name}
-          {/if}
-        {/if}
+        {formatCurrencyEquivalent(row.indicative_cad_total, row.currency_rate, row.currency_rate_date)}
       {/snippet}
       {#snippet line3(row: ExpenseSettlementRow)}
         {#if activeTab === "unsettled"}
-          {@const toleranceBounds = settlementToleranceBounds(row.indicative_home_total)}
+          {@const toleranceBounds = settlementToleranceBounds(row.indicative_cad_total)}
           <DSCurrencyInput
             bind:amount={draftValues[row.id]}
             currency=""
@@ -127,7 +121,7 @@
             currencyFieldName={`currency_${row.id}`}
             uiName="Settled CAD Total"
             disabledCurrency={true}
-            helperText={`Original amount: ${formatCurrencyAmount(row.total, row.currency_code)} · latest CAD equivalent ${formatCurrencyAmount(row.indicative_home_total, "CAD")} · allowed range ${formatCurrencyAmount(toleranceBounds.min, "CAD")} to ${formatCurrencyAmount(toleranceBounds.max, "CAD")}`}
+            helperText={`Original amount: ${formatCurrencyAmount(row.total, row.currency_code)} · latest CAD equivalent ${formatCurrencyAmount(row.indicative_cad_total, "CAD")} · allowed range ${formatCurrencyAmount(toleranceBounds.min, "CAD")} to ${formatCurrencyAmount(toleranceBounds.max, "CAD")}`}
             displayCode="CAD"
             displaySymbol="CAD"
           />

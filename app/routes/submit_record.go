@@ -107,19 +107,14 @@ func createSubmitRecordHandler(app core.App, collectionName string) func(e *core
 					}
 				}
 
-				if !utilities.IsHomeCurrencyInfo(currencyInfo) &&
-					record.GetString("purchase_order") == "" &&
-					record.GetString("payment_type") != "Mileage" &&
-					record.GetString("payment_type") != "FuelCard" &&
-					record.GetString("payment_type") != "PersonalReimbursement" &&
-					record.GetString("payment_type") != "Allowance" &&
-					utilities.GetNoPOExpenseLimit(txApp) > 0 &&
-					record.GetFloat("settled_total") >= utilities.GetNoPOExpenseLimit(txApp) {
+				if limitErr := validateExpenseNoPurchaseOrderLimit(
+					txApp,
+					record,
+					currencyInfo,
+					record.GetFloat("settled_total"),
+				); limitErr != nil {
 					httpResponseStatusCode = http.StatusBadRequest
-					return &CodeError{
-						Code:    "purchase_order_required",
-						Message: fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", utilities.GetNoPOExpenseLimit(txApp)),
-					}
+					return limitErr
 				}
 			}
 

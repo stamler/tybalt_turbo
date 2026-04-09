@@ -162,7 +162,7 @@ export type ExpenseCommitQueueRow = {
 export type ExpenseSettlementRow = {
   id: string;
   uid: string;
-  uid_name: string;
+  creator_name: string;
   date: string;
   description: string;
   payment_type: string;
@@ -171,19 +171,15 @@ export type ExpenseSettlementRow = {
   settled: string;
   settler: string;
   settler_name: string;
-  purchase_order: string;
   po_number: string;
   vendor_name: string;
-  vendor_alias: string;
-  job_number: string;
-  client_name: string;
   currency: string;
   currency_code: string;
   currency_symbol: string;
   currency_icon: string;
   currency_rate: number;
   currency_rate_date: string;
-  indicative_home_total: number;
+  indicative_cad_total: number;
   age_days: number;
 };
 
