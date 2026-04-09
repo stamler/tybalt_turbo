@@ -166,6 +166,7 @@ export type ExpenseSettlementRow = {
   date: string;
   description: string;
   payment_type: string;
+  cc_last_4_digits: string;
   total: number;
   settled_total: number;
   settled: string;

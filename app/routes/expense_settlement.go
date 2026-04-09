@@ -35,6 +35,7 @@ type expenseSettlementRow struct {
 	SettlerName        string  `db:"settler_name" json:"settler_name"`
 	Settled            string  `db:"settled" json:"settled"`
 	PaymentType        string  `db:"payment_type" json:"payment_type"`
+	CCLast4Digits      string  `db:"cc_last_4_digits" json:"cc_last_4_digits"`
 }
 
 type settleExpenseRequest struct {
@@ -105,7 +106,8 @@ func createExpenseSettlementListHandler(app core.App, settled bool) func(e *core
 				COALESCE(e.settler, '') AS settler,
 				COALESCE(sp.given_name || ' ' || sp.surname, '') AS settler_name,
 				COALESCE(e.settled, '') AS settled,
-				COALESCE(e.payment_type, '') AS payment_type
+				COALESCE(e.payment_type, '') AS payment_type,
+				COALESCE(e.cc_last_4_digits, '') AS cc_last_4_digits
 			FROM expenses e
 			LEFT JOIN profiles p ON p.uid = e.uid
 			LEFT JOIN profiles sp ON sp.uid = e.settler
