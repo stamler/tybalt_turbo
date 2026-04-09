@@ -128,11 +128,15 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 	}
 	isHomeCurrency := utilities.IsHomeCurrencyInfo(currencyInfo)
 	comparableSettledTotal := expenseRecord.GetFloat("settled_total")
-	if comparableSettledTotal <= 0 && isHomeCurrency {
-		comparableSettledTotal = expenseRecord.GetFloat("total")
-	}
 	if comparableSettledTotal <= 0 {
-		comparableSettledTotal = expenseRecord.GetFloat("total")
+		if isHomeCurrency {
+			comparableSettledTotal = expenseRecord.GetFloat("total")
+		} else {
+			comparableSettledTotal = utilities.IndicativeHomeAmount(
+				expenseRecord.GetFloat("total"),
+				currencyInfo,
+			)
+		}
 	}
 
 	// Require an attachment for all types except Allowance, Mileage, and PersonalReimbursement.

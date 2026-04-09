@@ -157,6 +157,7 @@ func TestSyncCurrencyRates_UpdatesNonHomeCurrenciesOnly(t *testing.T) {
 	defer app.Cleanup()
 
 	usd := loadCurrencyByCode(t, app, "USD")
+	jpy := loadCurrencyByCode(t, app, "JPY")
 	cad := loadCurrencyByCode(t, app, "CAD")
 	if _, err := app.NonconcurrentDB().NewQuery(`
 		UPDATE currencies
@@ -164,6 +165,13 @@ func TestSyncCurrencyRates_UpdatesNonHomeCurrenciesOnly(t *testing.T) {
 		WHERE id = {:id}
 	`).Bind(dbx.Params{"id": usd.Id}).Execute(); err != nil {
 		t.Fatalf("failed preparing USD currency fixture: %v", err)
+	}
+	if _, err := app.NonconcurrentDB().NewQuery(`
+		UPDATE currencies
+		SET rate = 0.0088, rate_date = '2026-04-01'
+		WHERE id = {:id}
+	`).Bind(dbx.Params{"id": jpy.Id}).Execute(); err != nil {
+		t.Fatalf("failed preparing JPY currency fixture: %v", err)
 	}
 	if _, err := app.NonconcurrentDB().NewQuery(`
 		UPDATE currencies
@@ -183,6 +191,12 @@ func TestSyncCurrencyRates_UpdatesNonHomeCurrenciesOnly(t *testing.T) {
 					{"d":"2026-04-03","FXUSDCAD":{"v":"1.4567"}}
 				]
 			}`)
+		case strings.Contains(r.URL.Path, "FXJPYCAD"):
+			fmt.Fprint(w, `{
+				"observations": [
+					{"d":"2026-04-03","FXJPYCAD":{"v":"0.0093"}}
+				]
+			}`)
 		default:
 			t.Fatalf("unexpected currency rate request: %s", r.URL.Path)
 		}
@@ -200,6 +214,14 @@ func TestSyncCurrencyRates_UpdatesNonHomeCurrenciesOnly(t *testing.T) {
 		t.Fatalf("expected USD rate to update, got rate=%v rate_date=%q", reloadedUSD.GetFloat("rate"), reloadedUSD.GetString("rate_date"))
 	}
 
+	reloadedJPY, err := app.FindRecordById("currencies", jpy.Id)
+	if err != nil {
+		t.Fatalf("failed to reload JPY currency: %v", err)
+	}
+	if reloadedJPY.GetFloat("rate") != 0.0093 || !strings.HasPrefix(reloadedJPY.GetString("rate_date"), "2026-04-03") {
+		t.Fatalf("expected JPY rate to update, got rate=%v rate_date=%q", reloadedJPY.GetFloat("rate"), reloadedJPY.GetString("rate_date"))
+	}
+
 	reloadedCAD, err := app.FindRecordById("currencies", cad.Id)
 	if err != nil {
 		t.Fatalf("failed to reload CAD currency: %v", err)
@@ -207,7 +229,9 @@ func TestSyncCurrencyRates_UpdatesNonHomeCurrenciesOnly(t *testing.T) {
 	if reloadedCAD.GetFloat("rate") != 1 || !strings.HasPrefix(reloadedCAD.GetString("rate_date"), "2026-01-01") {
 		t.Fatalf("expected CAD rate to remain unchanged, got rate=%v rate_date=%q", reloadedCAD.GetFloat("rate"), reloadedCAD.GetString("rate_date"))
 	}
-	if len(requestedSeries) != 1 || !strings.Contains(requestedSeries[0], "FXUSDCAD") {
-		t.Fatalf("expected only USD lookup during sync, got %v", requestedSeries)
+	if len(requestedSeries) != 2 ||
+		!strings.Contains(strings.Join(requestedSeries, ","), "FXUSDCAD") ||
+		!strings.Contains(strings.Join(requestedSeries, ","), "FXJPYCAD") {
+		t.Fatalf("expected lookups for each non-home currency, got %v", requestedSeries)
 	}
 }

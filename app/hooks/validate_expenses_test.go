@@ -293,6 +293,299 @@ func TestValidateExpense_ForeignNoPOLimitUsesSettledTotal(t *testing.T) {
 	}
 }
 
+func TestValidateExpense_ForeignNoPOLimitLowRateCurrencyWithoutSettledTotal(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
+		t.Fatalf("failed to load expenditure kinds config: %v", err)
+	}
+
+	jpyCurrency, err := app.FindFirstRecordByFilter("currencies", "code = {:code}", map[string]any{"code": "JPY"})
+	if err != nil {
+		t.Fatalf("failed to load JPY currency: %v", err)
+	}
+	underLimitSourceTotal := 5000.0
+	underLimitSettledTotal := utilities.IndicativeHomeAmount(underLimitSourceTotal, utilities.CurrencyInfo{
+		Code: "JPY",
+		Rate: jpyCurrency.GetFloat("rate"),
+	})
+	if underLimitSettledTotal >= constants.NO_PO_EXPENSE_LIMIT {
+		t.Fatalf("expected JPY fixture total to stay below no-PO CAD limit, got %.2f", underLimitSettledTotal)
+	}
+
+	tests := []struct {
+		name            string
+		paymentType     string
+		ccLast4Digits   string
+		wantValid       bool
+		wantErrorFields []string
+		noErrorFields   []string
+	}{
+		{
+			name:            "foreign_expense_only_requires_settled_total",
+			paymentType:     "Expense",
+			wantErrorFields: []string{"settled_total"},
+			noErrorFields:   []string{"total"},
+		},
+		{
+			name:        "foreign_onaccount_under_limit_draft_validates",
+			paymentType: "OnAccount",
+			wantValid:   true,
+		},
+		{
+			name:          "foreign_corporate_card_under_limit_draft_validates",
+			paymentType:   "CorporateCreditCard",
+			ccLast4Digits: "1234",
+			wantValid:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			record := buildRecordFromMap(expensesCollection, map[string]any{
+				"allowance_types": []string{},
+				"date":            "2024-01-22",
+				"description":     "Low-rate foreign draft under CAD cap",
+				"job":             "",
+				"payment_type":    tt.paymentType,
+				"purchase_order":  "",
+				"total":           underLimitSourceTotal,
+				"settled_total":   0.0,
+				"currency":        jpyCurrency.Id,
+				"vendor":          "2zqxtsmymf670ha",
+				"attachment":      "dummy.pdf",
+				"cc_last_4_digits": tt.ccLast4Digits,
+			})
+
+			err := validateExpense(app, record, nil, 0, false)
+			if tt.wantValid {
+				if err != nil {
+					t.Fatalf("expected under-limit %s draft to validate, got %v", tt.paymentType, err)
+				}
+				return
+			}
+
+			if err == nil {
+				t.Fatalf("expected validation error for %s draft with missing settled_total", tt.paymentType)
+			}
+
+			errMap, ok := err.(validation.Errors)
+			if !ok {
+				t.Fatalf("expected validation.Errors, got %T: %v", err, err)
+			}
+			for _, field := range tt.wantErrorFields {
+				if _, ok := errMap[field]; !ok {
+					t.Fatalf("expected %s validation error, got %v", field, errMap)
+				}
+			}
+			for _, field := range tt.noErrorFields {
+				if _, ok := errMap[field]; ok {
+					t.Fatalf("did not expect %s validation error, got %v", field, errMap)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateExpense_ForeignNoPOLimitHighRateCurrencyWithoutSettledTotal(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
+		t.Fatalf("failed to load expenditure kinds config: %v", err)
+	}
+
+	usdCurrency, err := app.FindFirstRecordByFilter("currencies", "code = {:code}", map[string]any{"code": "USD"})
+	if err != nil {
+		t.Fatalf("failed to load USD currency: %v", err)
+	}
+
+	overLimitSourceTotal := 75.0
+	indicativeSettledTotal := utilities.IndicativeHomeAmount(overLimitSourceTotal, utilities.CurrencyInfo{
+		Code: "USD",
+		Rate: usdCurrency.GetFloat("rate"),
+	})
+	if indicativeSettledTotal < constants.NO_PO_EXPENSE_LIMIT {
+		t.Fatalf("expected USD draft amount to exceed CAD cap, got %.2f", indicativeSettledTotal)
+	}
+
+	tests := []struct {
+		name            string
+		paymentType     string
+		ccLast4Digits   string
+		wantErrorFields []string
+	}{
+		{
+			name:            "foreign_expense_over_limit_requires_po_and_settled_total",
+			paymentType:     "Expense",
+			wantErrorFields: []string{"total", "settled_total"},
+		},
+		{
+			name:            "foreign_onaccount_over_limit_requires_po",
+			paymentType:     "OnAccount",
+			wantErrorFields: []string{"total"},
+		},
+		{
+			name:            "foreign_corporate_card_over_limit_requires_po",
+			paymentType:     "CorporateCreditCard",
+			ccLast4Digits:   "1234",
+			wantErrorFields: []string{"total"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			record := buildRecordFromMap(expensesCollection, map[string]any{
+				"allowance_types": []string{},
+				"date":            "2024-01-22",
+				"description":     "High-rate foreign draft over CAD cap",
+				"job":             "",
+				"payment_type":    tt.paymentType,
+				"purchase_order":  "",
+				"total":           overLimitSourceTotal,
+				"settled_total":   0.0,
+				"currency":        usdCurrency.Id,
+				"vendor":          "2zqxtsmymf670ha",
+				"attachment":      "dummy.pdf",
+				"cc_last_4_digits": tt.ccLast4Digits,
+			})
+
+			err := validateExpense(app, record, nil, 0, false)
+			if err == nil {
+				t.Fatalf("expected validation error for over-limit %s draft", tt.paymentType)
+			}
+
+			errMap, ok := err.(validation.Errors)
+			if !ok {
+				t.Fatalf("expected validation.Errors, got %T: %v", err, err)
+			}
+			for _, field := range tt.wantErrorFields {
+				if _, ok := errMap[field]; !ok {
+					t.Fatalf("expected %s validation error, got %v", field, errMap)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateExpense_ForeignNoPOLimitLowRateCurrencyWithSettledTotal(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	if err := utilities.ValidateExpenditureKindsConfig(app); err != nil {
+		t.Fatalf("failed to load expenditure kinds config: %v", err)
+	}
+
+	jpyCurrency, err := app.FindFirstRecordByFilter("currencies", "code = {:code}", map[string]any{"code": "JPY"})
+	if err != nil {
+		t.Fatalf("failed to load JPY currency: %v", err)
+	}
+	jpyInfo := utilities.CurrencyInfo{
+		Code: "JPY",
+		Rate: jpyCurrency.GetFloat("rate"),
+	}
+
+	underLimitSourceTotal := 5000.0
+	underLimitSettledTotal := utilities.IndicativeHomeAmount(underLimitSourceTotal, jpyInfo)
+	if underLimitSettledTotal >= constants.NO_PO_EXPENSE_LIMIT {
+		t.Fatalf("expected JPY under-limit settled total to stay below CAD cap, got %.2f", underLimitSettledTotal)
+	}
+
+	overLimitSourceTotal := 12000.0
+	overLimitSettledTotal := utilities.IndicativeHomeAmount(overLimitSourceTotal, jpyInfo)
+	if overLimitSettledTotal < constants.NO_PO_EXPENSE_LIMIT {
+		t.Fatalf("expected JPY over-limit settled total to meet or exceed CAD cap, got %.2f", overLimitSettledTotal)
+	}
+
+	tests := []struct {
+		name          string
+		paymentType   string
+		total         float64
+		settledTotal  float64
+		ccLast4Digits string
+		wantError     string
+	}{
+		{
+			name:         "foreign_expense_under_limit_with_settled_total_validates",
+			paymentType:  "Expense",
+			total:        underLimitSourceTotal,
+			settledTotal: underLimitSettledTotal,
+		},
+		{
+			name:         "foreign_expense_over_limit_with_settled_total_requires_po",
+			paymentType:  "Expense",
+			total:        overLimitSourceTotal,
+			settledTotal: overLimitSettledTotal,
+			wantError:    "total",
+		},
+		{
+			name:         "foreign_onaccount_under_limit_with_settled_total_validates",
+			paymentType:  "OnAccount",
+			total:        underLimitSourceTotal,
+			settledTotal: underLimitSettledTotal,
+		},
+		{
+			name:         "foreign_onaccount_over_limit_with_settled_total_requires_po",
+			paymentType:  "OnAccount",
+			total:        overLimitSourceTotal,
+			settledTotal: overLimitSettledTotal,
+			wantError:    "total",
+		},
+		{
+			name:          "foreign_corporate_card_under_limit_with_settled_total_validates",
+			paymentType:   "CorporateCreditCard",
+			total:         underLimitSourceTotal,
+			settledTotal:  underLimitSettledTotal,
+			ccLast4Digits: "1234",
+		},
+		{
+			name:          "foreign_corporate_card_over_limit_with_settled_total_requires_po",
+			paymentType:   "CorporateCreditCard",
+			total:         overLimitSourceTotal,
+			settledTotal:  overLimitSettledTotal,
+			ccLast4Digits: "1234",
+			wantError:     "total",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			record := buildRecordFromMap(expensesCollection, map[string]any{
+				"allowance_types": []string{},
+				"date":            "2024-01-22",
+				"description":     "Low-rate foreign expense with explicit settled total",
+				"job":             "",
+				"payment_type":    tt.paymentType,
+				"purchase_order":  "",
+				"total":           tt.total,
+				"settled_total":   tt.settledTotal,
+				"currency":        jpyCurrency.Id,
+				"vendor":          "2zqxtsmymf670ha",
+				"attachment":      "dummy.pdf",
+				"cc_last_4_digits": tt.ccLast4Digits,
+			})
+
+			err := validateExpense(app, record, nil, 0, false)
+			if tt.wantError == "" {
+				if err != nil {
+					t.Fatalf("expected %s to validate, got %v", tt.paymentType, err)
+				}
+				return
+			}
+
+			if err == nil {
+				t.Fatalf("expected %s validation error for %s", tt.wantError, tt.paymentType)
+			}
+
+			errMap, ok := err.(validation.Errors)
+			if !ok {
+				t.Fatalf("expected validation.Errors, got %T: %v", err, err)
+			}
+			if _, ok := errMap[tt.wantError]; !ok {
+				t.Fatalf("expected %s validation error, got %v", tt.wantError, errMap)
+			}
+		})
+	}
+}
+
 func TestValidateExpense_CurrencyMustMatchPurchaseOrder(t *testing.T) {
 	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
