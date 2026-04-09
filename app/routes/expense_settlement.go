@@ -88,8 +88,16 @@ func createExpenseSettlementListHandler(app core.App, settled bool) func(e *core
 				COALESCE(cur.symbol, 'CAD') AS currency_symbol,
 				COALESCE(cur.icon, '') AS currency_icon,
 				CAST(e.total AS REAL) AS total,
-				CAST(e.total * COALESCE(NULLIF(cur.rate, 0), 1) AS REAL) AS indicative_cad_total,
-				COALESCE(CAST(cur.rate AS REAL), 1) AS currency_rate,
+				CAST(
+					e.total * CASE
+						WHEN COALESCE(cur.code, 'CAD') = 'CAD' THEN 1
+						ELSE COALESCE(CAST(cur.rate AS REAL), 0)
+					END
+				AS REAL) AS indicative_cad_total,
+				CASE
+					WHEN COALESCE(cur.code, 'CAD') = 'CAD' THEN 1
+					ELSE COALESCE(CAST(cur.rate AS REAL), 0)
+				END AS currency_rate,
 				COALESCE(cur.rate_date, '') AS currency_rate_date,
 				COALESCE(e.approved, '') AS approved,
 				CAST(MAX(0, julianday('now') - julianday(substr(e.approved, 1, 10))) AS INTEGER) AS age_days,
@@ -180,6 +188,9 @@ func createSettleExpenseHandler(app core.App) func(e *core.RequestEvent) error {
 			currencyInfo, err := utilities.ResolveCurrencyInfo(txApp, record.GetString("currency"))
 			if err != nil {
 				return err
+			}
+			if rateErr := validatePositiveForeignCurrencyRate(currencyInfo); rateErr != nil {
+				return rateErr
 			}
 			if !utilities.IsSettledTotalWithinTolerance(record.GetFloat("total"), req.SettledTotal, currencyInfo) {
 				return &CodeError{

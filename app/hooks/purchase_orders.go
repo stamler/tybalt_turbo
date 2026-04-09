@@ -90,7 +90,7 @@ func CleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 			},
 		}
 	}
-	if !utilities.IsHomeCurrencyInfo(currencyInfo) && currencyInfo.Rate <= 0 {
+	if err := utilities.RequirePositiveForeignCurrencyRate(currencyInfo); err != nil {
 		return &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "hook error when cleaning purchase order",

@@ -85,6 +85,10 @@ func createSubmitRecordHandler(app core.App, collectionName string) func(e *core
 						Message: "referenced currency not found",
 					}
 				}
+				if rateErr := validatePositiveForeignCurrencyRate(currencyInfo); rateErr != nil {
+					httpResponseStatusCode = http.StatusBadRequest
+					return rateErr
+				}
 
 				if !utilities.IsHomeCurrencyInfo(currencyInfo) && record.GetString("payment_type") == "Expense" {
 					if record.GetFloat("settled_total") <= 0 {

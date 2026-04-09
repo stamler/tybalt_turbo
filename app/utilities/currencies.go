@@ -17,6 +17,7 @@ const HomeCurrencyCode = "CAD"
 const ForeignSettlementToleranceRatio = 0.20
 
 var ErrCurrencyNotFound = errors.New("currency not found")
+var ErrForeignCurrencyRateMissing = errors.New("foreign currency is missing an exchange rate")
 
 type CurrencyInfo struct {
 	ID       string
@@ -127,7 +128,20 @@ func CurrencyRateOrOne(info CurrencyInfo) float64 {
 	if info.Rate > 0 {
 		return info.Rate
 	}
-	return 1
+	if IsHomeCurrencyInfo(info) {
+		return 1
+	}
+	return 0
+}
+
+func RequirePositiveForeignCurrencyRate(info CurrencyInfo) error {
+	if IsHomeCurrencyInfo(info) {
+		return nil
+	}
+	if info.Rate > 0 {
+		return nil
+	}
+	return ErrForeignCurrencyRateMissing
 }
 
 func RoundCurrencyAmount(value float64) float64 {

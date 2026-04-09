@@ -419,6 +419,19 @@ func AddHooks(app core.App) {
 		}
 		return e.Next()
 	})
+	// hooks for currencies model
+	app.OnRecordCreateRequest("currencies").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessCurrency(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
+	app.OnRecordUpdateRequest("currencies").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := ProcessCurrency(app, e); err != nil {
+			return AnnotateHookError(app, e, err)
+		}
+		return e.Next()
+	})
 	// hooks for admin_profiles model
 	app.OnRecordCreateRequest("admin_profiles").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := EnforceAdminProfileRequestPermissions(app, e); err != nil {

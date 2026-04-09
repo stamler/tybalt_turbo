@@ -354,6 +354,74 @@ func TestExpenseSettlementRoutes_ListSettleAndClear(t *testing.T) {
 	mustStatus(t, doubleClearRes, 400)
 }
 
+func TestForeignExpenseRoutes_SubmitRejectsMissingForeignCurrencyRate(t *testing.T) {
+	ownerToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	if _, err := app.NonconcurrentDB().NewQuery(`
+		UPDATE currencies
+		SET rate = 0
+		WHERE id = {:currencyId}
+	`).Bind(dbx.Params{"currencyId": testUSDCurrencyID}).Execute(); err != nil {
+		t.Fatalf("failed zeroing foreign currency rate: %v", err)
+	}
+
+	if _, err := app.NonconcurrentDB().NewQuery(`
+		UPDATE expenses
+		SET currency = {:currencyId}, total = 25, settled_total = 33.75, submitted = 0, approved = '', rejected = '', settled = '', settler = ''
+		WHERE id = '77i1224mudailrb'
+	`).Bind(dbx.Params{"currencyId": testUSDCurrencyID}).Execute(); err != nil {
+		t.Fatalf("failed preparing foreign expense row: %v", err)
+	}
+
+	submitRes := performTestAPIRequest(t, app, "POST", "/api/expenses/77i1224mudailrb/submit", strings.NewReader(`{}`), map[string]string{
+		"Authorization": ownerToken,
+	})
+	mustStatus(t, submitRes, 400)
+	if !strings.Contains(mustReadBody(t, submitRes), "selected foreign currency is missing an exchange rate") {
+		t.Fatalf("expected submit to reject zero-rate foreign currency, body=%s", submitRes.Body.String())
+	}
+}
+
+func TestExpenseSettlementRoutes_SettleRejectsMissingForeignCurrencyRate(t *testing.T) {
+	payablesAdminToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	if _, err := app.NonconcurrentDB().NewQuery(`
+		UPDATE currencies
+		SET rate = 0
+		WHERE id = {:currencyId}
+	`).Bind(dbx.Params{"currencyId": testUSDCurrencyID}).Execute(); err != nil {
+		t.Fatalf("failed zeroing foreign currency rate: %v", err)
+	}
+
+	if _, err := app.NonconcurrentDB().NewQuery(`
+		UPDATE expenses
+		SET currency = {:currencyId}, settled_total = 0, settler = '', settled = '', approved = '2026-04-03 12:00:00.000Z', rejected = '', committed = ''
+		WHERE id = 'b4o6xph4ngwx4nw'
+	`).Bind(dbx.Params{"currencyId": testUSDCurrencyID}).Execute(); err != nil {
+		t.Fatalf("failed preparing unsettled foreign corp card expense: %v", err)
+	}
+
+	settleRes := performTestAPIRequest(t, app, "POST", "/api/expenses/b4o6xph4ngwx4nw/settle", strings.NewReader(`{"settled_total":90.00}`), map[string]string{
+		"Authorization": payablesAdminToken,
+	})
+	mustStatus(t, settleRes, 400)
+	if !strings.Contains(mustReadBody(t, settleRes), "selected foreign currency is missing an exchange rate") {
+		t.Fatalf("expected settle to reject zero-rate foreign currency, body=%s", settleRes.Body.String())
+	}
+}
+
 func TestForeignExpenseRoutes_SubmitCommitAndRejectRules(t *testing.T) {
 	ownerToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {

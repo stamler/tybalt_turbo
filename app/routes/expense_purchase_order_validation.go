@@ -87,3 +87,14 @@ func validateExpenseNoPurchaseOrderLimit(app core.App, record *core.Record, curr
 		Message: fmt.Sprintf("a purchase order is required for expenses of $%0.2f or more", limit),
 	}
 }
+
+func validatePositiveForeignCurrencyRate(currencyInfo utilities.CurrencyInfo) *CodeError {
+	if err := utilities.RequirePositiveForeignCurrencyRate(currencyInfo); err != nil {
+		return &CodeError{
+			Code:    "missing_rate",
+			Message: "selected foreign currency is missing an exchange rate",
+		}
+	}
+
+	return nil
+}

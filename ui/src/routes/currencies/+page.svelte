@@ -239,7 +239,7 @@
       uiName="Rate to CAD"
       type="number"
       step={0.0001}
-      min={0}
+      min={0.0001}
     />
     <DSTextInput
       bind:value={item.rate_date as string}
