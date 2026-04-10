@@ -38,8 +38,8 @@ var payablesSpreadsheetQuery string
 
 var payablesSpreadsheetHeaders = []string{
 	"Acct/Visa/Exp", "Job #", "Div", "Branch", "type", "Date", "Mon", "Year",
-	"Subtotal", "HST", "Total", "Currency", "Unit", "NC", "Meals",
-	"PO#", "Category", "Description", "Supplier", "Employee",
+	"Subtotal", "HST", "Total", "Currency", "PO#", "Category",
+	"Description", "Supplier", "Employee",
 	"Approved By", "Entered By", "Vendor Inv #", "Inv Date",
 	"Notes", "Pd By", "TBTE #", "Status",
 }
@@ -74,7 +74,7 @@ func (r payablesRow) toRecord() []string {
 	return []string{
 		r.PaymentType, r.JobNumber, r.DivisionCode, r.BranchCode, r.POType,
 		day, mon, year,
-		"", "", r.Total, r.CurrencyCode, "", "", "",
+		"", "", r.Total, r.CurrencyCode,
 		r.PONumber, "", r.Description, r.VendorName, r.Employee,
 		r.ApprovedBy, "TURBO", "", "", "", "", "",
 		r.Status,

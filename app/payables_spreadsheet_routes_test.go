@@ -124,14 +124,15 @@ func TestPayablesSpreadsheetRoutesDataAndFiltering(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				"Acct/Visa/Exp,Job #,Div,Branch,type,Date,Mon,Year",
-				"Total,Currency,Unit",
+				"Total,Currency,PO#",
 				"Seeded payables second approval fixture",
 				"2712-0102",
 				"One-Time",
-				",654.32,CAD,",
+				",654.32,CAD,2712-0102,",
 				"TURBO",
 			},
 			NotExpectedContent: []string{
+				"Currency,Unit,NC,Meals,PO#",
 				"Seeded payables excluded control-range fixture",
 			},
 			TestAppFactory: setupTestAppWithFixedPayablesSpreadsheetNow,
@@ -146,7 +147,7 @@ func TestPayablesSpreadsheetRoutesDataAndFiltering(t *testing.T) {
 				"Seeded payables second approval fixture",
 				"2712-0102",
 				"\tOne-Time\t",
-				"\t654.32\tCAD\t",
+				"\t654.32\tCAD\t2712-0102\t",
 				"\tTURBO\t",
 			},
 			NotExpectedContent: []string{

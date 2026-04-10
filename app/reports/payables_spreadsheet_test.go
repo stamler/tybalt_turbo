@@ -86,13 +86,16 @@ func TestPayablesRowToRecordUsesRecordDateForDisplayColumns(t *testing.T) {
 			if got := record[11]; got != "CAD" {
 				t.Fatalf("currency = %q, want %q", got, "CAD")
 			}
-			if got := record[17]; got != "Fixture row" {
+			if got := record[12]; got != "2603-0001" {
+				t.Fatalf("po number = %q, want %q", got, "2603-0001")
+			}
+			if got := record[14]; got != "Fixture row" {
 				t.Fatalf("description = %q, want %q", got, "Fixture row")
 			}
-			if got := record[20]; got != "Approver Name" {
+			if got := record[17]; got != "Approver Name" {
 				t.Fatalf("approved by = %q, want %q", got, "Approver Name")
 			}
-			if got := record[21]; got != "TURBO" {
+			if got := record[18]; got != "TURBO" {
 				t.Fatalf("entered by = %q, want %q", got, "TURBO")
 			}
 		})
@@ -141,8 +144,8 @@ func TestRowsToCSVAndTSV(t *testing.T) {
 	if !strings.Contains(tsvString, "Expense\t24-321\tBM\tTOR\tOne-Time\t1\tSep\t2024") {
 		t.Fatalf("tsv should contain tab-separated row data, got %q", tsvString)
 	}
-	if !strings.Contains(tsvString, "\t123.45\tUSD\t\t\t\t2603-0001\t") {
-		t.Fatalf("tsv should place currency immediately after total, got %q", tsvString)
+	if !strings.Contains(tsvString, "\t123.45\tUSD\t2603-0001\t") {
+		t.Fatalf("tsv should place po number immediately after currency, got %q", tsvString)
 	}
 	if !strings.HasSuffix(tsvString, "\n") {
 		t.Fatalf("tsv should end with newline, got %q", tsvString)
