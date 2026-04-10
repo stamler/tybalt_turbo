@@ -282,18 +282,9 @@ func TestValidateJobAllowsTimeTrackingAt_RejectsFutureProjectAwardDate(t *testin
 	app := testseed.NewSeededTestApp(t)
 	defer app.Cleanup()
 
-	proposal, err := app.FindRecordById("jobs", "awproprecent001")
+	proposal, err := app.FindRecordById("jobs", "awpropfuture001")
 	if err != nil {
 		t.Fatalf("failed to load proposal: %v", err)
-	}
-
-	project, err := app.FindRecordById("jobs", "awprojrecent001")
-	if err != nil {
-		t.Fatalf("failed to load referencing project: %v", err)
-	}
-	project.Set("project_award_date", "2026-03-25")
-	if err := app.Save(project); err != nil {
-		t.Fatalf("failed to update referencing project: %v", err)
 	}
 
 	now := time.Date(2026, time.March, 24, 12, 0, 0, 0, time.UTC)

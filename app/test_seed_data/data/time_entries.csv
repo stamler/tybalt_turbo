@@ -29,3 +29,13 @@ _imported,branch,category,created,date,description,division,hours,id,job,meals_h
 0,,bdzvwxqm33xijkn,2024-09-25 01:33:29.245Z,2024-09-25,EFJIlk,vccd5fo56ctbigh,8,v3t99zm2in7qvf9,cjf0kt0defhq480,0,0,,sdyfl3q7j7ap849,j1lr2oddjongtoj,f2j5a8vk006baub,2024-11-21 15:49:42.129Z,2024-09-28,
 0,,,2026-04-07 12:00:00.000Z,2024-09-09,,vccd5fo56ctbigh,8,te_self_apv_yes_001,mg0sp9iyjzo4zw9,0,0,,sdyfl3q7j7ap849,,u_self_apv_yes,2026-04-07 12:00:00.000Z,2024-09-14,
 0,,,2026-04-07 12:00:00.000Z,2024-09-09,,vccd5fo56ctbigh,8,te_self_apv_no_001,mg0sp9iyjzo4zw9,0,0,,sdyfl3q7j7ap849,,u_self_apv_no,2026-04-07 12:00:00.000Z,2024-09-14,
+0,,,2024-06-21 18:08:45.013Z,2024-06-22,Many fails,vccd5fo56ctbigh,9,wrkrcdentry0001,zke3cs3yipplwtu,0,0,,sdyfl3q7j7ap849,av32qwch9xrcb5n,f2j5a8vk006baub,2024-10-10 18:18:43.555Z,2024-06-22,K12-314
+0,80875lm27v8wgi4,,2026-04-10 00:00:00.000Z,2024-09-02,mismatched branch,fy4i9poneukvq9u,1,tebrmismatch001,jobbrmatch0001,0,0,tbgoiwwwfj8cvju,sdyfl3q7j7ap849,,rzr98oadsp9qc11,2026-04-10 00:00:00.000Z,2024-09-07,
+0,xeq9q81q5307f70,,2026-04-10 00:00:00.000Z,2024-09-02,matching branch,fy4i9poneukvq9u,1,tebranchokay001,jobbrmatch0001,0,0,tbgoiwwwfj8cvju,sdyfl3q7j7ap849,,rzr98oadsp9qc11,2026-04-10 00:00:00.000Z,2024-09-07,
+0,kpj5jijh0if8kx8,,2026-04-10 00:00:00.000Z,2024-09-02,copy source corporate no-claim,fy4i9poneukvq9u,1,tecopycorpnc001,,0,0,,sdyfl3q7j7ap849,,u_corp_noclaim,2026-04-10 00:00:00.000Z,2024-09-07,
+0,80875lm27v8wgi4,,2026-04-10 00:00:00.000Z,2024-09-02,copy source default branch no-claim,fy4i9poneukvq9u,1,tecopydefnc0001,,0,0,,sdyfl3q7j7ap849,,u_corp_noclaim,2026-04-10 00:00:00.000Z,2024-09-07,
+0,kpj5jijh0if8kx8,,2026-04-10 00:00:00.000Z,2024-09-02,copy source corporate with-claim,fy4i9poneukvq9u,1,tecopycorpcl001,,0,0,,sdyfl3q7j7ap849,,u_corp_claim,2026-04-10 00:00:00.000Z,2024-09-07,
+0,xeq9q81q5307f70,,2026-04-25 11:56:00.000Z,2030-01-12,branch allocation regular time,,8,ptbranchentry001,,0,0,,sdyfl3q7j7ap849,ptbranchsheet001,f2j5a8vk006baub,2026-04-25 11:56:00.000Z,2030-01-12,
+0,,,2026-04-25 11:56:00.000Z,2026-04-18,Placeholder payroll time row week1,,8,phw1entry000001,,0,0,,sdyfl3q7j7ap849,phw1sheet000001,u_placeholderpay,2026-04-25 11:56:00.000Z,2026-04-18,
+0,,,2026-04-25 11:56:00.000Z,2026-04-25,Placeholder payroll time row,,8,phw2entry000001,,0,0,,sdyfl3q7j7ap849,phw2sheet000001,u_placeholderpay,2026-04-25 11:56:00.000Z,2026-04-25,
+0,,,2026-04-25 11:56:00.000Z,2026-04-25,Control payroll time row,,8,ctw2entry000001,,0,0,,sdyfl3q7j7ap849,ctw2sheet000001,etysnrlup2f6bak,2026-04-25 11:56:00.000Z,2026-04-25,

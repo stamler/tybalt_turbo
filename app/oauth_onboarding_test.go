@@ -936,7 +936,7 @@ func TestMicrosoftExistingInactiveUserIsBlocked(t *testing.T) {
 	adminProfile.Set("untracked_time_off", false)
 	adminProfile.Set("time_sheet_expected", false)
 	adminProfile.Set("default_branch", constants.DEFAULT_BRANCH_ID)
-	adminProfile.Set("payroll_id", "912345678")
+	adminProfile.Set("payroll_id", "912345679")
 	if err := app.Save(adminProfile); err != nil {
 		t.Fatalf("failed to create inactive admin profile: %v", err)
 	}

@@ -17,43 +17,6 @@ import (
 	"github.com/pocketbase/pocketbase/tests"
 )
 
-func setupAdminOnlyExpenseViewerApp(tb testing.TB) *tests.TestApp {
-	tb.Helper()
-
-	app := testutils.SetupTestApp(tb)
-	claim, err := app.FindFirstRecordByFilter("claims", "name = 'admin'")
-	if err != nil {
-		tb.Fatalf("failed to load admin claim: %v", err)
-	}
-
-	_, err = app.NonconcurrentDB().NewQuery(`
-		INSERT OR IGNORE INTO user_claims (
-			_imported,
-			cid,
-			created,
-			id,
-			uid,
-			updated
-		) VALUES (
-			0,
-			{:cid},
-			strftime('%Y-%m-%d %H:%M:%fZ', 'now'),
-			{:id},
-			{:uid},
-			strftime('%Y-%m-%d %H:%M:%fZ', 'now')
-		)
-	`).Bind(dbx.Params{
-		"cid": claim.Id,
-		"id":  "test_admin_only_expense_claim_u_no_claims",
-		"uid": "u_no_claims",
-	}).Execute()
-	if err != nil {
-		tb.Fatalf("failed to grant admin claim in test setup: %v", err)
-	}
-
-	return app
-}
-
 func TestExpensesCreate(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
 	if err != nil {
@@ -2172,7 +2135,7 @@ func setupClosedPurchaseOrderForUncommit(t testing.TB, poID string) *tests.TestA
 }
 
 func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
-	adminToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	adminToken, err := testutils.GenerateRecordToken("users", "admin.only@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2192,7 +2155,7 @@ func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
 				`"id":"xg2yeucklhgbs3n"`,
 				`"committed":"2024-09-20 12:00:00.000Z"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin cannot read uncommitted expense details through custom route",
@@ -2203,7 +2166,7 @@ func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"Expense not found or not authorized."`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin can uncommit a committed expense",
@@ -2214,7 +2177,7 @@ func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"Record uncommitted successfully"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 				record, err := app.FindRecordById("expenses", "xg2yeucklhgbs3n")
 				if err != nil {
@@ -2246,7 +2209,7 @@ func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"code":"unauthorized"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin cannot uncommit an uncommitted expense",
@@ -2257,7 +2220,7 @@ func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"code":"record_not_committed"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "uncommitting a committed expense reopens a closed one-time purchase order",
@@ -2268,7 +2231,7 @@ func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"Record uncommitted successfully"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 				po, err := app.FindRecordById("purchase_orders", "0pia83nnprdlzf8")
 				if err != nil {
@@ -2289,23 +2252,7 @@ func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
 				`"message":"Record uncommitted successfully"`,
 			},
 			TestAppFactory: func(tb testing.TB) *tests.TestApp {
-				app := setupClosedPurchaseOrderForUncommit(tb, "d8463q483f3da28")
-				claim, err := app.FindFirstRecordByFilter("claims", "name = 'admin'")
-				if err != nil {
-					tb.Fatalf("failed to load admin claim: %v", err)
-				}
-				_, err = app.NonconcurrentDB().NewQuery(`
-					INSERT OR IGNORE INTO user_claims (_imported, cid, created, id, uid, updated)
-					VALUES (0, {:cid}, strftime('%Y-%m-%d %H:%M:%fZ', 'now'), {:id}, {:uid}, strftime('%Y-%m-%d %H:%M:%fZ', 'now'))
-				`).Bind(dbx.Params{
-					"cid": claim.Id,
-					"id":  "test_admin_only_expense_claim_u_no_claims",
-					"uid": "u_no_claims",
-				}).Execute()
-				if err != nil {
-					tb.Fatalf("failed to grant admin claim in test setup: %v", err)
-				}
-				return app
+				return setupClosedPurchaseOrderForUncommit(tb, "d8463q483f3da28")
 			},
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 				po, err := app.FindRecordById("purchase_orders", "d8463q483f3da28")
@@ -2327,23 +2274,7 @@ func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
 				`"message":"Record uncommitted successfully"`,
 			},
 			TestAppFactory: func(tb testing.TB) *tests.TestApp {
-				app := setupClosedPurchaseOrderForUncommit(tb, "ly8xyzpuj79upq1")
-				claim, err := app.FindFirstRecordByFilter("claims", "name = 'admin'")
-				if err != nil {
-					tb.Fatalf("failed to load admin claim: %v", err)
-				}
-				_, err = app.NonconcurrentDB().NewQuery(`
-					INSERT OR IGNORE INTO user_claims (_imported, cid, created, id, uid, updated)
-					VALUES (0, {:cid}, strftime('%Y-%m-%d %H:%M:%fZ', 'now'), {:id}, {:uid}, strftime('%Y-%m-%d %H:%M:%fZ', 'now'))
-				`).Bind(dbx.Params{
-					"cid": claim.Id,
-					"id":  "test_admin_only_expense_claim_u_no_claims",
-					"uid": "u_no_claims",
-				}).Execute()
-				if err != nil {
-					tb.Fatalf("failed to grant admin claim in test setup: %v", err)
-				}
-				return app
+				return setupClosedPurchaseOrderForUncommit(tb, "ly8xyzpuj79upq1")
 			},
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 				po, err := app.FindRecordById("purchase_orders", "ly8xyzpuj79upq1")
@@ -2363,7 +2294,7 @@ func TestExpenseDetailsAndUncommitRoutes(t *testing.T) {
 }
 
 func TestExpenseAdminDiscoveryRoutes(t *testing.T) {
-	adminToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	adminToken, err := testutils.GenerateRecordToken("users", "admin.only@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -2378,7 +2309,7 @@ func TestExpenseAdminDiscoveryRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"committed_week_ending":"2024-09-21"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin-only user can view committed expense tracking list",
@@ -2389,7 +2320,7 @@ func TestExpenseAdminDiscoveryRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"id":"xg2yeucklhgbs3n"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin-only user cannot view org-wide expenses list",
@@ -2403,7 +2334,7 @@ func TestExpenseAdminDiscoveryRoutes(t *testing.T) {
 			NotExpectedContent: []string{
 				`"id":"2gq9uyxmkcyopa4"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin-only user cannot view pending expenses list",
@@ -2417,7 +2348,7 @@ func TestExpenseAdminDiscoveryRoutes(t *testing.T) {
 			NotExpectedContent: []string{
 				`"id":"exp_approve_closed_po_1"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin-only user cannot view expense commit queue",
@@ -2428,7 +2359,7 @@ func TestExpenseAdminDiscoveryRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"code":"unauthorized"`,
 			},
-			TestAppFactory: setupAdminOnlyExpenseViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 	}
 

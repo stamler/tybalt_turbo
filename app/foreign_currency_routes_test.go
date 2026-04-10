@@ -84,35 +84,6 @@ func TestCurrenciesRoutes_ListPermissionsAndBackfill(t *testing.T) {
 	})
 	mustStatus(t, badBackfill, 400)
 
-	if _, err := app.NonconcurrentDB().NewQuery(`
-		UPDATE purchase_orders
-		SET approval_total = 100, approval_total_home = 0, currency = ''
-		WHERE id = 'standardupd001'
-	`).Execute(); err != nil {
-		t.Fatalf("failed preparing blank PO fixture: %v", err)
-	}
-	if _, err := app.NonconcurrentDB().NewQuery(`
-		UPDATE purchase_orders
-		SET approval_total = 100, approval_total_home = 135, currency = {:currencyId}
-		WHERE id = 'gal6e5la2fa4rpn'
-	`).Bind(dbx.Params{"currencyId": testUSDCurrencyID}).Execute(); err != nil {
-		t.Fatalf("failed preparing foreign PO fixture: %v", err)
-	}
-	if _, err := app.NonconcurrentDB().NewQuery(`
-		UPDATE expenses
-		SET currency = '', settled_total = 0
-		WHERE id = '2gq9uyxmkcyopa4'
-	`).Execute(); err != nil {
-		t.Fatalf("failed preparing blank expense fixture: %v", err)
-	}
-	if _, err := app.NonconcurrentDB().NewQuery(`
-		UPDATE expenses
-		SET currency = {:currencyId}, settled_total = 91.11
-		WHERE id = 'b4o6xph4ngwx4nw'
-	`).Bind(dbx.Params{"currencyId": testUSDCurrencyID}).Execute(); err != nil {
-		t.Fatalf("failed preparing foreign expense fixture: %v", err)
-	}
-
 	backfillRes := performTestAPIRequest(t, app, "POST", "/api/currencies/"+testCADCurrencyID+"/initialize_backfill", strings.NewReader("{}"), map[string]string{
 		"Authorization": adminToken,
 	})
@@ -129,7 +100,7 @@ func TestCurrenciesRoutes_ListPermissionsAndBackfill(t *testing.T) {
 		t.Fatalf("expected all blank currencies backfilled, got %+v", postStatus)
 	}
 
-	backfilledPO, err := app.FindRecordById("purchase_orders", "standardupd001")
+	backfilledPO, err := app.FindRecordById("purchase_orders", "curbackblankpo1")
 	if err != nil {
 		t.Fatalf("failed loading backfilled PO: %v", err)
 	}
@@ -140,7 +111,7 @@ func TestCurrenciesRoutes_ListPermissionsAndBackfill(t *testing.T) {
 		t.Fatalf("expected blank PO approval_total_home to match approval_total, got %v vs %v", got, backfilledPO.GetFloat("approval_total"))
 	}
 
-	foreignPO, err := app.FindRecordById("purchase_orders", "gal6e5la2fa4rpn")
+	foreignPO, err := app.FindRecordById("purchase_orders", "curbackfxpo0001")
 	if err != nil {
 		t.Fatalf("failed loading preserved foreign PO: %v", err)
 	}
@@ -151,7 +122,7 @@ func TestCurrenciesRoutes_ListPermissionsAndBackfill(t *testing.T) {
 		t.Fatalf("expected foreign PO approval_total_home preserved at 135, got %v", got)
 	}
 
-	backfilledExpense, err := app.FindRecordById("expenses", "2gq9uyxmkcyopa4")
+	backfilledExpense, err := app.FindRecordById("expenses", "curbackblankexp1")
 	if err != nil {
 		t.Fatalf("failed loading backfilled expense: %v", err)
 	}
@@ -162,7 +133,7 @@ func TestCurrenciesRoutes_ListPermissionsAndBackfill(t *testing.T) {
 		t.Fatalf("expected blank expense settled_total to match total, got %v vs %v", got, backfilledExpense.GetFloat("total"))
 	}
 
-	foreignExpense, err := app.FindRecordById("expenses", "b4o6xph4ngwx4nw")
+	foreignExpense, err := app.FindRecordById("expenses", "curbackfxexp0001")
 	if err != nil {
 		t.Fatalf("failed loading preserved foreign expense: %v", err)
 	}
@@ -178,7 +149,7 @@ func TestCurrenciesRoutes_ListPermissionsAndBackfill(t *testing.T) {
 	})
 	mustStatus(t, idempotentRes, 200)
 
-	foreignPO, err = app.FindRecordById("purchase_orders", "gal6e5la2fa4rpn")
+	foreignPO, err = app.FindRecordById("purchase_orders", "curbackfxpo0001")
 	if err != nil {
 		t.Fatalf("failed reloading preserved foreign PO: %v", err)
 	}

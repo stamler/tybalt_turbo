@@ -7,7 +7,6 @@ import (
 	"testing"
 	"tybalt/internal/testutils"
 
-	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -662,28 +661,17 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		{
 			Name:   "visible by id falls back to total when legacy one-time purchase order has zero approval_total",
 			Method: http.MethodGet,
-			URL:    "/api/purchase_orders/visible/0pia83nnprdlzf8",
+			URL:    "/api/purchase_orders/visible/poviszero000001",
 			Headers: map[string]string{
 				"Authorization": noclaimsToken,
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"id":"0pia83nnprdlzf8"`,
+				`"id":"poviszero000001"`,
 				`"type":"One-Time"`,
 				`"remaining_amount":`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				if _, err := app.DB().NewQuery(`
-					UPDATE purchase_orders
-					SET approval_total = 0
-					WHERE id = {:id}
-				`).Bind(map[string]any{
-					"id": "0pia83nnprdlzf8",
-				}).Execute(); err != nil {
-					t.Fatalf("failed updating purchase order fixture: %v", err)
-				}
-			},
 			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
 				defer res.Body.Close()
 

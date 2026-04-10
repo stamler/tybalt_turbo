@@ -25,3 +25,9 @@ created,email,emailVisibility,id,name,password,tokenKey,updated,username,verifie
 2024-09-04 19:22:58.152Z,fakemanager@fakesite.xyz,0,wegviunlyr2jjjv,,$2a$12$OMgb4zbBoXwInHaoBcf9Eug5Pa.2yNBUHZBILooZf8khEGOJcHODy,ukE7jwgdQC3AMYLXX6gzLGqyU6MAly9QcxPekKEdRHtkLRXkdO,2024-10-29 20:50:25.987Z,fmanager,1
 2026-04-07 12:00:00.000Z,self_apv_yes@test.com,0,u_self_apv_yes,Self Approver Yes,$2a$12$pJI2YW21.vQd0BS7kZUVAuCjhjFc/cx1piSslHL2cEBo/94dZniJi,tok_self_apv_yes_fixture_001,2026-04-07 12:00:00.000Z,selfapvyes,1
 2026-04-07 12:00:00.000Z,self_apv_no@test.com,0,u_self_apv_no,Self Approver No,$2a$12$pJI2YW21.vQd0BS7kZUVAuCjhjFc/cx1piSslHL2cEBo/94dZniJi,tok_self_apv_no_fixture_001,2026-04-07 12:00:00.000Z,selfapvno,1
+2026-04-10 00:00:00.000Z,admin.only@example.com,0,u_admin_only,Admin Only,a.vQd0,tok_u_admin_only,2026-04-10 00:00:00.000Z,u_admin_only,1
+2026-04-10 00:00:00.000Z,corp.noclaim@example.com,0,u_corp_noclaim,Corporate No Claim,a.vQd0,tok_u_corp_noclaim,2026-04-10 00:00:00.000Z,u_corp_noclaim,1
+2026-04-10 00:00:00.000Z,corp.claim@example.com,0,u_corp_claim,Corporate Claim,a.vQd0,tok_u_corp_claim,2026-04-10 00:00:00.000Z,u_corp_claim,1
+2026-04-10 00:00:00.000Z,corp.manager@example.com,0,u_corp_manager,Corporate Manager,a.vQd0,tok_u_corp_manager,2026-04-10 00:00:00.000Z,u_corp_manager,1
+2026-04-10 00:00:00.000Z,subject.corp@example.com,0,u_subject_corp,Subject Corporate,a.vQd0,tok_u_subject_corp,2026-04-10 00:00:00.000Z,u_subject_corp,1
+2026-04-10 00:00:00.000Z,placeholder.payroll@example.com,0,u_placeholderpay,Placeholder Payroll,a.vQd0,tok_u_placeholderpay,2026-04-10 00:00:00.000Z,u_placeholderpay,1

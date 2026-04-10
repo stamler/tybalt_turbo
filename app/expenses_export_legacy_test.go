@@ -50,72 +50,6 @@ func setupExpensesExportMissingLegacyUIDApp(tb testing.TB) *tests.TestApp {
 	return app
 }
 
-func setupExpensesExportCurrencyFieldsApp(tb testing.TB) *tests.TestApp {
-	app := testutils.SetupTestApp(tb)
-
-	if _, err := app.DB().NewQuery(`
-		UPDATE expenses
-		SET currency = 'usdcurr00000001',
-		    settled_total = 91.11,
-		    committed = '2026-04-05 12:00:00.000Z',
-		    committed_week_ending = '2026-04-11',
-		    pay_period_ending = '2026-04-11',
-		    updated = '2026-04-05 12:00:00.000Z',
-		    _imported = 0
-		WHERE id = '77i1224mudailrb'
-	`).Execute(); err != nil {
-		tb.Fatal(err)
-	}
-
-	if _, err := app.DB().NewQuery(`
-		UPDATE expenses
-		SET currency = '',
-		    settled_total = 88.88,
-		    committed = '2026-04-05 12:00:00.000Z',
-		    committed_week_ending = '2026-04-11',
-		    pay_period_ending = '2026-04-11',
-		    updated = '2026-04-05 12:00:00.000Z',
-		    _imported = 0
-		WHERE id = '2gq9uyxmkcyopa4'
-	`).Execute(); err != nil {
-		tb.Fatal(err)
-	}
-
-	return app
-}
-
-func setupExpensesExportBlankUnapprovedPOApp(tb testing.TB) *tests.TestApp {
-	app := testutils.SetupTestApp(tb)
-
-	if _, err := app.DB().NewQuery(`
-		INSERT INTO purchase_orders (
-			id,
-			po_number,
-			status,
-			_imported,
-			date,
-			type,
-			payment_type,
-			total,
-			description
-		) VALUES (
-			'po_export_blank_unapproved',
-			'',
-			'Unapproved',
-			0,
-			'2026-03-01',
-			'One-Time',
-			'CC',
-			123.45,
-			'Draft PO should not be exported'
-		)
-	`).Execute(); err != nil {
-		tb.Fatal(err)
-	}
-
-	return app
-}
-
 func TestExpensesExportLegacyIncludesPoApproverProps(t *testing.T) {
 	validToken := "test-secret-123"
 
@@ -194,7 +128,7 @@ func TestExpensesExportLegacyIncludesPoApproverProps(t *testing.T) {
 				`"id":"po_export_blank_unapproved"`,
 				`"description":"Draft PO should not be exported"`,
 			},
-			TestAppFactory: setupExpensesExportBlankUnapprovedPOApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "includes currency code and settled_total only when expense currency is explicitly set",
@@ -208,7 +142,7 @@ func TestExpensesExportLegacyIncludesPoApproverProps(t *testing.T) {
 				`"currency":"USD"`,
 				`"settled_total":91.11`,
 			},
-			TestAppFactory: setupExpensesExportCurrencyFieldsApp,
+			TestAppFactory: testutils.SetupTestApp,
 			AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
 				defer res.Body.Close()
 
@@ -236,9 +170,9 @@ func TestExpensesExportLegacyIncludesPoApproverProps(t *testing.T) {
 
 				for i := range payload.Expenses {
 					switch payload.Expenses[i].ImmutableID {
-					case "77i1224mudailrb":
+					case "rptcurusd000001":
 						withCurrency = &payload.Expenses[i]
-					case "2gq9uyxmkcyopa4":
+					case "rptcurcad000001":
 						blankCurrency = &payload.Expenses[i]
 					}
 				}

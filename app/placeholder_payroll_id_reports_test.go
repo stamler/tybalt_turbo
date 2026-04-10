@@ -11,20 +11,12 @@ import (
 )
 
 const (
-	placeholderPayrollTestUserID         = payrollReportSeedUserID
-	placeholderPayrollControlUserID      = "etysnrlup2f6bak"
 	placeholderPayrollPlaceholderID      = "912345678"
 	placeholderPayrollWeek1              = "2026-04-18"
 	placeholderPayrollWeek2              = "2026-04-25"
-	placeholderPayrollApproverID         = payrollReportSeedCommitterID
-	placeholderPayrollTimeTypeID         = "sdyfl3q7j7ap849"
 	placeholderPayrollTimesheetWeek1ID   = "phw1sheet000001"
 	placeholderPayrollTimesheetWeek2ID   = "phw2sheet000001"
 	placeholderPayrollControlSheetID     = "ctw2sheet000001"
-	placeholderPayrollEntryWeek1ID       = "phw1entry000001"
-	placeholderPayrollEntryWeek2ID       = "phw2entry000001"
-	placeholderPayrollControlEntryID     = "ctw2entry000001"
-	placeholderPayrollAmendWeek1ID       = "phw1amend000001"
 	placeholderPayrollAmendWeek2ID       = "phw2amend000001"
 	placeholderPayrollExpenseID          = "phw2expense0001"
 	placeholderPayrollControlExpenseID   = "ctw2expense0001"
@@ -37,343 +29,6 @@ const (
 	placeholderPayrollExpenseDesc        = "Placeholder payroll expense row"
 	placeholderPayrollControlExpenseDesc = "Control payroll expense row"
 )
-
-func setupPlaceholderPayrollIDReportApp(tb testing.TB) *tests.TestApp {
-	tb.Helper()
-
-	app := testutils.SetupTestApp(tb)
-
-	mustExec(tb, app, `
-		UPDATE admin_profiles
-		SET payroll_id = {:payroll_id}
-		WHERE uid = {:uid}
-	`, dbx.Params{
-		"payroll_id": placeholderPayrollPlaceholderID,
-		"uid":        placeholderPayrollTestUserID,
-	})
-
-	insertCommittedTimeSheetForUser(tb, app, placeholderPayrollTimesheetWeek1ID, placeholderPayrollTestUserID, placeholderPayrollWeek1)
-	insertCommittedTimeSheetForUser(tb, app, placeholderPayrollTimesheetWeek2ID, placeholderPayrollTestUserID, placeholderPayrollWeek2)
-	insertCommittedTimeSheetForUser(tb, app, placeholderPayrollControlSheetID, placeholderPayrollControlUserID, placeholderPayrollWeek2)
-
-	insertTimeEntryForTimesheet(tb, app, placeholderPayrollEntryWeek1ID, placeholderPayrollTimesheetWeek1ID, placeholderPayrollTestUserID, placeholderPayrollWeek1, placeholderPayrollTimeDescription+" week1")
-	insertTimeEntryForTimesheet(tb, app, placeholderPayrollEntryWeek2ID, placeholderPayrollTimesheetWeek2ID, placeholderPayrollTestUserID, placeholderPayrollWeek2, placeholderPayrollTimeDescription)
-	insertTimeEntryForTimesheet(tb, app, placeholderPayrollControlEntryID, placeholderPayrollControlSheetID, placeholderPayrollControlUserID, placeholderPayrollWeek2, placeholderPayrollControlTimeDesc)
-
-	insertCommittedTimeAmendmentForUser(tb, app, placeholderPayrollAmendWeek1ID, placeholderPayrollTimesheetWeek1ID, placeholderPayrollTestUserID, placeholderPayrollWeek1, placeholderPayrollTimeDescription+" amendment week1")
-	insertCommittedTimeAmendmentForUser(tb, app, placeholderPayrollAmendWeek2ID, placeholderPayrollTimesheetWeek2ID, placeholderPayrollTestUserID, placeholderPayrollWeek2, placeholderPayrollTimeDescription+" amendment week2")
-
-	insertVendor(tb, app, placeholderPayrollVendorID, placeholderPayrollVendorName)
-	insertVendor(tb, app, placeholderPayrollControlVendorID, placeholderPayrollControlVendorName)
-
-	insertCommittedExpenseForUser(tb, app, placeholderPayrollExpenseID, placeholderPayrollTestUserID, placeholderPayrollExpenseDesc, placeholderPayrollWeek2, placeholderPayrollWeek2, placeholderPayrollWeek2, placeholderPayrollVendorID)
-	insertCommittedExpenseForUser(tb, app, placeholderPayrollControlExpenseID, placeholderPayrollControlUserID, placeholderPayrollControlExpenseDesc, placeholderPayrollWeek2, placeholderPayrollWeek2, placeholderPayrollWeek2, placeholderPayrollControlVendorID)
-
-	return app
-}
-
-func mustExec(tb testing.TB, app *tests.TestApp, query string, params dbx.Params) {
-	tb.Helper()
-
-	if _, err := app.NonconcurrentDB().NewQuery(query).Bind(params).Execute(); err != nil {
-		tb.Fatal(err)
-	}
-}
-
-func insertCommittedTimeSheetForUser(tb testing.TB, app *tests.TestApp, id string, uid string, weekEnding string) {
-	tb.Helper()
-
-	mustExec(tb, app, `
-		INSERT INTO time_sheets (
-			_imported,
-			approved,
-			approver,
-			committed,
-			committer,
-			created,
-			id,
-			payroll_id,
-			rejected,
-			rejection_reason,
-			rejector,
-			salary,
-			submitted,
-			uid,
-			updated,
-			week_ending,
-			work_week_hours
-		) VALUES (
-			0,
-			'2026-04-25 12:00:00.000Z',
-			{:approver},
-			'2026-04-25 12:05:00.000Z',
-			{:committer},
-			'2026-04-25 11:55:00.000Z',
-			{:id},
-			{:payroll_id},
-			'',
-			'',
-			'',
-			1,
-			1,
-			{:uid},
-			'2026-04-25 12:05:00.000Z',
-			{:week_ending},
-			40
-		)
-	`, dbx.Params{
-		"approver":    placeholderPayrollApproverID,
-		"committer":   placeholderPayrollApproverID,
-		"id":          id,
-		"payroll_id":  payrollIDForUser(uid),
-		"uid":         uid,
-		"week_ending": weekEnding,
-	})
-}
-
-func insertTimeEntryForTimesheet(tb testing.TB, app *tests.TestApp, id string, tsid string, uid string, weekEnding string, description string) {
-	tb.Helper()
-
-	mustExec(tb, app, `
-		INSERT INTO time_entries (
-			_imported,
-			branch,
-			category,
-			created,
-			date,
-			description,
-			division,
-			hours,
-			id,
-			job,
-			meals_hours,
-			payout_request_amount,
-			role,
-			time_type,
-			tsid,
-			uid,
-			updated,
-			week_ending,
-			work_record
-		) VALUES (
-			0,
-			'',
-			'',
-			'2026-04-25 11:56:00.000Z',
-			{:date},
-			{:description},
-			'',
-			8,
-			{:id},
-			'',
-			0,
-			0,
-			'',
-			{:time_type},
-			{:tsid},
-			{:uid},
-			'2026-04-25 11:56:00.000Z',
-			{:week_ending},
-			''
-		)
-	`, dbx.Params{
-		"date":        weekEnding,
-		"description": description,
-		"id":          id,
-		"time_type":   placeholderPayrollTimeTypeID,
-		"tsid":        tsid,
-		"uid":         uid,
-		"week_ending": weekEnding,
-	})
-}
-
-func insertCommittedTimeAmendmentForUser(tb testing.TB, app *tests.TestApp, id string, tsid string, uid string, weekEnding string, description string) {
-	tb.Helper()
-
-	mustExec(tb, app, `
-		INSERT INTO time_amendments (
-			_imported,
-			branch,
-			category,
-			committed,
-			committed_week_ending,
-			committer,
-			created,
-			creator,
-			date,
-			description,
-			division,
-			hours,
-			id,
-			job,
-			meals_hours,
-			payout_request_amount,
-			skip_tsid_check,
-			time_type,
-			tsid,
-			uid,
-			updated,
-			week_ending,
-			work_record
-		) VALUES (
-			0,
-			'',
-			'',
-			'2026-04-25 12:06:00.000Z',
-			{:committed_week_ending},
-			{:committer},
-			'2026-04-25 12:01:00.000Z',
-			{:creator},
-			{:date},
-			{:description},
-			'',
-			2,
-			{:id},
-			'',
-			0,
-			0,
-			0,
-			{:time_type},
-			{:tsid},
-			{:uid},
-			'2026-04-25 12:06:00.000Z',
-			{:week_ending},
-			''
-		)
-	`, dbx.Params{
-		"committed_week_ending": weekEnding,
-		"committer":             placeholderPayrollApproverID,
-		"creator":               uid,
-		"date":                  weekEnding,
-		"description":           description,
-		"id":                    id,
-		"time_type":             placeholderPayrollTimeTypeID,
-		"tsid":                  tsid,
-		"uid":                   uid,
-		"week_ending":           weekEnding,
-	})
-}
-
-func insertVendor(tb testing.TB, app *tests.TestApp, id string, name string) {
-	tb.Helper()
-
-	mustExec(tb, app, `
-		INSERT INTO vendors (
-			_imported,
-			alias,
-			created,
-			id,
-			name,
-			status,
-			updated
-		) VALUES (
-			0,
-			'',
-			'2026-04-25 11:54:00.000Z',
-			{:id},
-			{:name},
-			'Active',
-			'2026-04-25 11:54:00.000Z'
-		)
-	`, dbx.Params{
-		"id":   id,
-		"name": name,
-	})
-}
-
-func insertCommittedExpenseForUser(tb testing.TB, app *tests.TestApp, id string, uid string, description string, date string, payPeriodEnding string, committedWeekEnding string, vendorID string) {
-	tb.Helper()
-
-	mustExec(tb, app, `
-		INSERT INTO expenses (
-			_imported,
-			allowance_types,
-			approved,
-			approver,
-			attachment,
-			attachment_hash,
-			branch,
-			category,
-			cc_last_4_digits,
-			committed,
-			committed_week_ending,
-			committer,
-			created,
-			date,
-			description,
-			distance,
-			division,
-			id,
-			job,
-			kind,
-			pay_period_ending,
-			payment_type,
-			purchase_order,
-			rejected,
-			rejection_reason,
-			rejector,
-			submitted,
-			total,
-			uid,
-			updated,
-			vendor
-		) VALUES (
-			0,
-			'[]',
-			'2026-04-25 12:00:00.000Z',
-			{:approver},
-			'',
-			'',
-			'',
-			'',
-			'',
-			'2026-04-25 12:05:00.000Z',
-			{:committed_week_ending},
-			{:committer},
-			'2026-04-25 11:55:00.000Z',
-			{:date},
-			{:description},
-			0,
-			'',
-			{:id},
-			'',
-			{:kind},
-			{:pay_period_ending},
-			'OnAccount',
-			'',
-			'',
-			'',
-			'',
-			1,
-			123.45,
-			{:uid},
-			'2026-04-25 12:05:00.000Z',
-			{:vendor}
-		)
-	`, dbx.Params{
-		"approver":              placeholderPayrollApproverID,
-		"committed_week_ending": committedWeekEnding,
-		"committer":             placeholderPayrollApproverID,
-		"date":                  date,
-		"description":           description,
-		"id":                    id,
-		"kind":                  payrollReportSeedKindID,
-		"pay_period_ending":     payPeriodEnding,
-		"uid":                   uid,
-		"vendor":                vendorID,
-	})
-}
-
-func payrollIDForUser(uid string) string {
-	if uid == placeholderPayrollTestUserID {
-		return placeholderPayrollPlaceholderID
-	}
-	if uid == placeholderPayrollControlUserID {
-		// This is intentionally in the 9xxxxxx range without being a generated placeholder.
-		return "900002"
-	}
-	return payrollReportSeedPayrollID
-}
 
 func TestPlaceholderPayrollIDWritebackExportsOmitRows(t *testing.T) {
 	validToken := "test-secret-123"
@@ -391,7 +46,7 @@ func TestPlaceholderPayrollIDWritebackExportsOmitRows(t *testing.T) {
 				`"timeSheets"`,
 				`"timeAmendments"`,
 			},
-			TestAppFactory: setupPlaceholderPayrollIDReportApp,
+			TestAppFactory: testutils.SetupTestApp,
 			AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
 				defer res.Body.Close()
 
@@ -433,7 +88,7 @@ func TestPlaceholderPayrollIDWritebackExportsOmitRows(t *testing.T) {
 			ExpectedContent: []string{
 				`"expenses"`,
 			},
-			TestAppFactory: setupPlaceholderPayrollIDReportApp,
+			TestAppFactory: testutils.SetupTestApp,
 			AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
 				defer res.Body.Close()
 
@@ -486,7 +141,7 @@ func TestPlaceholderPayrollIDWritebackExportsOmitRows(t *testing.T) {
 }
 
 func TestPlaceholderPayrollIDReportSourcesExposeCounts(t *testing.T) {
-	app := setupPlaceholderPayrollIDReportApp(t)
+	app := testutils.SetupTestApp(t)
 	defer app.Cleanup()
 
 	payrollRecord := findPayrollReportWeekEndingRecord(t, app, placeholderPayrollWeek2)
@@ -537,7 +192,7 @@ func TestPlaceholderPayrollIDReportSourcesExposeCounts(t *testing.T) {
 		ExpectedContent: []string{
 			`"committed_week_ending"`,
 		},
-		TestAppFactory: setupPlaceholderPayrollIDReportApp,
+		TestAppFactory: testutils.SetupTestApp,
 		AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
 			defer res.Body.Close()
 
@@ -586,7 +241,7 @@ func TestPlaceholderPayrollIDCSVReportsOmitRows(t *testing.T) {
 			NotExpectedContent: []string{
 				placeholderPayrollPlaceholderID,
 			},
-			TestAppFactory: setupPlaceholderPayrollIDReportApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "payroll expense report omits placeholder payroll rows",
@@ -603,7 +258,7 @@ func TestPlaceholderPayrollIDCSVReportsOmitRows(t *testing.T) {
 			NotExpectedContent: []string{
 				placeholderPayrollExpenseDesc,
 			},
-			TestAppFactory: setupPlaceholderPayrollIDReportApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "weekly expense report omits placeholder payroll rows",
@@ -620,7 +275,7 @@ func TestPlaceholderPayrollIDCSVReportsOmitRows(t *testing.T) {
 			NotExpectedContent: []string{
 				placeholderPayrollExpenseDesc,
 			},
-			TestAppFactory: setupPlaceholderPayrollIDReportApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 	}
 

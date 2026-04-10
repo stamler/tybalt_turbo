@@ -6,7 +6,6 @@ import (
 	"testing"
 	"tybalt/internal/testutils"
 
-	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -29,102 +28,6 @@ type workRecordDetailRow struct {
 	Surname     string  `json:"surname"`
 	GivenName   string  `json:"given_name"`
 	TimesheetID string  `json:"timesheet_id"`
-}
-
-func setupWorkRecordsApp(tb testing.TB) *tests.TestApp {
-	tb.Helper()
-
-	app := testutils.SetupTestApp(tb)
-
-	_, err := app.NonconcurrentDB().NewQuery(`
-		INSERT OR IGNORE INTO claims (created, description, id, name, updated)
-		VALUES (
-			strftime('%Y-%m-%d %H:%M:%fZ', 'now'),
-			'Can audit work records',
-			{:claim_id},
-			'work_record',
-			strftime('%Y-%m-%d %H:%M:%fZ', 'now')
-		)
-	`).Bind(dbx.Params{
-		"claim_id": "wrkrcdclaim0001",
-	}).Execute()
-	if err != nil {
-		tb.Fatalf("failed to seed work_record claim: %v", err)
-	}
-
-	_, err = app.NonconcurrentDB().NewQuery(`
-		INSERT OR IGNORE INTO user_claims (_imported, cid, created, id, uid, updated)
-		VALUES (
-			0,
-			{:cid},
-			strftime('%Y-%m-%d %H:%M:%fZ', 'now'),
-			{:id},
-			{:uid},
-			strftime('%Y-%m-%d %H:%M:%fZ', 'now')
-		)
-	`).Bind(dbx.Params{
-		"cid": "wrkrcdclaim0001",
-		"id":  "wrkrcduserclm01",
-		"uid": "f2j5a8vk006baub",
-	}).Execute()
-	if err != nil {
-		tb.Fatalf("failed to assign work_record claim in test setup: %v", err)
-	}
-
-	_, err = app.NonconcurrentDB().NewQuery(`
-		INSERT OR IGNORE INTO time_entries (
-			_imported,
-			branch,
-			category,
-			created,
-			date,
-			description,
-			division,
-			hours,
-			id,
-			job,
-			meals_hours,
-			payout_request_amount,
-			role,
-			time_type,
-			tsid,
-			uid,
-			updated,
-			week_ending,
-			work_record
-		)
-		SELECT
-			_imported,
-			branch,
-			category,
-			created,
-			date,
-			description,
-			division,
-			hours,
-			{:id},
-			job,
-			meals_hours,
-			payout_request_amount,
-			role,
-			time_type,
-			tsid,
-			uid,
-			updated,
-			week_ending,
-			{:work_record}
-		FROM time_entries
-		WHERE id = {:source_id}
-	`).Bind(dbx.Params{
-		"id":          "wrkrcdentry0001",
-		"work_record": "K12-314",
-		"source_id":   "tzzoosc7wjre5y3",
-	}).Execute()
-	if err != nil {
-		tb.Fatalf("failed to seed extra work record time entry: %v", err)
-	}
-
-	return app
 }
 
 func TestWorkRecordsRoutes(t *testing.T) {
@@ -154,7 +57,7 @@ func TestWorkRecordsRoutes(t *testing.T) {
 				`"work_record":"F34-142"`,
 				`"work_record":"K12-314"`,
 			},
-			TestAppFactory: setupWorkRecordsApp,
+			TestAppFactory: testutils.SetupTestApp,
 			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
 				defer res.Body.Close()
 
@@ -189,7 +92,7 @@ func TestWorkRecordsRoutes(t *testing.T) {
 				`"work_record":"K12-314"`,
 				`"entry_count":2`,
 			},
-			TestAppFactory: setupWorkRecordsApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "unauthorized user cannot fetch work records list",
@@ -202,7 +105,7 @@ func TestWorkRecordsRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"you are not authorized to view work records"`,
 			},
-			TestAppFactory: setupWorkRecordsApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "report holder can fetch work record details with hidden link fields",
@@ -216,7 +119,7 @@ func TestWorkRecordsRoutes(t *testing.T) {
 				`"work_record":"K12-314"`,
 				`"timesheet_id":"j1lr2oddjongtoj"`,
 			},
-			TestAppFactory: setupWorkRecordsApp,
+			TestAppFactory: testutils.SetupTestApp,
 			AfterTestFunc: func(t testing.TB, _ *tests.TestApp, res *http.Response) {
 				defer res.Body.Close()
 
@@ -252,7 +155,7 @@ func TestWorkRecordsRoutes(t *testing.T) {
 				`"job_id":"zke3cs3yipplwtu"`,
 				`"timesheet_id":"av32qwch9xrcb5n"`,
 			},
-			TestAppFactory: setupWorkRecordsApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:   "unauthorized user cannot fetch work record details",
@@ -265,7 +168,7 @@ func TestWorkRecordsRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"you are not authorized to view work records"`,
 			},
-			TestAppFactory: setupWorkRecordsApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 	}
 

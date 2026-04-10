@@ -26,12 +26,19 @@ These tests need one config row to be enabled, disabled, or missing across diffe
 - [legacy_purchase_orders_test.go](app/legacy_purchase_orders_test.go)
   - `setupLegacyPOFeatureDisabledApp`
   - mutates `app_config.key='purchase_orders'` to disable `enable_legacy_po_create_update`
+- [branch_claims_test.go](app/branch_claims_test.go)
+  - legacy purchase order claim-gating scenarios
+  - temporarily enables `app_config.key='purchase_orders'.enable_legacy_po_create_update`
+  - reason: those route tests need the opposite feature-flag state from the canonical seeded DB
 - [utilities/config_test.go](app/utilities/config_test.go)
   - upserts and deletes `app_config` rows for `purchase_orders`, `notifications`, and `expenses`
   - these tests are explicitly about fallback/default parsing behavior for present, absent, and malformed config states
 - [notifications_test.go](app/notifications_test.go)
   - `upsertNotificationsConfigRawValue(..., {"timesheet_shared":false})`
   - used by disabled-notification behavior tests
+- [cron/litestream_check_test.go](app/cron/litestream_check_test.go)
+  - `upsertLitestreamConfigRawValue`
+  - reason: exercises enabled/disabled/malformed `litestream` config states that cannot all exist in one canonical row
 
 ## 2. Negative Export Poison-Pill Fixture
 
@@ -79,7 +86,38 @@ These tests create or change rows because the test is specifically verifying the
   - creates absorb state through `routes.AbsorbRecords(...)`
   - inserts one synthetic `absorb_actions` row in a blocked-undo case
   - reason: absorb state is transient workflow state, not static seed data
+- [expenses_test.go](app/expenses_test.go)
+  - `setupClosedPurchaseOrderForUncommit`
+  - reason: the uncommit route tests specifically verify that a previously closed PO is reopened after expense uncommit
+- [hooks/ownership_guards_test.go](app/hooks/ownership_guards_test.go)
+  - marks one fixture expense as `submitted=1`
+  - reason: verifies the immutable "submitted expenses cannot be edited" guard
 
-## 6. Current Status
+## 6. Contradictory Record Variants For Logic-Level Tests
+
+These cases intentionally rewrite or remove one seeded row so the same business logic can be exercised against mutually exclusive input states without maintaining an oversized fixture matrix.
+
+- [utilities/currency_rates_test.go](app/utilities/currency_rates_test.go)
+  - rewrites `currencies.rate` / `currencies.rate_date` for `USD`
+  - reason: stale-response and empty-response tests need a pre-existing "newer stored rate" state
+- [utilities/currencies_test.go](app/utilities/currencies_test.go)
+  - deletes the seeded CAD row
+  - reason: validates fallback behavior when the singleton home-currency record is missing
+- [hooks/purchase_orders_test.go](app/hooks/purchase_orders_test.go)
+  - updates parent `purchase_orders.currency`
+  - reason: validates child-PO inheritance from a foreign-currency parent without seeding duplicate parent variants
+- [hooks/validate_expenses_test.go](app/hooks/validate_expenses_test.go)
+  - updates one parent `purchase_orders.currency`
+  - reason: validates PO-linked expense currency inheritance against a foreign-currency parent variant
+
+## 7. Identity / External Auth State Matrices
+
+OAuth relink and onboarding tests need conflicting combinations of email, username, provider id, and existing external-auth rows. Encoding every combination in the shared base fixture DB would make the canonical seed harder to reason about than the tests themselves.
+
+- [oauth_onboarding_test.go](app/oauth_onboarding_test.go)
+  - creates purpose-built `users`, `_externalAuths`, and one `admin_profiles` row in selected scenarios
+  - reason: the behavior under test is the onboarding/relink logic across conflicting identity states, not static business fixture coverage
+
+## 8. Current Status
 
 Everything else that was previously additive setup has been moved into `data.db` and should stay there unless it proves to be one of the exception types above.

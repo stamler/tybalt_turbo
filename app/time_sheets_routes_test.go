@@ -7,46 +7,8 @@ import (
 	"testing"
 	"tybalt/internal/testutils"
 
-	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
 )
-
-func setupAdminOnlyViewerApp(tb testing.TB) *tests.TestApp {
-	tb.Helper()
-
-	app := testutils.SetupTestApp(tb)
-	claim, err := app.FindFirstRecordByFilter("claims", "name = 'admin'")
-	if err != nil {
-		tb.Fatalf("failed to load admin claim: %v", err)
-	}
-
-	_, err = app.NonconcurrentDB().NewQuery(`
-		INSERT OR IGNORE INTO user_claims (
-			_imported,
-			cid,
-			created,
-			id,
-			uid,
-			updated
-		) VALUES (
-			0,
-			{:cid},
-			strftime('%Y-%m-%d %H:%M:%fZ', 'now'),
-			{:id},
-			{:uid},
-			strftime('%Y-%m-%d %H:%M:%fZ', 'now')
-		)
-	`).Bind(dbx.Params{
-		"cid": claim.Id,
-		"id":  "test_admin_only_claim_u_no_claims",
-		"uid": "u_no_claims",
-	}).Execute()
-	if err != nil {
-		tb.Fatalf("failed to grant admin claim in test setup: %v", err)
-	}
-
-	return app
-}
 
 func TestTimeSheetsRoutes(t *testing.T) {
 	committerToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
@@ -205,7 +167,7 @@ func TestTimeSheetsRoutes(t *testing.T) {
 }
 
 func TestTimeSheetDetailsAndUncommitRoutes(t *testing.T) {
-	adminToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	adminToken, err := testutils.GenerateRecordToken("users", "admin.only@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,7 +189,7 @@ func TestTimeSheetDetailsAndUncommitRoutes(t *testing.T) {
 				`"items":[`,
 				`"approverInfo":{"`,
 			},
-			TestAppFactory: setupAdminOnlyViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin cannot read uncommitted time sheet details through custom route",
@@ -238,7 +200,7 @@ func TestTimeSheetDetailsAndUncommitRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"Time sheet not found or not authorized."`,
 			},
-			TestAppFactory: setupAdminOnlyViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin can uncommit a committed time sheet",
@@ -249,7 +211,7 @@ func TestTimeSheetDetailsAndUncommitRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"Record uncommitted successfully"`,
 			},
-			TestAppFactory: setupAdminOnlyViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 				record, err := app.FindRecordById("time_sheets", "j1lr2oddjongtoj")
 				if err != nil {
@@ -275,7 +237,7 @@ func TestTimeSheetDetailsAndUncommitRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"code":"unauthorized"`,
 			},
-			TestAppFactory: setupAdminOnlyViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin cannot uncommit an uncommitted time sheet",
@@ -286,7 +248,7 @@ func TestTimeSheetDetailsAndUncommitRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"code":"record_not_committed"`,
 			},
-			TestAppFactory: setupAdminOnlyViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 	}
 
@@ -296,7 +258,7 @@ func TestTimeSheetDetailsAndUncommitRoutes(t *testing.T) {
 }
 
 func TestTimeSheetAdminDiscoveryRoutes(t *testing.T) {
-	adminToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	adminToken, err := testutils.GenerateRecordToken("users", "admin.only@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +273,7 @@ func TestTimeSheetAdminDiscoveryRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"week_ending":"2024-09-28"`,
 			},
-			TestAppFactory: setupAdminOnlyViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin-only user can view committed timesheet tracking list",
@@ -322,7 +284,7 @@ func TestTimeSheetAdminDiscoveryRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"id":"j1lr2oddjongtoj"`,
 			},
-			TestAppFactory: setupAdminOnlyViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
 			Name:           "admin-only user cannot view missing timesheet list",
@@ -333,7 +295,7 @@ func TestTimeSheetAdminDiscoveryRoutes(t *testing.T) {
 			ExpectedContent: []string{
 				`"code":"unauthorized"`,
 			},
-			TestAppFactory: setupAdminOnlyViewerApp,
+			TestAppFactory: testutils.SetupTestApp,
 		},
 	}
 

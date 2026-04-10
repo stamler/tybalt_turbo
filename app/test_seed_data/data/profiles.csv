@@ -25,3 +25,9 @@ _imported,alternate_manager,created,default_division,default_role,do_not_accept_
 0,wegviunlyr2jjjv,2024-10-22 21:02:29.772Z,frwg34x7wvheh0p,,0,Fatty,t1kxpwj9vt1rbbn,f2j5a8vk006baub,email_text,Maclean,etysnrlup2f6bak,2024-10-29 20:51:24.829Z
 0,,2026-04-07 12:00:00.000Z,vccd5fo56ctbigh,,0,SelfApvYes,prof_self_apv_yes,u_self_apv_yes,email_text,Test,u_self_apv_yes,2026-04-07 12:00:00.000Z
 0,,2026-04-07 12:00:00.000Z,vccd5fo56ctbigh,,0,SelfApvNo,prof_self_apv_no,u_self_apv_no,email_text,Test,u_self_apv_no,2026-04-07 12:00:00.000Z
+0,,2026-04-10 00:00:00.000Z,vccd5fo56ctbigh,,0,Admin,prof_admin_only,f2j5a8vk006baub,email_text,Only,u_admin_only,2026-04-10 00:00:00.000Z
+0,,2026-04-10 00:00:00.000Z,fy4i9poneukvq9u,,0,Corporate,prof_corp_noclaim,f2j5a8vk006baub,email_text,NoClaim,u_corp_noclaim,2026-04-10 00:00:00.000Z
+0,,2026-04-10 00:00:00.000Z,fy4i9poneukvq9u,,0,Corporate,prof_corp_claim,f2j5a8vk006baub,email_text,Claim,u_corp_claim,2026-04-10 00:00:00.000Z
+0,,2026-04-10 00:00:00.000Z,fy4i9poneukvq9u,,0,Corporate,prof_corp_manager,f2j5a8vk006baub,email_text,Manager,u_corp_manager,2026-04-10 00:00:00.000Z
+0,,2026-04-10 00:00:00.000Z,vccd5fo56ctbigh,,0,Subject,prof_subject_corp,f2j5a8vk006baub,email_text,Corporate,u_subject_corp,2026-04-10 00:00:00.000Z
+0,,2026-04-10 00:00:00.000Z,vccd5fo56ctbigh,,0,Placeholder,prof_placeholder_pay,f2j5a8vk006baub,email_text,Payroll,u_placeholderpay,2026-04-10 00:00:00.000Z

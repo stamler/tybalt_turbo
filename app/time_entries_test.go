@@ -9,7 +9,6 @@ import (
 	"tybalt/internal/testutils"
 
 	"github.com/pocketbase/dbx"
-	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -259,14 +258,14 @@ func TestTimeEntriesCreate_BranchResolutionMatchesPurchaseOrders(t *testing.T) {
 				"division": "fy4i9poneukvq9u",
 				"description": "job branch assignment",
 				"hours": 1,
-				"job": "test_job_w_rs",
+				"job": "jobbranchovr01",
 				"role": "tbgoiwwwfj8cvju",
 				"branch": "80875lm27v8wgi4"
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"job":"test_job_w_rs"`,
+				`"job":"jobbranchovr01"`,
 				`"branch":"xeq9q81q5307f70"`,
 			},
 			ExpectedEvents: map[string]int{
@@ -278,11 +277,7 @@ func TestTimeEntriesCreate_BranchResolutionMatchesPurchaseOrders(t *testing.T) {
 				"OnModelCreateExecute":       1,
 				"OnModelAfterCreateSuccess":  1,
 			},
-			TestAppFactory: func(tb testing.TB) *tests.TestApp {
-				app := testutils.SetupTestApp(tb)
-				setJobBranch(tb, app, "test_job_w_rs", "xeq9q81q5307f70")
-				return app
-			},
+			TestAppFactory: testutils.SetupTestApp,
 		},
 	}
 
@@ -616,7 +611,7 @@ func TestTimeEntriesCreate_AwardedProposalWindow(t *testing.T) {
 				"division": "fy4i9poneukvq9u",
 				"description": "time entry against proposal with future project award date",
 				"hours": 1,
-				"job": "awproprecent001",
+				"job": "awpropfuture001",
 				"role": "tbgoiwwwfj8cvju"
 			}`),
 			Headers:        map[string]string{"Authorization": recordToken},
@@ -629,19 +624,6 @@ func TestTimeEntriesCreate_AwardedProposalWindow(t *testing.T) {
 				"OnRecordCreateRequest": 1,
 			},
 			TestAppFactory: testutils.SetupTestApp,
-			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
-				t.Helper()
-
-				project, err := app.FindRecordById("jobs", "awprojrecent001")
-				if err != nil {
-					t.Fatalf("failed to load referencing project: %v", err)
-				}
-
-				project.Set("project_award_date", "2026-03-25")
-				if err := app.Save(project); err != nil {
-					t.Fatalf("failed to update referencing project: %v", err)
-				}
-			},
 		},
 	}
 
