@@ -48,6 +48,13 @@ export function dateInputMaxMonthsAhead(monthsAhead: number): string {
   return toIsoDate(target);
 }
 
+export function currentYearStartMinusDays(daysBeforeStart: number): string {
+  const today = new Date();
+  const target = new Date(Date.UTC(today.getFullYear(), 0, 1, 0, 0, 0, 0));
+  target.setUTCDate(target.getUTCDate() - daysBeforeStart);
+  return toIsoDate(target);
+}
+
 export function isValidPayrollOpeningDate(value: string): boolean {
   if (!value) return true;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;

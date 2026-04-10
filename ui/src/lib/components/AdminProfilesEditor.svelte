@@ -8,6 +8,7 @@
   import DsLabel from "$lib/components/DsLabel.svelte";
   import {
     DATE_INPUT_MIN,
+    currentYearStartMinusDays,
     dateInputMaxMonthsAhead,
     isValidPayrollOpeningDate,
     payrollOpeningDatesInRange,
@@ -65,7 +66,8 @@
   let errors = $state({} as Record<string, { message: string }>);
   let item = $state(untrack(() => ({ ...data.item })));
   const dateInputMax = dateInputMaxMonthsAhead(15);
-  const validOpeningDates = payrollOpeningDatesInRange(DATE_INPUT_MIN, dateInputMax);
+  const openingDateMin = currentYearStartMinusDays(14);
+  const validOpeningDates = payrollOpeningDatesInRange(openingDateMin, dateInputMax);
   const openingBalancesRequireDate = $derived.by(() => {
     const openingOP = Number(item.opening_op ?? 0);
     const openingOV = Number(item.opening_ov ?? 0);
@@ -81,11 +83,15 @@
     ];
 
     const currentOpeningDate = item.opening_date?.trim() ?? "";
-    if (currentOpeningDate !== "" && !isValidPayrollOpeningDate(currentOpeningDate)) {
+    const hasCurrentOpeningDate = options.some((option) => option.id === currentOpeningDate);
+    if (currentOpeningDate !== "" && !hasCurrentOpeningDate) {
+      const currentOpeningDateIsValid = isValidPayrollOpeningDate(currentOpeningDate);
       options.splice(1, 0, {
         id: currentOpeningDate,
-        name: `${currentOpeningDate} (invalid existing value)`,
-        invalid: true,
+        name: currentOpeningDateIsValid
+          ? `${shortDate(currentOpeningDate, true)} (${currentOpeningDate}) (existing value)`
+          : `${currentOpeningDate} (invalid existing value)`,
+        invalid: !currentOpeningDateIsValid,
       });
     }
 
