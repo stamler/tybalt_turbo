@@ -32,8 +32,9 @@ The agreed direction is:
 - attach work record type to the work record, not the note
 - track consumable usage per work record through normalized supporting
   collections (`work_records_consumables`, `work_records_type_consumables`,
-  `work_records_consumable_entries`), with consumable visibility driven by the
-  selected work record type
+  `work_records_consumable_entries`), with entries referencing
+  `work_records_consumables` directly and consumable visibility driven by the
+  selected work record type via `work_records_type_consumables`
 - add `time_entries.work_record_id` as the new relation to `work_records`
 - enforce that a time entry referencing a work record has hours matching the
   work record's `hours_on_site + hours_travel_time`; mismatches produce a
@@ -173,6 +174,8 @@ The agreed direction is:
 - it becomes `true` only when the manager approves the `time_sheets` record
   that contains the `time_entries` record referencing that work record
 - when `approved = true`, the work record becomes locked for normal editing
+- when `approved = true`, linked `work_records_consumable_entries` must also be
+  treated as locked and may not be created, updated, or deleted
 - if the related timesheet becomes unapproved, recalled, or rejected, the
   corresponding work record's `approved` field should be set back to `false`
 - approval and unapproval of `work_records.approved` is triggered by the
@@ -257,9 +260,14 @@ Rules:
   entry's hours so they no longer equal `hours_on_site + hours_travel_time`,
   a validation error must tell the user to either edit the work record to
   match or create a separate time entry
+- changing `type` is allowed only if all existing consumable entries remain
+  valid for the new type's allowlist; otherwise the update must fail with a
+  validation error directing the user to remove or adjust incompatible entries
 - `company_vehicle_unit_number` is required when `vehicle_type = company`
 - `company_vehicle_unit_number` must be empty when `vehicle_type = personal`
 - normal edits are blocked when `approved = true`
+- linked `work_records_consumable_entries` cannot be added, changed, or deleted
+  when `approved = true`
 - append-only notes remain allowed when `approved = true`
 - `approved` is synchronized from the approval state of the related timesheet,
   not directly edited on the work record
@@ -360,7 +368,8 @@ Notes:
 Purpose:
 
 - defines which consumables are allowed for each work record type
-- provides the UI metadata needed to render those consumables
+- provides the UI metadata and validation allowlist needed to render and
+  validate those consumables
 
 Fields:
 
@@ -376,6 +385,9 @@ Rules:
 - unique index on `(type, consumable)`
 - this collection is the source of truth for which consumables appear for a
   given type
+- this collection is also the allowlist used by hooks to validate whether a
+  `work_records_consumable_entries` row is permitted for a work record's
+  current `type`
 - if a type has no rows here, the UI shows no consumables for that type
 - `General` is expected to have no rows here in initial seed data
 
@@ -391,7 +403,7 @@ Fields:
 
 - `id`: PocketBase id
 - `work_record`: relation to `work_records`, required
-- `type_consumable`: relation to `work_records_type_consumables`, required
+- `consumable`: relation to `work_records_consumables`, required
 - `quantity_number`: number, optional
 - `selected`: boolean, optional
 - `created`: system timestamp
@@ -399,21 +411,42 @@ Fields:
 
 Rules:
 
-- unique index on `(work_record, type_consumable)`
-- for `input_kind = number`, `quantity_number` is required and must be positive
-- for `input_kind = boolean`, `selected = true` represents inclusion and
+- unique index on `(work_record, consumable)`
+- each row must contain exactly one meaningful stored value, determined by the
+  referenced consumable's `input_kind`
+- for `input_kind = number`, `quantity_number` is required and must be greater
+  than `0`, and `selected` must be empty
+- for `input_kind = boolean`, `selected = true` represents inclusion, and
   `quantity_number` must be empty
+- a row must never store both `quantity_number` and `selected`
+- a row must never store neither value
 - rows should be omitted entirely when the user leaves a numeric consumable at
-  zero or a boolean consumable unchecked
+  zero or empty, or a boolean consumable unchecked / false / empty
+- the backend must validate that the referenced `consumable` is allowed for the
+  referenced `work_record.type` by checking for a matching
+  `work_records_type_consumables` row
+- create, update, and delete operations on this collection must fail when the
+  referenced `work_record.approved = true`
 - UI rendering should come from `work_records_type_consumables`, while storage
-  lives here
+  lives here and references the canonical consumable directly
 - if a consumable is not listed for the selected work record type, the worker
   should record it in the work record notes instead
+- `input_kind` validation should come from the referenced
+  `work_records_consumables` row rather than from
+  `work_records_type_consumables`
+- this "exactly one meaningful value" rule should be enforced in a backend hook
+  so invalid combinations cannot be persisted
+- reads and reports that need the consumable identity should use the direct
+  `consumable` relation; joins to `work_records_type_consumables` are only
+  needed when type-specific presentation metadata such as `unit_label` or
+  `sort_order` is required
 
 Implementation note:
 
 - this collection is the denormalized per-record storage mentioned in
-  discussion; it avoids sparse columns and keeps consumables extensible
+  discussion; it avoids sparse columns, keeps consumables extensible, and keeps
+  stored usage facts pointing at the canonical consumable definition rather
+  than at a type-specific config row
 
 ### Related `time_entries` Change
 
@@ -501,8 +534,10 @@ Recommendation:
 
 - When a time entry referencing the work record becomes part of an approved
   timesheet, mark the work record approved and prevent normal edits.
+- While approved, the system must also block create, update, and delete
+  operations on linked `work_records_consumable_entries`.
 - If the timesheet is unapproved, recalled, or rejected, clear approval and
-  allow edits again.
+  allow edits again, including consumable-entry edits.
 - Notes remain append-only regardless of approval state.
 
 ## UI
@@ -533,10 +568,14 @@ Editor requirements:
 - consumables section driven by `work_records_type_consumables`
 - numeric inputs for `input_kind = number`
 - checkbox inputs for `input_kind = boolean`
+- saving consumable entries should write direct `consumable` relations to
+  `work_records_consumable_entries`
 - no consumables section content when the chosen type has no allowed
   consumables
 - the consumables section should include guidance that if a needed consumable
   is not listed, it should be recorded in the notes
+- if the user changes the work record type after adding consumables, the UI
+  should either clear incompatible entries or block save with a clear message
 - the notes UI should include a disclosure icon, such as an `i` in a circle,
   that shows note-writing guidance
 
@@ -554,6 +593,9 @@ Minimum useful reports:
 - work records with no referencing time entry
 - work records not referenced by an approved timesheet
 - work records by job, employee, date range, and type
+- consumable usage by consumable across work records, without requiring
+  reporting queries to join through the type-allowlist table just to resolve
+  the consumable identity
 
 ## Migration And Compatibility
 
@@ -612,6 +654,9 @@ rest of the system catches up.
 - `time_entries.work_record_id` becomes the new relational link
 - `time_entries.work_record` stays for historical compatibility
 - work record type lives on `work_records`
+- `work_records_consumable_entries` reference
+  `work_records_consumables` directly, while `work_records_type_consumables`
+  remain the type-specific allowlist and UI metadata source
 - work record granularity is one person per day per job
 - related work records come only from `Copy To Tomorrow`, each with its own
   independent number
@@ -631,7 +676,12 @@ rest of the system catches up.
 - add backend number generation for `W` work records
 - add CRUD endpoints and permission rules
 - add append-only notes support
-- add consumable validation based on type allowlists and input kind
+- add consumable validation based on direct `consumable` references, type
+  allowlists, and input kind
+- add approval-aware hooks so `work_records_consumable_entries` cannot be
+  created, updated, or deleted while their parent work record is approved
+- add validation on `work_records.type` updates so incompatible existing
+  consumable entries block save until resolved
 - add approval/unapproval synchronization with timesheet workflow by extending
   existing timesheet approval hooks to fan out to referenced work records
 - add unique index on `time_entries.work_record_id` to enforce one-to-one
