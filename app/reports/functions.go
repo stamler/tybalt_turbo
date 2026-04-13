@@ -97,7 +97,7 @@ func zipAttachments(app core.App, report []Attachment, collectionId string, clas
 
 	for _, attachment := range report {
 		fullPath := collectionId + "/" + attachment.SourcePath
-		filenameInZip := attachment.Filename
+		filenameInZip := attachment.ZipFilename
 
 		blob, err := fsys.GetReader(fullPath)
 		if err != nil {
