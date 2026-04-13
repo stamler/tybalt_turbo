@@ -20,6 +20,10 @@ PDF handoff to invoicing. Turbo already has a `work_record` string on
 `time_entries`, plus a read-only audit surface for searching those strings, but
 it does not yet model work records as first-class records.
 
+Safety-related information such as Field Level Hazard Assessments, Pre-Start
+Tailgate Meetings, and Incident Reports is already captured and stored in Site
+Docs and is not part of the work record scope.
+
 The agreed direction is:
 
 - add a first-class `work_records` collection
@@ -37,8 +41,8 @@ The agreed direction is:
   separate time entry
 - preserve legacy `time_entries.work_record` text for existing historical data
 - store notes as append-only records
-- support child work records only through a dedicated `Copy To Tomorrow`
-  workflow
+- support related work records through a dedicated `Copy To Tomorrow` workflow,
+  with each copied record receiving its own independent number
 - lock work records when the referencing timesheet is approved; unlock them
   when it is unapproved, recalled, or rejected
 - defer PDF and printing/export work for now
@@ -73,8 +77,8 @@ The agreed direction is:
   are billable per day.
 - Work records track time plus consumables.
 - The four known types are `Survey`, `General`, `Drilling`, and `Field Test`.
-- Type mostly affects which consumables are shown; the rest of the workflow is
-  broadly the same.
+- Type affects only which consumables are shown; the rest of the work record
+  workflow is the same regardless of type.
 - Notes may contain client-facing context, training details, or explanations of
   what happened on site.
 - In rare cases, clients ask to receive work records directly, but this is not
@@ -108,15 +112,11 @@ The agreed direction is:
   with `W`.
 - Number generation should follow the same general pattern as purchase order
   numbering, but with a work-record prefix.
-- The draft format remains `W<YYMM-XXXX>` for parent records.
-- Child records created through `Copy To Tomorrow` will keep the same root
-  parent number with a dash suffix, for example `W2604-0123-1`.
-- The number regex is `WYYMM-NNNN` for parent records and `WYYMM-NNNN-N` for
-  child records.
-- `Copy To Tomorrow` may be run from either a parent record or a child record.
-- When copying from a child record, the new record must use the same root parent
-  number and the next sequential child suffix rather than appending a second
-  suffix.
+- All work records use the same number format: `WYYMM-NNNN`.
+- There is no dash-suffix scheme; every work record, whether created fresh or
+  through `Copy To Tomorrow`, receives its own independent sequential number.
+- The `parent_work_record` relation tracks lineage between related records, but
+  numbering does not encode that relationship.
 - Users will not manually enter or reserve work record numbers in the new flow.
 
 ### Work Record Identity On Time Entries
@@ -142,11 +142,10 @@ The agreed direction is:
 
 - The business distinction for work records is one work record per person per
   day per job.
-- Multi-day records are represented as a parent plus child day records.
-- Child work records are created only through `Copy To Tomorrow`.
-- `Copy To Tomorrow` may start from any record in the group, but child numbering
-  always continues from the root parent sequence.
-- The UI should not allow arbitrary manual creation of child numbers.
+- Multi-day records are represented as a group of related work records linked
+  through `parent_work_record`.
+- Related work records are created only through `Copy To Tomorrow`.
+- Each record in the group receives its own independent `WYYMM-NNNN` number.
 
 ### Export Scope
 
@@ -160,8 +159,9 @@ The agreed direction is:
 - A work record is a first-class record, not just a string on a time entry.
 - A work record belongs to one employee (`uid`) and one job.
 - A work record is for one calendar day.
-- A work record may optionally reference a parent work record when created from
-  `Copy To Tomorrow`.
+- A work record may optionally reference a parent work record (via
+  `parent_work_record`) when created from `Copy To Tomorrow`, for lineage
+  tracking only; numbering is independent.
 - A work record may be referenced by zero or one time entry through
   `time_entries.work_record_id`. This means work_record_id can have unique index. But the error must be surfaced by a hook to catch and report to the user since otherwise it would be buried
 - A work record can exist before, during, or after field work.
@@ -216,8 +216,8 @@ Fields:
 
 - `id`: PocketBase id
 - `number`: text, unique, backend generated, required
-- `parent_work_record`: optional self-relation used only for child records and
-  always points at the root parent record
+- `parent_work_record`: optional self-relation pointing at the root parent
+  record, used for lineage tracking only; does not affect numbering
 - `date`: text, `YYYY-MM-DD`, required
 - `uid`: relation to users, required
 - `creator`: relation to users, required
@@ -247,11 +247,12 @@ Rules:
 - `number` is assigned on first save by the backend
 - once assigned, `number` is immutable and cannot be changed
 - `uid` and `creator` are immutable after creation
-- parent/child linkage is system-managed by the `Copy To Tomorrow` workflow
-- a child record must inherit the same `job`, `uid`, and root parent number
-  base
-- if `Copy To Tomorrow` is run from a child record, the backend must resolve the
-  root parent and assign the next sequential child suffix under that root
+- `parent_work_record` linkage is system-managed by the `Copy To Tomorrow`
+  workflow
+- a copied record must inherit the same `job` and `uid` from the source record
+- if `Copy To Tomorrow` is run from a record that already has a
+  `parent_work_record`, the new record must point at the same root parent
+  rather than pointing at the intermediate record
 - if a time entry references the work record and the user edits that time
   entry's hours so they no longer equal `hours_on_site + hours_travel_time`,
   a validation error must tell the user to either edit the work record to
@@ -406,6 +407,8 @@ Rules:
   zero or a boolean consumable unchecked
 - UI rendering should come from `work_records_type_consumables`, while storage
   lives here
+- if a consumable is not listed for the selected work record type, the worker
+  should record it in the work record notes instead
 
 Implementation note:
 
@@ -434,7 +437,9 @@ Behavior:
 ### Create
 
 - User opens `Work Records` and creates a new record.
-- Default type may come from a user preference if configured.
+- Default type comes from a user preference that each worker can view and
+  update in their own profile settings. If no preference is set, no default
+  is applied and the user must select a type manually.
 - On first successful save, the backend assigns the next `W` number.
 - The user will first see the generated number after save succeeds.
 - After creation, the number is read-only and can never be edited.
@@ -442,17 +447,16 @@ Behavior:
 ### Copy To Tomorrow
 
 - `Copy To Tomorrow` pre-populates the editor with an existing work record.
-- It may be run from either a parent work record or a child work record.
+- It may be run from any work record in a group.
 - The copied record gets:
-  - a new backend-generated number
+  - a new independent backend-generated `WYYMM-NNNN` number
   - tomorrow's date by default, but the date is editable before save
-  - `parent_work_record` set to the root parent record for the group
-- If the source record is already a child, the backend resolves the root parent
-  and assigns the next sequential child suffix under that root, rather than
-  appending a second suffix to the source number.
+  - `parent_work_record` set to the root parent record for the group (if the
+    source record already has a `parent_work_record`, the new record points at
+    the same root parent, not at the source record)
 - The unique `(uid, job, date)` constraint still applies, so the user must
   choose a date that does not conflict with an existing record.
-- This is the only UI path that can create a child work record number.
+- This is the only UI path that creates a linked work record.
 
 ### Complete
 
@@ -462,6 +466,10 @@ Behavior:
 
 ### Time Entry Integration
 
+- The expected workflow is to complete the work record first, then create a
+  time entry from it. A work record can exist independently before any time
+  entry is created, and there is no dependency that requires a time entry to
+  exist first.
 - The work record details page should expose `Create Time Entry` when:
   - the current user is the record owner
   - no time entry exists yet with `work_record_id` equal to the current work
@@ -527,6 +535,8 @@ Editor requirements:
 - checkbox inputs for `input_kind = boolean`
 - no consumables section content when the chosen type has no allowed
   consumables
+- the consumables section should include guidance that if a needed consumable
+  is not listed, it should be recorded in the notes
 - the notes UI should include a disclosure icon, such as an `i` in a circle,
   that shows note-writing guidance
 
@@ -603,7 +613,8 @@ rest of the system catches up.
 - `time_entries.work_record` stays for historical compatibility
 - work record type lives on `work_records`
 - work record granularity is one person per day per job
-- child work records come only from `Copy To Tomorrow`
+- related work records come only from `Copy To Tomorrow`, each with its own
+  independent number
 - `work_records.approved` is a system-managed boolean driven by timesheet
   approval state
 - PDF/export is out of scope for now
@@ -656,4 +667,4 @@ rest of the system catches up.
 
 The next concrete step is to turn Phase 2 into an implementation checklist:
 PocketBase collections, migration order, validation changes on `time_entries`,
-and the `Copy To Tomorrow` root-parent/next-suffix number-generation rules.
+and the `Copy To Tomorrow` lineage-tracking rules.
