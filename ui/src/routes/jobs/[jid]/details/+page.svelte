@@ -1,5 +1,7 @@
 <script lang="ts">
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DSPopover from "$lib/components/DSPopover.svelte";
+  import DSTextInput from "$lib/components/DSTextInput.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import type { PageData } from "./$types";
   import { onMount } from "svelte";
@@ -16,6 +18,7 @@
   import { pb } from "$lib/pocketbase";
   import { goto, invalidateAll } from "$app/navigation";
   import { globalStore } from "$lib/stores/global";
+  import { jobsEditingEnabled } from "$lib/stores/appConfig";
   import type { FilterDef } from "$lib/components/jobs/types";
   import { formatCurrency, shortDate } from "$lib/utilities";
   import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
@@ -26,6 +29,11 @@
   let showFastCloseConfirm = $state(false);
   let fastCloseContextLoading = $state(false);
   let fastCloseContextError = $state<string | null>(null);
+  let showSetNumberModal = $state(false);
+  let setNumberSubmitting = $state(false);
+  let setNumberValue = $state("");
+  let setNumberGlobalError = $state<string | null>(null);
+  let setNumberErrors = $state({} as Record<string, { message: string }>);
   let fastCloseProposal = $state<{
     id: string;
     number: string;
@@ -72,6 +80,11 @@
   const canFastCloseImportedProject = $derived(
     !isProposal && data.job.status === "Active" && data.job.imported === true,
   );
+  const canSetNumber = $derived($jobsEditingEnabled && $globalStore.claims.includes("admin"));
+  const hasNumberHierarchyWarning = $derived(
+    Boolean(data.job.parent_number) ||
+      (Array.isArray(data.job.children) && data.job.children.length > 0),
+  );
 
   // Load proposal context and open confirmation modal so users can see exact
   // side effects before executing a potentially destructive close.
@@ -108,6 +121,46 @@
     fastCloseContextLoading = false;
     fastCloseContextError = null;
     fastCloseProposal = null;
+  }
+
+  function openSetNumberModal() {
+    setNumberValue = data.job.number ?? "";
+    setNumberGlobalError = null;
+    setNumberErrors = {};
+    showSetNumberModal = true;
+  }
+
+  function closeSetNumberModal() {
+    if (setNumberSubmitting) return;
+    showSetNumberModal = false;
+    setNumberGlobalError = null;
+    setNumberErrors = {};
+  }
+
+  async function submitSetNumber() {
+    if (setNumberSubmitting) return;
+
+    setNumberSubmitting = true;
+    setNumberGlobalError = null;
+    setNumberErrors = {};
+
+    try {
+      await pb.send(`/api/jobs/${data.job.id}/set-number`, {
+        method: "POST",
+        body: { number: setNumberValue },
+      });
+      closeSetNumberModal();
+      await invalidateAll();
+    } catch (error: any) {
+      const backendErrors = error?.data?.data as Record<string, { message: string }> | undefined;
+      const backendMessage = error?.data?.message ?? error?.data?.error ?? error?.message;
+      setNumberErrors = backendErrors ?? {};
+      if (!backendErrors || Object.keys(backendErrors).length === 0) {
+        setNumberGlobalError = backendMessage ?? "Failed to change job number";
+      }
+    } finally {
+      setNumberSubmitting = false;
+    }
   }
 
   // Close an imported Active project through the dedicated backend flow.
@@ -415,12 +468,51 @@
     onCancel={closeFastCloseConfirm}
   />
 
+  <DSPopover
+    bind:show={showSetNumberModal}
+    title="Change Job Number"
+    subtitle="Admins can manually override the stored job number without reopening the full editor."
+    error={setNumberGlobalError}
+    submitting={setNumberSubmitting}
+    submitLabel="Save Number"
+    onSubmit={submitSetNumber}
+    onCancel={closeSetNumberModal}
+  >
+    <DSTextInput
+      bind:value={setNumberValue}
+      errors={setNumberErrors}
+      fieldName="number"
+      uiName="Job Number"
+      disabled={setNumberSubmitting}
+    />
+
+    {#if hasNumberHierarchyWarning}
+      <div class="rounded-sm border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+        <p class="font-semibold">Related records are not renumbered automatically.</p>
+        {#if data.job.parent_number}
+          <p class="mt-1">This job has parent number {data.job.parent_number}.</p>
+        {/if}
+        {#if Array.isArray(data.job.children) && data.job.children.length > 0}
+          <p class="mt-1">
+            This job has {data.job.children.length} child job{data.job.children.length === 1
+              ? ""
+              : "s"}.
+          </p>
+        {/if}
+        <p class="mt-1">If related job numbers should stay aligned, update those records separately.</p>
+      </div>
+    {/if}
+  </DSPopover>
+
   <div class="space-y-2 rounded-sm bg-neutral-100 p-4">
     <div class="flex items-center gap-2">
       <span class="font-semibold">Job Number:</span>
       <span>{data.job.number}</span>
       {#if data.job.number?.startsWith("P")}
         <DsLabel color="yellow">proposal</DsLabel>
+      {/if}
+      {#if canSetNumber}
+        <DsActionButton action={openSetNumberModal} color="yellow">Change Number</DsActionButton>
       {/if}
       {#if data.job.number && !data.job.number.startsWith("P") && /^\d{2}-\d{3,4}$/.test(data.job.number)}
         <a href={`/jobs/add/${data.job.id}`} class="ml-2 text-blue-600 underline">Create Sub-Job</a>

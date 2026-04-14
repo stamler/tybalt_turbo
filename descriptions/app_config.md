@@ -8,11 +8,11 @@ Configuration is read via helpers in `app/utilities/config.go`. Missing or inval
 
 ## Domain: `jobs`
 
-Controls job-related editing operations.
+Controls job-related editing operations, including the admin-only manual job renumber flow.
 
 | Property             | Type | Default | Description                                                                                                |
 |----------------------|------|---------|------------------------------------------------------------------------------------------------------------|
-| `create_edit_absorb` | bool | `true`  | Enables job creation, updating, and client/contact absorb. When `false`, these operations return HTTP 403. |
+| `create_edit_absorb` | bool | `true`  | Enables job creation, updating, admin-only manual renumbering, and client/contact absorb. When `false`, these operations return HTTP 403. |
 
 **Fail mode:** open (defaults to enabled)
 
