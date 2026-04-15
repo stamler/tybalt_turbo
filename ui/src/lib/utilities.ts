@@ -110,6 +110,7 @@ export interface TimeSheetTallyQueryRow {
   rb_hours: number;
   payout_request_amount: number;
   payout_request_dates: string[];
+  shared_reviewer_count: number;
   submitted: boolean;
   rejected: string;
   rejection_reason: string;

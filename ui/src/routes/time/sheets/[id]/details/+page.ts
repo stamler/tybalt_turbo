@@ -31,6 +31,7 @@ export const load: PageLoad = async ({ params }) => {
       timesheetId: params.id,
       approverInfo,
       committerInfo,
+      sharedReviewerCount: response.sharedReviewerCount ?? 0,
     };
   } catch (err) {
     console.error(`loading time sheet details: ${err}`);

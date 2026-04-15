@@ -7,6 +7,7 @@
   import { goto } from "$app/navigation";
   import ShareModal from "$lib/components/ShareModal.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
+  import TimesheetSharedBadge from "$lib/components/TimesheetSharedBadge.svelte";
   import { shortDate } from "$lib/utilities";
   import type { TimeSheetTallyQueryRow } from "$lib/utilities";
   import type { SvelteComponent } from "svelte";
@@ -102,18 +103,27 @@
   <span>{tally.job_numbers.join(", ")}</span>
 {/snippet}
 {#snippet line3(tally: TimeSheetTallyQueryRow)}
-  {#if tally.rejected}
-    <span class="text-red-600">Rejected: {tally.rejection_reason}</span>
-  {/if}
-  {#if tally.payout_request_dates.length > 0}
-    <span>$${tally.payout_request_amount.toFixed(2)} in payout requests</span>
-  {:else}
-    <span>no payout requests</span>
-  {/if}
-  <!-- TODO: implement viewers, reviewed -->
-  <span>Viewers, Reviewed</span>
+  <span class="flex flex-wrap items-center gap-1">
+    {#if tally.rejected}
+      <span class="text-red-600">Rejected: {tally.rejection_reason}</span>
+    {/if}
+    <TimesheetSharedBadge count={tally.shared_reviewer_count} />
+    {#if tally.payout_request_dates.length > 0}
+      <span>$${tally.payout_request_amount.toFixed(2)} in payout requests</span>
+    {:else}
+      <span>no payout requests</span>
+    {/if}
+  </span>
 {/snippet}
-{#snippet actions({ id, uid, submitted, approved, approver, rejected, committed }: TimeSheetTallyQueryRow)}
+{#snippet actions({
+  id,
+  uid,
+  submitted,
+  approved,
+  approver,
+  rejected,
+  committed,
+}: TimeSheetTallyQueryRow)}
   {#if canRecallTimesheet({ uid, submitted, approved, rejected, committed }, viewerId)}
     <DsActionButton action={() => unbundle(id)} icon="mdi:rewind" title="Recall" color="orange" />
   {/if}

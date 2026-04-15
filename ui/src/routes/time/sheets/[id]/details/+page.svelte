@@ -3,6 +3,7 @@
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import TimesheetSharedBadge from "$lib/components/TimesheetSharedBadge.svelte";
   import type { PageData } from "./$types";
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
@@ -28,6 +29,7 @@
   let timeSheet = $state(untrack(() => data.timeSheet));
   let approverInfo = $state(untrack(() => data.approverInfo as any));
   let committerInfo = $state(untrack(() => data.committerInfo));
+  let sharedReviewerCount = $state(untrack(() => data.sharedReviewerCount ?? 0));
   let showUncommitConfirm = $state(false);
   let uncommitSubmitting = $state(false);
   let uncommitError = $state<string | null>(null);
@@ -45,6 +47,7 @@
       items = response.items;
       approverInfo = response.approverInfo;
       committerInfo = { committer_name: response.approverInfo?.committer_name || "" };
+      sharedReviewerCount = response.sharedReviewerCount ?? 0;
     } catch (error: any) {
       globalStore.addError(getApiErrorMessage(error, "Refresh failed"));
     }
@@ -215,6 +218,12 @@
           </div>
         {:else if !timeSheet.committed && !timeSheet.approved && timeSheet.rejected === ""}
           <DsLabel color="orange">Pending</DsLabel>
+        {/if}
+
+        {#if sharedReviewerCount > 0}
+          <div class="flex flex-wrap items-center gap-1">
+            <TimesheetSharedBadge count={sharedReviewerCount} />
+          </div>
         {/if}
       </div>
       <!-- Action Buttons -->

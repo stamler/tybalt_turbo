@@ -9,9 +9,10 @@ import (
 )
 
 type TimeSheetDetailsResponse struct {
-	TimeSheet    *core.Record      `json:"timeSheet"`
-	Items        []*core.Record    `json:"items"`
-	ApproverInfo TimesheetApprover `json:"approverInfo"`
+	TimeSheet           *core.Record      `json:"timeSheet"`
+	Items               []*core.Record    `json:"items"`
+	ApproverInfo        TimesheetApprover `json:"approverInfo"`
+	SharedReviewerCount int               `json:"sharedReviewerCount"`
 }
 
 func createGetTimeSheetDetailsHandler(app core.App) func(e *core.RequestEvent) error {
@@ -55,12 +56,37 @@ func createGetTimeSheetDetailsHandler(app core.App) func(e *core.RequestEvent) e
 			return e.Error(http.StatusInternalServerError, "failed to load approver info", err)
 		}
 
+		sharedReviewerCount, err := getTimesheetSharedReviewerCount(app, id)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to load shared reviewer count", err)
+		}
+
 		return e.JSON(http.StatusOK, TimeSheetDetailsResponse{
-			TimeSheet:    timeSheet,
-			Items:        items,
-			ApproverInfo: approverInfo,
+			TimeSheet:           timeSheet,
+			Items:               items,
+			ApproverInfo:        approverInfo,
+			SharedReviewerCount: sharedReviewerCount,
 		})
 	}
+}
+
+func getTimesheetSharedReviewerCount(app core.App, timeSheetID string) (int, error) {
+	var row struct {
+		Count int `db:"count"`
+	}
+
+	err := app.DB().NewQuery(`
+SELECT COUNT(*) AS count
+FROM time_sheet_reviewers
+WHERE time_sheet = {:timeSheetId}
+`).Bind(dbx.Params{
+		"timeSheetId": timeSheetID,
+	}).One(&row)
+	if err != nil {
+		return 0, err
+	}
+
+	return row.Count, nil
 }
 
 func canViewTimeSheetDetails(app core.App, auth *core.Record, timeSheet *core.Record) (bool, error) {

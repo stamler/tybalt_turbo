@@ -4,6 +4,7 @@
   import { pb } from "$lib/pocketbase";
   import { managers } from "$lib/stores/managers";
   import { globalStore } from "$lib/stores/global";
+  import { timesheets } from "$lib/stores/timesheets";
 
   type Reviewer = {
     id: string;
@@ -68,6 +69,12 @@
     reloadReviewers();
   }
 
+  async function refreshTimesheetListIfNeeded() {
+    if (collectionName === "time_sheet_reviewers") {
+      await timesheets.refresh();
+    }
+  }
+
   async function addViewer() {
     if (!newViewer) {
       globalStore.addError("Please select a manager to add as viewer");
@@ -79,7 +86,8 @@
         time_sheet: itemId,
         reviewer: newViewer,
       });
-      reloadReviewers();
+      await reloadReviewers();
+      await refreshTimesheetListIfNeeded();
     } catch (error: any) {
       globalStore.addError(`Failed to add viewer: ${error}`);
     }
@@ -88,7 +96,8 @@
   async function deleteViewer(reviewerRecordId: string) {
     try {
       await pb.collection(collectionName).delete(reviewerRecordId);
-      reloadReviewers();
+      await reloadReviewers();
+      await refreshTimesheetListIfNeeded();
     } catch (error: any) {
       globalStore.addError(`Failed to remove viewer: ${error}`);
     }

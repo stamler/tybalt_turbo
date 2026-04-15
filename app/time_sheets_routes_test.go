@@ -1,12 +1,14 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
 	"testing"
 	"tybalt/internal/testutils"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -301,6 +303,128 @@ func TestTimeSheetAdminDiscoveryRoutes(t *testing.T) {
 
 	for _, scenario := range scenarios {
 		scenario.Test(t)
+	}
+}
+
+func TestTimeSheetTalliesIncludeSharedReviewerCountsWithoutInflatingTotals(t *testing.T) {
+	const (
+		timesheetID = "aeyl94og4xmnpq4"
+		ownerEmail  = "author@soup.com"
+	)
+
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	ownerToken, err := testutils.GenerateRecordToken("users", ownerEmail)
+	if err != nil {
+		t.Fatalf("failed to generate owner token: %v", err)
+	}
+
+	beforeRows := fetchTimesheetTalliesForOwner(t, app, ownerToken)
+	beforeRow := findTimesheetTallyRow(t, beforeRows, timesheetID)
+
+	seedTimesheetReviewers(t, app, timesheetID, "rzr98oadsp9qc11", "etysnrlup2f6bak")
+
+	afterRows := fetchTimesheetTalliesForOwner(t, app, ownerToken)
+	afterRow := findTimesheetTallyRow(t, afterRows, timesheetID)
+
+	if len(afterRows) != len(beforeRows) {
+		t.Fatalf("row count changed after adding reviewers: before=%d after=%d", len(beforeRows), len(afterRows))
+	}
+	if afterRow.SharedReviewerCount != 2 {
+		t.Fatalf("shared_reviewer_count = %d, want 2", afterRow.SharedReviewerCount)
+	}
+	if afterRow.WorkTotalHours != beforeRow.WorkTotalHours {
+		t.Fatalf("work_total_hours changed after adding reviewers: before=%v after=%v", beforeRow.WorkTotalHours, afterRow.WorkTotalHours)
+	}
+}
+
+func TestTimeSheetDetailsIncludeSharedReviewerCount(t *testing.T) {
+	const (
+		timesheetID = "aeyl94og4xmnpq4"
+		ownerEmail  = "author@soup.com"
+	)
+
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	ownerToken, err := testutils.GenerateRecordToken("users", ownerEmail)
+	if err != nil {
+		t.Fatalf("failed to generate owner token: %v", err)
+	}
+
+	seedTimesheetReviewers(t, app, timesheetID, "rzr98oadsp9qc11", "etysnrlup2f6bak")
+
+	recorder := performTestAPIRequest(t, app, http.MethodGet, "/api/time_sheets/"+timesheetID+"/details", nil, map[string]string{
+		"Authorization": ownerToken,
+	})
+	mustStatus(t, recorder, http.StatusOK)
+
+	var payload struct {
+		Items               []json.RawMessage `json:"items"`
+		SharedReviewerCount int               `json:"sharedReviewerCount"`
+	}
+	if err := json.NewDecoder(recorder.Body).Decode(&payload); err != nil {
+		t.Fatalf("failed to decode details response: %v", err)
+	}
+	if payload.SharedReviewerCount != 2 {
+		t.Fatalf("sharedReviewerCount = %d, want 2", payload.SharedReviewerCount)
+	}
+	if len(payload.Items) == 0 {
+		t.Fatal("expected details response to include time entries")
+	}
+}
+
+type timeSheetTallyResponse struct {
+	Id                  string  `json:"id"`
+	SharedReviewerCount int     `json:"shared_reviewer_count"`
+	WorkTotalHours      float64 `json:"work_total_hours"`
+}
+
+func fetchTimesheetTalliesForOwner(t testing.TB, app *tests.TestApp, ownerToken string) []timeSheetTallyResponse {
+	t.Helper()
+
+	recorder := performTestAPIRequest(t, app, http.MethodGet, "/api/time_sheets/tallies", nil, map[string]string{
+		"Authorization": ownerToken,
+	})
+	mustStatus(t, recorder, http.StatusOK)
+
+	var rows []timeSheetTallyResponse
+	if err := json.NewDecoder(recorder.Body).Decode(&rows); err != nil {
+		t.Fatalf("failed to decode tallies response: %v", err)
+	}
+
+	return rows
+}
+
+func findTimesheetTallyRow(t testing.TB, rows []timeSheetTallyResponse, timesheetID string) timeSheetTallyResponse {
+	t.Helper()
+
+	for _, row := range rows {
+		if row.Id == timesheetID {
+			return row
+		}
+	}
+
+	t.Fatalf("timesheet %s not found in tallies response", timesheetID)
+	return timeSheetTallyResponse{}
+}
+
+func seedTimesheetReviewers(t testing.TB, app *tests.TestApp, timesheetID string, reviewerIDs ...string) {
+	t.Helper()
+
+	collection, err := app.FindCollectionByNameOrId("time_sheet_reviewers")
+	if err != nil {
+		t.Fatalf("failed to load time_sheet_reviewers collection: %v", err)
+	}
+
+	for _, reviewerID := range reviewerIDs {
+		record := core.NewRecord(collection)
+		record.Set("time_sheet", timesheetID)
+		record.Set("reviewer", reviewerID)
+		if err := app.Save(record); err != nil {
+			t.Fatalf("failed to save reviewer %s for timesheet %s: %v", reviewerID, timesheetID, err)
+		}
 	}
 }
 

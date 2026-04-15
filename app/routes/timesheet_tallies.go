@@ -30,6 +30,7 @@ type TimeSheetTally struct {
 	OvHours             float64                   `json:"ov_hours"`
 	PayoutRequestAmount float64                   `json:"payout_request_amount"`
 	PayoutRequestDates  utilities.JsonStringSlice `json:"payout_request_dates"`
+	SharedReviewerCount int                       `json:"shared_reviewer_count"`
 	Submitted           bool                      `json:"submitted"`
 	Rejected            string                    `json:"rejected"`
 	RejectionReason     string                    `json:"rejection_reason"`
