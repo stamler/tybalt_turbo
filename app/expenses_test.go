@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"strings"
 	"testing"
+	"time"
 	"tybalt/internal/testutils"
 	"tybalt/utilities"
 
@@ -2360,6 +2361,419 @@ func TestExpenseAdminDiscoveryRoutes(t *testing.T) {
 				`"code":"unauthorized"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+const (
+	expensesListMixedPaginationOwnerEmail      = "admin.only@example.com"
+	expensesListMixedPaginationOwnerID         = "u_admin_only"
+	expensesListMixedPaginationApproverID      = "f2j5a8vk006baub"
+	expensesListMixedPaginationDivisionID      = "vccd5fo56ctbigh"
+	expensesListMixedPaginationKindID          = "prj0kind0000001"
+	expensesListMixedPaginationPurchaseOrderID = "ly8xyzpuj79upq1"
+	expensesListMixedPaginationCommittedCount  = 55
+	expensesListMixedPaginationOpenCount       = 4
+)
+
+type paginatedExpensesListRow struct {
+	ID            string `json:"id"`
+	Committed     string `json:"committed"`
+	PurchaseOrder string `json:"purchase_order"`
+}
+
+type paginatedExpensesListResponse struct {
+	Data       []paginatedExpensesListRow `json:"data"`
+	Page       int                        `json:"page"`
+	Limit      int                        `json:"limit"`
+	Total      int                        `json:"total"`
+	TotalPages int                        `json:"total_pages"`
+}
+
+func decodePaginatedExpensesListResponse(t testing.TB, res *http.Response) paginatedExpensesListResponse {
+	t.Helper()
+	defer res.Body.Close()
+
+	var decoded paginatedExpensesListResponse
+	if err := json.NewDecoder(res.Body).Decode(&decoded); err != nil {
+		t.Fatalf("failed decoding paginated expenses list response: %v", err)
+	}
+
+	return decoded
+}
+
+func mixedPaginationOpenExpenseID(index int) string {
+	return fmt.Sprintf("mxlopen%03d", index)
+}
+
+func mixedPaginationCommittedExpenseID(index int) string {
+	return fmt.Sprintf("mxlcomm%03d", index)
+}
+
+func mixedPaginationTimestamp(ts time.Time) string {
+	return ts.UTC().Format("2006-01-02 15:04:05.000Z")
+}
+
+func expectedMixedPaginationPage1IDs() []string {
+	ids := make([]string, 0, expensesListMixedPaginationOpenCount+50)
+	for i := expensesListMixedPaginationOpenCount - 1; i >= 0; i-- {
+		ids = append(ids, mixedPaginationOpenExpenseID(i))
+	}
+	for i := expensesListMixedPaginationCommittedCount - 1; i >= 5; i-- {
+		ids = append(ids, mixedPaginationCommittedExpenseID(i))
+	}
+	return ids
+}
+
+func expectedMixedPaginationPage2IDs() []string {
+	ids := make([]string, 0, 5)
+	for i := 4; i >= 0; i-- {
+		ids = append(ids, mixedPaginationCommittedExpenseID(i))
+	}
+	return ids
+}
+
+func expectedMixedPaginationPurchaseOrderPage1IDs() []string {
+	ids := []string{
+		mixedPaginationOpenExpenseID(1),
+		mixedPaginationOpenExpenseID(0),
+	}
+	for i := expensesListMixedPaginationCommittedCount - 1; i >= 5; i-- {
+		ids = append(ids, mixedPaginationCommittedExpenseID(i))
+	}
+	return ids
+}
+
+func seedExpensesListMixedPaginationFixture(tb testing.TB, app *tests.TestApp) {
+	tb.Helper()
+
+	insertExpenseQuery := `
+		INSERT INTO expenses (
+			id,
+			uid,
+			date,
+			division,
+			description,
+			total,
+			payment_type,
+			attachment,
+			attachment_hash,
+			rejector,
+			rejected,
+			rejection_reason,
+			approver,
+			approved,
+			job,
+			category,
+			kind,
+			pay_period_ending,
+			allowance_types,
+			submitted,
+			committer,
+			committed,
+			committed_week_ending,
+			distance,
+			cc_last_4_digits,
+			currency,
+			settled_total,
+			settler,
+			settled,
+			purchase_order,
+			vendor,
+			branch,
+			created,
+			updated
+		) VALUES (
+			{:id},
+			{:uid},
+			{:date},
+			{:division},
+			{:description},
+			{:total},
+			{:payment_type},
+			{:attachment},
+			{:attachment_hash},
+			{:rejector},
+			{:rejected},
+			{:rejection_reason},
+			{:approver},
+			{:approved},
+			{:job},
+			{:category},
+			{:kind},
+			{:pay_period_ending},
+			{:allowance_types},
+			{:submitted},
+			{:committer},
+			{:committed},
+			{:committed_week_ending},
+			{:distance},
+			{:cc_last_4_digits},
+			{:currency},
+			{:settled_total},
+			{:settler},
+			{:settled},
+			{:purchase_order},
+			{:vendor},
+			{:branch},
+			{:created},
+			{:updated}
+		)
+	`
+
+	insertExpense := func(params dbx.Params) {
+		if _, err := app.NonconcurrentDB().NewQuery(insertExpenseQuery).Bind(params).Execute(); err != nil {
+			tb.Fatalf("failed seeding mixed pagination expense %q: %v", params["id"], err)
+		}
+	}
+
+	baseCreated := time.Date(2026, 5, 1, 9, 0, 0, 0, time.UTC)
+
+	for i := 0; i < expensesListMixedPaginationOpenCount; i++ {
+		purchaseOrder := ""
+		if i < 2 {
+			purchaseOrder = expensesListMixedPaginationPurchaseOrderID
+		}
+
+		createdAt := baseCreated.Add(time.Duration(i) * time.Minute)
+		expenseDate := time.Date(2026, 5, 1+i, 0, 0, 0, 0, time.UTC)
+		insertExpense(dbx.Params{
+			"id":                    mixedPaginationOpenExpenseID(i),
+			"uid":                   expensesListMixedPaginationOwnerID,
+			"date":                  expenseDate.Format(time.DateOnly),
+			"division":              expensesListMixedPaginationDivisionID,
+			"description":           fmt.Sprintf("Mixed pagination open expense %02d", i),
+			"total":                 100 + i,
+			"payment_type":          "OnAccount",
+			"attachment":            "",
+			"attachment_hash":       "",
+			"rejector":              "",
+			"rejected":              "",
+			"rejection_reason":      "",
+			"approver":              expensesListMixedPaginationApproverID,
+			"approved":              "",
+			"job":                   "",
+			"category":              "",
+			"kind":                  expensesListMixedPaginationKindID,
+			"pay_period_ending":     "",
+			"allowance_types":       "[]",
+			"submitted":             0,
+			"committer":             "",
+			"committed":             "",
+			"committed_week_ending": "",
+			"distance":              0,
+			"cc_last_4_digits":      "",
+			"currency":              "",
+			"settled_total":         0,
+			"settler":               "",
+			"settled":               "",
+			"purchase_order":        purchaseOrder,
+			"vendor":                "",
+			"branch":                "",
+			"created":               mixedPaginationTimestamp(createdAt),
+			"updated":               mixedPaginationTimestamp(createdAt),
+		})
+	}
+
+	committedBase := time.Date(2026, 6, 1, 8, 0, 0, 0, time.UTC)
+	for i := 0; i < expensesListMixedPaginationCommittedCount; i++ {
+		purchaseOrder := expensesListMixedPaginationPurchaseOrderID
+		if i < 2 {
+			purchaseOrder = ""
+		}
+
+		approvedAt := committedBase.Add(time.Duration(i) * time.Hour)
+		committedAt := approvedAt.Add(15 * time.Minute)
+		committedDate := committedAt.Format(time.DateOnly)
+		committedWeekEnding, err := utilities.GenerateWeekEnding(committedDate)
+		if err != nil {
+			tb.Fatalf("failed generating committed week ending for mixed pagination fixture: %v", err)
+		}
+
+		expenseDate := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC).AddDate(0, 0, i)
+		createdAt := baseCreated.Add(24*time.Hour + time.Duration(i)*time.Minute)
+		insertExpense(dbx.Params{
+			"id":                    mixedPaginationCommittedExpenseID(i),
+			"uid":                   expensesListMixedPaginationOwnerID,
+			"date":                  expenseDate.Format(time.DateOnly),
+			"division":              expensesListMixedPaginationDivisionID,
+			"description":           fmt.Sprintf("Mixed pagination committed expense %02d", i),
+			"total":                 200 + i,
+			"payment_type":          "OnAccount",
+			"attachment":            "",
+			"attachment_hash":       "",
+			"rejector":              "",
+			"rejected":              "",
+			"rejection_reason":      "",
+			"approver":              expensesListMixedPaginationApproverID,
+			"approved":              mixedPaginationTimestamp(approvedAt),
+			"job":                   "",
+			"category":              "",
+			"kind":                  expensesListMixedPaginationKindID,
+			"pay_period_ending":     committedWeekEnding,
+			"allowance_types":       "[]",
+			"submitted":             1,
+			"committer":             expensesListMixedPaginationApproverID,
+			"committed":             mixedPaginationTimestamp(committedAt),
+			"committed_week_ending": committedWeekEnding,
+			"distance":              0,
+			"cc_last_4_digits":      "",
+			"currency":              "",
+			"settled_total":         0,
+			"settler":               "",
+			"settled":               "",
+			"purchase_order":        purchaseOrder,
+			"vendor":                "",
+			"branch":                "",
+			"created":               mixedPaginationTimestamp(createdAt),
+			"updated":               mixedPaginationTimestamp(createdAt),
+		})
+	}
+}
+
+func TestExpensesListMixedPagination(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", expensesListMixedPaginationOwnerEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	makeSeededApp := func(tb testing.TB) *tests.TestApp {
+		app := testutils.SetupTestApp(tb)
+		seedExpensesListMixedPaginationFixture(tb, app)
+		return app
+	}
+
+	assertRowIDs := func(tb testing.TB, rows []paginatedExpensesListRow, wantIDs []string) {
+		tb.Helper()
+
+		if len(rows) != len(wantIDs) {
+			tb.Fatalf("row count = %d, want %d", len(rows), len(wantIDs))
+		}
+
+		for i, wantID := range wantIDs {
+			if got := rows[i].ID; got != wantID {
+				tb.Fatalf("row %d id = %q, want %q", i, got, wantID)
+			}
+		}
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:           "expenses list page 1 shows all open expenses then 50 newest committed expenses",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/list",
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"page":1`,
+			},
+			TestAppFactory: makeSeededApp,
+			AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
+				decoded := decodePaginatedExpensesListResponse(tb, res)
+				wantIDs := expectedMixedPaginationPage1IDs()
+
+				if decoded.Page != 1 {
+					tb.Fatalf("page = %d, want 1", decoded.Page)
+				}
+				if decoded.Limit != 50 {
+					tb.Fatalf("limit = %d, want 50", decoded.Limit)
+				}
+				if decoded.Total != expensesListMixedPaginationOpenCount+expensesListMixedPaginationCommittedCount {
+					tb.Fatalf("total = %d, want %d", decoded.Total, expensesListMixedPaginationOpenCount+expensesListMixedPaginationCommittedCount)
+				}
+				if decoded.TotalPages != 2 {
+					tb.Fatalf("total_pages = %d, want 2", decoded.TotalPages)
+				}
+
+				assertRowIDs(tb, decoded.Data, wantIDs)
+
+				for i := 0; i < expensesListMixedPaginationOpenCount; i++ {
+					if decoded.Data[i].Committed != "" {
+						tb.Fatalf("row %d committed = %q, want blank for non-committed expense", i, decoded.Data[i].Committed)
+					}
+				}
+				for i := expensesListMixedPaginationOpenCount; i < len(decoded.Data); i++ {
+					if decoded.Data[i].Committed == "" {
+						tb.Fatalf("row %d committed unexpectedly blank for committed expense", i)
+					}
+				}
+			},
+		},
+		{
+			Name:           "expenses list page 2 shows remaining committed overflow only",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/list?page=2",
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"page":2`,
+			},
+			TestAppFactory: makeSeededApp,
+			AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
+				decoded := decodePaginatedExpensesListResponse(tb, res)
+				wantIDs := expectedMixedPaginationPage2IDs()
+
+				if decoded.Page != 2 {
+					tb.Fatalf("page = %d, want 2", decoded.Page)
+				}
+				if decoded.Limit != 50 {
+					tb.Fatalf("limit = %d, want 50", decoded.Limit)
+				}
+				if decoded.Total != expensesListMixedPaginationOpenCount+expensesListMixedPaginationCommittedCount {
+					tb.Fatalf("total = %d, want %d", decoded.Total, expensesListMixedPaginationOpenCount+expensesListMixedPaginationCommittedCount)
+				}
+				if decoded.TotalPages != 2 {
+					tb.Fatalf("total_pages = %d, want 2", decoded.TotalPages)
+				}
+
+				assertRowIDs(tb, decoded.Data, wantIDs)
+
+				for i, row := range decoded.Data {
+					if row.Committed == "" {
+						tb.Fatalf("page 2 row %d committed unexpectedly blank", i)
+					}
+				}
+			},
+		},
+		{
+			Name:           "expenses list purchase order filter applies before mixed pagination buckets",
+			Method:         http.MethodGet,
+			URL:            "/api/expenses/list?purchase_order=" + expensesListMixedPaginationPurchaseOrderID,
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"page":1`,
+			},
+			TestAppFactory: makeSeededApp,
+			AfterTestFunc: func(tb testing.TB, _ *tests.TestApp, res *http.Response) {
+				decoded := decodePaginatedExpensesListResponse(tb, res)
+				wantIDs := expectedMixedPaginationPurchaseOrderPage1IDs()
+
+				if decoded.Page != 1 {
+					tb.Fatalf("page = %d, want 1", decoded.Page)
+				}
+				if decoded.Limit != 50 {
+					tb.Fatalf("limit = %d, want 50", decoded.Limit)
+				}
+				if decoded.Total != 55 {
+					tb.Fatalf("total = %d, want 55", decoded.Total)
+				}
+				if decoded.TotalPages != 2 {
+					tb.Fatalf("total_pages = %d, want 2", decoded.TotalPages)
+				}
+
+				assertRowIDs(tb, decoded.Data, wantIDs)
+
+				for i, row := range decoded.Data {
+					if row.PurchaseOrder != expensesListMixedPaginationPurchaseOrderID {
+						tb.Fatalf("row %d purchase_order = %q, want %q", i, row.PurchaseOrder, expensesListMixedPaginationPurchaseOrderID)
+					}
+				}
+			},
 		},
 	}
 

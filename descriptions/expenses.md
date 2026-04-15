@@ -71,6 +71,13 @@ Note: "required" below means enforced in hooks/validation, not necessarily at th
 
 Primary list UI is implemented in `ui/src/lib/components/ExpensesList.svelte` and used by routes such as `/expenses/list` and `/expenses/pending`.
 
+Pagination note for `/api/expenses/list`:
+
+- The route ignores caller-supplied `?limit=` and uses a fixed mixed-page contract instead.
+- Page 1 returns all non-committed expenses plus up to 50 committed expenses.
+- Later pages return committed overflow 50 at a time.
+- The response `limit` field for this route means the committed-overflow batch size, not the maximum number of rows on page 1.
+
 Current action placement:
 
 - Owner list actions:

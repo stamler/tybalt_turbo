@@ -77,6 +77,14 @@ func buildListQuery(whereClause string) string {
 	return expensesSelectBaseQuery + "\nWHERE " + whereClause + "\nORDER BY e.date DESC\nLIMIT {:limit} OFFSET {:offset}"
 }
 
+func buildOrderedExpensesQuery(whereClause string, orderBy string) string {
+	return expensesSelectBaseQuery + "\nWHERE " + whereClause + "\nORDER BY " + orderBy
+}
+
+func buildPaginatedOrderedExpensesQuery(whereClause string, orderBy string) string {
+	return buildOrderedExpensesQuery(whereClause, orderBy) + "\nLIMIT {:limit} OFFSET {:offset}"
+}
+
 // expenseVisibilityParams resolves the claim-dependent inputs needed by the
 // shared expense visibility predicate.
 //
@@ -201,8 +209,18 @@ type PaginatedExpensesResponse struct {
 // Default page size used by expenses list endpoints unless overridden via query param
 const defaultPageLimit = 20
 
+// expenses/list shows all non-committed rows on the first page, then paginates
+// committed overflow in fixed-size batches behind "Load More".
+const expensesListCommittedOverflowLimit = 50
+
 // createGetExpensesListHandler returns the caller's own expenses, paginated,
 // with optional purchase_order filter.
+//
+// Special pagination contract for /api/expenses/list:
+//   - caller-supplied ?limit= is intentionally ignored for this route
+//   - the response Limit field means "committed overflow batch size"
+//   - page 1 may therefore return more than Limit rows because it includes all
+//     non-committed expenses plus up to Limit committed expenses
 func createGetExpensesListHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		auth := e.Auth
@@ -218,24 +236,11 @@ func createGetExpensesListHandler(app core.App) func(e *core.RequestEvent) error
 				page = p
 			}
 		}
-		limit := defaultPageLimit
-		if s := q.Get("limit"); s != "" {
-			if l, err := strconv.Atoi(s); err == nil && l > 0 {
-				if l > 200 {
-					l = 200
-				}
-				limit = l
-			}
-		}
-		offset := (page - 1) * limit
-
 		purchaseOrder := q.Get("purchase_order")
 
 		params := dbx.Params{
 			"auth":           authID,
 			"purchase_order": purchaseOrder,
-			"limit":          limit,
-			"offset":         offset,
 		}
 
 		// Choose WHERE based on whether a purchase_order filter is supplied
@@ -243,6 +248,8 @@ func createGetExpensesListHandler(app core.App) func(e *core.RequestEvent) error
 		if purchaseOrder != "" {
 			whereClause = whereListMineByPO
 		}
+		nonCommittedWhereClause := whereClause + " AND COALESCE(e.committed, '') = ''"
+		committedWhereClause := whereClause + " AND COALESCE(e.committed, '') != ''"
 
 		// total count (no joins needed)
 		countQuery := buildCountQuery(whereClause)
@@ -251,19 +258,52 @@ func createGetExpensesListHandler(app core.App) func(e *core.RequestEvent) error
 			return e.Error(http.StatusInternalServerError, "failed to count expenses: "+err.Error(), err)
 		}
 
-		// rows
-		listQuery := buildListQuery(whereClause)
+		var committedCount int
+		if err := app.DB().NewQuery(buildCountQuery(committedWhereClause)).Bind(params).Row(&committedCount); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to count committed expenses: "+err.Error(), err)
+		}
+
 		var rows []ExpensesAugmentedRow
-		if err := app.DB().NewQuery(listQuery).Bind(params).All(&rows); err != nil {
-			return e.Error(http.StatusInternalServerError, "failed to load expenses: "+err.Error(), err)
+		if page == 1 {
+			nonCommittedQuery := buildOrderedExpensesQuery(nonCommittedWhereClause, "e.date DESC, e.created DESC")
+			if err := app.DB().NewQuery(nonCommittedQuery).Bind(params).All(&rows); err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to load non-committed expenses: "+err.Error(), err)
+			}
+
+			params["limit"] = expensesListCommittedOverflowLimit
+			params["offset"] = 0
+
+			var committedRows []ExpensesAugmentedRow
+			committedQuery := buildPaginatedOrderedExpensesQuery(committedWhereClause, "e.committed DESC, e.date DESC, e.created DESC")
+			if err := app.DB().NewQuery(committedQuery).Bind(params).All(&committedRows); err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to load committed expenses: "+err.Error(), err)
+			}
+
+			rows = append(rows, committedRows...)
+		} else {
+			params["limit"] = expensesListCommittedOverflowLimit
+			params["offset"] = expensesListCommittedOverflowLimit + (page-2)*expensesListCommittedOverflowLimit
+
+			committedQuery := buildPaginatedOrderedExpensesQuery(committedWhereClause, "e.committed DESC, e.date DESC, e.created DESC")
+			if err := app.DB().NewQuery(committedQuery).Bind(params).All(&rows); err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to load committed expenses: "+err.Error(), err)
+			}
+		}
+
+		totalPages := 1
+		if committedCount > expensesListCommittedOverflowLimit {
+			overflowCommittedCount := committedCount - expensesListCommittedOverflowLimit
+			totalPages += (overflowCommittedCount + expensesListCommittedOverflowLimit - 1) / expensesListCommittedOverflowLimit
 		}
 
 		resp := PaginatedExpensesResponse{
-			Data:       rows,
-			Page:       page,
-			Limit:      limit,
+			Data: rows,
+			Page: page,
+			// Limit is the committed overflow batch size for this mixed first-page
+			// contract, not a guarantee about the number of rows returned on page 1.
+			Limit:      expensesListCommittedOverflowLimit,
 			Total:      total,
-			TotalPages: (total + limit - 1) / limit,
+			TotalPages: totalPages,
 		}
 		return e.JSON(http.StatusOK, resp)
 	}

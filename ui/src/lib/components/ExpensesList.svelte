@@ -60,8 +60,9 @@
     listLoading = true;
     try {
       const nextPage = page + 1;
+      const requestLimit = serverLimit;
       const res: { data: ExpensesAugmentedResponse[]; total_pages?: number; limit?: number } =
-        await pb.send(`${endpoint}?page=${nextPage}&limit=20`, { method: "GET" });
+        await pb.send(`${endpoint}?page=${nextPage}&limit=${requestLimit}`, { method: "GET" });
       const newItems = res?.data ?? [];
       // Append and advance
       items = [...items, ...newItems];
