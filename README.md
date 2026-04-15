@@ -48,6 +48,7 @@ flyctl deploy
 │   ├── deploy-local-db.sh  # Deploy local database to production
 │   └── README.md           # Scripts documentation
 ├── docs/                   # Documentation
+│   ├── user-onboarding.md  # HR/accounting onboarding guide
 │   └── DEPLOYMENT.md       # Deployment guide
 ├── Dockerfile              # Container build for fly.io
 ├── start.sh                # Container startup script
