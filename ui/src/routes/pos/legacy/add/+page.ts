@@ -22,6 +22,7 @@ export const load: PageLoad<PurchaseOrdersPageData> = async () => {
     division: "",
     description: "",
     total: 0,
+    covered_within_project_budget: false,
     payment_type: PurchaseOrdersPaymentTypeOptions.OnAccount,
     vendor: "",
     job: "",

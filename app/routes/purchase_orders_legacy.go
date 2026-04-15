@@ -214,6 +214,7 @@ func normalizeLegacyPurchaseOrderRecord(record *core.Record) error {
 	record.Set("category", "")
 	record.Set("attachment", "")
 	record.Set("attachment_hash", "")
+	record.Set("covered_within_project_budget", false)
 
 	if !legacyPurchaseOrderNumberPattern.MatchString(record.GetString("po_number")) {
 		return &errs.HookError{

@@ -116,6 +116,8 @@ type purchaseOrderVisibilityRow struct {
 	Closer                     string  `db:"closer" json:"closer"`
 	Closed                     string  `db:"closed" json:"closed"`
 	ClosedBySystem             bool    `db:"closed_by_system" json:"closed_by_system"`
+	CoveredWithinProjectBudget bool    `db:"covered_within_project_budget" json:"covered_within_project_budget"`
+	HasProjectAuthorization    bool    `db:"has_project_authorization" json:"has_project_authorization"`
 	PrioritySecondApprover     string  `db:"priority_second_approver" json:"priority_second_approver"`
 	ApprovalTotal              float64 `db:"approval_total" json:"approval_total"`
 	ApprovalTotalHome          float64 `db:"approval_total_home" json:"approval_total_home"`

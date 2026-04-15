@@ -16,6 +16,7 @@
   import DSCurrencyInput from "$lib/components/DSCurrencyInput.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
+  import DsCheck from "$lib/components/DsCheck.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DSToggle from "$lib/components/DSToggle.svelte";
   import DsFileSelect from "$lib/components/DsFileSelect.svelte";
@@ -71,6 +72,7 @@
   const dateInputMax = dateInputMaxMonthsAhead(15);
   let showApprovalResetSuccess = $state(false);
   let showApprovalResetToast = $state(false);
+  let showBudgetCoverageHelp = $state(false);
   let resetSuccessTimeout: ReturnType<typeof setTimeout> | null = null;
   const legacyPoNumberPattern = /^(25|26)(0[1-9]|1[0-2])-5\d{3}$/;
   const legacyTypeOptions = [
@@ -141,6 +143,16 @@
     $expenditureKindsStore.items.find((kind) => kind.id === item.kind),
   );
   const kindAllowsJob = $derived.by(() => selectedKind?.allow_job ?? true);
+  const selectedJobRecord = $derived.by(
+    () => $jobs.items.find((job) => job.id === (item.job ?? "")) ?? null,
+  );
+  const selectedJobNumber = $derived.by(() => selectedJobRecord?.number ?? "");
+  const selectedJobIsProject = $derived.by(
+    () =>
+      (item.job ?? "") !== "" &&
+      selectedJobNumber !== "" &&
+      !selectedJobNumber.toUpperCase().startsWith("P"),
+  );
   const typeOptions = [
     {
       id: "One-Time",
@@ -297,6 +309,7 @@
     item.frequency = "" as PurchaseOrdersRecord["frequency"];
     item.parent_po = "";
     item.category = "";
+    item.covered_within_project_budget = false;
     item.attachment = "";
     item.rejector = "";
     item.rejected = "";
@@ -352,9 +365,11 @@
     };
 
     item = structuredClone(nextRouteData.item);
+    item.covered_within_project_budget = item.covered_within_project_budget ?? false;
     errors = {};
     showApprovalResetSuccess = false;
     showApprovalResetToast = false;
+    showBudgetCoverageHelp = false;
   });
 
   $effect(() => {
@@ -439,6 +454,27 @@
       return;
     }
     normalizeLegacyClientFields();
+  });
+
+  $effect(() => {
+    const jobId = item.job ?? "";
+    const jobNumber = selectedJobNumber;
+    const hasLoadedJobRecord = selectedJobRecord !== null;
+
+    if (jobId === "") {
+      item.covered_within_project_budget = false;
+      showBudgetCoverageHelp = false;
+      return;
+    }
+
+    if (!hasLoadedJobRecord && $jobs.items.length > 0) {
+      return;
+    }
+
+    if (jobNumber.toUpperCase().startsWith("P")) {
+      item.covered_within_project_budget = false;
+      showBudgetCoverageHelp = false;
+    }
   });
 
   // Default division from caller's profile if creating and empty
@@ -638,9 +674,10 @@
     }
     const shouldShowResetFeedback = isEditingFirstApprovedPendingSecond;
 
-    // if the job is empty, set the category to empty
+    // if the job is empty, set dependent project-only fields to empty
     if (item.job === "") {
       item.category = "";
+      item.covered_within_project_budget = false;
     }
     if (!item.kind || item.kind === "") {
       const hasJob = item.job && item.job !== "";
@@ -651,6 +688,7 @@
     if (!kindAllowsJob) {
       item.job = "";
       item.category = "";
+      item.covered_within_project_budget = false;
     }
 
     if (legacyMode) {
@@ -1184,6 +1222,33 @@
           {item.name}
         {/snippet}
       </DsSelector>
+    {/if}
+
+    {#if !legacyMode && selectedJobIsProject}
+      <div class="w-full space-y-2 rounded-sm border border-neutral-200 bg-neutral-50 p-3">
+        <DsCheck
+          bind:value={item.covered_within_project_budget as boolean}
+          {errors}
+          fieldName="covered_within_project_budget"
+          uiName="Covered within project budget"
+        />
+        <div class="text-sm text-neutral-600">
+          <button
+            type="button"
+            class="underline hover:text-neutral-900"
+            onclick={() => {
+              showBudgetCoverageHelp = !showBudgetCoverageHelp;
+            }}
+          >
+            {showBudgetCoverageHelp ? "Hide why" : "Why?"}
+          </button>
+        </div>
+        {#if showBudgetCoverageHelp}
+          <div class="rounded-sm border border-sky-200 bg-sky-50 p-2 text-sm text-sky-950">
+            I have verified that this expense is covered within the project budget.
+          </div>
+        {/if}
+      </div>
     {/if}
 
     <DsTextInput

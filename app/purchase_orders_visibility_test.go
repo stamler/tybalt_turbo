@@ -784,6 +784,33 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
+		{
+			Name:   "visible purchase order response includes project authorization and budget coverage flags",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/2plsetqdxht7esg",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"2plsetqdxht7esg"`,
+				`"has_project_authorization":true`,
+				`"covered_within_project_budget":true`,
+			},
+			TestAppFactory: func(tb testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(tb)
+				if _, err := app.DB().NewQuery(`
+					UPDATE purchase_orders
+					SET covered_within_project_budget = 1
+					WHERE id = {:id}
+				`).Bind(map[string]any{
+					"id": "2plsetqdxht7esg",
+				}).Execute(); err != nil {
+					tb.Fatalf("failed seeding budget coverage flag: %v", err)
+				}
+				return app
+			},
+		},
 	}
 
 	for _, scenario := range scenarios {

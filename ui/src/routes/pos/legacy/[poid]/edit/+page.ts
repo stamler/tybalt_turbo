@@ -23,6 +23,7 @@ const defaultItem = (): PurchaseOrdersRecord =>
     category: "",
     closed: "",
     closed_by_system: false,
+    covered_within_project_budget: false,
     closer: "",
     created: "",
     date: new Date().toISOString().split("T")[0],

@@ -270,6 +270,108 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		})
 	}
 
+	// budget coverage can be confirmed for a purchase order linked to a project job
+	{
+		b := bytes.NewBufferString(fmt.Sprintf(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "vccd5fo56ctbigh",
+            "description": "project PO with budget confirmation",
+            "payment_type": "Expense",
+            "total": 123.45,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "One-Time",
+            "job": "cjf0kt0defhq480",
+            "kind": "%s",
+            "covered_within_project_budget": true
+        }`, projectKindID))
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "budget coverage can be confirmed for a purchase order linked to a project job",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"job":"cjf0kt0defhq480"`,
+				`"covered_within_project_budget":true`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 2,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// budget coverage cannot be confirmed without a linked job
+	{
+		b := bytes.NewBufferString(fmt.Sprintf(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "vccd5fo56ctbigh",
+            "description": "capital PO with invalid budget confirmation",
+            "payment_type": "Expense",
+            "total": 123.45,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "One-Time",
+            "kind": "%s",
+            "covered_within_project_budget": true
+        }`, capitalKindID))
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "budget coverage cannot be confirmed without a linked job",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"covered_within_project_budget":{"code":"project_job_required"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// budget coverage cannot be confirmed for a purchase order linked to a proposal job
+	{
+		b := bytes.NewBufferString(fmt.Sprintf(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2024-09-01",
+            "division": "fy4i9poneukvq9u",
+            "description": "proposal PO with invalid budget confirmation",
+            "payment_type": "Expense",
+            "total": 123.45,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "status": "Unapproved",
+            "type": "One-Time",
+            "job": "mg0sp9iyjzo4zw9",
+            "kind": "%s",
+            "covered_within_project_budget": true
+        }`, projectKindID))
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "budget coverage cannot be confirmed for a purchase order linked to a proposal job",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"covered_within_project_budget":{"code":"project_job_required"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
 	// valid purchase order can be created with a job and computer kind
 	{
 		b, ct, err := makeMultipart(fmt.Sprintf(`{
@@ -1818,6 +1920,42 @@ func TestPurchaseOrdersUpdate(t *testing.T) {
 			ExpectedContent: []string{
 				`"approved":""`,
 				`"approver":"etysnrlup2f6bak"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdate": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+
+	// valid purchase order update can confirm budget coverage for a project job
+	{
+		b := bytes.NewBufferString(fmt.Sprintf(`{
+			"uid": "f2j5a8vk006baub",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "test purchase order with budget confirmation",
+			"payment_type": "Expense",
+			"total": 223.45,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "etysnrlup2f6bak",
+			"status": "Unapproved",
+			"type": "Cumulative",
+			"job": "cjf0kt0defhq480",
+			"category": "t5nmdl188gtlhz0",
+			"kind": "%s",
+			"covered_within_project_budget": true
+		}`, projectKindID))
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "valid purchase order update can confirm budget coverage for a project job",
+			Method:         http.MethodPatch,
+			URL:            "/api/collections/purchase_orders/records/gal6e5la2fa4rpn",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": "application/json"},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"job":"cjf0kt0defhq480"`,
+				`"covered_within_project_budget":true`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdate": 1,

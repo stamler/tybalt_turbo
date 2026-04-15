@@ -29,6 +29,7 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     division: parentPo.division,
     description: parentPo.description,
     total: 0,
+    covered_within_project_budget: false,
     payment_type: parentPo.payment_type,
     vendor: parentPo.vendor,
     job: parentPo.job,

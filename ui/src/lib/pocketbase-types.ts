@@ -675,6 +675,7 @@ export type PurchaseOrdersRecord = {
   category: RecordIdString;
   closed: IsoDateString;
   closed_by_system: boolean;
+  covered_within_project_budget: boolean;
   closer: RecordIdString;
   created: IsoDateString;
   currency: RecordIdString;

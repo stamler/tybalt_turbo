@@ -22,6 +22,8 @@
   const viewerId = pb.authStore.record?.id ?? "";
   let rejectModal: RejectModal;
   let showSecondApproverWhy = $state(false);
+  let showProjectAuthorizationHelp = $state(false);
+  let showBudgetCoverageHelp = $state(false);
   let showConvertPopover = $state(false);
   let convertError = $state<string | null>(null);
   let isConvertingToCumulative = $state(false);
@@ -33,6 +35,12 @@
   const displayStatus = $derived(isRejected ? "Rejected" : data.po.status);
   const isOwner = $derived(data.po.uid === viewerId);
   const canApproveOrReject = $derived(data.canApproveOrReject);
+  const hasProjectJob = $derived.by(
+    () => Boolean(data.po.job && data.po.job_number && !data.po.job_number.toUpperCase().startsWith("P")),
+  );
+  const showProjectAuthorizationBadge = $derived.by(
+    () => hasProjectJob && data.po.has_project_authorization,
+  );
   const isPayablesAdmin = $derived(
     $globalStore.showAllUi || $globalStore.claims.includes("payables_admin"),
   );
@@ -345,16 +353,34 @@
       {#if data.po.job || data.po.client_name}
         <div class="flex flex-wrap items-center gap-4">
           {#if data.po.job}
-            <div>
+            <div class="space-y-2">
               <span class="font-semibold">Job:</span>
-              <a
-                href={resolve(`/jobs/${data.po.job}/details`)}
-                class="text-blue-600 hover:underline"
-              >
-                {data.po.job_number}
-              </a>
-              {#if data.po.job_description}
-                — {data.po.job_description}
+              <div class="flex flex-wrap items-center gap-2">
+                <a
+                  href={resolve(`/jobs/${data.po.job}/details`)}
+                  class="text-blue-600 hover:underline"
+                >
+                  {data.po.job_number}
+                </a>
+                {#if showProjectAuthorizationBadge}
+                  <button
+                    type="button"
+                    class="rounded-sm border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-200"
+                    onclick={() => {
+                      showProjectAuthorizationHelp = !showProjectAuthorizationHelp;
+                    }}
+                  >
+                    PA
+                  </button>
+                {/if}
+                {#if data.po.job_description}
+                  <span>— {data.po.job_description}</span>
+                {/if}
+              </div>
+              {#if showProjectAuthorizationHelp && showProjectAuthorizationBadge}
+                <div class="rounded-sm border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-950">
+                  Procurement assures that this job has a project authorization.
+                </div>
               {/if}
             </div>
           {/if}
@@ -375,6 +401,37 @@
             </div>
           {:else if data.po.client_name}
             <div><span class="font-semibold">Client:</span> {data.po.client_name}</div>
+          {/if}
+        </div>
+      {/if}
+
+      {#if hasProjectJob}
+        <div class="space-y-2">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="font-semibold">Covered within project budget:</span>
+            <span class="inline-flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={data.po.covered_within_project_budget}
+                disabled
+                class="h-4 w-4"
+              />
+              <span>{data.po.covered_within_project_budget ? "Confirmed" : "Not confirmed"}</span>
+            </span>
+            <button
+              type="button"
+              class="text-sm underline hover:text-neutral-900"
+              onclick={() => {
+                showBudgetCoverageHelp = !showBudgetCoverageHelp;
+              }}
+            >
+              {showBudgetCoverageHelp ? "Hide why" : "Why?"}
+            </button>
+          </div>
+          {#if showBudgetCoverageHelp}
+            <div class="rounded-sm border border-sky-200 bg-sky-50 p-2 text-sm text-sky-950">
+              I have verified that this expense is covered within the project budget.
+            </div>
           {/if}
         </div>
       {/if}

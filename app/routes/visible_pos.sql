@@ -35,6 +35,8 @@ SELECT
   closer,
   closed,
   closed_by_system,
+  covered_within_project_budget,
+  has_project_authorization,
   priority_second_approver,
   approval_total,
   approval_total_home,

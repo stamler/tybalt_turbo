@@ -11,7 +11,9 @@ export type VisiblePOScope =
   | "approved_by_me_awaiting_second";
 
 export type VisiblePurchaseOrderResponse = PurchaseOrdersAugmentedResponse & {
+  covered_within_project_budget: boolean;
   expenses_total: number;
+  has_project_authorization: boolean;
   recurring_expected_occurrences: number;
   recurring_remaining_occurrences: number;
   remaining_amount: number;

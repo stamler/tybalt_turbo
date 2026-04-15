@@ -180,6 +180,7 @@ func CleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 func ValidatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record, legacyMode bool) error {
 	isRecurring := purchaseOrderRecord.GetString("type") == "Recurring"
 	isChild := purchaseOrderRecord.GetString("parent_po") != ""
+	var linkedJobRecord *core.Record
 
 	// Provide friendly errors for required fields that PocketBase schema would
 	// otherwise reject with a generic message. We have intentionally relaxed
@@ -537,6 +538,22 @@ func ValidatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record, legac
 			if field, allocErr := validateDivisionAllocatedToJob(app, jobID, purchaseOrderRecord.GetString("division")); allocErr != nil {
 				validationsErrors[field] = allocErr
 			}
+		}
+		linkedJobRecord = jobRecord
+	}
+
+	if purchaseOrderRecord.GetBool("covered_within_project_budget") {
+		switch {
+		case strings.TrimSpace(purchaseOrderRecord.GetString("job")) == "":
+			validationsErrors["covered_within_project_budget"] = validation.NewError(
+				"project_job_required",
+				"covered within project budget may only be confirmed for purchase orders linked to a project job",
+			)
+		case linkedJobRecord != nil && typeFromNumber(linkedJobRecord.GetString("number")) == jobTypeProposal:
+			validationsErrors["covered_within_project_budget"] = validation.NewError(
+				"project_job_required",
+				"covered within project budget may only be confirmed for purchase orders linked to a project job",
+			)
 		}
 	}
 

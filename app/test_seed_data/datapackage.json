@@ -1963,6 +1963,11 @@
             "x-sqlite-type": "BOOLEAN"
           },
           {
+            "name": "covered_within_project_budget",
+            "type": "boolean",
+            "x-sqlite-type": "BOOLEAN"
+          },
+          {
             "name": "closer",
             "type": "string",
             "x-sqlite-type": "TEXT"

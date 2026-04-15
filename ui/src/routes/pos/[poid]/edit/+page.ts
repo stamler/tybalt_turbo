@@ -25,6 +25,7 @@ export const load: PageLoad<PurchaseOrdersPageData> = async ({ params }) => {
     total: 0,
     currency: "",
     approval_total_home: 0,
+    covered_within_project_budget: false,
     payment_type: PurchaseOrdersPaymentTypeOptions.OnAccount,
     vendor: "",
     job: "",
