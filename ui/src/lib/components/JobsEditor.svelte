@@ -792,7 +792,7 @@
       >
         <label for="project_award_date">Project Award Date</label>
         <DsDateInput
-          class="flex-1"
+          class="flex-1 md:flex-none"
           name="project_award_date"
           max={dateInputMax}
           bind:value={item.project_award_date}
@@ -819,7 +819,7 @@
       >
         <label for="proposal_opening_date">Proposal Opening Date</label>
         <DsDateInput
-          class="flex-1"
+          class="flex-1 md:flex-none"
           name="proposal_opening_date"
           max={dateInputMax}
           bind:value={item.proposal_opening_date}
@@ -844,7 +844,7 @@
       >
         <label for="proposal_submission_due_date">Proposal Submission Due Date</label>
         <DsDateInput
-          class="flex-1"
+          class="flex-1 md:flex-none"
           name="proposal_submission_due_date"
           max={dateInputMax}
           bind:value={item.proposal_submission_due_date}

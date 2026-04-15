@@ -826,7 +826,7 @@
       >
         <label for="personal_vehicle_insurance_expiry">Personal Vehicle Insurance Expiry</label>
         <DsDateInput
-          class="flex-1"
+          class="flex-1 md:flex-none"
           name="personal_vehicle_insurance_expiry"
           min={DATE_INPUT_MIN}
           max={dateInputMax}

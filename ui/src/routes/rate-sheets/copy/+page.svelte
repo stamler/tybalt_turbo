@@ -132,7 +132,7 @@
       <span class="flex w-full gap-2">
         <label for="effective_date">Effective Date</label>
         <DsDateInput
-          class="flex-1 rounded-sm border border-neutral-300 px-1"
+          class="flex-1 md:flex-none rounded-sm border border-neutral-300 px-1"
           id="effective_date"
           name="effective_date"
           bind:value={effective_date}

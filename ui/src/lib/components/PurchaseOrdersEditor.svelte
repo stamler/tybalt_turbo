@@ -1126,7 +1126,7 @@
       <span class="flex w-full gap-2 {errors.end_date !== undefined ? 'bg-red-200' : ''}">
         <label for="end_date">End Date</label>
         <DsDateInput
-          class="flex-1"
+          class="flex-1 md:flex-none"
           name="end_date"
           min={DATE_INPUT_MIN}
           max={dateInputMax}
@@ -1157,7 +1157,7 @@
     <span class="flex w-full gap-2 {errors.date !== undefined ? 'bg-red-200' : ''}">
       <label for="date">Date</label>
       <DsDateInput
-        class="flex-1"
+        class="flex-1 md:flex-none"
         name="date"
         min={DATE_INPUT_MIN}
         max={dateInputMax}
