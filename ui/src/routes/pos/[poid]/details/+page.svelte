@@ -408,7 +408,21 @@
       {#if hasProjectJob}
         <div class="space-y-2">
           <div class="flex flex-wrap items-center gap-3">
-            <span class="font-semibold">Covered within project budget:</span>
+            <span class="inline-flex items-center gap-1 font-semibold">
+              <span>Covered within project budget:</span>
+              <button
+                type="button"
+                class="inline-flex items-center text-slate-500 transition-colors hover:text-slate-700"
+                aria-label="Covered within project budget explanation"
+                aria-expanded={showBudgetCoverageHelp}
+                aria-haspopup="dialog"
+                onclick={() => {
+                  showBudgetCoverageHelp = !showBudgetCoverageHelp;
+                }}
+              >
+                <Icon icon="mdi:information-outline" width="15px" />
+              </button>
+            </span>
             <span class="inline-flex items-center gap-2">
               <input
                 type="checkbox"
@@ -418,15 +432,6 @@
               />
               <span>{data.po.covered_within_project_budget ? "Confirmed" : "Not confirmed"}</span>
             </span>
-            <button
-              type="button"
-              class="text-sm underline hover:text-neutral-900"
-              onclick={() => {
-                showBudgetCoverageHelp = !showBudgetCoverageHelp;
-              }}
-            >
-              {showBudgetCoverageHelp ? "Hide why" : "Why?"}
-            </button>
           </div>
           {#if showBudgetCoverageHelp}
             <div class="rounded-sm border border-sky-200 bg-sky-50 p-2 text-sm text-sky-950">

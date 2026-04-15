@@ -5,6 +5,7 @@
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
   } from "$lib/utilities";
+  import Icon from "@iconify/svelte";
   import { jobs } from "$lib/stores/jobs";
   import { divisions } from "$lib/stores/divisions";
   import { branches as branchesStore } from "$lib/stores/branches";
@@ -16,7 +17,6 @@
   import DSCurrencyInput from "$lib/components/DSCurrencyInput.svelte";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
-  import DsCheck from "$lib/components/DsCheck.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DSToggle from "$lib/components/DSToggle.svelte";
   import DsFileSelect from "$lib/components/DsFileSelect.svelte";
@@ -364,8 +364,9 @@
       loadError: data.loadError,
     };
 
-    item = structuredClone(nextRouteData.item);
-    item.covered_within_project_budget = item.covered_within_project_budget ?? false;
+    const nextItem = structuredClone(nextRouteData.item);
+    nextItem.covered_within_project_budget = nextItem.covered_within_project_budget ?? false;
+    item = nextItem;
     errors = {};
     showApprovalResetSuccess = false;
     showApprovalResetToast = false;
@@ -462,8 +463,12 @@
     const hasLoadedJobRecord = selectedJobRecord !== null;
 
     if (jobId === "") {
-      item.covered_within_project_budget = false;
-      showBudgetCoverageHelp = false;
+      if (item.covered_within_project_budget) {
+        item.covered_within_project_budget = false;
+      }
+      if (showBudgetCoverageHelp) {
+        showBudgetCoverageHelp = false;
+      }
       return;
     }
 
@@ -472,8 +477,12 @@
     }
 
     if (jobNumber.toUpperCase().startsWith("P")) {
-      item.covered_within_project_budget = false;
-      showBudgetCoverageHelp = false;
+      if (item.covered_within_project_budget) {
+        item.covered_within_project_budget = false;
+      }
+      if (showBudgetCoverageHelp) {
+        showBudgetCoverageHelp = false;
+      }
     }
   });
 
@@ -1226,22 +1235,37 @@
 
     {#if !legacyMode && selectedJobIsProject}
       <div class="w-full space-y-2 rounded-sm border border-neutral-200 bg-neutral-50 p-3">
-        <DsCheck
-          bind:value={item.covered_within_project_budget as boolean}
-          {errors}
-          fieldName="covered_within_project_budget"
-          uiName="Covered within project budget"
-        />
-        <div class="text-sm text-neutral-600">
-          <button
-            type="button"
-            class="underline hover:text-neutral-900"
-            onclick={() => {
-              showBudgetCoverageHelp = !showBudgetCoverageHelp;
-            }}
-          >
-            {showBudgetCoverageHelp ? "Hide why" : "Why?"}
-          </button>
+        <div
+          class="flex w-full flex-col gap-2"
+          class:bg-red-200={errors.covered_within_project_budget !== undefined}
+        >
+          <span class="flex w-full items-center gap-2">
+            <input
+              id="purchase-order-budget-coverage"
+              type="checkbox"
+              class="h-4 w-4"
+              name="covered_within_project_budget"
+              bind:checked={item.covered_within_project_budget}
+            />
+            <span class="inline-flex items-center gap-1">
+              <label for="purchase-order-budget-coverage">Covered within project budget</label>
+              <button
+                type="button"
+                class="inline-flex items-center text-slate-500 transition-colors hover:text-slate-700"
+                aria-label="Covered within project budget explanation"
+                aria-expanded={showBudgetCoverageHelp}
+                aria-haspopup="dialog"
+                onclick={() => {
+                  showBudgetCoverageHelp = !showBudgetCoverageHelp;
+                }}
+              >
+                <Icon icon="mdi:information-outline" width="15px" />
+              </button>
+            </span>
+          </span>
+          {#if errors.covered_within_project_budget !== undefined}
+            <span class="text-red-600">{errors.covered_within_project_budget.message}</span>
+          {/if}
         </div>
         {#if showBudgetCoverageHelp}
           <div class="rounded-sm border border-sky-200 bg-sky-50 p-2 text-sm text-sky-950">
