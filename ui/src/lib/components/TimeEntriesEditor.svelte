@@ -127,6 +127,18 @@
   // Track allowed division IDs for the selected job (null = show all divisions, empty Set = job has no allocations)
   let jobDivisionIds = $state<Set<string> | null>(null);
   let jobHasNoAllocations = $derived(jobDivisionIds !== null && jobDivisionIds.size === 0);
+  const associatedJobDivisionCodes = $derived.by(() => {
+    const selectedJobDivisionIds = jobDivisionIds;
+    if (selectedJobDivisionIds === null || selectedJobDivisionIds.size === 0) {
+      return [];
+    }
+
+    return $divisions.items
+      .filter((division) => selectedJobDivisionIds.has(division.id))
+      .map((division) => division.code)
+      .filter((code): code is string => !!code)
+      .sort((a, b) => a.localeCompare(b));
+  });
   let jobAllocationsRequestId = 0;
 
   // Fetch job divisions when job changes
@@ -140,6 +152,8 @@
     }
 
     const requestId = ++jobAllocationsRequestId;
+    // Clear the previous job's allocation state until this job's allocations load.
+    jobDivisionIds = null;
     // Fetch job details to get allocations.
     // /api/jobs/:id does not include allocations, so we must use /details.
     pb.send(`/api/jobs/${jobId}/details`, { method: "GET" })
@@ -491,6 +505,11 @@
       >
         {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
       </DsAutoComplete>
+    {/if}
+    {#if item.job && item.job !== "" && associatedJobDivisionCodes.length > 0}
+      <span class="w-full text-sm text-neutral-600">
+        Associated divisions: {associatedJobDivisionCodes.join(", ")}
+      </span>
     {/if}
     {#if jobHasNoAllocations}
       <span class="flex w-full gap-2 bg-red-200 text-red-600">
