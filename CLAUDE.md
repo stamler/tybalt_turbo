@@ -51,6 +51,7 @@ go run main.go serve --dir="./test_pb_data"
 ```
 
 **Required**: Create `ui/.env` with:
+
 ```
 PUBLIC_POCKETBASE_URL=http://localhost:8090
 ```
@@ -70,12 +71,14 @@ PUBLIC_POCKETBASE_URL=http://localhost:8090
 ### Backend: `app/`
 
 PocketBase-based Go application. Entry point is `main.go`, which registers:
+
 - **Hooks** (`hooks/AddHooks`) — database lifecycle event handlers
 - **Routes** (`routes/AddRoutes`) — custom API endpoints beyond PocketBase's built-ins
 - **Cron jobs** (`cron/AddCronJobs`) — scheduled tasks
 - **Migrations** (`migrations/`) — applied automatically on startup; new migrations auto-generated when using `go run` (not `go build`)
 
 **Key packages:**
+
 - `hooks/` — Business logic enforced at the DB layer (validation, cascade updates, auth gating). Each collection has a dedicated `*_hooks.go` file. Hooks use `errs.HookError` and `AnnotateHookError` for structured error responses.
 - `routes/` — REST handlers. Files named `*_api.go` for CRUD, `*_writeback.go` for Firebase sync, `*_tracking.go` for activity tracking. SQL queries in `.sql` files alongside Go files.
 - `utilities/` — Shared helpers including `config.go` (feature flags), `po_approvers.go` (approval hierarchy), `expenditure_kinds.go` (expense categories).
