@@ -71,6 +71,53 @@ The underlying PO already carries the staff member, vendor, job/category, amount
 
 ## Desired behavior
 
+### Flow comparison
+
+After this branch is deployed, both PO-linked paths use the same green plus UI and keep the same baseline PO-linked validation. The table below calls out only the differences between the regular path and the narrow bookkeeper on-behalf path.
+
+| Area                               | Regular PO-linked flow after `book_keeping` deployment                                                                    | Bookkeeper on-behalf flow after `book_keeping` deployment                                                                     |
+|------------------------------------|---------------------------------------------------------------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| Who can use it                     | Any authenticated user.                                                                                                   | Authenticated user with `book_keeper`.                                                                                        |
+| When this path is used             | The expense is being created for the authenticated user, including when the user has `book_keeper` or owns the linked PO. | The expense is being created for another user, and that user is the linked PO owner.                                          |
+| Expense `uid`                      | The authenticated user.                                                                                                   | The linked PO owner.                                                                                                          |
+| Expense `creator`                  | The authenticated user, so `creator = uid = auth.id`.                                                                     | The authenticated bookkeeper, so `creator != uid`.                                                                            |
+| Relationship to PO owner           | The expense can be linked to someone else's PO, but it is still the caller's expense.                                     | The expense is for the PO owner, and the bookkeeper is recorded separately as the entering user.                              |
+| Extra PO eligibility               | No additional owner or PO-number requirement beyond normal PO-linked expense validation.                                  | PO must have a non-empty `po_number`, and PO owner must differ from the bookkeeper.                                           |
+| Payment types                      | Existing expense payment-type rules apply.                                                                                | Only `OnAccount` and `CorporateCreditCard`, and the expense payment type must match the PO payment type.                      |
+| Approver                           | Derived from the expense owner's manager, and that manager must be active with `tapr`.                                    | Set to the bookkeeper/creator. The creator must be active with `book_keeper`; `tapr` is not required for this assignment.     |
+| Draft edit, delete, submit, recall | The caller controls the draft because `creator = uid`.                                                                    | The bookkeeper controls the draft because `creator != uid`; the PO owner can view when visible but is not the draft operator. |
+| Approval queue                     | Submitted expense appears for the manager-derived approver.                                                               | Submitted expense appears for the bookkeeper because `approver = creator`.                                                    |
+| Same-user bookkeeper PO            | A bookkeeper creating against their own PO stays on this regular path.                                                    | Not applicable; same-user POs do not use the on-behalf path and do not create self-approval.                                  |
+
+### Path selection
+
+There is no separate button or toggle for the bookkeeper flow. The two PO-linked flows are selected by the `uid` that reaches the expense create hook.
+
+Regular PO-linked flow is active when the create payload has:
+
+- `uid = auth.id`.
+
+This remains true even when the linked PO belongs to another user. In that case, the user is creating their own expense against another person's PO.
+
+Bookkeeper on-behalf flow is attempted only when the create request has:
+
+- `uid != auth.id`;
+- `purchase_order` set to the linked PO.
+
+When this path is accepted, the server sets `creator = auth.id`.
+
+The frontend sends `uid = purchase_orders.uid` only for the narrow green plus case where all of the following are true:
+
+- the user has `book_keeper`;
+- the linked PO owner differs from the current user;
+- the linked PO has a non-empty `po_number`;
+- the selected expense payment type is `OnAccount` or `CorporateCreditCard`;
+- the selected expense payment type matches the linked PO payment type.
+
+If any of those conditions is false, the frontend keeps the regular behavior and sends `uid = auth.id`. The server then treats the create as a regular PO-linked expense.
+
+The server is still authoritative. If any client submits `uid != auth.id`, the hook accepts it only after validating the full bookkeeper eligibility list: `book_keeper` claim, active numbered PO, PO owner match, allowed and matching payment type, different PO owner, and existing branch and PO-linked expense validation.
+
 ### Definitions
 
 - `uid`: the person the expense is for. For the bookkeeper flow, this must be the linked PO's `uid`.
