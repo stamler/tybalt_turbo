@@ -17,7 +17,7 @@
 
 1. When creating a new database migration, always call `date +%s` to get the prefix for the new migration. This is because chronological order matters when migrations are applied.
 2. Never edit a migration that's on the origin/main branch because these are already deployed and that would cause these migrations to not be applied or to have unpredictable outcomes.
-3. If you must edit a migration on any other branch, including main that is undeployed (i.e. not pushed to origin/main yet), ask for confirmation before making an edit. When in doubt, just create a new migration.
+3. You may edit a migration on any other branch besides main.
 4. Migrations should always use the Pocketbase format when defining schema (adding columns, removing columns, changing column types, adding indices, adding collections etc.) This is because these changes are persisted to the _collections collection so full pocketbase schema dumps will reflect the changes.
 5. SQL can be used in migrations to data modifications such as initially populating a new column or deriving its value from a different column because these aren't schema changes and are only ever applied one time.
 
