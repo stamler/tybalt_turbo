@@ -222,12 +222,12 @@ The migration should be idempotent around the claim insert so environments with 
 
 Update `expenses` collection rules to recognize the split:
 
-- create rule permits regular creates where `uid` is absent or equals auth id;
-- create rule permits `uid != auth.id` only for authenticated users with `book_keeper`, with `purchase_order` present and eligible;
-- update/delete rules permit draft operations by `creator` when `creator != uid`, while preserving existing owner behavior for legacy and regular rows;
+- create rule permits regular creates where `uid` equals auth id;
+- create rule permits the shape of a possible bookkeeper-on-behalf create only for authenticated users with `book_keeper`, with `purchase_order` present, `uid != auth.id`, and an allowed payment type;
+- update/delete rules permit draft operations by `creator`;
 - approval, rejection, commit, and settlement remain route-controlled where they already are.
 
-Hook validation must remain authoritative. Collection rules should be a first gate, not the only enforcement.
+Hook validation remains authoritative. Collection rules are an initial gate for authentication, actor shape, and basic field protection; the hook enforces full PO eligibility, PO owner matching, PO payment compatibility, branch-claim access, and approval assignment.
 
 ### 3. Expense hook changes
 
@@ -264,13 +264,12 @@ The pending and approved approval queues can continue to use `approver = auth.id
 
 ### 5. Submit, recall, delete, and edit lifecycle
 
-Any route or hook that currently says "only `uid` can do this" needs to distinguish effective owner:
+Any route or hook that currently says "only `uid` can do this" needs to use `creator` as the operational owner after the migration backfills existing rows:
 
-- regular rows: effective owner is `uid`;
-- bookkeeper-entered rows: effective owner is `creator`;
-- legacy rows with blank `creator`: effective owner is `uid`.
+- regular rows: `creator = uid`;
+- bookkeeper-entered rows: `creator != uid`.
 
-Apply that effective owner to draft edit, draft delete, submit, and recall checks. Keep approved/committed locks unchanged.
+Apply `creator` ownership to draft edit, draft delete, submit, and recall checks. Keep approved/committed locks unchanged.
 
 ### 6. Frontend changes
 

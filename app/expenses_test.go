@@ -1212,6 +1212,182 @@ func TestBookKeeperPurchaseOrderExpenseFlow(t *testing.T) {
 	mustStatus(t, mismatchRes, http.StatusBadRequest)
 }
 
+func TestBookKeeperSameUserPurchaseOrderUsesRegularApproval(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	activatePurchaseOrderFixtures(t, app, "bkpoownacct01")
+
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	managerToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fields := bookKeeperExpenseFields(map[string]string{
+		"uid":            "tqqf7q0f3378rvp",
+		"date":           "2026-04-28",
+		"description":    "same-user bookkeeper invoice",
+		"purchase_order": "bkpoownacct01",
+	})
+	body, contentType := mustMultipartExpense(t, fields, "bookkeeper-own-po.png")
+	createRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+		"Authorization": bookkeeperToken,
+		"Content-Type":  contentType,
+	})
+	mustStatus(t, createRes, http.StatusOK)
+
+	var created bookKeeperExpenseCreateResult
+	if err := json.Unmarshal(createRes.Body.Bytes(), &created); err != nil {
+		t.Fatalf("failed to decode create response: %v; body=%s", err, createRes.Body.String())
+	}
+	if created.UID != "tqqf7q0f3378rvp" || created.Creator != "tqqf7q0f3378rvp" || created.Approver != "wegviunlyr2jjjv" {
+		t.Fatalf("same-user bookkeeper PO should use regular manager approval, got %+v", created)
+	}
+
+	submitRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/submit", nil, map[string]string{
+		"Authorization": bookkeeperToken,
+	})
+	mustStatus(t, submitRes, http.StatusOK)
+
+	bookkeeperApproveRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/approve", nil, map[string]string{
+		"Authorization": bookkeeperToken,
+	})
+	mustStatus(t, bookkeeperApproveRes, http.StatusForbidden)
+
+	managerApproveRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/approve", nil, map[string]string{
+		"Authorization": managerToken,
+	})
+	mustStatus(t, managerApproveRes, http.StatusOK)
+}
+
+func TestBookKeeperPurchaseOrderExpenseCorporateCreditCardFlow(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	activatePurchaseOrderFixtures(t, app, "bkpootherccc1")
+
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	fields := bookKeeperExpenseFields(map[string]string{
+		"description":      "bookkeeper corporate card invoice",
+		"date":             "2026-04-28",
+		"payment_type":     "CorporateCreditCard",
+		"purchase_order":   "bkpootherccc1",
+		"cc_last_4_digits": "1234",
+	})
+	body, contentType := mustMultipartExpense(t, fields, "bookkeeper-corporate-card.png")
+	createRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+		"Authorization": bookkeeperToken,
+		"Content-Type":  contentType,
+	})
+	mustStatus(t, createRes, http.StatusOK)
+
+	var created bookKeeperExpenseCreateResult
+	if err := json.Unmarshal(createRes.Body.Bytes(), &created); err != nil {
+		t.Fatalf("failed to decode create response: %v; body=%s", err, createRes.Body.String())
+	}
+	if created.UID != "rzr98oadsp9qc11" || created.Creator != "tqqf7q0f3378rvp" || created.Approver != "tqqf7q0f3378rvp" {
+		t.Fatalf("unexpected actor fields after corporate card create: %+v", created)
+	}
+}
+
+func TestBookKeeperPurchaseOrderExpenseRejectsIneligibleCreates(t *testing.T) {
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name        string
+		overrides   map[string]string
+		activePOIDs []string
+		want        string
+	}{
+		{
+			name:      "without purchase order",
+			overrides: map[string]string{"purchase_order": ""},
+		},
+		{
+			name:      "uid does not match purchase order owner",
+			overrides: map[string]string{"uid": "f2j5a8vk006baub"},
+			want:      "must_match_purchase_order_owner",
+		},
+		{
+			name:      "closed purchase order",
+			overrides: map[string]string{"purchase_order": "exp_closed_po_1"},
+			want:      "not_active",
+		},
+		{
+			name:      "cancelled purchase order",
+			overrides: map[string]string{"uid": "4ssj9f1yg250o9y", "purchase_order": "1cqrvp4mna33k2b"},
+			want:      "not_active",
+		},
+		{
+			name:      "unapproved purchase order",
+			overrides: map[string]string{"purchase_order": "ponactvbrnch001"},
+			want:      "not_active",
+		},
+		{
+			name:      "unsupported payment type",
+			overrides: map[string]string{"payment_type": "Mileage"},
+		},
+		{
+			name:        "caller cannot use purchase order branch",
+			overrides:   map[string]string{"date": "2026-04-28", "purchase_order": "bkpocorpbr01"},
+			activePOIDs: []string{"bkpocorpbr01"},
+			want:        "branch_claim_required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			app := testutils.SetupTestApp(t)
+			t.Cleanup(app.Cleanup)
+			activatePurchaseOrderFixtures(t, app, tt.activePOIDs...)
+
+			body, contentType := mustMultipartExpense(t, bookKeeperExpenseFields(tt.overrides), strings.ReplaceAll(tt.name, " ", "-")+".png")
+			res := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+				"Authorization": bookkeeperToken,
+				"Content-Type":  contentType,
+			})
+			mustStatus(t, res, http.StatusBadRequest)
+			if tt.want != "" && !strings.Contains(res.Body.String(), tt.want) {
+				t.Fatalf("expected response to contain %q; body=%s", tt.want, res.Body.String())
+			}
+		})
+	}
+}
+
+func TestBookKeeperExpenseCannotBeApprovedByUnrelatedBookKeeper(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	unrelatedBookkeeperToken, err := testutils.GenerateRecordToken("users", "corp.claim@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	created := createBookKeeperPOExpense(t, app, bookkeeperToken, "bookkeeper unrelated approval invoice", "bookkeeper-unrelated-approval.png")
+	submitRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/submit", nil, map[string]string{
+		"Authorization": bookkeeperToken,
+	})
+	mustStatus(t, submitRes, http.StatusOK)
+
+	approveRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/approve", nil, map[string]string{
+		"Authorization": unrelatedBookkeeperToken,
+	})
+	mustStatus(t, approveRes, http.StatusForbidden)
+}
+
 func TestBookKeeperExpenseEditRejectsOverwrittenOwnerPayload(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	t.Cleanup(app.Cleanup)
@@ -1493,14 +1669,12 @@ type bookKeeperExpenseCreateResult struct {
 	Approver string `json:"approver"`
 }
 
-func createBookKeeperPOExpense(t testing.TB, app *tests.TestApp, bookkeeperToken string, description string, filename string) bookKeeperExpenseCreateResult {
-	t.Helper()
-
-	body, contentType := mustMultipartExpense(t, map[string]string{
+func bookKeeperExpenseFields(overrides map[string]string) map[string]string {
+	fields := map[string]string{
 		"uid":            "rzr98oadsp9qc11",
 		"date":           "2024-09-01",
 		"division":       "vccd5fo56ctbigh",
-		"description":    description,
+		"description":    "bookkeeper entered invoice",
 		"payment_type":   "OnAccount",
 		"purchase_order": "poa1ctvbrnch001",
 		"job":            "cjf0kt0defhq480",
@@ -1508,7 +1682,35 @@ func createBookKeeperPOExpense(t testing.TB, app *tests.TestApp, bookkeeperToken
 		"kind":           "prj0kind0000001",
 		"total":          "25",
 		"vendor":         "z66xe6vqhwtokt4",
-	}, filename)
+	}
+	for key, value := range overrides {
+		fields[key] = value
+	}
+	return fields
+}
+
+func activatePurchaseOrderFixtures(t testing.TB, app *tests.TestApp, ids ...string) {
+	t.Helper()
+
+	// These fixtures are stored as Unapproved so global active-PO visibility counts
+	// remain stable. Tests that need a narrowly eligible PO activate only their
+	// private app copy.
+	for _, id := range ids {
+		record, err := app.FindRecordById("purchase_orders", id)
+		if err != nil {
+			t.Fatalf("failed to load purchase order fixture %s: %v", id, err)
+		}
+		record.Set("status", "Active")
+		if err := app.Save(record); err != nil {
+			t.Fatalf("failed to activate purchase order fixture %s: %v", id, err)
+		}
+	}
+}
+
+func createBookKeeperPOExpense(t testing.TB, app *tests.TestApp, bookkeeperToken string, description string, filename string) bookKeeperExpenseCreateResult {
+	t.Helper()
+
+	body, contentType := mustMultipartExpense(t, bookKeeperExpenseFields(map[string]string{"description": description}), filename)
 	createRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
 		"Authorization": bookkeeperToken,
 		"Content-Type":  contentType,
