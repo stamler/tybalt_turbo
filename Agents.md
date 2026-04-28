@@ -23,7 +23,7 @@
 
 ## Git
 
-1. If asked to write a commit message, never commit unless explicitly told to do so
+1. If asked to write a commit message, never commit unless explicitly told to do so. Always show the commit message in markdown that is able to be copied (i.e. in a text fence so the user can copy it). Don't hard wrap lines in the commit message.
 2. When you make changes to files, never stage your changes unless explicitly told to do so. This applies even if the files you changed were already staged.
 
 ## Review
