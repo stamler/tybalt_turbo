@@ -399,6 +399,7 @@ export type ExpensesRecord = {
   committed_week_ending: string;
   committer: RecordIdString;
   created: IsoDateString;
+  creator: RecordIdString;
   currency: RecordIdString;
   date: string;
   description: string;
@@ -452,6 +453,8 @@ export type ExpensesAugmentedRecord = {
   committed: IsoDateString;
   committed_week_ending: string;
   committer: RecordIdString;
+  creator: RecordIdString;
+  creator_name: string;
   currency: RecordIdString;
   currency_code: string;
   currency_icon: string;

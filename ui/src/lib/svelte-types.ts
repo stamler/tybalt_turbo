@@ -61,6 +61,7 @@ export type PurchaseOrderDetailsPageData = {
 };
 export type LinkedPurchaseOrderSummary = {
   id: string;
+  uid: string;
   po_number: string;
   currency: string;
   type: VisiblePurchaseOrderResponse["type"];

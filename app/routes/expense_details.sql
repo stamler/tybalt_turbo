@@ -1,6 +1,7 @@
 SELECT 
   e.id,
   e.uid,
+  e.creator,
   e.date,
   e.division,
   e.description,
@@ -49,6 +50,7 @@ SELECT
   COALESCE(p1.given_name || ' ' || p1.surname, '') AS approver_name,
   COALESCE(p2.given_name || ' ' || p2.surname, '') AS rejector_name,
   COALESCE(p4.given_name || ' ' || p4.surname, '') AS settler_name,
+  COALESCE(p5.given_name || ' ' || p5.surname, '') AS creator_name,
   COALESCE(b.name, '') AS branch_name,
   COALESCE(po.vendor, '') AS po_vendor,
   COALESCE(pov.name, '') AS po_vendor_name,
@@ -89,6 +91,7 @@ LEFT JOIN profiles p2 ON e.rejector = p2.uid
 LEFT JOIN purchase_orders po ON e.purchase_order = po.id
 LEFT JOIN profiles p3 ON po.uid = p3.uid
 LEFT JOIN profiles p4 ON e.settler = p4.uid
+LEFT JOIN profiles p5 ON e.creator = p5.uid
 LEFT JOIN currencies cur ON e.currency = cur.id
 LEFT JOIN branches b ON e.branch = b.id
 LEFT JOIN vendors pov ON po.vendor = pov.id

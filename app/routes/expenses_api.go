@@ -40,8 +40,8 @@ var expenseDetailsQuery string
 // participation. That means a caller may be able to open a PO details page and
 // still see a filtered subset of linked expenses.
 const (
-	whereListMine     = "e.uid = {:auth}"
-	whereListMineByPO = "e.uid = {:auth} AND e.purchase_order = {:purchase_order}"
+	whereListMine     = "(e.uid = {:auth} OR e.creator = {:auth})"
+	whereListMineByPO = "(e.uid = {:auth} OR e.creator = {:auth}) AND e.purchase_order = {:purchase_order}"
 	wherePending      = "e.approver = {:auth} AND e.submitted = 1 AND (e.approved = '' OR e.approved IS NULL)"
 	whereApproved     = "e.approver = {:auth} AND (e.approved != '' AND e.approved IS NOT NULL)"
 	// expenseVisibilityPredicate is the canonical EXPENSE-level visibility rule
@@ -63,6 +63,7 @@ const (
 	//   a given caller.
 	expenseVisibilityPredicate = `
   e.uid = {:auth}
+  OR e.creator = {:auth}
   OR (e.approver = {:auth} AND e.submitted = 1)
   OR (({:has_commit} = 1) AND e.approved != '')
   OR (({:has_report} = 1) AND e.committed != '')
@@ -114,6 +115,7 @@ func expenseVisibilityParams(app core.App, auth *core.Record) (dbx.Params, error
 type ExpensesAugmentedRow struct {
 	ID                  string  `db:"id" json:"id"`
 	UID                 string  `db:"uid" json:"uid"`
+	Creator             string  `db:"creator" json:"creator"`
 	Date                string  `db:"date" json:"date"`
 	Division            string  `db:"division" json:"division"`
 	Description         string  `db:"description" json:"description"`
@@ -160,6 +162,7 @@ type ExpensesAugmentedRow struct {
 	VendorName          string  `db:"vendor_name" json:"vendor_name"`
 	VendorAlias         string  `db:"vendor_alias" json:"vendor_alias"`
 	UIDName             string  `db:"uid_name" json:"uid_name"`
+	CreatorName         string  `db:"creator_name" json:"creator_name"`
 	ApproverName        string  `db:"approver_name" json:"approver_name"`
 	RejectorName        string  `db:"rejector_name" json:"rejector_name"`
 	BranchName          string  `db:"branch_name" json:"branch_name"`

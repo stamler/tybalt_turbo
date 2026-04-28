@@ -174,9 +174,20 @@
       {/if}
     </span>
   {/snippet}
-  {#snippet line1({ uid_name, division_code, division_name }: ExpensesAugmentedResponse)}
+  {#snippet line1({
+    uid,
+    uid_name,
+    creator,
+    creator_name,
+    division_code,
+    division_name,
+  }: ExpensesAugmentedResponse)}
     <span>
-      {uid_name} / {division_code}
+      {#if creator !== uid}
+        {uid_name} / Entered by {creator_name} / {division_code}
+      {:else}
+        {uid_name} / {division_code}
+      {/if}
       {division_name}
     </span>
   {/snippet}
@@ -215,6 +226,7 @@
   {#snippet actions({
     id,
     uid,
+    creator,
     approver,
     submitted,
     approved,
@@ -222,9 +234,9 @@
     committed,
   }: ExpensesAugmentedResponse)}
     {#if $expensesEditingEnabled}
-      {@const isOwner = uid === viewerId}
+      {@const isOwner = creator === viewerId}
       {@const isApprover = approver === viewerId}
-      {@const hasTaprAccess = $globalStore.claims.includes("tapr")}
+      {@const hasApprovalAccess = $globalStore.claims.includes("tapr") || $globalStore.claims.includes("book_keeper")}
       {#if isOwner && !submitted}
         <DsActionButton
           action={`/expenses/${id}/edit`}
@@ -236,7 +248,7 @@
       {#if isOwner && ((submitted && approved === "") || rejected !== "") && committed === ""}
         <DsActionButton action={() => recall(id)} icon="mdi:rewind" title="Recall" color="orange" />
       {/if}
-      {#if isOwner && isApprover && hasTaprAccess && submitted && approved === "" && rejected === "" && committed === ""}
+      {#if isOwner && isApprover && hasApprovalAccess && submitted && approved === "" && rejected === "" && committed === ""}
         <DsActionButton
           action={() => approve(id)}
           icon="mdi:approve"

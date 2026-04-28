@@ -1056,6 +1056,314 @@ func TestRejectExpense_QueuesNotifications(t *testing.T) {
 	scenario.Test(t)
 }
 
+func TestBookKeeperPurchaseOrderExpenseFlow(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	noClaimsToken, err := testutils.GenerateRecordToken("users", "noclaims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	hasBookKeeperClaim, err := utilities.HasClaimByUserID(app, "tqqf7q0f3378rvp", "book_keeper")
+	if err != nil {
+		t.Fatalf("failed checking book_keeper claim: %v", err)
+	}
+	if !hasBookKeeperClaim {
+		t.Fatal("book@keeper.com fixture must have book_keeper claim")
+	}
+	body, contentType := mustMultipartExpense(t, map[string]string{
+		"uid":            "rzr98oadsp9qc11",
+		"date":           "2024-09-01",
+		"division":       "vccd5fo56ctbigh",
+		"description":    "bookkeeper entered invoice",
+		"payment_type":   "OnAccount",
+		"purchase_order": "poa1ctvbrnch001",
+		"job":            "cjf0kt0defhq480",
+		"category":       "t5nmdl188gtlhz0",
+		"kind":           "prj0kind0000001",
+		"total":          "25",
+		"vendor":         "z66xe6vqhwtokt4",
+	}, "bookkeeper-flow.png")
+	createRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+		"Authorization": bookkeeperToken,
+		"Content-Type":  contentType,
+	})
+	mustStatus(t, createRes, http.StatusOK)
+
+	var created struct {
+		ID       string `json:"id"`
+		UID      string `json:"uid"`
+		Creator  string `json:"creator"`
+		Approver string `json:"approver"`
+	}
+	if err := json.Unmarshal(createRes.Body.Bytes(), &created); err != nil {
+		t.Fatalf("failed to decode create response: %v; body=%s", err, createRes.Body.String())
+	}
+	if created.UID != "rzr98oadsp9qc11" || created.Creator != "tqqf7q0f3378rvp" || created.Approver != "tqqf7q0f3378rvp" {
+		t.Fatalf("unexpected actor fields after create: %+v", created)
+	}
+
+	updateRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/"+created.ID, strings.NewReader(`{
+		"uid": "rzr98oadsp9qc11",
+		"creator": "tqqf7q0f3378rvp",
+		"date": "2024-09-01",
+		"division":       "vccd5fo56ctbigh",
+		"description": "bookkeeper updated invoice",
+		"payment_type": "OnAccount",
+		"purchase_order": "poa1ctvbrnch001",
+		"job":            "cjf0kt0defhq480",
+		"category":       "t5nmdl188gtlhz0",
+		"kind": "prj0kind0000001",
+		"total": 25,
+		"vendor": "z66xe6vqhwtokt4"
+	}`), map[string]string{"Authorization": bookkeeperToken})
+	mustStatus(t, updateRes, http.StatusOK)
+
+	badPaymentUpdateRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/"+created.ID, strings.NewReader(`{
+		"uid": "rzr98oadsp9qc11",
+		"creator": "tqqf7q0f3378rvp",
+		"date": "2024-09-01",
+		"division": "vccd5fo56ctbigh",
+		"description": "bookkeeper bad payment update",
+		"payment_type": "CorporateCreditCard",
+		"cc_last_4_digits": "1234",
+		"purchase_order": "poa1ctvbrnch001",
+		"job": "cjf0kt0defhq480",
+		"category": "t5nmdl188gtlhz0",
+		"kind": "prj0kind0000001",
+		"total": 25,
+		"vendor": "z66xe6vqhwtokt4"
+	}`), map[string]string{"Authorization": bookkeeperToken})
+	mustStatus(t, badPaymentUpdateRes, http.StatusBadRequest)
+
+	ownerSubmitRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/submit", nil, map[string]string{
+		"Authorization": ownerToken,
+	})
+	mustStatus(t, ownerSubmitRes, http.StatusForbidden)
+
+	submitRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/submit", nil, map[string]string{
+		"Authorization": bookkeeperToken,
+	})
+	mustStatus(t, submitRes, http.StatusOK)
+
+	pendingRes := performTestAPIRequest(t, app, http.MethodGet, "/api/expenses/pending", nil, map[string]string{
+		"Authorization": bookkeeperToken,
+	})
+	mustStatus(t, pendingRes, http.StatusOK)
+	if !strings.Contains(pendingRes.Body.String(), created.ID) {
+		t.Fatalf("expected pending queue to include bookkeeper expense %s; body=%s", created.ID, pendingRes.Body.String())
+	}
+
+	ownerApproveRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/approve", nil, map[string]string{
+		"Authorization": ownerToken,
+	})
+	mustStatus(t, ownerApproveRes, http.StatusForbidden)
+
+	approveRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/approve", nil, map[string]string{
+		"Authorization": bookkeeperToken,
+	})
+	mustStatus(t, approveRes, http.StatusOK)
+
+	body, contentType = mustMultipartExpense(t, map[string]string{
+		"uid":            "rzr98oadsp9qc11",
+		"date":           "2024-09-01",
+		"division":       "vccd5fo56ctbigh",
+		"description":    "non bookkeeper invoice",
+		"payment_type":   "OnAccount",
+		"purchase_order": "poa1ctvbrnch001",
+		"job":            "cjf0kt0defhq480",
+		"category":       "t5nmdl188gtlhz0",
+		"kind":           "prj0kind0000001",
+		"total":          "25",
+		"vendor":         "z66xe6vqhwtokt4",
+	}, "non-bookkeeper-flow.png")
+	noClaimCreateRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+		"Authorization": noClaimsToken,
+		"Content-Type":  contentType,
+	})
+	mustStatus(t, noClaimCreateRes, http.StatusBadRequest)
+
+	body, contentType = mustMultipartExpense(t, map[string]string{
+		"uid":              "rzr98oadsp9qc11",
+		"date":             "2024-09-01",
+		"division":         "vccd5fo56ctbigh",
+		"description":      "payment mismatch invoice",
+		"payment_type":     "CorporateCreditCard",
+		"cc_last_4_digits": "1234",
+		"purchase_order":   "poa1ctvbrnch001",
+		"job":              "cjf0kt0defhq480",
+		"category":         "t5nmdl188gtlhz0",
+		"kind":             "prj0kind0000001",
+		"total":            "25",
+		"vendor":           "z66xe6vqhwtokt4",
+	}, "payment-mismatch-flow.png")
+	mismatchRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+		"Authorization": bookkeeperToken,
+		"Content-Type":  contentType,
+	})
+	mustStatus(t, mismatchRes, http.StatusBadRequest)
+}
+
+func TestBookKeeperExpenseEditRejectsOverwrittenOwnerPayload(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, contentType := mustMultipartExpense(t, map[string]string{
+		"uid":            "rzr98oadsp9qc11",
+		"date":           "2024-09-01",
+		"division":       "vccd5fo56ctbigh",
+		"description":    "bookkeeper entered invoice",
+		"payment_type":   "OnAccount",
+		"purchase_order": "poa1ctvbrnch001",
+		"job":            "cjf0kt0defhq480",
+		"category":       "t5nmdl188gtlhz0",
+		"kind":           "prj0kind0000001",
+		"total":          "25",
+		"vendor":         "z66xe6vqhwtokt4",
+	}, "bookkeeper-edit-payload.png")
+	createRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+		"Authorization": bookkeeperToken,
+		"Content-Type":  contentType,
+	})
+	mustStatus(t, createRes, http.StatusOK)
+
+	var created struct {
+		ID      string `json:"id"`
+		UID     string `json:"uid"`
+		Creator string `json:"creator"`
+	}
+	if err := json.Unmarshal(createRes.Body.Bytes(), &created); err != nil {
+		t.Fatalf("failed to decode create response: %v; body=%s", err, createRes.Body.String())
+	}
+	if created.UID == created.Creator {
+		t.Fatalf("fixture setup must create an on-behalf expense, got owner fields %+v", created)
+	}
+
+	updateRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/"+created.ID, strings.NewReader(`{
+		"uid": "tqqf7q0f3378rvp",
+		"creator": "tqqf7q0f3378rvp",
+		"date": "2024-09-01",
+		"division": "vccd5fo56ctbigh",
+		"description": "bookkeeper updated invoice",
+		"payment_type": "OnAccount",
+		"purchase_order": "poa1ctvbrnch001",
+		"job": "cjf0kt0defhq480",
+		"category": "t5nmdl188gtlhz0",
+		"kind": "prj0kind0000001",
+		"total": 25,
+		"vendor": "z66xe6vqhwtokt4"
+	}`), map[string]string{"Authorization": bookkeeperToken})
+	if updateRes.Code == http.StatusOK {
+		t.Fatalf("expected overwritten uid payload to be rejected, got status %d; body=%s", updateRes.Code, updateRes.Body.String())
+	}
+
+	reloaded, err := app.FindRecordById("expenses", created.ID)
+	if err != nil {
+		t.Fatalf("failed to reload expense: %v", err)
+	}
+	if got := reloaded.GetString("uid"); got != created.UID {
+		t.Fatalf("expense uid changed after rejected update: got %q, want %q", got, created.UID)
+	}
+}
+
+func TestBookKeeperExpenseDraftCannotBeDeletedByPurchaseOrderOwner(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ownerToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, contentType := mustMultipartExpense(t, map[string]string{
+		"uid":            "rzr98oadsp9qc11",
+		"date":           "2024-09-01",
+		"division":       "vccd5fo56ctbigh",
+		"description":    "bookkeeper entered invoice for delete regression",
+		"payment_type":   "OnAccount",
+		"purchase_order": "poa1ctvbrnch001",
+		"job":            "cjf0kt0defhq480",
+		"category":       "t5nmdl188gtlhz0",
+		"kind":           "prj0kind0000001",
+		"total":          "25",
+		"vendor":         "z66xe6vqhwtokt4",
+	}, "bookkeeper-delete-regression.png")
+	createRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+		"Authorization": bookkeeperToken,
+		"Content-Type":  contentType,
+	})
+	mustStatus(t, createRes, http.StatusOK)
+
+	var created struct {
+		ID      string `json:"id"`
+		UID     string `json:"uid"`
+		Creator string `json:"creator"`
+	}
+	if err := json.Unmarshal(createRes.Body.Bytes(), &created); err != nil {
+		t.Fatalf("failed to decode create response: %v; body=%s", err, createRes.Body.String())
+	}
+	if created.UID != "rzr98oadsp9qc11" || created.Creator != "tqqf7q0f3378rvp" {
+		t.Fatalf("fixture setup must create an on-behalf expense, got owner fields %+v", created)
+	}
+
+	ownerDeleteRes := performTestAPIRequest(t, app, http.MethodDelete, "/api/collections/expenses/records/"+created.ID, nil, map[string]string{
+		"Authorization": ownerToken,
+	})
+	if ownerDeleteRes.Code == http.StatusNoContent {
+		t.Fatalf("purchase order owner deleted a bookkeeper-created draft; body=%s", ownerDeleteRes.Body.String())
+	}
+
+	if _, err := app.FindRecordById("expenses", created.ID); err != nil {
+		t.Fatalf("bookkeeper-created draft was removed by rejected owner delete: %v", err)
+	}
+
+	bookkeeperDeleteRes := performTestAPIRequest(t, app, http.MethodDelete, "/api/collections/expenses/records/"+created.ID, nil, map[string]string{
+		"Authorization": bookkeeperToken,
+	})
+	mustStatus(t, bookkeeperDeleteRes, http.StatusNoContent)
+}
+
+func mustMultipartExpense(t testing.TB, fields map[string]string, filename string) (*bytes.Buffer, string) {
+	t.Helper()
+
+	buf := &bytes.Buffer{}
+	w := multipart.NewWriter(buf)
+	for k, v := range fields {
+		if err := w.WriteField(k, v); err != nil {
+			t.Fatalf("failed to write multipart field %s: %v", k, err)
+		}
+	}
+	fw, err := w.CreateFormFile("attachment", filename)
+	if err != nil {
+		t.Fatalf("failed to create attachment field: %v", err)
+	}
+	if _, err := fw.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}); err != nil {
+		t.Fatalf("failed to write attachment: %v", err)
+	}
+	contentType := w.FormDataContentType()
+	if err := w.Close(); err != nil {
+		t.Fatalf("failed to close multipart writer: %v", err)
+	}
+	return buf, contentType
+}
+
 func TestRejectExpense_CommitHolderCannotRejectUnapprovedExpense(t *testing.T) {
 	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
 	if err != nil {

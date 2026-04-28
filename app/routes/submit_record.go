@@ -41,8 +41,13 @@ func createSubmitRecordHandler(app core.App, collectionName string) func(e *core
 				}
 			}
 
-			// Verify the caller is the record's owner
-			if record.Get("uid") != userId {
+			ownerField := "uid"
+			if collectionName == "expenses" {
+				ownerField = "creator"
+			}
+
+			// Verify the caller is the record's owner for this transition.
+			if record.GetString(ownerField) != userId {
 				httpResponseStatusCode = http.StatusForbidden
 				return &CodeError{
 					Code:    "unauthorized",

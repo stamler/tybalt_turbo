@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -49,9 +48,6 @@ func validateExpensePurchaseOrderIsActive(app core.App, record *core.Record) *Co
 // expensePurchaseOrderOwnerUIDMismatch compares the expense owner to the linked
 // purchase order owner. We only flag a mismatch when both IDs are present.
 func expensePurchaseOrderOwnerUIDMismatch(expenseUID string, purchaseOrderOwnerUID string) bool {
-	expenseUID = strings.TrimSpace(expenseUID)
-	purchaseOrderOwnerUID = strings.TrimSpace(purchaseOrderOwnerUID)
-
 	return expenseUID != "" && purchaseOrderOwnerUID != "" && expenseUID != purchaseOrderOwnerUID
 }
 
@@ -65,7 +61,7 @@ func validateExpenseNoPurchaseOrderLimit(app core.App, record *core.Record, curr
 	if utilities.IsHomeCurrencyInfo(currencyInfo) {
 		return nil
 	}
-	if strings.TrimSpace(record.GetString("purchase_order")) != "" {
+	if record.GetString("purchase_order") != "" {
 		return nil
 	}
 

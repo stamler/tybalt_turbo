@@ -82,6 +82,24 @@
     }
     return "";
   });
+  const linkedPurchaseOrderPaymentType = $derived.by(() => {
+    if (data.linked_purchase_order?.payment_type) {
+      return data.linked_purchase_order.payment_type;
+    }
+    if (isExpensesResponse(item) && item.purchase_order !== "") {
+      return item.expand.purchase_order.payment_type;
+    }
+    return "";
+  });
+  const linkedPurchaseOrderUID = $derived.by(() => {
+    if (data.linked_purchase_order?.uid) {
+      return data.linked_purchase_order.uid;
+    }
+    if (isExpensesResponse(item) && item.purchase_order !== "") {
+      return item.expand.purchase_order.uid;
+    }
+    return "";
+  });
   const linkedRecurringRemainingOccurrences = $derived.by(
     () => data.linked_purchase_order?.recurring_remaining_occurrences ?? null,
   );
@@ -128,8 +146,25 @@
     return `Latest CAD equivalent: ${formatCurrencyAmount(suggestedSettledTotal, "CAD")} · allowed range ${formatCurrencyAmount(settledTotalBounds.min, "CAD")} to ${formatCurrencyAmount(settledTotalBounds.max, "CAD")}. Enter a settled CAD total in this range.`;
   });
   const nonOwnerEditMessage = "You can view this expense, but only its creator can edit it.";
+  const effectiveOwnerID = $derived.by(() => {
+    if (isExpensesResponse(item)) {
+      return item.creator;
+    }
+    return item.uid;
+  });
   const isEditingAnotherUsersExpense = $derived.by(
-    () => data.editing && authUserID !== "" && item.uid !== "" && item.uid !== authUserID,
+    () => data.editing && authUserID !== "" && effectiveOwnerID !== "" && effectiveOwnerID !== authUserID,
+  );
+  const isEligibleBookkeeperOnBehalfCreate = $derived.by(
+    () =>
+      !data.editing &&
+      $globalStore.claims.includes("book_keeper") &&
+      item.purchase_order !== "" &&
+      linkedPurchaseOrderUID !== "" &&
+      linkedPurchaseOrderUID !== authUserID &&
+      linkedPurchaseOrderNumber !== "" &&
+      (item.payment_type === "OnAccount" || item.payment_type === "CorporateCreditCard") &&
+      String(item.payment_type) === String(linkedPurchaseOrderPaymentType),
   );
 
   const allPaymentTypes = [
@@ -204,10 +239,11 @@
       };
       return;
     }
-    item.uid = $authStore?.model?.id ?? "";
-
     // pay_period_ending is server-managed and must not be sent from the editor.
     const payload: Partial<typeof item> = { ...item };
+    if (!data.editing) {
+      payload.uid = isEligibleBookkeeperOnBehalfCreate ? linkedPurchaseOrderUID : authUserID;
+    }
     delete payload.pay_period_ending;
 
     // if the job is empty, set the category to empty

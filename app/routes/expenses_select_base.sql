@@ -1,6 +1,7 @@
 SELECT 
   e.id,
   e.uid,
+  e.creator,
   e.date,
   e.division,
   e.description,
@@ -49,6 +50,7 @@ SELECT
   COALESCE(p1.given_name || ' ' || p1.surname, '') AS approver_name,
   COALESCE(p2.given_name || ' ' || p2.surname, '') AS rejector_name,
   COALESCE(p3.given_name || ' ' || p3.surname, '') AS settler_name,
+  COALESCE(p4.given_name || ' ' || p4.surname, '') AS creator_name,
   COALESCE(b.name, '') AS branch_name
 FROM expenses e
 LEFT JOIN jobs j ON e.job = j.id
@@ -64,3 +66,4 @@ LEFT JOIN purchase_orders po ON e.purchase_order = po.id
 LEFT JOIN currencies cur ON e.currency = cur.id
 LEFT JOIN branches b ON e.branch = b.id
 LEFT JOIN profiles p3 ON e.settler = p3.uid
+LEFT JOIN profiles p4 ON e.creator = p4.uid

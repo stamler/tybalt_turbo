@@ -343,17 +343,17 @@ func TestValidateExpense_ForeignNoPOLimitLowRateCurrencyWithoutSettledTotal(t *t
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			record := buildRecordFromMap(expensesCollection, map[string]any{
-				"allowance_types": []string{},
-				"date":            "2024-01-22",
-				"description":     "Low-rate foreign draft under CAD cap",
-				"job":             "",
-				"payment_type":    tt.paymentType,
-				"purchase_order":  "",
-				"total":           underLimitSourceTotal,
-				"settled_total":   0.0,
-				"currency":        jpyCurrency.Id,
-				"vendor":          "2zqxtsmymf670ha",
-				"attachment":      "dummy.pdf",
+				"allowance_types":  []string{},
+				"date":             "2024-01-22",
+				"description":      "Low-rate foreign draft under CAD cap",
+				"job":              "",
+				"payment_type":     tt.paymentType,
+				"purchase_order":   "",
+				"total":            underLimitSourceTotal,
+				"settled_total":    0.0,
+				"currency":         jpyCurrency.Id,
+				"vendor":           "2zqxtsmymf670ha",
+				"attachment":       "dummy.pdf",
 				"cc_last_4_digits": tt.ccLast4Digits,
 			})
 
@@ -435,17 +435,17 @@ func TestValidateExpense_ForeignNoPOLimitHighRateCurrencyWithoutSettledTotal(t *
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			record := buildRecordFromMap(expensesCollection, map[string]any{
-				"allowance_types": []string{},
-				"date":            "2024-01-22",
-				"description":     "High-rate foreign draft over CAD cap",
-				"job":             "",
-				"payment_type":    tt.paymentType,
-				"purchase_order":  "",
-				"total":           overLimitSourceTotal,
-				"settled_total":   0.0,
-				"currency":        usdCurrency.Id,
-				"vendor":          "2zqxtsmymf670ha",
-				"attachment":      "dummy.pdf",
+				"allowance_types":  []string{},
+				"date":             "2024-01-22",
+				"description":      "High-rate foreign draft over CAD cap",
+				"job":              "",
+				"payment_type":     tt.paymentType,
+				"purchase_order":   "",
+				"total":            overLimitSourceTotal,
+				"settled_total":    0.0,
+				"currency":         usdCurrency.Id,
+				"vendor":           "2zqxtsmymf670ha",
+				"attachment":       "dummy.pdf",
 				"cc_last_4_digits": tt.ccLast4Digits,
 			})
 
@@ -549,17 +549,17 @@ func TestValidateExpense_ForeignNoPOLimitLowRateCurrencyWithSettledTotal(t *test
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			record := buildRecordFromMap(expensesCollection, map[string]any{
-				"allowance_types": []string{},
-				"date":            "2024-01-22",
-				"description":     "Low-rate foreign expense with explicit settled total",
-				"job":             "",
-				"payment_type":    tt.paymentType,
-				"purchase_order":  "",
-				"total":           tt.total,
-				"settled_total":   tt.settledTotal,
-				"currency":        jpyCurrency.Id,
-				"vendor":          "2zqxtsmymf670ha",
-				"attachment":      "dummy.pdf",
+				"allowance_types":  []string{},
+				"date":             "2024-01-22",
+				"description":      "Low-rate foreign expense with explicit settled total",
+				"job":              "",
+				"payment_type":     tt.paymentType,
+				"purchase_order":   "",
+				"total":            tt.total,
+				"settled_total":    tt.settledTotal,
+				"currency":         jpyCurrency.Id,
+				"vendor":           "2zqxtsmymf670ha",
+				"attachment":       "dummy.pdf",
 				"cc_last_4_digits": tt.ccLast4Digits,
 			})
 
@@ -726,7 +726,7 @@ func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
 			"currency":       homeCurrency.Id,
 		})
 
-		if err := cleanExpense(app, record); err != nil {
+		if err := cleanExpense(app, record, nil, false); err != nil {
 			t.Fatalf("expected cleanExpense to succeed, got %v", err)
 		}
 		if got := record.GetString("currency"); got != usdCurrency.Id {
@@ -744,7 +744,7 @@ func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
 			"currency":     usdCurrency.Id,
 		})
 
-		if err := cleanExpense(app, record); err != nil {
+		if err := cleanExpense(app, record, nil, false); err != nil {
 			t.Fatalf("expected cleanExpense to succeed for mileage, got %v", err)
 		}
 		if got := record.GetString("currency"); got != homeCurrency.Id {
@@ -766,7 +766,7 @@ func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
 			"attachment":   "dummy.pdf",
 		})
 
-		if err := cleanExpense(app, record); err != nil {
+		if err := cleanExpense(app, record, nil, false); err != nil {
 			t.Fatalf("expected cleanExpense to succeed for blank home-currency expense, got %v", err)
 		}
 		if got := record.GetString("currency"); got != homeCurrency.Id {
@@ -789,7 +789,7 @@ func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
 			"settled":       "2026-04-03 12:00:00.000Z",
 		})
 
-		if err := cleanExpense(app, record); err != nil {
+		if err := cleanExpense(app, record, nil, false); err != nil {
 			t.Fatalf("expected cleanExpense to succeed for foreign on-account, got %v", err)
 		}
 		if record.GetFloat("settled_total") != 0 {
@@ -815,7 +815,7 @@ func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
 			"settled":       "2026-04-03 12:00:00.000Z",
 		})
 
-		if err := cleanExpense(app, record); err != nil {
+		if err := cleanExpense(app, record, nil, false); err != nil {
 			t.Fatalf("expected cleanExpense to succeed for foreign Expense, got %v", err)
 		}
 		if record.GetFloat("settled_total") != 91.25 {
@@ -839,7 +839,7 @@ func TestCleanExpense_CurrencyAssignmentAndSettlementRules(t *testing.T) {
 			"settled_total": 0,
 		})
 
-		if err := cleanExpense(app, record); err != nil {
+		if err := cleanExpense(app, record, nil, false); err != nil {
 			t.Fatalf("expected cleanExpense to succeed for foreign Expense, got %v", err)
 		}
 		if record.GetFloat("settled_total") != 0 {

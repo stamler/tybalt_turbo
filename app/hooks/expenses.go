@@ -21,7 +21,7 @@ import (
 // and to ensure that the record is in a valid state before it is created or
 // updated. It is called by ProcessExpense to reduce the number of fields
 // that need to be validated.
-func cleanExpense(app core.App, expenseRecord *core.Record) error {
+func cleanExpense(app core.App, expenseRecord *core.Record, poRecord *core.Record, creatorApprover bool) error {
 	if expenseRecord.GetString("uid") == "" {
 		return &errs.HookError{
 			Status:  http.StatusBadRequest,
@@ -35,7 +35,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		}
 	}
 
-	purchaseOrderID := strings.TrimSpace(expenseRecord.GetString("purchase_order"))
+	purchaseOrderID := expenseRecord.GetString("purchase_order")
 	homeCurrencyID := ""
 	if homeCurrency, err := utilities.FindHomeCurrency(app); err == nil && homeCurrency != nil {
 		homeCurrencyID = homeCurrency.Id
@@ -50,84 +50,36 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 
 	// No-PO expenses default to capital (no job) or project (with job).
 	if purchaseOrderID == "" {
-		hasJob := strings.TrimSpace(expenseRecord.GetString("job")) != ""
+		hasJob := expenseRecord.GetString("job") != ""
 		expenseRecord.Set("kind", utilities.DefaultExpenditureKindIDForJob(hasJob))
 	}
 
-	// get the user's manager and set the approver field
-	profile, err := app.FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
-		"userId": expenseRecord.GetString("uid"),
-	})
-	if profile == nil {
-		return &errs.HookError{
-			Status:  http.StatusBadRequest,
-			Message: "hook error when cleaning expense",
-			Data: map[string]errs.CodeError{
-				"uid": {
-					Code:    "no_profile_found_for_uid",
-					Message: "no profile found for uid",
-				},
-			},
+	if creatorApprover {
+		creatorUID := expenseRecord.GetString("creator")
+		if err := validateBookkeeperApprover(app, creatorUID); err != nil {
+			return err
 		}
+		expenseRecord.Set("approver", creatorUID)
+	} else if err := setManagerApprover(app, expenseRecord); err != nil {
+		return err
 	}
-	if err != nil {
-		return &errs.HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when cleaning expense",
-			Data: map[string]errs.CodeError{
-				"uid": {
-					Code:    "error_during_profile_lookup",
-					Message: "error during profile lookup",
-				},
-			},
-		}
-	}
-	approverUID := profile.GetString("manager")
-
-	// Check that the approver (manager) is an active user
-	active, activeErr := utilities.IsUserActive(app, approverUID)
-	if activeErr != nil {
-		return &errs.HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "failed to check approver active status",
-		}
-	}
-	if !active {
-		return &errs.HookError{
-			Status:  http.StatusBadRequest,
-			Message: "your manager must be an active user to create expenses",
-			Data: map[string]errs.CodeError{
-				"approver": {Code: "approver_not_active", Message: "the approver (your manager) is not an active user"},
-			},
-		}
-	}
-
-	// Ensure the approver (manager) has the `tapr` claim
-	hasTapr, taprErr := utilities.HasClaimByUserID(app, approverUID, "tapr")
-	if taprErr != nil {
-		return &errs.HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "hook error when cleaning expense",
-			Data: map[string]errs.CodeError{
-				"approver": {Code: "error_checking_claim", Message: "error checking approver claim"},
-			},
-		}
-	}
-	if !hasTapr {
-		return &errs.HookError{
-			Status:  http.StatusBadRequest,
-			Message: "hook error when cleaning expense",
-			Data: map[string]errs.CodeError{
-				"approver": {Code: "unqualified_approver", Message: "the approver must have the tapr claim"},
-			},
-		}
-	}
-	expenseRecord.Set("approver", approverUID)
 
 	// If a purchase order is linked, force branch from the PO branch.
 	if purchaseOrderID != "" {
-		purchaseOrderRecord, err := app.FindRecordById("purchase_orders", purchaseOrderID)
-		if err != nil || purchaseOrderRecord == nil {
+		if poRecord == nil {
+			var err error
+			poRecord, err = app.FindRecordById("purchase_orders", purchaseOrderID)
+			if err != nil {
+				return &errs.HookError{
+					Status:  http.StatusBadRequest,
+					Message: "hook error when cleaning expense",
+					Data: map[string]errs.CodeError{
+						"purchase_order": {Code: "not_found", Message: "referenced purchase order not found"},
+					},
+				}
+			}
+		}
+		if poRecord == nil {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "hook error when cleaning expense",
@@ -136,7 +88,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 				},
 			}
 		}
-		poBranchID := strings.TrimSpace(purchaseOrderRecord.GetString("branch"))
+		poBranchID := poRecord.GetString("branch")
 		if poBranchID == "" {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
@@ -147,7 +99,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 			}
 		}
 		expenseRecord.Set("branch", poBranchID)
-		expenseRecord.Set("currency", purchaseOrderRecord.GetString("currency"))
+		expenseRecord.Set("currency", poRecord.GetString("currency"))
 	} else {
 		// Set branch from job if provided; otherwise from user's default branch.
 		jobId := expenseRecord.GetString("job")
@@ -410,7 +362,7 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 		}
 	}
 
-	if strings.TrimSpace(expenseRecord.GetString("currency")) == "" && homeCurrencyID != "" {
+	if expenseRecord.GetString("currency") == "" && homeCurrencyID != "" {
 		expenseRecord.Set("currency", homeCurrencyID)
 	}
 
@@ -452,6 +404,201 @@ func cleanExpense(app core.App, expenseRecord *core.Record) error {
 	return nil
 }
 
+func setManagerApprover(app core.App, expenseRecord *core.Record) error {
+	profile, err := app.FindFirstRecordByFilter("profiles", "uid = {:userId}", dbx.Params{
+		"userId": expenseRecord.GetString("uid"),
+	})
+	if profile == nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"uid": {
+					Code:    "no_profile_found_for_uid",
+					Message: "no profile found for uid",
+				},
+			},
+		}
+	}
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"uid": {
+					Code:    "error_during_profile_lookup",
+					Message: "error during profile lookup",
+				},
+			},
+		}
+	}
+	approverUID := profile.GetString("manager")
+
+	active, activeErr := utilities.IsUserActive(app, approverUID)
+	if activeErr != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "failed to check approver active status",
+		}
+	}
+	if !active {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "your manager must be an active user to create expenses",
+			Data: map[string]errs.CodeError{
+				"approver": {Code: "approver_not_active", Message: "the approver (your manager) is not an active user"},
+			},
+		}
+	}
+
+	hasTapr, taprErr := utilities.HasClaimByUserID(app, approverUID, "tapr")
+	if taprErr != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"approver": {Code: "error_checking_claim", Message: "error checking approver claim"},
+			},
+		}
+	}
+	if !hasTapr {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"approver": {Code: "unqualified_approver", Message: "the approver must have the tapr claim"},
+			},
+		}
+	}
+	expenseRecord.Set("approver", approverUID)
+	return nil
+}
+
+func validateBookkeeperApprover(app core.App, creatorUID string) error {
+	if creatorUID == "" {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"creator": {Code: "not_provided", Message: "creator is required"},
+			},
+		}
+	}
+
+	active, activeErr := utilities.IsUserActive(app, creatorUID)
+	if activeErr != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "failed to check creator active status",
+		}
+	}
+	if !active {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "bookkeeper approver must be an active user",
+			Data: map[string]errs.CodeError{
+				"approver": {Code: "approver_not_active", Message: "the bookkeeper approver is not an active user"},
+			},
+		}
+	}
+
+	hasClaim, claimErr := utilities.HasClaimByUserID(app, creatorUID, "book_keeper")
+	if claimErr != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"approver": {Code: "error_checking_claim", Message: "error checking bookkeeper claim"},
+			},
+		}
+	}
+	if !hasClaim {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when cleaning expense",
+			Data: map[string]errs.CodeError{
+				"approver": {Code: "unqualified_approver", Message: "the approver must have the book_keeper claim"},
+			},
+		}
+	}
+	return nil
+}
+
+func validateBookkeeperOnBehalfCreate(app core.App, expenseRecord *core.Record, authID string, poRecord *core.Record) error {
+	if poRecord == nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating bookkeeper expense",
+			Data: map[string]errs.CodeError{
+				"purchase_order": {Code: "required", Message: "purchase order is required for bookkeeper-created expenses"},
+			},
+		}
+	}
+
+	hasClaim, claimErr := utilities.HasClaimByUserID(app, authID, "book_keeper")
+	if claimErr != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "error checking bookkeeper claim",
+			Data: map[string]errs.CodeError{
+				"creator": {Code: "error_checking_claim", Message: "error checking bookkeeper claim"},
+			},
+		}
+	}
+	if !hasClaim {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "hook error when validating uid",
+			Data: map[string]errs.CodeError{
+				"uid": {Code: "value_mismatch", Message: "uid must be equal to the authenticated user's id"},
+			},
+		}
+	}
+
+	if poRecord.GetString("status") != "Active" {
+		return validation.Errors{
+			"purchase_order": validation.NewError("not_active", "purchase order must be active"),
+		}.Filter()
+	}
+	if strings.TrimSpace(poRecord.GetString("po_number")) == "" {
+		return validation.Errors{
+			"purchase_order": validation.NewError("missing_po_number", "purchase order must have a po number"),
+		}.Filter()
+	}
+
+	poUID := poRecord.GetString("uid")
+	if poUID == "" {
+		return validation.Errors{
+			"purchase_order": validation.NewError("missing_uid", "purchase order is missing an owner"),
+		}.Filter()
+	}
+	if poUID == authID {
+		return validation.Errors{
+			"uid": validation.NewError("same_user_bookkeeper_not_applicable", "same-user purchase orders must use the regular expense flow"),
+		}.Filter()
+	}
+	if expenseRecord.GetString("uid") != poUID {
+		return validation.Errors{
+			"uid": validation.NewError("must_match_purchase_order_owner", "uid must match the purchase order owner"),
+		}.Filter()
+	}
+
+	paymentType := expenseRecord.GetString("payment_type")
+	if paymentType != "OnAccount" && paymentType != "CorporateCreditCard" {
+		return validation.Errors{
+			"payment_type": validation.NewError("not_allowed_for_bookkeeper", "bookkeeper-created expenses must be OnAccount or CorporateCreditCard"),
+		}.Filter()
+	}
+	if paymentType != poRecord.GetString("payment_type") {
+		return validation.Errors{
+			"payment_type": validation.NewError("must_match_purchase_order", "payment type must match purchase order payment type"),
+		}.Filter()
+	}
+
+	expenseRecord.Set("uid", poUID)
+	return nil
+}
+
 // The processExpense function is used to process the expense record. It is
 // called by the hooks for the expenses collection to ensure that the record
 // is in a valid state before it is created or updated.
@@ -462,7 +609,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 
 	expenseRecord := e.Record
 	authRecord := e.Auth
-	if authRecord == nil || strings.TrimSpace(authRecord.Id) == "" {
+	if authRecord == nil || authRecord.Id == "" {
 		return &errs.HookError{
 			Status:  http.StatusUnauthorized,
 			Message: "hook error when validating uid",
@@ -475,19 +622,40 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
-	requestUID := strings.TrimSpace(expenseRecord.GetString("uid"))
-	if expenseRecord.IsNew() {
-		if requestUID != authRecord.Id {
+	// if the expense record has a purchase_order, load it before ownership and
+	// approver decisions because the bookkeeper path is defined by the linked PO.
+	var poRecord *core.Record
+	var err error
+	purchaseOrder := expenseRecord.GetString("purchase_order")
+	if purchaseOrder != "" {
+		poRecord, err = app.FindRecordById("purchase_orders", purchaseOrder)
+		if err != nil {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
-				Message: "hook error when validating uid",
+				Message: "hook error when processing expense",
 				Data: map[string]errs.CodeError{
-					"uid": {
-						Code:    "value_mismatch",
-						Message: "uid must be equal to the authenticated user's id",
+					"purchase_order": {
+						Code:    "not_found",
+						Message: "purchase order not found",
 					},
 				},
 			}
+		}
+	}
+
+	authID := authRecord.Id
+	requestUID := expenseRecord.GetString("uid")
+	creatorApprover := false
+	if expenseRecord.IsNew() {
+		expenseRecord.Set("creator", authID)
+		if requestUID == authID {
+			// Regular creates, including bookkeepers entering against their own PO,
+			// continue through manager-derived approval.
+		} else {
+			if err := validateBookkeeperOnBehalfCreate(app, expenseRecord, authID, poRecord); err != nil {
+				return err
+			}
+			creatorApprover = true
 		}
 	} else {
 		original := expenseRecord.Original()
@@ -504,8 +672,9 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 			}
 		}
 
-		originalUID := strings.TrimSpace(original.GetString("uid"))
-		if originalUID != authRecord.Id {
+		originalUID := original.GetString("uid")
+		originalCreator := original.GetString("creator")
+		if original.GetString("creator") != authID {
 			return &errs.HookError{
 				Status:  http.StatusForbidden,
 				Message: "hook error when validating uid",
@@ -527,6 +696,24 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 						Message: "uid cannot be changed",
 					},
 				},
+			}
+		}
+		if expenseRecord.GetString("creator") != originalCreator {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "hook error when validating creator",
+				Data: map[string]errs.CodeError{
+					"creator": {
+						Code:    "immutable_field",
+						Message: "creator cannot be changed",
+					},
+				},
+			}
+		}
+		creatorApprover = originalCreator != "" && originalCreator != originalUID
+		if creatorApprover {
+			if err := validateBookkeeperOnBehalfCreate(app, expenseRecord, authID, poRecord); err != nil {
+				return err
 			}
 		}
 
@@ -559,7 +746,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	}
 
 	// clean the expense record
-	if err := cleanExpense(app, expenseRecord); err != nil {
+	if err := cleanExpense(app, expenseRecord, poRecord, creatorApprover); err != nil {
 		return err
 	}
 
@@ -607,27 +794,9 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	}
 	// Otherwise: no new file and attachment still exists - leave hash unchanged
 
-	// if the expense record has a purchase_order, load it
-	var poRecord *core.Record
-	var err error
-	purchaseOrder := expenseRecord.GetString("purchase_order")
-	if purchaseOrder != "" {
-		poRecord, err = app.FindRecordById("purchase_orders", purchaseOrder)
-		if err != nil {
-			return &errs.HookError{
-				Status:  http.StatusInternalServerError,
-				Message: "hook error when processing expense",
-				Data: map[string]errs.CodeError{
-					"purchase_order": {
-						Code:    "not_found",
-						Message: "purchase order not found",
-					},
-				},
-			}
-		}
-
+	if poRecord != nil {
 		// Expense kind is inherited from its purchase order and is not user-editable.
-		poHasJob := strings.TrimSpace(poRecord.GetString("job")) != ""
+		poHasJob := poRecord.GetString("job") != ""
 		inheritedKind := utilities.NormalizeExpenditureKindID(poRecord.GetString("kind"), poHasJob)
 		expenseRecord.Set("kind", inheritedKind)
 	}

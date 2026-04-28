@@ -1175,6 +1175,11 @@
             "x-sqlite-type": "TEXT"
           },
           {
+            "name": "creator",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
             "name": "currency",
             "type": "string",
             "x-sqlite-type": "TEXT"

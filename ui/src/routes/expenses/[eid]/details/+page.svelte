@@ -33,7 +33,7 @@
 
   $: hasCommitAccess = $globalStore.showAllUi || $globalStore.claims.includes("commit");
   $: hasAdminAccess = $globalStore.showAllUi || $globalStore.claims.includes("admin");
-  $: isOwner = expense.uid === viewerId;
+  $: isOwner = expense.creator === viewerId;
   $: isApprover = expense.approver === viewerId;
 
   async function refreshExpense() {
@@ -157,7 +157,12 @@
       {/if}
     </div>
 
-    <div><span class="font-semibold">Submitted By:</span> {expense.uid_name}</div>
+    {#if expense.creator && expense.creator !== expense.uid}
+      <div><span class="font-semibold">Submitted for:</span> {expense.uid_name}</div>
+      <div><span class="font-semibold">Entered by:</span> {expense.creator_name}</div>
+    {:else}
+      <div><span class="font-semibold">Submitted By:</span> {expense.uid_name}</div>
+    {/if}
 
     {#if expense.po_owner_uid_mismatch}
       <div class="rounded-sm border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">

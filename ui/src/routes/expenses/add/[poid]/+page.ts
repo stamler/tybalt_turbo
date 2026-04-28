@@ -37,6 +37,7 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     defaultItem.kind = result.kind ?? "";
     linkedPurchaseOrder = {
       id: result.id,
+      uid: result.uid,
       po_number: result.po_number,
       currency: result.currency ?? "",
       type: result.type,
