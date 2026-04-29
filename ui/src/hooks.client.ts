@@ -10,6 +10,17 @@ import { globalStore } from "$lib/stores/global";
 
 const allStores = [jobs, vendors, clients, divisions, timeTypes];
 
+type AuthIdentityRecord = {
+  id?: string;
+  collectionId?: string;
+  collectionName?: string;
+};
+
+function authIdentity(record: AuthIdentityRecord | null | undefined): string {
+  if (!record?.id) return "";
+  return `${record.collectionId ?? record.collectionName ?? "auth"}:${record.id}`;
+}
+
 /**
  * CLIENT-SIDE AUTH INITIALIZATION
  * ===============================
@@ -97,7 +108,12 @@ if (pb.authStore.token && pb.authStore.record) {
 // - User logs out (manual logout, token expiration, etc.)
 // - Token gets refreshed
 // - Auth state gets cleared due to errors
+let previousAuthIdentity = "";
 pb.authStore.onChange(() => {
+  const currentAuthIdentity = authIdentity(pb.authStore.record);
+  const authIdentityChanged = currentAuthIdentity !== previousAuthIdentity;
+  previousAuthIdentity = currentAuthIdentity;
+
   // Update our Svelte store to match PocketBase state
   authStore.refresh();
 
@@ -105,6 +121,8 @@ pb.authStore.onChange(() => {
   // If user is not authenticated, setupTokenRefresh() will clear any existing timer
   if (pb.authStore.token && pb.authStore.record) {
     authStore.setupTokenRefresh();
+
+    if (!authIdentityChanged) return;
 
     // initialize stores
     /*
@@ -142,7 +160,7 @@ pb.authStore.onChange(() => {
     allStores.forEach((store) => store.init());
     // refresh global store (profile, permissions)
     globalStore.refresh();
-  } else {
+  } else if (authIdentityChanged) {
     // clear the stores
     allStores.forEach((store) => store.unsubscribe());
   }

@@ -120,6 +120,13 @@ let sessionExpiredNotified = false;
 // so hooks.client.ts can call it confidently during client startup.
 let requestAuthGuardSetup = false;
 
+// PocketBase auth JWTs currently expose exp but not iat. For those tokens we
+// remember when the browser first observed each token so short configured token
+// lifetimes can still be refreshed near the end of their actual lifetime instead
+// of immediately on every guarded request.
+let observedToken = "";
+let observedTokenFirstSeenAt = 0;
+
 /**
  * Reads the JWT `exp` claim from the PocketBase auth token.
  *
@@ -136,13 +143,25 @@ function tokenExpirationDate(): Date | null {
 }
 
 function tokenTimingMilliseconds(): TokenTimingMilliseconds | null {
-  const payload = getTokenPayload(pb.authStore.token);
+  const token = pb.authStore.token;
+  if (!token) return null;
+
+  const payload = getTokenPayload(token);
   const exp = payload?.exp;
   const iat = payload?.iat;
-  if (typeof exp !== "number" || typeof iat !== "number") return null;
+  if (typeof exp !== "number") return null;
 
-  const issuedAt = iat * 1000;
   const expiresAt = exp * 1000;
+  const issuedAt =
+    typeof iat === "number"
+      ? iat * 1000
+      : (() => {
+          if (observedToken !== token) {
+            observedToken = token;
+            observedTokenFirstSeenAt = Date.now();
+          }
+          return observedTokenFirstSeenAt;
+        })();
   const lifetime = expiresAt - issuedAt;
   return lifetime > 0 ? { issuedAt, expiresAt, lifetime } : null;
 }
@@ -200,10 +219,10 @@ function scheduleSessionExpiration() {
  * and the app would continuously call authRefresh.
  *
  * When the configured buffer is larger than the token's whole lifetime, we
- * refresh once the token has used most of its lifetime instead. The refresh
- * point is calculated from `iat`, not from the moving "remaining time", so a 60
- * second token refreshes around 48 seconds after issue rather than before every
- * protected request.
+ * refresh once the token has used most of its lifetime instead. PocketBase
+ * auth tokens may not include `iat`, so for those we use the time the browser
+ * first observed the token. A 60 second token seen at login refreshes around 48
+ * seconds later rather than before every protected request.
  */
 function millisecondsUntilNextRefresh(): number | null {
   const millisecondsUntilExpiration = millisecondsUntilTokenExpiration();
@@ -213,8 +232,8 @@ function millisecondsUntilNextRefresh(): number | null {
 
   const timing = tokenTimingMilliseconds();
   if (!timing) {
-    // PocketBase JWTs include `iat`; this fallback keeps exp-only tokens usable
-    // instead of treating a missing issued-at claim as an immediate logout.
+    // Keep unexpected token payloads usable instead of treating them as an
+    // immediate logout.
     return millisecondsUntilExpiration - AUTH_TIMEOUTS.TOKEN_REFRESH_BUFFER_MS;
   }
 
@@ -270,6 +289,8 @@ function notifySessionExpired(message = SESSION_EXPIRED_MESSAGE) {
 function expireSession(message = SESSION_EXPIRED_MESSAGE) {
   clearRefreshTimer();
   refreshPromise = null;
+  observedToken = "";
+  observedTokenFirstSeenAt = 0;
   notifySessionExpired(message);
 
   if (pb.authStore.token || pb.authStore.record) {
@@ -612,6 +633,8 @@ function loginWithMicrosoft() {
 function logout() {
   clearRefreshTimer();
   refreshPromise = null;
+  observedToken = "";
+  observedTokenFirstSeenAt = 0;
   sessionExpiredNotified = false;
   pb.authStore.clear();
 }
