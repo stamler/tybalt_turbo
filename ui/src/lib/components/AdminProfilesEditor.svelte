@@ -316,6 +316,18 @@
     return values?.id ?? null;
   }
 
+  async function resolvePoApproverUserClaimIdByUid(claimId: string): Promise<string | null> {
+    if (!item?.uid || claimId === "") return null;
+    try {
+      const userClaim = await pb
+        .collection("user_claims")
+        .getFirstListItem<UserClaimsResponse>(`uid="${item.uid}" && cid="${claimId}"`);
+      return userClaim.id;
+    } catch {
+      return null;
+    }
+  }
+
   async function reloadUserClaims() {
     if (!item?.uid) {
       originalUserClaims = [];
@@ -550,27 +562,29 @@
 
     let userClaimId = poApproverUserClaimId;
     if (!userClaimId) {
-      const createdClaim = await pb
-        .collection("user_claims")
-        .create<UserClaimsResponse>({ uid: item.uid, cid: claimId });
-      userClaimId = createdClaim.id;
-      poApproverUserClaimId = createdClaim.id;
-      originalUserClaims = [...originalUserClaims, createdClaim];
-      stagedClaimIds = [...new Set([...stagedClaimIds, claimId])];
+      const existingUserClaimId = await resolvePoApproverUserClaimIdByUid(claimId);
+      if (existingUserClaimId) {
+        userClaimId = existingUserClaimId;
+        poApproverUserClaimId = existingUserClaimId;
+      } else {
+        const createdClaim = await pb
+          .collection("user_claims")
+          .create<UserClaimsResponse>({ uid: item.uid, cid: claimId });
+        userClaimId = createdClaim.id;
+        poApproverUserClaimId = createdClaim.id;
+        originalUserClaims = [...originalUserClaims, createdClaim];
+        stagedClaimIds = [...new Set([...stagedClaimIds, claimId])];
+      }
     }
 
     const payload = {
       user_claim: userClaimId,
-      max_amount: Number.isFinite(poApproverMaxAmount) ? poApproverMaxAmount : 0,
-      project_max: Number.isFinite(poApproverProjectMax) ? poApproverProjectMax : 0,
-      sponsorship_max: Number.isFinite(poApproverSponsorshipMax) ? poApproverSponsorshipMax : 0,
-      staff_and_social_max: Number.isFinite(poApproverStaffAndSocialMax)
-        ? poApproverStaffAndSocialMax
-        : 0,
-      media_and_event_max: Number.isFinite(poApproverMediaAndEventMax)
-        ? poApproverMediaAndEventMax
-        : 0,
-      computer_max: Number.isFinite(poApproverComputerMax) ? poApproverComputerMax : 0,
+      max_amount: normalizeNumber(poApproverMaxAmount),
+      project_max: normalizeNumber(poApproverProjectMax),
+      sponsorship_max: normalizeNumber(poApproverSponsorshipMax),
+      staff_and_social_max: normalizeNumber(poApproverStaffAndSocialMax),
+      media_and_event_max: normalizeNumber(poApproverMediaAndEventMax),
+      computer_max: normalizeNumber(poApproverComputerMax),
       divisions: poApproverDivisions,
     };
 
@@ -690,12 +704,11 @@
         },
       });
 
+      await persistPoApproverProps();
       await reloadUserClaims();
       if (item.uid === (pb.authStore.model?.id ?? "")) {
         await globalStore.refresh();
       }
-
-      await persistPoApproverProps();
 
       errors = {};
       goto(resolve("/admin_profiles/list"));
