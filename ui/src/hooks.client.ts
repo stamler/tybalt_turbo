@@ -1,5 +1,5 @@
 import { pb } from "$lib/pocketbase";
-import { authStore } from "$lib/stores/auth";
+import { AUTH_SESSION_EXPIRED_EVENT, authStore } from "$lib/stores/auth";
 import { AUTH_CONFIG } from "$lib/config";
 import { jobs } from "$lib/stores/jobs";
 import { vendors } from "$lib/stores/vendors";
@@ -18,21 +18,24 @@ const allStores = [jobs, vendors, clients, divisions, timeTypes];
  * It sets up the entire auth system and keeps it synchronized.
  *
  * WHAT THIS FILE DOES:
- * 1. Sets up activity tracking across the entire app
- * 2. Attempts to refresh any existing token on app startup
+ * 1. Sets up app wake/activity checks across the browser
+ * 2. Attempts to refresh existing or near-expiry tokens before users hit failures
  * 3. Initializes the Svelte auth store with current state
  * 4. Keeps the store synchronized with PocketBase auth changes
  *
- * ACTIVITY TRACKING:
- * - Listens for user interactions (mouse, keyboard, scroll, touch) on the entire document
- * - Every interaction updates the "last activity" timestamp in the auth store
- * - This timestamp is used by the refresh timer to determine if user is active
+ * WAKE/ACTIVITY CHECKS:
+ * - Listens for selected user interactions, focus, visibility, and online events
+ * - These events do not enforce an idle timeout
+ * - They simply give the auth store a chance to restart a missed timer or
+ *   refresh a near-expiry token after a tab wakes up or comes back online
  *
- * TOKEN REFRESH ON STARTUP:
- * - If user has an existing token from previous session, try to refresh it immediately
- * - This ensures the token is valid and extends its lifetime
- * - If refresh succeeds, start the periodic refresh timer
- * - If refresh fails, user will need to log in again
+ * TOKEN REFRESH:
+ * - Validate existing browser auth state immediately on app startup
+ * - Refresh authenticated sessions shortly before the JWT expires
+ * - Attempt one last refresh before protected API requests
+ * - Probe non-auth 401 responses with authRefresh so permission failures do not
+ *   log out users with otherwise valid sessions
+ * - Clear expired auth state so the layout can send the user to login
  *
  * STORE SYNCHRONIZATION:
  * - PocketBase has its own auth store (pb.authStore)
@@ -40,36 +43,55 @@ const allStores = [jobs, vendors, clients, divisions, timeTypes];
  * - This onChange callback keeps them synchronized
  */
 
-// STEP 1: Set up app-wide activity tracking
-// These event listeners capture ALL user interactions across the entire SPA
-// The third parameter (true) means we capture during the capturing phase,
-// ensuring we catch events even if they're handled by child components
-AUTH_CONFIG.ACTIVITY_EVENTS.forEach((event) => {
+// STEP 1: Set up centralized request auth handling before any app requests fire.
+authStore.setupRequestAuthGuard();
+
+// STEP 2: Set up app-wide wake/activity checks.
+// These events do not decide whether the user is "active enough" to stay signed
+// in. The app intentionally has no idle timeout. They only give the auth store a
+// timely chance to refresh when the browser tab wakes, focuses, reconnects, or
+// receives input.
+AUTH_CONFIG.SESSION_CHECK_EVENTS.forEach((event) => {
   document.addEventListener(event, authStore.updateActivity, true);
 });
 
-// STEP 2: Handle existing token on app startup
-// If user has a token from a previous session (stored in browser),
-// try to refresh it to ensure it's still valid and extend its lifetime
-if (pb.authStore.token && pb.authStore.record) {
-  authStore.refreshAuth().then((success) => {
-    if (success) {
-      // Token refresh succeeded - start the periodic refresh system
-      // This will keep the user logged in as long as they remain active
-      authStore.setupTokenRefresh();
-      // load global user-scoped data (profile, permissions)
-      globalStore.refresh();
-    }
-    // If refresh failed, the authStore.refreshAuth() function already cleared
-    // the invalid auth state, so user will see login screen
-  });
-}
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) {
+    authStore.updateActivity();
+  }
+});
+window.addEventListener("focus", authStore.updateActivity);
+window.addEventListener("online", authStore.updateActivity);
+window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, (event) => {
+  const message =
+    event instanceof CustomEvent && typeof event.detail?.message === "string"
+      ? event.detail.message
+      : "Your session expired. Sign in again to continue.";
+  globalStore.addError(message);
+});
 
 // STEP 3: Initialize the Svelte store with current auth state
 // This makes the auth state immediately available to all Svelte components
 authStore.refresh();
 
-// STEP 4: Keep Svelte store synchronized with PocketBase auth changes
+// STEP 4: Handle existing token on app startup
+// If user has a token from a previous session, refresh it to ensure it is
+// still valid and to extend its lifetime.
+if (pb.authStore.token && pb.authStore.record) {
+  authStore.refreshAuth().then((success) => {
+    if (success) {
+      // Token refresh succeeded - start the expiry-aware refresh system.
+      // This keeps the user logged in as long as PocketBase auth can continue
+      // refreshing, regardless of local app inactivity.
+      authStore.setupTokenRefresh();
+      // load global user-scoped data (profile, permissions)
+      globalStore.refresh();
+    }
+    // If refresh failed, refreshAuth already cleared the invalid auth state.
+  });
+}
+
+// STEP 5: Keep Svelte store synchronized with PocketBase auth changes
 // This onChange callback fires whenever PocketBase auth state changes:
 // - User logs in (successful OAuth2, password login, etc.)
 // - User logs out (manual logout, token expiration, etc.)
