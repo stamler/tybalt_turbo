@@ -145,9 +145,13 @@ func AddRoutes(app core.App) {
 
 		adminProfilesGroup := se.Router.Group("/api/admin_profiles")
 		adminProfilesGroup.Bind(apis.RequireAuth("users"))
+		adminProfilesGroup.GET("/identity", createGetAdminProfileIdentityListHandler(app))
 		adminProfilesGroup.POST("/save_with_claims", createSaveAdminProfileWithClaimsHandler(app))
 		adminProfilesGroup.POST("/{id}/save_with_claims", createSaveAdminProfileWithClaimsHandler(app))
 		adminProfilesGroup.POST("/{id}/save_limited", createSaveLimitedAdminProfileHandler(app))
+		adminProfilesGroup.GET("/{id}/identity", createGetAdminProfileIdentityHandler(app))
+		adminProfilesGroup.POST("/{id}/identity", createSaveAdminProfileIdentityHandler(app))
+		adminProfilesGroup.POST("/{id}/authorized_providers/{externalAuthId}/clear", createClearAdminProfileAuthorizedProviderHandler(app))
 
 		poGroup := se.Router.Group("/api/purchase_orders")
 		poGroup.Bind(apis.RequireAuth("users"))

@@ -31,3 +31,5 @@ _imported,alternate_manager,created,default_division,default_role,do_not_accept_
 0,,2026-04-10 00:00:00.000Z,fy4i9poneukvq9u,,0,Corporate,prof_corp_manager,f2j5a8vk006baub,email_text,Manager,u_corp_manager,2026-04-10 00:00:00.000Z
 0,,2026-04-10 00:00:00.000Z,vccd5fo56ctbigh,,0,Subject,prof_subject_corp,f2j5a8vk006baub,email_text,Corporate,u_subject_corp,2026-04-10 00:00:00.000Z
 0,,2026-04-10 00:00:00.000Z,vccd5fo56ctbigh,,0,Placeholder,prof_placeholder_pay,f2j5a8vk006baub,email_text,Payroll,u_placeholderpay,2026-04-10 00:00:00.000Z
+0,,2026-04-29 00:00:00.000Z,vccd5fo56ctbigh,,0,Identity,pfidsubject0001,f2j5a8vk006baub,email_text,Subject,uidsubject00001,2026-04-29 00:00:00.000Z
+0,,2026-04-29 00:00:00.000Z,vccd5fo56ctbigh,,0,Identity,pfidother000001,f2j5a8vk006baub,email_text,Other,uidother0000001,2026-04-29 00:00:00.000Z

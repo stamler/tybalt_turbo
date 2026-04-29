@@ -7,14 +7,24 @@
   import Icon from "@iconify/svelte";
   import type { AdminProfilesAugmentedResponse } from "$lib/pocketbase-types";
   let { data } = $props();
-  const items = $derived(data.items as AdminProfilesAugmentedResponse[]);
+  type AdminProfileListItem = AdminProfilesAugmentedResponse & {
+    legacy_uid?: string;
+    provider_count?: number;
+    email?: string;
+    name?: string;
+  };
+  const items = $derived(data.items as AdminProfileListItem[]);
   const isAdmin = $derived($globalStore.claims.includes("admin"));
+  const hasHrClaim = $derived($globalStore.claims.includes("hr"));
+  const hasTimeOffManagerClaim = $derived($globalStore.claims.includes("time_off_manager"));
+  const hasItClaim = $derived($globalStore.claims.includes("it"));
+  const canViewDetails = $derived(isAdmin || hasHrClaim || hasTimeOffManagerClaim);
 
   function normalizeDivisions(value: null | string[] | undefined): string[] {
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
   }
 
-  function poApproverLabel(item: AdminProfilesAugmentedResponse): string | null {
+  function poApproverLabel(item: AdminProfileListItem): string | null {
     const divisions = normalizeDivisions(item.po_approver_divisions);
     const hasProps =
       (typeof item.po_approver_props_id === "string" && item.po_approver_props_id.trim() !== "") ||
@@ -26,6 +36,15 @@
         ? "All divisions"
         : `${divisions.length} division${divisions.length === 1 ? "" : "s"}`;
     return `po_approver • ${divisionsPart}`;
+  }
+
+  function displayName(item: AdminProfileListItem): string {
+    const profileName = `${item.given_name ?? ""} ${item.surname ?? ""}`.trim();
+    return profileName || item.name || item.email || item.uid;
+  }
+
+  function canLinkDetails(item: AdminProfileListItem): boolean {
+    return canViewDetails && item.provider_count === undefined;
   }
 </script>
 
@@ -41,52 +60,63 @@
     {/if}
   {/snippet}
 
-  {#snippet anchor(item: AdminProfilesAugmentedResponse)}
+  {#snippet anchor(item: AdminProfileListItem)}
     <div class="flex flex-col">
-      <a
-        href={resolve(`/admin_profiles/${item.id}/details`)}
-        class={item.active === false
-          ? "text-blue-400 hover:underline"
-          : "text-blue-600 hover:underline"}
-      >
-        {item.given_name}
-        {item.surname}
-      </a>
+      {#if canLinkDetails(item)}
+        <a
+          href={resolve(`/admin_profiles/${item.id}/details`)}
+          class={item.active === false
+            ? "text-blue-400 hover:underline"
+            : "text-blue-600 hover:underline"}
+        >
+          {displayName(item)}
+        </a>
+      {:else}
+        <span class={item.active === false ? "text-neutral-400" : ""}>{displayName(item)}</span>
+      {/if}
       {#if item.active === false}
         <span class="self-center text-xs font-medium text-red-500">Inactive</span>
       {/if}
     </div>
   {/snippet}
 
-  {#snippet headline(item: AdminProfilesAugmentedResponse)}
+  {#snippet headline(item: AdminProfileListItem)}
     <span class={`flex items-center gap-2 ${item.active === false ? "opacity-50" : ""}`}>
-      {item.job_title || "-"}
+      {item.job_title || (hasItClaim ? item.email || "-" : "-")}
     </span>
   {/snippet}
 
-  {#snippet byline(item: AdminProfilesAugmentedResponse)}
+  {#snippet byline(item: AdminProfileListItem)}
     <span class={item.active === false ? "opacity-30" : "opacity-60"}>
-      {#if item.mobile_phone && item.mobile_phone.trim() !== ""}
+      {#if hasItClaim && !canViewDetails}
+        Legacy UID: {item.legacy_uid || "—"} • Providers: {item.provider_count ?? 0}
+      {:else if item.mobile_phone && item.mobile_phone.trim() !== ""}
         Mobile: {item.mobile_phone}
         {#if item.payroll_id && item.payroll_id.trim() !== ""}
           •
         {/if}
+        Payroll: {item.payroll_id || "—"}
+      {:else}
+        Payroll: {item.payroll_id || "—"}
       {/if}
-      Payroll: {item.payroll_id || "—"}
     </span>
   {/snippet}
 
-  {#snippet line1(item: AdminProfilesAugmentedResponse)}
+  {#snippet line1(item: AdminProfileListItem)}
     <span class={`flex items-center gap-2 ${item.active === false ? "opacity-50" : ""}`}>
-      <span>{item.salary ? "Salary" : "Hourly"}</span>
-      <span>Charge Out Rate: {item.default_charge_out_rate}</span>
-      {#if isAdmin && poApproverLabel(item)}
-        <DsLabel color="purple">{poApproverLabel(item)}</DsLabel>
+      {#if hasItClaim && !canViewDetails}
+        <span>UID: {item.uid}</span>
+      {:else}
+        <span>{item.salary ? "Salary" : "Hourly"}</span>
+        <span>Charge Out Rate: {item.default_charge_out_rate}</span>
+        {#if isAdmin && poApproverLabel(item)}
+          <DsLabel color="purple">{poApproverLabel(item)}</DsLabel>
+        {/if}
       {/if}
     </span>
   {/snippet}
 
-  {#snippet actions(item: AdminProfilesAugmentedResponse)}
+  {#snippet actions(item: AdminProfileListItem)}
     <DsActionButton
       action={`/admin_profiles/${item.id}/edit`}
       icon="mdi:edit-outline"

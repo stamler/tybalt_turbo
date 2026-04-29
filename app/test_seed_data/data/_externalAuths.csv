@@ -1,1 +1,4 @@
 collectionRef,created,id,provider,providerId,recordRef,updated
+_pb_users_auth_,2026-04-29 00:00:00.000Z,easubject000001,microsoft,provider-subject-ms,uidsubject00001,2026-04-29 00:00:00.000Z
+_pb_users_auth_,2026-04-29 00:00:00.000Z,easubject000002,google,provider-subject-google,uidsubject00001,2026-04-29 00:00:00.000Z
+_pb_users_auth_,2026-04-29 00:00:00.000Z,eaother00000001,microsoft,provider-other-ms,uidother0000001,2026-04-29 00:00:00.000Z

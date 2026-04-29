@@ -11,7 +11,7 @@ Verified against the current implementation on 2026-04-15.
 3. That first sign-in does not create the user's `profiles` record.
 4. The user must complete their own profile from the Account section by clicking their email address and saving their details.
 5. HR then updates the user's Admin Profile, including replacing the placeholder payroll ID with the real payroll ID from Accounting.
-6. If legacy writeback compatibility is required, the user must sign in to legacy Tybalt once so their legacy uid is generated, then a PocketBase superuser must write that value to `admin_profiles.legacy_uid`.
+6. If legacy writeback compatibility is required, the user must sign in to legacy Tybalt once so their legacy uid is generated, then an Admin or IT user updates `admin_profiles.legacy_uid` from the Turbo Admin Profile edit screen.
 7. If the user has opening time-off balances, the time-off manager sets `opening_date`, `opening_ov`, and `opening_op`.
 
 ## Recommended Procedure
@@ -39,8 +39,8 @@ Verified against the current implementation on 2026-04-15.
    - default charge-out rate
 
 4. If the user needs legacy Tybalt compatibility, ask them to sign in to legacy Tybalt once.
-   After that login creates their legacy uid, a PocketBase superuser must update `admin_profiles.legacy_uid` directly in the backend.
-   This is not currently exposed in the Turbo UI.
+   After that login creates their legacy uid, an Admin or IT user updates `admin_profiles.legacy_uid` in the Identity section of the Turbo Admin Profile edit screen.
+   The same section can clear individual Authorized Providers if the user's OAuth link needs to be repaired.
 
 5. If the user has opening time-off balances, the time-off manager updates the same Admin Profile.
    Enter:
@@ -53,8 +53,8 @@ Verified against the current implementation on 2026-04-15.
 - If the user has never signed in, there will be no Admin Profile for HR to edit yet.
 - The placeholder payroll ID is expected until HR or the time-off manager replaces it with the real payroll ID.
 - If legacy writeback is still in use for the employee, `admin_profiles.legacy_uid` must be populated after the user signs in to legacy Tybalt once.
-- `legacy_uid` is not currently exposed for editing in the Turbo UI.
-- The current supported path for setting `legacy_uid` is a backend update by a PocketBase superuser.
+- Admin and IT users can set, update, or clear `legacy_uid` from the Turbo Admin Profile edit screen.
+- Admin and IT users can clear individual Authorized Providers from the same Identity section.
 - `opening_date` must be a valid payroll Sunday.
 - If `opening_ov` or `opening_op` is non-zero, `opening_date` is required.
 - If the user has no opening time-off balances, `opening_date` can be left blank.

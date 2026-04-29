@@ -59,6 +59,23 @@
     "Opening date is required when opening OP or OV is non-zero.";
 
   type OpeningDateOption = SelectOption & { id: string; name: string; invalid?: boolean };
+  type AuthorizedProvider = {
+    id: string;
+    provider: string;
+    provider_id: string;
+    created: string;
+    updated: string;
+  };
+  type AdminProfileIdentityResponse = {
+    id: string;
+    uid: string;
+    legacy_uid: string;
+    email: string;
+    name: string;
+    given_name: string;
+    surname: string;
+    authorized_providers: AuthorizedProvider[];
+  };
 
   let { data }: { data: AdminProfilesEditPageData & { divisions?: DivisionsResponse[] } } =
     $props();
@@ -104,6 +121,9 @@
   const isAdmin = $derived($globalStore.claims.includes("admin"));
   const hasHrClaim = $derived($globalStore.claims.includes("hr"));
   const hasTimeOffManagerClaim = $derived($globalStore.claims.includes("time_off_manager"));
+  const hasItClaim = $derived($globalStore.claims.includes("it"));
+  const canManageIdentity = $derived(isAdmin || hasItClaim);
+  const canEditAdminProfile = $derived(isAdmin || hasHrClaim || hasTimeOffManagerClaim);
   const isLimitedEditor = $derived(!isAdmin && (hasHrClaim || hasTimeOffManagerClaim));
   const canEditHrFields = $derived(isAdmin || hasHrClaim);
   const canEditOpeningFields = $derived(isAdmin || hasHrClaim || hasTimeOffManagerClaim);
@@ -165,6 +185,11 @@
   let poApproverDivisions = $state(initialPoApproverDivisions);
   let originalApproverDivisions = $state([...initialPoApproverDivisions]);
   let poApproverDivisionsSearch = $state("");
+  let identity = $state<AdminProfileIdentityResponse | null>(null);
+  let identityLegacyUID = $state("");
+  let identityErrors = $state({} as Record<string, { message: string }>);
+  let identityMessage = $state("");
+  let pendingClearProviderId = $state<string | null>(null);
 
   const poApproverDivisionsError = $derived.by(
     () => errors.divisions ?? errors.po_approver_divisions ?? null,
@@ -176,11 +201,16 @@
 
   onMount(async () => {
     await branchesStore.init();
+    if (canManageIdentity && data.id) {
+      await reloadIdentity();
+    }
     if (isAdmin) {
       await Promise.all([reloadAllClaims(), reloadUserClaims()]);
       return;
     }
-    await reloadUserClaims();
+    if (canEditAdminProfile) {
+      await reloadUserClaims();
+    }
   });
 
   function normalizeNumber(value: unknown): number {
@@ -660,8 +690,78 @@
     return {};
   }
 
+  async function reloadIdentity() {
+    if (!data.id) return;
+    try {
+      const response = (await pb.send(`/api/admin_profiles/${data.id}/identity`, {
+        method: "GET",
+      })) as AdminProfileIdentityResponse;
+      identity = response;
+      identityLegacyUID = response.legacy_uid ?? "";
+      identityErrors = {};
+    } catch (error: unknown) {
+      identityErrors = errorData(error);
+      if (!identityErrors.global) {
+        identityErrors.global = { message: "Failed to load identity details." };
+      }
+    }
+  }
+
+  async function saveIdentity() {
+    if (!data.id) return;
+    try {
+      const response = (await pb.send(`/api/admin_profiles/${data.id}/identity`, {
+        method: "POST",
+        body: {
+          legacy_uid: identityLegacyUID,
+        },
+      })) as AdminProfileIdentityResponse;
+      identity = response;
+      identityLegacyUID = response.legacy_uid ?? "";
+      identityErrors = {};
+      identityMessage = "Identity saved.";
+    } catch (error: unknown) {
+      identityMessage = "";
+      identityErrors = errorData(error);
+      if (!identityErrors.global) {
+        identityErrors.global = { message: "Failed to save identity details." };
+      }
+    }
+  }
+
+  async function clearAuthorizedProvider(provider: AuthorizedProvider) {
+    if (!data.id) return;
+    try {
+      const response = (await pb.send(
+        `/api/admin_profiles/${data.id}/authorized_providers/${provider.id}/clear`,
+        {
+          method: "POST",
+        },
+      )) as AdminProfileIdentityResponse;
+      identity = response;
+      identityLegacyUID = response.legacy_uid ?? "";
+      identityErrors = {};
+      identityMessage = `${providerName(provider.provider)} provider cleared.`;
+      pendingClearProviderId = null;
+    } catch (error: unknown) {
+      identityMessage = "";
+      identityErrors = errorData(error);
+      if (!identityErrors.global) {
+        identityErrors.global = { message: "Failed to clear authorized provider." };
+      }
+    }
+  }
+
+  function providerName(provider: string): string {
+    if (provider.trim() === "") return "Unknown";
+    return provider.charAt(0).toUpperCase() + provider.slice(1);
+  }
+
   async function save(event: Event) {
     event.preventDefault();
+    if (!canEditAdminProfile) {
+      return;
+    }
     try {
       if (isLimitedEditor && (!data.editing || !data.id)) {
         errors = {
@@ -907,6 +1007,70 @@
     {/if}
   </div>
 
+  {#if canManageIdentity}
+    <section class="mt-4 w-full space-y-3 rounded-sm border border-neutral-200 bg-neutral-50 p-3">
+      <h2 class="text-lg font-semibold">Identity</h2>
+
+      <div class="grid grid-cols-1 gap-2 md:grid-cols-[1fr_auto]">
+        <DsTextInput
+          bind:value={identityLegacyUID}
+          errors={identityErrors}
+          fieldName="legacy_uid"
+          uiName="Legacy UID"
+        />
+        <span class="flex items-start">
+          <DsActionButton action={saveIdentity} color="green">Save Identity</DsActionButton>
+        </span>
+      </div>
+
+      {#if identityMessage}
+        <span class="text-sm text-green-700">{identityMessage}</span>
+      {/if}
+      {#if identityErrors.global !== undefined}
+        <span class="text-sm text-red-600">{identityErrors.global.message}</span>
+      {/if}
+
+      <div class="space-y-2">
+        <h3 class="text-base font-semibold">Authorized Providers</h3>
+        {#if identity === null}
+          <span class="text-sm text-neutral-500">Loading providers…</span>
+        {:else if identity.authorized_providers.length === 0}
+          <span class="text-sm text-neutral-500">No authorized providers.</span>
+        {:else}
+          <div class="flex flex-col gap-2">
+            {#each identity.authorized_providers as provider (provider.id)}
+              <div
+                class="grid grid-cols-1 gap-2 rounded-sm border border-neutral-200 bg-white p-2 md:grid-cols-[1fr_auto]"
+              >
+                <span class="min-w-0">
+                  <span class="font-semibold">{providerName(provider.provider)}</span>
+                  <span class="break-all text-sm text-neutral-600">{provider.provider_id}</span>
+                </span>
+                <span class="flex items-center gap-2">
+                  {#if pendingClearProviderId === provider.id}
+                    <DsActionButton action={() => clearAuthorizedProvider(provider)} color="red"
+                      >Confirm Clear</DsActionButton
+                    >
+                    <DsActionButton action={() => (pendingClearProviderId = null)} color="neutral"
+                      >Cancel</DsActionButton
+                    >
+                  {:else}
+                    <DsActionButton
+                      action={() => (pendingClearProviderId = provider.id)}
+                      icon="mdi:link-off"
+                      title="Clear provider"
+                      color="red"
+                    />
+                  {/if}
+                </span>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
+    </section>
+  {/if}
+
   {#if isAdmin}
     <!-- Claims section -->
     <div class="mt-4 w-full space-y-4">
@@ -1057,8 +1221,12 @@
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
     <span class="flex w-full gap-2">
-      <DsActionButton type="submit">Save</DsActionButton>
-      <DsActionButton action="/admin_profiles/list">Cancel</DsActionButton>
+      {#if canEditAdminProfile}
+        <DsActionButton type="submit">Save</DsActionButton>
+        <DsActionButton action="/admin_profiles/list">Cancel</DsActionButton>
+      {:else}
+        <DsActionButton action="/admin_profiles/list">Back</DsActionButton>
+      {/if}
     </span>
     {#if errors.global !== undefined}
       <span class="text-red-600">{errors.global.message}</span>

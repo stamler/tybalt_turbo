@@ -31,3 +31,6 @@ created,email,emailVisibility,id,name,password,tokenKey,updated,username,verifie
 2026-04-10 00:00:00.000Z,corp.manager@example.com,0,u_corp_manager,Corporate Manager,a.vQd0,tok_u_corp_manager,2026-04-10 00:00:00.000Z,u_corp_manager,1
 2026-04-10 00:00:00.000Z,subject.corp@example.com,0,u_subject_corp,Subject Corporate,a.vQd0,tok_u_subject_corp,2026-04-10 00:00:00.000Z,u_subject_corp,1
 2026-04-10 00:00:00.000Z,placeholder.payroll@example.com,0,u_placeholderpay,Placeholder Payroll,a.vQd0,tok_u_placeholderpay,2026-04-10 00:00:00.000Z,u_placeholderpay,1
+2026-04-29 00:00:00.000Z,it.identity@example.com,0,uitidentity0001,IT Identity,a.vQd0,tok_uit_identity_000000000000000000000000000000,2026-04-29 00:00:00.000Z,uitidentity,1
+2026-04-29 00:00:00.000Z,identity.subject@example.com,0,uidsubject00001,Identity Subject,a.vQd0,tok_uid_subject_000000000000000000000000000000,2026-04-29 00:00:00.000Z,uidsubject,1
+2026-04-29 00:00:00.000Z,identity.other@example.com,0,uidother0000001,Identity Other,a.vQd0,tok_uid_other_0000000000000000000000000000000,2026-04-29 00:00:00.000Z,uidother,1

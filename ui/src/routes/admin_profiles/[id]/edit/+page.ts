@@ -1,8 +1,30 @@
 import type { PageLoad } from "./$types";
+import { get } from "svelte/store";
 import { AdminProfilesAugmentedSkipMinTimeCheckOptions, Collections } from "$lib/pocketbase-types";
 import type { AdminProfilesAugmentedResponse, DivisionsResponse } from "$lib/pocketbase-types";
 import { pb } from "$lib/pocketbase";
 import type { AdminProfilesEditPageData } from "$lib/svelte-types";
+import { globalStore } from "$lib/stores/global";
+
+type AdminProfileIdentityResponse = {
+  id: string;
+  uid: string;
+  legacy_uid: string;
+  email: string;
+  name: string;
+  given_name: string;
+  surname: string;
+};
+
+function isIdentityOnlyUser(): boolean {
+  const claims = get(globalStore).claims;
+  return (
+    claims.includes("it") &&
+    !claims.includes("admin") &&
+    !claims.includes("hr") &&
+    !claims.includes("time_off_manager")
+  );
+}
 
 export const load: PageLoad<
   AdminProfilesEditPageData & { divisions: DivisionsResponse[] }
@@ -43,6 +65,33 @@ export const load: PageLoad<
     default_branch: "",
   } satisfies AdminProfilesAugmentedResponse;
 
+  const loadIdentityProfile = async () => {
+    const identity = (await pb.send(`/api/admin_profiles/${params.id}/identity`, {
+      method: "GET",
+    })) as AdminProfileIdentityResponse;
+    return {
+      item: {
+        ...defaultItem,
+        id: identity.id,
+        uid: identity.uid,
+        given_name: identity.given_name,
+        surname: identity.surname,
+      },
+      editing: true,
+      id: params.id,
+      divisions: [],
+    };
+  };
+
+  if (isIdentityOnlyUser()) {
+    try {
+      return await loadIdentityProfile();
+    } catch (error) {
+      console.error(`error loading admin_profile identity, returning default item: ${error}`);
+      return { item: { ...defaultItem }, editing: false, id: null, divisions: [] };
+    }
+  }
+
   try {
     const item = await pb
       .collection("admin_profiles_augmented")
@@ -56,7 +105,11 @@ export const load: PageLoad<
 
     return { item, editing: true, id: params.id, divisions };
   } catch (error) {
-    console.error(`error loading admin_profile, returning default item: ${error}`);
+    try {
+      return await loadIdentityProfile();
+    } catch {
+      console.error(`error loading admin_profile, returning default item: ${error}`);
+    }
     return { item: { ...defaultItem }, editing: false, id: null, divisions: [] };
   }
 };

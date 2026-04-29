@@ -77,7 +77,8 @@
                   return (
                     $globalStore.claims.includes("admin") ||
                     $globalStore.claims.includes("hr") ||
-                    $globalStore.claims.includes("time_off_manager")
+                    $globalStore.claims.includes("time_off_manager") ||
+                    $globalStore.claims.includes("it")
                   );
                 }
                 if (
