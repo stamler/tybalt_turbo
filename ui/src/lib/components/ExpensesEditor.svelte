@@ -4,6 +4,7 @@
     applyDefaultDivisionOnce,
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
+    expenseAttachmentHref,
     formatCurrencyAmount,
     indicativeCadAmount,
     settlementToleranceBounds,
@@ -107,6 +108,9 @@
     () => data.linked_purchase_order?.remaining_amount ?? null,
   );
   const authUserID = $derived.by(() => $authStore?.model?.id ?? "");
+  const existingAttachmentHref = $derived.by(() =>
+    data.editing && data.id !== null && item.attachment ? expenseAttachmentHref(data.id) : "",
+  );
   const selectedCurrency = $derived.by(() => $currencies.items.find((row) => row.id === item.currency));
   const selectedCurrencyCode = $derived.by(() => selectedCurrency?.code ?? "CAD");
   const homeCurrency = $derived.by(() => $currencies.items.find((row) => row.code === "CAD"));
@@ -240,11 +244,43 @@
       return;
     }
     // pay_period_ending is server-managed and must not be sent from the editor.
-    const payload: Partial<typeof item> = { ...item };
+    const editableExpenseFields = [
+      "uid",
+      "date",
+      "division",
+      "description",
+      "total",
+      "payment_type",
+      "attachment",
+      "job",
+      "category",
+      "kind",
+      "allowance_types",
+      "distance",
+      "cc_last_4_digits",
+      "currency",
+      "settled_total",
+      "purchase_order",
+      "vendor",
+    ] as const;
+    const payload: Partial<typeof item> & { source_expense?: string } = {};
+    for (const field of editableExpenseFields) {
+      if (field === "attachment") {
+        if (item.attachment instanceof File || item.attachment === "") {
+          payload.attachment = item.attachment;
+        }
+        continue;
+      }
+      if (field in item) {
+        payload[field] = item[field];
+      }
+    }
     if (!data.editing) {
       payload.uid = isEligibleBookkeeperOnBehalfCreate ? linkedPurchaseOrderUID : authUserID;
     }
-    delete payload.pay_period_ending;
+    if (data.source_expense) {
+      payload.source_expense = data.source_expense;
+    }
 
     // if the job is empty, set the category to empty
     if (payload.job === "") {
@@ -258,9 +294,15 @@
 
     try {
       if (data.editing && data.id !== null) {
-        await pb.collection("expenses").update(data.id, payload);
+        await pb.send(`/api/expenses/${data.id}`, {
+          method: "PATCH",
+          body: payload,
+        });
       } else {
-        await pb.collection("expenses").create(payload);
+        await pb.send("/api/expenses", {
+          method: "POST",
+          body: payload,
+        });
       }
 
       errors = {};
@@ -525,7 +567,13 @@
     {/if}
 
     <!-- File upload for attachment -->
-    <DsFileSelect bind:record={item} {errors} fieldName="attachment" uiName="Attachment" />
+    <DsFileSelect
+      bind:record={item}
+      {errors}
+      fieldName="attachment"
+      uiName="Attachment"
+      fileHref={existingAttachmentHref}
+    />
   {/if}
 
   <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">

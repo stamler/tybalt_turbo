@@ -3,7 +3,7 @@ import type { PageLoad } from "./$types";
 import type { ExpensesPageData } from "$lib/svelte-types";
 import { fetchVisiblePO, type VisiblePurchaseOrderResponse } from "$lib/poVisibility";
 
-export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
+export const load: PageLoad<ExpensesPageData> = async ({ params, url }) => {
   const defaultItem = {
     uid: "",
     // date in YYYY-MM-DD format
@@ -54,5 +54,6 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     editing: false,
     id: null,
     linked_purchase_order: linkedPurchaseOrder,
+    source_expense: url.searchParams.get("source_expense") ?? undefined,
   };
 };

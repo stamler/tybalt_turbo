@@ -19,11 +19,13 @@
     errors,
     fieldName,
     uiName,
+    fileHref = "",
   }: {
     record: T;
     errors: Record<string, { message: string }>;
     fieldName: string;
     uiName: string;
+    fileHref?: string;
   } = $props();
 
   let newFileName = $state("");
@@ -41,7 +43,13 @@
     to replace or remove it -->
 
     {#if record[fieldName as keyof T]}
-      {#if isBaseSystemFields(record) && newFileName === ""}
+      {#if fileHref && newFileName === ""}
+        <span>
+          <a href={fileHref} target="_blank">
+            <DsFileLink filename={record[fieldName as keyof T] as string} />
+          </a>
+        </span>
+      {:else if isBaseSystemFields(record) && newFileName === ""}
         <!-- The file is already stored on the server, so we can link to it
         directly unless the file name is different than the original file name
         which happens when the user changes the file -->

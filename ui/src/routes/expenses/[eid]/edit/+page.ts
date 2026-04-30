@@ -26,8 +26,11 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
   let item: ExpensesResponse;
   try {
     item = await pb.collection("expenses").getOne(params.eid, {
-      expand: "purchase_order",
+      expand: "purchase_order,attachment_document",
     });
+    if (item.expand?.attachment_document?.attachment) {
+      item.attachment = item.expand.attachment_document.attachment;
+    }
     return { item, editing: true, id: params.eid };
   } catch (error) {
     console.error(`error loading data, returning default item: ${error}`);

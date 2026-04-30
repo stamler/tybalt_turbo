@@ -11,6 +11,7 @@
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
   import { formatCurrencyAmount, pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { page } from "$app/stores";
 
   const collectionId = "purchase_orders";
   type SearchStatus = POSearchApiResponse["status"];
@@ -30,6 +31,7 @@
   );
 
   let selectedStatus = $state<SearchStatus>("Active");
+  const sourceExpense = $derived($page.url.searchParams.get("source_expense") ?? "");
 
   poSearch.init();
 
@@ -184,7 +186,7 @@
     {#snippet actions(item: POSearchApiResponse)}
       {#if $expensesEditingEnabled && item.status === "Active"}
         <DsActionButton
-          action={`/expenses/add/${item.id}`}
+          action={`/expenses/add/${item.id}${sourceExpense ? `?source_expense=${encodeURIComponent(sourceExpense)}` : ""}`}
           icon="mdi:add-bold"
           title="Create Expense"
           color="green"

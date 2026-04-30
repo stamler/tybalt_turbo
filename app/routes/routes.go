@@ -122,6 +122,8 @@ func AddRoutes(app core.App) {
 
 		expensesGroup := se.Router.Group("/api/expenses")
 		expensesGroup.Bind(apis.RequireAuth("users"))
+		expensesGroup.POST("", createCreateExpenseHandler(app))
+		expensesGroup.PATCH("/{id}", createUpdateExpenseHandler(app))
 		expensesGroup.POST("/{id}/submit", createSubmitRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/recall", createRecallRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/approve", createApproveRecordHandler(app, "expenses"))
@@ -130,6 +132,7 @@ func AddRoutes(app core.App) {
 		expensesGroup.POST("/{id}/uncommit", createUncommitRecordHandler(app, "expenses"))
 		expensesGroup.GET("/list", createGetExpensesListHandler(app))
 		expensesGroup.GET("/details/{id}", createGetExpenseDetailsHandler(app))
+		expensesGroup.GET("/attachment/{id}", createGetExpenseAttachmentHandler(app))
 		expensesGroup.GET("/pending", createGetPendingExpensesHandler(app))
 		expensesGroup.GET("/approved", createGetApprovedExpensesHandler(app))
 		// Expense tracking endpoints plus the org-wide expense commit queue.

@@ -1045,6 +1045,51 @@
       ]
     },
     {
+      "name": "expense_documents",
+      "path": "data/expense_documents.csv",
+      "schema": {
+        "fields": [
+          {
+            "name": "attachment",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "attachment_hash",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "uploaded_by",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ],
+        "primaryKey": [
+          "id"
+        ]
+      },
+      "x-groups": [
+        "test-full",
+        "import-baseline"
+      ]
+    },
+    {
       "name": "expense_rates",
       "path": "data/expense_rates.csv",
       "schema": {

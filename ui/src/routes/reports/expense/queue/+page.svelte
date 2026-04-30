@@ -7,7 +7,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
-  import { formatCurrencyAmount, pocketBaseFileHref, shortDate } from "$lib/utilities";
+  import { expenseAttachmentHref, formatCurrencyAmount, shortDate } from "$lib/utilities";
   import type { PageData } from "./$types";
   import { untrack } from "svelte";
 
@@ -49,12 +49,8 @@
     return resolve(`/expenses/${id}/details`);
   }
 
-  function attachmentHref(id: string, attachment: string) {
-    return pocketBaseFileHref("expenses", id, attachment);
-  }
-
   function openAttachment(id: string, attachment: string) {
-    window.open(attachmentHref(id, attachment), "_blank", "noopener,noreferrer");
+    window.open(expenseAttachmentHref(id), "_blank", "noopener,noreferrer");
   }
 </script>
 

@@ -12,12 +12,13 @@ The target model is:
 - Only users with the `book_keeper` claim may reuse an existing document.
 - Everyone else keeps the same UX and duplicate-file protection they have today.
 
-This will be implemented in two phases.
+This will be implemented in three phases.
 
 1. Phase 1 cuts over the app so new expense uploads use `expense_documents`, while legacy expense attachments continue to work through fallback reads.
-2. Phase 2 backfills existing legacy expense attachments into `expense_documents`, then removes the legacy attachment columns from `expenses`.
+2. Phase 2 backfills existing legacy expense attachments into `expense_documents`.
+3. Phase 3 removes the legacy fallback code and legacy attachment columns after the backfill has been verified.
 
-Phase 1 and Phase 2 do not need to be close together. After Phase 1, the app can run indefinitely with mixed storage: new attachments in `expense_documents`, old attachments still on `expenses`.
+Phase 1 and Phase 2 do not need to be close together. After Phase 1, the app can run indefinitely with mixed storage: new attachments in `expense_documents`, old attachments still on `expenses`. Phase 3 happens only after Phase 2 has been verified in production.
 
 ## Current Storage Model
 
@@ -126,7 +127,7 @@ Because document files are no longer necessarily stored under the expense record
 Add a route like:
 
 ```text
-GET /api/expenses/{id}/attachment
+GET /api/expenses/attachment/{id}
 ```
 
 Behavior:
@@ -140,18 +141,35 @@ The details page and list/report links should use this expense-scoped route rath
 
 Server-side report generation can continue reading files internally through PocketBase filesystem APIs, using the effective storage key.
 
-### 5. Replace frontend expense saves with backend expense mutation routes
+### 5. Add transactional custom expense write endpoints
 
-The current editor saves through generic PocketBase collection create/update. That path stores uploaded files on the `expenses` collection, which is exactly what Phase 1 is cutting over from.
-
-Add custom authenticated routes for expense mutations:
+The editor saves expenses through app-owned write endpoints rather than the generic PocketBase collection write endpoints:
 
 ```text
 POST  /api/expenses
 PATCH /api/expenses/{id}
 ```
 
-The routes accept the same form payload the editor sends today, including multipart file uploads. `ExpensesEditor.svelte` should call these routes instead of `pb.collection("expenses").create(...)` and `pb.collection("expenses").update(...)`.
+This is intentional because an expense attachment upload now mutates two collections:
+
+```text
+expense_documents
+expenses
+```
+
+The custom endpoints are the canonical Phase 1 write path for expense create/update from the UI. They accept the same logical form payload the editor already produces, including file uploads, duplicate-upload reuse, and `source_expense` reuse.
+
+The endpoint implementation:
+
+1. requires an authenticated `users` record;
+2. loads or creates the target `expenses` record;
+3. loads request data into the normal PocketBase `RecordUpsert` form so collection field validation and normal model save hooks still run;
+4. calls the existing expense processing code for ownership, PO, branch, approver, currency, cumulative total, bookkeeper-on-behalf, attachment-required, and submitted-expense validation;
+5. resolves the effective attachment document before saving;
+6. saves the `expense_documents` row and the `expenses` row inside one `app.RunInTransaction` call;
+7. if the transaction fails after a new document file was uploaded, rolls back the DB changes and best-effort deletes the uploaded document object from PocketBase storage/S3.
+
+The generic PocketBase `expenses` create/update request hooks also wrap their existing `ProcessExpense` + `e.Next()` flow in a transaction and use the same cleanup tracker. This keeps direct collection API writes safe during the transition, but the UI uses only the custom endpoints.
 
 Keep the visible form unchanged for ordinary users:
 
@@ -160,13 +178,15 @@ Keep the visible form unchanged for ordinary users:
 - same validation messages where possible;
 - same redirect after save.
 
-Refactor existing backend validation so the custom routes reuse the same expense processing rules as the collection hooks. Do not duplicate PO, branch, approver, bookkeeper-on-behalf, currency, and attachment-required logic in a second implementation.
+All existing backend validation remains centralized in the current expense processing path. The custom endpoint owns the transaction boundary and request parsing, not a second copy of PO, branch, approver, bookkeeper-on-behalf, currency, and attachment-required rules.
 
-The generic `expenses` collection hooks should still reject or ignore direct legacy file writes after cutover. A direct upload to `expenses.attachment` should not silently create a new legacy attachment after Phase 1.
+After cutover, a direct upload to `expenses.attachment` is not a legacy write. Whether it arrives through the custom endpoint or the generic collection API, the backend converts it to an `expense_documents` link before persistence.
+
+The editor trims its save payload to editable expense fields before calling the custom endpoint. Existing document-backed filenames shown in the attachment control are not resent as `attachment` values. Only a new `File`, an explicit empty attachment removal, or `source_expense` is sent as attachment intent.
 
 ### 6. Implement document resolution during create/update
 
-Add a backend helper for expense mutation routes:
+Add a backend helper used by the expense create/update hooks:
 
 ```text
 resolveExpenseDocumentForSave(auth, targetExpense, uploadedFile, sourceExpenseID)
@@ -237,7 +257,7 @@ expenses.attachment != ''
 expenses.attachment_document == ''
 ```
 
-and that expense is saved through the new custom route, migrate it as part of the save unless the user replaces the attachment.
+and that expense is saved through the generic expense save path, migrate it as part of the save unless the user replaces the attachment.
 
 Legacy edit behavior:
 
@@ -265,7 +285,31 @@ Recommended route shape:
 
 The page loader can preserve `source_expense` in page data, and the editor includes it in the create request. The backend remains authoritative and must validate every condition listed in Case D.
 
-### 9. Phase 1 validation before deploy
+### 9. Preserve editor record shape for edit pages
+
+Expense edit pages should continue loading the normal PocketBase `expenses` record rather than the custom details response:
+
+```text
+pb.collection("expenses").getOne(expense_id, {
+  expand: "purchase_order,attachment_document"
+})
+```
+
+This is intentional. The editor relies on PocketBase system fields and `expand.purchase_order` to determine ownership, PO payment type, PO currency, and recurring/cumulative PO hints. Loading the custom details response would drop that record shape and make some PO-backed or bookkeeper-created expenses behave like non-editable records.
+
+For document-backed expenses, the edit loader uses `expand.attachment_document.attachment` as the display filename while preserving the canonical `attachment_document` relation on the expense record. For legacy-only expenses during Phase 1 and Phase 2, the loader falls back to `expenses.attachment`.
+
+The editor's attachment link should use the expense-scoped download route:
+
+```text
+GET /api/expenses/attachment/{id}
+```
+
+Do not construct direct `expense_documents` file URLs in the UI. The route keeps authorization scoped to expense visibility and supports both document-backed and legacy-only attachments.
+
+In Phase 3, after all legacy rows have been backfilled and the legacy columns are removed, the editor can remove the fallback to `expenses.attachment` and rely only on `attachment_document`.
+
+### 10. Phase 1 validation before deploy
 
 Test on `multi_use_attachment` with a dumped production DB.
 
@@ -279,7 +323,7 @@ Minimum manual checks:
 6. Edit an old legacy expense without changing the attachment. Verify it gets an `attachment_document` and the copied document file downloads.
 7. Generate receipt zips and legacy writeback/export output for a mix of legacy and document-backed expenses.
 
-### 10. Phase 1 backend tests
+### 11. Phase 1 backend tests
 
 Implement backend tests before merging Phase 1.
 
@@ -320,8 +364,11 @@ Regression coverage:
 
 - existing PO-backed expense validation still enforces active PO, matching job, matching currency, and cumulative overflow behavior;
 - existing bookkeeper-on-behalf validation still requires `book_keeper`, a PO-backed target, valid payment type, and PO owner matching;
-- submitted expenses still cannot be edited through the new mutation route;
-- direct generic collection file upload to `expenses.attachment` is rejected or prevented after cutover.
+- submitted expenses still cannot be edited through the generic expense save path;
+- direct generic collection file upload to `expenses.attachment` is converted to `expense_documents` and does not persist a new legacy expense attachment;
+- custom `POST /api/expenses` creates a document-backed expense;
+- custom `PATCH /api/expenses/{id}` updates through the same document-first workflow;
+- a failed final expense save after document creation rolls back the `expense_documents` row so the unique document hash cannot block a later valid upload.
 
 ## Phase 2: Backfill Existing Legacy Attachments
 
@@ -598,3 +645,7 @@ Integration/manual testing against the dumped production DB should include:
 - The old S3 objects under the `expenses` collection prefix should not be deleted during Phase 2. Deletion, if desired, should be considered only after a separate retention/rollback decision.
 - The `expense_documents.attachment_hash` unique index remains the long-term duplicate prevention mechanism.
 - `book_keeper` reuse changes only which expense may point at an existing document. It never creates two document records with the same hash.
+
+## Phase 3: cleanup
+
+After everything is fully migrated and we're only using `expense_documents`, we can remove all the fallback code completely so it's a tight implementation once again.

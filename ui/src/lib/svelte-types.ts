@@ -73,6 +73,7 @@ export type LinkedPurchaseOrderSummary = {
 };
 export type ExpensesPageData = PageData<ExpensesRecord | ExpensesResponse> & {
   linked_purchase_order?: LinkedPurchaseOrderSummary;
+  source_expense?: string;
 };
 export type JobsPageData = PageData<JobsRecord> & {
   categories: CategoriesResponse[];

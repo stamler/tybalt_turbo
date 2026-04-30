@@ -309,8 +309,8 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			  END AS currency,
 			  COALESCE(e.allowance_types, '[]') AS allowance_types_json,
 			  COALESCE(e.cc_last_4_digits, '') AS cc_last_4_digits,
-			  COALESCE(e.attachment, '') AS attachment,
-			  COALESCE(e.attachment_hash, '') AS attachment_hash,
+			  COALESCE(ed.attachment, e.attachment, '') AS attachment,
+			  COALESCE(ed.attachment_hash, e.attachment_hash, '') AS attachment_hash,
 			  COALESCE(e.submitted, 0) AS submitted,
 			  COALESCE(e.approved, '') AS approved,
 			  COALESCE(e.committed, '') AS committed,
@@ -369,6 +369,7 @@ func createExpensesExportLegacyHandler(app core.App) func(e *core.RequestEvent) 
 			LEFT JOIN vendors v ON e.vendor = v.id
 			LEFT JOIN purchase_orders po ON e.purchase_order = po.id
 			LEFT JOIN currencies cur ON e.currency = cur.id
+			LEFT JOIN expense_documents ed ON e.attachment_document = ed.id
 			-- Category join
 			LEFT JOIN categories cat ON e.category = cat.id
 			WHERE e.updated >= {:updatedAfter}

@@ -11,7 +11,7 @@
   import {
     formatCurrencyAmount,
     formatCurrencyEquivalent,
-    pocketBaseFileHref,
+    expenseAttachmentHref,
     shortDate,
     trimmedOrEmpty,
   } from "$lib/utilities";
@@ -25,6 +25,7 @@
   let expense = data.expense;
   let hasCommitAccess = false;
   let hasAdminAccess = false;
+  let hasBookKeeperAccess = false;
   let isOwner = false;
   let isApprover = false;
   let showUncommitConfirm = false;
@@ -33,6 +34,7 @@
 
   $: hasCommitAccess = $globalStore.showAllUi || $globalStore.claims.includes("commit");
   $: hasAdminAccess = $globalStore.showAllUi || $globalStore.claims.includes("admin");
+  $: hasBookKeeperAccess = $globalStore.claims.includes("book_keeper");
   $: isOwner = expense.creator === viewerId;
   $: isApprover = expense.approver === viewerId;
 
@@ -135,7 +137,7 @@
   }
 
   function attachmentHref() {
-    return pocketBaseFileHref("expenses", expense.id, expense.attachment);
+    return expenseAttachmentHref(expense.id);
   }
 
   function personLabel(name: string, uid: string, fallback: string): string {
@@ -368,6 +370,14 @@
       <div class="flex items-center gap-2">
         <span class="font-semibold">Attachment:</span>
         <DsExternalLinkButton href={attachmentHref()} label="Download" />
+        {#if hasBookKeeperAccess}
+          <DsActionButton
+            action={`/pos/search?source_expense=${encodeURIComponent(expense.id)}`}
+            icon="mdi:file-document-plus-outline"
+            title="Create another expense with this attachment"
+            color="green"
+          />
+        {/if}
         {#if expense.attachment_hash}
           <span class="font-mono text-sm opacity-70">{expense.attachment_hash.slice(0, 8)}</span>
           <button

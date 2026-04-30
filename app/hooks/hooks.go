@@ -492,16 +492,36 @@ func AddHooks(app core.App) {
 	})
 	// hooks for expenses model
 	app.OnRecordCreateRequest("expenses").BindFunc(func(e *core.RecordRequestEvent) error {
-		if err := ProcessExpense(app, e); err != nil {
-			return AnnotateHookError(app, e, err)
+		originalApp := e.App
+		err := e.App.RunInTransaction(func(txApp core.App) error {
+			e.App = txApp
+			defer func() { e.App = originalApp }()
+
+			if err := ProcessExpense(txApp, e); err != nil {
+				return AnnotateHookError(txApp, e, err)
+			}
+			return e.Next()
+		})
+		if err != nil {
+			CleanupExpenseDocumentUploads(app, e)
 		}
-		return e.Next()
+		return err
 	})
 	app.OnRecordUpdateRequest("expenses").BindFunc(func(e *core.RecordRequestEvent) error {
-		if err := ProcessExpense(app, e); err != nil {
-			return AnnotateHookError(app, e, err)
+		originalApp := e.App
+		err := e.App.RunInTransaction(func(txApp core.App) error {
+			e.App = txApp
+			defer func() { e.App = originalApp }()
+
+			if err := ProcessExpense(txApp, e); err != nil {
+				return AnnotateHookError(txApp, e, err)
+			}
+			return e.Next()
+		})
+		if err != nil {
+			CleanupExpenseDocumentUploads(app, e)
 		}
-		return e.Next()
+		return err
 	})
 	// Gate-only hook: blocks the request when expenses editing is disabled.
 	// Used for delete hooks on expenses/purchase_orders and all CUD hooks on vendors.

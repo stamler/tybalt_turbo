@@ -259,6 +259,10 @@ export function pocketBaseFileHref(
   )}/${encodeURIComponent(filename)}`;
 }
 
+export function expenseAttachmentHref(expenseId: string): string {
+  return `${pb.baseURL}/api/expenses/attachment/${encodeURIComponent(expenseId)}`;
+}
+
 export function currencyIconHref(recordId: string, filename: string): string {
   return pocketBaseFileHref("currencies", recordId, filename);
 }

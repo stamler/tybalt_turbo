@@ -113,59 +113,62 @@ func expenseVisibilityParams(app core.App, auth *core.Record) (dbx.Params, error
 
 // ExpensesAugmentedRow models the augmented expense row returned by SQL.
 type ExpensesAugmentedRow struct {
-	ID                  string  `db:"id" json:"id"`
-	UID                 string  `db:"uid" json:"uid"`
-	Creator             string  `db:"creator" json:"creator"`
-	Date                string  `db:"date" json:"date"`
-	Division            string  `db:"division" json:"division"`
-	Description         string  `db:"description" json:"description"`
-	Total               float64 `db:"total" json:"total"`
-	PaymentType         string  `db:"payment_type" json:"payment_type"`
-	Attachment          string  `db:"attachment" json:"attachment"`
-	AttachmentHash      string  `db:"attachment_hash" json:"attachment_hash"`
-	Rejector            string  `db:"rejector" json:"rejector"`
-	Rejected            string  `db:"rejected" json:"rejected"`
-	RejectionReason     string  `db:"rejection_reason" json:"rejection_reason"`
-	Approver            string  `db:"approver" json:"approver"`
-	Approved            string  `db:"approved" json:"approved"`
-	Job                 string  `db:"job" json:"job"`
-	Category            string  `db:"category" json:"category"`
-	Kind                string  `db:"kind" json:"kind"`
-	PayPeriodEnding     string  `db:"pay_period_ending" json:"pay_period_ending"`
-	AllowanceTypes      string  `db:"allowance_types" json:"allowance_types"`
-	Submitted           bool    `db:"submitted" json:"submitted"`
-	Committer           string  `db:"committer" json:"committer"`
-	Committed           string  `db:"committed" json:"committed"`
-	CommittedWeekEnding string  `db:"committed_week_ending" json:"committed_week_ending"`
-	Distance            float64 `db:"distance" json:"distance"`
-	CCLast4Digits       string  `db:"cc_last_4_digits" json:"cc_last_4_digits"`
-	Currency            string  `db:"currency" json:"currency"`
-	CurrencyCode        string  `db:"currency_code" json:"currency_code"`
-	CurrencySymbol      string  `db:"currency_symbol" json:"currency_symbol"`
-	CurrencyIcon        string  `db:"currency_icon" json:"currency_icon"`
-	CurrencyRate        float64 `db:"currency_rate" json:"currency_rate"`
-	CurrencyRateDate    string  `db:"currency_rate_date" json:"currency_rate_date"`
-	SettledTotal        float64 `db:"settled_total" json:"settled_total"`
-	Settler             string  `db:"settler" json:"settler"`
-	Settled             string  `db:"settled" json:"settled"`
-	SettlerName         string  `db:"settler_name" json:"settler_name"`
-	PurchaseOrder       string  `db:"purchase_order" json:"purchase_order"`
-	Vendor              string  `db:"vendor" json:"vendor"`
-	PurchaseOrderNumber string  `db:"purchase_order_number" json:"purchase_order_number"`
-	ClientName          string  `db:"client_name" json:"client_name"`
-	CategoryName        string  `db:"category_name" json:"category_name"`
-	KindName            string  `db:"kind_name" json:"kind_name"`
-	JobNumber           string  `db:"job_number" json:"job_number"`
-	JobDescription      string  `db:"job_description" json:"job_description"`
-	DivisionName        string  `db:"division_name" json:"division_name"`
-	DivisionCode        string  `db:"division_code" json:"division_code"`
-	VendorName          string  `db:"vendor_name" json:"vendor_name"`
-	VendorAlias         string  `db:"vendor_alias" json:"vendor_alias"`
-	UIDName             string  `db:"uid_name" json:"uid_name"`
-	CreatorName         string  `db:"creator_name" json:"creator_name"`
-	ApproverName        string  `db:"approver_name" json:"approver_name"`
-	RejectorName        string  `db:"rejector_name" json:"rejector_name"`
-	BranchName          string  `db:"branch_name" json:"branch_name"`
+	ID                     string  `db:"id" json:"id"`
+	UID                    string  `db:"uid" json:"uid"`
+	Creator                string  `db:"creator" json:"creator"`
+	Date                   string  `db:"date" json:"date"`
+	Division               string  `db:"division" json:"division"`
+	Description            string  `db:"description" json:"description"`
+	Total                  float64 `db:"total" json:"total"`
+	PaymentType            string  `db:"payment_type" json:"payment_type"`
+	Attachment             string  `db:"attachment" json:"attachment"`
+	AttachmentHash         string  `db:"attachment_hash" json:"attachment_hash"`
+	AttachmentDocument     string  `db:"attachment_document" json:"attachment_document"`
+	AttachmentCollectionID string  `db:"attachment_collection_id" json:"attachment_collection_id"`
+	AttachmentRecordID     string  `db:"attachment_record_id" json:"attachment_record_id"`
+	Rejector               string  `db:"rejector" json:"rejector"`
+	Rejected               string  `db:"rejected" json:"rejected"`
+	RejectionReason        string  `db:"rejection_reason" json:"rejection_reason"`
+	Approver               string  `db:"approver" json:"approver"`
+	Approved               string  `db:"approved" json:"approved"`
+	Job                    string  `db:"job" json:"job"`
+	Category               string  `db:"category" json:"category"`
+	Kind                   string  `db:"kind" json:"kind"`
+	PayPeriodEnding        string  `db:"pay_period_ending" json:"pay_period_ending"`
+	AllowanceTypes         string  `db:"allowance_types" json:"allowance_types"`
+	Submitted              bool    `db:"submitted" json:"submitted"`
+	Committer              string  `db:"committer" json:"committer"`
+	Committed              string  `db:"committed" json:"committed"`
+	CommittedWeekEnding    string  `db:"committed_week_ending" json:"committed_week_ending"`
+	Distance               float64 `db:"distance" json:"distance"`
+	CCLast4Digits          string  `db:"cc_last_4_digits" json:"cc_last_4_digits"`
+	Currency               string  `db:"currency" json:"currency"`
+	CurrencyCode           string  `db:"currency_code" json:"currency_code"`
+	CurrencySymbol         string  `db:"currency_symbol" json:"currency_symbol"`
+	CurrencyIcon           string  `db:"currency_icon" json:"currency_icon"`
+	CurrencyRate           float64 `db:"currency_rate" json:"currency_rate"`
+	CurrencyRateDate       string  `db:"currency_rate_date" json:"currency_rate_date"`
+	SettledTotal           float64 `db:"settled_total" json:"settled_total"`
+	Settler                string  `db:"settler" json:"settler"`
+	Settled                string  `db:"settled" json:"settled"`
+	SettlerName            string  `db:"settler_name" json:"settler_name"`
+	PurchaseOrder          string  `db:"purchase_order" json:"purchase_order"`
+	Vendor                 string  `db:"vendor" json:"vendor"`
+	PurchaseOrderNumber    string  `db:"purchase_order_number" json:"purchase_order_number"`
+	ClientName             string  `db:"client_name" json:"client_name"`
+	CategoryName           string  `db:"category_name" json:"category_name"`
+	KindName               string  `db:"kind_name" json:"kind_name"`
+	JobNumber              string  `db:"job_number" json:"job_number"`
+	JobDescription         string  `db:"job_description" json:"job_description"`
+	DivisionName           string  `db:"division_name" json:"division_name"`
+	DivisionCode           string  `db:"division_code" json:"division_code"`
+	VendorName             string  `db:"vendor_name" json:"vendor_name"`
+	VendorAlias            string  `db:"vendor_alias" json:"vendor_alias"`
+	UIDName                string  `db:"uid_name" json:"uid_name"`
+	CreatorName            string  `db:"creator_name" json:"creator_name"`
+	ApproverName           string  `db:"approver_name" json:"approver_name"`
+	RejectorName           string  `db:"rejector_name" json:"rejector_name"`
+	BranchName             string  `db:"branch_name" json:"branch_name"`
 }
 
 // ExpenseDetailsRow extends ExpensesAugmentedRow with PO comparison fields
@@ -466,6 +469,57 @@ func createGetExpenseDetailsHandler(app core.App) func(e *core.RequestEvent) err
 		row.POOwnerUIDMismatch = expensePurchaseOrderOwnerUIDMismatch(row.UID, row.POUID)
 
 		return e.JSON(http.StatusOK, row)
+	}
+}
+
+func createGetExpenseAttachmentHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		auth := e.Auth
+		if auth == nil {
+			return e.Error(http.StatusUnauthorized, "unauthorized", nil)
+		}
+
+		id := e.Request.PathValue("id")
+		if id == "" {
+			return e.Error(http.StatusBadRequest, "id is required", nil)
+		}
+
+		params, err := expenseVisibilityParams(app, auth)
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "error checking expense visibility claims", err)
+		}
+		hasAdmin, err := utilities.HasClaim(app, auth, "admin")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "error checking expense visibility claims", err)
+		}
+		params["id"] = id
+		params["has_admin"] = boolToInt(hasAdmin)
+
+		query := expenseDetailsQuery + "\nAND (\n" + expenseVisibilityPredicate + "\nOR ({:has_admin} = 1 AND e.committed != '')\n)"
+
+		var row ExpenseDetailsRow
+		if err := app.DB().NewQuery(query).Bind(params).One(&row); err != nil {
+			return e.Error(http.StatusNotFound, "expense not found or not authorized", err)
+		}
+		if row.Attachment == "" || row.AttachmentCollectionID == "" || row.AttachmentRecordID == "" {
+			return e.Error(http.StatusNotFound, "expense attachment not found", nil)
+		}
+
+		fsys, err := app.NewFilesystem()
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to open filesystem", err)
+		}
+		defer fsys.Close()
+
+		sourcePath := fmt.Sprintf("%s/%s/%s", row.AttachmentCollectionID, row.AttachmentRecordID, row.Attachment)
+		reader, err := fsys.GetReader(sourcePath)
+		if err != nil {
+			return e.Error(http.StatusNotFound, "expense attachment not found", err)
+		}
+		defer reader.Close()
+
+		e.Response.Header().Set("Content-Disposition", fmt.Sprintf(`inline; filename="%s"`, row.Attachment))
+		return e.Stream(http.StatusOK, "application/octet-stream", reader)
 	}
 }
 

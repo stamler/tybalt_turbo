@@ -7,13 +7,12 @@
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { formatCurrencyAmount, pocketBaseFileHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { expenseAttachmentHref, formatCurrencyAmount, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { onMount, onDestroy, untrack } from "svelte";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
 
-  const collectionId = "expenses";
   const viewerId = pb.authStore.record?.id ?? "";
 
   let {
@@ -217,7 +216,7 @@
         ({shortDate(approved)})
       {/if}
       {#if attachment}
-        <a href={pocketBaseFileHref(collectionId, id, attachment)} target="_blank">
+        <a href={expenseAttachmentHref(id)} target="_blank">
           <DsFileLink filename={attachment as string} />
         </a>
       {/if}

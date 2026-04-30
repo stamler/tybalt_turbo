@@ -24,6 +24,7 @@ export enum Collections {
   Divisions = "divisions",
   RateRoles = "rate_roles",
   ExpenseAllowanceTotals = "expense_allowance_totals",
+  ExpenseDocuments = "expense_documents",
   ExpenseMileageTotals = "expense_mileage_totals",
   ExpenseRates = "expense_rates",
   Expenses = "expenses",
@@ -345,6 +346,15 @@ export type ExpenseAllowanceTotalsRecord = {
   payment_type: ExpenseAllowanceTotalsPaymentTypeOptions;
 };
 
+export type ExpenseDocumentsRecord = {
+  attachment: string;
+  attachment_hash: string;
+  created: IsoDateString;
+  id: string;
+  updated: IsoDateString;
+  uploaded_by: RecordIdString;
+};
+
 export type ExpenseMileageTotalsRecord = {
   cumulative: number;
   date: string;
@@ -390,6 +400,7 @@ export type ExpensesRecord = {
   approved: IsoDateString;
   approver: RecordIdString;
   attachment: string;
+  attachment_document: RecordIdString;
   attachment_hash: string;
   branch: RecordIdString;
   category: RecordIdString;
@@ -445,6 +456,10 @@ export type ExpensesAugmentedRecord = {
   approver: RecordIdString;
   approver_name: string;
   attachment: string;
+  attachment_collection_id: string;
+  attachment_document: RecordIdString;
+  attachment_hash: string;
+  attachment_record_id: string;
   category: RecordIdString;
   category_name: string;
   kind: RecordIdString;
@@ -1033,6 +1048,7 @@ type TimeSheetReviewersRecordExpands = {
 };
 
 type ExpensesRecordExpands = {
+  attachment_document: ExpenseDocumentsResponse;
   approver: UsersResponse;
   category: CategoriesRecord;
   division: DivisionsRecord;
@@ -1116,6 +1132,8 @@ export type ExpenditureKindsResponse<Texpand = unknown> = Required<ExpenditureKi
   BaseSystemFields<Texpand>;
 export type ExpenseAllowanceTotalsResponse<Texpand = unknown> =
   Required<ExpenseAllowanceTotalsRecord> & BaseSystemFields<Texpand>;
+export type ExpenseDocumentsResponse<Texpand = unknown> = Required<ExpenseDocumentsRecord> &
+  BaseSystemFields<Texpand>;
 export type ExpenseMileageTotalsResponse<Texpand = unknown> = Required<ExpenseMileageTotalsRecord> &
   BaseSystemFields<Texpand>;
 export type ExpenseRatesResponse<Texpand = unknown> = Required<ExpenseRatesRecord> &
@@ -1207,6 +1225,7 @@ export type CollectionRecords = {
   divisions: DivisionsRecord;
   expenditure_kinds: ExpenditureKindsRecord;
   expense_allowance_totals: ExpenseAllowanceTotalsRecord;
+  expense_documents: ExpenseDocumentsRecord;
   expense_mileage_totals: ExpenseMileageTotalsRecord;
   expense_rates: ExpenseRatesRecord;
   expenses: ExpensesRecord;
@@ -1317,6 +1336,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "currencies"): RecordService<CurrenciesResponse>;
   collection(idOrName: "divisions"): RecordService<DivisionsResponse>;
   collection(idOrName: "expense_allowance_totals"): RecordService<ExpenseAllowanceTotalsResponse>;
+  collection(idOrName: "expense_documents"): RecordService<ExpenseDocumentsResponse>;
   collection(idOrName: "expense_mileage_totals"): RecordService<ExpenseMileageTotalsResponse>;
   collection(idOrName: "expense_rates"): RecordService<ExpenseRatesResponse>;
   collection(idOrName: "expenses"): RecordService<ExpensesResponse>;

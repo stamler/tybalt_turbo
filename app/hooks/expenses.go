@@ -760,39 +760,36 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	}
 
 	NormalizePendingFileNames(expenseRecord, "attachment")
+	requestInfo, requestInfoErr := e.RequestInfo()
+	if requestInfoErr != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "error reading request info",
+			Data: map[string]errs.CodeError{
+				"global": {Code: "request_info_error", Message: "error reading request info"},
+			},
+		}
+	}
+	if rawSourceExpenseID, ok := requestInfo.Body["source_expense"]; ok {
+		if sourceExpenseID := strings.TrimSpace(fmt.Sprint(rawSourceExpenseID)); sourceExpenseID != "" {
+			expenseRecord.Set("source_expense", sourceExpenseID)
+		}
+	}
+	explicitAttachmentRemoval := false
+	if rawAttachment, ok := requestInfo.Body["attachment"]; ok && strings.TrimSpace(fmt.Sprint(rawAttachment)) == "" {
+		explicitAttachmentRemoval = len(expenseRecord.GetUnsavedFiles("attachment")) == 0 && expenseRecord.GetString("source_expense") == ""
+		if explicitAttachmentRemoval {
+			expenseRecord.Set("attachment_document", "")
+		}
+	}
 
 	// if the expense record has an attachment, calculate the sha256 hash of the
-	// file and set the attachment_hash property on the record
+	// file so it can be stored or reused through expense_documents after the
+	// expense has passed the rest of its validation.
 	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")
 	if hashErr != nil {
 		return hashErr
 	}
-	if attachmentHash != "" {
-		// New file uploaded - check for duplicate before setting hash
-		// Look for existing expense with the same attachment hash (excluding this record)
-		existingExpense, _ := app.FindFirstRecordByFilter("expenses", "attachment_hash = {:hash} && id != {:id}", dbx.Params{
-			"hash": attachmentHash,
-			"id":   expenseRecord.Id,
-		})
-		if existingExpense != nil {
-			return &errs.HookError{
-				Status:  http.StatusBadRequest,
-				Message: "duplicate attachment detected",
-				Data: map[string]errs.CodeError{
-					"attachment": {
-						Code:    "duplicate_file",
-						Message: "This file has already been uploaded to another expense",
-					},
-				},
-			}
-		}
-
-		expenseRecord.Set("attachment_hash", attachmentHash)
-	} else if expenseRecord.GetString("attachment") == "" {
-		// Attachment was explicitly removed - clear the hash
-		expenseRecord.Set("attachment_hash", "")
-	}
-	// Otherwise: no new file and attachment still exists - leave hash unchanged
 
 	if poRecord != nil {
 		// Expense kind is inherited from its purchase order and is not user-editable.
@@ -854,5 +851,44 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	if err := validateExpense(app, expenseRecord, poRecord, existingExpensesTotal, hasPayablesAdminClaim); err != nil {
 		return err
 	}
+
+	hasBookKeeperClaim, err := utilities.HasClaim(app, e.Auth, "book_keeper")
+	if err != nil {
+		return &errs.HookError{
+			Status:  http.StatusInternalServerError,
+			Message: "error checking claim",
+			Data: map[string]errs.CodeError{
+				"global": {
+					Code:    "error_checking_claim",
+					Message: "error checking book_keeper claim",
+				},
+			},
+		}
+	}
+
+	clearExpenseDocumentForAttachmentlessType(expenseRecord)
+	if explicitAttachmentRemoval {
+		expenseRecord.Set("attachment_document", "")
+		expenseRecord.Set("attachment_hash", "")
+	} else if attachmentHash == "" && expenseRecord.GetString("source_expense") == "" && expenseRecord.GetString("attachment") == "" {
+		if expenseRecord.IsNew() {
+			expenseRecord.Set("attachment_document", "")
+		} else if original := expenseRecord.Original(); original != nil {
+			expenseRecord.Set("attachment_document", original.GetString("attachment_document"))
+		}
+	} else if expenseRecord.GetString("attachment_document") == "" {
+		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
+		if err != nil {
+			return err
+		}
+		applyResolvedExpenseDocument(expenseRecord, documentID)
+	} else if attachmentHash != "" || expenseRecord.GetString("source_expense") != "" {
+		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
+		if err != nil {
+			return err
+		}
+		applyResolvedExpenseDocument(expenseRecord, documentID)
+	}
+
 	return nil
 }

@@ -144,8 +144,10 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 	requiresAttachment := !(isAllowance || isMileage || isPersonalReimbursement)
 	if requiresAttachment {
 		hasStoredAttachment := expenseRecord.GetString("attachment") != ""
+		hasDocumentAttachment := !expenseRecord.IsNew() && expenseRecord.GetString("attachment_document") != ""
+		hasSourceExpenseAttachment := strings.TrimSpace(expenseRecord.GetString("source_expense")) != ""
 		hasUploadedAttachment := len(expenseRecord.GetUnsavedFiles("attachment")) > 0
-		if !hasStoredAttachment && !hasUploadedAttachment {
+		if !hasStoredAttachment && !hasDocumentAttachment && !hasSourceExpenseAttachment && !hasUploadedAttachment {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "hook error when validating expense",
@@ -341,6 +343,30 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 				"out_of_range",
 				utilities.SettledTotalToleranceMessage(expenseRecord.GetFloat("total"), currencyInfo),
 			)
+		}
+	}
+
+	vendorID := strings.TrimSpace(expenseRecord.GetString("vendor"))
+	if vendorID != "" {
+		vendorRecord, err := app.FindRecordById("vendors", vendorID)
+		if err != nil || vendorRecord == nil {
+			validationsErrors["vendor"] = validation.NewError("invalid_reference", "invalid vendor reference")
+		} else if vendorRecord.GetString("status") != "Active" {
+			validationsErrors["vendor"] = validation.NewError("not_active", "vendor must be active")
+		}
+	}
+
+	categoryID := strings.TrimSpace(expenseRecord.GetString("category"))
+	if categoryID != "" {
+		if !hasJob {
+			validationsErrors["category"] = validation.NewError("requires_job", "category requires a job")
+		} else {
+			categoryRecord, err := app.FindRecordById("categories", categoryID)
+			if err != nil || categoryRecord == nil {
+				validationsErrors["category"] = validation.NewError("invalid_reference", "invalid category reference")
+			} else if categoryRecord.GetString("job") != expenseRecord.GetString("job") {
+				validationsErrors["category"] = validation.NewError("must_match_job", "category must belong to the selected job")
+			}
 		}
 	}
 

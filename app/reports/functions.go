@@ -96,7 +96,11 @@ func zipAttachments(app core.App, report []Attachment, collectionId string, clas
 	defer fsys.Close()
 
 	for _, attachment := range report {
-		fullPath := collectionId + "/" + attachment.SourcePath
+		sourceCollectionID := attachment.CollectionID
+		if sourceCollectionID == "" {
+			sourceCollectionID = collectionId
+		}
+		fullPath := sourceCollectionID + "/" + attachment.SourcePath
 		filenameInZip := attachment.ZipFilename
 
 		blob, err := fsys.GetReader(fullPath)

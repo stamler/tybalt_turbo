@@ -183,7 +183,7 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
                 e.payment_type,
                 CAST(e.distance AS REAL) AS distance,
                 COALESCE(e.cc_last_4_digits, '') AS cc_last_4_digits,
-                COALESCE(e.attachment, '') AS attachment,
+                COALESCE(ed.attachment, e.attachment, '') AS attachment,
                 TRIM(
                     (CASE WHEN e.allowance_types LIKE '%"Breakfast"%' THEN 'Breakfast ' ELSE '' END) ||
                     (CASE WHEN e.allowance_types LIKE '%"Lunch"%' THEN 'Lunch ' ELSE '' END) ||
@@ -222,6 +222,7 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
                 LEFT JOIN currencies cur ON cur.id = e.currency
                 LEFT JOIN categories cat ON cat.id = e.category
                 LEFT JOIN purchase_orders po ON po.id = e.purchase_order
+                LEFT JOIN expense_documents ed ON ed.id = e.attachment_document
             WHERE e.committed_week_ending = {:committed_week_ending}
 	              AND e.committed != ''
             ORDER BY p.surname, p.given_name, e.date
@@ -270,7 +271,7 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
                 END AS phase,
                 e.date,
                 e.description,
-                COALESCE(e.attachment, '') AS attachment,
+                COALESCE(ed.attachment, e.attachment, '') AS attachment,
                 TRIM(
                     (CASE WHEN e.allowance_types LIKE '%"Breakfast"%' THEN 'Breakfast ' ELSE '' END) ||
                     (CASE WHEN e.allowance_types LIKE '%"Lunch"%' THEN 'Lunch ' ELSE '' END) ||
@@ -299,6 +300,7 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
             LEFT JOIN clients c ON c.id = j.client
             LEFT JOIN currencies cur ON cur.id = e.currency
             LEFT JOIN purchase_orders po ON po.id = e.purchase_order
+            LEFT JOIN expense_documents ed ON ed.id = e.attachment_document
             WHERE e.submitted = 1
               AND e.committed = ''
               AND e.approved != ''

@@ -2,14 +2,19 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"mime/multipart"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+	"tybalt/constants"
 	"tybalt/internal/testutils"
 	"tybalt/utilities"
 
@@ -1212,6 +1217,805 @@ func TestBookKeeperPurchaseOrderExpenseFlow(t *testing.T) {
 	mustStatus(t, mismatchRes, http.StatusBadRequest)
 }
 
+func TestExpenseDocumentsPhase1CreateAndReuse(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	regularToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	createRegularExpense := func(description string, content []byte) string {
+		t.Helper()
+		body, contentType := mustMultipartExpenseWithContent(t, map[string]string{
+			"uid":          "rzr98oadsp9qc11",
+			"date":         "2024-09-01",
+			"division":     "vccd5fo56ctbigh",
+			"description":  description,
+			"payment_type": "Expense",
+			"kind":         "l3vtlbqg529m52j",
+			"total":        "99",
+			"vendor":       "2zqxtsmymf670ha",
+		}, "receipt.png", content)
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, res, http.StatusOK)
+
+		var created struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
+			t.Fatalf("failed to decode regular expense create response: %v; body=%s", err, res.Body.String())
+		}
+		return created.ID
+	}
+
+	t.Run("new upload stores document and clears legacy columns", func(t *testing.T) {
+		expenseID := createRegularExpense("document-first expense", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01})
+		expense, err := app.FindRecordById("expenses", expenseID)
+		if err != nil {
+			t.Fatalf("failed to load created expense: %v", err)
+		}
+		documentID := expense.GetString("attachment_document")
+		if documentID == "" {
+			t.Fatal("expected created expense to reference an expense_document")
+		}
+		if expense.GetString("attachment") != "" || expense.GetString("attachment_hash") != "" {
+			t.Fatalf("expected legacy attachment columns to be cleared, got attachment=%q hash=%q", expense.GetString("attachment"), expense.GetString("attachment_hash"))
+		}
+		document, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, documentID)
+		if err != nil {
+			t.Fatalf("failed to load expense_document %s: %v", documentID, err)
+		}
+		if document.GetString("attachment") == "" || document.GetString("attachment_hash") == "" || document.GetString("uploaded_by") != "rzr98oadsp9qc11" {
+			t.Fatalf("expense_document was not populated as expected: attachment=%q hash=%q uploaded_by=%q", document.GetString("attachment"), document.GetString("attachment_hash"), document.GetString("uploaded_by"))
+		}
+
+		downloadRes := performTestAPIRequest(t, app, http.MethodGet, "/api/expenses/attachment/"+expenseID, nil, map[string]string{
+			"Authorization": regularToken,
+		})
+		mustStatus(t, downloadRes, http.StatusOK)
+		if downloadRes.Body.Len() == 0 {
+			t.Fatal("expected attachment download route to stream the document file")
+		}
+	})
+
+	t.Run("regular users cannot upload an already used document", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x02}
+		createRegularExpense("first regular duplicate source", content)
+		body, contentType := mustMultipartExpenseWithContent(t, map[string]string{
+			"uid":          "rzr98oadsp9qc11",
+			"date":         "2024-09-01",
+			"division":     "vccd5fo56ctbigh",
+			"description":  "second regular duplicate attempt",
+			"payment_type": "Expense",
+			"kind":         "l3vtlbqg529m52j",
+			"total":        "99",
+			"vendor":       "2zqxtsmymf670ha",
+		}, "receipt.png", content)
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"duplicate_file"`) {
+			t.Fatalf("expected duplicate_file error, got body=%s", res.Body.String())
+		}
+	})
+
+	t.Run("custom update endpoint preserves existing document", func(t *testing.T) {
+		expenseID := createRegularExpense("document custom patch source", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x05})
+		expense, err := app.FindRecordById("expenses", expenseID)
+		if err != nil {
+			t.Fatalf("failed to load expense before patch: %v", err)
+		}
+		documentID := expense.GetString("attachment_document")
+		if documentID == "" {
+			t.Fatal("expected created expense to have an attachment document before patch")
+		}
+
+		patchRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/expenses/"+expenseID, strings.NewReader(`{
+			"description": "document custom patch updated"
+		}`), map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, patchRes, http.StatusOK)
+
+		expense, err = app.FindRecordById("expenses", expenseID)
+		if err != nil {
+			t.Fatalf("failed to load expense after patch: %v", err)
+		}
+		if got := expense.GetString("description"); got != "document custom patch updated" {
+			t.Fatalf("expected patched description, got %q", got)
+		}
+		if got := expense.GetString("attachment_document"); got != documentID {
+			t.Fatalf("expected patch to preserve document %q, got %q", documentID, got)
+		}
+	})
+
+	t.Run("custom create endpoint rejects server-managed fields", func(t *testing.T) {
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", strings.NewReader(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "malicious create approved field",
+			"payment_type": "Allowance",
+			"allowance_types": ["Breakfast"],
+			"kind": "l3vtlbqg529m52j",
+			"total": 25,
+			"approved": "2024-09-01 00:00:00.000Z"
+		}`), map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"approved":{"code":"not_editable"`) {
+			t.Fatalf("expected approved not_editable error, got body=%s", res.Body.String())
+		}
+	})
+
+	t.Run("custom update endpoint rejects server-managed fields", func(t *testing.T) {
+		expenseID := createRegularExpense("document custom patch malicious source", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x06})
+		res := performTestAPIRequest(t, app, http.MethodPatch, "/api/expenses/"+expenseID, strings.NewReader(`{
+			"description": "malicious committer patch",
+			"committer": "rzr98oadsp9qc11"
+		}`), map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"committer":{"code":"not_editable"`) {
+			t.Fatalf("expected committer not_editable error, got body=%s", res.Body.String())
+		}
+
+		expense, err := app.FindRecordById("expenses", expenseID)
+		if err != nil {
+			t.Fatalf("failed to load expense after rejected patch: %v", err)
+		}
+		if got := expense.GetString("description"); got != "document custom patch malicious source" {
+			t.Fatalf("rejected patch should not update description, got %q", got)
+		}
+		if got := expense.GetString("committer"); got != "" {
+			t.Fatalf("rejected patch should not set committer, got %q", got)
+		}
+	})
+
+	t.Run("custom create endpoint rejects inactive vendors", func(t *testing.T) {
+		body, contentType := mustMultipartExpenseWithContent(t, map[string]string{
+			"uid":          "rzr98oadsp9qc11",
+			"date":         "2024-09-01",
+			"division":     "vccd5fo56ctbigh",
+			"description":  "inactive vendor custom endpoint",
+			"payment_type": "Expense",
+			"kind":         "l3vtlbqg529m52j",
+			"total":        "99",
+			"vendor":       "ctswqva5onxj75q",
+		}, "receipt.png", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x07})
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"vendor":{"code":"not_active"`) {
+			t.Fatalf("expected vendor not_active error, got body=%s", res.Body.String())
+		}
+	})
+
+	t.Run("custom create endpoint rejects category job mismatches", func(t *testing.T) {
+		body, contentType := mustMultipartExpenseWithContent(t, map[string]string{
+			"uid":            "rzr98oadsp9qc11",
+			"date":           "2024-09-01",
+			"division":       "vccd5fo56ctbigh",
+			"description":    "category mismatch custom endpoint",
+			"payment_type":   "Expense",
+			"kind":           "l3vtlbqg529m52j",
+			"total":          "99",
+			"vendor":         "2zqxtsmymf670ha",
+			"category":       "he1f7oej613mxh7",
+			"job":            "cjf0kt0defhq480",
+			"purchase_order": "poa1ctvbrnch001",
+		}, "receipt.png", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x08})
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"category":{"code":"must_match_job"`) {
+			t.Fatalf("expected category must_match_job error, got body=%s", res.Body.String())
+		}
+	})
+
+	t.Run("bookkeepers can reuse an existing document by duplicate upload or source expense", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x03}
+		body, contentType := mustMultipartExpenseWithContent(t, bookKeeperExpenseFields(map[string]string{
+			"description": "bookkeeper original document expense",
+		}), "receipt.png", content)
+		firstRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": bookkeeperToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, firstRes, http.StatusOK)
+		var first struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(firstRes.Body.Bytes(), &first); err != nil {
+			t.Fatalf("failed to decode first bookkeeper expense: %v; body=%s", err, firstRes.Body.String())
+		}
+		firstExpense, err := app.FindRecordById("expenses", first.ID)
+		if err != nil {
+			t.Fatalf("failed to load first bookkeeper expense: %v", err)
+		}
+		documentID := firstExpense.GetString("attachment_document")
+		if documentID == "" {
+			t.Fatal("expected first bookkeeper expense to reference an expense_document")
+		}
+
+		body, contentType = mustMultipartExpenseWithContent(t, bookKeeperExpenseFields(map[string]string{
+			"description": "bookkeeper duplicate upload expense",
+		}), "receipt.png", content)
+		duplicateUploadRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": bookkeeperToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, duplicateUploadRes, http.StatusOK)
+		var duplicateUpload struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(duplicateUploadRes.Body.Bytes(), &duplicateUpload); err != nil {
+			t.Fatalf("failed to decode duplicate upload expense: %v; body=%s", err, duplicateUploadRes.Body.String())
+		}
+		duplicateUploadExpense, err := app.FindRecordById("expenses", duplicateUpload.ID)
+		if err != nil {
+			t.Fatalf("failed to load duplicate upload expense: %v", err)
+		}
+		if got := duplicateUploadExpense.GetString("attachment_document"); got != documentID {
+			t.Fatalf("duplicate upload should reuse document %q, got %q", documentID, got)
+		}
+
+		sourceFields := bookKeeperExpenseFields(map[string]string{
+			"description":    "bookkeeper source expense reuse",
+			"source_expense": first.ID,
+		})
+		sourcePayload, err := json.Marshal(sourceFields)
+		if err != nil {
+			t.Fatalf("failed to encode source reuse payload: %v", err)
+		}
+		sourceRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", bytes.NewReader(sourcePayload), map[string]string{
+			"Authorization": bookkeeperToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, sourceRes, http.StatusOK)
+		var sourceReuse struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(sourceRes.Body.Bytes(), &sourceReuse); err != nil {
+			t.Fatalf("failed to decode source reuse expense: %v; body=%s", err, sourceRes.Body.String())
+		}
+		sourceExpense, err := app.FindRecordById("expenses", sourceReuse.ID)
+		if err != nil {
+			t.Fatalf("failed to load source reuse expense: %v", err)
+		}
+		if got := sourceExpense.GetString("attachment_document"); got != documentID {
+			t.Fatalf("source reuse should reuse document %q, got %q", documentID, got)
+		}
+	})
+
+	t.Run("failed final expense save rolls back the document row", func(t *testing.T) {
+		var before int
+		if err := app.DB().NewQuery("SELECT COUNT(*) FROM expense_documents").Row(&before); err != nil {
+			t.Fatalf("failed to count expense_documents before request: %v", err)
+		}
+
+		body, contentType := mustMultipartExpenseWithContent(t, map[string]string{
+			"uid":          "rzr98oadsp9qc11",
+			"date":         "2024-09-01",
+			"division":     "vccd5fo56ctbigh",
+			"description":  "document rollback duplicate id",
+			"payment_type": "NotARealPaymentType",
+			"kind":         "l3vtlbqg529m52j",
+			"total":        "99",
+			"vendor":       "2zqxtsmymf670ha",
+		}, "receipt.png", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x44})
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+
+		var after int
+		if err := app.DB().NewQuery("SELECT COUNT(*) FROM expense_documents").Row(&after); err != nil {
+			t.Fatalf("failed to count expense_documents after request: %v", err)
+		}
+		if after != before {
+			t.Fatalf("expected failed expense save to roll back expense_documents row count from %d, got %d", before, after)
+		}
+	})
+}
+
+func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	regularToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	hashContent := func(content []byte) string {
+		sum := sha256.Sum256(content)
+		return hex.EncodeToString(sum[:])
+	}
+
+	createMultipartExpense := func(token string, url string, fields map[string]string, filename string, content []byte) string {
+		t.Helper()
+		body, contentType := mustMultipartExpenseWithContent(t, fields, filename, content)
+		res := performTestAPIRequest(t, app, http.MethodPost, url, body, map[string]string{
+			"Authorization": token,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, res, http.StatusOK)
+		var created struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(res.Body.Bytes(), &created); err != nil {
+			t.Fatalf("failed to decode expense create response: %v; body=%s", err, res.Body.String())
+		}
+		return created.ID
+	}
+
+	regularExpenseFields := func(description string) map[string]string {
+		return map[string]string{
+			"uid":          "rzr98oadsp9qc11",
+			"date":         "2024-09-01",
+			"division":     "vccd5fo56ctbigh",
+			"description":  description,
+			"payment_type": "Expense",
+			"kind":         "l3vtlbqg529m52j",
+			"total":        "99",
+			"vendor":       "2zqxtsmymf670ha",
+		}
+	}
+
+	bookkeeperSelfExpenseFields := func(description string) map[string]string {
+		return map[string]string{
+			"uid":          "tqqf7q0f3378rvp",
+			"date":         "2024-09-01",
+			"division":     "vccd5fo56ctbigh",
+			"description":  description,
+			"payment_type": "Expense",
+			"kind":         "l3vtlbqg529m52j",
+			"total":        "99",
+			"vendor":       "2zqxtsmymf670ha",
+		}
+	}
+
+	createRegularDocumentExpense := func(description string, content []byte) string {
+		t.Helper()
+		return createMultipartExpense(regularToken, "/api/expenses", regularExpenseFields(description), "receipt.png", content)
+	}
+
+	createBookkeeperDocumentExpense := func(description string, content []byte) string {
+		t.Helper()
+		return createMultipartExpense(bookkeeperToken, "/api/expenses", bookKeeperExpenseFields(map[string]string{
+			"description": description,
+		}), "receipt.png", content)
+	}
+
+	convertCreatedExpenseToLegacyOnly := func(expenseID string, filename string, content []byte) string {
+		t.Helper()
+
+		expense, err := app.FindRecordById("expenses", expenseID)
+		if err != nil {
+			t.Fatalf("failed to load expense %s before legacy conversion: %v", expenseID, err)
+		}
+		legacyPath := expense.BaseFilesPath() + "/" + filename
+
+		fsys, err := app.NewFilesystem()
+		if err != nil {
+			t.Fatalf("failed to open filesystem for legacy conversion: %v", err)
+		}
+		if err := fsys.Upload(content, legacyPath); err != nil {
+			fsys.Close()
+			t.Fatalf("failed to upload legacy attachment %s: %v", legacyPath, err)
+		}
+		if err := fsys.Close(); err != nil {
+			t.Fatalf("failed to close filesystem after legacy conversion: %v", err)
+		}
+
+		attachmentHash := hashContent(content)
+		_, err = app.DB().NewQuery(`
+			UPDATE expenses
+			SET attachment = {:attachment},
+			    attachment_hash = {:attachment_hash},
+			    attachment_document = ''
+			WHERE id = {:id}
+		`).Bind(dbx.Params{
+			"id":              expenseID,
+			"attachment":      filename,
+			"attachment_hash": attachmentHash,
+		}).Execute()
+		if err != nil {
+			t.Fatalf("failed to convert expense %s to legacy-only attachment fields: %v", expenseID, err)
+		}
+
+		// The row was originally created through the document-first API. Remove
+		// that test-created document row so the following assertions exercise the
+		// real legacy-only fallback path rather than an existing document match.
+		if _, err := app.DB().NewQuery(`
+			DELETE FROM expense_documents
+			WHERE attachment_hash = {:attachment_hash}
+		`).Bind(dbx.Params{"attachment_hash": attachmentHash}).Execute(); err != nil {
+			t.Fatalf("failed to remove test-created document row for legacy-only setup: %v", err)
+		}
+
+		return attachmentHash
+	}
+
+	clearCreatedExpenseAttachment := func(expenseID string) {
+		t.Helper()
+		if _, err := app.DB().NewQuery(`
+			UPDATE expenses
+			SET attachment = '',
+			    attachment_hash = '',
+			    attachment_document = ''
+			WHERE id = {:id}
+		`).Bind(dbx.Params{"id": expenseID}).Execute(); err != nil {
+			t.Fatalf("failed to clear test-created expense attachment: %v", err)
+		}
+	}
+
+	markExpenseCommitted := func(expenseID string, weekEnding string) {
+		t.Helper()
+		if _, err := app.DB().NewQuery(`
+			UPDATE expenses
+			SET submitted = 1,
+			    approved = '2026-04-24 09:00:00.000Z',
+			    committer = 'wegviunlyr2jjjv',
+			    committed = '2026-04-24 10:00:00.000Z',
+			    committed_week_ending = {:week_ending},
+			    pay_period_ending = {:week_ending},
+			    updated = '2026-04-24 10:00:00.000Z'
+			WHERE id = {:id}
+		`).Bind(dbx.Params{
+			"id":          expenseID,
+			"week_ending": weekEnding,
+		}).Execute(); err != nil {
+			t.Fatalf("failed to mark expense %s committed: %v", expenseID, err)
+		}
+	}
+
+	t.Run("non bookkeepers cannot use source expense reuse", func(t *testing.T) {
+		sourceID := createRegularDocumentExpense("regular source document for denied source reuse", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x51})
+		fields := regularExpenseFields("regular source reuse should fail")
+		fields["source_expense"] = sourceID
+		payload, err := json.Marshal(fields)
+		if err != nil {
+			t.Fatalf("failed to encode source reuse payload: %v", err)
+		}
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", bytes.NewReader(payload), map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"source_expense":{"code":"book_keeper_required"`) {
+			t.Fatalf("expected book_keeper_required source_expense error, got body=%s", res.Body.String())
+		}
+	})
+
+	t.Run("source expense reuse rejects invisible and attachmentless sources", func(t *testing.T) {
+		invisibleSourceID := createRegularDocumentExpense("regular source invisible to bookkeeper", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x52})
+		fields := bookKeeperExpenseFields(map[string]string{
+			"description":    "bookkeeper invisible source reuse should fail",
+			"source_expense": invisibleSourceID,
+		})
+		payload, err := json.Marshal(fields)
+		if err != nil {
+			t.Fatalf("failed to encode invisible source reuse payload: %v", err)
+		}
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", bytes.NewReader(payload), map[string]string{
+			"Authorization": bookkeeperToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"source_expense":{"code":"not_found"`) {
+			t.Fatalf("expected source_expense not_found error, got body=%s", res.Body.String())
+		}
+
+		attachmentlessSourceID := createBookkeeperDocumentExpense("bookkeeper source with attachment cleared", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x53})
+		clearCreatedExpenseAttachment(attachmentlessSourceID)
+		fields = bookKeeperExpenseFields(map[string]string{
+			"description":    "bookkeeper attachmentless source reuse should fail",
+			"source_expense": attachmentlessSourceID,
+		})
+		payload, err = json.Marshal(fields)
+		if err != nil {
+			t.Fatalf("failed to encode attachmentless source reuse payload: %v", err)
+		}
+		res = performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", bytes.NewReader(payload), map[string]string{
+			"Authorization": bookkeeperToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"source_expense":{"code":"missing_attachment"`) {
+			t.Fatalf("expected source_expense missing_attachment error, got body=%s", res.Body.String())
+		}
+	})
+
+	t.Run("bookkeeper duplicate upload reuse still requires a PO backed target", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x54}
+		createRegularDocumentExpense("document source for non po bookkeeper duplicate", content)
+		if _, err := app.DB().NewQuery(`
+			UPDATE admin_profiles
+			SET default_branch = '80875lm27v8wgi4'
+			WHERE uid = 'tqqf7q0f3378rvp'
+		`).Execute(); err != nil {
+			t.Fatalf("failed to set bookkeeper default_branch for non-PO duplicate reuse test: %v", err)
+		}
+		body, contentType := mustMultipartExpenseWithContent(t, bookkeeperSelfExpenseFields("bookkeeper non po duplicate should fail"), "receipt.png", content)
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": bookkeeperToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"purchase_order":{"code":"required"`) {
+			t.Fatalf("expected purchase_order required duplicate reuse error, got body=%s", res.Body.String())
+		}
+	})
+
+	t.Run("legacy only details and source reuse migrate through expense documents", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x55}
+		sourceID := createBookkeeperDocumentExpense("bookkeeper legacy source before migration", content)
+		legacyHash := convertCreatedExpenseToLegacyOnly(sourceID, "legacy-source.png", content)
+
+		detailsRes := performTestAPIRequest(t, app, http.MethodGet, "/api/expenses/details/"+sourceID, nil, map[string]string{
+			"Authorization": bookkeeperToken,
+		})
+		mustStatus(t, detailsRes, http.StatusOK)
+		if !strings.Contains(detailsRes.Body.String(), `"attachment":"legacy-source.png"`) || !strings.Contains(detailsRes.Body.String(), `"attachment_hash":"`+legacyHash+`"`) {
+			t.Fatalf("expected details to expose legacy attachment filename and hash, got body=%s", detailsRes.Body.String())
+		}
+		downloadRes := performTestAPIRequest(t, app, http.MethodGet, "/api/expenses/attachment/"+sourceID, nil, map[string]string{
+			"Authorization": bookkeeperToken,
+		})
+		mustStatus(t, downloadRes, http.StatusOK)
+		if !bytes.Equal(downloadRes.Body.Bytes(), content) {
+			t.Fatalf("legacy attachment download body = %x, want %x", downloadRes.Body.Bytes(), content)
+		}
+
+		fields := bookKeeperExpenseFields(map[string]string{
+			"description":    "bookkeeper source reuse from legacy source",
+			"source_expense": sourceID,
+		})
+		payload, err := json.Marshal(fields)
+		if err != nil {
+			t.Fatalf("failed to encode legacy source reuse payload: %v", err)
+		}
+		reuseRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", bytes.NewReader(payload), map[string]string{
+			"Authorization": bookkeeperToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, reuseRes, http.StatusOK)
+		var created struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(reuseRes.Body.Bytes(), &created); err != nil {
+			t.Fatalf("failed to decode source reuse response: %v; body=%s", err, reuseRes.Body.String())
+		}
+		sourceExpense, err := app.FindRecordById("expenses", sourceID)
+		if err != nil {
+			t.Fatalf("failed to reload migrated source expense: %v", err)
+		}
+		reuseExpense, err := app.FindRecordById("expenses", created.ID)
+		if err != nil {
+			t.Fatalf("failed to reload source reuse expense: %v", err)
+		}
+		if sourceExpense.GetString("attachment_document") == "" {
+			t.Fatal("expected source legacy expense to be linked to an expense_document after reuse")
+		}
+		if got := reuseExpense.GetString("attachment_document"); got != sourceExpense.GetString("attachment_document") {
+			t.Fatalf("source reuse document = %q, want migrated source document %q", got, sourceExpense.GetString("attachment_document"))
+		}
+		if sourceExpense.GetString("attachment") != "legacy-source.png" {
+			t.Fatalf("source legacy attachment filename should be preserved until Phase 2 cleanup, got %q", sourceExpense.GetString("attachment"))
+		}
+	})
+
+	t.Run("editing legacy only expenses migrates or replaces the attachment", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x56}
+		legacyID := createRegularDocumentExpense("regular legacy edit before migration", content)
+		legacyHash := convertCreatedExpenseToLegacyOnly(legacyID, "legacy-edit.png", content)
+
+		patchRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/expenses/"+legacyID, strings.NewReader(`{
+			"description": "regular legacy edit migrated"
+		}`), map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, patchRes, http.StatusOK)
+		legacyExpense, err := app.FindRecordById("expenses", legacyID)
+		if err != nil {
+			t.Fatalf("failed to reload migrated legacy edit expense: %v", err)
+		}
+		migratedDocumentID := legacyExpense.GetString("attachment_document")
+		if migratedDocumentID == "" {
+			t.Fatal("expected editing a legacy-only expense to create an attachment_document")
+		}
+		migratedDocument, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, migratedDocumentID)
+		if err != nil {
+			t.Fatalf("failed to load migrated document: %v", err)
+		}
+		if got := migratedDocument.GetString("attachment_hash"); got != legacyHash {
+			t.Fatalf("migrated document hash = %q, want %q", got, legacyHash)
+		}
+
+		replaceContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x57}
+		replaceOriginalContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5A}
+		replaceID := createRegularDocumentExpense("regular legacy edit before replacement", replaceOriginalContent)
+		convertCreatedExpenseToLegacyOnly(replaceID, "legacy-replaced.png", replaceOriginalContent)
+		body, contentType := mustMultipartExpenseWithContent(t, map[string]string{
+			"description": "regular legacy edit replaced attachment",
+		}, "replacement.png", replaceContent)
+		replaceRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/expenses/"+replaceID, body, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, replaceRes, http.StatusOK)
+		replacedExpense, err := app.FindRecordById("expenses", replaceID)
+		if err != nil {
+			t.Fatalf("failed to reload replaced legacy expense: %v", err)
+		}
+		replacementDocument, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, replacedExpense.GetString("attachment_document"))
+		if err != nil {
+			t.Fatalf("failed to load replacement document: %v", err)
+		}
+		if got, want := replacementDocument.GetString("attachment_hash"), hashContent(replaceContent); got != want {
+			t.Fatalf("replacement document hash = %q, want %q", got, want)
+		}
+	})
+
+	t.Run("generic collection file upload is converted to an expense document", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x58}
+		expenseID := createMultipartExpense(regularToken, "/api/collections/expenses/records", regularExpenseFields("generic collection document cutover"), "generic.png", content)
+		expense, err := app.FindRecordById("expenses", expenseID)
+		if err != nil {
+			t.Fatalf("failed to load generic collection-created expense: %v", err)
+		}
+		if expense.GetString("attachment_document") == "" {
+			t.Fatal("expected generic collection upload to create attachment_document")
+		}
+		if expense.GetString("attachment") != "" || expense.GetString("attachment_hash") != "" {
+			t.Fatalf("expected generic collection upload to clear legacy attachment fields, got attachment=%q hash=%q", expense.GetString("attachment"), expense.GetString("attachment_hash"))
+		}
+	})
+
+	t.Run("regular duplicate upload is rejected when the existing hash is legacy only", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x59}
+		sourceID := createRegularDocumentExpense("regular legacy duplicate source", content)
+		convertCreatedExpenseToLegacyOnly(sourceID, "legacy-duplicate-source.png", content)
+		body, contentType := mustMultipartExpenseWithContent(t, regularExpenseFields("regular duplicate against legacy-only source"), "receipt.png", content)
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"attachment":{"code":"duplicate_file"`) {
+			t.Fatalf("expected duplicate_file error for legacy-only duplicate hash, got body=%s", res.Body.String())
+		}
+	})
+
+	t.Run("receipt zip and legacy writeback include mixed legacy and document backed attachments", func(t *testing.T) {
+		weekEnding := "2026-04-25"
+		legacyContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x60}
+		documentContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x61}
+
+		legacyID := createRegularDocumentExpense("phase1 mixed legacy receipt export", legacyContent)
+		legacyHash := convertCreatedExpenseToLegacyOnly(legacyID, "mixed-legacy.png", legacyContent)
+		documentID := createRegularDocumentExpense("phase1 mixed document receipt export", documentContent)
+		documentExpense, err := app.FindRecordById("expenses", documentID)
+		if err != nil {
+			t.Fatalf("failed to load document-backed mixed expense: %v", err)
+		}
+		documentRecord, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, documentExpense.GetString("attachment_document"))
+		if err != nil {
+			t.Fatalf("failed to load document-backed mixed expense document: %v", err)
+		}
+		documentFilename := documentRecord.GetString("attachment")
+		documentHash := documentRecord.GetString("attachment_hash")
+
+		markExpenseCommitted(legacyID, weekEnding)
+		markExpenseCommitted(documentID, weekEnding)
+
+		receiptsRes := performTestAPIRequest(t, app, http.MethodGet, "/api/reports/weekly_receipts/"+weekEnding, nil, map[string]string{
+			"Authorization": reportToken,
+		})
+		mustStatus(t, receiptsRes, http.StatusOK)
+		var receiptsPayload struct {
+			URL string `json:"url"`
+		}
+		if err := json.Unmarshal(receiptsRes.Body.Bytes(), &receiptsPayload); err != nil {
+			t.Fatalf("failed to decode receipts response: %v; body=%s", err, receiptsRes.Body.String())
+		}
+		fsys, err := app.NewFilesystem()
+		if err != nil {
+			t.Fatalf("failed to open filesystem for receipt zip verification: %v", err)
+		}
+		reader, err := fsys.GetReader(receiptsPayload.URL)
+		if err != nil {
+			fsys.Close()
+			t.Fatalf("failed to read receipt zip %s: %v", receiptsPayload.URL, err)
+		}
+		zipBytes, err := io.ReadAll(reader)
+		reader.Close()
+		if closeErr := fsys.Close(); closeErr != nil {
+			t.Fatalf("failed to close filesystem after receipt zip verification: %v", closeErr)
+		}
+		if err != nil {
+			t.Fatalf("failed to read receipt zip bytes: %v", err)
+		}
+		archive, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+		if err != nil {
+			t.Fatalf("failed to open receipt zip: %v", err)
+		}
+		zipNames := make([]string, 0, len(archive.File))
+		for _, f := range archive.File {
+			zipNames = append(zipNames, f.Name)
+		}
+		if len(zipNames) != 2 || !strings.Contains(strings.Join(zipNames, "\n"), "mixed-legacy.png") || !strings.Contains(strings.Join(zipNames, "\n"), documentFilename) {
+			t.Fatalf("receipt zip names = %#v, want legacy and document-backed attachments", zipNames)
+		}
+
+		writebackRes := performTestAPIRequest(t, app, http.MethodGet, "/api/export_legacy/expenses/2026-04-01", nil, map[string]string{
+			"Authorization": reportToken,
+		})
+		mustStatus(t, writebackRes, http.StatusOK)
+		var writeback struct {
+			Expenses []struct {
+				ImmutableID    string `json:"immutableID"`
+				Attachment     string `json:"attachment"`
+				AttachmentHash string `json:"attachmentHash"`
+			} `json:"expenses"`
+		}
+		if err := json.Unmarshal(writebackRes.Body.Bytes(), &writeback); err != nil {
+			t.Fatalf("failed to decode writeback response: %v; body=%s", err, writebackRes.Body.String())
+		}
+		foundLegacy := false
+		foundDocument := false
+		for _, row := range writeback.Expenses {
+			switch row.ImmutableID {
+			case legacyID:
+				foundLegacy = true
+				if row.Attachment != "mixed-legacy.png" || row.AttachmentHash != legacyHash {
+					t.Fatalf("legacy writeback row = attachment %q hash %q, want mixed-legacy.png %s", row.Attachment, row.AttachmentHash, legacyHash)
+				}
+			case documentID:
+				foundDocument = true
+				if row.Attachment != documentFilename || row.AttachmentHash != documentHash {
+					t.Fatalf("document writeback row = attachment %q hash %q, want %s %s", row.Attachment, row.AttachmentHash, documentFilename, documentHash)
+				}
+			}
+		}
+		if !foundLegacy || !foundDocument {
+			t.Fatalf("writeback missing mixed attachment rows: foundLegacy=%v foundDocument=%v", foundLegacy, foundDocument)
+		}
+	})
+}
+
 func TestBookKeeperSameUserPurchaseOrderUsesRegularApproval(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	t.Cleanup(app.Cleanup)
@@ -1730,6 +2534,12 @@ func createBookKeeperPOExpense(t testing.TB, app *tests.TestApp, bookkeeperToken
 func mustMultipartExpense(t testing.TB, fields map[string]string, filename string) (*bytes.Buffer, string) {
 	t.Helper()
 
+	return mustMultipartExpenseWithContent(t, fields, filename, []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A})
+}
+
+func mustMultipartExpenseWithContent(t testing.TB, fields map[string]string, filename string, content []byte) (*bytes.Buffer, string) {
+	t.Helper()
+
 	buf := &bytes.Buffer{}
 	w := multipart.NewWriter(buf)
 	for k, v := range fields {
@@ -1741,7 +2551,7 @@ func mustMultipartExpense(t testing.TB, fields map[string]string, filename strin
 	if err != nil {
 		t.Fatalf("failed to create attachment field: %v", err)
 	}
-	if _, err := fw.Write([]byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A}); err != nil {
+	if _, err := fw.Write(content); err != nil {
 		t.Fatalf("failed to write attachment: %v", err)
 	}
 	contentType := w.FormDataContentType()

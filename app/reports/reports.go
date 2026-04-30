@@ -18,11 +18,12 @@ var expenseCollectionId = "o1vpz1mm7qsfoyy"
 // Attachment represents a file attachment to an record.
 // It is used to store the filename, source path, and SHA-256 hash of the attachment.
 type Attachment struct {
-	Id          string `db:"id"`
-	Filename    string `db:"filename"`
-	ZipFilename string `db:"zip_filename"`
-	SourcePath  string `db:"source_path"`
-	Sha256      string `db:"sha256"`
+	Id           string `db:"id"`
+	CollectionID string `db:"collection_id"`
+	Filename     string `db:"filename"`
+	ZipFilename  string `db:"zip_filename"`
+	SourcePath   string `db:"source_path"`
+	Sha256       string `db:"sha256"`
 }
 
 //go:embed payroll_time.sql
@@ -349,6 +350,7 @@ func CreateReceiptsReportHandler(app core.App, dateColumnName string) func(e *co
 		receipts := []Attachment{}
 		for _, rowMap := range report {
 			idVal, idOk := rowMap["id"]
+			collectionIDVal, collectionIDOk := rowMap["collection_id"]
 			sourcePathVal, sourcePathOk := rowMap["source_path"]
 			filenameVal, filenameOk := rowMap["filename"]
 			zipFilenameVal, zipFilenameOk := rowMap["zip_filename"]
@@ -358,12 +360,16 @@ func CreateReceiptsReportHandler(app core.App, dateColumnName string) func(e *co
 				continue
 			}
 			receipts = append(receipts, Attachment{
-				Id:          idVal.String,
-				Filename:    filenameVal.String,
-				ZipFilename: zipFilenameVal.String,
-				SourcePath:  sourcePathVal.String,
-				Sha256:      sha256Val.String,
+				Id:           idVal.String,
+				CollectionID: collectionIDVal.String,
+				Filename:     filenameVal.String,
+				ZipFilename:  zipFilenameVal.String,
+				SourcePath:   sourcePathVal.String,
+				Sha256:       sha256Val.String,
 			})
+			if !collectionIDOk {
+				receipts[len(receipts)-1].CollectionID = expenseCollectionId
+			}
 		}
 
 		// Check the zip cache for a record that matches the dateColumnValue in the

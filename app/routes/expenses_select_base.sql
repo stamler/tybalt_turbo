@@ -7,8 +7,11 @@ SELECT
   e.description,
   CAST(e.total AS REAL) AS total,
   e.payment_type,
-  e.attachment,
-  e.attachment_hash,
+  COALESCE(ed.attachment, e.attachment) AS attachment,
+  COALESCE(ed.attachment_hash, e.attachment_hash) AS attachment_hash,
+  e.attachment_document,
+  CASE WHEN ed.id IS NOT NULL THEN 'pbc_2089657321' ELSE 'o1vpz1mm7qsfoyy' END AS attachment_collection_id,
+  CASE WHEN ed.id IS NOT NULL THEN ed.id ELSE e.id END AS attachment_record_id,
   e.rejector,
   e.rejected,
   e.rejection_reason,
@@ -67,3 +70,4 @@ LEFT JOIN currencies cur ON e.currency = cur.id
 LEFT JOIN branches b ON e.branch = b.id
 LEFT JOIN profiles p3 ON e.settler = p3.uid
 LEFT JOIN profiles p4 ON e.creator = p4.uid
+LEFT JOIN expense_documents ed ON e.attachment_document = ed.id
