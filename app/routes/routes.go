@@ -266,6 +266,7 @@ func AddRoutes(app core.App) {
 		reportsGroup.GET("/payables_spreadsheet/{date}", reports.CreatePayablesSpreadsheetHandler(app))
 		reportsGroup.GET("/payables_spreadsheet_monthly/{yymm}", reports.CreatePayablesSpreadsheetMonthlyHandler(app))
 		reportsGroup.GET("/time_entry_branch_mismatches", createTimeEntryBranchMismatchesReportHandler(app))
+		reportsGroup.GET("/active_jobs", createActiveJobsReportHandler(app))
 
 		// Admin stats dashboard
 		statsGroup := se.Router.Group("/api/stats")

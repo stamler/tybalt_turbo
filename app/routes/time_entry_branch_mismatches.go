@@ -30,8 +30,6 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
-	"tybalt/errs"
-	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
 )
@@ -55,30 +53,9 @@ type timeEntryBranchMismatchRow struct {
 	Description         string  `db:"description" json:"description"`
 }
 
-func requireTimeEntryBranchMismatchReportViewer(app core.App, auth *core.Record) error {
-	hasReportClaim, err := utilities.HasClaim(app, auth, "report")
-	if err != nil {
-		return err
-	}
-	if hasReportClaim {
-		return nil
-	}
-
-	return &errs.HookError{
-		Status:  http.StatusForbidden,
-		Message: "you are not authorized to view this report",
-		Data: map[string]errs.CodeError{
-			"global": {
-				Code:    "unauthorized",
-				Message: "you are not authorized to view this report",
-			},
-		},
-	}
-}
-
 func createTimeEntryBranchMismatchesReportHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
-		if err := requireTimeEntryBranchMismatchReportViewer(app, e.Auth); err != nil {
+		if err := requireReportViewer(app, e.Auth); err != nil {
 			return writeHookError(e, err)
 		}
 

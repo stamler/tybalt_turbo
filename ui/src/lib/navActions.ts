@@ -7,3 +7,7 @@ export async function downloadTimeEntryBranchMismatchesCsv() {
     "time_entry_branch_mismatches.csv",
   );
 }
+
+export async function downloadActiveJobsCsv() {
+  await downloadCSV(`${pb.baseUrl}/api/reports/active_jobs`, "active_jobs.csv");
+}
