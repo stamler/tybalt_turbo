@@ -249,7 +249,7 @@ This means normal interaction with old rows gradually moves them to the new mode
 
 ### 8. Add bookkeeper-only source reuse UX
 
-On the expense details page, for callers with `book_keeper`, show a new action only when the source expense has an effective attachment:
+On the expense details page, for callers with `book_keeper`, show a new action only when the source expense has an effective attachment. The action button should be next to the attachment field (download) and read:
 
 ```text
 Create another expense with this attachment
