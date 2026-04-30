@@ -21,6 +21,10 @@ func TestTimeSheetsRoutes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	noClaimsToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	// A submitted, not committed, not approved timesheet to exercise reject path
 	// Using one of the seeded ids seen in test db query: aeyl94og4xmnpq4
@@ -131,6 +135,17 @@ func TestTimeSheetsRoutes(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				"[",
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "user without time claim cannot unbundle a timesheet",
+			Method:         http.MethodPost,
+			URL:            "/api/time_sheets/" + tsToReject + "/unbundle",
+			Headers:        map[string]string{"Authorization": noClaimsToken},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"message":"Time claim required."`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

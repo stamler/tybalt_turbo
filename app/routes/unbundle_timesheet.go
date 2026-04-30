@@ -17,6 +17,10 @@ func createUnbundleTimesheetHandler(app core.App) func(e *core.RequestEvent) err
 	// will also error if the submitted, approved, or committed fields are true
 	// on the time sheet record.
 	return func(e *core.RequestEvent) error {
+		if err := requireTimeClaim(app, e.Auth); err != nil {
+			return err
+		}
+
 		// get the auth record from the context
 		authRecord := e.Auth
 		userId := authRecord.Id

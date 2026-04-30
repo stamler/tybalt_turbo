@@ -7,6 +7,10 @@ _imported,cid,created,id,uid,updated
 0,v748dp232p1onmh,2025-09-25 18:10:40.368Z,6whj7258a7rq800,4r70mfovf22m9uh,2025-09-25 18:10:40.368Z
 0,5vh881k048bboim,2025-03-13 15:53:01.593Z,9azfu0gh25n6mjm,6bq4j0eb26631dy,2025-03-20 15:48:18.088Z
 0,rpuh5vwzvagchjd,2024-10-29 12:26:47.623Z,auncwoq1bbgvr9s,rzr98oadsp9qc11,2024-10-29 12:26:47.623Z
+0,rpuh5vwzvagchjd,2026-04-30 00:00:00.000Z,uc_author_time_001,f2j5a8vk006baub,2026-04-30 00:00:00.000Z
+0,rpuh5vwzvagchjd,2026-04-30 00:00:00.000Z,uc_inactive_mgr_time,u_has_inactive_mgr,2026-04-30 00:00:00.000Z
+0,rpuh5vwzvagchjd,2026-04-30 00:00:00.000Z,uc_self_apv_yes_time,u_self_apv_yes,2026-04-30 00:00:00.000Z
+0,rpuh5vwzvagchjd,2026-04-30 00:00:00.000Z,uc_self_apv_no_time,u_self_apv_no,2026-04-30 00:00:00.000Z
 0,0zcz7sw4bmofzkn,2024-09-04 19:23:29.292Z,b55aqwzll9hj20u,wegviunlyr2jjjv,2024-09-04 19:23:29.292Z
 0,ioemk1d4qo2u6xh,2024-06-21 16:31:45.132Z,dchp79rdutl780t,f2j5a8vk006baub,2024-06-21 16:31:45.132Z
 0,mjli2j7oc7osy8b,2024-07-26 17:27:54.588Z,et2b00ej9dhptbh,f2j5a8vk006baub,2024-07-26 17:27:54.588Z
@@ -40,6 +44,8 @@ _imported,cid,created,id,uid,updated
 0,0zcz7sw4bmofzkn,2026-04-07 12:00:00.000Z,uc_self_apv_yes_tapr,u_self_apv_yes,2026-04-07 12:00:00.000Z
 0,cjna52siibr7zgq,2026-04-10 00:00:00.000Z,uc_admin_only_001,u_admin_only,2026-04-10 00:00:00.000Z
 0,tq5pln371m2xqrd,2026-04-10 00:00:00.000Z,uc_corp_claim_001,u_corp_claim,2026-04-10 00:00:00.000Z
+0,rpuh5vwzvagchjd,2026-04-29 00:00:00.000Z,uc_corp_noclaim_time,u_corp_noclaim,2026-04-29 00:00:00.000Z
+0,rpuh5vwzvagchjd,2026-04-29 00:00:00.000Z,uc_corp_claim_time,u_corp_claim,2026-04-29 00:00:00.000Z
 0,tq5pln371m2xqrd,2026-04-10 00:00:00.000Z,uc_corp_mgr_br_01,u_corp_manager,2026-04-10 00:00:00.000Z
 0,1p1cj0lrno2njmw,2026-04-10 00:00:00.000Z,uc_corp_mgr_leg01,u_corp_manager,2026-04-10 00:00:00.000Z
 0,tq5pln371m2xqrd,2026-04-10 00:00:00.000Z,uc_subject_corp01,u_subject_corp,2026-04-10 00:00:00.000Z

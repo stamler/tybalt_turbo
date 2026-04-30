@@ -575,6 +575,10 @@ func TestTimeEditingDisabledBlocks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	timeUserToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
 	inactiveMgrToken, err := testutils.GenerateRecordToken("users", "has_inactive_mgr@test.com")
 	if err != nil {
 		t.Fatal(err)
@@ -594,13 +598,13 @@ func TestTimeEditingDisabledBlocks(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/collections/time_entries/records",
 			Body: strings.NewReader(`{
-				"uid": "u_no_claims",
+				"uid": "rzr98oadsp9qc11",
 				"time_type": "d35auo4vawx7t9u",
 				"date": "2024-01-08",
 				"description": "blocked time entry create",
 				"hours": 1
 			}`),
-			Headers:        map[string]string{"Authorization": uNoClaimsToken},
+			Headers:        map[string]string{"Authorization": timeUserToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"time_editing_disabled"`,
@@ -610,9 +614,9 @@ func TestTimeEditingDisabledBlocks(t *testing.T) {
 		{
 			Name:           "time entry update blocked when editing disabled",
 			Method:         http.MethodPatch,
-			URL:            "/api/collections/time_entries/records/r464ccf9b3527eb",
+			URL:            "/api/collections/time_entries/records/teclaimwrite001",
 			Body:           strings.NewReader(`{"description":"blocked update"}`),
-			Headers:        map[string]string{"Authorization": uNoClaimsToken},
+			Headers:        map[string]string{"Authorization": timeUserToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"time_editing_disabled"`,
@@ -622,8 +626,8 @@ func TestTimeEditingDisabledBlocks(t *testing.T) {
 		{
 			Name:           "time entry delete blocked when editing disabled",
 			Method:         http.MethodDelete,
-			URL:            "/api/collections/time_entries/records/r464ccf9b3527eb",
-			Headers:        map[string]string{"Authorization": uNoClaimsToken},
+			URL:            "/api/collections/time_entries/records/teclaimwrite001",
+			Headers:        map[string]string{"Authorization": timeUserToken},
 			ExpectedStatus: 403,
 			ExpectedContent: []string{
 				`"time_editing_disabled"`,

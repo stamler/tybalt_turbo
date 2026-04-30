@@ -28,6 +28,9 @@ func createCopyTimeEntryHandler(app core.App) func(e *core.RequestEvent) error {
 		if err := requireTimeEditing(app); err != nil {
 			return err
 		}
+		if err := requireTimeClaim(app, e.Auth); err != nil {
+			return err
+		}
 
 		authRecord := e.Auth
 		userId := authRecord.Id

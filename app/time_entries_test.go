@@ -21,6 +21,27 @@ import (
 //   - jobs: "u09fwwcg07y03m7" (24-291, project with NO rate_sheet)
 //   - rate_roles: "tbgoiwwwfj8cvju" (Principal)
 
+func TestTimeEntriesCopyToTomorrow_TimeClaimRequired(t *testing.T) {
+	noClaimsToken, err := testutils.GenerateRecordToken("users", "u_no_claims@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenario := tests.ApiScenario{
+		Name:           "copy to tomorrow requires time claim",
+		Method:         http.MethodPost,
+		URL:            "/api/time_entries/r464ccf9b3527eb/copy_to_tomorrow",
+		Headers:        map[string]string{"Authorization": noClaimsToken},
+		ExpectedStatus: http.StatusForbidden,
+		ExpectedContent: []string{
+			`"message":"Time claim required."`,
+		},
+		TestAppFactory: testutils.SetupTestApp,
+	}
+
+	scenario.Test(t)
+}
+
 func TestTimeEntriesCreate_InactiveDivisionFails(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
 	if err != nil {
