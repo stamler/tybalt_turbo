@@ -279,6 +279,50 @@ Minimum manual checks:
 6. Edit an old legacy expense without changing the attachment. Verify it gets an `attachment_document` and the copied document file downloads.
 7. Generate receipt zips and legacy writeback/export output for a mix of legacy and document-backed expenses.
 
+### 10. Phase 1 backend tests
+
+Implement backend tests before merging Phase 1.
+
+Expense document creation and linking:
+
+- creating an expense with a new attachment creates exactly one `expense_documents` record;
+- the created expense has `attachment_document` set;
+- the created expense does not write a new legacy `expenses.attachment` value;
+- the stored document hash matches the uploaded file content;
+- the document `uploaded_by` field is the authenticated user.
+
+Duplicate hash behavior:
+
+- non-`book_keeper` uploading a file whose hash already exists in `expense_documents` receives the existing field-level duplicate attachment error;
+- non-`book_keeper` uploading a file whose hash exists only on a legacy expense is still rejected;
+- `book_keeper` uploading a duplicate file for a PO-backed expense links the existing document and creates no duplicate document;
+- `book_keeper` uploading a duplicate file for a non-PO expense is rejected.
+
+Source expense reuse:
+
+- `book_keeper` can create a PO-backed expense using `source_expense` when the source has an `attachment_document`;
+- `book_keeper` can create a PO-backed expense using `source_expense` when the source is legacy-only, and the source is migrated to `expense_documents` first;
+- non-`book_keeper` using `source_expense` is rejected;
+- `source_expense` is rejected when the source expense is not visible to the caller;
+- `source_expense` is rejected when the source expense has no effective attachment;
+- `source_expense` is rejected when the target expense has no PO.
+
+Legacy fallback and auto-migration:
+
+- expense details return a downloadable attachment for legacy-only expenses;
+- receipt zip generation includes both legacy-only and document-backed expense attachments;
+- legacy writeback/export includes effective attachment filename and hash for both legacy-only and document-backed expenses;
+- editing a legacy-only expense without replacing its file creates or reuses an `expense_documents` row and links it;
+- editing a legacy-only expense with a replacement file uses the replacement document and does not migrate the old file;
+- removing an attachment from an expense type that permits no attachment clears the effective attachment relation/fields.
+
+Regression coverage:
+
+- existing PO-backed expense validation still enforces active PO, matching job, matching currency, and cumulative overflow behavior;
+- existing bookkeeper-on-behalf validation still requires `book_keeper`, a PO-backed target, valid payment type, and PO owner matching;
+- submitted expenses still cannot be edited through the new mutation route;
+- direct generic collection file upload to `expenses.attachment` is rejected or prevented after cutover.
+
 ## Phase 2: Backfill Existing Legacy Attachments
 
 Phase 2 can happen days, weeks, or months after Phase 1. The app will already support mixed legacy/document attachment storage.
@@ -467,6 +511,49 @@ Only after the report shows no legacy-only attachment rows:
 7. Remove any UI handling that displays legacy expense attachment links.
 
 Cleanup should be its own PR/release after the backfill has been verified in production.
+
+### 8. Phase 2 backend tests
+
+Implement backend tests before running Phase 2 in production.
+
+Prepare mode:
+
+- `prepare` creates document records for legacy-only expenses with valid attachments;
+- `prepare` reuses an existing document when another expense has the same hash;
+- `prepare` uses `expenses.attachment_hash` when present;
+- `prepare` computes the SHA-256 hash from the legacy file when `expenses.attachment_hash` is blank;
+- `prepare` records an error and skips rows whose legacy file cannot be read;
+- `prepare` writes a manifest with correct old and new S3 keys;
+- rerunning `prepare` is idempotent and preserves previously created document ids.
+
+Manual copy support:
+
+- generated copy commands use the legacy expense collection prefix as the source;
+- generated copy commands use the `expense_documents` collection prefix and document id as the destination;
+- rows that already have a verified destination object are marked as not requiring copy;
+- generated scripts never delete legacy objects.
+
+Verify mode:
+
+- `verify` succeeds when the copied destination object exists and its SHA-256 matches the document hash;
+- `verify` fails when the destination object is missing;
+- `verify` fails when the copied destination object hash does not match;
+- `verify` fails when the legacy source object is missing;
+- rerunning `verify` after correcting a failed copy succeeds without changing linked expenses.
+
+Link mode:
+
+- `link` sets `expenses.attachment_document` only for verified rows;
+- `link` leaves `expenses.attachment` and `expenses.attachment_hash` untouched during the backfill pass;
+- `link` skips rows already linked to the expected document;
+- `link` refuses to overwrite a row linked to a different document unless an explicit force mode is used;
+- `link` is transactional for DB updates and leaves no partially linked batch after an injected failure.
+
+Report and cleanup readiness:
+
+- `report` counts legacy-only, document-backed, missing-copy, missing-source, and duplicate-hash rows correctly;
+- cleanup tests verify the app no longer needs legacy fallback after all rows are linked;
+- post-cleanup export/report tests use only `expense_documents` as the source of expense attachment data.
 
 ## Testing Requirements
 
