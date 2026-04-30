@@ -1,0 +1,513 @@
+# Expense Documents
+
+## Goal
+
+Expense attachments are currently stored directly on `expenses` records and guarded by a unique hash on `expenses.attachment_hash`. That prevents a legitimate finance workflow: a `book_keeper` receives one vendor attachment that supports multiple PO-backed expenses, then needs to enter one expense per PO while reusing the same supporting document.
+
+The target model is:
+
+- `expenses` remain the accounting rows.
+- `expense_documents` own uploaded receipt/invoice files.
+- Multiple expenses may reference the same `expense_documents` row.
+- Only users with the `book_keeper` claim may reuse an existing document.
+- Everyone else keeps the same UX and duplicate-file protection they have today.
+
+This will be implemented in two phases.
+
+1. Phase 1 cuts over the app so new expense uploads use `expense_documents`, while legacy expense attachments continue to work through fallback reads.
+2. Phase 2 backfills existing legacy expense attachments into `expense_documents`, then removes the legacy attachment columns from `expenses`.
+
+Phase 1 and Phase 2 do not need to be close together. After Phase 1, the app can run indefinitely with mixed storage: new attachments in `expense_documents`, old attachments still on `expenses`.
+
+## Current Storage Model
+
+PocketBase stores files under the collection id and record id:
+
+```text
+{collection_id}/{record_id}/{filename}
+```
+
+For current expense attachments, the collection id is the `expenses` collection id:
+
+```text
+o1vpz1mm7qsfoyy/{expense_id}/{expense_attachment_filename}
+```
+
+After this change, new expense documents will be stored under the new `expense_documents` collection id:
+
+```text
+{expense_documents_collection_id}/{expense_document_id}/{document_attachment_filename}
+```
+
+That storage-prefix change is the main reason this is a two-phase rollout. Phase 1 must read both locations. Phase 2 can later copy old S3 objects into the new prefixes and link the old expenses to the new document rows.
+
+## Phase 1: Cut Over New Writes
+
+Phase 1 is implemented on the `multi_use_attachment` branch and tested locally against a dumped production DB before deployment. The Phase 1 deploy includes schema changes, document-first reads with legacy fallback, and the new write path in the same release.
+
+### 1. Add the `expense_documents` schema
+
+Create a migration using `date +%s` for the filename prefix.
+
+Add a new base collection named `expense_documents` with these fields:
+
+- `attachment`: file, required, `maxSelect: 1`, same max size and MIME types as the current `expenses.attachment` field.
+- `attachment_hash`: text, required, 64-character SHA-256 hex string.
+- `uploaded_by`: relation to `users`, required.
+- standard PocketBase `created` and `updated` autodate fields.
+
+Add this index:
+
+```sql
+CREATE UNIQUE INDEX `idx_expense_documents_attachment_hash`
+ON `expense_documents` (`attachment_hash`)
+WHERE `attachment_hash` != ''
+```
+
+Direct API access to `expense_documents` should be intentionally narrow:
+
+- no general list/search UI;
+- no user-created direct document records through the generic collection API;
+- no direct document browsing.
+
+The backend expense save flow will create and link documents. Users interact through expenses, not through a standalone file cabinet.
+
+### 2. Add `expenses.attachment_document`
+
+In the same migration, add a nullable relation field to `expenses`:
+
+```text
+attachment_document -> expense_documents
+```
+
+Do not remove or clear these existing fields in Phase 1:
+
+- `expenses.attachment`
+- `expenses.attachment_hash`
+- the existing unique index on `expenses.attachment_hash`
+
+Those legacy fields remain the fallback source for old rows until Phase 2 cleanup.
+
+### 3. Introduce an effective attachment resolver
+
+Add one backend concept for "the attachment for this expense":
+
+```text
+if expenses.attachment_document is set:
+  use expense_documents.attachment and expense_documents.attachment_hash
+else:
+  use expenses.attachment and expenses.attachment_hash
+```
+
+The resolver must return enough information for all existing use cases:
+
+- effective filename;
+- effective SHA-256 hash;
+- effective collection id;
+- effective record id;
+- effective storage key/source path;
+- whether the value came from `expense_documents` or legacy `expenses` fields.
+
+All code that displays, downloads, zips, exports, or writes back expense attachments must use this resolver or SQL equivalent. Do not leave ad hoc reads of `e.attachment` in user-facing or integration paths unless they are deliberately handling the legacy fallback branch.
+
+Update at minimum:
+
+- expense details API and details page;
+- expense list and tracking responses when attachment data is shown;
+- receipt zip query and zip creation;
+- legacy expenses writeback/export;
+- any expense report SQL that selects `e.attachment` or `e.attachment_hash`;
+- generated TypeScript types after the schema changes.
+
+### 4. Add an authorized expense attachment download route
+
+Because document files are no longer necessarily stored under the expense record, avoid exposing document files through broad collection rules.
+
+Add a route like:
+
+```text
+GET /api/expenses/{id}/attachment
+```
+
+Behavior:
+
+1. Require auth.
+2. Load the expense through the same visibility policy used by expense details.
+3. Resolve the effective attachment.
+4. Stream or redirect to the underlying PocketBase file only if the caller can view the expense.
+
+The details page and list/report links should use this expense-scoped route rather than constructing document collection file URLs directly.
+
+Server-side report generation can continue reading files internally through PocketBase filesystem APIs, using the effective storage key.
+
+### 5. Replace frontend expense saves with backend expense mutation routes
+
+The current editor saves through generic PocketBase collection create/update. That path stores uploaded files on the `expenses` collection, which is exactly what Phase 1 is cutting over from.
+
+Add custom authenticated routes for expense mutations:
+
+```text
+POST  /api/expenses
+PATCH /api/expenses/{id}
+```
+
+The routes accept the same form payload the editor sends today, including multipart file uploads. `ExpensesEditor.svelte` should call these routes instead of `pb.collection("expenses").create(...)` and `pb.collection("expenses").update(...)`.
+
+Keep the visible form unchanged for ordinary users:
+
+- same fields;
+- same attachment control;
+- same validation messages where possible;
+- same redirect after save.
+
+Refactor existing backend validation so the custom routes reuse the same expense processing rules as the collection hooks. Do not duplicate PO, branch, approver, bookkeeper-on-behalf, currency, and attachment-required logic in a second implementation.
+
+The generic `expenses` collection hooks should still reject or ignore direct legacy file writes after cutover. A direct upload to `expenses.attachment` should not silently create a new legacy attachment after Phase 1.
+
+### 6. Implement document resolution during create/update
+
+Add a backend helper for expense mutation routes:
+
+```text
+resolveExpenseDocumentForSave(auth, targetExpense, uploadedFile, sourceExpenseID)
+```
+
+It handles four cases.
+
+#### Case A: New file, hash not seen before
+
+1. Compute SHA-256 from the uploaded file.
+2. Create a new `expense_documents` record.
+3. Store the uploaded file on `expense_documents.attachment`.
+4. Set `expense_documents.attachment_hash`.
+5. Set `expense_documents.uploaded_by` to the authenticated user.
+6. Set `expenses.attachment_document` to the new document id.
+7. Leave `expenses.attachment` and `expenses.attachment_hash` empty for this new/updated expense.
+
+#### Case B: New file, hash already exists, caller is not `book_keeper`
+
+Reject with the existing duplicate attachment semantics:
+
+```text
+field: attachment
+code: duplicate_file
+message: This file has already been uploaded to another expense
+```
+
+This preserves current UX for everyone without the `book_keeper` claim.
+
+#### Case C: New file, hash already exists, caller has `book_keeper`
+
+Allow reuse only when the target expense is PO-backed:
+
+```text
+expenses.purchase_order != ''
+```
+
+Then:
+
+1. Do not create a duplicate `expense_documents` row.
+2. Set `expenses.attachment_document` to the existing document id.
+3. Leave `expenses.attachment` and `expenses.attachment_hash` empty for this expense.
+
+If the target expense has no PO, reject the reuse. The special workflow exists only for splitting a shared vendor document across multiple PO-backed expenses.
+
+#### Case D: Existing source expense document
+
+For the "Create another expense with this attachment" workflow, accept a `source_expense` id in the create request.
+
+Allow this only when:
+
+- caller has the `book_keeper` claim;
+- target expense is PO-backed;
+- source expense is visible to the caller;
+- source expense has an effective attachment;
+- if the source expense is still legacy-only, the source attachment can be migrated to `expense_documents` before linking it.
+
+Then set the target expense's `attachment_document` to the source document id.
+
+Do not implement arbitrary document picking. The only reuse flows are duplicate upload and "create another expense with this attachment" from an existing visible expense.
+
+### 7. Automatically migrate legacy attachments when edited
+
+When an existing expense has:
+
+```text
+expenses.attachment != ''
+expenses.attachment_document == ''
+```
+
+and that expense is saved through the new custom route, migrate it as part of the save unless the user replaces the attachment.
+
+Legacy edit behavior:
+
+- If the user uploads a replacement file, use the new uploaded file and the normal document-resolution rules.
+- If the user does not upload a replacement and the legacy attachment remains present, copy the existing legacy file into a new or existing `expense_documents` record and set `expenses.attachment_document`.
+- If the user removes an attachment and the expense type permits no attachment, clear both the document relation and legacy attachment values as appropriate.
+
+This means normal interaction with old rows gradually moves them to the new model even before the Phase 2 bulk backfill.
+
+### 8. Add bookkeeper-only source reuse UX
+
+On the expense details page, for callers with `book_keeper`, show a new action only when the source expense has an effective attachment:
+
+```text
+Create another expense with this attachment
+```
+
+The action should lead into the existing PO-backed create flow. The target expense still gets its PO-specific defaults from the selected PO. The source expense contributes only the attachment document.
+
+Recommended route shape:
+
+```text
+/expenses/add/{poid}?source_expense={expense_id}
+```
+
+The page loader can preserve `source_expense` in page data, and the editor includes it in the create request. The backend remains authoritative and must validate every condition listed in Case D.
+
+### 9. Phase 1 validation before deploy
+
+Test on `multi_use_attachment` with a dumped production DB.
+
+Minimum manual checks:
+
+1. Open old expenses with legacy attachments. Download links still work.
+2. Create a new expense with a new attachment. Verify the S3 key uses the `expense_documents` collection id, not the `expenses` collection id.
+3. Create a normal non-bookkeeper duplicate. Verify it is rejected.
+4. Create a bookkeeper PO-backed duplicate. Verify it reuses the existing `expense_documents` row.
+5. Use "Create another expense with this attachment" as a bookkeeper. Verify the new PO expense shares the same document.
+6. Edit an old legacy expense without changing the attachment. Verify it gets an `attachment_document` and the copied document file downloads.
+7. Generate receipt zips and legacy writeback/export output for a mix of legacy and document-backed expenses.
+
+## Phase 2: Backfill Existing Legacy Attachments
+
+Phase 2 can happen days, weeks, or months after Phase 1. The app will already support mixed legacy/document attachment storage.
+
+The backfill should be idempotent and split into prepare, manual S3 copy, verify, and link steps. This prevents the app from pointing an expense at a document path before the file exists in S3.
+
+### 1. Add a backfill command
+
+Add a command under `app/cmd/backfill_expense_documents`.
+
+It should support at least these modes:
+
+```text
+prepare
+verify
+link
+report
+```
+
+The command uses the app database and PocketBase collection metadata so it can discover:
+
+- `expenses` collection id;
+- `expense_documents` collection id;
+- file names;
+- record ids;
+- hashes.
+
+### 2. Prepare mode
+
+`prepare` scans for expenses that still need migration:
+
+```sql
+SELECT *
+FROM expenses
+WHERE attachment != ''
+  AND (attachment_document = '' OR attachment_document IS NULL)
+```
+
+For each row:
+
+1. Determine the legacy S3 key:
+
+   ```text
+   {expenses_collection_id}/{expense_id}/{expenses.attachment}
+   ```
+
+2. Determine the attachment hash:
+
+   - use `expenses.attachment_hash` when present;
+   - if blank, read the legacy file and compute SHA-256;
+   - if the file cannot be read, record an error and skip that expense.
+
+3. Find an existing `expense_documents` row by `attachment_hash`.
+
+4. If no document exists, create one with:
+
+   - `attachment` set to the same filename as the legacy attachment;
+   - `attachment_hash` set to the computed hash;
+   - `uploaded_by` set to `expenses.creator` when present, otherwise `expenses.uid`.
+
+5. Do not set `expenses.attachment_document` yet unless the document's S3 object already exists and verifies.
+
+6. Write a manifest row containing:
+
+   ```text
+   expense_id
+   expense_attachment
+   attachment_hash
+   expense_document_id
+   document_attachment
+   old_s3_key
+   new_s3_key
+   copy_required
+   status
+   ```
+
+7. Write an executable copy script derived from the manifest.
+
+Recommended output paths:
+
+```text
+tmp/expense_document_backfill/manifest.tsv
+tmp/expense_document_backfill/copy_s3.sh
+tmp/expense_document_backfill/errors.tsv
+```
+
+`prepare` must be safe to rerun. If it sees a document it created earlier, it should reuse it and preserve the same `expense_document_id`.
+
+### 3. Manual S3 copy
+
+After `prepare`, manually copy the existing S3 objects from the old expense prefixes to the new expense document prefixes.
+
+This manual copy happens after document records are prepared and before expenses are linked.
+
+For each manifest row with `copy_required = true`, copy:
+
+```text
+from: {expenses_collection_id}/{expense_id}/{expenses.attachment}
+to:   {expense_documents_collection_id}/{expense_document_id}/{expense_documents.attachment}
+```
+
+Example key shape:
+
+```text
+from: o1vpz1mm7qsfoyy/b4o6xph4ngwx4nw/receipt.pdf
+to:   {expense_documents_collection_id}/{expense_document_id}/receipt.pdf
+```
+
+The generated `copy_s3.sh` should contain explicit copy commands so the operator can review exactly what will move before running it. It should not delete the old objects.
+
+Example command shape:
+
+```bash
+aws s3 cp "s3://$TYBALT_S3_BUCKET/o1vpz1mm7qsfoyy/{expense_id}/{filename}" \
+  "s3://$TYBALT_S3_BUCKET/{expense_documents_collection_id}/{expense_document_id}/{filename}"
+```
+
+Do not set `expenses.attachment_document` for rows whose new S3 object has not been copied and verified.
+
+### 4. Verify mode
+
+After the manual S3 copy, run `verify`.
+
+`verify` reads the manifest and checks every target object:
+
+1. New S3 object exists.
+2. New S3 object can be read through PocketBase filesystem APIs.
+3. SHA-256 of the copied object matches `expense_documents.attachment_hash`.
+4. Existing legacy source object still exists.
+
+Rows that fail verification remain unlinked. Write failures to:
+
+```text
+tmp/expense_document_backfill/verify_errors.tsv
+```
+
+`verify` must be safe to rerun after recopying failed rows.
+
+### 5. Link mode
+
+After `verify` succeeds for a row, `link` updates the expense:
+
+```text
+expenses.attachment_document = expense_document_id
+```
+
+Leave these fields in place during the first backfill pass:
+
+```text
+expenses.attachment
+expenses.attachment_hash
+```
+
+Keeping the legacy fields until cleanup gives a rollback path and makes it easier to audit the migration.
+
+`link` should be transactional for DB changes and idempotent:
+
+- skip rows already linked to the expected document;
+- flag rows linked to a different document;
+- never overwrite a non-empty `attachment_document` without an explicit force flag.
+
+### 6. Report mode
+
+`report` summarizes migration progress:
+
+- total expenses with legacy attachment;
+- total with `attachment_document`;
+- total still legacy-only;
+- total document-backed but missing target S3 object;
+- duplicate hashes sharing one document;
+- rows with missing legacy files;
+- rows with blank or invalid hash.
+
+This report is the acceptance checkpoint before cleanup.
+
+### 7. Cleanup after successful backfill
+
+Only after the report shows no legacy-only attachment rows:
+
+1. Remove all remaining code paths that rely on legacy fallback.
+2. Remove `expenses.attachment`.
+3. Remove `expenses.attachment_hash`.
+4. Remove the old unique index on `expenses.attachment_hash`.
+5. Update generated PocketBase types.
+6. Update imports/exports/writeback queries so `expense_documents` is the only source for expense attachments.
+7. Remove any UI handling that displays legacy expense attachment links.
+
+Cleanup should be its own PR/release after the backfill has been verified in production.
+
+## Testing Requirements
+
+Backend tests should cover:
+
+- new expense with a new document;
+- duplicate upload rejected for non-bookkeeper;
+- duplicate upload reused for bookkeeper on PO-backed expense;
+- duplicate upload rejected for bookkeeper on non-PO expense;
+- source expense reuse accepted for bookkeeper;
+- source expense reuse rejected for non-bookkeeper;
+- source expense reuse rejected when source is not visible;
+- source expense reuse rejected when source has no effective attachment;
+- legacy fallback read for expense details and receipt generation;
+- legacy edit auto-migrates to `expense_documents`;
+- replacement attachment on a legacy expense uses the replacement document rather than migrating the old file;
+- backfill prepare is idempotent;
+- backfill verify refuses bad or missing copies;
+- backfill link skips already-linked rows and refuses mismatched links.
+
+Frontend tests or manual checks should cover:
+
+- ordinary users see the same expense form and attachment control;
+- bookkeepers see the details-page action only when an attachment exists;
+- source reuse lands on the existing PO-backed expense form;
+- validation errors still display next to the attachment field.
+
+Integration/manual testing against the dumped production DB should include:
+
+- mixed legacy and document-backed expenses in details/list/tracking;
+- receipt zip generation for a mixed pay period;
+- legacy writeback/export for a mixed updated-after range;
+- editing old rows with legacy attachments;
+- the exact generated S3 copy manifest for Phase 2.
+
+## Operational Notes
+
+- Phase 1 requires a normal deployment but not an outage window.
+- Phase 1 should be deployed only after testing locally on `multi_use_attachment` against a dumped production DB.
+- Phase 2 does not need to be scheduled immediately.
+- The manual S3 copy belongs to Phase 2, after `prepare` and before `verify`/`link`.
+- The old S3 objects under the `expenses` collection prefix should not be deleted during Phase 2. Deletion, if desired, should be considered only after a separate retention/rollback decision.
+- The `expense_documents.attachment_hash` unique index remains the long-term duplicate prevention mechanism.
+- `book_keeper` reuse changes only which expense may point at an existing document. It never creates two document records with the same hash.
