@@ -41,6 +41,17 @@ func requireTimeEditing(app core.App) error {
 	return nil
 }
 
+func requireReportClaim(app core.App, auth *core.Record) error {
+	hasReportClaim, err := utilities.HasClaim(app, auth, "report")
+	if err != nil {
+		return err
+	}
+	if !hasReportClaim {
+		return apis.NewForbiddenError("you are not authorized to view this report", nil)
+	}
+	return nil
+}
+
 // Define request bodies for the handlers
 type RejectionRequest struct {
 	RejectionReason string `json:"rejection_reason"`
@@ -238,6 +249,12 @@ func AddRoutes(app core.App) {
 
 		reportsGroup := se.Router.Group("/api/reports")
 		reportsGroup.Bind(apis.RequireAuth("users"))
+		reportsGroup.BindFunc(func(e *core.RequestEvent) error {
+			if err := requireReportClaim(app, e.Auth); err != nil {
+				return err
+			}
+			return e.Next()
+		})
 		reportsGroup.GET("/payroll_time/{date_column_value}/{week}", reports.CreatePayrollTimeReportHandler(app))
 		reportsGroup.GET("/weekly_time/{date_column_value}", reports.CreateTimeReportHandler(app, "week_ending", "committed_week_ending"))
 		reportsGroup.GET("/weekly_time_by_employee/{date_column_value}", reports.CreateTimeSummaryByEmployeeHandler(app, "week_ending"))
