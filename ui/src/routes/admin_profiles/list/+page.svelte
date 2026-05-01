@@ -1,9 +1,12 @@
 <script lang="ts">
+  import { invalidateAll } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import DSToggle from "$lib/components/DSToggle.svelte";
+  import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
-  import { resolve } from "$app/paths";
   import Icon from "@iconify/svelte";
   import type { AdminProfilesAugmentedResponse } from "$lib/pocketbase-types";
   let { data } = $props();
@@ -12,13 +15,23 @@
     provider_count?: number;
     email?: string;
     name?: string;
+    can_toggle_active?: boolean;
   };
   const items = $derived(data.items as AdminProfileListItem[]);
+  let activeStatus = $state<"active" | "inactive">("active");
+  const activeStatusOptions = [
+    { id: "active", label: "Active" },
+    { id: "inactive", label: "Inactive" },
+  ];
+  const filteredItems = $derived(
+    items.filter((item) => (activeStatus === "active" ? item.active !== false : item.active === false)),
+  );
   const isAdmin = $derived($globalStore.claims.includes("admin"));
   const hasHrClaim = $derived($globalStore.claims.includes("hr"));
   const hasTimeOffManagerClaim = $derived($globalStore.claims.includes("time_off_manager"));
   const hasItClaim = $derived($globalStore.claims.includes("it"));
   const canViewDetails = $derived(isAdmin || hasHrClaim || hasTimeOffManagerClaim);
+  const canSetActive = $derived(isAdmin || hasItClaim || hasHrClaim);
 
   function normalizeDivisions(value: null | string[] | undefined): string[] {
     return Array.isArray(value) ? value.filter((id): id is string => typeof id === "string") : [];
@@ -46,18 +59,42 @@
   function canLinkDetails(item: AdminProfileListItem): boolean {
     return canViewDetails && item.provider_count === undefined;
   }
+
+  function canToggleActive(item: AdminProfileListItem): boolean {
+    return canSetActive && item.can_toggle_active === true;
+  }
+
+  async function setActive(item: AdminProfileListItem, active: boolean): Promise<void> {
+    await pb.send(`/api/admin_profiles/${item.id}/active`, {
+      method: "POST",
+      body: { active },
+    });
+    item.active = active;
+    await invalidateAll();
+  }
 </script>
 
-<DsList {items} search={true} inListHeader="Staff">
+<DsList
+  items={filteredItems}
+  search={true}
+  inListHeader={activeStatus === "active" ? "Active Staff" : "Inactive Staff"}
+>
   {#snippet searchBarExtra()}
-    {#if isAdmin}
-      <a
-        href={resolve("/admin_profiles/po_approvers")}
-        class="flex items-center gap-1 rounded-sm bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
-      >
-        <Icon icon="mdi:edit-outline" class="text-base" /> PO Approvers
-      </a>
-    {/if}
+    <div class="flex items-center gap-2 max-[639px]:w-full max-[639px]:flex-wrap">
+      <DSToggle
+        bind:value={activeStatus}
+        options={activeStatusOptions}
+        ariaLabel="Admin profile active state filter"
+      />
+      {#if isAdmin}
+        <a
+          href={resolve("/admin_profiles/po_approvers")}
+          class="flex items-center gap-1 rounded-sm bg-neutral-200 px-3 py-1 text-sm text-gray-700 hover:bg-neutral-300"
+        >
+          <Icon icon="mdi:edit-outline" class="text-base" /> PO Approvers
+        </a>
+      {/if}
+    </div>
   {/snippet}
 
   {#snippet anchor(item: AdminProfileListItem)}
@@ -117,11 +154,30 @@
   {/snippet}
 
   {#snippet actions(item: AdminProfileListItem)}
-    <DsActionButton
-      action={`/admin_profiles/${item.id}/edit`}
-      icon="mdi:edit-outline"
-      title="Edit"
-      color="blue"
-    />
+    <div class="flex items-center gap-1">
+      {#if canToggleActive(item)}
+        {#if item.active === false}
+          <DsActionButton
+            action={() => setActive(item, true)}
+            icon="mdi:account-check-outline"
+            title="Activate"
+            color="green"
+          />
+        {:else}
+          <DsActionButton
+            action={() => setActive(item, false)}
+            icon="mdi:account-cancel-outline"
+            title="Deactivate"
+            color="red"
+          />
+        {/if}
+      {/if}
+      <DsActionButton
+        action={`/admin_profiles/${item.id}/edit`}
+        icon="mdi:edit-outline"
+        title="Edit"
+        color="blue"
+      />
+    </div>
   {/snippet}
 </DsList>

@@ -18,6 +18,7 @@ const itClaimName = "it"
 type adminProfileIdentityListRow struct {
 	ID            string `db:"id" json:"id"`
 	UID           string `db:"uid" json:"uid"`
+	Active        bool   `db:"active" json:"active"`
 	LegacyUID     string `db:"legacy_uid" json:"legacy_uid"`
 	Email         string `db:"email" json:"email"`
 	Name          string `db:"name" json:"name"`
@@ -65,6 +66,7 @@ func createGetAdminProfileIdentityListHandler(app core.App) func(e *core.Request
 			SELECT
 				ap.id,
 				ap.uid,
+				ap.active,
 				COALESCE(ap.legacy_uid, '') AS legacy_uid,
 				COALESCE(u.email, '') AS email,
 				COALESCE(u.name, '') AS name,
