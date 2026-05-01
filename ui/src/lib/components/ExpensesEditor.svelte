@@ -25,7 +25,11 @@
   import { goto } from "$app/navigation";
   import { resolve } from "$app/paths";
   import type { ExpensesPageData } from "$lib/svelte-types";
-  import type { CategoriesResponse, ExpensesAllowanceTypesOptions } from "$lib/pocketbase-types";
+  import type {
+    CategoriesResponse,
+    ExpensesAllowanceTypesOptions,
+    ExpensesRecord,
+  } from "$lib/pocketbase-types";
   import { isExpensesResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import CumulativePOOverflowModal from "./CumulativePOOverflowModal.svelte";
@@ -42,6 +46,31 @@
   currencies.init();
   expenditureKindsStore.init();
   let { data }: { data: ExpensesPageData } = $props();
+
+  type EditableExpenseFields = Pick<
+    ExpensesRecord,
+    | "uid"
+    | "date"
+    | "division"
+    | "description"
+    | "total"
+    | "payment_type"
+    | "attachment"
+    | "job"
+    | "category"
+    | "kind"
+    | "allowance_types"
+    | "distance"
+    | "cc_last_4_digits"
+    | "currency"
+    | "settled_total"
+    | "purchase_order"
+    | "vendor"
+  >;
+  type ExpenseSavePayload = Partial<Omit<EditableExpenseFields, "attachment">> & {
+    attachment?: string | File;
+    source_expense?: string;
+  };
 
   let errors = $state({} as Record<string, { message: string; code?: string }>);
   let item = $state(untrack(() => data.item));
@@ -245,36 +274,27 @@
       return;
     }
     // pay_period_ending is server-managed and must not be sent from the editor.
-    const editableExpenseFields = [
-      "uid",
-      "date",
-      "division",
-      "description",
-      "total",
-      "payment_type",
-      "attachment",
-      "job",
-      "category",
-      "kind",
-      "allowance_types",
-      "distance",
-      "cc_last_4_digits",
-      "currency",
-      "settled_total",
-      "purchase_order",
-      "vendor",
-    ] as const;
-    const payload: Partial<typeof item> & { source_expense?: string } = {};
-    for (const field of editableExpenseFields) {
-      if (field === "attachment") {
-        if (item.attachment instanceof File || item.attachment === "") {
-          payload.attachment = item.attachment;
-        }
-        continue;
-      }
-      if (field in item) {
-        payload[field] = item[field];
-      }
+    const payload: ExpenseSavePayload = {
+      uid: item.uid,
+      date: item.date,
+      division: item.division,
+      description: item.description,
+      total: item.total,
+      payment_type: item.payment_type,
+      job: item.job,
+      category: item.category,
+      kind: item.kind,
+      allowance_types: item.allowance_types,
+      distance: item.distance,
+      cc_last_4_digits: item.cc_last_4_digits,
+      currency: item.currency,
+      settled_total: item.settled_total,
+      purchase_order: item.purchase_order,
+      vendor: item.vendor,
+    };
+    const attachment = item.attachment as string | File;
+    if ((typeof File !== "undefined" && attachment instanceof File) || attachment === "") {
+      payload.attachment = attachment;
     }
     if (!data.editing) {
       payload.uid = isEligibleBookkeeperOnBehalfCreate ? linkedPurchaseOrderUID : authUserID;

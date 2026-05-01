@@ -29,7 +29,9 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
       expand: "purchase_order,attachment_document",
     });
     try {
-      const details = await pb.send<ExpensesAugmentedResponse>(`/api/expenses/details/${params.eid}`);
+      const details = await pb.send<ExpensesAugmentedResponse>(`/api/expenses/details/${params.eid}`, {
+        method: "GET",
+      });
       if (details.attachment) {
         item.attachment = details.attachment;
       }
