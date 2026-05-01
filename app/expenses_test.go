@@ -1889,6 +1889,103 @@ func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
 		}
 	})
 
+	t.Run("generic collection update ignores client supplied attachment document on legacy only expense", func(t *testing.T) {
+		otherContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5B}
+		otherID := createRegularDocumentExpense("regular unrelated document target", otherContent)
+		otherExpense, err := app.FindRecordById("expenses", otherID)
+		if err != nil {
+			t.Fatalf("failed to load unrelated document expense: %v", err)
+		}
+		clientSuppliedDocumentID := otherExpense.GetString("attachment_document")
+		if clientSuppliedDocumentID == "" {
+			t.Fatal("expected unrelated expense to have an attachment document")
+		}
+
+		legacyContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5C}
+		legacyID := createRegularDocumentExpense("regular legacy edit with smuggled document", legacyContent)
+		legacyHash := convertCreatedExpenseToLegacyOnly(legacyID, "legacy-smuggled.png", legacyContent)
+
+		body := strings.NewReader(fmt.Sprintf(`{
+				"description": "generic patch must ignore attachment_document",
+				"attachment_document": %q
+			}`, clientSuppliedDocumentID))
+		patchRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/"+legacyID, body, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, patchRes, http.StatusOK)
+
+		legacyExpense, err := app.FindRecordById("expenses", legacyID)
+		if err != nil {
+			t.Fatalf("failed to reload legacy expense after generic patch: %v", err)
+		}
+		resolvedDocumentID := legacyExpense.GetString("attachment_document")
+		if resolvedDocumentID == "" {
+			t.Fatal("expected generic patch to migrate the legacy attachment to an expense document")
+		}
+		if resolvedDocumentID == clientSuppliedDocumentID {
+			t.Fatalf("generic patch preserved client supplied attachment_document %q", clientSuppliedDocumentID)
+		}
+
+		resolvedDocument, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, resolvedDocumentID)
+		if err != nil {
+			t.Fatalf("failed to load resolved legacy document: %v", err)
+		}
+		if got := resolvedDocument.GetString("attachment_hash"); got != legacyHash {
+			t.Fatalf("resolved document hash = %q, want legacy hash %q", got, legacyHash)
+		}
+	})
+
+	t.Run("generic collection update cannot use client supplied attachment document to bypass attachment requirement", func(t *testing.T) {
+		otherContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5D}
+		otherID := createRegularDocumentExpense("regular unrelated bypass document target", otherContent)
+		otherExpense, err := app.FindRecordById("expenses", otherID)
+		if err != nil {
+			t.Fatalf("failed to load unrelated document expense: %v", err)
+		}
+		clientSuppliedDocumentID := otherExpense.GetString("attachment_document")
+		if clientSuppliedDocumentID == "" {
+			t.Fatal("expected unrelated expense to have an attachment document")
+		}
+
+		createAllowanceBody := strings.NewReader(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2025-01-10",
+			"division": "vccd5fo56ctbigh",
+			"payment_type": "Allowance",
+			"allowance_types": ["Breakfast"],
+			"total": 0,
+			"description": "attachmentless allowance before bypass attempt"
+		}`)
+		createAllowanceRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", createAllowanceBody, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, createAllowanceRes, http.StatusOK)
+		var allowance struct {
+			ID string `json:"id"`
+		}
+		if err := json.Unmarshal(createAllowanceRes.Body.Bytes(), &allowance); err != nil {
+			t.Fatalf("failed to decode allowance create response: %v; body=%s", err, createAllowanceRes.Body.String())
+		}
+
+		patchBody := strings.NewReader(fmt.Sprintf(`{
+			"description": "generic patch must still require an attachment",
+			"payment_type": "Expense",
+			"total": 99,
+			"vendor": "2zqxtsmymf670ha",
+			"attachment_document": %q
+		}`, clientSuppliedDocumentID))
+		patchRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/"+allowance.ID, patchBody, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  "application/json",
+		})
+		mustStatus(t, patchRes, http.StatusBadRequest)
+		if !strings.Contains(patchRes.Body.String(), `"attachment":{"code":"required"`) {
+			t.Fatalf("expected attachment required error, got body=%s", patchRes.Body.String())
+		}
+	})
+
 	t.Run("generic collection file upload is converted to an expense document", func(t *testing.T) {
 		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x58}
 		expenseID := createMultipartExpense(regularToken, "/api/collections/expenses/records", regularExpenseFields("generic collection document cutover"), "generic.png", content)

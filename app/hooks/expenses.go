@@ -782,6 +782,12 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 			expenseRecord.Set("attachment_document", "")
 		}
 	}
+	originalAttachmentDocument := ""
+	if !expenseRecord.IsNew() {
+		if original := expenseRecord.Original(); original != nil {
+			originalAttachmentDocument = original.GetString("attachment_document")
+		}
+	}
 
 	// if the expense record has an attachment, calculate the sha256 hash of the
 	// file so it can be stored or reused through expense_documents after the
@@ -847,6 +853,14 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
+	// attachment_document is server-managed. Restore it before validation so a
+	// client-supplied relation cannot satisfy attachment-required checks.
+	if expenseRecord.IsNew() || explicitAttachmentRemoval {
+		expenseRecord.Set("attachment_document", "")
+	} else {
+		expenseRecord.Set("attachment_document", originalAttachmentDocument)
+	}
+
 	// validate the expense record
 	if err := validateExpense(app, expenseRecord, poRecord, existingExpensesTotal, hasPayablesAdminClaim); err != nil {
 		return err
@@ -866,28 +880,36 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
+	hasAttachmentIntent := attachmentHash != "" || expenseRecord.GetString("source_expense") != ""
+	attachmentlessType := expensePaymentTypeSkipsAttachment(expenseRecord.GetString("payment_type"))
+
 	clearExpenseDocumentForAttachmentlessType(expenseRecord)
-	if explicitAttachmentRemoval {
+	if attachmentlessType {
+		// Attachmentless expense types should never keep or accept a document relation.
+	} else if explicitAttachmentRemoval {
 		expenseRecord.Set("attachment_document", "")
 		expenseRecord.Set("attachment_hash", "")
-	} else if attachmentHash == "" && expenseRecord.GetString("source_expense") == "" && expenseRecord.GetString("attachment") == "" {
+	} else if hasAttachmentIntent {
+		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
+		if err != nil {
+			return err
+		}
+		applyResolvedExpenseDocument(expenseRecord, documentID)
+	} else if expenseRecord.GetString("attachment") != "" && originalAttachmentDocument == "" {
+		expenseRecord.Set("attachment_document", "")
+		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
+		if err != nil {
+			return err
+		}
+		applyResolvedExpenseDocument(expenseRecord, documentID)
+	} else if expenseRecord.GetString("attachment") == "" {
 		if expenseRecord.IsNew() {
 			expenseRecord.Set("attachment_document", "")
-		} else if original := expenseRecord.Original(); original != nil {
-			expenseRecord.Set("attachment_document", original.GetString("attachment_document"))
+		} else {
+			expenseRecord.Set("attachment_document", originalAttachmentDocument)
 		}
-	} else if expenseRecord.GetString("attachment_document") == "" {
-		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
-		if err != nil {
-			return err
-		}
-		applyResolvedExpenseDocument(expenseRecord, documentID)
-	} else if attachmentHash != "" || expenseRecord.GetString("source_expense") != "" {
-		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
-		if err != nil {
-			return err
-		}
-		applyResolvedExpenseDocument(expenseRecord, documentID)
+	} else if !expenseRecord.IsNew() {
+		expenseRecord.Set("attachment_document", originalAttachmentDocument)
 	}
 
 	return nil

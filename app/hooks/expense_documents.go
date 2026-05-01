@@ -116,10 +116,18 @@ func applyResolvedExpenseDocument(expenseRecord *core.Record, documentID string)
 }
 
 func clearExpenseDocumentForAttachmentlessType(expenseRecord *core.Record) {
-	switch expenseRecord.GetString("payment_type") {
-	case "Allowance", "Mileage", "PersonalReimbursement":
+	if expensePaymentTypeSkipsAttachment(expenseRecord.GetString("payment_type")) {
 		expenseRecord.Set("attachment_document", "")
 		expenseRecord.Set("attachment_hash", "")
+	}
+}
+
+func expensePaymentTypeSkipsAttachment(paymentType string) bool {
+	switch paymentType {
+	case "Allowance", "Mileage", "PersonalReimbursement":
+		return true
+	default:
+		return false
 	}
 }
 
