@@ -309,7 +309,28 @@ Do not construct direct `expense_documents` file URLs in the UI. The route keeps
 
 In Phase 3, after all legacy rows have been backfilled and the legacy columns are removed, the editor can remove the fallback to `expenses.attachment` and rely only on `attachment_document`.
 
-### 10. Phase 1 validation before deploy
+### 10. Known issues and caveats
+
+Phase 1 is intentionally a mixed-storage rollout. The app writes new expense attachments to `expense_documents`, but legacy rows may continue to point at files under the `expenses` collection until Phase 2 backfill. Any code that reads expense attachments must use the effective attachment resolver pattern:
+
+```text
+COALESCE(expense_documents.attachment, expenses.attachment)
+COALESCE(expense_documents.attachment_hash, expenses.attachment_hash)
+```
+
+Known caveats:
+
+- Old direct file URLs under `/api/files/expenses/...` are not the long-term attachment contract. UI links should use `GET /api/expenses/attachment/{id}` so authorization stays expense-scoped and both document-backed and legacy-only rows work.
+- Legacy writeback keeps the old payload shape. It exports effective `attachment` and `attachmentHash` values, not `attachment_document`, so downstream legacy consumers do not need a schema change. If a downstream process fetches files by filename, confirm it still resolves the correct storage location during mixed storage.
+- Receipt ZIP generation must include both legacy-only and document-backed attachments. The ZIP cache manifest must include collection id, storage path, zip filename, and hash so a reused document or duplicate hash cannot produce a stale ZIP.
+- The ZIP cache migration deletes existing `zip_cache` rows. The first receipt ZIP requests after deploy should regenerate those archives.
+- A concurrent upload of the same new file can still race at the `expense_documents.attachment_hash` unique index. The expected steady-state behavior is still one document row per hash, but the losing request may surface a lower-level save error rather than the normal `duplicate_file` validation message.
+- Phase 1 does not delete old legacy expense attachment objects. Storage cleanup should wait until after Phase 2 backfill is verified and a separate retention/rollback decision is made.
+- Editing a legacy-only expense can lazily create or reuse an `expense_documents` row. This is expected, but it means normal user activity will gradually change some old rows before the bulk backfill runs.
+- The generic PocketBase `expenses` create/update hooks remain active and convert direct uploads to `expense_documents`. The custom `/api/expenses` routes are the UI path, but direct collection API writes should not silently create new legacy-only attachments.
+- `image/heic` is accepted by backend validation, but browser preview/download behavior may be less polished than PDF, PNG, or JPEG. The attachment route should still stream the original file.
+
+### 11. Phase 1 validation before deploy
 
 Test on `multi_use_attachment` with a dumped production DB.
 
@@ -323,7 +344,7 @@ Minimum manual checks:
 6. Edit an old legacy expense without changing the attachment. Verify it gets an `attachment_document` and the copied document file downloads.
 7. Generate receipt zips and legacy writeback/export output for a mix of legacy and document-backed expenses.
 
-### 11. Phase 1 backend tests
+### 12. Phase 1 backend tests
 
 Implement backend tests before merging Phase 1.
 
