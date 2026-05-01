@@ -27,7 +27,7 @@ func TestActiveJobsReport(t *testing.T) {
 			Headers:        map[string]string{"Authorization": adminToken},
 			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{
-				`"code":"unauthorized"`,
+				`You are not authorized to view this report.`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
