@@ -345,6 +345,74 @@ Minimum manual checks:
 6. Edit an old legacy expense without changing the attachment. Verify it gets an `attachment_document` and the copied document file downloads.
 7. Generate receipt zips and legacy writeback/export output for a mix of legacy and document-backed expenses.
 
+After deploying Phase 1 to production, run a short smoke test before treating the
+release as stable. The goal is not to re-test every backend branch; it is to
+prove that the production app, database schema, file storage, auth rules, and
+integration read paths all agree on the mixed-storage model.
+
+Production smoke test:
+
+1. Confirm the migration ran:
+   - `expense_documents` exists;
+   - `expenses.attachment_document` exists;
+   - `zip_cache` has the `manifest` field instead of `hashes` and `filenames`.
+2. Open a known old expense that still has a legacy `expenses.attachment` value and no `attachment_document`.
+   - The details page should show the attachment.
+   - `GET /api/expenses/attachment/{id}` should download or preview the file.
+   - The file should still resolve from the old `expenses` storage prefix.
+3. Create a normal user expense with a new PDF, PNG, or JPEG attachment.
+   - The expense should save through `/api/expenses`.
+   - The expense row should have `attachment_document` set.
+   - The expense row should have blank legacy `attachment` and `attachment_hash` fields.
+   - The linked `expense_documents` row should have the filename, hash, and `uploaded_by`.
+   - The stored object should live under the `expense_documents` collection prefix.
+   - The details/list attachment link should download through `/api/expenses/attachment/{id}`.
+4. Attempt a duplicate upload as a normal non-`book_keeper` user.
+   - The request should fail with the existing `attachment.duplicate_file` style error.
+   - No new `expense_documents` row should be created.
+5. Create a PO-backed expense as a `book_keeper` using a duplicate attachment.
+   - The new expense should save.
+   - It should reference the existing `expense_documents` row.
+   - It should not create a second document row with the same hash.
+6. From an expense details page as a `book_keeper`, use "Create another expense with this attachment".
+   - The PO search flow should preserve `source_expense`.
+   - The created PO-backed expense should share the same `attachment_document`.
+   - The target expense should still inherit its normal PO-specific defaults.
+7. Edit a legacy-only expense without changing its file.
+   - The edit should save.
+   - The expense should gain an `attachment_document`.
+   - The old legacy filename should remain available for Phase 1 fallback.
+   - The copied document-backed attachment should download successfully.
+8. Generate a receipt ZIP for a date/week that includes both legacy-only and document-backed expenses.
+   - The ZIP should include both files.
+   - Re-running the same report should hit the regenerated `zip_cache` record.
+   - Changing the attachment set later should miss the cache and regenerate the ZIP.
+9. Run the legacy expense export/writeback path for rows created or edited after Phase 1.
+   - The payload should still expose effective `attachment` and `attachmentHash` values.
+   - Downstream consumers should not need to know about `attachment_document`.
+10. Monitor the first production users for errors around:
+    - `POST /api/expenses`;
+    - `PATCH /api/expenses/{id}`;
+    - `GET /api/expenses/attachment/{id}`;
+    - weekly receipt ZIP generation;
+    - legacy expense export/writeback.
+
+After the smoke test passes, keep Phase 1 running in mixed-storage mode for
+several normal business days before starting Phase 2. During that soak period,
+prefer roll-forward fixes for any issue that appears. Avoid reverting to
+pre-Phase-1 code unless there is a severe incident and a data repair plan has
+already accounted for document-backed expenses with blank legacy attachment
+fields and reused documents that cannot cleanly map back to the old unique
+`expenses.attachment_hash` invariant.
+
+Before starting Phase 2, produce a small production baseline report:
+
+- count of legacy-only expenses with `attachment != ''` and no `attachment_document`;
+- count of document-backed expenses;
+- count of `expense_documents` rows referenced by more than one expense;
+- count of document-backed expenses whose legacy `attachment` field is blank;
+- any attachment download, receipt ZIP, or writeback errors observed during the soak period.
+
 ### 12. Phase 1 backend tests
 
 Implement backend tests before merging Phase 1.
