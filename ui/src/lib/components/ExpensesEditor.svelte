@@ -7,6 +7,7 @@
     expenseAttachmentHref,
     formatCurrencyAmount,
     indicativeCadAmount,
+    openExpenseAttachment,
     settlementToleranceBounds,
   } from "$lib/utilities";
   import { expenditureKinds as expenditureKindsStore } from "$lib/stores/expenditureKinds";
@@ -573,6 +574,10 @@
       fieldName="attachment"
       uiName="Attachment"
       fileHref={existingAttachmentHref}
+      fileAction={() => {
+        if (!data.id) return;
+        return openExpenseAttachment(data.id, item.attachment as string);
+      }}
     />
   {/if}
 

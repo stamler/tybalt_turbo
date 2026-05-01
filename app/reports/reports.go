@@ -375,7 +375,7 @@ func CreateReceiptsReportHandler(app core.App, dateColumnName string) func(e *co
 		// Check the zip cache for a record that matches the dateColumnValue in the
 		// specified class and receipts. If there's a cache hit, return the file
 		// url. The class for this zip is "receipts_by_" + dateColumnName.
-		zipCacheRecord, err := zipCacheLookup(app, dateColumnValue.Format("2006-01-02"), "receipts_by_"+dateColumnName, receipts)
+		zipCacheRecord, err := zipCacheLookup(app, dateColumnValue.Format("2006-01-02"), "receipts_by_"+dateColumnName, receipts, expenseCollectionId)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to lookup zip cache: "+err.Error(), err)
 		}

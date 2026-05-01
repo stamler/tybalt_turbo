@@ -3,7 +3,6 @@
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
-  import DsExternalLinkButton from "$lib/components/DsExternalLinkButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import UncommitConfirmPopover from "$lib/components/UncommitConfirmPopover.svelte";
@@ -11,7 +10,7 @@
   import {
     formatCurrencyAmount,
     formatCurrencyEquivalent,
-    expenseAttachmentHref,
+    openExpenseAttachment,
     shortDate,
     trimmedOrEmpty,
   } from "$lib/utilities";
@@ -134,10 +133,6 @@
       default:
         return pt;
     }
-  }
-
-  function attachmentHref() {
-    return expenseAttachmentHref(expense.id);
   }
 
   function personLabel(name: string, uid: string, fallback: string): string {
@@ -369,7 +364,12 @@
     {#if expense.attachment}
       <div class="flex items-center gap-2">
         <span class="font-semibold">Attachment:</span>
-        <DsExternalLinkButton href={attachmentHref()} label="Download" />
+        <DsActionButton
+          action={() => openExpenseAttachment(expense.id, expense.attachment)}
+          icon="mdi:download"
+        >
+          Download
+        </DsActionButton>
         {#if hasBookKeeperAccess}
           <DsActionButton
             action={`/pos/search?source_expense=${encodeURIComponent(expense.id)}`}

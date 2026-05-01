@@ -20,12 +20,14 @@
     fieldName,
     uiName,
     fileHref = "",
+    fileAction,
   }: {
     record: T;
     errors: Record<string, { message: string }>;
     fieldName: string;
     uiName: string;
     fileHref?: string;
+    fileAction?: () => void | Promise<void>;
   } = $props();
 
   let newFileName = $state("");
@@ -45,7 +47,15 @@
     {#if record[fieldName as keyof T]}
       {#if fileHref && newFileName === ""}
         <span>
-          <a href={fileHref} target="_blank">
+          <a
+            href={fileHref}
+            target="_blank"
+            onclick={(event) => {
+              if (!fileAction) return;
+              event.preventDefault();
+              fileAction();
+            }}
+          >
             <DsFileLink filename={record[fieldName as keyof T] as string} />
           </a>
         </span>

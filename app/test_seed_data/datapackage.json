@@ -3003,12 +3003,7 @@
             "x-sqlite-type": "TEXT"
           },
           {
-            "name": "filenames",
-            "type": "string",
-            "x-sqlite-type": "JSON"
-          },
-          {
-            "name": "hashes",
+            "name": "manifest",
             "type": "string",
             "x-sqlite-type": "JSON"
           },

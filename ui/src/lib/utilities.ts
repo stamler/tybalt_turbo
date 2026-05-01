@@ -263,6 +263,52 @@ export function expenseAttachmentHref(expenseId: string): string {
   return `${pb.baseURL}/api/expenses/attachment/${encodeURIComponent(expenseId)}`;
 }
 
+function attachmentMimeType(filename?: string): string {
+  const lowerFilename = filename?.toLowerCase() ?? "";
+  if (lowerFilename.endsWith(".pdf")) return "application/pdf";
+  if (lowerFilename.endsWith(".png")) return "image/png";
+  if (lowerFilename.endsWith(".jpg") || lowerFilename.endsWith(".jpeg")) return "image/jpeg";
+  return "application/octet-stream";
+}
+
+export async function openExpenseAttachment(expenseId: string, filename?: string) {
+  const targetWindow = window.open("", "_blank");
+  const headers: HeadersInit = {};
+  if (pb.authStore.isValid) {
+    headers["Authorization"] = pb.authStore.token;
+  }
+
+  try {
+    const response = await fetch(expenseAttachmentHref(expenseId), {
+      method: "GET",
+      headers,
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}: ${await response.text()}`);
+    }
+
+    const responseBlob = await response.blob();
+    const responseType = response.headers.get("Content-Type") ?? "";
+    const blob = new Blob([responseBlob], {
+      type:
+        responseType && responseType !== "application/octet-stream"
+          ? responseType
+          : attachmentMimeType(filename),
+    });
+    const blobUrl = URL.createObjectURL(blob);
+    if (targetWindow) {
+      targetWindow.location.href = blobUrl;
+    } else {
+      window.open(blobUrl, "_blank", "noopener,noreferrer");
+    }
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+  } catch (error) {
+    targetWindow?.close();
+    console.error("Error opening expense attachment:", error);
+  }
+}
+
 export function currencyIconHref(recordId: string, filename: string): string {
   return pocketBaseFileHref("currencies", recordId, filename);
 }

@@ -7,7 +7,7 @@
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { expenseAttachmentHref, formatCurrencyAmount, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { formatCurrencyAmount, openExpenseAttachment, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { onMount, onDestroy, untrack } from "svelte";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
@@ -216,9 +216,13 @@
         ({shortDate(approved)})
       {/if}
       {#if attachment}
-        <a href={expenseAttachmentHref(id)} target="_blank">
+        <button
+          type="button"
+          class="border-0 bg-transparent p-0"
+          onclick={() => openExpenseAttachment(id, attachment as string)}
+        >
           <DsFileLink filename={attachment as string} />
-        </a>
+        </button>
       {/if}
     </span>
   {/snippet}

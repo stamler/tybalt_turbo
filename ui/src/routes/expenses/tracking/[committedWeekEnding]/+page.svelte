@@ -3,7 +3,7 @@
   import { globalStore } from "$lib/stores/global";
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
-  import { expenseAttachmentHref, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { openExpenseAttachment, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import Icon from "@iconify/svelte";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import { page } from "$app/stores";
@@ -151,9 +151,13 @@
         ({shortDate(r.approved.split("T")[0], true)})
       {/if}
       {#if r.attachment}
-        <a href={expenseAttachmentHref(r.id)} target="_blank">
+        <button
+          type="button"
+          class="border-0 bg-transparent p-0"
+          onclick={() => openExpenseAttachment(r.id, r.attachment as string)}
+        >
           <DsFileLink filename={r.attachment as string} />
-        </a>
+        </button>
       {/if}
     </span>
   {/snippet}

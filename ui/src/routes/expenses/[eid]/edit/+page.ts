@@ -1,4 +1,4 @@
-import type { ExpensesResponse } from "$lib/pocketbase-types";
+import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
 import type { ExpensesPageData } from "$lib/svelte-types";
 import { pb } from "$lib/pocketbase";
@@ -28,8 +28,13 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
     item = await pb.collection("expenses").getOne(params.eid, {
       expand: "purchase_order,attachment_document",
     });
-    if (item.expand?.attachment_document?.attachment) {
-      item.attachment = item.expand.attachment_document.attachment;
+    try {
+      const details = await pb.send<ExpensesAugmentedResponse>(`/api/expenses/details/${params.eid}`);
+      if (details.attachment) {
+        item.attachment = details.attachment;
+      }
+    } catch (error) {
+      console.warn(`error loading expense attachment metadata: ${error}`);
     }
     return { item, editing: true, id: params.eid };
   } catch (error) {

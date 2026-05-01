@@ -75,15 +75,14 @@ func convertToCSV(report []dbx.NullStringMap, headers []string) (string, error) 
 
 // zipAttachments takes a slice of Attachment and produces a zip archive of each
 // file referenced by the source_path property giving it the corresponding
-// filename from the filename property. It then creates a zip_cache record with
-// the hashes of the attachments and the zip file. Finally, it returns the
+// filename from the filename property. It then creates a zip_cache record with a
+// manifest of the zip entries and the zip file. Finally, it returns the
 // zip_cache record.
 func zipAttachments(app core.App, report []Attachment, collectionId string, class string, key string) (*core.Record, error) {
-	hashes := []string{}
-	filenames := []string{}
 	if len(report) == 0 {
 		return nil, fmt.Errorf("no attachments to zip")
 	}
+	manifest := attachmentManifest(report, collectionId)
 
 	buf := new(bytes.Buffer)
 	zipWriter := zip.NewWriter(buf)
@@ -136,9 +135,6 @@ func zipAttachments(app core.App, report []Attachment, collectionId string, clas
 			return nil, fmt.Errorf("failed to close file %s after copying: %w", attachment.SourcePath, err_close)
 		}
 
-		hashes = append(hashes, attachment.Sha256)
-		filenames = append(filenames, attachment.Id+"/"+attachment.Filename)
-
 		app.Logger().Debug(
 			"File copied to zip",
 			"sourcePath", attachment.SourcePath,
@@ -173,13 +169,8 @@ func zipAttachments(app core.App, report []Attachment, collectionId string, clas
 		zipCacheRecord = core.NewRecord(zipCacheCollection)
 		zipCacheRecord.Set("key", key)
 		zipCacheRecord.Set("class", class)
-		if slices.Contains(hashes, "") {
-			zipCacheRecord.Set("hashes", []string{})
-		} else {
-			zipCacheRecord.Set("hashes", hashes)
-		}
+		zipCacheRecord.Set("manifest", manifest)
 		zipCacheRecord.Set("zip", zipFile)
-		zipCacheRecord.Set("filenames", filenames)
 		err = app.Save(zipCacheRecord)
 		if err != nil {
 			return nil, fmt.Errorf("failed to save zip cache record: %w", err)
@@ -187,12 +178,7 @@ func zipAttachments(app core.App, report []Attachment, collectionId string, clas
 	} else {
 		// Update the existing zip_cache record
 		zipCacheRecord.Set("zip", zipFile)
-		zipCacheRecord.Set("filenames", filenames)
-		if slices.Contains(hashes, "") {
-			zipCacheRecord.Set("hashes", []string{})
-		} else {
-			zipCacheRecord.Set("hashes", hashes)
-		}
+		zipCacheRecord.Set("manifest", manifest)
 		err = app.Save(zipCacheRecord)
 		if err != nil {
 			return nil, fmt.Errorf("failed to save zip cache record: %w", err)
@@ -202,14 +188,46 @@ func zipAttachments(app core.App, report []Attachment, collectionId string, clas
 	return zipCacheRecord, nil
 }
 
+func attachmentManifest(attachments []Attachment, defaultCollectionID string) []string {
+	manifest := make([]string, 0, len(attachments))
+	for _, attachment := range attachments {
+		sourceCollectionID := attachment.CollectionID
+		if sourceCollectionID == "" {
+			sourceCollectionID = defaultCollectionID
+		}
+		// Encode each row as a tuple string so filename delimiters cannot collide.
+		entry, _ := json.Marshal([]string{
+			sourceCollectionID,
+			attachment.SourcePath,
+			attachment.ZipFilename,
+			attachment.Sha256,
+		})
+		manifest = append(manifest, string(entry))
+	}
+	sort.Strings(manifest)
+	return manifest
+}
+
+func zipCacheStringSliceField(record *core.Record, field string) ([]string, bool, error) {
+	raw, ok := record.Get(field).(types.JSONRaw)
+	if !ok || len(raw) == 0 || string(raw) == "null" {
+		return nil, false, nil
+	}
+
+	values := []string{}
+	if err := json.Unmarshal(raw, &values); err != nil {
+		return nil, true, err
+	}
+	return values, true, nil
+}
+
 // This function looks for a record in the zip_cache collection that matches the
-// key and class. If it finds a record, it checks the hashes property of the
-// record and verifies that every attachment in the attachments slice has a
-// matching hash in the hashes property and that the length of the hashes
-// property is the same as the length of the attachments slice. If the checks
-// pass, it returns the record. Otherwise, it returns nil.
-func zipCacheLookup(app core.App, key string, class string, attachments []Attachment) (*core.Record, error) {
-	// The zip_cache collection has properties key, class, hashes (JSON array of strings), filenames (JSON array of strings), and zip (the zip file).
+// key and class. If it finds a record, it compares the stored attachment
+// manifest against the manifest that would be zipped today. If the manifests
+// match exactly, it returns the record. Otherwise, it returns nil.
+func zipCacheLookup(app core.App, key string, class string, attachments []Attachment, collectionId string) (*core.Record, error) {
+	// The zip_cache collection has properties key, class, manifest, and zip.
+	// The manifest is the cache authority.
 	// In most cases key will be a date string, but it could be anything.
 	// The class will be the identifier of the class of zips that the zip is for.
 
@@ -223,60 +241,18 @@ func zipCacheLookup(app core.App, key string, class string, attachments []Attach
 		return nil, nil
 	}
 
-	// Load the hashes property into a slice of strings
-	hashesJson := zipCacheRecord.Get("hashes").(types.JSONRaw)
-	hashes := []string{}
-	err = json.Unmarshal(hashesJson, &hashes)
+	cachedManifest, hasManifest, err := zipCacheStringSliceField(zipCacheRecord, "manifest")
 	if err != nil {
-		return nil, fmt.Errorf("failed to unmarshal hashes: %w", err)
+		return nil, fmt.Errorf("failed to unmarshal manifest: %w", err)
+	}
+	if !hasManifest {
+		app.Logger().Debug("zip_cache miss for missing manifest")
+		return nil, nil
+	}
+	if !slices.Equal(cachedManifest, attachmentManifest(attachments, collectionId)) {
+		app.Logger().Debug("zip_cache miss for manifest mismatch")
+		return nil, nil
 	}
 
-	if slices.Contains(hashes, "") || len(hashes) != len(attachments) {
-		// If any of the hashes is an empty string or the length of hashes doesn't
-		// match the length of the attachments, fallback to verifying the filenames
-		// instead
-		app.Logger().Debug("at least one hash is empty, falling back to filenames")
-		filenamesJson := zipCacheRecord.Get("filenames").(types.JSONRaw)
-		filenames := []string{}
-		err = json.Unmarshal(filenamesJson, &filenames)
-		if err != nil {
-			return nil, fmt.Errorf("failed to unmarshal filenames: %w", err)
-		}
-		if len(filenames) != len(attachments) {
-			app.Logger().Debug("zip_cache miss for filename length mismatch")
-			return nil, nil
-		}
-		for _, filename := range filenames {
-			found := false
-			for _, attachment := range attachments {
-				if attachment.Id+"/"+attachment.Filename == filename {
-					found = true
-					break
-				}
-			}
-			if !found {
-				app.Logger().Debug("zip_cache miss for filename: " + filename)
-				return nil, nil
-			}
-		}
-	} else {
-		// Otherwise, verify that each hash in the hashes slice is in the
-		// attachments slice. If not, return nil.
-		for _, hash := range hashes {
-			found := false
-			for _, attachment := range attachments {
-				if attachment.Sha256 == hash {
-					found = true
-					break
-				}
-			}
-			if !found {
-				app.Logger().Debug("zip_cache miss for hash: " + hash)
-				return nil, nil
-			}
-		}
-	}
-
-	// Return the zip cache record
 	return zipCacheRecord, nil
 }

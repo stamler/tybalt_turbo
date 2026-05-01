@@ -7,7 +7,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
-  import { expenseAttachmentHref, formatCurrencyAmount, shortDate } from "$lib/utilities";
+  import { formatCurrencyAmount, openExpenseAttachment, shortDate } from "$lib/utilities";
   import type { PageData } from "./$types";
   import { untrack } from "svelte";
 
@@ -50,7 +50,8 @@
   }
 
   function openAttachment(id: string, attachment: string) {
-    window.open(expenseAttachmentHref(id), "_blank", "noopener,noreferrer");
+    if (!attachment) return;
+    return openExpenseAttachment(id, attachment);
   }
 </script>
 
