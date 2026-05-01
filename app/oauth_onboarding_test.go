@@ -198,6 +198,46 @@ func externalAuthExists(app *tests.TestApp, collectionID string, provider string
 	return false, err
 }
 
+func countUserClaimsByName(t *testing.T, app *tests.TestApp, uid string, claimName string) int {
+	t.Helper()
+
+	var result struct {
+		Count int `db:"count"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT COUNT(*) AS count
+		FROM user_claims uc
+		INNER JOIN claims c ON c.id = uc.cid
+		WHERE uc.uid = {:uid}
+		  AND c.name = {:claimName}
+	`).Bind(dbx.Params{"uid": uid, "claimName": claimName}).One(&result); err != nil {
+		t.Fatalf("failed counting %s claims for %s: %v", claimName, uid, err)
+	}
+
+	return result.Count
+}
+
+func deleteUserClaimsByName(t *testing.T, app *tests.TestApp, uid string, claimName string) {
+	t.Helper()
+
+	records, err := app.FindRecordsByFilter(
+		"user_claims",
+		"uid={:uid} && cid.name={:claimName}",
+		"",
+		0,
+		0,
+		dbx.Params{"uid": uid, "claimName": claimName},
+	)
+	if err != nil {
+		t.Fatalf("failed loading %s claims for %s: %v", claimName, uid, err)
+	}
+	for _, record := range records {
+		if err := app.Delete(record); err != nil {
+			t.Fatalf("failed deleting user_claim %s: %v", record.Id, err)
+		}
+	}
+}
+
 // Happy-path first login:
 // - name comes from givenName + surname
 // - username comes from the email local-part
@@ -239,6 +279,9 @@ func TestMicrosoftFirstLoginPopulatesIdentityAndOnboards(t *testing.T) {
 	if !user.Verified() {
 		t.Fatal("expected Microsoft email-backed user to be marked verified")
 	}
+	if got := countUserClaimsByName(t, app, user.Id, "time"); got != 1 {
+		t.Fatalf("expected first Microsoft login to assign one time claim, got %d", got)
+	}
 
 	adminProfile := findAdminProfileByUID(t, app, user.Id)
 	if got := adminProfile.GetString("payroll_id"); got == "999999" || !strings.HasPrefix(got, "9") {
@@ -251,6 +294,46 @@ func TestMicrosoftFirstLoginPopulatesIdentityAndOnboards(t *testing.T) {
 	}
 	if exists {
 		t.Fatal("expected no profile to be created during Microsoft onboarding because manager is required")
+	}
+}
+
+func TestMicrosoftReturningLoginDoesNotReassignInitialTimeClaim(t *testing.T) {
+	app := setupMicrosoftOAuthTestApp(t)
+	defer app.Cleanup()
+
+	setMockUser := installMicrosoftOAuthMock(t)
+	setMockUser(&pbauth.AuthUser{
+		Id:    "provider-no-reassign",
+		Name:  "No Reassign",
+		Email: "no.reassign@tbte.ca",
+		RawUser: map[string]any{
+			"givenName":         "No",
+			"surname":           "Reassign",
+			"mail":              "no.reassign@tbte.ca",
+			"userPrincipalName": "no.reassign@tbte.ca",
+		},
+	})
+
+	first := performMicrosoftAuthRequest(t, app)
+	if first.Code != http.StatusOK {
+		t.Fatalf("first auth expected 200, got %d: %s", first.Code, first.Body.String())
+	}
+
+	user, err := app.FindAuthRecordByEmail("users", "no.reassign@tbte.ca")
+	if err != nil {
+		t.Fatalf("failed to load created user: %v", err)
+	}
+	deleteUserClaimsByName(t, app, user.Id, "time")
+	if got := countUserClaimsByName(t, app, user.Id, "time"); got != 0 {
+		t.Fatalf("expected manual time claim removal to leave zero rows, got %d", got)
+	}
+
+	second := performMicrosoftAuthRequest(t, app)
+	if second.Code != http.StatusOK {
+		t.Fatalf("second auth expected 200, got %d: %s", second.Code, second.Body.String())
+	}
+	if got := countUserClaimsByName(t, app, user.Id, "time"); got != 0 {
+		t.Fatalf("returning login reassigned time claim, got %d rows", got)
 	}
 }
 

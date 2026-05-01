@@ -466,6 +466,46 @@ func ensureMicrosoftUserOnboarded(app core.App, userRecord *core.Record) error {
 	return ensureUserAdminProfile(app, userRecord.Id)
 }
 
+func ensureInitialTimeClaim(app core.App, uid string) error {
+	if uid == "" {
+		return fmt.Errorf("missing user id for initial time claim")
+	}
+
+	timeClaim, err := app.FindFirstRecordByFilter("claims", "name={:name}", dbx.Params{"name": "time"})
+	if err != nil {
+		return fmt.Errorf("failed to load time claim: %w", err)
+	}
+
+	existingClaims, err := app.FindRecordsByFilter(
+		"user_claims",
+		"uid={:uid} && cid={:cid}",
+		"",
+		1,
+		0,
+		dbx.Params{"uid": uid, "cid": timeClaim.Id},
+	)
+	if err != nil {
+		return fmt.Errorf("failed checking initial time claim for %s: %w", uid, err)
+	}
+	if len(existingClaims) > 0 {
+		return nil
+	}
+
+	userClaims, err := app.FindCollectionByNameOrId("user_claims")
+	if err != nil {
+		return err
+	}
+
+	record := core.NewRecord(userClaims)
+	record.Set("uid", uid)
+	record.Set("cid", timeClaim.Id)
+	if err := app.Save(record); err != nil {
+		return fmt.Errorf("failed assigning initial time claim to %s: %w", uid, err)
+	}
+
+	return nil
+}
+
 // ensureUserAdminProfile is idempotent and safe to call when the auth flow has
 // decided a missing admin profile should be repaired.
 //

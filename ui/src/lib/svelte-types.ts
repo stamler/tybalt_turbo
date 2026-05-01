@@ -200,11 +200,28 @@ export interface ClaimHolder {
   surname: string;
 }
 
+export interface ClaimAssignableUser {
+  id: string;
+  admin_profile_id: string;
+  given_name: string;
+  surname: string;
+  name: string;
+  username: string;
+  email: string;
+}
+
 export interface ClaimDetails {
   id: string;
   name: string;
   description: string;
   holders: ClaimHolder[];
+}
+
+export interface ClaimAssignableUsers {
+  id: string;
+  name: string;
+  description: string;
+  assignable_users: ClaimAssignableUser[];
 }
 
 export interface WorkRecordSearchRow {

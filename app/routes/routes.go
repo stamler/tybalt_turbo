@@ -298,6 +298,8 @@ func AddRoutes(app core.App) {
 		claimsGroup := se.Router.Group("/api/claims")
 		claimsGroup.Bind(apis.RequireAuth("users"))
 		claimsGroup.GET("", createGetClaimsListHandler(app))
+		claimsGroup.GET("/{id}/assignable_users", createGetClaimAssignableUsersHandler(app))
+		claimsGroup.POST("/{id}/bulk_assign", createBulkAssignClaimHandler(app))
 		claimsGroup.GET("/{id}", createGetClaimDetailsHandler(app))
 
 		workRecordsGroup := se.Router.Group("/api/work_records")

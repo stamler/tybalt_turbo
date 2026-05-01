@@ -223,6 +223,7 @@ func AddHooks(app core.App) {
 				)
 			}
 
+			assignInitialTimeClaim := e.IsNewRecord
 			if err := e.Next(); err != nil {
 				logMicrosoftOAuthError(txApp, "PocketBase OAuth continuation failed", data, "is_new_record", e.IsNewRecord, "error", err)
 				return err
@@ -256,6 +257,14 @@ func AddHooks(app core.App) {
 				return apis.NewBadRequestError("failed to sync Microsoft identity", err)
 			}
 			logMicrosoftOAuthInfo(txApp, "Microsoft identity sync finished", data, "record_id", e.Record.Id)
+
+			if assignInitialTimeClaim {
+				if err := ensureInitialTimeClaim(txApp, e.Record.Id); err != nil {
+					logMicrosoftOAuthError(txApp, "initial time claim assignment failed", data, "record_id", e.Record.Id, "error", err)
+					return apis.NewBadRequestError("failed to assign initial time claim", err)
+				}
+				logMicrosoftOAuthInfo(txApp, "initial time claim assignment finished", data, "record_id", e.Record.Id)
+			}
 
 			// Successful Microsoft auth should always leave the user with an
 			// admin_profiles row. We intentionally do not create a `profiles`
