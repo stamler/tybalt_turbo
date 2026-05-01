@@ -320,13 +320,14 @@ COALESCE(expense_documents.attachment_hash, expenses.attachment_hash)
 
 Known caveats:
 
+- Rolling back to pre-Phase-1 code after new document-backed writes have landed is not data-neutral. Pre-Phase-1 code reads `expenses.attachment` directly, so newly created document-backed expenses with blank legacy attachment fields can lose attachment visibility until the Phase 1 code is restored or the data is repaired.
 - Old direct file URLs under `/api/files/expenses/...` are not the long-term attachment contract. UI links should use `GET /api/expenses/attachment/{id}` so authorization stays expense-scoped and both document-backed and legacy-only rows work.
 - Legacy writeback keeps the old payload shape. It exports effective `attachment` and `attachmentHash` values, not `attachment_document`, so downstream legacy consumers do not need a schema change. If a downstream process fetches files by filename, confirm it still resolves the correct storage location during mixed storage.
 - Receipt ZIP generation must include both legacy-only and document-backed attachments. The ZIP cache manifest must include collection id, storage path, zip filename, and hash so a reused document or duplicate hash cannot produce a stale ZIP.
 - The ZIP cache migration deletes existing `zip_cache` rows. The first receipt ZIP requests after deploy should regenerate those archives.
 - A concurrent upload of the same new file can still race at the `expense_documents.attachment_hash` unique index. The expected steady-state behavior is still one document row per hash, but the losing request may surface a lower-level save error rather than the normal `duplicate_file` validation message.
 - Phase 1 does not delete old legacy expense attachment objects. Storage cleanup should wait until after Phase 2 backfill is verified and a separate retention/rollback decision is made.
-- Editing a legacy-only expense can lazily create or reuse an `expense_documents` row. This is expected, but it means normal user activity will gradually change some old rows before the bulk backfill runs.
+- Editing or reusing a legacy-only expense can lazily create or reuse an `expense_documents` row. This is expected, but it means normal user activity will gradually change some old rows before the bulk backfill runs. If the legacy file object is missing or unreadable in storage, that edit or source-reuse request can fail until the legacy attachment is restored or handled manually.
 - The generic PocketBase `expenses` create/update hooks remain active and convert direct uploads to `expense_documents`. The custom `/api/expenses` routes are the UI path, but direct collection API writes should not silently create new legacy-only attachments.
 - `image/heic` is accepted by backend validation, but browser preview/download behavior may be less polished than PDF, PNG, or JPEG. The attachment route should still stream the original file.
 
