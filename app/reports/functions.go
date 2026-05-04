@@ -188,33 +188,49 @@ func zipAttachments(app core.App, report []Attachment, collectionId string, clas
 	return zipCacheRecord, nil
 }
 
-func attachmentManifest(attachments []Attachment, defaultCollectionID string) []string {
-	manifest := make([]string, 0, len(attachments))
+type zipCacheManifestEntry struct {
+	CollectionID string `json:"collection_id"`
+	SourcePath   string `json:"source_path"`
+	ZipFilename  string `json:"zip_filename"`
+	Sha256       string `json:"sha256"`
+}
+
+func attachmentManifest(attachments []Attachment, defaultCollectionID string) []zipCacheManifestEntry {
+	manifest := make([]zipCacheManifestEntry, 0, len(attachments))
 	for _, attachment := range attachments {
 		sourceCollectionID := attachment.CollectionID
 		if sourceCollectionID == "" {
 			sourceCollectionID = defaultCollectionID
 		}
-		// Encode each row as a tuple string so filename delimiters cannot collide.
-		entry, _ := json.Marshal([]string{
-			sourceCollectionID,
-			attachment.SourcePath,
-			attachment.ZipFilename,
-			attachment.Sha256,
+		manifest = append(manifest, zipCacheManifestEntry{
+			CollectionID: sourceCollectionID,
+			SourcePath:   attachment.SourcePath,
+			ZipFilename:  attachment.ZipFilename,
+			Sha256:       attachment.Sha256,
 		})
-		manifest = append(manifest, string(entry))
 	}
-	sort.Strings(manifest)
+	sort.Slice(manifest, func(i, j int) bool {
+		if manifest[i].CollectionID != manifest[j].CollectionID {
+			return manifest[i].CollectionID < manifest[j].CollectionID
+		}
+		if manifest[i].SourcePath != manifest[j].SourcePath {
+			return manifest[i].SourcePath < manifest[j].SourcePath
+		}
+		if manifest[i].ZipFilename != manifest[j].ZipFilename {
+			return manifest[i].ZipFilename < manifest[j].ZipFilename
+		}
+		return manifest[i].Sha256 < manifest[j].Sha256
+	})
 	return manifest
 }
 
-func zipCacheStringSliceField(record *core.Record, field string) ([]string, bool, error) {
+func zipCacheManifestField(record *core.Record, field string) ([]zipCacheManifestEntry, bool, error) {
 	raw, ok := record.Get(field).(types.JSONRaw)
 	if !ok || len(raw) == 0 || string(raw) == "null" {
 		return nil, false, nil
 	}
 
-	values := []string{}
+	values := []zipCacheManifestEntry{}
 	if err := json.Unmarshal(raw, &values); err != nil {
 		return nil, true, err
 	}
@@ -241,7 +257,7 @@ func zipCacheLookup(app core.App, key string, class string, attachments []Attach
 		return nil, nil
 	}
 
-	cachedManifest, hasManifest, err := zipCacheStringSliceField(zipCacheRecord, "manifest")
+	cachedManifest, hasManifest, err := zipCacheManifestField(zipCacheRecord, "manifest")
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal manifest: %w", err)
 	}

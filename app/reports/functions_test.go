@@ -107,15 +107,20 @@ func TestZipCacheLookupRequiresExactManifestForDuplicateHashes(t *testing.T) {
 		t.Fatalf("zipAttachments returned error: %v", err)
 	}
 
-	cachedManifest, hasManifest, err := zipCacheStringSliceField(record, "manifest")
+	cachedManifest, hasManifest, err := zipCacheManifestField(record, "manifest")
 	if err != nil {
-		t.Fatalf("zipCacheStringSliceField returned error: %v", err)
+		t.Fatalf("zipCacheManifestField returned error: %v", err)
 	}
 	if !hasManifest {
 		t.Fatal("expected zip cache record to store manifest")
 	}
-	wantManifest := []string{
-		`["o1vpz1mm7qsfoyy","expense-duplicate/shared_receipt.pdf","Expense-A-2026_May_01-100-shared_receipt.pdf","same-hash"]`,
+	wantManifest := []zipCacheManifestEntry{
+		{
+			CollectionID: "o1vpz1mm7qsfoyy",
+			SourcePath:   "expense-duplicate/shared_receipt.pdf",
+			ZipFilename:  "Expense-A-2026_May_01-100-shared_receipt.pdf",
+			Sha256:       "same-hash",
+		},
 	}
 	if !slices.Equal(cachedManifest, wantManifest) {
 		t.Fatalf("manifest = %#v, want %#v", cachedManifest, wantManifest)
