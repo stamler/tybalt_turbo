@@ -1310,6 +1310,62 @@ func TestExpenseDocumentsPhase1CreateAndReuse(t *testing.T) {
 		}
 	})
 
+	t.Run("regular users can upload a document whose existing hash is orphaned", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x04}
+		sourceID := createRegularExpense("regular orphan document source", content)
+		sourceExpense, err := app.FindRecordById("expenses", sourceID)
+		if err != nil {
+			t.Fatalf("failed to load source expense: %v", err)
+		}
+		documentID := sourceExpense.GetString("attachment_document")
+		if documentID == "" {
+			t.Fatal("expected source expense to reference an expense_document")
+		}
+		document, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, documentID)
+		if err != nil {
+			t.Fatalf("failed to load source expense_document: %v", err)
+		}
+		documentHash := document.GetString("attachment_hash")
+
+		// Delete only the referencing test-created expense. The document row is
+		// intentionally left in place to simulate the current orphan behavior.
+		if err := app.Delete(sourceExpense); err != nil {
+			t.Fatalf("failed to delete source expense: %v", err)
+		}
+		var references int
+		if err := app.DB().NewQuery(`
+				SELECT COUNT(*)
+				FROM expenses
+				WHERE attachment_document = {:document_id}
+			`).Bind(dbx.Params{"document_id": documentID}).Row(&references); err != nil {
+			t.Fatalf("failed to count document references after delete: %v", err)
+		}
+		if references != 0 {
+			t.Fatalf("expected deleted expense to leave document %q orphaned, got %d references", documentID, references)
+		}
+
+		replacementID := createRegularExpense("regular orphan document reuse", content)
+		replacementExpense, err := app.FindRecordById("expenses", replacementID)
+		if err != nil {
+			t.Fatalf("failed to load replacement expense: %v", err)
+		}
+		if got := replacementExpense.GetString("attachment_document"); got != documentID {
+			t.Fatalf("expected regular upload to reuse orphaned document %q, got %q", documentID, got)
+		}
+
+		var documentsWithHash int
+		if err := app.DB().NewQuery(`
+				SELECT COUNT(*)
+				FROM expense_documents
+				WHERE attachment_hash = {:attachment_hash}
+			`).Bind(dbx.Params{"attachment_hash": documentHash}).Row(&documentsWithHash); err != nil {
+			t.Fatalf("failed to count documents with reused hash: %v", err)
+		}
+		if documentsWithHash != 1 {
+			t.Fatalf("expected orphaned document hash to be reused without creating a duplicate row, got %d rows", documentsWithHash)
+		}
+	})
+
 	t.Run("custom update endpoint preserves existing document", func(t *testing.T) {
 		expenseID := createRegularExpense("document custom patch source", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x05})
 		expense, err := app.FindRecordById("expenses", expenseID)
@@ -2013,6 +2069,91 @@ func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
 		mustStatus(t, res, http.StatusBadRequest)
 		if !strings.Contains(res.Body.String(), `"attachment":{"code":"duplicate_file"`) {
 			t.Fatalf("expected duplicate_file error for legacy-only duplicate hash, got body=%s", res.Body.String())
+		}
+	})
+
+	t.Run("regular duplicate upload can reuse an orphaned document when mixed legacy rows use other hashes", func(t *testing.T) {
+		legacyContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x62}
+		legacyID := createRegularDocumentExpense("regular unrelated legacy row before orphan reuse", legacyContent)
+		convertCreatedExpenseToLegacyOnly(legacyID, "unrelated-legacy-before-orphan-reuse.png", legacyContent)
+
+		orphanContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x63}
+		orphanSourceID := createRegularDocumentExpense("regular mixed orphan source", orphanContent)
+		orphanSource, err := app.FindRecordById("expenses", orphanSourceID)
+		if err != nil {
+			t.Fatalf("failed to load orphan source expense: %v", err)
+		}
+		documentID := orphanSource.GetString("attachment_document")
+		if documentID == "" {
+			t.Fatal("expected orphan source expense to reference an expense_document")
+		}
+		if err := app.Delete(orphanSource); err != nil {
+			t.Fatalf("failed to delete orphan source expense: %v", err)
+		}
+
+		reuseID := createRegularDocumentExpense("regular mixed orphan reuse succeeds", orphanContent)
+		reuseExpense, err := app.FindRecordById("expenses", reuseID)
+		if err != nil {
+			t.Fatalf("failed to load mixed orphan reuse expense: %v", err)
+		}
+		if got := reuseExpense.GetString("attachment_document"); got != documentID {
+			t.Fatalf("expected regular upload to reuse orphaned document %q, got %q", documentID, got)
+		}
+	})
+
+	t.Run("regular duplicate upload is rejected when an orphaned document hash is still used by legacy expense", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x64}
+		orphanSourceID := createRegularDocumentExpense("regular mixed orphan duplicate source", content)
+		orphanSource, err := app.FindRecordById("expenses", orphanSourceID)
+		if err != nil {
+			t.Fatalf("failed to load mixed orphan duplicate source: %v", err)
+		}
+		documentID := orphanSource.GetString("attachment_document")
+		if documentID == "" {
+			t.Fatal("expected mixed orphan duplicate source to reference an expense_document")
+		}
+		if err := app.Delete(orphanSource); err != nil {
+			t.Fatalf("failed to delete mixed orphan duplicate source: %v", err)
+		}
+
+		legacyID := createRegularDocumentExpense("regular legacy duplicate holder before conversion", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x65})
+		legacyExpense, err := app.FindRecordById("expenses", legacyID)
+		if err != nil {
+			t.Fatalf("failed to load legacy duplicate holder: %v", err)
+		}
+		legacyPath := legacyExpense.BaseFilesPath() + "/legacy-duplicate-holder.png"
+		fsys, err := app.NewFilesystem()
+		if err != nil {
+			t.Fatalf("failed to open filesystem for legacy duplicate holder: %v", err)
+		}
+		if err := fsys.Upload(content, legacyPath); err != nil {
+			fsys.Close()
+			t.Fatalf("failed to upload legacy duplicate holder attachment: %v", err)
+		}
+		if err := fsys.Close(); err != nil {
+			t.Fatalf("failed to close filesystem after legacy duplicate holder upload: %v", err)
+		}
+		if _, err := app.DB().NewQuery(`
+			UPDATE expenses
+			SET attachment = 'legacy-duplicate-holder.png',
+			    attachment_hash = {:attachment_hash},
+			    attachment_document = ''
+			WHERE id = {:id}
+		`).Bind(dbx.Params{
+			"id":              legacyID,
+			"attachment_hash": hashContent(content),
+		}).Execute(); err != nil {
+			t.Fatalf("failed to convert legacy duplicate holder to matching legacy hash: %v", err)
+		}
+
+		body, contentType := mustMultipartExpenseWithContent(t, regularExpenseFields("regular mixed orphan duplicate should fail"), "receipt.png", content)
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
+			"Authorization": regularToken,
+			"Content-Type":  contentType,
+		})
+		mustStatus(t, res, http.StatusBadRequest)
+		if !strings.Contains(res.Body.String(), `"attachment":{"code":"duplicate_file"`) {
+			t.Fatalf("expected duplicate_file error for legacy reference to orphaned document hash, got body=%s", res.Body.String())
 		}
 	})
 

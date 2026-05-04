@@ -137,6 +137,17 @@ func documentIDFromUploadedExpenseAttachment(app core.App, e *core.RecordRequest
 		return "", err
 	}
 	if existingDocument != nil {
+		documentInUse, err := expenseDocumentReferencedByAnotherExpense(app, existingDocument.Id, e.Record.Id)
+		if err != nil {
+			return "", err
+		}
+		legacyDuplicate, err := legacyExpenseAttachmentHashExists(app, attachmentHash, e.Record.Id)
+		if err != nil {
+			return "", err
+		}
+		if !documentInUse && !legacyDuplicate {
+			return existingDocument.Id, nil
+		}
 		if !hasBookKeeperClaim {
 			return "", duplicateAttachmentError()
 		}
@@ -310,6 +321,27 @@ func findExpenseDocumentByHash(app core.App, attachmentHash string) (*core.Recor
 		return nil, nil
 	}
 	return record, nil
+}
+
+func expenseDocumentReferencedByAnotherExpense(app core.App, documentID string, currentExpenseID string) (bool, error) {
+	if strings.TrimSpace(documentID) == "" {
+		return false, nil
+	}
+
+	var count int
+	err := app.DB().NewQuery(`
+		SELECT COUNT(*)
+		FROM expenses
+		WHERE attachment_document = {:document_id}
+		  AND id != {:current_expense_id}
+	`).Bind(dbx.Params{
+		"document_id":        documentID,
+		"current_expense_id": currentExpenseID,
+	}).Row(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }
 
 func legacyExpenseAttachmentHashExists(app core.App, attachmentHash string, currentExpenseID string) (bool, error) {

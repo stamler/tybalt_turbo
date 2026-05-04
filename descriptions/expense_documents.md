@@ -206,7 +206,14 @@ It handles four cases.
 
 #### Case B: New file, hash already exists, caller is not `book_keeper`
 
-Reject with the existing duplicate attachment semantics:
+Reject with the existing duplicate attachment semantics when the hash is already
+used by another expense. During Phase 1, "already used" must check both storage
+shapes:
+
+- another expense references the matching `expense_documents` row through
+  `expenses.attachment_document`; or
+- another legacy-only expense still has the matching value in
+  `expenses.attachment_hash`.
 
 ```text
 field: attachment
@@ -214,7 +221,12 @@ code: duplicate_file
 message: This file has already been uploaded to another expense
 ```
 
-This preserves current UX for everyone without the `book_keeper` claim.
+If the matching `expense_documents` row exists but no expense references it and
+no legacy-only expense has the same hash, allow the upload to relink that
+orphaned document row. Do not create a second `expense_documents` row for the
+same hash. This preserves the duplicate-file UX for everyone without the
+`book_keeper` claim while avoiding a stale orphaned document row blocking a
+valid upload.
 
 #### Case C: New file, hash already exists, caller has `book_keeper`
 
@@ -327,6 +339,7 @@ Known caveats:
 - The ZIP cache migration deletes existing `zip_cache` rows. The first receipt ZIP requests after deploy should regenerate those archives.
 - A concurrent upload of the same new file can still race at the `expense_documents.attachment_hash` unique index. The expected steady-state behavior is still one document row per hash, but the losing request may surface a lower-level save error rather than the normal `duplicate_file` validation message.
 - Phase 1 does not delete old legacy expense attachment objects. Storage cleanup should wait until after Phase 2 backfill is verified and a separate retention/rollback decision is made.
+- Phase 1 expense deletion may leave an unreferenced `expense_documents` row. A later non-`book_keeper` upload of the same file may relink that orphaned document only if no document-backed or legacy-only expense still uses the same hash.
 - Editing or reusing a legacy-only expense can lazily create or reuse an `expense_documents` row. This is expected, but it means normal user activity will gradually change some old rows before the bulk backfill runs. If the legacy file object is missing or unreadable in storage, that edit or source-reuse request can fail until the legacy attachment is restored or handled manually.
 - The generic PocketBase `expenses` create/update hooks remain active and convert direct uploads to `expense_documents`. The custom `/api/expenses` routes are the UI path, but direct collection API writes should not silently create new legacy-only attachments.
 - `image/heic` is accepted by backend validation, but browser preview/download behavior may be less polished than PDF, PNG, or JPEG. The attachment route should still stream the original file.
@@ -368,7 +381,9 @@ Production smoke test:
    - The stored object should live under the `expense_documents` collection prefix.
    - The details/list attachment link should download through `/api/expenses/attachment/{id}`.
 4. Attempt a duplicate upload as a normal non-`book_keeper` user.
-   - The request should fail with the existing `attachment.duplicate_file` style error.
+   - If another expense still references the matching document, the request should fail with the existing `attachment.duplicate_file` style error.
+   - If the matching document row is orphaned and no legacy-only expense has the same hash, the request should save and reference the existing document row.
+   - If the matching document row is orphaned but a legacy-only expense still has the same hash, the request should fail with the existing `attachment.duplicate_file` style error.
    - No new `expense_documents` row should be created.
 5. Create a PO-backed expense as a `book_keeper` using a duplicate attachment.
    - The new expense should save.
@@ -427,7 +442,9 @@ Expense document creation and linking:
 
 Duplicate hash behavior:
 
-- non-`book_keeper` uploading a file whose hash already exists in `expense_documents` receives the existing field-level duplicate attachment error;
+- non-`book_keeper` uploading a file whose hash already exists in `expense_documents` receives the existing field-level duplicate attachment error when another expense references that document;
+- non-`book_keeper` uploading a file whose hash already exists only on an orphaned `expense_documents` row succeeds and references that existing document;
+- non-`book_keeper` uploading a file whose hash exists on an orphaned `expense_documents` row and on a legacy-only expense is still rejected;
 - non-`book_keeper` uploading a file whose hash exists only on a legacy expense is still rejected;
 - `book_keeper` uploading a duplicate file for a PO-backed expense links the existing document and creates no duplicate document;
 - `book_keeper` uploading a duplicate file for a non-PO expense is rejected.
@@ -734,6 +751,7 @@ Integration/manual testing against the dumped production DB should include:
 - The manual S3 copy belongs to Phase 2, after `prepare` and before `verify`/`link`.
 - The old S3 objects under the `expenses` collection prefix should not be deleted during Phase 2. Deletion, if desired, should be considered only after a separate retention/rollback decision.
 - The `expense_documents.attachment_hash` unique index remains the long-term duplicate prevention mechanism.
+- Orphaned `expense_documents` rows may be relinked by later uploads of the same file; this is not treated as multi-expense reuse unless another expense still references the document or hash.
 - `book_keeper` reuse changes only which expense may point at an existing document. It never creates two document records with the same hash.
 
 ## Phase 3: cleanup
