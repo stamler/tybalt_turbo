@@ -12,6 +12,12 @@ The target model is:
 - Only users with the `book_keeper` claim may reuse an existing document.
 - Everyone else keeps the same UX and duplicate-file protection they have today.
 
+The `book_keeper` claim, `expenses.creator`, `creator != uid` semantics,
+bookkeeper-on-behalf PO eligibility, and creator-as-approver rules are specified
+in `book_keepers.md`. This spec relies on that actor model and defines only the
+attachment/document storage, duplicate-file, source-expense reuse, legacy
+fallback, and backfill behavior.
+
 This will be implemented in three phases.
 
 1. Phase 1 cuts over the app so new expense uploads use `expense_documents`, while legacy expense attachments continue to work through fallback reads.

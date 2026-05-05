@@ -18,6 +18,12 @@ The desired model is:
 
 This is intentionally limited to the green plus flow: creating an expense from an existing active `purchase_orders` record.
 
+Document reuse for bookkeeper-entered PO expenses is specified separately in
+`expense_documents.md`. This spec defines the actor, ownership, visibility, and
+approval model for bookkeeping-on-behalf; it does not define the attachment
+storage, duplicate-file, source-expense reuse, or legacy attachment backfill
+model.
+
 ## Status quo
 
 ### Expense ownership
