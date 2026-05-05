@@ -86,7 +86,8 @@
                   item.href.startsWith("/currencies") ||
                   item.href.startsWith("/timetypes") ||
                   item.href.startsWith("/divisions") ||
-                  item.href.startsWith("/machine_secrets")
+                  item.href.startsWith("/machine_secrets") ||
+                  item.href.startsWith("/attachment_audit")
                 ) {
                   return $globalStore.claims.includes("admin");
                 }

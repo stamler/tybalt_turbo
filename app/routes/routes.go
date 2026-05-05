@@ -284,6 +284,14 @@ func AddRoutes(app core.App) {
 		machineSecretsGroup.GET("/list", listMachineSecretsHandler(app))
 		machineSecretsGroup.POST("/create", createMachineSecretHandler(app))
 
+		attachmentAuditGroup := se.Router.Group("/api/attachment_audit")
+		attachmentAuditGroup.Bind(apis.RequireAuth("users"))
+		attachmentAuditGroup.GET("/targets", createListAttachmentAuditTargetsHandler(app))
+		attachmentAuditGroup.GET("/targets/{target}", createGetAttachmentAuditRunHandler(app))
+		attachmentAuditGroup.POST("/targets/{target}/refresh", createRefreshAttachmentAuditHandler(app))
+		attachmentAuditGroup.GET("/targets/{target}/missing.csv", createDownloadAttachmentAuditReportHandler(app, "missing_report"))
+		attachmentAuditGroup.GET("/targets/{target}/orphaned.csv", createDownloadAttachmentAuditReportHandler(app, "orphaned_report"))
+
 		currenciesGroup := se.Router.Group("/api/currencies")
 		currenciesGroup.Bind(apis.RequireAuth("users"))
 		currenciesGroup.GET("", createGetCurrenciesHandler(app))

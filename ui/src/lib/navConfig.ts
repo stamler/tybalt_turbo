@@ -227,6 +227,7 @@ export const navSections: NavSection[] = [
       { label: "Time Types", href: "/timetypes", buttons: [] },
       { label: "Divisions", href: "/divisions", buttons: [] },
       { label: "Machine Secrets", href: "/machine_secrets", buttons: [] },
+      { label: "Attachment Audit", href: "/attachment_audit", buttons: [] },
     ],
   },
 ];
