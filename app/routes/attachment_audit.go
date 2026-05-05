@@ -6,6 +6,7 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"path"
 	"sort"
@@ -56,6 +57,23 @@ type attachmentAuditRunResponse struct {
 type attachmentAuditTargetResponse struct {
 	attachmentAuditTarget
 	Latest *attachmentAuditRunResponse `json:"latest"`
+}
+
+type attachmentAuditDeleteOrphansResponse struct {
+	TargetKey              string                         `json:"target_key"`
+	DeletedFiles           int                            `json:"deleted_files"`
+	SkippedReferencedFiles int                            `json:"skipped_referenced_files"`
+	AlreadyMissingFiles    int                            `json:"already_missing_files"`
+	SkippedInvalidFiles    int                            `json:"skipped_invalid_files"`
+	FailedFiles            int                            `json:"failed_files"`
+	Failures               []attachmentAuditDeleteFailure `json:"failures"`
+	RefreshError           string                         `json:"refresh_error"`
+	Latest                 *attachmentAuditRunResponse    `json:"latest"`
+}
+
+type attachmentAuditDeleteFailure struct {
+	StoragePath string `json:"storage_path"`
+	Error       string `json:"error"`
 }
 
 type attachmentAuditResult struct {
@@ -242,6 +260,34 @@ func createDownloadAttachmentAuditReportHandler(app core.App, reportField string
 	}
 }
 
+func createDeleteAttachmentAuditOrphansHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if err := requireAdminClaimForAttachmentAudit(app, e, "delete orphaned attachment files"); err != nil {
+			return err
+		}
+
+		target, ok := attachmentAuditTargetByKey(e.Request.PathValue("target"))
+		if !ok {
+			return e.Error(http.StatusNotFound, "attachment audit target not found", nil)
+		}
+
+		if _, loaded := attachmentAuditActiveRuns.LoadOrStore(target.Key, true); loaded {
+			return e.Error(http.StatusConflict, "attachment audit target is already running", nil)
+		}
+		defer attachmentAuditActiveRuns.Delete(target.Key)
+
+		response, err := deleteCachedAttachmentAuditOrphans(app, target, e.Auth.Id)
+		if errors.Is(err, sql.ErrNoRows) || errors.Is(err, filesystem.ErrNotFound) {
+			return e.Error(http.StatusNotFound, "attachment audit orphaned report not found", err)
+		}
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to delete orphaned attachment files", err)
+		}
+
+		return e.JSON(http.StatusOK, response)
+	}
+}
+
 func attachmentAuditTargetByKey(key string) (attachmentAuditTarget, bool) {
 	for _, target := range attachmentAuditTargets {
 		if target.Key == key {
@@ -358,6 +404,186 @@ func completeAttachmentAuditRun(app core.App, target attachmentAuditTarget, requ
 	record.Set("missing_report", missingFile)
 	record.Set("orphaned_report", orphanedFile)
 	return app.Save(record)
+}
+
+// deleteCachedAttachmentAuditOrphans deletes orphaned attachment files using the
+// latest cached orphan report as the candidate list, but it does not trust that
+// report as authoritative at delete time.
+//
+// The audit report is only a snapshot. Between the audit run and this cleanup
+// action, a user or import may have attached one of those files to a record, a
+// file may have already been removed from storage, or storage may contain a row
+// whose path is malformed or belongs to a different target. Because the database
+// record state and the configured file storage cannot be updated in one shared
+// transaction, this function treats every CSV row as a delete candidate that
+// must be revalidated immediately before its storage object is removed.
+//
+// The process is:
+//  1. Load the single cached attachment_audit_runs record for the target.
+//  2. Read that run's cached orphaned_report CSV from PocketBase storage.
+//  3. For each CSV row, validate that the collection, field, and storage path
+//     still match the requested audit target and that the path still lives under
+//     the target collection's file prefix.
+//  4. Parse the path-derived record id and filename from the storage path.
+//  5. Look up the current record with that path-derived id. If the record now
+//     exists and its audited attachment field references the same filename, skip
+//     the delete because the file is no longer orphaned.
+//  6. Delete the storage object only after that current-state check passes.
+//     Missing files are counted separately, and non-not-found storage errors are
+//     reported per file without aborting the rest of the cleanup.
+//  7. Run a fresh attachment audit after the delete pass so the cached counts
+//     and downloadable CSV reports reflect the post-cleanup storage state.
+//
+// This still cannot close the tiny race where a file becomes referenced after
+// the revalidation query but before the storage delete completes. The important
+// safety property is that we never delete solely because an older cached report
+// said a file was orphaned; we always re-check current database state first.
+func deleteCachedAttachmentAuditOrphans(app core.App, target attachmentAuditTarget, requestedBy string) (attachmentAuditDeleteOrphansResponse, error) {
+	record, err := findAttachmentAuditRun(app, target.Key)
+	if err != nil {
+		return attachmentAuditDeleteOrphansResponse{}, err
+	}
+
+	rows, err := readCachedAttachmentAuditOrphanedRows(app, record)
+	if err != nil {
+		return attachmentAuditDeleteOrphansResponse{}, err
+	}
+
+	fsys, err := app.NewFilesystem()
+	if err != nil {
+		return attachmentAuditDeleteOrphansResponse{}, err
+	}
+	defer fsys.Close()
+
+	response := attachmentAuditDeleteOrphansResponse{
+		TargetKey: target.Key,
+		Failures:  []attachmentAuditDeleteFailure{},
+	}
+	for _, row := range rows {
+		status, err := deleteCachedAttachmentAuditOrphan(app, fsys, target, row)
+		if err != nil {
+			response.FailedFiles++
+			response.Failures = append(response.Failures, attachmentAuditDeleteFailure{
+				StoragePath: row.StoragePath,
+				Error:       err.Error(),
+			})
+			continue
+		}
+
+		switch status {
+		case "deleted":
+			response.DeletedFiles++
+		case "referenced":
+			response.SkippedReferencedFiles++
+		case "missing":
+			response.AlreadyMissingFiles++
+		case "invalid":
+			response.SkippedInvalidFiles++
+		}
+	}
+
+	if err := completeAttachmentAuditRun(app, target, requestedBy); err != nil {
+		response.RefreshError = err.Error()
+		return response, nil
+	}
+
+	updated, err := findAttachmentAuditRun(app, target.Key)
+	if err != nil {
+		response.RefreshError = err.Error()
+		return response, nil
+	}
+	response.Latest = attachmentAuditRunResponseFromRecord(updated)
+	return response, nil
+}
+
+func readCachedAttachmentAuditOrphanedRows(app core.App, record *core.Record) ([]attachmentAuditOrphanedRow, error) {
+	filename := record.GetString("orphaned_report")
+	if filename == "" {
+		return nil, filesystem.ErrNotFound
+	}
+
+	fsys, err := app.NewFilesystem()
+	if err != nil {
+		return nil, err
+	}
+	defer fsys.Close()
+
+	reader, err := fsys.GetReader(record.BaseFilesPath() + "/" + filename)
+	if err != nil {
+		return nil, err
+	}
+	defer reader.Close()
+
+	csvReader := csv.NewReader(reader)
+	if _, err := csvReader.Read(); err != nil {
+		if errors.Is(err, io.EOF) {
+			return []attachmentAuditOrphanedRow{}, nil
+		}
+		return nil, err
+	}
+
+	rows := []attachmentAuditOrphanedRow{}
+	for {
+		fields, err := csvReader.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		if len(fields) < 5 {
+			rows = append(rows, attachmentAuditOrphanedRow{})
+			continue
+		}
+		rows = append(rows, attachmentAuditOrphanedRow{
+			Collection:  fields[0],
+			Field:       fields[1],
+			StoragePath: fields[2],
+			RecordID:    fields[3],
+			Filename:    fields[4],
+		})
+	}
+	return rows, nil
+}
+
+func deleteCachedAttachmentAuditOrphan(app core.App, fsys *filesystem.System, target attachmentAuditTarget, row attachmentAuditOrphanedRow) (string, error) {
+	if row.Collection != target.Collection || row.Field != target.Field || row.StoragePath == "" {
+		return "invalid", nil
+	}
+
+	collection, err := app.FindCollectionByNameOrId(target.Collection)
+	if err != nil {
+		return "", err
+	}
+	prefix := collection.BaseFilesPath() + "/"
+	if !strings.HasPrefix(row.StoragePath, prefix) {
+		return "invalid", nil
+	}
+
+	recordID, filename := splitAttachmentAuditStoragePath(collection.BaseFilesPath(), row.StoragePath)
+	if recordID == "" || filename == "" {
+		return "invalid", nil
+	}
+
+	record, err := app.FindFirstRecordByFilter(
+		target.Collection,
+		"id = {:recordID}",
+		dbx.Params{"recordID": recordID},
+	)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	if record != nil && strings.TrimSpace(record.GetString(target.Field)) == filename {
+		return "referenced", nil
+	}
+
+	if err := fsys.Delete(row.StoragePath); err != nil {
+		if errors.Is(err, filesystem.ErrNotFound) {
+			return "missing", nil
+		}
+		return "", err
+	}
+	return "deleted", nil
 }
 
 func runAttachmentAudit(app core.App, target attachmentAuditTarget) (attachmentAuditResult, error) {
@@ -485,7 +711,7 @@ func buildAttachmentAuditMissingCSV(rows []attachmentAuditMissingRow) ([]byte, e
 func buildAttachmentAuditOrphanedCSV(rows []attachmentAuditOrphanedRow) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	writer := csv.NewWriter(buf)
-	if err := writer.Write([]string{"collection", "field", "storage_path", "record_id", "filename"}); err != nil {
+	if err := writer.Write([]string{"collection", "field", "storage_path", "record_id_from_path", "filename"}); err != nil {
 		return nil, err
 	}
 	for _, row := range rows {

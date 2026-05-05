@@ -1,5 +1,6 @@
 <script lang="ts">
   import DsActionButton from "$lib/components/DSActionButton.svelte";
+  import DSPopover from "$lib/components/DSPopover.svelte";
   import { pb } from "$lib/pocketbase";
   import { downloadCSV } from "$lib/utilities";
   import Icon from "@iconify/svelte";
@@ -32,12 +33,25 @@
     latest: AttachmentAuditRun | null;
   }
 
+  interface DeleteOrphansResponse {
+    deleted_files: number;
+    skipped_referenced_files: number;
+    already_missing_files: number;
+    skipped_invalid_files: number;
+    failed_files: number;
+    refresh_error: string;
+    latest: AttachmentAuditRun | null;
+  }
+
   let targets = $state<AttachmentAuditTarget[]>([]);
   let loading = $state(true);
   let refreshingTargets = $state(new Set<string>());
+  let deletingTargets = $state(new Set<string>());
   let errors = $state<Record<string, string>>({});
+  let notices = $state<Record<string, string>>({});
   let pollHandle: ReturnType<typeof setInterval> | null = null;
   let openHeadingHelp = $state<AttachmentAuditHeading | null>(null);
+  let deleteConfirmTarget = $state<AttachmentAuditTarget | null>(null);
 
   type AttachmentAuditHeading = "records" | "referenced" | "present" | "missing" | "orphaned";
 
@@ -77,6 +91,7 @@
 
   async function refreshTarget(target: AttachmentAuditTarget) {
     errors = {};
+    notices = {};
     refreshingTargets = new Set([...refreshingTargets, target.key]);
     try {
       const latest = (await pb.send(`/api/attachment_audit/targets/${target.key}/refresh`, {
@@ -107,6 +122,62 @@
         [target.key]: error?.message ?? "Failed to download attachment audit report",
       };
     }
+  }
+
+  function openDeleteConfirm(target: AttachmentAuditTarget) {
+    errors = {};
+    deleteConfirmTarget = target;
+  }
+
+  function closeDeleteConfirm() {
+    deleteConfirmTarget = null;
+  }
+
+  async function deleteOrphans() {
+    if (!deleteConfirmTarget) return;
+
+    const target = deleteConfirmTarget;
+    errors = {};
+    notices = {};
+    deletingTargets = new Set([...deletingTargets, target.key]);
+    try {
+      const response = (await pb.send(
+        `/api/attachment_audit/targets/${target.key}/delete_orphans`,
+        { method: "POST" },
+      )) as DeleteOrphansResponse;
+
+      targets = targets.map((row) =>
+        row.key === target.key && response.latest ? { ...row, latest: response.latest } : row,
+      );
+      notices = {
+        [target.key]: deleteOrphansSummary(response),
+      };
+      if (response.refresh_error) {
+        errors = {
+          [target.key]: `Deleted orphan cleanup completed, but refresh failed: ${response.refresh_error}`,
+        };
+      }
+      closeDeleteConfirm();
+    } catch (error: any) {
+      errors = {
+        [target.key]: error?.response?.message ?? "Failed to delete orphaned attachments",
+      };
+    } finally {
+      const next = new Set(deletingTargets);
+      next.delete(target.key);
+      deletingTargets = next;
+    }
+  }
+
+  function deleteOrphansSummary(response: DeleteOrphansResponse): string {
+    const parts = [
+      `${response.deleted_files} deleted`,
+      `${response.skipped_referenced_files} skipped because they are now referenced`,
+      `${response.already_missing_files} already missing`,
+      `${response.skipped_invalid_files} invalid cached rows skipped`,
+      `${response.failed_files} failed`,
+    ];
+    return `Orphan cleanup complete: ${parts.join(", ")}.`;
   }
 
   function formatDate(value: string): string {
@@ -210,6 +281,9 @@
                 {#if errors[target.key]}
                   <div class="mt-1 text-xs text-red-600">{errors[target.key]}</div>
                 {/if}
+                {#if notices[target.key]}
+                  <div class="mt-1 text-xs text-green-700">{notices[target.key]}</div>
+                {/if}
                 {#if run?.status === "failed" && run.error}
                   <div class="mt-1 text-xs text-red-600">{run.error}</div>
                 {/if}
@@ -248,6 +322,14 @@
                     color="blue"
                     disabled={!run?.has_orphaned_report || (run?.orphaned_files ?? 0) === 0}
                   />
+                  <DsActionButton
+                    action={() => openDeleteConfirm(target)}
+                    icon="mdi:delete-alert-outline"
+                    title="Delete Orphaned Attachments"
+                    color="red"
+                    loading={deletingTargets.has(target.key)}
+                    disabled={!run?.has_orphaned_report || (run?.orphaned_files ?? 0) === 0}
+                  />
                 </div>
               </td>
             </tr>
@@ -257,3 +339,24 @@
     </div>
   {/if}
 </div>
+
+{#if deleteConfirmTarget}
+  <DSPopover
+    show={true}
+    title="Delete Orphaned Attachments"
+    subtitle={deleteConfirmTarget.label}
+    submitLabel="Delete Orphans"
+    submitting={deletingTargets.has(deleteConfirmTarget.key)}
+    onSubmit={deleteOrphans}
+    onCancel={closeDeleteConfirm}
+  >
+    <p class="text-sm text-neutral-700">
+      This will use the latest cached orphaned report for {deleteConfirmTarget.label} as the basis
+      for deletion. Before each file is deleted, the server will re-check current records and skip
+      any file that is now referenced.
+    </p>
+    <p class="text-sm font-semibold text-red-700">
+      Deleted files are removed from configured storage and cannot be restored from this screen.
+    </p>
+  </DSPopover>
+{/if}

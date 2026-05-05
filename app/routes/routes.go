@@ -289,6 +289,7 @@ func AddRoutes(app core.App) {
 		attachmentAuditGroup.GET("/targets", createListAttachmentAuditTargetsHandler(app))
 		attachmentAuditGroup.GET("/targets/{target}", createGetAttachmentAuditRunHandler(app))
 		attachmentAuditGroup.POST("/targets/{target}/refresh", createRefreshAttachmentAuditHandler(app))
+		attachmentAuditGroup.POST("/targets/{target}/delete_orphans", createDeleteAttachmentAuditOrphansHandler(app))
 		attachmentAuditGroup.GET("/targets/{target}/missing.csv", createDownloadAttachmentAuditReportHandler(app, "missing_report"))
 		attachmentAuditGroup.GET("/targets/{target}/orphaned.csv", createDownloadAttachmentAuditReportHandler(app, "orphaned_report"))
 
