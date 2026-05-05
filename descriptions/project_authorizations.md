@@ -12,6 +12,7 @@ time capture until the proof exists.
 ## Goals
 
 * Store the scanned PA PDF on the project job record.
+* Record who uploaded the scanned PA PDF and when they uploaded it.
 * Detect duplicate uploaded PA documents across all jobs.
 * Give Accounting a queue of uploaded-but-unreviewed PAs.
 * Approve a PA only when Accounting approves the same file they reviewed.
@@ -57,19 +58,31 @@ feature.
 
 ## Data Model
 
+Add this field to `branches`:
+
+| Field | Type | Notes |
+| --- | --- | --- |
+| `manager` | relation to `users` | Branch manager for the branch. Used as one of the project-side users allowed to upload a PA document. |
+
 Add these fields to `jobs`:
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `project_authorization_doc` | file | Required to be a PDF when present. Stores the scanned PA. Configure the PocketBase file field with `mimeTypes = ["application/pdf"]`. |
 | `project_authorization_doc_hash` | text | Server-calculated content hash of `project_authorization_doc`. Must be globally unique across `jobs` when non-empty. |
-| `pa_reviewer` | relation to `users` | User who approved the current PA document. Blank until approved. |
-| `pa_reviewed` | datetime | Approval timestamp. Blank until approved. |
+| `project_authorization_doc_uploader` | relation to `users` | User who uploaded the current PA document. This is the project-side primary approval record. Blank until a PA document is uploaded. |
+| `project_authorization_doc_uploaded` | datetime | Server timestamp for the current PA document upload. This is the project-side primary approval timestamp. Blank until a PA document is uploaded. |
+| `pa_reviewer` | relation to `users` | Accounting user who approved the current PA document. Blank until Accounting approves. |
+| `pa_reviewed` | datetime | Accounting approval timestamp. Blank until Accounting approves. |
 
-Hashing must be server-owned. Clients may upload files, but they must not submit
-or override the hash. A changed unreviewed file must always produce a new hash,
-and any change to an unreviewed `project_authorization_doc` must keep
-`pa_reviewed` and `pa_reviewer` blank.
+Hashing and upload metadata must be server-owned. Clients may upload files, but
+they must not submit or override the hash, uploader, or upload timestamp. A
+changed unreviewed file must always produce a new hash, set
+`project_authorization_doc_uploader` to the caller, set
+`project_authorization_doc_uploaded` to the current server timestamp, and keep
+`pa_reviewed` and `pa_reviewer` blank. Removing an unreviewed uploaded document
+must clear the hash, uploader, upload timestamp, reviewer, and reviewed
+timestamp.
 Use the existing attachment hash convention: SHA-256 over the raw uploaded file
 bytes, stored as a lowercase hex string. Turbo already uses this through
 `CalculateFileFieldHash` for expense and purchase order attachment hashes.
@@ -84,31 +97,44 @@ hashes as a validation error on `project_authorization_doc`.
 
 ## Upload Permissions
 
-The meeting notes say that either the project manager or a `job` claim holder can
-upload the PA after the job is created. In the current schema, the project
-manager is `jobs.manager`; there is no separate `project_manager` field.
+The PA upload is the project-side primary approval. The current schema already
+has an assigned project manager as `jobs.manager`; it does not currently have a
+branch manager field, so this feature should extend `branches` with a `manager`
+relation.
 
 Because the current `jobs` collection update rule is scoped to `job` claim
-holders, manager upload access will need either:
+holders, manager and branch-manager upload access will need either:
 
 * a dedicated route such as `POST /api/jobs/:id/project_authorization_doc`, or
-* a collection rule change that allows `jobs.manager` to update only the PA file
-  fields.
+* a collection rule change that allows only the assigned job manager or the
+  job's branch manager to update only the PA file fields.
 
 A dedicated route is safer because it can enforce file type, hashing,
-duplicate-hash checks, and approval reset behavior in one place without opening
-general job editing to managers.
+duplicate-hash checks, upload metadata, and approval reset behavior in one place
+without opening general job editing to managers.
 
 Upload should be allowed only when:
 
-* the caller has the `job` claim, or
 * the caller is the job's `manager`, or
-* the caller is the job's `alternate_manager`.
+* the caller is the `manager` for the job's related `branch`.
+
+The successful upload records the caller and server timestamp in
+`project_authorization_doc_uploader` and `project_authorization_doc_uploaded`.
+Those fields are the primary approval record. Accounting approval remains
+separate and is recorded in `pa_reviewer` and `pa_reviewed`.
 
 Approved PA documents are immutable. Once `pa_reviewed` and `pa_reviewer` are
 populated, nobody may replace or remove `project_authorization_doc`, including
-admins, managers, alternate managers, and `job` claim holders. An admin must
-revoke the PA approval first; only then may the unreviewed document be changed.
+admins, managers, branch managers, and `job` claim holders. An admin must revoke
+the PA approval first; only then may the unreviewed document be changed.
+
+This intentionally does not fully model a value-based Functional Authority
+Matrix. The proposed policy mentions higher approval levels depending on project
+value, but the current Turbo schema does not identify a division manager role or
+define the value thresholds, escalation rules, substitute approvers, or how
+executive approval should be represented. Until those details are specified,
+this spec treats upload by the assigned job manager or branch manager as the
+project-side primary approval.
 
 ## File Visibility
 
@@ -130,12 +156,15 @@ The queue lists project jobs where:
 * `status = "Active"`,
 * `authorizing_document = "PA"`,
 * `project_authorization_doc` is populated,
+* `project_authorization_doc_uploader` is populated,
+* `project_authorization_doc_uploaded` is populated,
 * `pa_reviewed` is blank, and
 * `pa_reviewer` is blank.
 
 The queue should include enough context for review:
 
 * job id, number, description, client, manager, branch, status,
+* PA uploader and uploaded timestamp,
 * uploaded file URL or preview action,
 * `project_authorization_doc_hash`.
 
@@ -236,6 +265,13 @@ When the key or property is missing, invalid, or unreadable, Turbo should not
 block writes. This matches the requested rollout behavior: deployment can fall
 back to permissive behavior if a problem appears.
 
+This spec interprets "not active until approved" as operational blocking, not as
+a new job status lifecycle. A job may still have `status = "Active"` so it can
+appear in review queues and normal project views, but when enforcement is
+enabled it is not usable for timesheet bundling, purchase order saves, or
+expense saves until the project-side upload record and Accounting approval both
+exist.
+
 ## Enforcement Gates
 
 When `jobs.enforce_project_authorization = true`, Turbo must gate the workflows
@@ -285,6 +321,8 @@ A project is PA-approved only when all of the following are true:
 * `jobs.authorizing_document = "PA"`,
 * `jobs.project_authorization_doc` is populated,
 * `jobs.project_authorization_doc_hash` is populated,
+* `jobs.project_authorization_doc_uploader` is populated,
+* `jobs.project_authorization_doc_uploaded` is populated,
 * `jobs.pa_reviewed` is populated, and
 * `jobs.pa_reviewer` is populated.
 
@@ -315,8 +353,9 @@ For projects, show the PA status near the existing authorizing document details:
 
 * no PA expected: no PA review controls,
 * PA expected, no file: "PA document missing",
-* PA uploaded, pending review: "PA pending Accounting approval",
-* PA approved: reviewer and reviewed timestamp,
+* PA uploaded, pending review: uploader, uploaded timestamp, and "PA pending
+  Accounting approval",
+* PA approved: uploader, uploaded timestamp, reviewer, and reviewed timestamp,
 * PA revoked: same as uploaded pending review; prior approval history is not
   retained.
 
@@ -339,13 +378,15 @@ information; otherwise use the generic "project's manager" wording.
 
 ## Migration And Backfill
 
-Initial migration should add the four `jobs` fields and the hash uniqueness
-guard. Existing projects should remain unapproved until a scanned PA PDF is
-uploaded and Accounting approves it.
+Initial migration should add the `branches.manager` field, the six `jobs`
+fields, and the hash uniqueness guard. Existing projects should remain
+unapproved until a scanned PA PDF is uploaded by the assigned job manager or
+branch manager and Accounting approves it.
 
-Do not backfill `pa_reviewed` based only on `authorizing_document = "PA"`. That
-would recreate the current weak proxy and defeat the purpose of the review
-workflow.
+Do not backfill `project_authorization_doc_uploader`,
+`project_authorization_doc_uploaded`, `pa_reviewed`, or `pa_reviewer` based only
+on `authorizing_document = "PA"`. That would recreate the current weak proxy and
+defeat the purpose of the two-approval workflow.
 
 This is intentional. The rollout review period happens while
 `jobs.enforce_project_authorization` is `false`. The flag should remain off
@@ -359,22 +400,31 @@ for still unreviewed PA projects.
   only to jobs where `authorizing_document = "PA"` or whether it replaces the
   current PO/PA distinction and applies to all projects. This is a fundamental
   architectural blocker and must be resolved before implementation starts.
+* The value-based Functional Authority Matrix requirement is underspecified.
+  Turbo currently has `jobs.manager` and, after this feature, `branches.manager`.
+  It does not specify who counts as the division manager for a job, and it does
+  not have a clear division-manager field, value threshold table, executive
+  approval model, or rule for when each approval level is required.
+  Implementation should not claim to satisfy that matrix until those details are
+  defined.
 
 ## Implementation Checklist
 
-1. Add a PocketBase migration for the four `jobs` fields and hash uniqueness.
+1. Add a PocketBase migration for `branches.manager`, the six `jobs` fields, and
+   hash uniqueness.
 2. Add server-owned PDF upload handling, PDF-only PocketBase MIME restriction,
-   and hash calculation.
-3. Prevent replacing or removing an approved PA document until admin revocation.
-4. Add the Accounting approval queue endpoint/query.
-5. Add the Accounting approval endpoint with hash compare-and-set semantics.
-6. Add the admin revocation endpoint.
-7. Add `jobs.enforce_project_authorization` config lookup with default `false`.
-8. Gate timesheet bundle, purchase order create/update, and expense
+   hash calculation, uploader recording, and upload timestamp recording.
+3. Restrict PA upload to the assigned job manager or the job's branch manager.
+4. Prevent replacing or removing an approved PA document until admin revocation.
+5. Add the Accounting approval queue endpoint/query.
+6. Add the Accounting approval endpoint with hash compare-and-set semantics.
+7. Add the admin revocation endpoint.
+8. Add `jobs.enforce_project_authorization` config lookup with default `false`.
+9. Gate timesheet bundle, purchase order create/update, and expense
    create/update when the flag is enabled.
-9. Update PO visibility fields that currently expose `has_project_authorization`
+10. Update PO visibility fields that currently expose `has_project_authorization`
    from `authorizing_document = "PA"` if they are meant to mean approved PA.
-10. Add UI controls on job details, Accounting queue UI, and downstream editor
+11. Add UI controls on job details, Accounting queue UI, and downstream editor
     error handling.
 
 ## Test Coverage
@@ -382,12 +432,18 @@ for still unreviewed PA projects.
 Backend tests should cover:
 
 * upload accepts PDFs and rejects non-PDFs,
+* upload is allowed for the assigned job manager,
+* upload is allowed for the job's branch manager,
+* upload is rejected for other authenticated users,
 * `project_authorization_doc` is configured with only `application/pdf` in its
   PocketBase `mimeTypes`,
 * hash is calculated server-side,
+* uploader and uploaded timestamp are calculated server-side,
 * duplicate hashes are rejected,
-* changing an unreviewed uploaded PDF keeps `pa_reviewed` and `pa_reviewer`
-  blank,
+* changing an unreviewed uploaded PDF updates uploader and uploaded timestamp,
+  and keeps `pa_reviewed` and `pa_reviewer` blank,
+* removing an unreviewed uploaded PDF clears hash, uploader, uploaded timestamp,
+  reviewer, and reviewed timestamp,
 * replacing or removing an approved PA document fails until admin revocation,
 * Accounting approval succeeds with the current hash,
 * Accounting approval fails when the submitted hash is stale,
