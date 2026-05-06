@@ -487,7 +487,29 @@ Regression coverage:
 
 Phase 2 can happen days, weeks, or months after Phase 1. The app will already support mixed legacy/document attachment storage.
 
-The backfill should be idempotent and split into prepare, manual S3 copy, verify, and link steps. This prevents the app from pointing an expense at a document path before the file exists in S3.
+The backfill should be idempotent and split into prepare, manual S3 copy, verify, and apply steps. This prevents the app from pointing an expense at a document path before the file exists in S3.
+
+Phase 2 is a local-first maintenance workflow:
+
+1. Dump the production database locally.
+2. Run `prepare` against the local dump to precompute the migration manifest.
+3. Run the generated `copy_s3.sh` to copy legacy S3 objects into their new document-owned prefixes.
+4. Run `verify` against the copied objects.
+5. Stop production.
+6. Re-dump or otherwise refresh the production database state locally.
+7. Run `apply` from the verified manifest so the database rows match the already-copied files.
+
+The target set is committed legacy-only expenses:
+
+```sql
+SELECT *
+FROM expenses
+WHERE attachment != ''
+  AND (attachment_document = '' OR attachment_document IS NULL)
+  AND committed != ''
+```
+
+The copy step must copy, never move or delete, legacy S3 objects. Any reconcile mismatch during `verify` or `apply` should abort rather than inventing a new mapping.
 
 ### 1. Add a backfill command
 
@@ -498,7 +520,7 @@ It should support at least these modes:
 ```text
 prepare
 verify
-link
+apply
 report
 ```
 
@@ -512,13 +534,14 @@ The command uses the app database and PocketBase collection metadata so it can d
 
 ### 2. Prepare mode
 
-`prepare` scans for expenses that still need migration:
+`prepare` scans for committed expenses that still need migration:
 
 ```sql
 SELECT *
 FROM expenses
 WHERE attachment != ''
   AND (attachment_document = '' OR attachment_document IS NULL)
+  AND committed != ''
 ```
 
 For each row:
@@ -535,15 +558,34 @@ For each row:
    - if blank, read the legacy file and compute SHA-256;
    - if the file cannot be read, record an error and skip that expense.
 
-3. Find an existing `expense_documents` row by `attachment_hash`.
+3. Determine the document id and document attachment filename for the attachment hash:
 
-4. If no document exists, create one with:
+   - if the hash already exists in `expense_documents`, use that document id and the row's current `attachment` filename;
+   - if the hash already appeared earlier in the manifest, reuse the same precomputed document id and document attachment filename;
+   - otherwise generate a new deterministic `expense_document_id` for the manifest and use the legacy expense attachment filename as `document_attachment`.
+
+   Any generated `expense_document_id` must be deterministically derived from
+   the attachment hash and must be a valid PocketBase record id: exactly 15
+   lowercase alphanumeric characters. Use the first 15 characters of the
+   lowercase base32 encoding of:
+
+   ```text
+   SHA-256("expense_document:" + attachment_hash)
+   ```
+
+   Do not use the raw attachment hash prefix directly as the document id.
+
+4. Determine the future `expense_documents` row values for newly generated document ids:
 
    - `attachment` set to the same filename as the legacy attachment;
    - `attachment_hash` set to the computed hash;
    - `uploaded_by` set to `expenses.creator` when present, otherwise `expenses.uid`.
 
-5. Do not set `expenses.attachment_document` yet unless the document's S3 object already exists and verifies.
+   When the manifest reuses an existing `expense_documents` row, do not rewrite
+   that row's attachment filename. The manifest's `new_s3_key` must use the
+   existing document id and existing document attachment filename.
+
+5. Do not create `expense_documents` rows and do not set `expenses.attachment_document` in `prepare`. The database writes happen in `apply`, after S3 copies are complete and production is stopped.
 
 6. Write a manifest row containing:
 
@@ -553,6 +595,7 @@ For each row:
    attachment_hash
    expense_document_id
    document_attachment
+   uploaded_by
    old_s3_key
    new_s3_key
    copy_required
@@ -569,13 +612,13 @@ tmp/expense_document_backfill/copy_s3.sh
 tmp/expense_document_backfill/errors.tsv
 ```
 
-`prepare` must be safe to rerun. If it sees a document it created earlier, it should reuse it and preserve the same `expense_document_id`.
+`prepare` must be safe to rerun. For the same input database and files, it should preserve the same `expense_document_id` values so the generated S3 destination keys stay stable.
 
 ### 3. Manual S3 copy
 
 After `prepare`, manually copy the existing S3 objects from the old expense prefixes to the new expense document prefixes.
 
-This manual copy happens after document records are prepared and before expenses are linked.
+This manual copy happens before the database is mutated. The manifest's precomputed `expense_document_id` values determine the destination S3 keys that `apply` will later reference.
 
 For each manifest row with `copy_required = true`, copy:
 
@@ -591,7 +634,7 @@ from: o1vpz1mm7qsfoyy/b4o6xph4ngwx4nw/receipt.pdf
 to:   {expense_documents_collection_id}/{expense_document_id}/receipt.pdf
 ```
 
-The generated `copy_s3.sh` should contain explicit copy commands so the operator can review exactly what will move before running it. It should not delete the old objects.
+The generated `copy_s3.sh` should contain explicit copy commands so the operator can review exactly what will move before running it. It must not delete the old objects.
 
 Example command shape:
 
@@ -600,7 +643,7 @@ aws s3 cp "s3://$TYBALT_S3_BUCKET/o1vpz1mm7qsfoyy/{expense_id}/{filename}" \
   "s3://$TYBALT_S3_BUCKET/{expense_documents_collection_id}/{expense_document_id}/{filename}"
 ```
 
-Do not set `expenses.attachment_document` for rows whose new S3 object has not been copied and verified.
+Do not create `expense_documents` rows or set `expenses.attachment_document` for rows whose new S3 object has not been copied and verified.
 
 ### 4. Verify mode
 
@@ -610,10 +653,13 @@ After the manual S3 copy, run `verify`.
 
 1. New S3 object exists.
 2. New S3 object can be read through PocketBase filesystem APIs.
-3. SHA-256 of the copied object matches `expense_documents.attachment_hash`.
+3. SHA-256 of the copied object matches the manifest `attachment_hash`.
 4. Existing legacy source object still exists.
+5. The current expense row is still legacy-only or already linked to the expected document.
+6. No existing `expense_documents` row maps the same hash to a different id.
+7. If the manifest reuses an existing `expense_documents` row, that row's `attachment_hash` and `attachment` still match the manifest.
 
-Rows that fail verification remain unlinked. Write failures to:
+Rows that fail verification remain unapplied. Write failures to:
 
 ```text
 tmp/expense_document_backfill/verify_errors.tsv
@@ -621,9 +667,9 @@ tmp/expense_document_backfill/verify_errors.tsv
 
 `verify` must be safe to rerun after recopying failed rows.
 
-### 5. Link mode
+### 5. Apply mode
 
-After `verify` succeeds for a row, `link` updates the expense:
+After `verify` succeeds and production is stopped, `apply` reconciles the refreshed database against the manifest and performs the database writes. It inserts any missing `expense_documents` rows using the manifest's precomputed ids, then updates each verified expense:
 
 ```text
 expenses.attachment_document = expense_document_id
@@ -638,11 +684,14 @@ expenses.attachment_hash
 
 Keeping the legacy fields until cleanup gives a rollback path and makes it easier to audit the migration.
 
-`link` should be transactional for DB changes and idempotent:
+`apply` should run all DB changes in one transaction and be idempotent:
 
 - skip rows already linked to the expected document;
-- flag rows linked to a different document;
-- never overwrite a non-empty `attachment_document` without an explicit force flag.
+- abort if a row is linked to a different document;
+- abort if an expected expense is missing;
+- abort if an `expense_documents` row already uses the same hash with a different id;
+- abort if a copied S3 target is missing or fails hash verification;
+- never overwrite a non-empty `attachment_document`.
 
 ### 6. Report mode
 
@@ -650,7 +699,7 @@ Keeping the legacy fields until cleanup gives a rollback path and makes it easie
 
 - total expenses with legacy attachment;
 - total with `attachment_document`;
-- total still legacy-only;
+- total still legacy-only committed expenses;
 - total document-backed but missing target S3 object;
 - duplicate hashes sharing one document;
 - rows with missing legacy files;
@@ -678,13 +727,14 @@ Implement backend tests before running Phase 2 in production.
 
 Prepare mode:
 
-- `prepare` creates document records for legacy-only expenses with valid attachments;
-- `prepare` reuses an existing document when another expense has the same hash;
+- `prepare` precomputes document ids for legacy-only committed expenses with valid attachments;
+- `prepare` reuses an existing or already-manifested document id when another expense has the same hash;
 - `prepare` uses `expenses.attachment_hash` when present;
 - `prepare` computes the SHA-256 hash from the legacy file when `expenses.attachment_hash` is blank;
 - `prepare` records an error and skips rows whose legacy file cannot be read;
 - `prepare` writes a manifest with correct old and new S3 keys;
-- rerunning `prepare` is idempotent and preserves previously created document ids.
+- rerunning `prepare` is idempotent and preserves deterministic 15-character lowercase alphanumeric manifest document ids derived from the attachment hash;
+- generated manifest document ids use the namespaced SHA-256/base32 derivation, not a raw attachment hash prefix.
 
 Manual copy support:
 
@@ -701,13 +751,15 @@ Verify mode:
 - `verify` fails when the legacy source object is missing;
 - rerunning `verify` after correcting a failed copy succeeds without changing linked expenses.
 
-Link mode:
+Apply mode:
 
-- `link` sets `expenses.attachment_document` only for verified rows;
-- `link` leaves `expenses.attachment` and `expenses.attachment_hash` untouched during the backfill pass;
-- `link` skips rows already linked to the expected document;
-- `link` refuses to overwrite a row linked to a different document unless an explicit force mode is used;
-- `link` is transactional for DB updates and leaves no partially linked batch after an injected failure.
+- `apply` inserts missing `expense_documents` rows using manifest ids;
+- `apply` sets `expenses.attachment_document` only for verified rows;
+- `apply` leaves `expenses.attachment` and `expenses.attachment_hash` untouched during the backfill pass;
+- `apply` skips rows already linked to the expected document;
+- `apply` aborts when a row is linked to a different document;
+- `apply` aborts when a matching hash exists under a different document id;
+- `apply` is transactional for DB updates and leaves no partially applied batch after an injected failure.
 
 Report and cleanup readiness:
 
@@ -732,7 +784,7 @@ Backend tests should cover:
 - replacement attachment on a legacy expense uses the replacement document rather than migrating the old file;
 - backfill prepare is idempotent;
 - backfill verify refuses bad or missing copies;
-- backfill link skips already-linked rows and refuses mismatched links.
+- backfill apply skips already-linked rows and refuses mismatched links.
 
 Frontend tests or manual checks should cover:
 
@@ -754,7 +806,7 @@ Integration/manual testing against the dumped production DB should include:
 - Phase 1 requires a normal deployment but not an outage window.
 - Phase 1 should be deployed only after testing locally on `multi_use_attachment` against a dumped production DB.
 - Phase 2 does not need to be scheduled immediately.
-- The manual S3 copy belongs to Phase 2, after `prepare` and before `verify`/`link`.
+- The manual S3 copy belongs to Phase 2, after `prepare` and before `verify`/`apply`.
 - The old S3 objects under the `expenses` collection prefix should not be deleted during Phase 2. Deletion, if desired, should be considered only after a separate retention/rollback decision.
 - The `expense_documents.attachment_hash` unique index remains the long-term duplicate prevention mechanism.
 - Orphaned `expense_documents` rows may be relinked by later uploads of the same file; this is not treated as multi-expense reuse unless another expense still references the document or hash.
