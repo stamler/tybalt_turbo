@@ -34,3 +34,7 @@ created,email,emailVisibility,id,name,password,tokenKey,updated,username,verifie
 2026-04-29 00:00:00.000Z,it.identity@example.com,0,uitidentity0001,IT Identity,a.vQd0,tok_uit_identity_000000000000000000000000000000,2026-04-29 00:00:00.000Z,uitidentity,1
 2026-04-29 00:00:00.000Z,identity.subject@example.com,0,uidsubject00001,Identity Subject,a.vQd0,tok_uid_subject_000000000000000000000000000000,2026-04-29 00:00:00.000Z,uidsubject,1
 2026-04-29 00:00:00.000Z,identity.other@example.com,0,uidother0000001,Identity Other,a.vQd0,tok_uid_other_0000000000000000000000000000000,2026-04-29 00:00:00.000Z,uidother,1
+2026-05-06 12:00:00.000Z,payroll.branch.hourly@example.com,0,u_pbranch_hourly,Payroll Branch Hourly,a.vQd0,tok_u_pbranch_hourly,2026-05-06 12:00:00.000Z,upbranchhourly,1
+2026-05-06 12:00:00.000Z,payroll.branch.salary.default@example.com,0,u_pbranch_saldef,Payroll Branch Salary Default,a.vQd0,tok_u_pbranch_saldef,2026-05-06 12:00:00.000Z,upbranchsaldef,1
+2026-05-06 12:00:00.000Z,payroll.branch.salary.fallback@example.com,0,u_pbranch_salfallback,Payroll Branch Salary Fallback,a.vQd0,tok_u_pbranch_salfallback,2026-05-06 12:00:00.000Z,upbranchsalfallback,1
+2026-05-06 12:00:00.000Z,payroll.branch.salary.tie@example.com,0,u_pbranch_saltie,Payroll Branch Salary Tie,a.vQd0,tok_u_pbranch_saltie,2026-05-06 12:00:00.000Z,upbranchsaltie,1

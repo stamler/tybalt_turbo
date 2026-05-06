@@ -1,6 +1,6 @@
 # Payroll Branch Report Columns
 
-## STATUS: PLANNED, UNIMPLEMENTED, PENDING REVIEW
+## STATUS: IMPLEMENTED, PENDING REVIEW
 
 ### Scope
 
@@ -51,18 +51,18 @@ No cap or normalization is applied to hourly staff branch values.
 For salary staff, branch columns begin with the same `R` and `RT` branch totals
 used for hourly staff.
 
-After those branch totals are calculated, apply a 40-hour cap across all branch
-columns for that salary user.
+After those branch totals are calculated, apply a cap equal to the salary user's
+payroll-row `work_week_hours` across all branch columns for that salary user.
 
-If the salary user's total across branch columns is 40 or less, leave the branch
-values unchanged.
+If the salary user's total across branch columns is equal to or less than their
+`work_week_hours`, leave the branch values unchanged.
 
-If the salary user's total across branch columns exceeds 40:
+If the salary user's total across branch columns exceeds `work_week_hours`:
 
 1. Calculate the excess:
 
    ```text
-   excess = SUM(all branch values for the user) - 40
+   excess = SUM(all branch values for the user) - work_week_hours
    ```
 
 2. Subtract the excess from the user's default branch first.
@@ -75,12 +75,23 @@ If the salary user's total across branch columns exceeds 40:
 
 5. If draining the highest remaining branch still leaves excess, continue
    subtracting from the next highest remaining branch until the user's total
-   branch hours equal 40.
+   branch hours equal `work_week_hours`.
 
 6. Branch values must never be negative.
 
 If there is a tie for highest remaining branch, use a deterministic tie-breaker
 so the report is stable across runs. Branch name ascending order is preferred.
+
+### Salary Cap Source
+
+For regular time entries, the salary cap must come from
+`time_sheets.work_week_hours`. `time_sheets.work_week_hours` is snapshotted from
+`admin_profiles.work_week_hours` at bundle time, so it preserves the historical
+payroll context even if the admin profile is edited later.
+
+For committed amendments, use the amendment's linked
+`time_sheets.work_week_hours` when `time_amendments.tsid` resolves. If no linked
+timesheet snapshot is available, fall back to `admin_profiles.work_week_hours`.
 
 ### Default Branch Handling
 
@@ -161,8 +172,9 @@ Backend tests should cover at least:
 - Hourly staff branch columns include only `R` and `RT`.
 - Hourly staff branch columns exclude PPTO, Sick, Vacation, Bereavement, and
   Stat Holiday.
-- Salary staff branch totals at or below 40 remain unchanged.
-- Salary staff branch totals above 40 are reduced from the default branch first.
+- Salary staff branch totals at or below `work_week_hours` remain unchanged.
+- Salary staff branch totals above `work_week_hours` are reduced from the
+  default branch first.
 - Salary staff reduction falls through to the highest remaining branch when the
   default branch cannot absorb the full excess.
 - Salary staff reduction is deterministic when two branches tie for the highest

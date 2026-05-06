@@ -12,21 +12,14 @@ import (
 )
 
 const (
-	payrollBranchColumnsWeekEnding  = "2030-01-12"
-	payrollBranchColumnsTimeSheetID = "ptbranchsheet001"
-	payrollBranchColumnsTimeEntryID = "ptbranchentry001"
-	payrollBranchColumnsAmendmentID = "ptbranchamend001"
-	payrollBranchColumnsMissingID   = "ptbranchamend002"
-	payrollBranchTorontoID          = "xeq9q81q5307f70"
-	payrollBranchThunderBayID       = "80875lm27v8wgi4"
-	payrollBranchRegularTimeTypeID  = "sdyfl3q7j7ap849"
-	payrollBranchPPTOTimeTypeID     = "mn8q8lnnqln0kt6"
-	payrollBranchExpectedThunderBay = 2.0
-	payrollBranchExpectedToronto    = 8.0
-	payrollBranchExpectedUnassigned = 3.0
+	payrollBranchColumnsWeekEnding = "2030-01-12"
+	payrollBranchHourlyPayrollID   = "930010"
+	payrollBranchSalaryDefaultID   = "930011"
+	payrollBranchSalaryFallbackID  = "930012"
+	payrollBranchSalaryTieID       = "930013"
 )
 
-func TestPayrollTimeReport_IncludesOrderedBranchAllocationColumns(t *testing.T) {
+func TestPayrollTimeReport_AppliesBranchAllocationRules(t *testing.T) {
 	reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
 	if err != nil {
 		t.Fatal(err)
@@ -96,14 +89,45 @@ func TestPayrollTimeReport_IncludesOrderedBranchAllocationColumns(t *testing.T) 
 
 			assertCSVFloatEquals(tb, row["hours worked"], 8)
 			assertCSVFloatEquals(tb, row["PPTO"], 5)
-			assertCSVFloatEquals(tb, row["Thunder Bay"], payrollBranchExpectedThunderBay)
-			assertCSVFloatEquals(tb, row["Toronto"], payrollBranchExpectedToronto)
+			assertCSVFloatEquals(tb, row["Thunder Bay"], 0)
+			assertCSVFloatEquals(tb, row["Toronto"], 8)
 			assertCSVFloatEquals(tb, row["Collingwood"], 0)
-			assertCSVFloatEquals(tb, row["Unassigned"], payrollBranchExpectedUnassigned)
+			assertCSVFloatEquals(tb, row["Unassigned"], 0)
+
+			hourlyRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchHourlyPayrollID)
+			assertCSVFloatEquals(tb, hourlyRow["Thunder Bay"], 32)
+			assertCSVFloatEquals(tb, hourlyRow["Toronto"], 12)
+			assertCSVFloatEquals(tb, hourlyRow["Ottawa"], 0)
+			assertCSVFloatEquals(tb, hourlyRow["Collingwood"], 0)
+			assertCSVFloatEquals(tb, hourlyRow["Unassigned"], 0)
+
+			salaryDefaultRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchSalaryDefaultID)
+			assertCSVFloatEquals(tb, salaryDefaultRow["Thunder Bay"], 30)
+			assertCSVFloatEquals(tb, salaryDefaultRow["Toronto"], 10)
+
+			salaryFallbackRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchSalaryFallbackID)
+			assertCSVFloatEquals(tb, salaryFallbackRow["Thunder Bay"], 0)
+			assertCSVFloatEquals(tb, salaryFallbackRow["Toronto"], 20)
+			assertCSVFloatEquals(tb, salaryFallbackRow["Ottawa"], 20)
+
+			salaryTieRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchSalaryTieID)
+			assertCSVFloatEquals(tb, salaryTieRow["Ottawa"], 15)
+			assertCSVFloatEquals(tb, salaryTieRow["Toronto"], 25)
+			assertCSVFloatEquals(tb, salaryTieRow["Thunder Bay"], 0)
 		},
 	}
 
 	scenario.Test(t)
+}
+
+func requirePayrollReportRow(tb testing.TB, rows map[string]map[string]string, payrollID string) map[string]string {
+	tb.Helper()
+
+	row, ok := rows[payrollID]
+	if !ok {
+		tb.Fatalf("missing payroll row for payrollId %s", payrollID)
+	}
+	return row
 }
 
 func assertCSVFloatEquals(tb testing.TB, value string, want float64) {

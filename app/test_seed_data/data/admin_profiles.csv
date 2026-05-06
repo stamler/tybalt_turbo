@@ -32,3 +32,7 @@ _imported,active,allow_personal_reimbursement,created,default_branch,default_cha
 0,1,0,2026-04-10 00:00:00.000Z,80875lm27v8wgi4,50,ap_placeholderpay,Placeholder Payroll,,,0,2024-01-07,0,0,912345678,,0,no,0,u_placeholderpay,0,2026-04-10 00:00:00.000Z,40
 0,1,0,2026-04-29 00:00:00.000Z,80875lm27v8wgi4,50,apidsubject0001,Identity Subject,legacy_identity_subject,,0,2024-01-07,0,0,920001,,0,no,0,uidsubject00001,0,2026-04-29 00:00:00.000Z,40
 0,1,0,2026-04-29 00:00:00.000Z,80875lm27v8wgi4,50,apidother000001,Identity Other,legacy_identity_other,,0,2024-01-07,0,0,920002,,0,no,0,uidother0000001,0,2026-04-29 00:00:00.000Z,40
+0,1,0,2026-05-06 12:00:00.000Z,80875lm27v8wgi4,50,ap_pbranch_h01,Payroll Branch Hourly,,,0,2024-01-07,0,0,930010,,0,no,0,u_pbranch_hourly,0,2026-05-06 12:00:00.000Z,40
+0,1,0,2026-05-06 12:00:00.000Z,80875lm27v8wgi4,50,ap_pbranch_sd1,Payroll Branch Salary Default,,,0,2024-01-07,0,0,930011,,1,no,0,u_pbranch_saldef,0,2026-05-06 12:00:00.000Z,37.5
+0,1,0,2026-05-06 12:00:00.000Z,80875lm27v8wgi4,50,ap_pbranch_sf1,Payroll Branch Salary Fallback,,,0,2024-01-07,0,0,930012,,1,no,0,u_pbranch_salfallback,0,2026-05-06 12:00:00.000Z,40
+0,1,0,2026-05-06 12:00:00.000Z,80875lm27v8wgi4,50,ap_pbranch_st1,Payroll Branch Salary Tie,,,0,2024-01-07,0,0,930013,,1,no,0,u_pbranch_saltie,0,2026-05-06 12:00:00.000Z,40
