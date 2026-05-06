@@ -2,12 +2,12 @@
 
 * STATUS: UNIMPLEMENTED, DRAFT, REQUESTING FEEDBACK *
 
-Turbo needs a formal project authorization flow for projects whose authorizing
-document is a Project Authorization (`PA`). The current `jobs.authorizing_document`
-field records the business authorization type (`Unauthorized`, `PO`, or `PA`),
-but it does not prove that Accounting has reviewed a scanned PA document. This
-feature adds that proof and optionally blocks downstream project spending and
-time capture until the proof exists.
+Turbo needs a formal project authorization flow for project jobs. The current
+`jobs.authorizing_document` field records the legacy business authorization type
+(`Unauthorized`, `PO`, or `PA`), but it does not prove that Accounting has
+reviewed a scanned signed PA document. This feature makes reviewed PA documents
+the authorization source of truth for project jobs and optionally blocks
+downstream project spending and time capture until that proof exists.
 
 ## Goals
 
@@ -19,7 +19,11 @@ time capture until the proof exists.
   unapproved PA projects when enforcement is enabled.
 * Allow admins to revoke PA approval without deleting the uploaded PDF.
 
-## Current Model To Preserve
+## Authorization Type Deprecation
+
+In this document, "project job" means a non-proposal record in the `jobs`
+collection, as determined by Turbo's existing job-number/type logic. Proposal
+records are not project jobs and should not be blocked by the PA approval gate.
 
 `jobs.authorizing_document` already identifies the kind of project authorization.
 Existing code treats `authorizing_document = "PA"` as project-authorized in PO
@@ -27,33 +31,30 @@ visibility queries. That is too weak for this new workflow because it only means
 the project is marked as PA-backed; it does not mean a scanned PA exists or has
 been reviewed.
 
-The new approval state should therefore be separate from `authorizing_document`:
+This feature deprecates `jobs.authorizing_document` as the authorization source
+of truth for projects. The field remains in the schema for existing records and
+legacy data readability, but new and edited project records must use
+`authorizing_document = "PA"`. `Unauthorized` becomes an implied state: a project
+is unauthorized for downstream use when it lacks a reviewed PA, not because a
+user selected an `Unauthorized` value.
 
-* `authorizing_document = "PA"`: the project is expected to be PA-backed.
-* `project_authorization_doc` is populated: a scanned PA PDF has been uploaded.
+The new approval state is therefore the source of truth:
+
+* `project_authorization_doc` is populated: a scanned signed PA PDF has been
+  uploaded.
 * `pa_reviewed` and `pa_reviewer` are populated: Accounting has approved the
   currently uploaded PA file.
 
 Any code currently using `authorizing_document = "PA"` as a proxy for project
-authorization should be revisited where actual approval matters.
+authorization should be revisited where actual approval matters. Any code
+currently treating `authorizing_document = "PO"` and `client_po` as a separate
+authorization path should be updated because client PO data is no longer the
+authorization state.
 
-## Fundamental Open Decision
-
-Management and administrators must decide whether the new PA approval gate
-applies only to jobs where `authorizing_document = "PA"` or whether it replaces
-the current PO/PA distinction and applies to all projects.
-
-This is a fundamental architectural blocker. Implementation should not move
-forward until this decision is made because it affects schema meaning,
-migration/backfill strategy, PO behavior, UI copy, validation hooks, and how
-existing projects are interpreted.
-
-The rest of this document assumes the narrower interpretation: the new
-scanned-document approval gate applies to PA-backed projects, not PO-backed
-projects. If the intended policy is that every project must have a scanned PA
-regardless of `authorizing_document`, then `authorizing_document = "PO"` and the
-existing `client_po` path need to be redefined or deprecated as part of this
-feature.
+`client_po` and `client_reference_number` are optional project reference fields.
+They should remain editable independently of `authorizing_document`; neither
+field should be required for PA approval, and neither field should be cleared
+merely because the project is PA-authorized.
 
 ## Data Model
 
@@ -83,10 +84,10 @@ Turbo's existing PO and expense attachment file fields already use PocketBase
 `mimeTypes` allow lists, so the PA field should use the same schema mechanism
 with PDF as the only allowed type.
 
-Uniqueness should be enforced at the database level if PocketBase schema/index
-support allows a partial unique index for non-empty hashes. If not, enforce it
-inside the same transaction that saves the uploaded document and treat duplicate
-hashes as a validation error on `project_authorization_doc`.
+Uniqueness must be enforced with a database-level partial unique index for
+non-empty hashes, matching the existing attachment-hash pattern used elsewhere in
+Turbo. The upload path should still translate duplicate-hash constraint failures
+into a validation error on `project_authorization_doc`.
 
 ## Upload Permissions
 
@@ -97,16 +98,30 @@ manager is `jobs.manager`; there is no separate `project_manager` field, and the
 branch manager should be represented as `branches.manager`.
 
 Because the current `jobs` collection update rule is scoped to `job` claim
-holders, manager, alternate-manager, and branch-manager upload access will need
-either:
+holders, upload should use a dedicated route:
 
-* a dedicated route such as `POST /api/jobs/:id/project_authorization_doc`, or
-* a collection rule change that allows `jobs.manager`, `jobs.alternate_manager`,
-  and the related branch's `manager` to update only the PA file fields.
+```text
+POST /api/jobs/:id/project_authorization_doc
+```
 
-A dedicated route is safer because it can enforce file type, hashing,
-duplicate-hash checks, and approval reset behavior in one place without opening
-general job editing to managers.
+The route is the user-facing write path for managers, alternate managers, branch
+managers, and `job` claim holders. It should enforce upload permission, PDF-only
+files, server-owned hash calculation, duplicate-hash handling, and approval reset
+behavior.
+
+The `jobs` hook must also enforce the invariant as a backstop for every save
+path. Clients must not be able to set or override
+`project_authorization_doc_hash`, approval fields must remain server-owned, and
+an approved PA document must not be deleted, cleared, replaced, or otherwise
+changed until admin revocation clears `pa_reviewed` and `pa_reviewer`.
+The generic `jobs` PocketBase update rule should also be updated so normal
+client-side job edits cannot directly change `project_authorization_doc`,
+`project_authorization_doc_hash`, `pa_reviewer`, or `pa_reviewed`. Document
+changes should go through the dedicated upload route, approval fields should go
+through the Accounting approval endpoint, and revocation should go through the
+admin revocation endpoint. PocketBase rules and hooks should both defend this:
+rules keep ordinary client updates narrow, while hooks preserve the invariant for
+any save path.
 
 Upload should be allowed only when:
 
@@ -152,7 +167,6 @@ paper approval and the internal/client information needed for AR processing.
 The queue lists project jobs where:
 
 * `status = "Active"`,
-* `authorizing_document = "PA"`,
 * `project_authorization_doc` is populated,
 * `pa_reviewed` is blank, and
 * `pa_reviewer` is blank.
@@ -270,26 +284,29 @@ exists.
 ## Enforcement Gates
 
 When `jobs.enforce_project_authorization = true`, Turbo must gate the workflows
-that make PA-backed project work usable downstream. The gate does not apply to
-raw `time_entries` save.
+that make project work usable downstream. The gate does not apply to raw
+`time_entries` save.
+
+When `jobs.enforce_project_authorization = false`, none of the gates in this
+section should block timesheet bundling, purchase order saves, or expense saves.
 
 ### Time
 
-Turbo should allow users to create and edit time entries even when the referenced
-job requires a reviewed PA but does not yet have one. This gives the project
+Turbo should allow users to create and edit time entries even when the
+referenced project job does not yet have a reviewed PA. This gives the project
 team time to upload and review the PA before payroll/accounting workflow reaches
 the timesheet bundle step.
 
 Timesheet bundle must fail atomically if any time entry being bundled references
-a job that requires a reviewed PA and is not approved. No partial bundle should
-be created in that case, and the existing time entries should remain unbundled.
+a project job without a reviewed PA. No partial bundle should be created in that
+case, and the existing time entries should remain unbundled.
 
 ### Purchase Orders
 
 Turbo must reject purchase order save on both create and update when the PO
-references a job that requires a reviewed PA and does not have one. This closes
-the create/update loophole where a PO could be created jobless or against a
-different job and then moved onto an unapproved PA project.
+references a project job without a reviewed PA. This closes the create/update
+loophole where a PO could be created jobless or against a different job and then
+moved onto an unapproved project.
 
 Implement this in the purchase order hook validation path so all normal PO save
 paths receive the same field-level error, not only one HTTP route or UI flow.
@@ -297,13 +314,13 @@ paths receive the same field-level error, not only one HTTP route or UI flow.
 ### Expenses
 
 Turbo must reject expense save on both create and update when the expense
-references a job that requires a reviewed PA and does not have one.
+references a project job without a reviewed PA.
 
 This direct expense gate is required even though many job expenses already
 require a PO, because current Turbo expense rules allow some job expenses
 without a PO for exempt payment types such as mileage, fuel card, personal
 reimbursement, and allowance. Those exempt expense types must also be blocked
-until the referenced PA project is reviewed.
+until the referenced project is reviewed.
 
 Implement this in the expense hook validation path so all normal expense save
 paths receive the same field-level error, not only one HTTP route or UI flow.
@@ -312,17 +329,15 @@ paths receive the same field-level error, not only one HTTP route or UI flow.
 
 A project is PA-approved only when all of the following are true:
 
-* the referenced job exists,
-* `jobs.authorizing_document = "PA"`,
+* the referenced project job exists,
 * `jobs.project_authorization_doc` is populated,
 * `jobs.project_authorization_doc_hash` is populated,
 * `jobs.pa_reviewed` is populated, and
 * `jobs.pa_reviewer` is populated.
 
-This gate should apply only to projects that require PA approval. Jobs whose
-`authorizing_document` is `PO` should continue to use the existing client PO
-rules. Jobs marked `Unauthorized` should not be treated as PA-approved merely
-because PA enforcement is disabled.
+This gate applies to projects regardless of the legacy `authorizing_document`
+value. Jobs marked `Unauthorized` or `PO` should not be treated as PA-approved
+merely because PA enforcement is disabled or because a `client_po` value exists.
 
 Failure responses should be user-actionable:
 
@@ -344,7 +359,7 @@ practical.
 
 For projects, show the PA status near the existing authorizing document details:
 
-* no PA expected: no PA review controls,
+* non-project records: no PA review controls,
 * PA expected, no file: "PA document missing",
 * PA uploaded, pending review: "PA pending Accounting approval",
 * PA approved: reviewer and reviewed timestamp,
@@ -352,8 +367,21 @@ For projects, show the PA status near the existing authorizing document details:
   retained.
 
 Users with upload permission should see a PDF upload control when
-`authorizing_document = "PA"`. Admins should see a revoke action only when the PA
-is currently approved.
+the job is a project. Admins should see a revoke action only when the PA is
+currently approved.
+
+The job editor should keep surfacing the legacy `authorizing_document` value for
+existing records so old data remains understandable. For new project records,
+the UI should hide `authorizing_document`, and the backend clean function should
+write `authorizing_document = "PA"`. When editing existing project records, the
+UI may submit the existing legacy value, but the backend must fail loudly unless
+the submitted value is `PA`. Users must manually select `PA` before saving a
+project that still has `authorizing_document = "PO"` or
+`authorizing_document = "Unauthorized"`.
+
+The `client_po` and `client_reference_number` fields should always be visible
+and editable in the job editor. Job details should show either field when it is
+present.
 
 ### Accounting Queue
 
@@ -374,9 +402,9 @@ Initial migration should add the `branches.manager` field, the four `jobs`
 fields, and the hash uniqueness guard. Existing projects should remain
 unapproved until a scanned signed PA PDF is uploaded and Accounting approves it.
 
-Do not backfill `pa_reviewed` based only on `authorizing_document = "PA"`. That
-would recreate the current weak proxy and defeat the purpose of the review
-workflow.
+Do not backfill `pa_reviewed` based only on `authorizing_document = "PA"` or a
+populated `client_po`. That would recreate the current weak proxy and defeat the
+purpose of the review workflow.
 
 This is intentional. The rollout review period happens while
 `jobs.enforce_project_authorization` is `false`. The flag should remain off
@@ -384,31 +412,40 @@ until the existing PA backlog has been uploaded and reviewed, because enabling
 the flag will block purchase order saves, expense saves, and timesheet bundling
 for still unreviewed PA projects.
 
-## Open Questions
-
-* Management and administrators must decide whether the PA approval gate applies
-  only to jobs where `authorizing_document = "PA"` or whether it replaces the
-  current PO/PA distinction and applies to all projects. This is a fundamental
-  architectural blocker and must be resolved before implementation starts.
+The previous open question about whether PA approval replaces the PO/PA
+distinction is resolved by this plan: PA review is the authorization gate for
+projects, and `client_po` is an optional reference field rather than an
+alternate approval path.
 
 ## Implementation Checklist
 
 1. Add a PocketBase migration for `branches.manager`, the four `jobs` fields,
    and hash uniqueness.
-2. Add server-owned PDF upload handling, PDF-only PocketBase MIME restriction,
-   and hash calculation.
+2. Add a dedicated PA document upload route, server-owned PDF upload handling,
+   PDF-only PocketBase MIME restriction, and hash calculation.
 3. Allow upload for `job` claim holders, the assigned job manager, the alternate
    manager, and the related branch manager.
-4. Prevent replacing or removing an approved PA document until admin revocation.
-5. Add the Accounting approval queue endpoint/query.
-6. Add the Accounting approval endpoint with hash compare-and-set semantics.
-7. Add the admin revocation endpoint.
-8. Add `jobs.enforce_project_authorization` config lookup with default `false`.
-9. Gate timesheet bundle, purchase order create/update, and expense
+4. Update the generic `jobs` PocketBase update rule so ordinary client job edits
+   cannot directly mutate PA document, hash, reviewer, or reviewed fields.
+5. Enforce PA document invariants in the `jobs` hook, including server-owned
+   hash/review fields and no approved-document delete, clear, replace, or update
+   before admin revocation.
+6. Add the Accounting approval queue endpoint/query.
+7. Add the Accounting approval endpoint with hash compare-and-set semantics.
+8. Add the admin revocation endpoint.
+9. Add `jobs.enforce_project_authorization` config lookup with default `false`.
+10. Gate timesheet bundle, purchase order create/update, and expense
    create/update when the flag is enabled.
-10. Update PO visibility fields that currently expose `has_project_authorization`
+11. Deprecate project editing of `authorizing_document`: hide it for new project
+   records and have the backend write `PA`; for existing project records, surface
+   the legacy value and fail loudly unless the user manually selects `PA`.
+12. Stop requiring `client_po` when `authorizing_document = "PO"` and stop
+   clearing `client_po` when `authorizing_document != "PO"`.
+13. Show `client_po` and `client_reference_number` in the job editor at all
+   times, and show them on job details when present.
+14. Update PO visibility fields that currently expose `has_project_authorization`
    from `authorizing_document = "PA"` if they are meant to mean approved PA.
-11. Add UI controls on job details, Accounting queue UI, and downstream editor
+15. Add UI controls on job details, Accounting queue UI, and downstream editor
     error handling.
 
 ## Test Coverage
@@ -423,6 +460,8 @@ Backend tests should cover:
 * upload is rejected for other authenticated users,
 * `project_authorization_doc` is configured with only `application/pdf` in its
   PocketBase `mimeTypes`,
+* generic client-side `jobs` updates cannot directly mutate PA document, hash,
+  reviewer, or reviewed fields,
 * hash is calculated server-side,
 * duplicate hashes are rejected,
 * changing an unreviewed uploaded PDF keeps `pa_reviewed` and `pa_reviewer`
@@ -434,7 +473,15 @@ Backend tests should cover:
 * non-Accounting users cannot approve,
 * admin revocation clears only review fields,
 * non-admin users cannot revoke,
-* enforcement disabled allows existing time bundle and PO save behavior,
+* new project records write `authorizing_document = "PA"` from backend cleaning
+  even though the UI hides the field,
+* editing an existing project fails loudly when `authorizing_document = "PO"` or
+  `authorizing_document = "Unauthorized"` is submitted,
+* `client_po` remains optional when `authorizing_document = "PO"`,
+* `client_po` is preserved when `authorizing_document != "PO"`,
+* `client_reference_number` remains optional,
+* enforcement disabled allows existing time bundle, PO save, and expense save
+  behavior,
 * enforcement enabled allows time entry create/update against unapproved PA
   projects,
 * enforcement enabled blocks timesheet bundle when bundled entries reference
@@ -445,7 +492,7 @@ Backend tests should cover:
   through the expense hook validation path,
 * enforcement enabled allows timesheet bundle, PO saves, and expense saves for
   approved PA projects,
-* PO/client-PO projects are not incorrectly handled as PA projects.
+* legacy PO/client-PO values do not bypass PA approval.
 
 Fixture updates should be append-only where possible, with new job rows for:
 
@@ -453,4 +500,4 @@ Fixture updates should be append-only where possible, with new job rows for:
 * PA uploaded and pending review,
 * PA uploaded and approved,
 * PA uploaded, approved, then stale/changed for hash mismatch tests,
-* PO-authorized project to prove non-PA behavior remains unchanged.
+* legacy PO/client-PO project to prove legacy values do not bypass PA approval.
