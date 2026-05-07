@@ -1,4 +1,5 @@
 app/pb_data
+app/tmp/
 app/test_pb_data/*
 !app/test_pb_data/*.md
 app/coverage.out

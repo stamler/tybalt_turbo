@@ -700,6 +700,7 @@ Keeping the legacy fields until cleanup gives a rollback path and makes it easie
 - total expenses with legacy attachment;
 - total with `attachment_document`;
 - total still legacy-only committed expenses;
+- total document-backed expenses whose legacy `attachment` field is blank;
 - total document-backed but missing target S3 object;
 - duplicate hashes sharing one document;
 - rows with missing legacy files;
