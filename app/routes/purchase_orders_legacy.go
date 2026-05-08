@@ -15,7 +15,7 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-var legacyPurchaseOrderNumberPattern = regexp.MustCompile(`^(25|26)(0[1-9]|1[0-2])-5\d{3}$`)
+var legacyPurchaseOrderNumberPattern = regexp.MustCompile(`^(24|25|26)(0[1-9]|1[0-2])-5\d{3}$`)
 
 var legacyPurchaseOrderEditableFields = map[string]struct{}{
 	"uid":          {},
@@ -223,7 +223,7 @@ func normalizeLegacyPurchaseOrderRecord(record *core.Record) error {
 			Data: map[string]errs.CodeError{
 				"po_number": {
 					Code:    "invalid_legacy_po_number",
-					Message: "Legacy PO number must match YYMM-NNNN with YY 25/26 and NNNN in the 5XXX range.",
+					Message: "Legacy PO number must match YYMM-NNNN with YY 24/25/26 and NNNN in the 5XXX range.",
 				},
 			},
 		}

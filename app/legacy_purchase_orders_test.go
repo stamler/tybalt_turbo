@@ -242,11 +242,11 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "legacy claim holder can create active legacy PO with manual number",
+			Name:   "legacy claim holder can create active legacy PO with 2024 manual number",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/legacy",
 			Body: strings.NewReader(`{
-				"po_number": "2501-5000",
+				"po_number": "2401-5000",
 				"uid": "f2j5a8vk006baub",
 				"approver": "wegviunlyr2jjjv",
 				"date": "2025-01-15",
@@ -266,7 +266,7 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				`"legacy_manual_entry":true`,
-				`"po_number":"2501-5000"`,
+				`"po_number":"2401-5000"`,
 				`"status":"Active"`,
 				`"uid":"f2j5a8vk006baub"`,
 				`"approver":"wegviunlyr2jjjv"`,
@@ -275,7 +275,7 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 				tb.Helper()
 				var id string
-				if err := app.DB().NewQuery(`SELECT id FROM purchase_orders WHERE po_number = '2501-5000' LIMIT 1`).Row(&id); err != nil {
+				if err := app.DB().NewQuery(`SELECT id FROM purchase_orders WHERE po_number = '2401-5000' LIMIT 1`).Row(&id); err != nil {
 					tb.Fatalf("failed to find created legacy PO: %v", err)
 				}
 				assertLegacyPOForcedState(tb, app, id, true)
@@ -290,7 +290,7 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/legacy",
 			Body: strings.NewReader(`{
-				"po_number": "2401-4000",
+				"po_number": "2301-5000",
 				"uid": "f2j5a8vk006baub",
 				"approver": "wegviunlyr2jjjv",
 				"date": "2025-01-15",

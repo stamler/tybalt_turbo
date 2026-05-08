@@ -74,7 +74,7 @@
   let showApprovalResetToast = $state(false);
   let showBudgetCoverageHelp = $state(false);
   let resetSuccessTimeout: ReturnType<typeof setTimeout> | null = null;
-  const legacyPoNumberPattern = /^(25|26)(0[1-9]|1[0-2])-5\d{3}$/;
+  const legacyPoNumberPattern = /^(24|25|26)(0[1-9]|1[0-2])-5\d{3}$/;
   const legacyTypeOptions = [
     {
       id: "One-Time",
@@ -742,7 +742,7 @@
           po_number: {
             code: "invalid_legacy_po_number",
             message:
-              "Legacy PO number must match YYMM-NNNN with YY 25/26 and NNNN in the 5XXX range.",
+              "Legacy PO number must match YYMM-NNNN with YY 24/25/26 and NNNN in the 5XXX range.",
           },
         };
         return;
