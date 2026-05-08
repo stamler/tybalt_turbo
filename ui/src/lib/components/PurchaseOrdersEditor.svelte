@@ -1010,7 +1010,7 @@
       />
       <span class="flex w-full gap-2 text-sm text-neutral-600">
         <span class="invisible">Legacy PO Number</span>
-        <span>Format: YYMM-NNNN where YY is 25 or 26 and NNNN is in the 5XXX range.</span>
+        <span>Format: YYMM-NNNN where YY is 24, 25, or 26 and NNNN is in the 5XXX range.</span>
       </span>
 
       {#if $profiles.index !== null}
