@@ -2305,6 +2305,60 @@ func TestBookKeeperSameUserPurchaseOrderUsesRegularApproval(t *testing.T) {
 	mustStatus(t, managerApproveRes, http.StatusOK)
 }
 
+func TestSubmitExpenseAutoApproval(t *testing.T) {
+	t.Run("self approver submit is immediately approved", func(t *testing.T) {
+		app := testutils.SetupTestApp(t)
+		t.Cleanup(app.Cleanup)
+
+		token, err := testutils.GenerateRecordToken("users", "author@soup.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/31vvfz3z77n9628/submit", nil, map[string]string{
+			"Authorization": token,
+		})
+		mustStatus(t, res, http.StatusOK)
+
+		reloaded, err := app.FindRecordById("expenses", "31vvfz3z77n9628")
+		if err != nil {
+			t.Fatalf("failed to reload expense: %v", err)
+		}
+		if !reloaded.GetBool("submitted") {
+			t.Fatal("expected self-approver expense to be submitted")
+		}
+		if reloaded.GetDateTime("approved").IsZero() {
+			t.Fatal("expected self-approver expense to be approved on submit")
+		}
+	})
+
+	t.Run("non self approver submit remains unapproved", func(t *testing.T) {
+		app := testutils.SetupTestApp(t)
+		t.Cleanup(app.Cleanup)
+
+		token, err := testutils.GenerateRecordToken("users", "time@test.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/2gq9uyxmkcyopa4/submit", nil, map[string]string{
+			"Authorization": token,
+		})
+		mustStatus(t, res, http.StatusOK)
+
+		reloaded, err := app.FindRecordById("expenses", "2gq9uyxmkcyopa4")
+		if err != nil {
+			t.Fatalf("failed to reload expense: %v", err)
+		}
+		if !reloaded.GetBool("submitted") {
+			t.Fatal("expected non-self-approver expense to be submitted")
+		}
+		if !reloaded.GetDateTime("approved").IsZero() {
+			t.Fatal("expected non-self-approver expense to remain unapproved on submit")
+		}
+	})
+}
+
 func TestBookKeeperPurchaseOrderExpenseCorporateCreditCardFlow(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	t.Cleanup(app.Cleanup)

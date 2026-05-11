@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"time"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -129,6 +130,9 @@ func createSubmitRecordHandler(app core.App, collectionName string) func(e *core
 
 			// Set submitted to true
 			record.Set("submitted", true)
+			if collectionName == "expenses" && record.GetString("uid") == userId && record.GetString("approver") == userId {
+				record.Set("approved", time.Now())
+			}
 
 			// Save the updated record
 			if err := txApp.Save(record); err != nil {
