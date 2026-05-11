@@ -143,6 +143,14 @@
             !
           </button>
         {/if}
+        {#if $expensesEditingEnabled && data.po.status === "Active"}
+          <DsActionButton
+            action={`/expenses/add/${data.po.id}`}
+            icon="mdi:add-bold"
+            title="Create Expense"
+            color="green"
+          />
+        {/if}
         {#if data.po.status}
           <DsLabel
             color={displayStatus === "Active"

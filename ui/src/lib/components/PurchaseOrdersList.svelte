@@ -20,7 +20,7 @@
     shortDate,
     trimmedOrEmpty,
   } from "$lib/utilities";
-  import { onMount, onDestroy, untrack } from "svelte";
+  import { onMount, onDestroy, untrack, type Snippet } from "svelte";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { fetchPendingPO, fetchVisiblePO } from "$lib/poVisibility";
   // import { toastStore, type ToastSettings } from "@skeletonlabs/skeleton";
@@ -36,6 +36,8 @@
     refreshItems,
     shouldRefreshOnEvent,
     hideWhenEmpty = false,
+    filter,
+    searchBarExtra,
   }: {
     inListHeader?: string;
     data: PurchaseOrdersListData;
@@ -46,11 +48,17 @@
       | ((record: PurchaseOrdersResponse, currentItems: VisiblePurchaseOrderResponse[]) => boolean)
       | undefined;
     hideWhenEmpty?: boolean;
+    filter?: ((item: VisiblePurchaseOrderResponse) => boolean) | undefined;
+    searchBarExtra?: Snippet;
   } = $props();
   let items = $state(untrack(() => data.items));
   let createdItemIsVisible = $state(untrack(() => data.createdItemIsVisible));
   let pendingApprovalIds = $state(new Set<string>());
   let remainingInfoOpenId = $state<string | null>(null);
+  const visibleItems = $derived.by(() => {
+    const currentItems = items ?? [];
+    return filter ? currentItems.filter(filter) : currentItems;
+  });
 
   // Subscribe to the base collection but update the items from the augmented
   // view
@@ -270,8 +278,8 @@
   }
 </script>
 
-{#if !hideWhenEmpty || (items?.length ?? 0) > 0}
-  <DsList items={items as VisiblePurchaseOrderResponse[]} search={true} {inListHeader}>
+{#if !hideWhenEmpty || visibleItems.length > 0}
+  <DsList items={visibleItems} search={true} {inListHeader} {searchBarExtra}>
     {#snippet anchor(item: VisiblePurchaseOrderResponse)}
       <span class="flex flex-col items-center gap-2">
         {#if item.status === "Active"}
