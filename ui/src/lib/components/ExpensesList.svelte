@@ -7,11 +7,17 @@
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import type { ExpensesAugmentedResponse, ExpensesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { formatCurrencyAmount, openExpenseAttachment, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import {
+    formatCurrencyAmount,
+    openExpenseAttachment,
+    shortDate,
+    trimmedOrEmpty,
+  } from "$lib/utilities";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
-  import { onMount, onDestroy, untrack } from "svelte";
+  import { onMount, onDestroy, untrack, type Snippet } from "svelte";
   import { proxySubscriptionWithLoader } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
+  import type { ExpensesListData } from "$lib/svelte-types";
 
   const viewerId = pb.authStore.record?.id ?? "";
 
@@ -19,10 +25,16 @@
     inListHeader,
     data,
     endpoint,
+    filter,
+    searchBarExtra,
+    showLoadMore = true,
   }: {
     inListHeader?: string;
-    data: { items: any; createdItemIsVisible?: any; totalPages?: number; limit?: number };
+    data: ExpensesListData;
     endpoint: string;
+    filter?: ((item: ExpensesAugmentedResponse) => boolean) | undefined;
+    searchBarExtra?: Snippet;
+    showLoadMore?: boolean;
   } = $props();
   let items = $state(untrack(() => data.items));
   let createdItemIsVisible = $state(untrack(() => data.createdItemIsVisible));
@@ -30,6 +42,10 @@
   let listLoading = $state(false);
   let hasMore = $state(untrack(() => (data.totalPages ?? 0) > 1));
   const serverLimit = untrack(() => data.limit ?? 20);
+  const visibleItems = $derived.by(() => {
+    const currentItems = items ?? [];
+    return filter ? currentItems.filter(filter) : currentItems;
+  });
 
   // Subscribe to the base collection but update items using the details API
   let unsubscribeFunc: UnsubscribeFunc;
@@ -121,7 +137,7 @@
   }
 </script>
 
-<DsList items={items as ExpensesAugmentedResponse[]} search={true} {inListHeader}>
+<DsList items={visibleItems} search={true} {inListHeader} {searchBarExtra}>
   {#snippet anchor(item: ExpensesAugmentedResponse)}
     <a href={`/expenses/${item.id}/details`} class="text-blue-600 hover:underline">
       {item.date}
@@ -239,7 +255,8 @@
     {#if $expensesEditingEnabled}
       {@const isOwner = creator === viewerId}
       {@const isApprover = approver === viewerId}
-      {@const hasApprovalAccess = $globalStore.claims.includes("tapr") || $globalStore.claims.includes("book_keeper")}
+      {@const hasApprovalAccess =
+        $globalStore.claims.includes("tapr") || $globalStore.claims.includes("book_keeper")}
       {#if isOwner && !submitted}
         <DsActionButton
           action={`/expenses/${id}/edit`}
@@ -304,7 +321,7 @@
     {/if}
   {/snippet}
 </DsList>
-{#if hasMore}
+{#if showLoadMore && hasMore}
   <div class="mt-4 text-center">
     <button
       class="mb-4 rounded-sm bg-blue-600 px-4 py-2 text-white"
