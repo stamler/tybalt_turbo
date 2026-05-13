@@ -47,6 +47,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/pocketbase/pocketbase/core"
 
@@ -69,6 +70,8 @@ func main() {
 	limit := flags.Int("limit", 0, "prepare only: maximum number of manifest rows to emit; 0 means no limit")
 	requireCopy := flags.Bool("require-copy", false, "prepare only: include only rows that require a destination S3 copy")
 	checksumModeFlag := flags.String("checksum-mode", string(expensedocuments.ChecksumModeAuto), "verify/apply only: checksum source, one of auto, s3, or local")
+	checksumReports := stringListFlag{}
+	flags.Var(&checksumReports, "s3-checksum-report", "prepare/report only: local S3 Batch Operations Compute checksum completion-report manifest.json for the bucket named by --bucket-env; repeatable or comma-separated")
 	flags.Usage = func() {
 		usageForCommand(command, flags)
 	}
@@ -103,8 +106,9 @@ func main() {
 		// Prepare is safe to run before production is stopped: it reads the local
 		// dump and writes only local operator artifacts under --out-dir.
 		result, err := expensedocuments.PrepareWithOptions(app, paths, expensedocuments.PrepareOptions{
-			Limit:       *limit,
-			RequireCopy: *requireCopy,
+			Limit:                 *limit,
+			RequireCopy:           *requireCopy,
+			S3ChecksumReportPaths: checksumReports,
 		})
 		if err != nil {
 			log.Fatal(err)
@@ -136,7 +140,9 @@ func main() {
 		// Report is a baseline/checkpoint artifact. It is useful both before the
 		// migration and after apply to show how many legacy-only committed rows
 		// remain and whether storage references are missing.
-		result, err := expensedocuments.Report(app, paths)
+		result, err := expensedocuments.ReportWithOptions(app, paths, expensedocuments.ReportOptions{
+			S3ChecksumReportPaths: checksumReports,
+		})
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -168,6 +174,12 @@ Common options:
   --encryption-env <name> Environment variable containing the PocketBase settings encryption key.
   --out-dir <path>        Artifact directory. Defaults to tmp/expense_document_backfill.
   --bucket-env <name>     Environment variable used by generated S3 scripts. Defaults to TYBALT_S3_BUCKET.
+  --s3-checksum-report <path>
+                         For prepare/report: local S3 Batch Operations Compute
+                         checksum completion-report manifest.json. May be
+                         repeated or comma-separated. Rows are trusted only when
+                         bucket matches --bucket-env, SHA256/FULL_OBJECT, and
+                         current S3 ETag matches.
   --checksum-mode <mode>  For verify/apply: auto, s3, or local. Defaults to auto.
 
 Prepare smoke-test options:
@@ -197,4 +209,20 @@ func usageForCommand(command string, flags *flag.FlagSet) {
 	fmt.Fprintln(os.Stderr)
 	fmt.Fprintf(os.Stderr, "Options accepted by %s:\n", command)
 	flags.PrintDefaults()
+}
+
+type stringListFlag []string
+
+func (f *stringListFlag) String() string {
+	return strings.Join(*f, ",")
+}
+
+func (f *stringListFlag) Set(value string) error {
+	for _, part := range strings.Split(value, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			*f = append(*f, part)
+		}
+	}
+	return nil
 }

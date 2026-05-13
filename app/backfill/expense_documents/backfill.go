@@ -78,14 +78,19 @@ import (
 	"encoding/base64"
 	"encoding/csv"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -130,6 +135,20 @@ type PrepareOptions struct {
 	// manifest contains rows that will actually appear in copy_s3.sh and
 	// the smoke-only cleanup_s3.sh.
 	RequireCopy bool
+	// S3ChecksumReportPaths optionally points at one or more locally downloaded
+	// S3 Batch Operations Compute checksum completion-report manifest.json files.
+	// The bucket named by Paths.BucketEnv must be set. Prepare trusts only rows
+	// for that bucket whose SHA256/FULL_OBJECT checksum report ETag still
+	// matches current S3 HeadObject metadata; all other rows fall back to local
+	// reads.
+	S3ChecksumReportPaths []string
+}
+
+type ReportOptions struct {
+	// S3ChecksumReportPaths has the same meaning as PrepareOptions. It lets the
+	// baseline report count missing storage objects by checking current S3 ETag
+	// metadata against AWS's checksum report before falling back to local reads.
+	S3ChecksumReportPaths []string
 }
 
 type ChecksumMode string
@@ -236,6 +255,15 @@ type s3ChecksumResult struct {
 	FullObject  bool
 }
 
+type s3ObjectID struct {
+	Bucket string
+	Key    string
+}
+
+type s3ReportMetadataReader interface {
+	ETag(ctx context.Context, bucket string, key string) (string, error)
+}
+
 type s3ChecksumVerifier interface {
 	ChecksumSHA256Hex(ctx context.Context, key string) (s3ChecksumResult, error)
 }
@@ -245,7 +273,12 @@ type defaultS3ChecksumVerifier struct {
 	client *s3.Client
 }
 
+type defaultS3ReportMetadataReader struct {
+	client *s3.Client
+}
+
 var newS3ChecksumVerifier = defaultNewS3ChecksumVerifier
+var newS3ReportMetadataReader = defaultNewS3ReportMetadataReader
 
 func DefaultPaths(outDir string) Paths {
 	if strings.TrimSpace(outDir) == "" {
@@ -296,6 +329,10 @@ func PrepareWithOptions(app core.App, paths Paths, options PrepareOptions) (Prep
 		return PrepareResult{}, err
 	}
 	defer fsys.Close()
+	hashSource, err := newStorageHashSource(paths, options.S3ChecksumReportPaths, fsys)
+	if err != nil {
+		return PrepareResult{}, err
+	}
 
 	candidates, err := committedLegacyOnlyExpenses(app)
 	if err != nil {
@@ -310,19 +347,22 @@ func PrepareWithOptions(app core.App, paths Paths, options PrepareOptions) (Prep
 	// change. The tuple-level manifest identity still remains per expense row.
 	byHash := map[string]ManifestRow{}
 
-	for _, expense := range candidates {
+	for i, expense := range candidates {
+		if i > 0 && i%1000 == 0 {
+			fmt.Fprintf(os.Stderr, "processed %d/%d candidate expenses; prepared %d manifest rows and %d errors...\n", i, len(candidates), len(rows), len(errorsOut))
+		}
 		oldKey := storageKey(expensesCollection, expense.ID, expense.Attachment)
 		attachmentHash := strings.ToLower(strings.TrimSpace(expense.AttachmentHash))
 		if attachmentHash == "" {
 			// Older rows may not have attachment_hash populated. In that case the
 			// source file is the source of truth, so prepare hashes the legacy
 			// object before deciding the document id and target key.
-			attachmentHash, err = hashStorageObject(fsys, oldKey)
+			attachmentHash, err = hashSource.Hash(oldKey)
 			if err != nil {
 				errorsOut = append(errorsOut, errorRow(expense.ID, "prepare", "missing_legacy_file", err))
 				continue
 			}
-		} else if sourceHash, err := hashStorageObject(fsys, oldKey); err != nil {
+		} else if sourceHash, err := hashSource.Hash(oldKey); err != nil {
 			errorsOut = append(errorsOut, errorRow(expense.ID, "prepare", "missing_legacy_file", err))
 			continue
 		} else if sourceHash != attachmentHash {
@@ -385,7 +425,7 @@ func PrepareWithOptions(app core.App, paths Paths, options PrepareOptions) (Prep
 		newKey := storageKey(documentsCollection, docID, documentAttachment)
 		status := StatusReady
 		copyRequired := true
-		if targetHash, err := hashStorageObject(fsys, newKey); err == nil {
+		if targetHash, err := hashSource.Hash(newKey); err == nil {
 			// If the target already exists and matches, prepare can mark the row
 			// verified and omit it from copy_s3.sh. If it exists with different
 			// bytes, we stop instead of overwriting a possibly unrelated object.
@@ -614,8 +654,13 @@ func ApplyWithOptions(app core.App, paths Paths, options VerifyOptions) (ApplyRe
 }
 
 func Report(app core.App, paths Paths) (ReportResult, error) {
+	return ReportWithOptions(app, paths, ReportOptions{})
+}
+
+func ReportWithOptions(app core.App, paths Paths, options ReportOptions) (ReportResult, error) {
 	paths = normalizePaths(paths)
 	result := ReportResult{}
+	fmt.Fprintln(os.Stderr, "collecting database attachment baseline counts...")
 	if err := app.DB().NewQuery("SELECT COUNT(*) FROM expenses WHERE attachment != ''").
 		Row(&result.LegacyAttachments); err != nil {
 		return ReportResult{}, err
@@ -636,17 +681,22 @@ func Report(app core.App, paths Paths) (ReportResult, error) {
 		Row(&result.DuplicateDocumentReferences); err != nil {
 		return ReportResult{}, err
 	}
+	fmt.Fprintf(os.Stderr, "database counts collected: %d legacy attachments, %d document-backed attachments, %d committed legacy-only attachments\n", result.LegacyAttachments, result.DocumentBackedAttachments, result.CommittedLegacyOnlyAttachments)
 
 	fsys, err := app.NewFilesystem()
 	if err != nil {
 		return ReportResult{}, err
 	}
 	defer fsys.Close()
-
-	if result.DocumentBackedMissingTargets, err = countMissingDocumentTargets(app, fsys); err != nil {
+	hashSource, err := newStorageHashSource(paths, options.S3ChecksumReportPaths, fsys)
+	if err != nil {
 		return ReportResult{}, err
 	}
-	if result.MissingLegacyFiles, err = countMissingLegacyFiles(app, fsys); err != nil {
+
+	if result.DocumentBackedMissingTargets, err = countMissingDocumentTargets(app, hashSource); err != nil {
+		return ReportResult{}, err
+	}
+	if result.MissingLegacyFiles, err = countMissingLegacyFiles(app, hashSource); err != nil {
 		return ReportResult{}, err
 	}
 	if result.BlankOrInvalidHashes, err = countBlankOrInvalidLegacyHashes(app); err != nil {
@@ -1010,6 +1060,370 @@ func storageObjectExists(fsys *filesystem.System, key string) error {
 	return reader.Close()
 }
 
+type storageHashSource struct {
+	fsys   *filesystem.System
+	report *s3ChecksumReportIndex
+}
+
+func newStorageHashSource(paths Paths, reportPaths []string, fsys *filesystem.System) (*storageHashSource, error) {
+	source := &storageHashSource{fsys: fsys}
+	report, err := loadS3ChecksumReports(paths, reportPaths)
+	if err != nil {
+		return nil, err
+	}
+	source.report = report
+	return source, nil
+}
+
+func (source *storageHashSource) Hash(key string) (string, error) {
+	if source.report != nil {
+		if hash, ok := source.report.Hash(key); ok {
+			return hash, nil
+		}
+	}
+	return hashStorageObject(source.fsys, key)
+}
+
+func (source *storageHashSource) Exists(key string) error {
+	if source.report != nil {
+		if _, ok := source.report.Hash(key); ok {
+			return nil
+		}
+	}
+	return storageObjectExists(source.fsys, key)
+}
+
+type s3ChecksumReportIndex struct {
+	entriesByKey map[string][]s3ChecksumReportEntry
+	reader       s3ReportMetadataReader
+	preferred    string
+}
+
+type s3ChecksumReportEntry struct {
+	Bucket      string
+	Key         string
+	ETag        string
+	ChecksumHex string
+}
+
+type s3ChecksumReportManifest struct {
+	Results []s3ChecksumReportResult `json:"Results"`
+}
+
+type s3ChecksumReportResult struct {
+	Key string `json:"Key"`
+}
+
+const s3ChecksumReportColumns = 7
+
+func loadS3ChecksumReports(paths Paths, reportPaths []string) (*s3ChecksumReportIndex, error) {
+	reportPaths = cleanReportPaths(reportPaths)
+	if len(reportPaths) == 0 {
+		return nil, nil
+	}
+	bucket := strings.TrimSpace(os.Getenv(paths.BucketEnv))
+	if bucket == "" {
+		return nil, fmt.Errorf("set %s before using --s3-checksum-report", paths.BucketEnv)
+	}
+	reader, err := newS3ReportMetadataReader(paths)
+	if err != nil {
+		return nil, err
+	}
+	index := &s3ChecksumReportIndex{
+		entriesByKey: map[string][]s3ChecksumReportEntry{},
+		reader:       reader,
+		preferred:    bucket,
+	}
+	for _, reportPath := range reportPaths {
+		fmt.Fprintf(os.Stderr, "loading S3 checksum report bundle %s...\n", reportPath)
+		if err := index.loadManifest(reportPath); err != nil {
+			return nil, err
+		}
+	}
+	index.retainCurrentEntries()
+	return index, nil
+}
+
+func cleanReportPaths(paths []string) []string {
+	cleaned := []string{}
+	seen := map[string]struct{}{}
+	for _, value := range paths {
+		for _, part := range strings.Split(value, ",") {
+			part = strings.TrimSpace(part)
+			if part == "" {
+				continue
+			}
+			if _, ok := seen[part]; ok {
+				continue
+			}
+			seen[part] = struct{}{}
+			cleaned = append(cleaned, part)
+		}
+	}
+	return cleaned
+}
+
+func (index *s3ChecksumReportIndex) loadManifest(manifestPath string) error {
+	data, err := os.ReadFile(manifestPath)
+	if err != nil {
+		return fmt.Errorf("read S3 checksum report manifest %s: %w", manifestPath, err)
+	}
+	manifest := s3ChecksumReportManifest{}
+	if err := json.Unmarshal(data, &manifest); err != nil {
+		return fmt.Errorf("parse S3 checksum report manifest %s: %w", manifestPath, err)
+	}
+	reportFiles, err := resolveS3ChecksumReportFiles(filepath.Dir(manifestPath), manifest.Results)
+	if err != nil {
+		return err
+	}
+	for _, reportFile := range reportFiles {
+		if err := index.loadCSV(reportFile); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func resolveS3ChecksumReportFiles(manifestDir string, results []s3ChecksumReportResult) ([]string, error) {
+	reportFiles := []string{}
+	seen := map[string]struct{}{}
+	for _, result := range results {
+		name := path.Base(strings.TrimSpace(result.Key))
+		if name == "" || name == "." || name == "/" {
+			continue
+		}
+		match, err := resolveReportFileByBase(manifestDir, name)
+		if err != nil {
+			return nil, err
+		}
+		if _, ok := seen[match]; ok {
+			continue
+		}
+		seen[match] = struct{}{}
+		reportFiles = append(reportFiles, match)
+	}
+	return reportFiles, nil
+}
+
+func resolveReportFileByBase(root string, name string) (string, error) {
+	matches := []string{}
+	err := filepath.WalkDir(root, func(candidate string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			if d != nil && d.IsDir() {
+				return fs.SkipDir
+			}
+			return nil
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if d.Name() == name {
+			matches = append(matches, candidate)
+		}
+		return nil
+	})
+	if err != nil {
+		return "", fmt.Errorf("search S3 checksum report bundle: %w", err)
+	}
+	if len(matches) == 0 {
+		return "", fmt.Errorf("S3 checksum report CSV %q was not found under %s", name, root)
+	}
+	if len(matches) > 1 {
+		return "", fmt.Errorf("S3 checksum report CSV %q is ambiguous under %s", name, root)
+	}
+	return matches[0], nil
+}
+
+func (index *s3ChecksumReportIndex) loadCSV(reportPath string) error {
+	file, err := os.Open(reportPath)
+	if err != nil {
+		return fmt.Errorf("open S3 checksum report CSV %s: %w", reportPath, err)
+	}
+	defer file.Close()
+	reader := csv.NewReader(file)
+	reader.FieldsPerRecord = -1
+	reader.TrimLeadingSpace = true
+	for {
+		record, err := reader.Read()
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("read S3 checksum report CSV %s: %w", reportPath, err)
+		}
+		if isS3ReportHeader(record) {
+			continue
+		}
+		if len(record) != s3ChecksumReportColumns {
+			return fmt.Errorf("S3 checksum report CSV %s has %d columns, expected %d", reportPath, len(record), s3ChecksumReportColumns)
+		}
+		entry, ok := parseS3ChecksumReportEntry(record)
+		if !ok {
+			continue
+		}
+		// Completion reports name the bucket for each row. Only rows from the
+		// configured production bucket are allowed to bypass local hashing.
+		if entry.Bucket != index.preferred {
+			continue
+		}
+		index.entriesByKey[entry.Key] = append(index.entriesByKey[entry.Key], entry)
+	}
+}
+
+func isS3ReportHeader(record []string) bool {
+	return len(record) > 1 && strings.EqualFold(strings.TrimSpace(record[0]), "Bucket") && strings.EqualFold(strings.TrimSpace(record[1]), "Key")
+}
+
+func parseS3ChecksumReportEntry(record []string) (s3ChecksumReportEntry, bool) {
+	if !strings.EqualFold(strings.TrimSpace(record[3]), "succeeded") {
+		return s3ChecksumReportEntry{}, false
+	}
+	key, err := url.QueryUnescape(record[1])
+	if err != nil {
+		key = record[1]
+	}
+	var raw map[string]any
+	if err := json.Unmarshal([]byte(record[6]), &raw); err != nil {
+		return s3ChecksumReportEntry{}, false
+	}
+	algorithm := strings.ToUpper(jsonStringValue(raw, "checksumAlgorithm", "checksum_algorithm", "ChecksumAlgorithm"))
+	checksumType := strings.ToUpper(jsonStringValue(raw, "checksumType", "checksum_type", "ChecksumType"))
+	checksumHex := strings.ToLower(jsonStringValue(raw, "checksum_hex", "checksumHex", "ChecksumHex"))
+	if checksumHex == "" {
+		if checksumBase64 := jsonStringValue(raw, "checksum_base64", "checksumBase64", "ChecksumBase64"); checksumBase64 != "" {
+			if decoded, err := base64.StdEncoding.DecodeString(checksumBase64); err == nil {
+				checksumHex = hex.EncodeToString(decoded)
+			}
+		}
+	}
+	if algorithm != "SHA256" || checksumType != "FULL_OBJECT" || !hashPattern.MatchString(checksumHex) {
+		return s3ChecksumReportEntry{}, false
+	}
+	etag := normalizeETag(jsonStringValue(raw, "etag", "ETag"))
+	if etag == "" {
+		return s3ChecksumReportEntry{}, false
+	}
+	return s3ChecksumReportEntry{
+		Bucket:      strings.TrimSpace(record[0]),
+		Key:         key,
+		ETag:        etag,
+		ChecksumHex: checksumHex,
+	}, true
+}
+
+func jsonStringValue(raw map[string]any, names ...string) string {
+	for _, name := range names {
+		value, ok := raw[name]
+		if !ok || value == nil {
+			continue
+		}
+		switch typed := value.(type) {
+		case string:
+			return strings.TrimSpace(typed)
+		default:
+			return strings.TrimSpace(fmt.Sprint(typed))
+		}
+	}
+	return ""
+}
+
+func (index *s3ChecksumReportIndex) Hash(key string) (string, bool) {
+	if index == nil {
+		return "", false
+	}
+	entries := index.entriesByKey[key]
+	if len(entries) == 0 {
+		return "", false
+	}
+	for _, entry := range entries {
+		if entry.Bucket != index.preferred {
+			continue
+		}
+		return entry.ChecksumHex, true
+	}
+	return "", false
+}
+
+func (index *s3ChecksumReportIndex) retainCurrentEntries() {
+	entries := index.allEntries()
+	if len(entries) == 0 {
+		return
+	}
+	fmt.Fprintf(os.Stderr, "validating %d S3 checksum report rows against current ETags...\n", len(entries))
+
+	const workers = 32
+	jobs := make(chan s3ChecksumReportEntry)
+	results := make(chan s3ChecksumReportValidationResult)
+	var wg sync.WaitGroup
+	workerCount := workers
+	if len(entries) < workerCount {
+		workerCount = len(entries)
+	}
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for entry := range jobs {
+				results <- s3ChecksumReportValidationResult{
+					entry:   entry,
+					current: index.entryStillCurrent(entry),
+				}
+			}
+		}()
+	}
+	go func() {
+		for _, entry := range entries {
+			jobs <- entry
+		}
+		close(jobs)
+		wg.Wait()
+		close(results)
+	}()
+
+	current := map[string][]s3ChecksumReportEntry{}
+	checked := 0
+	trusted := 0
+	for result := range results {
+		checked++
+		if result.current {
+			current[result.entry.Key] = append(current[result.entry.Key], result.entry)
+			trusted++
+		}
+		if checked%1000 == 0 {
+			fmt.Fprintf(os.Stderr, "checked %d/%d S3 report ETags; trusted %d rows...\n", checked, len(entries), trusted)
+		}
+	}
+	index.entriesByKey = current
+	fmt.Fprintf(os.Stderr, "trusted %d/%d current S3 checksum report rows\n", trusted, len(entries))
+}
+
+type s3ChecksumReportValidationResult struct {
+	entry   s3ChecksumReportEntry
+	current bool
+}
+
+func (index *s3ChecksumReportIndex) allEntries() []s3ChecksumReportEntry {
+	entries := []s3ChecksumReportEntry{}
+	for _, keyEntries := range index.entriesByKey {
+		entries = append(entries, keyEntries...)
+	}
+	return entries
+}
+
+func (index *s3ChecksumReportIndex) entryStillCurrent(entry s3ChecksumReportEntry) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	etag, err := index.reader.ETag(ctx, entry.Bucket, entry.Key)
+	if err != nil {
+		return false
+	}
+	return normalizeETag(etag) == entry.ETag
+}
+
+func normalizeETag(etag string) string {
+	return strings.Trim(strings.TrimSpace(etag), `"`)
+}
+
 func storageKey(collection *core.Collection, recordID string, filename string) string {
 	return collection.BaseFilesPath() + "/" + recordID + "/" + filename
 }
@@ -1196,7 +1610,7 @@ func writeReport(path string, result ReportResult) error {
 	return writer.Error()
 }
 
-func countMissingDocumentTargets(app core.App, fsys *filesystem.System) (int, error) {
+func countMissingDocumentTargets(app core.App, hashSource *storageHashSource) (int, error) {
 	rows := []struct {
 		DocumentID string `db:"document_id"`
 		Attachment string `db:"attachment"`
@@ -1214,15 +1628,20 @@ func countMissingDocumentTargets(app core.App, fsys *filesystem.System) (int, er
 		return 0, err
 	}
 	missing := 0
-	for _, row := range rows {
-		if _, err := hashStorageObject(fsys, storageKey(collection, row.DocumentID, row.Attachment)); err != nil {
+	fmt.Fprintf(os.Stderr, "checking %d document-backed expense document targets...\n", len(rows))
+	for i, row := range rows {
+		if i > 0 && i%1000 == 0 {
+			fmt.Fprintf(os.Stderr, "checked %d/%d document-backed targets; missing %d...\n", i, len(rows), missing)
+		}
+		if err := hashSource.Exists(storageKey(collection, row.DocumentID, row.Attachment)); err != nil {
 			missing++
 		}
 	}
+	fmt.Fprintf(os.Stderr, "checked %d document-backed targets; missing %d\n", len(rows), missing)
 	return missing, nil
 }
 
-func countMissingLegacyFiles(app core.App, fsys *filesystem.System) (int, error) {
+func countMissingLegacyFiles(app core.App, hashSource *storageHashSource) (int, error) {
 	rows := []struct {
 		ID         string `db:"id"`
 		Attachment string `db:"attachment"`
@@ -1235,11 +1654,16 @@ func countMissingLegacyFiles(app core.App, fsys *filesystem.System) (int, error)
 		return 0, err
 	}
 	missing := 0
-	for _, row := range rows {
-		if _, err := hashStorageObject(fsys, storageKey(collection, row.ID, row.Attachment)); err != nil {
+	fmt.Fprintf(os.Stderr, "checking %d legacy expense attachment targets...\n", len(rows))
+	for i, row := range rows {
+		if i > 0 && i%1000 == 0 {
+			fmt.Fprintf(os.Stderr, "checked %d/%d legacy targets; missing %d...\n", i, len(rows), missing)
+		}
+		if err := hashSource.Exists(storageKey(collection, row.ID, row.Attachment)); err != nil {
 			missing++
 		}
 	}
+	fmt.Fprintf(os.Stderr, "checked %d legacy targets; missing %d\n", len(rows), missing)
 	return missing, nil
 }
 
@@ -1320,6 +1744,22 @@ func defaultNewS3ChecksumVerifier(paths Paths) (s3ChecksumVerifier, error) {
 	}, nil
 }
 
+func defaultNewS3ReportMetadataReader(paths Paths) (s3ReportMetadataReader, error) {
+	cfg := s3ChecksumConfigFromEnv(paths)
+	awsCfg, err := config.LoadDefaultConfig(context.Background(), config.WithRegion(cfg.region))
+	if err != nil {
+		return nil, err
+	}
+	opts := []func(*s3.Options){}
+	if cfg.endpoint != "" && strings.HasPrefix(cfg.endpoint, "http") {
+		opts = append(opts, func(o *s3.Options) {
+			o.BaseEndpoint = aws.String(cfg.endpoint)
+			o.UsePathStyle = true
+		})
+	}
+	return &defaultS3ReportMetadataReader{client: s3.NewFromConfig(awsCfg, opts...)}, nil
+}
+
 func s3ChecksumConfigFromEnv(paths Paths) s3ChecksumConfig {
 	region := os.Getenv("AWS_REGION")
 	if region == "" {
@@ -1338,6 +1778,17 @@ func (cfg s3ChecksumConfig) missingRequiredEnv(bucketEnv string) []string {
 		missing = append(missing, bucketEnv)
 	}
 	return missing
+}
+
+func (r *defaultS3ReportMetadataReader) ETag(ctx context.Context, bucket string, key string) (string, error) {
+	output, err := r.client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: aws.String(bucket),
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		return "", err
+	}
+	return aws.ToString(output.ETag), nil
 }
 
 func (v *defaultS3ChecksumVerifier) ChecksumSHA256Hex(ctx context.Context, key string) (s3ChecksumResult, error) {

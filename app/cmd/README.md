@@ -42,6 +42,16 @@ It writes operator artifacts under `--out-dir`:
 
 `prepare` does not write to the database.
 
+If you pass one or more S3 Batch Operations Compute checksum completion reports
+with `--s3-checksum-report`, `prepare` and `report` use those AWS-computed
+SHA-256 values before downloading objects locally. The command requires
+`TYBALT_S3_BUCKET` or the variable named by `--bucket-env`; report rows are
+trusted only when their bucket matches that value, the checksum is
+`SHA256` / `FULL_OBJECT`, and the row's ETag still matches a current S3
+`HeadObject` response. If the object is absent from the report, the bucket does
+not match, the checksum type is unsupported, or the ETag is stale, the command
+falls back to the slower local read/hash path.
+
 `copy_s3.sh` first preflights every planned destination key with:
 
 ```sh
@@ -284,6 +294,26 @@ Expected:
 ```text
 verified <manifest row count> rows, 0 failed
 ```
+
+When a checksum report bundle is available locally, include it in the report and
+prepare steps:
+
+```sh
+go run ./cmd/backfill_expense_documents report \
+  --data-dir pb_data \
+  $PB_ENCRYPTION_FLAG \
+  --out-dir "$FULL_OUT" \
+  --s3-checksum-report /path/to/checksum-report/manifest.json
+
+go run ./cmd/backfill_expense_documents prepare \
+  --data-dir pb_data \
+  $PB_ENCRYPTION_FLAG \
+  --out-dir "$FULL_OUT" \
+  --s3-checksum-report /path/to/checksum-report/manifest.json
+```
+
+These report rows are used only for `TYBALT_S3_BUCKET`; passing a report from a
+different bucket is safe but gives no speedup because those rows are ignored.
 
 ## Failed Full Run Cleanup
 

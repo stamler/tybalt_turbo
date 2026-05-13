@@ -2,6 +2,8 @@ package expense_documents
 
 import (
 	"context"
+	"encoding/csv"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -185,6 +187,122 @@ func TestPrepareLimitCanEmitSmallCopyOnlySmokeManifest(t *testing.T) {
 		if !strings.Contains(cleanupText, row.NewS3Key) {
 			t.Fatalf("cleanup script missing copied target key %s:\n%s", row.NewS3Key, cleanupText)
 		}
+	}
+}
+
+func TestPrepareTrustsChecksumReportWhenETagMatches(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	expensesCollection, err := app.FindCollectionByNameOrId("expenses")
+	if err != nil {
+		t.Fatal(err)
+	}
+	alphaKey := storageKey(expensesCollection, alphaExpenseID, "alpha.pdf")
+	fsys, err := app.NewFilesystem()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := fsys.Delete(alphaKey); err != nil {
+		t.Fatal(err)
+	}
+	fsys.Close()
+
+	reportPath := writeS3ChecksumReport(t, t.TempDir(), "bucket", alphaKey, "matching-etag", alphaHash)
+	withFakeS3ReportMetadataReader(t, fakeS3ReportMetadataReader{
+		{Bucket: "bucket", Key: alphaKey}: "matching-etag",
+	}, nil)
+	paths := DefaultPaths(t.TempDir())
+	paths.BucketEnv = "TEST_BACKFILL_BUCKET"
+	t.Setenv("TEST_BACKFILL_BUCKET", "bucket")
+
+	if _, err := PrepareWithOptions(app, paths, PrepareOptions{S3ChecksumReportPaths: []string{reportPath}}); err != nil {
+		t.Fatal(err)
+	}
+	rows := fixtureManifestRows(t, paths)
+	if rows[alphaExpenseID].AttachmentHash != alphaHash {
+		t.Fatalf("alpha hash = %s, want report hash %s", rows[alphaExpenseID].AttachmentHash, alphaHash)
+	}
+
+	errorsFile, err := os.ReadFile(paths.ErrorsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(errorsFile), alphaExpenseID) {
+		t.Fatalf("prepare should not treat report-backed alpha source as missing:\n%s", string(errorsFile))
+	}
+}
+
+func TestPrepareFallsBackToLocalHashWhenChecksumReportETagIsStale(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	expensesCollection, err := app.FindCollectionByNameOrId("expenses")
+	if err != nil {
+		t.Fatal(err)
+	}
+	alphaKey := storageKey(expensesCollection, alphaExpenseID, "alpha.pdf")
+	reportPath := writeS3ChecksumReport(t, t.TempDir(), "bucket", alphaKey, "stale-etag", strings.Repeat("a", 64))
+	withFakeS3ReportMetadataReader(t, fakeS3ReportMetadataReader{
+		{Bucket: "bucket", Key: alphaKey}: "current-etag",
+	}, nil)
+	paths := DefaultPaths(t.TempDir())
+	paths.BucketEnv = "TEST_BACKFILL_BUCKET"
+	t.Setenv("TEST_BACKFILL_BUCKET", "bucket")
+
+	if _, err := PrepareWithOptions(app, paths, PrepareOptions{S3ChecksumReportPaths: []string{reportPath}}); err != nil {
+		t.Fatal(err)
+	}
+	rows := fixtureManifestRows(t, paths)
+	if rows[alphaExpenseID].AttachmentHash != alphaHash {
+		t.Fatalf("alpha hash = %s, want local hash %s after stale report ETag", rows[alphaExpenseID].AttachmentHash, alphaHash)
+	}
+}
+
+func TestPrepareRequiresBucketEnvWhenChecksumReportIsProvided(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	expensesCollection, err := app.FindCollectionByNameOrId("expenses")
+	if err != nil {
+		t.Fatal(err)
+	}
+	alphaKey := storageKey(expensesCollection, alphaExpenseID, "alpha.pdf")
+	reportPath := writeS3ChecksumReport(t, t.TempDir(), "bucket", alphaKey, "matching-etag", alphaHash)
+	paths := DefaultPaths(t.TempDir())
+	paths.BucketEnv = "TEST_BACKFILL_REQUIRED_BUCKET"
+	t.Setenv("TEST_BACKFILL_REQUIRED_BUCKET", "")
+
+	_, err = PrepareWithOptions(app, paths, PrepareOptions{S3ChecksumReportPaths: []string{reportPath}})
+	if err == nil {
+		t.Fatal("expected missing bucket env error")
+	}
+	if !strings.Contains(err.Error(), "set TEST_BACKFILL_REQUIRED_BUCKET") {
+		t.Fatalf("error = %v, want missing bucket env guidance", err)
+	}
+}
+
+func TestPrepareIgnoresChecksumReportRowsFromDifferentBucket(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	expensesCollection, err := app.FindCollectionByNameOrId("expenses")
+	if err != nil {
+		t.Fatal(err)
+	}
+	alphaKey := storageKey(expensesCollection, alphaExpenseID, "alpha.pdf")
+	reportPath := writeS3ChecksumReport(t, t.TempDir(), "wrong-bucket", alphaKey, "matching-etag", strings.Repeat("a", 64))
+	withFakeS3ReportMetadataReader(t, fakeS3ReportMetadataReader{}, nil)
+	paths := DefaultPaths(t.TempDir())
+	paths.BucketEnv = "TEST_BACKFILL_BUCKET"
+	t.Setenv("TEST_BACKFILL_BUCKET", "bucket")
+
+	if _, err := PrepareWithOptions(app, paths, PrepareOptions{S3ChecksumReportPaths: []string{reportPath}}); err != nil {
+		t.Fatal(err)
+	}
+	rows := fixtureManifestRows(t, paths)
+	if rows[alphaExpenseID].AttachmentHash != alphaHash {
+		t.Fatalf("alpha hash = %s, want local hash %s after wrong-bucket report row", rows[alphaExpenseID].AttachmentHash, alphaHash)
 	}
 }
 
@@ -714,4 +832,78 @@ func withFakeS3ChecksumVerifier(t *testing.T, verifier s3ChecksumVerifier, err e
 	t.Cleanup(func() {
 		newS3ChecksumVerifier = original
 	})
+}
+
+type fakeS3ReportMetadataReader map[s3ObjectID]string
+
+func (reader fakeS3ReportMetadataReader) ETag(ctx context.Context, bucket string, key string) (string, error) {
+	etag, ok := reader[s3ObjectID{Bucket: bucket, Key: key}]
+	if !ok {
+		return "", fmt.Errorf("missing fake ETag for s3://%s/%s", bucket, key)
+	}
+	return etag, nil
+}
+
+func withFakeS3ReportMetadataReader(t *testing.T, reader s3ReportMetadataReader, err error) {
+	t.Helper()
+	original := newS3ReportMetadataReader
+	newS3ReportMetadataReader = func(paths Paths) (s3ReportMetadataReader, error) {
+		if err != nil {
+			return nil, err
+		}
+		if reader == nil {
+			return nil, fmt.Errorf("fake S3 report metadata reader not configured")
+		}
+		return reader, nil
+	}
+	t.Cleanup(func() {
+		newS3ReportMetadataReader = original
+	})
+}
+
+func writeS3ChecksumReport(t *testing.T, dir string, bucket string, key string, etag string, checksumHex string) string {
+	t.Helper()
+	resultsDir := dir + "/results"
+	if err := os.MkdirAll(resultsDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	csvPath := resultsDir + "/report.csv"
+	file, err := os.Create(csvPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := csv.NewWriter(file)
+	resultMessage, err := json.Marshal(map[string]string{
+		"etag":              etag,
+		"checksumAlgorithm": "SHA256",
+		"checksumType":      "FULL_OBJECT",
+		"checksum_hex":      checksumHex,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Write([]string{bucket, key, "", "succeeded", "", "200", string(resultMessage)}); err != nil {
+		t.Fatal(err)
+	}
+	writer.Flush()
+	if err := writer.Error(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	manifestPath := dir + "/manifest.json"
+	manifest, err := json.Marshal(map[string]any{
+		"Results": []map[string]string{
+			{"Key": "results/report.csv"},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(manifestPath, manifest, 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return manifestPath
 }
