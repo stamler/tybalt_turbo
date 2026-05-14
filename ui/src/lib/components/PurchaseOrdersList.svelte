@@ -37,6 +37,7 @@
     shouldRefreshOnEvent,
     hideWhenEmpty = false,
     filter,
+    showTemplateAction = false,
     searchBarExtra,
   }: {
     inListHeader?: string;
@@ -49,6 +50,7 @@
       | undefined;
     hideWhenEmpty?: boolean;
     filter?: ((item: VisiblePurchaseOrderResponse) => boolean) | undefined;
+    showTemplateAction?: boolean;
     searchBarExtra?: Snippet;
   } = $props();
   let items = $state(untrack(() => data.items));
@@ -315,7 +317,10 @@
         {#if showRemaining && item.status === "Active"}
           <span class="flex items-center gap-1">
             <span>
-              Provisional Remaining: {formatCurrencyAmount(item.remaining_amount, item.currency_code)}
+              Provisional Remaining: {formatCurrencyAmount(
+                item.remaining_amount,
+                item.currency_code,
+              )}
             </span>
             <button
               type="button"
@@ -408,6 +413,14 @@
 
     {#snippet actions(item: VisiblePurchaseOrderResponse)}
       {#if $expensesEditingEnabled}
+        {#if showTemplateAction}
+          <DsActionButton
+            action={`/pos/add?template=${item.id}`}
+            icon="mdi:content-copy"
+            title="Copy to New Purchase Order"
+            color="blue"
+          />
+        {/if}
         {#if item.status === "Active"}
           <DsActionButton
             action={`/expenses/add/${item.id}`}

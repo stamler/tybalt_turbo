@@ -30,6 +30,7 @@
   {data}
   showRemaining={true}
   filter={statusFilter}
+  showTemplateAction={purchaseOrderListMode === "closed_cancelled"}
 >
   {#snippet searchBarExtra()}
     <div class="flex items-center gap-2 max-[639px]:w-full max-[639px]:flex-wrap">
