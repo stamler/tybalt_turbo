@@ -26,7 +26,7 @@
   const settlementTabs = [
     { id: "unsettled", label: "Unsettled" },
     { id: "settled", label: "Settled" },
-  ] as const;
+  ];
 
   function paymentTypeLabel(paymentType: string): string {
     switch (paymentType) {
@@ -132,7 +132,9 @@
       {/if}
     {/snippet}
     {#snippet line2(row: ExpenseSettlementRow)}
-      {formatCurrencyEquivalent(row.indicative_cad_total, row.currency_rate, row.currency_rate_date)}
+      {#if activeTab === "unsettled"}
+        {formatCurrencyEquivalent(row.indicative_cad_total, row.currency_rate, row.currency_rate_date)}
+      {/if}
     {/snippet}
     {#snippet line3(row: ExpenseSettlementRow)}
       {#if activeTab === "unsettled"}

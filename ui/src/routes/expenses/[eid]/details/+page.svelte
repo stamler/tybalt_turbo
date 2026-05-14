@@ -148,6 +148,9 @@
   function personLabel(name: string, uid: string, fallback: string): string {
     return trimmedOrEmpty(name) || trimmedOrEmpty(uid) || fallback;
   }
+
+  $: hasSettledCadTotal = Number(expense.settled_total ?? 0) > 0;
+  $: showIndicativeCadEquivalent = expense.currency_code !== "CAD" && !hasSettledCadTotal;
 </script>
 
 <div class="mx-auto space-y-4 p-4">
@@ -210,18 +213,18 @@
       {/if}
     </div>
 
-    {#if expense.currency_code !== "CAD"}
+    {#if showIndicativeCadEquivalent}
       <div>
-        <span class="font-semibold">CAD Equivalent:</span>
+        <span class="font-semibold">Indicative CAD Equivalent:</span>
         {formatCurrencyEquivalent(
-          expense.settled_total || expense.total * expense.currency_rate,
+          expense.total * expense.currency_rate,
           expense.currency_rate,
           expense.currency_rate_date,
         )}
       </div>
     {/if}
 
-    {#if expense.settled_total}
+    {#if hasSettledCadTotal}
       <div>
         <span class="font-semibold">Settled Total:</span>
         {formatCurrencyAmount(expense.settled_total, "CAD")}
