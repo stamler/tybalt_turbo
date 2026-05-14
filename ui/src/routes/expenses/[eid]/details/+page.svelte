@@ -4,6 +4,7 @@
   import { globalStore } from "$lib/stores/global";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
+  import ExpenseAttachmentHashRepairPopover from "$lib/components/ExpenseAttachmentHashRepairPopover.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import UncommitConfirmPopover from "$lib/components/UncommitConfirmPopover.svelte";
   import Icon from "@iconify/svelte";
@@ -28,6 +29,7 @@
   let isOwner = false;
   let isApprover = false;
   let showUncommitConfirm = false;
+  let showHashRepairPopover = false;
   let uncommitSubmitting = false;
   let uncommitError: string | null = null;
 
@@ -116,6 +118,14 @@
   function closeUncommitConfirm() {
     uncommitError = null;
     showUncommitConfirm = false;
+  }
+
+  function openHashRepairPopover() {
+    showHashRepairPopover = true;
+  }
+
+  function closeHashRepairPopover() {
+    showHashRepairPopover = false;
   }
 
   function poDiffers(expenseVal: string, poVal: string): boolean {
@@ -378,8 +388,19 @@
             color="green"
           />
         {/if}
-        {#if expense.attachment_hash}
+        {#if hasAdminAccess}
+          <button
+            type="button"
+            class="font-mono text-sm text-blue-700 underline decoration-dotted underline-offset-2 hover:text-blue-900"
+            title="Audit attachment hash"
+            on:click={openHashRepairPopover}
+          >
+            {expense.attachment_hash ? expense.attachment_hash.slice(0, 8) : "No hash"}
+          </button>
+        {:else if expense.attachment_hash}
           <span class="font-mono text-sm opacity-70">{expense.attachment_hash.slice(0, 8)}</span>
+        {/if}
+        {#if expense.attachment_hash}
           <button
             type="button"
             class="text-neutral-500 hover:text-neutral-700"
@@ -523,5 +544,12 @@
     error={uncommitError}
     onSubmit={uncommitExpense}
     onCancel={closeUncommitConfirm}
+  />
+  <ExpenseAttachmentHashRepairPopover
+    show={showHashRepairPopover}
+    expenseId={expense.id}
+    currentHash={expense.attachment_hash}
+    onClose={closeHashRepairPopover}
+    onRepaired={refreshExpense}
   />
 </div>
