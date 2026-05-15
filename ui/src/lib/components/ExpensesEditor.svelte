@@ -113,15 +113,6 @@
     }
     return "";
   });
-  const linkedPurchaseOrderPaymentType = $derived.by(() => {
-    if (data.linked_purchase_order?.payment_type) {
-      return data.linked_purchase_order.payment_type;
-    }
-    if (isExpensesResponse(item) && item.purchase_order !== "") {
-      return item.expand.purchase_order.payment_type;
-    }
-    return "";
-  });
   const linkedPurchaseOrderUID = $derived.by(() => {
     if (data.linked_purchase_order?.uid) {
       return data.linked_purchase_order.uid;
@@ -197,8 +188,7 @@
       linkedPurchaseOrderUID !== "" &&
       linkedPurchaseOrderUID !== authUserID &&
       linkedPurchaseOrderNumber !== "" &&
-      (item.payment_type === "OnAccount" || item.payment_type === "CorporateCreditCard") &&
-      String(item.payment_type) === String(linkedPurchaseOrderPaymentType),
+      (item.payment_type === "OnAccount" || item.payment_type === "CorporateCreditCard"),
   );
 
   const allPaymentTypes = [

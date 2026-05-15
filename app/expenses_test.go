@@ -1132,12 +1132,12 @@ func TestBookKeeperPurchaseOrderExpenseFlow(t *testing.T) {
 	}`), map[string]string{"Authorization": bookkeeperToken})
 	mustStatus(t, updateRes, http.StatusOK)
 
-	badPaymentUpdateRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/"+created.ID, strings.NewReader(`{
+	alternateAllowedPaymentUpdateRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/"+created.ID, strings.NewReader(`{
 		"uid": "rzr98oadsp9qc11",
 		"creator": "tqqf7q0f3378rvp",
 		"date": "2024-09-01",
 		"division": "vccd5fo56ctbigh",
-		"description": "bookkeeper bad payment update",
+		"description": "bookkeeper alternate payment update",
 		"payment_type": "CorporateCreditCard",
 		"cc_last_4_digits": "1234",
 		"purchase_order": "poa1ctvbrnch001",
@@ -1147,7 +1147,7 @@ func TestBookKeeperPurchaseOrderExpenseFlow(t *testing.T) {
 		"total": 25,
 		"vendor": "z66xe6vqhwtokt4"
 	}`), map[string]string{"Authorization": bookkeeperToken})
-	mustStatus(t, badPaymentUpdateRes, http.StatusBadRequest)
+	mustStatus(t, alternateAllowedPaymentUpdateRes, http.StatusOK)
 
 	ownerSubmitRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses/"+created.ID+"/submit", nil, map[string]string{
 		"Authorization": ownerToken,
@@ -1200,7 +1200,7 @@ func TestBookKeeperPurchaseOrderExpenseFlow(t *testing.T) {
 		"uid":              "rzr98oadsp9qc11",
 		"date":             "2024-09-01",
 		"division":         "vccd5fo56ctbigh",
-		"description":      "payment mismatch invoice",
+		"description":      "corporate card invoice against on-account PO",
 		"payment_type":     "CorporateCreditCard",
 		"cc_last_4_digits": "1234",
 		"purchase_order":   "poa1ctvbrnch001",
@@ -1209,12 +1209,20 @@ func TestBookKeeperPurchaseOrderExpenseFlow(t *testing.T) {
 		"kind":             "prj0kind0000001",
 		"total":            "25",
 		"vendor":           "z66xe6vqhwtokt4",
-	}, "payment-mismatch-flow.png")
-	mismatchRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+	}, "payment-independent-flow.png")
+	paymentIndependentRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
 		"Authorization": bookkeeperToken,
 		"Content-Type":  contentType,
 	})
-	mustStatus(t, mismatchRes, http.StatusBadRequest)
+	mustStatus(t, paymentIndependentRes, http.StatusOK)
+
+	var paymentIndependentCreated bookKeeperExpenseCreateResult
+	if err := json.Unmarshal(paymentIndependentRes.Body.Bytes(), &paymentIndependentCreated); err != nil {
+		t.Fatalf("failed to decode payment-independent create response: %v; body=%s", err, paymentIndependentRes.Body.String())
+	}
+	if paymentIndependentCreated.UID != "rzr98oadsp9qc11" || paymentIndependentCreated.Creator != "tqqf7q0f3378rvp" || paymentIndependentCreated.Approver != "tqqf7q0f3378rvp" {
+		t.Fatalf("unexpected actor fields after payment-independent create: %+v", paymentIndependentCreated)
+	}
 }
 
 func TestExpenseDocumentsPhase1CreateAndReuse(t *testing.T) {
@@ -2389,6 +2397,77 @@ func TestBookKeeperPurchaseOrderExpenseCorporateCreditCardFlow(t *testing.T) {
 	}
 	if created.UID != "rzr98oadsp9qc11" || created.Creator != "tqqf7q0f3378rvp" || created.Approver != "tqqf7q0f3378rvp" {
 		t.Fatalf("unexpected actor fields after corporate card create: %+v", created)
+	}
+}
+
+func TestBookKeeperPurchaseOrderExpenseIgnoresReferencedPOPaymentType(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	activatePurchaseOrderFixtures(t, app, "bkpoexpense0001")
+
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	body, contentType := mustMultipartExpense(t, bookKeeperExpenseFields(map[string]string{
+		"description":    "bookkeeper on-account invoice against expense PO",
+		"date":           "2026-04-28",
+		"payment_type":   "OnAccount",
+		"purchase_order": "bkpoexpense0001",
+	}), "bookkeeper-onaccount-expense-po.png")
+	createRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+		"Authorization": bookkeeperToken,
+		"Content-Type":  contentType,
+	})
+	mustStatus(t, createRes, http.StatusOK)
+
+	var created bookKeeperExpenseCreateResult
+	if err := json.Unmarshal(createRes.Body.Bytes(), &created); err != nil {
+		t.Fatalf("failed to decode create response: %v; body=%s", err, createRes.Body.String())
+	}
+	if created.UID != "rzr98oadsp9qc11" || created.Creator != "tqqf7q0f3378rvp" || created.Approver != "tqqf7q0f3378rvp" {
+		t.Fatalf("unexpected actor fields after create against expense PO: %+v", created)
+	}
+}
+
+func TestBookKeeperPurchaseOrderExpenseStillRejectsExpensePaymentType(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+	activatePurchaseOrderFixtures(t, app, "bkpoexpense0001")
+
+	bookkeeperToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	description := "bookkeeper expense payment type should fail"
+	body, contentType := mustMultipartExpense(t, bookKeeperExpenseFields(map[string]string{
+		"description":    description,
+		"date":           "2026-04-28",
+		"payment_type":   "Expense",
+		"purchase_order": "bkpoexpense0001",
+	}), "bookkeeper-expense-payment-type.png")
+	createRes := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", body, map[string]string{
+		"Authorization": bookkeeperToken,
+		"Content-Type":  contentType,
+	})
+	mustStatus(t, createRes, http.StatusBadRequest)
+
+	var countResult struct {
+		Count int `db:"count"`
+	}
+	if err := app.DB().NewQuery(`
+		SELECT COUNT(*) AS count
+		FROM expenses
+		WHERE description = {:description}
+	`).Bind(dbx.Params{
+		"description": description,
+	}).One(&countResult); err != nil {
+		t.Fatalf("failed to query rejected expense count: %v", err)
+	}
+	if countResult.Count != 0 {
+		t.Fatalf("expected forbidden bookkeeper expense payment type not to create a fallback expense, found %d matching rows", countResult.Count)
 	}
 }
 

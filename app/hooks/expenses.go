@@ -589,11 +589,6 @@ func validateBookkeeperOnBehalfCreate(app core.App, expenseRecord *core.Record, 
 			"payment_type": validation.NewError("not_allowed_for_bookkeeper", "bookkeeper-created expenses must be OnAccount or CorporateCreditCard"),
 		}.Filter()
 	}
-	if paymentType != poRecord.GetString("payment_type") {
-		return validation.Errors{
-			"payment_type": validation.NewError("must_match_purchase_order", "payment type must match purchase order payment type"),
-		}.Filter()
-	}
 
 	expenseRecord.Set("uid", poUID)
 	return nil

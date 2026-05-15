@@ -89,7 +89,7 @@ After this branch is deployed, both PO-linked paths use the same green plus UI a
 | Expense `creator`                  | The authenticated user, so `creator = uid = auth.id`.                                                                     | The authenticated bookkeeper, so `creator != uid`.                                                                            |
 | Relationship to PO owner           | The expense can be linked to someone else's PO, but it is still the caller's expense.                                     | The expense is for the PO owner, and the bookkeeper is recorded separately as the entering user.                              |
 | Extra PO eligibility               | No additional owner or PO-number requirement beyond normal PO-linked expense validation.                                  | PO must have a non-empty `po_number`, and PO owner must differ from the bookkeeper.                                           |
-| Payment types                      | Existing expense payment-type rules apply.                                                                                | Only `OnAccount` and `CorporateCreditCard`, and the expense payment type must match the PO payment type.                      |
+| Payment types                      | Existing expense payment-type rules apply.                                                                                | Only `OnAccount` and `CorporateCreditCard`; the linked PO's payment type does not control bookkeeper eligibility.             |
 | Approver                           | Derived from the expense owner's manager, and that manager must be active with `tapr`.                                    | Set to the bookkeeper/creator. The creator must be active with `book_keeper`; `tapr` is not required for this assignment.     |
 | Draft edit, delete, submit, recall | The caller controls the draft because `creator = uid`.                                                                    | The bookkeeper controls the draft because `creator != uid`; the PO owner can view when visible but is not the draft operator. |
 | Approval queue                     | Submitted expense appears for the manager-derived approver.                                                               | Submitted expense appears for the bookkeeper because `approver = creator`.                                                    |
@@ -117,12 +117,11 @@ The frontend sends `uid = purchase_orders.uid` only for the narrow green plus ca
 - the user has `book_keeper`;
 - the linked PO owner differs from the current user;
 - the linked PO has a non-empty `po_number`;
-- the selected expense payment type is `OnAccount` or `CorporateCreditCard`;
-- the selected expense payment type matches the linked PO payment type.
+- the selected expense payment type is `OnAccount` or `CorporateCreditCard`.
 
 If any of those conditions is false, the frontend keeps the regular behavior and sends `uid = auth.id`. The server then treats the create as a regular PO-linked expense.
 
-The server is still authoritative. If any client submits `uid != auth.id`, the hook accepts it only after validating the full bookkeeper eligibility list: `book_keeper` claim, active numbered PO, PO owner match, allowed and matching payment type, different PO owner, and existing branch and PO-linked expense validation.
+The server is still authoritative. If any client submits `uid != auth.id`, the hook accepts it only after validating the full bookkeeper eligibility list: `book_keeper` claim, active numbered PO, PO owner match, allowed expense payment type, different PO owner, and existing branch and PO-linked expense validation.
 
 ### Definitions
 
@@ -162,7 +161,6 @@ The system may accept `creator != uid` only when all conditions are true:
 - the linked PO's `uid` is not the authenticated user;
 - submitted expense `uid` equals the linked PO's `uid`;
 - expense `payment_type` is `CorporateCreditCard` or `OnAccount`;
-- linked PO `payment_type` is compatible with the submitted expense payment type;
 - the caller is allowed to use the linked PO's branch under existing branch-claim rules.
 
 If any of these conditions are not met, the existing rule applies: `uid` must equal the authenticated user.
@@ -332,7 +330,6 @@ Update the green plus expense creation flow:
 - when creating from `/expenses/add/{poid}`, detect:
   - current user has `book_keeper`;
   - linked PO `uid` differs from current user;
-  - linked PO payment type is `CorporateCreditCard` or `OnAccount`;
   - linked PO has a PO number;
 - set the form's `uid` to the linked PO `uid` for that narrow case;
 - otherwise keep setting `uid` to the authenticated user.
