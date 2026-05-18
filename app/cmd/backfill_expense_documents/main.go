@@ -15,7 +15,9 @@
 //     storage prefix, compare those copied targets against manifest.tsv and mark
 //     each row verified or verify_error. By default this command uses S3's
 //     stored full-object SHA-256 checksum metadata when direct S3 credentials
-//     are available, falling back to local hashing only when needed.
+//     are available, falling back to local hashing only when needed. Operators
+//     can pass --status verify_error to retry only the small tail of rows that
+//     failed a previous strict verify pass.
 //   - apply: after production has been stopped and the database has been
 //     re-dumped/reconciled locally, insert the missing expense_documents rows
 //     and link expenses to them in one database transaction.
@@ -72,6 +74,8 @@ func main() {
 	checksumModeFlag := flags.String("checksum-mode", string(expensedocuments.ChecksumModeAuto), "verify/apply only: checksum source, one of auto, s3, or local")
 	checksumReports := stringListFlag{}
 	flags.Var(&checksumReports, "s3-checksum-report", "prepare/report only: local S3 Batch Operations Compute checksum completion-report manifest.json for the bucket named by --bucket-env; repeatable or comma-separated")
+	verifyStatuses := stringListFlag{}
+	flags.Var(&verifyStatuses, "status", "verify only: limit verification to manifest rows with this current status; repeatable or comma-separated, e.g. verify_error")
 	flags.Usage = func() {
 		usageForCommand(command, flags)
 	}
@@ -120,6 +124,7 @@ func main() {
 		// allowed to create/link database rows.
 		result, err := expensedocuments.VerifyWithOptions(app, paths, expensedocuments.VerifyOptions{
 			ChecksumMode: checksumMode,
+			Statuses:     verifyStatuses,
 		})
 		if err != nil {
 			log.Fatal(err)
@@ -181,6 +186,9 @@ Common options:
                          bucket matches --bucket-env, SHA256/FULL_OBJECT, and
                          current S3 ETag matches.
   --checksum-mode <mode>  For verify/apply: auto, s3, or local. Defaults to auto.
+  --status <status>       For verify: limit verification to rows with this current
+                         manifest status, for example --status verify_error.
+                         Repeatable or comma-separated. Omit to verify all rows.
 
 Prepare smoke-test options:
   --limit <n>             Emit at most n manifest rows. Use only for pre-apply smoke tests.

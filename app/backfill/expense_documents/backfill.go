@@ -169,6 +169,12 @@ const (
 
 type VerifyOptions struct {
 	ChecksumMode ChecksumMode
+	// Statuses limits verify to manifest rows whose current status is in this
+	// set. It exists for operational retries, for example rerunning only rows
+	// marked verify_error with checksum-mode=auto after a strict S3 checksum
+	// pass found a small tail of unsupported checksum metadata. An empty set
+	// verifies every row.
+	Statuses []string
 }
 
 type ManifestRow struct {
@@ -504,6 +510,7 @@ func VerifyWithOptions(app core.App, paths Paths, options VerifyOptions) (Verify
 	if err != nil {
 		return VerifyResult{}, err
 	}
+	statusFilter := verifyStatusFilter(options.Statuses)
 
 	fsys, err := app.NewFilesystem()
 	if err != nil {
@@ -513,7 +520,27 @@ func VerifyWithOptions(app core.App, paths Paths, options VerifyOptions) (Verify
 
 	errorsOut := []ErrorRow{}
 	verified := 0
+	total := len(rows)
+	filteredTotal := verifyFilteredRowCount(rows, statusFilter)
+	if total > 0 {
+		if len(statusFilter) > 0 {
+			fmt.Fprintf(os.Stderr, "verifying %d/%d manifest rows with checksum_mode=%s and status filter %s...\n", filteredTotal, total, options.ChecksumMode, strings.Join(options.Statuses, ","))
+		} else {
+			fmt.Fprintf(os.Stderr, "verifying %d manifest rows with checksum_mode=%s...\n", total, options.ChecksumMode)
+		}
+	}
+	lastProgressLog := time.Now()
+	processed := 0
 	for i := range rows {
+		if len(statusFilter) > 0 {
+			if _, ok := statusFilter[rows[i].Status]; !ok {
+				if rows[i].Status == StatusVerified || rows[i].Status == StatusApplied {
+					verified++
+				}
+				continue
+			}
+		}
+
 		// Verification is intentionally row-local and repeatable. A failed row
 		// does not prevent other rows from being checked, but apply later
 		// requires every manifest row to be verified/applied.
@@ -521,10 +548,20 @@ func VerifyWithOptions(app core.App, paths Paths, options VerifyOptions) (Verify
 		if len(rowErrors) == 0 {
 			rows[i].Status = StatusVerified
 			verified++
-			continue
+		} else {
+			rows[i].Status = StatusVerifyError
+			errorsOut = append(errorsOut, rowErrors...)
 		}
-		rows[i].Status = StatusVerifyError
-		errorsOut = append(errorsOut, rowErrors...)
+
+		processed++
+		if processed == filteredTotal || processed%250 == 0 || time.Since(lastProgressLog) >= 30*time.Second {
+			if len(statusFilter) > 0 {
+				fmt.Fprintf(os.Stderr, "verified progress %d/%d filtered rows; total passed %d total failed %d...\n", processed, filteredTotal, verified, total-verified)
+			} else {
+				fmt.Fprintf(os.Stderr, "verified progress %d/%d rows; passed %d failed %d...\n", processed, total, verified, processed-verified)
+			}
+			lastProgressLog = time.Now()
+		}
 	}
 
 	if err := WriteManifest(paths.ManifestPath, rows); err != nil {
@@ -534,6 +571,30 @@ func VerifyWithOptions(app core.App, paths Paths, options VerifyOptions) (Verify
 		return VerifyResult{}, err
 	}
 	return VerifyResult{Verified: verified, Failed: len(rows) - verified}, nil
+}
+
+func verifyStatusFilter(statuses []string) map[string]struct{} {
+	filter := map[string]struct{}{}
+	for _, status := range statuses {
+		status = strings.TrimSpace(status)
+		if status != "" {
+			filter[status] = struct{}{}
+		}
+	}
+	return filter
+}
+
+func verifyFilteredRowCount(rows []ManifestRow, statusFilter map[string]struct{}) int {
+	if len(statusFilter) == 0 {
+		return len(rows)
+	}
+	total := 0
+	for _, row := range rows {
+		if _, ok := statusFilter[row.Status]; ok {
+			total++
+		}
+	}
+	return total
 }
 
 func Apply(app core.App, paths Paths) (ApplyResult, error) {
@@ -558,7 +619,12 @@ func ApplyWithOptions(app core.App, paths Paths, options VerifyOptions) (ApplyRe
 	}
 	defer fsys.Close()
 
-	for _, row := range rows {
+	total := len(rows)
+	if total > 0 {
+		fmt.Fprintf(os.Stderr, "apply preflight checking %d manifest rows with checksum_mode=%s...\n", total, options.ChecksumMode)
+	}
+	lastProgressLog := time.Now()
+	for i, row := range rows {
 		// Apply repeats the verify checks instead of trusting yesterday's
 		// manifest status. The operator may have refreshed the DB dump, copied
 		// more files, or discovered drift after verify was last run.
@@ -568,11 +634,19 @@ func ApplyWithOptions(app core.App, paths Paths, options VerifyOptions) (ApplyRe
 		if errs := verifyManifestRow(app, fsys, verifier, options.ChecksumMode, row); len(errs) > 0 {
 			return ApplyResult{}, fmt.Errorf("manifest row for expense %s failed apply preflight: %s", row.ExpenseID, errs[0].Message)
 		}
+
+		processed := i + 1
+		if processed == total || processed%250 == 0 || time.Since(lastProgressLog) >= 30*time.Second {
+			fmt.Fprintf(os.Stderr, "apply preflight progress %d/%d rows...\n", processed, total)
+			lastProgressLog = time.Now()
+		}
 	}
+	fmt.Fprintf(os.Stderr, "apply preflight complete; starting database transaction for %d rows...\n", total)
 
 	result := ApplyResult{}
 	err = app.RunInTransaction(func(txApp core.App) error {
-		for _, row := range rows {
+		lastTransactionLog := time.Now()
+		for i, row := range rows {
 			// The whole batch is all-or-nothing. Any unexpected expense state,
 			// document hash conflict, or insert/update failure aborts the
 			// transaction so production cannot be left half-linked.
@@ -637,12 +711,19 @@ func ApplyWithOptions(app core.App, paths Paths, options VerifyOptions) (ApplyRe
 				return err
 			}
 			result.LinkedExpenses++
+
+			processed := i + 1
+			if processed == total || processed%500 == 0 || time.Since(lastTransactionLog) >= 10*time.Second {
+				fmt.Fprintf(os.Stderr, "apply transaction progress %d/%d rows; inserted_documents=%d linked_expenses=%d skipped_expenses=%d...\n", processed, total, result.InsertedDocuments, result.LinkedExpenses, result.SkippedExpenses)
+				lastTransactionLog = time.Now()
+			}
 		}
 		return nil
 	})
 	if err != nil {
 		return ApplyResult{}, err
 	}
+	fmt.Fprintf(os.Stderr, "apply transaction committed; writing applied manifest statuses...\n")
 
 	for i := range rows {
 		rows[i].Status = StatusApplied
