@@ -46,6 +46,12 @@ source scripts/setup-env.sh
 4. Clears local Litestream state and forces a full replacement snapshot upload to S3
 5. Re-enables Fly auto-start and starts the same production machine
 6. Startup clears local DB/WAL/Litestream state from the volume and restores from the replica
+7. Waits for the restored app health endpoint to pass
+8. Stages and deploys `LITESTREAM_FORCE_RESTORE=0`, then verifies the live machine reports `0`
+
+Staging the disarm is not enough on its own. The script deploys staged secrets
+after the restore boot is healthy so later restarts reuse the mounted database
+instead of force-restoring again.
 
 ---
 

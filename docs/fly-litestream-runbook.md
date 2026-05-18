@@ -96,18 +96,26 @@ With `auto-recover: true`, Litestream should attempt to reset its state after LT
 ```bash
 fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=1
 fly machine restart <machine-id> -a <app-name>
+fly ssh console -a <app-name> -C "wget -qO- http://127.0.0.1:8080/api/health"
 fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=0
+fly secrets deploy -a <app-name>
+fly ssh console -a <app-name> -C 'sh -c "printenv LITESTREAM_FORCE_RESTORE || true"'
 ```
 
 Expected startup lines:
 
 ```text
-[start] Restore requested: force-file
+[start] Restore requested: env
 [start] Preparing clean restore (clearing local WAL + Litestream state if present)...
 [start] Restoring /app/pb_data/data.db from Litestream replica (config: /etc/litestream.yml)
 ```
 
 This deletes the local DB, WAL/SHM files, and Litestream state before restoring from S3.
+
+The final `printenv` command must return `0`. Staging the disarm without
+deploying staged secrets can leave the running machine with the previous value,
+which means later restarts can continue to force-restore. Wait for health before
+deploying the disarm so the forced restore boot has finished.
 
 ## Volume Failure Or Lost Machine
 
@@ -145,10 +153,15 @@ fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=1
 
 ```bash
 fly machine restart <machine-id> -a <app-name>
+fly ssh console -a <app-name> -C "wget -qO- http://127.0.0.1:8080/api/health"
 fly secrets set -a <app-name> --stage LITESTREAM_FORCE_RESTORE=0
+fly secrets deploy -a <app-name>
+fly ssh console -a <app-name> -C 'sh -c "printenv LITESTREAM_FORCE_RESTORE || true"'
 ```
 
 The startup script will perform a clean restore from the replica when `LITESTREAM_FORCE_RESTORE=1` is present at boot.
+After the restore boot, the disarm is only active once staged secrets have been
+deployed and the live machine reports `LITESTREAM_FORCE_RESTORE=0`.
 
 This is the correct replacement workflow when the production machine already has a database on the mounted Fly volume. A normal restart will keep the on-volume database, so replacing production requires `LITESTREAM_FORCE_RESTORE=1`.
 

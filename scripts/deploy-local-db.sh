@@ -39,6 +39,9 @@ set -o pipefail
 # 8. Runs `litestream replicate -once -force-snapshot` to push a complete
 #    replacement snapshot to S3 and exit only when that upload is done.
 # 9. Re-enables auto-start and starts the same production machine again.
+# 10. Waits for the restored app to become healthy.
+# 11. Stages and deploys `LITESTREAM_FORCE_RESTORE=0`, then verifies the live
+#     machine sees the disarmed value.
 #
 # Important safety properties:
 # - Production is stopped before the replacement DB is pushed, so the live app
@@ -49,6 +52,9 @@ set -o pipefail
 #   single authoritative restore trigger.
 # - The script clears local Litestream state before replication so a replaced
 #   local database does not reuse stale generation metadata.
+# - After the restore boot succeeds and the app is healthy, the script does not
+#   merely stage the disarm. It deploys staged secrets so future starts do not
+#   keep booting with `LITESTREAM_FORCE_RESTORE=1`.
 # - The script refuses to continue if machine state is ambiguous.
 # - If the one-shot snapshot upload fails, production is NOT started
 #   automatically. This avoids booting with restore still armed and pulling
@@ -116,6 +122,7 @@ echo "WARNING: Bad sign: a log line beginning with '[start] Using existing datab
 echo "WARNING: If you see the bad sign, the replacement DB was not restored from the replica."
 echo "WARNING: This script temporarily disables Fly autostart during cutover and re-enables it before starting production again."
 echo "WARNING: If the script exits early, verify autostart was re-enabled before bringing production back."
+echo "WARNING: After the restore boot, this script deploys LITESTREAM_FORCE_RESTORE=0 and verifies the live machine sees 0."
 echo ""
 
 # Query Fly once up front and verify the deployment is in the single-machine
@@ -210,6 +217,67 @@ disarm_force_restore_secret() {
     flyctl secrets set -a "$APP_NAME" --stage "${FORCE_RESTORE_SECRET_NAME}=0" >/dev/null
 }
 
+deploy_staged_secrets() {
+    flyctl secrets deploy -a "$APP_NAME"
+}
+
+app_health_response() {
+    flyctl ssh console -a "$APP_NAME" -C "wget -qO- http://127.0.0.1:8080/api/health" 2>/dev/null | tail -n 1 | tr -d '\r'
+}
+
+wait_for_app_health() {
+    local label="${1:-app}"
+    local failure_hint="${2:-Check Fly logs before deciding whether to restart or roll back.}"
+    local max_attempts=60
+    local sleep_seconds=5
+    local attempt=1
+    local health_response
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        health_response=$(app_health_response || true)
+        if printf '%s\n' "$health_response" | grep -q '"code":200'; then
+            echo "✅ Production health endpoint is passing"
+            return 0
+        fi
+
+        echo "⏳ Waiting for $label health... ($attempt/$max_attempts)"
+        sleep "$sleep_seconds"
+        attempt=$((attempt + 1))
+    done
+
+    echo "❌ Production did not become healthy during $label"
+    echo "💡 $failure_hint"
+    return 1
+}
+
+live_force_restore_value() {
+    flyctl ssh console -a "$APP_NAME" -C "sh -c 'printenv ${FORCE_RESTORE_SECRET_NAME} || true'" 2>/dev/null | tail -n 1 | tr -d '\r'
+}
+
+verify_force_restore_disarmed_live() {
+    local max_attempts=24
+    local sleep_seconds=5
+    local attempt=1
+    local live_value
+
+    while [ "$attempt" -le "$max_attempts" ]; do
+        live_value=$(live_force_restore_value || true)
+        if [ "$live_value" = "0" ]; then
+            echo "✅ Live ${FORCE_RESTORE_SECRET_NAME}=0"
+            return 0
+        fi
+
+        echo "⏳ Waiting for live ${FORCE_RESTORE_SECRET_NAME}=0... ($attempt/$max_attempts; current=${live_value:-unset})"
+        sleep "$sleep_seconds"
+        attempt=$((attempt + 1))
+    done
+
+    live_value=$(live_force_restore_value || true)
+    echo "❌ Live ${FORCE_RESTORE_SECRET_NAME} is ${live_value:-unset}, expected 0"
+    echo "💡 Future restarts may still force-restore until staged secrets are deployed and the live machine sees 0."
+    return 1
+}
+
 # Mark production so the next startup performs a clean restore from S3 instead
 # of reusing the existing on-volume database.
 echo "📝 Staging LITESTREAM_FORCE_RESTORE=1 for the next boot..."
@@ -245,13 +313,22 @@ start_production_app() {
     set_machine_autostart true
     echo "🚀 Starting production app..."
     flyctl machine start "$MACHINE_ID" -a "$APP_NAME"
+    echo "🔎 Waiting for restore boot to finish and app health to pass..."
+    wait_for_app_health "restore boot" "LITESTREAM_FORCE_RESTORE is still armed; check logs before restarting so the next start can still perform a clean restore if needed."
     echo "🧹 Setting LITESTREAM_FORCE_RESTORE=0 for future boots..."
     disarm_force_restore_secret
+    echo "🚚 Deploying staged secrets so future boots are actually disarmed..."
+    deploy_staged_secrets
+    echo "🔎 Waiting for post-disarm restart health to pass..."
+    wait_for_app_health "post-disarm restart" "LITESTREAM_FORCE_RESTORE has already been deployed as 0; check logs before deciding whether to re-arm restore."
+    echo "🔎 Verifying the running machine sees LITESTREAM_FORCE_RESTORE=0..."
+    verify_force_restore_disarmed_live
     echo "✅ Production app started!"
 
     echo ""
     echo "🎉 Deployment complete!"
     echo "🌐 Check your app at: https://$APP_NAME.fly.dev"
+    echo "📋 Expected post-disarm startup log on future restarts: [start] Using existing database at /app/pb_data/data.db (no restore requested)"
 }
 
 # Capture Litestream output to both the terminal and a temp file so we can show
@@ -273,8 +350,9 @@ if [ "$REPLICATE_EXIT_CODE" -ne 0 ]; then
     echo "🧹 Setting LITESTREAM_FORCE_RESTORE=0 because cutover did not complete..."
     disarm_force_restore_secret || true
     echo "❌ Production remains stopped so the existing mounted database is not overwritten by a bad restore."
+    echo "💡 Before starting production manually, deploy the staged disarm with: flyctl secrets deploy -a $APP_NAME"
     echo "💡 When you are ready to bring production back, re-enable auto-start with: flyctl machine update $MACHINE_ID -a $APP_NAME --autostart=true --skip-start -y"
-    echo "💡 If you need to bring production back on the old database, make sure LITESTREAM_FORCE_RESTORE is staged as 0 before starting the machine."
+    echo "💡 If you need to bring production back on the old database, make sure LITESTREAM_FORCE_RESTORE is deployed as 0 before starting the machine."
     exit 1
 fi
 

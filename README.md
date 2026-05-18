@@ -207,10 +207,17 @@ flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=1
 # and restores from the replica into the mounted volume.
 MACHINE_ID=$(flyctl status --json | jq -r '.Machines[0].id')
 flyctl machine restart "$MACHINE_ID"
+flyctl ssh console -C "wget -qO- http://127.0.0.1:8080/api/health"
+
+# Stage and deploy the disarm. Staging 0 alone is not enough: the running
+# machine can keep booting with the previous env value until staged secrets are
+# deployed. Wait for health first so the forced restore boot has finished.
 flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=0
+flyctl secrets deploy
+flyctl ssh console -C 'sh -c "printenv LITESTREAM_FORCE_RESTORE || true"'
 ```
 
-For full database replacement from a local copy, prefer [`scripts/deploy-local-db.sh`](scripts/deploy-local-db.sh), which stages `LITESTREAM_FORCE_RESTORE=1`, resets local Litestream state, and forces a complete snapshot upload before restarting production.
+For full database replacement from a local copy, prefer [`scripts/deploy-local-db.sh`](scripts/deploy-local-db.sh), which stages `LITESTREAM_FORCE_RESTORE=1`, resets local Litestream state, forces a complete snapshot upload before restarting production, then deploys and verifies `LITESTREAM_FORCE_RESTORE=0`.
 
 **Local:**
 

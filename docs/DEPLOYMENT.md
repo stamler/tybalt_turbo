@@ -169,15 +169,37 @@ When you need to push local database changes (schema changes, data fixes, rollba
    ```bash
    flyctl machine update "$MACHINE_ID" --autostart=true --skip-start -y
    flyctl machine start "$MACHINE_ID"
-   flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=0
+   flyctl ssh console -C "wget -qO- http://127.0.0.1:8080/api/health"
    ```
 
-On next boot, the app startup script will:
+   The health command must succeed before disarming forced restores. It confirms
+   startup finished the restore, passed the integrity check, and started the app.
+
+6. **Disarm forced restores for future boots**:
+
+   ```bash
+   flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=0
+   flyctl secrets deploy
+   flyctl ssh console -C 'sh -c "printenv LITESTREAM_FORCE_RESTORE || true"'
+   ```
+
+   The final command must print `0`. Staging `LITESTREAM_FORCE_RESTORE=0`
+   alone is not sufficient, because Fly can keep the previous value active
+   until staged secrets are deployed. Deploy it only after the restore boot is
+   healthy, because `flyctl secrets deploy` can restart/replace the machine.
+
+On the restore boot, the app startup script will:
 
 - Ignore the existing on-volume database because restore was explicitly requested
 - Delete `data.db`, WAL/SHM files, and local Litestream state from the volume
 - Restore `data.db` from S3 into the mounted volume
 - Clear stale Litestream state (`/app/pb_data/.data.db-litestream`) and any SQLite WAL/SHM files
+
+After the disarm deployment, a future restart should log:
+
+```text
+[start] Using existing database at /app/pb_data/data.db (no restore requested)
+```
 
 This prevents common Litestream WAL verification errors after DB replacement.
 
@@ -227,6 +249,12 @@ flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=1
 # Restart the machine so startup performs a clean restore
 MACHINE_ID=$(flyctl status --json | jq -r '.Machines[0].id')
 flyctl machine restart $MACHINE_ID
+flyctl ssh console -C "wget -qO- http://127.0.0.1:8080/api/health"
+
+# Disarm future restores, then deploy the staged secret change.
+flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=0
+flyctl secrets deploy
+flyctl ssh console -C 'sh -c "printenv LITESTREAM_FORCE_RESTORE || true"'
 ```
 
 **For complete disaster recovery:**
@@ -267,6 +295,9 @@ flyctl secrets list
 
 - Mark a clean restore on next boot: `flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=1`
 - Restart the machine: `flyctl machine restart $(flyctl status --json | jq -r '.Machines[0].id')`
+- Wait for health: `flyctl ssh console -C "wget -qO- http://127.0.0.1:8080/api/health"`
+- After the restore boot, disarm and deploy the secret change: `flyctl secrets set --stage LITESTREAM_FORCE_RESTORE=0 && flyctl secrets deploy`
+- Verify the live machine prints `0`: `flyctl ssh console -C 'sh -c "printenv LITESTREAM_FORCE_RESTORE || true"'`
 
 **App not starting:**
 
