@@ -145,9 +145,10 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 	if requiresAttachment {
 		hasStoredAttachment := expenseRecord.GetString("attachment") != ""
 		hasDocumentAttachment := !expenseRecord.IsNew() && expenseRecord.GetString("attachment_document") != ""
+		hasMissingAttachmentReason := !expenseRecord.IsNew() && strings.TrimSpace(expenseRecord.GetString("attachment_missing_reason")) != ""
 		hasSourceExpenseAttachment := strings.TrimSpace(expenseRecord.GetString("source_expense")) != ""
 		hasUploadedAttachment := len(expenseRecord.GetUnsavedFiles("attachment")) > 0
-		if !hasStoredAttachment && !hasDocumentAttachment && !hasSourceExpenseAttachment && !hasUploadedAttachment {
+		if !hasStoredAttachment && !hasDocumentAttachment && !hasMissingAttachmentReason && !hasSourceExpenseAttachment && !hasUploadedAttachment {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "hook error when validating expense",

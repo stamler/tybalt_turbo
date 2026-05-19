@@ -414,6 +414,24 @@
           </button>
         {/if}
       </div>
+    {:else if expense.attachment_missing_reason}
+      <div class="flex items-start gap-2">
+        <span class="font-semibold">Attachment:</span>
+        <div class="max-w-2xl rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div class="font-semibold">Missing historical attachment</div>
+          <div>{expense.attachment_missing_reason}</div>
+        </div>
+        {#if hasAdminAccess}
+          <button
+            type="button"
+            class="font-mono text-sm text-blue-700 underline decoration-dotted underline-offset-2 hover:text-blue-900"
+            title="Review attachment missing reason"
+            on:click={openHashRepairPopover}
+          >
+            Review
+          </button>
+        {/if}
+      </div>
     {/if}
 
     {#if expense.pay_period_ending}
@@ -551,7 +569,10 @@
   <ExpenseAttachmentHashRepairPopover
     show={showHashRepairPopover}
     expenseId={expense.id}
+    hasAttachment={Boolean(expense.attachment)}
     currentHash={expense.attachment_hash}
+    currentUpdated={expense.updated}
+    missingReason={expense.attachment_missing_reason}
     onClose={closeHashRepairPopover}
     onRepaired={refreshExpense}
   />

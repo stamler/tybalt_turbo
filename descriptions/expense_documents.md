@@ -710,7 +710,8 @@ This report is the acceptance checkpoint before cleanup.
 
 ### 7. Cleanup after successful backfill
 
-Only after the report shows no legacy-only attachment rows:
+Only after the report shows no legacy-only attachment rows, except rows with a
+deliberate `attachment_missing_reason`:
 
 1. Remove all remaining code paths that rely on legacy fallback.
 2. Remove `expenses.attachment`.
@@ -719,6 +720,14 @@ Only after the report shows no legacy-only attachment rows:
 5. Update generated PocketBase types.
 6. Update imports/exports/writeback queries so `expense_documents` is the only source for expense attachments.
 7. Remove any UI handling that displays legacy expense attachment links.
+
+`attachment_missing_reason` is the permanent audit marker for historical
+receipts that were supposed to exist but were already unrecoverable in the
+legacy system. It must be set only by an admin-only repair endpoint that clears
+the legacy attachment fields in a guarded transaction after the operator has
+verified the receipt cannot be recovered. These rows are not migrated to
+`expense_documents`, and Phase 3 should continue to display the missing reason
+instead of treating the expense as an ordinary attachmentless row.
 
 Cleanup should be its own PR/release after the backfill has been verified in production.
 
@@ -786,12 +795,16 @@ Backend tests should cover:
 - backfill prepare is idempotent;
 - backfill verify refuses bad or missing copies;
 - backfill apply skips already-linked rows and refuses mismatched links.
+- admin repair can mark an unrecoverable historical attachment missing while
+  preserving a text reason and clearing only the legacy attachment fields.
 
 Frontend tests or manual checks should cover:
 
 - ordinary users see the same expense form and attachment control;
 - bookkeepers see the details-page action only when an attachment exists;
 - source reuse lands on the existing PO-backed expense form;
+- admins can audit/repair a bad hash or mark a confirmed unrecoverable
+  historical attachment missing from the expense details dialog;
 - validation errors still display next to the attachment field.
 
 Integration/manual testing against the dumped production DB should include:
@@ -812,7 +825,13 @@ Integration/manual testing against the dumped production DB should include:
 - The `expense_documents.attachment_hash` unique index remains the long-term duplicate prevention mechanism.
 - Orphaned `expense_documents` rows may be relinked by later uploads of the same file; this is not treated as multi-expense reuse unless another expense still references the document or hash.
 - `book_keeper` reuse changes only which expense may point at an existing document. It never creates two document records with the same hash.
+- Historical required-attachment expenses whose original files are permanently
+  lost should be marked with `attachment_missing_reason`; do not upload
+  placeholders, invent replacement files, or blank them silently.
 
 ## Phase 3: cleanup
 
-After everything is fully migrated and we're only using `expense_documents`, we can remove all the fallback code completely so it's a tight implementation once again.
+After every recoverable attachment is migrated to `expense_documents`, and any
+known unrecoverable historical attachment is represented by
+`attachment_missing_reason`, remove the legacy fallback code so the steady-state
+implementation is tight again.

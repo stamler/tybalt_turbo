@@ -4,7 +4,10 @@
 
   export let show = false;
   export let expenseId: string;
+  export let hasAttachment = false;
   export let currentHash = "";
+  export let currentUpdated = "";
+  export let missingReason = "";
   export let onClose: () => void = () => {};
   export let onRepaired: () => Promise<void> | void = () => {};
 
@@ -27,18 +30,35 @@
     noop: boolean;
   };
 
+  type MarkMissingResponse = {
+    expense_id: string;
+    updated: string;
+    attachment_missing_reason: string;
+    previous_attachment: string;
+    previous_attachment_hash: string;
+    previous_attachment_document: string;
+    marked: boolean;
+    noop: boolean;
+  };
+
   type MessageTone = "green" | "red" | "orange" | "neutral";
 
   let auditResult: AuditResponse | null = null;
+  let missingReasonDraft = "";
   let message = "";
   let messageTone: MessageTone = "neutral";
   let loading = false;
 
   $: if (!show) {
     auditResult = null;
+    missingReasonDraft = "";
     message = "";
     messageTone = "neutral";
     loading = false;
+  }
+
+  $: if (show && !missingReasonDraft) {
+    missingReasonDraft = missingReason;
   }
 
   function close() {
@@ -107,6 +127,37 @@
       loading = false;
     }
   }
+
+  async function markMissing() {
+    const reason = missingReasonDraft.trim();
+    if (!reason || !currentUpdated) return;
+
+    const confirmed = window.confirm(
+      "Marking this attachment missing is irreversible. Use this only after verifying that the original receipt cannot be recovered.",
+    );
+    if (!confirmed) return;
+
+    loading = true;
+    try {
+      const result = (await pb.send(`/api/expenses/${expenseId}/attachment_missing/mark`, {
+        method: "POST",
+        body: { updated: currentUpdated, reason },
+      })) as MarkMissingResponse;
+      if (result.noop) {
+        message = "No change made. The attachment was already marked missing with this reason.";
+        messageTone = "neutral";
+      } else {
+        message = "Attachment marked missing and legacy attachment fields cleared.";
+        messageTone = "orange";
+        await onRepaired();
+      }
+    } catch (error: any) {
+      message = errorMessage(error, "Marking attachment missing failed");
+      messageTone = "red";
+    } finally {
+      loading = false;
+    }
+  }
 </script>
 
 {#if show}
@@ -114,7 +165,7 @@
     <div class="w-full max-w-2xl rounded-lg bg-white p-5 shadow-xl">
       <div class="mb-4 flex items-start justify-between gap-4">
         <div>
-          <h2 class="text-xl font-bold">Attachment Hash</h2>
+          <h2 class="text-xl font-bold">Attachment Repair</h2>
           <p class="mt-1 text-sm text-neutral-600">{expenseId}</p>
         </div>
         <button
@@ -130,9 +181,18 @@
 
       <div class="space-y-3 text-sm">
         <div>
-          <div class="font-semibold text-neutral-700">Current</div>
+          <div class="font-semibold text-neutral-700">Current Hash</div>
           <div class="break-all font-mono text-neutral-700">{currentHash || "No stored hash"}</div>
         </div>
+
+        {#if missingReason}
+          <div>
+            <div class="font-semibold text-neutral-700">Missing Reason</div>
+            <div class="rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+              {missingReason}
+            </div>
+          </div>
+        {/if}
 
         {#if auditResult}
           <div class="grid gap-3 md:grid-cols-2">
@@ -154,14 +214,27 @@
         {#if message}
           <div class="rounded-sm border px-3 py-2 {messageClass(messageTone)}">{message}</div>
         {/if}
+
+        <div class="border-t pt-3">
+          <label class="block text-sm font-semibold text-neutral-700" for="missing-reason">
+            Mark attachment missing
+          </label>
+          <textarea
+            id="missing-reason"
+            class="mt-1 min-h-24 w-full rounded-sm border border-neutral-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-hidden"
+            placeholder="Explain why this historical attachment is missing and cannot be recovered."
+            bind:value={missingReasonDraft}
+            disabled={loading}
+          ></textarea>
+        </div>
       </div>
 
-      <div class="mt-5 flex justify-end gap-2">
+      <div class="mt-5 flex flex-wrap justify-end gap-2">
         <button
           type="button"
           class="rounded-sm bg-neutral-200 px-4 py-2 text-neutral-700 hover:bg-neutral-300 disabled:opacity-50"
           on:click={auditHash}
-          disabled={loading}
+          disabled={loading || !hasAttachment}
         >
           {loading ? "Working..." : "Audit"}
         </button>
@@ -169,9 +242,17 @@
           type="button"
           class="rounded-sm bg-orange-500 px-4 py-2 text-white hover:bg-orange-600 disabled:opacity-50"
           on:click={replaceHash}
-          disabled={loading || !auditResult}
+          disabled={loading || !hasAttachment || !auditResult}
         >
           Replace
+        </button>
+        <button
+          type="button"
+          class="rounded-sm bg-red-600 px-4 py-2 text-white hover:bg-red-700 disabled:opacity-50"
+          on:click={markMissing}
+          disabled={loading || !missingReasonDraft.trim() || !currentUpdated}
+        >
+          Mark Missing
         </button>
       </div>
     </div>

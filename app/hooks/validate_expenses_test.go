@@ -16,6 +16,15 @@ import (
 var expensesCollection = core.NewBaseCollection("expenses")
 var poCollection = core.NewBaseCollection("purchase_orders")
 
+func mustBuildExistingExpenseRecordFromMap(t *testing.T, m map[string]any) *core.Record {
+	t.Helper()
+	record := buildRecordFromMap(expensesCollection, m)
+	if err := record.PostScan(); err != nil {
+		t.Fatalf("failed to mark expense test record as existing: %v", err)
+	}
+	return record
+}
+
 func TestValidateExpense(t *testing.T) {
 	// Initialize a PocketBase TestApp for validations that require DB lookups
 	app := testseed.NewSeededTestApp(t)
@@ -71,13 +80,15 @@ func TestValidateExpense(t *testing.T) {
 		"invalid_no_allowance_types_allowance":                  {valid: false, field: "allowance_types", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "mg0sp9iyjzo4zw9", "payment_type": "Allowance", "purchase_order": "", "total": constants.NO_PO_EXPENSE_LIMIT + 100, "vendor": "2zqxtsmymf670ha"})},
 
 		// Attachment presence validation across payment types
-		"invalid_attachment_required_for_expense":                   {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "Expense", "purchase_order": "", "total": 10.00, "vendor": "2zqxtsmymf670ha"})},
-		"invalid_attachment_required_for_onaccount":                 {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "OnAccount", "purchase_order": "", "total": 10.00, "vendor": "2zqxtsmymf670ha"})},
-		"invalid_attachment_required_for_corporate_credit_card_att": {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "CorporateCreditCard", "purchase_order": "", "total": 10.00, "cc_last_4_digits": "1234", "vendor": "2zqxtsmymf670ha"})},
-		"invalid_attachment_required_for_fuelcard_att":              {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "FuelCard", "purchase_order": "", "total": 10.00, "vendor": "2zqxtsmymf670ha"})},
-		"valid_no_attachment_for_allowance":                         {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{"Breakfast"}, "date": "2024-01-22", "description": "", "job": "", "payment_type": "Allowance", "purchase_order": "", "total": 25.00, "vendor": ""})},
-		"valid_no_attachment_for_mileage":                           {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "Mileage", "purchase_order": "", "total": 25.00, "distance": 10.0, "vendor": ""})},
-		"valid_no_attachment_for_personal_reimbursement":            {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "PersonalReimbursement", "purchase_order": "", "total": 25.00, "vendor": ""})},
+		"invalid_attachment_required_for_expense":                     {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "Expense", "purchase_order": "", "total": 10.00, "vendor": "2zqxtsmymf670ha"})},
+		"invalid_attachment_required_for_onaccount":                   {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "OnAccount", "purchase_order": "", "total": 10.00, "vendor": "2zqxtsmymf670ha"})},
+		"invalid_attachment_required_for_corporate_credit_card_att":   {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "CorporateCreditCard", "purchase_order": "", "total": 10.00, "cc_last_4_digits": "1234", "vendor": "2zqxtsmymf670ha"})},
+		"invalid_attachment_required_for_fuelcard_att":                {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "FuelCard", "purchase_order": "", "total": 10.00, "vendor": "2zqxtsmymf670ha"})},
+		"invalid_new_expense_cannot_use_missing_reason_as_attachment": {valid: false, field: "attachment", po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "Expense", "purchase_order": "", "total": 10.00, "vendor": "2zqxtsmymf670ha", "attachment_missing_reason": "client supplied reason"})},
+		"valid_existing_expense_with_missing_attachment_reason":       {valid: true, po: nil, hasPayablesAdminClaim: false, record: mustBuildExistingExpenseRecordFromMap(t, map[string]any{"id": "missingreceipt01", "allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "Expense", "purchase_order": "", "total": 10.00, "vendor": "2zqxtsmymf670ha", "attachment_missing_reason": "historical receipt could not be recovered"})},
+		"valid_no_attachment_for_allowance":                           {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{"Breakfast"}, "date": "2024-01-22", "description": "", "job": "", "payment_type": "Allowance", "purchase_order": "", "total": 25.00, "vendor": ""})},
+		"valid_no_attachment_for_mileage":                             {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "Mileage", "purchase_order": "", "total": 25.00, "distance": 10.0, "vendor": ""})},
+		"valid_no_attachment_for_personal_reimbursement":              {valid: true, po: nil, hasPayablesAdminClaim: false, record: buildRecordFromMap(expensesCollection, map[string]any{"allowance_types": []string{}, "date": "2024-01-22", "description": "Valid description", "job": "", "payment_type": "PersonalReimbursement", "purchase_order": "", "total": 25.00, "vendor": ""})},
 
 		// Tests that an expense against a Cumulative PO is valid when:
 		// 1. The PO has a total of $1000

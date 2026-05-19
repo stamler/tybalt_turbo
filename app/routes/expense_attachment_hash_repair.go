@@ -43,12 +43,28 @@ type expenseAttachmentHashReplaceRequest struct {
 	Updated string `json:"updated"`
 }
 
+type expenseAttachmentMissingMarkRequest struct {
+	Updated string `json:"updated"`
+	Reason  string `json:"reason"`
+}
+
 type expenseAttachmentHashReplaceResponse struct {
 	expenseAttachmentHashAuditResponse
 	PreviousHash string `json:"previous_hash"`
 	NewHash      string `json:"new_hash"`
 	Replaced     bool   `json:"replaced"`
 	Noop         bool   `json:"noop"`
+}
+
+type expenseAttachmentMissingMarkResponse struct {
+	ExpenseID               string `json:"expense_id"`
+	Updated                 string `json:"updated"`
+	AttachmentMissingReason string `json:"attachment_missing_reason"`
+	PreviousAttachment      string `json:"previous_attachment"`
+	PreviousAttachmentHash  string `json:"previous_attachment_hash"`
+	PreviousDocumentID      string `json:"previous_attachment_document"`
+	Marked                  bool   `json:"marked"`
+	Noop                    bool   `json:"noop"`
 }
 
 type expenseAttachmentHashHTTPError struct {
@@ -93,6 +109,31 @@ func createReplaceExpenseAttachmentHashHandler(app core.App) func(e *core.Reques
 		}
 
 		response, err := replaceExpenseAttachmentHash(app, e.Request.PathValue("id"), strings.TrimSpace(req.Updated))
+		if err != nil {
+			return expenseAttachmentHashRouteError(e, err)
+		}
+		return e.JSON(http.StatusOK, response)
+	}
+}
+
+func createMarkExpenseAttachmentMissingHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if err := requireAdminForExpenseAttachmentHashRepair(app, e); err != nil {
+			return err
+		}
+
+		var req expenseAttachmentMissingMarkRequest
+		if err := e.BindBody(&req); err != nil {
+			return e.Error(http.StatusBadRequest, "invalid request body", err)
+		}
+		if strings.TrimSpace(req.Updated) == "" {
+			return e.Error(http.StatusBadRequest, "updated is required", nil)
+		}
+		if strings.TrimSpace(req.Reason) == "" {
+			return e.Error(http.StatusBadRequest, "attachment missing reason is required", nil)
+		}
+
+		response, err := markExpenseAttachmentMissing(app, e.Request.PathValue("id"), strings.TrimSpace(req.Updated), strings.TrimSpace(req.Reason))
 		if err != nil {
 			return expenseAttachmentHashRouteError(e, err)
 		}
@@ -199,6 +240,83 @@ func replaceExpenseAttachmentHash(app core.App, expenseID string, expectedUpdate
 	response.Updated = updated
 	response.StoredHash = audit.CalculatedHash
 	response.Matches = true
+	return response, nil
+}
+
+func markExpenseAttachmentMissing(app core.App, expenseID string, expectedUpdated string, reason string) (expenseAttachmentMissingMarkResponse, error) {
+	expenseID = strings.TrimSpace(expenseID)
+	if expenseID == "" {
+		return expenseAttachmentMissingMarkResponse{}, &expenseAttachmentHashHTTPError{status: http.StatusBadRequest, message: "expense id is required"}
+	}
+
+	response := expenseAttachmentMissingMarkResponse{
+		ExpenseID:               expenseID,
+		AttachmentMissingReason: reason,
+	}
+
+	var updated string
+	err := app.RunInTransaction(func(txApp core.App) error {
+		expense, err := txApp.FindRecordById("expenses", expenseID)
+		if err != nil {
+			return &expenseAttachmentHashHTTPError{status: http.StatusNotFound, message: "expense not found", err: err}
+		}
+
+		currentUpdated, err := expenseAttachmentHashUpdatedString(txApp, "expenses", expenseID)
+		if err != nil {
+			return &expenseAttachmentHashHTTPError{status: http.StatusInternalServerError, message: "failed to load expense timestamp", err: err}
+		}
+		if currentUpdated != expectedUpdated {
+			return &expenseAttachmentHashHTTPError{status: http.StatusConflict, message: "expense changed; refresh before marking attachment missing"}
+		}
+
+		response.PreviousAttachment = strings.TrimSpace(expense.GetString("attachment"))
+		response.PreviousAttachmentHash = strings.TrimSpace(expense.GetString("attachment_hash"))
+		response.PreviousDocumentID = strings.TrimSpace(expense.GetString("attachment_document"))
+		currentReason := strings.TrimSpace(expense.GetString("attachment_missing_reason"))
+		if response.PreviousAttachment == "" &&
+			response.PreviousAttachmentHash == "" &&
+			response.PreviousDocumentID == "" &&
+			currentReason == reason {
+			updated = currentUpdated
+			response.Noop = true
+			return nil
+		}
+
+		newUpdated := types.NowDateTime()
+		result, err := txApp.DB().NewQuery(`
+			UPDATE expenses
+			SET attachment = '',
+			    attachment_hash = '',
+			    attachment_document = '',
+			    attachment_missing_reason = {:reason},
+			    updated = {:updated}
+			WHERE id = {:id} AND updated = {:expected_updated}
+		`).Bind(dbx.Params{
+			"reason":           reason,
+			"updated":          newUpdated,
+			"id":               expenseID,
+			"expected_updated": expectedUpdated,
+		}).Execute()
+		if err != nil {
+			return err
+		}
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if affected != 1 {
+			return &expenseAttachmentHashHTTPError{status: http.StatusConflict, message: "expense changed; refresh before marking attachment missing"}
+		}
+
+		updated = newUpdated.String()
+		response.Marked = true
+		return nil
+	})
+	if err != nil {
+		return expenseAttachmentMissingMarkResponse{}, err
+	}
+
+	response.Updated = updated
 	return response, nil
 }
 

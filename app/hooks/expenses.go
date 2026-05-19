@@ -778,9 +778,11 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 	originalAttachmentDocument := ""
+	originalAttachmentMissingReason := ""
 	if !expenseRecord.IsNew() {
 		if original := expenseRecord.Original(); original != nil {
 			originalAttachmentDocument = original.GetString("attachment_document")
+			originalAttachmentMissingReason = original.GetString("attachment_missing_reason")
 		}
 	}
 
@@ -852,8 +854,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	// client-supplied relation cannot satisfy attachment-required checks.
 	if expenseRecord.IsNew() || explicitAttachmentRemoval {
 		expenseRecord.Set("attachment_document", "")
+		expenseRecord.Set("attachment_missing_reason", "")
 	} else {
 		expenseRecord.Set("attachment_document", originalAttachmentDocument)
+		expenseRecord.Set("attachment_missing_reason", originalAttachmentMissingReason)
 	}
 
 	// validate the expense record
@@ -881,15 +885,18 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	clearExpenseDocumentForAttachmentlessType(expenseRecord)
 	if attachmentlessType {
 		// Attachmentless expense types should never keep or accept a document relation.
+		expenseRecord.Set("attachment_missing_reason", "")
 	} else if explicitAttachmentRemoval {
 		expenseRecord.Set("attachment_document", "")
 		expenseRecord.Set("attachment_hash", "")
+		expenseRecord.Set("attachment_missing_reason", "")
 	} else if hasAttachmentIntent {
 		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
 		if err != nil {
 			return err
 		}
 		applyResolvedExpenseDocument(expenseRecord, documentID)
+		expenseRecord.Set("attachment_missing_reason", "")
 	} else if expenseRecord.GetString("attachment") != "" && originalAttachmentDocument == "" {
 		expenseRecord.Set("attachment_document", "")
 		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
@@ -897,6 +904,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 			return err
 		}
 		applyResolvedExpenseDocument(expenseRecord, documentID)
+		expenseRecord.Set("attachment_missing_reason", "")
 	} else if expenseRecord.GetString("attachment") == "" {
 		if expenseRecord.IsNew() {
 			expenseRecord.Set("attachment_document", "")

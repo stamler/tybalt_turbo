@@ -135,6 +135,7 @@ func AddRoutes(app core.App) {
 		expensesGroup.GET("/attachment/{id}", createGetExpenseAttachmentHandler(app))
 		expensesGroup.POST("/{id}/attachment_hash/audit", createAuditExpenseAttachmentHashHandler(app))
 		expensesGroup.POST("/{id}/attachment_hash/replace", createReplaceExpenseAttachmentHashHandler(app))
+		expensesGroup.POST("/{id}/attachment_missing/mark", createMarkExpenseAttachmentMissingHandler(app))
 		expensesGroup.GET("/pending", createGetPendingExpensesHandler(app))
 		expensesGroup.GET("/approved", createGetApprovedExpensesHandler(app))
 		// Expense tracking endpoints plus the org-wide expense commit queue.

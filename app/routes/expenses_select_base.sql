@@ -1,5 +1,6 @@
 SELECT 
   e.id,
+  e.updated,
   e.uid,
   e.creator,
   e.date,
@@ -10,6 +11,7 @@ SELECT
   COALESCE(ed.attachment, e.attachment) AS attachment,
   COALESCE(ed.attachment_hash, e.attachment_hash) AS attachment_hash,
   e.attachment_document,
+  COALESCE(e.attachment_missing_reason, '') AS attachment_missing_reason,
   CASE WHEN ed.id IS NOT NULL THEN 'pbc_2089657321' ELSE 'o1vpz1mm7qsfoyy' END AS attachment_collection_id,
   CASE WHEN ed.id IS NOT NULL THEN ed.id ELSE e.id END AS attachment_record_id,
   e.rejector,

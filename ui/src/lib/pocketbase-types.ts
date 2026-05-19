@@ -402,6 +402,7 @@ export type ExpensesRecord = {
   attachment: string;
   attachment_document: RecordIdString;
   attachment_hash: string;
+  attachment_missing_reason: string;
   branch: RecordIdString;
   category: RecordIdString;
   kind: RecordIdString;
@@ -459,6 +460,7 @@ export type ExpensesAugmentedRecord = {
   attachment_collection_id: string;
   attachment_document: RecordIdString;
   attachment_hash: string;
+  attachment_missing_reason: string;
   attachment_record_id: string;
   category: RecordIdString;
   category_name: string;
