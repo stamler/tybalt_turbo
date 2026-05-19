@@ -18,7 +18,14 @@ Each branch column represents regular working time allocated to that branch for
 the report week.
 
 Only time entries and committed amendments with time type code `R` or `RT`
-contribute to branch columns.
+create positive branch-column hours.
+
+The following time types do not create positive branch-column hours, but can
+reduce or cap branch-column hours:
+
+- `RB` / overtime banked
+- `OH` / Stat Holiday
+- `OB` / Bereavement
 
 The branch columns must exclude every other time type, including but not limited
 to:
@@ -26,10 +33,7 @@ to:
 - `OP` / PPTO
 - `OS` / Sick
 - `OV` / Vacation
-- `OB` / Bereavement
-- `OH` / Stat Holiday
 - `OR` / off rotation days
-- `RB` / overtime banked
 - `OTO` / overtime payout requests
 
 Rows with no branch continue to be grouped under the `Unassigned` branch column.
@@ -44,25 +48,63 @@ For a given hourly user and report week:
 branch value = SUM(hours) where time_types.code IN ('R', 'RT')
 ```
 
-No cap or normalization is applied to hourly staff branch values.
+If the hourly user banks overtime with an `RB` entry, subtract the `RB` hours
+from branch values. The `RB` hours do not appear as positive branch-column
+hours.
+
+Apply the banked-overtime reduction in this order:
+
+1. If the `RB` entry has a branch, subtract from that branch first.
+
+2. If that branch is missing from the branch columns or cannot absorb the full
+   `RB` amount, set that branch value to zero and carry the remaining reduction
+   forward.
+
+3. If the `RB` entry has no branch, or after the preferred branch is drained,
+   subtract from the branch with the highest remaining hours.
+
+4. If draining the highest remaining branch still leaves a reduction, continue
+   subtracting from the next highest remaining branch until the `RB` amount has
+   been fully applied.
+
+5. Branch values must never be negative.
+
+If there is a tie for highest remaining branch, use branch name ascending order
+as the deterministic tie-breaker.
 
 ### Salary Staff
 
 For salary staff, branch columns begin with the same `R` and `RT` branch totals
 used for hourly staff.
 
-After those branch totals are calculated, apply a cap equal to the salary user's
-payroll-row `work_week_hours` across all branch columns for that salary user.
+After those branch totals are calculated, apply a cap across all branch columns
+for that salary user.
+
+The default cap is the salary user's payroll-row `work_week_hours`.
+
+If the salary user has Stat Holiday or Bereavement hours and:
+
+```text
+SUM(R and RT branch values) + Stat Holiday + Bereavement > work_week_hours
+```
+
+then the effective cap is:
+
+```text
+work_week_hours - Stat Holiday - Bereavement
+```
+
+The effective cap cannot be less than zero.
 
 If the salary user's total across branch columns is equal to or less than their
-`work_week_hours`, leave the branch values unchanged.
+effective cap, leave the branch values unchanged.
 
-If the salary user's total across branch columns exceeds `work_week_hours`:
+If the salary user's total across branch columns exceeds the effective cap:
 
 1. Calculate the excess:
 
    ```text
-   excess = SUM(all branch values for the user) - work_week_hours
+   excess = SUM(all branch values for the user) - effective cap
    ```
 
 2. Subtract the excess from the user's default branch first.
@@ -75,7 +117,7 @@ If the salary user's total across branch columns exceeds `work_week_hours`:
 
 5. If draining the highest remaining branch still leaves excess, continue
    subtracting from the next highest remaining branch until the user's total
-   branch hours equal `work_week_hours`.
+   branch hours equal the effective cap.
 
 6. Branch values must never be negative.
 
@@ -125,6 +167,30 @@ Toronto: 12
 
 The PPTO hours do not appear in any branch column.
 
+#### Hourly user with banked overtime
+
+An hourly user has:
+
+```text
+Thunder Bay: 2 R hours
+Toronto: 46 R hours
+Thunder Bay: 4 RB hours
+```
+
+The `RB` reduction starts with Thunder Bay. Thunder Bay can absorb 2 hours, then
+the remaining 2 hours are subtracted from Toronto because it has the highest
+remaining branch value.
+
+Branch output:
+
+```text
+Thunder Bay: 0
+Toronto: 44
+```
+
+If the `RB` entry has no branch, the full reduction starts with the highest
+remaining branch value.
+
 #### Salary user with excess absorbed by default branch
 
 A salary user whose default branch is Thunder Bay has:
@@ -165,19 +231,48 @@ Toronto: 20
 Ottawa: 20
 ```
 
+#### Salary user with stat holiday
+
+A salary user whose default branch is Thunder Bay has:
+
+```text
+Thunder Bay: 20 R hours
+Toronto: 14 R hours
+Stat Holiday: 8 hours
+work_week_hours: 40
+```
+
+The regular branch total is 34. Because 34 + 8 is greater than 40, the effective
+cap is 32. The excess is 2, which is subtracted from the default branch.
+
+Branch output:
+
+```text
+Thunder Bay: 18
+Toronto: 14
+```
+
 ### Test Expectations
 
 Backend tests should cover at least:
 
 - Hourly staff branch columns include only `R` and `RT`.
-- Hourly staff branch columns exclude PPTO, Sick, Vacation, Bereavement, and
-  Stat Holiday.
-- Salary staff branch totals at or below `work_week_hours` remain unchanged.
-- Salary staff branch totals above `work_week_hours` are reduced from the
+- Hourly staff PPTO, Sick, Vacation, Bereavement, and Stat Holiday hours do not
+  create positive branch-column hours.
+- Salary staff branch totals remain unchanged when regular branch hours plus
+  Stat Holiday and Bereavement are at or below `work_week_hours`.
+- Salary staff branch totals above the effective cap are reduced from the
   default branch first.
 - Salary staff reduction falls through to the highest remaining branch when the
   default branch cannot absorb the full excess.
 - Salary staff reduction is deterministic when two branches tie for the highest
   remaining value.
+- Salary staff Stat Holiday and Bereavement hours reduce the effective branch
+  cap only when regular branch hours plus those paid time-off hours exceed
+  `work_week_hours`.
+- Hourly staff banked overtime reduces branch columns from the `RB` branch first
+  when one is available.
+- Hourly staff banked overtime falls back to the highest remaining branch when
+  the `RB` branch is missing or cannot absorb the full reduction.
 - Committed amendments follow the same `R` and `RT` inclusion rule as time
-  entries.
+  entries, and the same `RB`, Stat Holiday, and Bereavement reduction rules.

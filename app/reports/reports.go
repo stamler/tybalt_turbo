@@ -60,12 +60,16 @@ type branchNameRow struct {
 }
 
 type payrollBranchHoursRow struct {
-	PayrollID         string         `db:"payrollId"`
-	BranchName        string         `db:"branchName"`
-	Salary            bool           `db:"salary"`
-	WorkWeekHours     float64        `db:"workWeekHours"`
-	DefaultBranchName sql.NullString `db:"defaultBranchName"`
-	TotalHours        float64        `db:"totalHours"`
+	PayrollID           string         `db:"payrollId"`
+	RegularBranchName   sql.NullString `db:"regularBranchName"`
+	ReductionBranchName sql.NullString `db:"reductionBranchName"`
+	Salary              bool           `db:"salary"`
+	WorkWeekHours       float64        `db:"workWeekHours"`
+	DefaultBranchName   sql.NullString `db:"defaultBranchName"`
+	RegularHours        float64        `db:"regularHours"`
+	BankedHours         float64        `db:"bankedHours"`
+	StatHours           float64        `db:"statHours"`
+	BereavementHours    float64        `db:"bereavementHours"`
 }
 
 type payrollBranchHoursAllocation struct {
@@ -73,6 +77,10 @@ type payrollBranchHoursAllocation struct {
 	WorkWeekHours     float64
 	DefaultBranchName string
 	BranchHours       map[string]float64
+	BankedHours       map[string]float64
+	UnassignedBanked  float64
+	StatHours         float64
+	BereavementHours  float64
 }
 
 func withPlaceholderPayrollIDCondition(query string, columnExpr string) string {
@@ -125,6 +133,7 @@ func getPayrollBranchHours(app core.App, weekEnding string) (map[string]map[stri
 		if _, ok := allocations[row.PayrollID]; !ok {
 			allocations[row.PayrollID] = &payrollBranchHoursAllocation{
 				BranchHours: map[string]float64{},
+				BankedHours: map[string]float64{},
 			}
 		}
 
@@ -136,11 +145,23 @@ func getPayrollBranchHours(app core.App, weekEnding string) (map[string]map[stri
 		if allocation.DefaultBranchName == "" && row.DefaultBranchName.Valid {
 			allocation.DefaultBranchName = row.DefaultBranchName.String
 		}
-		allocation.BranchHours[row.BranchName] += row.TotalHours
+		if row.RegularBranchName.Valid {
+			allocation.BranchHours[row.RegularBranchName.String] += row.RegularHours
+		}
+		if row.BankedHours > payrollBranchHoursEpsilon {
+			if row.ReductionBranchName.Valid && strings.TrimSpace(row.ReductionBranchName.String) != "" {
+				allocation.BankedHours[row.ReductionBranchName.String] += row.BankedHours
+			} else {
+				allocation.UnassignedBanked += row.BankedHours
+			}
+		}
+		allocation.StatHours += row.StatHours
+		allocation.BereavementHours += row.BereavementHours
 	}
 
 	branchHours := make(map[string]map[string]string, len(allocations))
 	for payrollID, allocation := range allocations {
+		normalizeBankedOvertimePayrollBranchHours(allocation)
 		normalizeSalaryPayrollBranchHours(allocation)
 		branchHours[payrollID] = make(map[string]string, len(allocation.BranchHours))
 		for branchName, totalHours := range allocation.BranchHours {
@@ -149,6 +170,23 @@ func getPayrollBranchHours(app core.App, weekEnding string) (map[string]map[stri
 	}
 
 	return branchHours, nil
+}
+
+func normalizeBankedOvertimePayrollBranchHours(allocation *payrollBranchHoursAllocation) {
+	if allocation.Salary {
+		return
+	}
+
+	branchNames := make([]string, 0, len(allocation.BankedHours))
+	for branchName := range allocation.BankedHours {
+		branchNames = append(branchNames, branchName)
+	}
+	sort.Strings(branchNames)
+
+	for _, branchName := range branchNames {
+		reducePayrollBranchHoursWithFallback(allocation.BranchHours, branchName, allocation.BankedHours[branchName])
+	}
+	reducePayrollBranchHoursWithFallback(allocation.BranchHours, "", allocation.UnassignedBanked)
 }
 
 func normalizeSalaryPayrollBranchHours(allocation *payrollBranchHoursAllocation) {
@@ -165,21 +203,36 @@ func normalizeSalaryPayrollBranchHours(allocation *payrollBranchHoursAllocation)
 		totalHours += branchHours
 	}
 
-	excess := totalHours - allocation.WorkWeekHours
+	targetHours := allocation.WorkWeekHours
+	paidTimeOffHours := allocation.StatHours + allocation.BereavementHours
+	if paidTimeOffHours > payrollBranchHoursEpsilon && totalHours+paidTimeOffHours > allocation.WorkWeekHours {
+		targetHours = allocation.WorkWeekHours - paidTimeOffHours
+		if targetHours < 0 {
+			targetHours = 0
+		}
+	}
+
+	excess := totalHours - targetHours
 	if excess <= payrollBranchHoursEpsilon {
 		return
 	}
 
-	if allocation.DefaultBranchName != "" {
-		excess = reducePayrollBranchHours(allocation.BranchHours, allocation.DefaultBranchName, excess)
-	}
+	reducePayrollBranchHoursWithFallback(allocation.BranchHours, allocation.DefaultBranchName, excess)
+}
 
+func reducePayrollBranchHoursWithFallback(branchHours map[string]float64, branchName string, excess float64) {
+	if excess <= payrollBranchHoursEpsilon {
+		return
+	}
+	if branchName != "" {
+		excess = reducePayrollBranchHours(branchHours, branchName, excess)
+	}
 	for excess > payrollBranchHoursEpsilon {
-		branchName, ok := highestPayrollBranchHours(allocation.BranchHours)
+		branchName, ok := highestPayrollBranchHours(branchHours)
 		if !ok {
 			return
 		}
-		excess = reducePayrollBranchHours(allocation.BranchHours, branchName, excess)
+		excess = reducePayrollBranchHours(branchHours, branchName, excess)
 	}
 }
 

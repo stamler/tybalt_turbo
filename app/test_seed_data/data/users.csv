@@ -38,3 +38,6 @@ created,email,emailVisibility,id,name,password,tokenKey,updated,username,verifie
 2026-05-06 12:00:00.000Z,payroll.branch.salary.default@example.com,0,u_pbranch_saldef,Payroll Branch Salary Default,a.vQd0,tok_u_pbranch_saldef,2026-05-06 12:00:00.000Z,upbranchsaldef,1
 2026-05-06 12:00:00.000Z,payroll.branch.salary.fallback@example.com,0,u_pbranch_salfallback,Payroll Branch Salary Fallback,a.vQd0,tok_u_pbranch_salfallback,2026-05-06 12:00:00.000Z,upbranchsalfallback,1
 2026-05-06 12:00:00.000Z,payroll.branch.salary.tie@example.com,0,u_pbranch_saltie,Payroll Branch Salary Tie,a.vQd0,tok_u_pbranch_saltie,2026-05-06 12:00:00.000Z,upbranchsaltie,1
+2026-05-19 12:00:00.000Z,payroll.branch.hourly.banked@example.com,0,u_pbranch_hbank,Payroll Branch Hourly Banked,a.vQd0,tok_u_pbranch_hbank,2026-05-19 12:00:00.000Z,upbranchhbank,1
+2026-05-19 12:00:00.000Z,payroll.branch.salary.stat@example.com,0,u_pbranch_salstat,Payroll Branch Salary Stat,a.vQd0,tok_u_pbranch_salstat,2026-05-19 12:00:00.000Z,upbranchsalstat,1
+2026-05-19 12:00:00.000Z,payroll.branch.hourly.banked.nobranch@example.com,0,u_pbranch_hbankno,Payroll Branch Hourly Banked No Branch,a.vQd0,tok_u_pbranch_hbankno,2026-05-19 12:00:00.000Z,upbranchhbankno,1

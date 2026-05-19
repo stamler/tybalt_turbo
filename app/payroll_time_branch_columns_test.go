@@ -17,6 +17,9 @@ const (
 	payrollBranchSalaryDefaultID   = "930011"
 	payrollBranchSalaryFallbackID  = "930012"
 	payrollBranchSalaryTieID       = "930013"
+	payrollBranchHourlyBankedID    = "930014"
+	payrollBranchSalaryStatID      = "930015"
+	payrollBranchHourlyBankedNoID  = "930016"
 )
 
 func TestPayrollTimeReport_AppliesBranchAllocationRules(t *testing.T) {
@@ -114,6 +117,26 @@ func TestPayrollTimeReport_AppliesBranchAllocationRules(t *testing.T) {
 			assertCSVFloatEquals(tb, salaryTieRow["Ottawa"], 15)
 			assertCSVFloatEquals(tb, salaryTieRow["Toronto"], 25)
 			assertCSVFloatEquals(tb, salaryTieRow["Thunder Bay"], 0)
+
+			hourlyBankedRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchHourlyBankedID)
+			assertCSVFloatEquals(tb, hourlyBankedRow["hours worked"], 48)
+			assertCSVFloatEquals(tb, hourlyBankedRow["overtime hours to bank"], 4)
+			assertCSVFloatEquals(tb, hourlyBankedRow["overtime hours to pay"], 0)
+			assertCSVFloatEquals(tb, hourlyBankedRow["Thunder Bay"], 0)
+			assertCSVFloatEquals(tb, hourlyBankedRow["Toronto"], 44)
+
+			salaryStatRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchSalaryStatID)
+			assertCSVFloatEquals(tb, salaryStatRow["hours worked"], 34)
+			assertCSVFloatEquals(tb, salaryStatRow["adjustedHoursWorked"], 32)
+			assertCSVFloatEquals(tb, salaryStatRow["Stat Holiday"], 8)
+			assertCSVFloatEquals(tb, salaryStatRow["Thunder Bay"], 18)
+			assertCSVFloatEquals(tb, salaryStatRow["Toronto"], 14)
+
+			hourlyBankedNoBranchRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchHourlyBankedNoID)
+			assertCSVFloatEquals(tb, hourlyBankedNoBranchRow["hours worked"], 48)
+			assertCSVFloatEquals(tb, hourlyBankedNoBranchRow["overtime hours to bank"], 4)
+			assertCSVFloatEquals(tb, hourlyBankedNoBranchRow["Thunder Bay"], 20)
+			assertCSVFloatEquals(tb, hourlyBankedNoBranchRow["Toronto"], 24)
 		},
 	}
 
