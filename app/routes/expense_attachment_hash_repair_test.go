@@ -307,6 +307,31 @@ func TestExpenseAttachmentMissingMarkNoopsWhenAlreadyMarkedWithSameReason(t *tes
 	}
 }
 
+func TestExpenseAttachmentMissingMarkRejectsReasonChangeOnceMarked(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	t.Cleanup(app.Cleanup)
+	AddRoutes(app)
+
+	adminToken := authTokenForEmail(t, app, hashRepairAdminEmail)
+	originalReason := "Legacy attachment was unrecoverable."
+	firstUpdated := expenseUpdatedForRepairTest(t, app, hashRepairMissingFileID)
+	markExpenseAttachmentMissingForTest(t, app, adminToken, hashRepairMissingFileID, firstUpdated, originalReason, http.StatusOK)
+
+	stateAfterFirst := expenseAttachmentMissingStateForRepairTest(t, app, hashRepairMissingFileID)
+	rec := performClaimsJSONRequest(t, app, http.MethodPost, "/api/expenses/"+hashRepairMissingFileID+"/attachment_missing/mark", adminToken, map[string]any{
+		"updated": stateAfterFirst.Updated,
+		"reason":  "A different historical explanation.",
+	})
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("changed reason status = %d, want %d; body=%s", rec.Code, http.StatusConflict, rec.Body.String())
+	}
+
+	stateAfterSecond := expenseAttachmentMissingStateForRepairTest(t, app, hashRepairMissingFileID)
+	if stateAfterSecond.AttachmentMissingReason != originalReason || stateAfterSecond.Updated != stateAfterFirst.Updated {
+		t.Fatalf("changed reason mutated state from %+v to %+v", stateAfterFirst, stateAfterSecond)
+	}
+}
+
 func TestExpenseAttachmentMissingMarkRejectsStaleUpdated(t *testing.T) {
 	app := testseed.NewSeededTestApp(t)
 	t.Cleanup(app.Cleanup)

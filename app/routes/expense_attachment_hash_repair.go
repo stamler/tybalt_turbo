@@ -275,11 +275,13 @@ func markExpenseAttachmentMissing(app core.App, expenseID string, expectedUpdate
 		currentReason := strings.TrimSpace(expense.GetString("attachment_missing_reason"))
 		if response.PreviousAttachment == "" &&
 			response.PreviousAttachmentHash == "" &&
-			response.PreviousDocumentID == "" &&
-			currentReason == reason {
-			updated = currentUpdated
-			response.Noop = true
-			return nil
+			response.PreviousDocumentID == "" && currentReason != "" {
+			if currentReason == reason {
+				updated = currentUpdated
+				response.Noop = true
+				return nil
+			}
+			return &expenseAttachmentHashHTTPError{status: http.StatusConflict, message: "attachment is already marked missing; reason cannot be changed"}
 		}
 
 		newUpdated := types.NowDateTime()
