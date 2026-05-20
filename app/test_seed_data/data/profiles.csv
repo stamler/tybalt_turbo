@@ -40,3 +40,5 @@ _imported,alternate_manager,created,default_division,default_role,do_not_accept_
 0,,2026-05-19 12:00:00.000Z,vccd5fo56ctbigh,,0,Branch,prof_pbranch_hb1,f2j5a8vk006baub,email_text,HourlyBanked,u_pbranch_hbank,2026-05-19 12:00:00.000Z
 0,,2026-05-19 12:00:00.000Z,vccd5fo56ctbigh,,0,Branch,prof_pbranch_ss1,f2j5a8vk006baub,email_text,SalaryStat,u_pbranch_salstat,2026-05-19 12:00:00.000Z
 0,,2026-05-19 12:00:00.000Z,vccd5fo56ctbigh,,0,Branch,prof_pbranch_hbn,f2j5a8vk006baub,email_text,HourlyBankNo,u_pbranch_hbankno,2026-05-19 12:00:00.000Z
+0,,2026-05-20 12:00:00.000Z,vccd5fo56ctbigh,,0,Branch,prof_pbranch_ho1,f2j5a8vk006baub,email_text,HourlyOvertime,u_pbranch_hover,2026-05-20 12:00:00.000Z
+0,,2026-05-20 12:00:00.000Z,vccd5fo56ctbigh,,0,Branch,prof_pbranch_hn1,f2j5a8vk006baub,email_text,HourlyNoNegative,u_pbranch_hnoneg,2026-05-20 12:00:00.000Z

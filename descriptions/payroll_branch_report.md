@@ -12,6 +12,14 @@ It does not change the meaning of the base payroll report columns such as
 time-off columns. Those columns continue to follow the existing payroll report
 rules.
 
+The payroll report contains two sets of dynamic branch columns:
+
+1. Regular branch columns, one per branch plus `Unassigned`.
+
+2. Overtime branch columns, one per regular branch column, appended after all
+   regular branch columns and prefixed with `OT `. For example:
+   `OT Thunder Bay`, `OT Toronto`, and `OT Unassigned`.
+
 ### Branch Column Inputs
 
 Each branch column represents regular working time allocated to that branch for
@@ -72,6 +80,42 @@ Apply the banked-overtime reduction in this order:
 If there is a tie for highest remaining branch, use branch name ascending order
 as the deterministic tie-breaker.
 
+After banked-overtime reduction is applied, hourly branch columns are capped at
+44 total regular hours across all branch columns.
+
+If the hourly user's total branch-column hours are equal to or less than 44,
+leave the branch values unchanged and leave all `OT ` branch columns at zero.
+
+If the hourly user's total branch-column hours exceed 44:
+
+1. Calculate the overage:
+
+   ```text
+   overage = SUM(all regular branch values for the user) - 44
+   ```
+
+2. Consider every branch with a value greater than zero.
+
+3. Split the overage as evenly as possible across those branches in 0.5-hour
+   increments.
+
+4. If the split is not perfectly even, assign the extra 0.5-hour reductions to
+   branches with the highest regular branch values first. If branches tie, use
+   branch name ascending order as the deterministic tie-breaker.
+
+5. Subtract each branch's allocated overage from its regular branch column.
+
+6. Add that same amount to the matching `OT ` branch column.
+
+7. Branch values must never be negative. If an even reduction would push a
+   branch below zero, reduce that branch to zero and redistribute the remaining
+   overage across the other positive branches using the same rules.
+
+Banked overtime does not appear in `OT ` branch columns. The 44-hour cap is
+applied after banked overtime has already been removed from regular branch
+columns, so banked hours are excluded from both paid regular branch allocation
+and paid overtime branch allocation.
+
 ### Salary Staff
 
 For salary staff, branch columns begin with the same `R` and `RT` branch totals
@@ -123,6 +167,9 @@ If the salary user's total across branch columns exceeds the effective cap:
 
 If there is a tie for highest remaining branch, use a deterministic tie-breaker
 so the report is stable across runs. Branch name ascending order is preferred.
+
+Salary users do not receive `OT ` branch-column values from this branch-column
+normalization. Their matching `OT ` branch columns remain zero.
 
 ### Salary Cap Source
 
@@ -190,6 +237,34 @@ Toronto: 44
 
 If the `RB` entry has no branch, the full reduction starts with the highest
 remaining branch value.
+
+#### Hourly user with overtime branch allocation
+
+An hourly user has:
+
+```text
+Thunder Bay: 20 R hours
+Toronto: 25 R hours
+Ottawa: 30 R hours
+```
+
+The regular branch total is 75, so the overage is 31. The overage is split
+across the three positive branches in 0.5-hour increments. Ottawa and Toronto
+have the highest regular branch values, so they receive the extra 0.5-hour
+reductions.
+
+Branch output:
+
+```text
+Thunder Bay: 10
+Toronto: 14.5
+Ottawa: 19.5
+OT Thunder Bay: 10
+OT Toronto: 10.5
+OT Ottawa: 10.5
+```
+
+The regular branch columns total 44. The `OT ` branch columns total 31.
 
 #### Salary user with excess absorbed by default branch
 
@@ -274,5 +349,16 @@ Backend tests should cover at least:
   when one is available.
 - Hourly staff banked overtime falls back to the highest remaining branch when
   the `RB` branch is missing or cannot absorb the full reduction.
+- Hourly staff branch columns are capped at 44 after banked-overtime reduction.
+- Hourly staff over-44 regular branch hours are moved into matching `OT ` branch
+  columns.
+- Hourly staff over-44 reductions are split evenly across positive branches in
+  0.5-hour increments, with extra 0.5-hour reductions assigned to highest branch
+  values first.
+- Hourly staff over-44 reductions never make a branch negative; any unabsorbed
+  reduction is redistributed across the other positive branches.
 - Committed amendments follow the same `R` and `RT` inclusion rule as time
   entries, and the same `RB`, Stat Holiday, and Bereavement reduction rules.
+  Because amendments are included in the report week where they are committed,
+  they can also contribute to hourly over-44 branch allocation for that report
+  week.

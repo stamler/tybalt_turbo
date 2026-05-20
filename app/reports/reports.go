@@ -3,6 +3,7 @@ package reports
 import (
 	"database/sql"
 	_ "embed" // Needed for //go:embed
+	"math"
 	"net/http"
 	"sort"
 	"strconv"
@@ -51,7 +52,9 @@ var jobTimeQueryTemplate string
 
 const placeholderPayrollIDConditionToken = "{:placeholder_payroll_id_condition}"
 const payrollUnassignedBranchHeader = "Unassigned"
+const payrollOvertimeBranchHeaderPrefix = "OT "
 const payrollBranchHoursEpsilon = 0.000000001
+const hourlyPayrollBranchRegularCap = 44.0
 
 var payrollTimeBaseHeaders = []string{"payrollId", "weekEnding", "surname", "givenName", "name", "manager", "meals", "days off rotation", "hours worked", "salaryHoursOver44", "adjustedHoursWorked", "total overtime hours", "overtime hours to pay", "Bereavement", "Stat Holiday", "PPTO", "Sick", "Vacation", "overtime hours to bank", "Overtime Payout Requested", "hasAmendmentsForWeeksEnding", "salary"}
 
@@ -73,14 +76,15 @@ type payrollBranchHoursRow struct {
 }
 
 type payrollBranchHoursAllocation struct {
-	Salary            bool
-	WorkWeekHours     float64
-	DefaultBranchName string
-	BranchHours       map[string]float64
-	BankedHours       map[string]float64
-	UnassignedBanked  float64
-	StatHours         float64
-	BereavementHours  float64
+	Salary              bool
+	WorkWeekHours       float64
+	DefaultBranchName   string
+	BranchHours         map[string]float64
+	BankedHours         map[string]float64
+	OvertimeBranchHours map[string]float64
+	UnassignedBanked    float64
+	StatHours           float64
+	BereavementHours    float64
 }
 
 func withPlaceholderPayrollIDCondition(query string, columnExpr string) string {
@@ -119,6 +123,18 @@ func getOrderedPayrollBranchHeaders(app core.App) ([]string, error) {
 	return headers, nil
 }
 
+func getPayrollOvertimeBranchHeaders(branchHeaders []string) []string {
+	headers := make([]string, 0, len(branchHeaders))
+	for _, header := range branchHeaders {
+		headers = append(headers, payrollOvertimeBranchHeader(header))
+	}
+	return headers
+}
+
+func payrollOvertimeBranchHeader(branchName string) string {
+	return payrollOvertimeBranchHeaderPrefix + branchName
+}
+
 func getPayrollBranchHours(app core.App, weekEnding string) (map[string]map[string]string, error) {
 	var rows []payrollBranchHoursRow
 	query := withPlaceholderPayrollIDCondition(payrollTimeBranchHoursQuery, "ap.payroll_id")
@@ -132,8 +148,9 @@ func getPayrollBranchHours(app core.App, weekEnding string) (map[string]map[stri
 	for _, row := range rows {
 		if _, ok := allocations[row.PayrollID]; !ok {
 			allocations[row.PayrollID] = &payrollBranchHoursAllocation{
-				BranchHours: map[string]float64{},
-				BankedHours: map[string]float64{},
+				BranchHours:         map[string]float64{},
+				BankedHours:         map[string]float64{},
+				OvertimeBranchHours: map[string]float64{},
 			}
 		}
 
@@ -162,10 +179,14 @@ func getPayrollBranchHours(app core.App, weekEnding string) (map[string]map[stri
 	branchHours := make(map[string]map[string]string, len(allocations))
 	for payrollID, allocation := range allocations {
 		normalizeBankedOvertimePayrollBranchHours(allocation)
+		normalizeHourlyPayrollBranchOvertimeHours(allocation)
 		normalizeSalaryPayrollBranchHours(allocation)
-		branchHours[payrollID] = make(map[string]string, len(allocation.BranchHours))
+		branchHours[payrollID] = make(map[string]string, len(allocation.BranchHours)+len(allocation.OvertimeBranchHours))
 		for branchName, totalHours := range allocation.BranchHours {
 			branchHours[payrollID][branchName] = formatPayrollBranchHours(totalHours)
+		}
+		for branchName, totalHours := range allocation.OvertimeBranchHours {
+			branchHours[payrollID][payrollOvertimeBranchHeader(branchName)] = formatPayrollBranchHours(totalHours)
 		}
 	}
 
@@ -187,6 +208,119 @@ func normalizeBankedOvertimePayrollBranchHours(allocation *payrollBranchHoursAll
 		reducePayrollBranchHoursWithFallback(allocation.BranchHours, branchName, allocation.BankedHours[branchName])
 	}
 	reducePayrollBranchHoursWithFallback(allocation.BranchHours, "", allocation.UnassignedBanked)
+}
+
+func normalizeHourlyPayrollBranchOvertimeHours(allocation *payrollBranchHoursAllocation) {
+	if allocation.Salary {
+		return
+	}
+
+	branchUnits := make(map[string]int, len(allocation.BranchHours))
+	totalUnits := 0
+	for branchName, branchHours := range allocation.BranchHours {
+		units := payrollBranchHoursToUnits(branchHours)
+		if units <= 0 {
+			continue
+		}
+		branchUnits[branchName] = units
+		totalUnits += units
+	}
+
+	capUnits := payrollBranchHoursToUnits(hourlyPayrollBranchRegularCap)
+	overageUnits := totalUnits - capUnits
+	if overageUnits <= 0 {
+		return
+	}
+
+	reductionUnits := distributePayrollBranchOvertimeUnits(branchUnits, overageUnits)
+	for branchName, units := range reductionUnits {
+		overtimeHours := payrollBranchUnitsToHours(units)
+		allocation.OvertimeBranchHours[branchName] += overtimeHours
+		allocation.BranchHours[branchName] -= overtimeHours
+		if allocation.BranchHours[branchName] < payrollBranchHoursEpsilon {
+			allocation.BranchHours[branchName] = 0
+		}
+	}
+}
+
+func distributePayrollBranchOvertimeUnits(branchUnits map[string]int, overageUnits int) map[string]int {
+	reductions := map[string]int{}
+	activeBranches := sortedPayrollBranchesByUnits(branchUnits)
+
+	for overageUnits > 0 && len(activeBranches) > 0 {
+		baseReduction := overageUnits / len(activeBranches)
+		extraReductionCount := overageUnits % len(activeBranches)
+		appliedUnits := 0
+		nextBranchUnits := map[string]int{}
+
+		for i, branchName := range activeBranches {
+			reduction := baseReduction
+			if i < extraReductionCount {
+				reduction++
+			}
+			if reduction <= 0 {
+				nextBranchUnits[branchName] = branchUnits[branchName]
+				continue
+			}
+			if reduction > branchUnits[branchName] {
+				reduction = branchUnits[branchName]
+			}
+			if reduction <= 0 {
+				continue
+			}
+
+			reductions[branchName] += reduction
+			branchUnits[branchName] -= reduction
+			overageUnits -= reduction
+			appliedUnits += reduction
+			if branchUnits[branchName] > 0 {
+				nextBranchUnits[branchName] = branchUnits[branchName]
+			}
+		}
+
+		if appliedUnits == 0 {
+			return reductions
+		}
+		activeBranches = sortedPayrollBranchesByUnits(nextBranchUnits)
+		branchUnits = nextBranchUnits
+	}
+
+	return reductions
+}
+
+func sortedPayrollBranchesByUnits(branchUnits map[string]int) []string {
+	type branchTotal struct {
+		Name  string
+		Units int
+	}
+
+	branches := []branchTotal{}
+	for branchName, units := range branchUnits {
+		if units > 0 {
+			branches = append(branches, branchTotal{Name: branchName, Units: units})
+		}
+	}
+
+	sort.Slice(branches, func(i, j int) bool {
+		if branches[i].Units == branches[j].Units {
+			return branches[i].Name < branches[j].Name
+		}
+		return branches[i].Units > branches[j].Units
+	})
+
+	names := make([]string, 0, len(branches))
+	for _, branch := range branches {
+		names = append(names, branch.Name)
+	}
+	return names
+}
+
+func payrollBranchHoursToUnits(hours float64) int {
+	return int(math.Round(hours * 2))
+}
+
+func payrollBranchUnitsToHours(units int) float64 {
+	return float64(units) / 2
 }
 
 func normalizeSalaryPayrollBranchHours(allocation *payrollBranchHoursAllocation) {
@@ -342,10 +476,12 @@ func CreatePayrollTimeReportHandler(app core.App) func(e *core.RequestEvent) err
 			return e.Error(http.StatusInternalServerError, "failed to execute payroll branch query: "+err.Error(), err)
 		}
 
-		applyPayrollBranchHours(report, branchHeaders, branchHours)
+		overtimeBranchHeaders := getPayrollOvertimeBranchHeaders(branchHeaders)
+		payrollBranchHeaders := append(append([]string{}, branchHeaders...), overtimeBranchHeaders...)
+		applyPayrollBranchHours(report, payrollBranchHeaders, branchHours)
 
 		// convert the report to a csv string
-		headers := append(append([]string{}, payrollTimeBaseHeaders...), branchHeaders...)
+		headers := append(append([]string{}, payrollTimeBaseHeaders...), payrollBranchHeaders...)
 		csvString, err := convertToCSV(report, headers)
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to generate CSV report: "+err.Error(), err)

@@ -12,14 +12,16 @@ import (
 )
 
 const (
-	payrollBranchColumnsWeekEnding = "2030-01-12"
-	payrollBranchHourlyPayrollID   = "930010"
-	payrollBranchSalaryDefaultID   = "930011"
-	payrollBranchSalaryFallbackID  = "930012"
-	payrollBranchSalaryTieID       = "930013"
-	payrollBranchHourlyBankedID    = "930014"
-	payrollBranchSalaryStatID      = "930015"
-	payrollBranchHourlyBankedNoID  = "930016"
+	payrollBranchColumnsWeekEnding  = "2030-01-12"
+	payrollBranchHourlyPayrollID    = "930010"
+	payrollBranchSalaryDefaultID    = "930011"
+	payrollBranchSalaryFallbackID   = "930012"
+	payrollBranchSalaryTieID        = "930013"
+	payrollBranchHourlyBankedID     = "930014"
+	payrollBranchSalaryStatID       = "930015"
+	payrollBranchHourlyBankedNoID   = "930016"
+	payrollBranchHourlyOvertimeID   = "930017"
+	payrollBranchHourlyNoNegativeID = "930018"
 )
 
 func TestPayrollTimeReport_AppliesBranchAllocationRules(t *testing.T) {
@@ -69,8 +71,10 @@ func TestPayrollTimeReport_AppliesBranchAllocationRules(t *testing.T) {
 				tb.Fatalf("missing salary header in %+v", headers)
 			}
 
-			if got := headers[salaryIndex+1:]; !slices.Equal(got, expectedBranchHeaders) {
-				tb.Fatalf("branch headers = %+v, want %+v", got, expectedBranchHeaders)
+			expectedOvertimeBranchHeaders := overtimeBranchHeaders(expectedBranchHeaders)
+			expectedPayrollBranchHeaders := append(append([]string{}, expectedBranchHeaders...), expectedOvertimeBranchHeaders...)
+			if got := headers[salaryIndex+1:]; !slices.Equal(got, expectedPayrollBranchHeaders) {
+				tb.Fatalf("branch headers = %+v, want %+v", got, expectedPayrollBranchHeaders)
 			}
 
 			rowByPayrollID := map[string]map[string]string{}
@@ -124,6 +128,8 @@ func TestPayrollTimeReport_AppliesBranchAllocationRules(t *testing.T) {
 			assertCSVFloatEquals(tb, hourlyBankedRow["overtime hours to pay"], 0)
 			assertCSVFloatEquals(tb, hourlyBankedRow["Thunder Bay"], 0)
 			assertCSVFloatEquals(tb, hourlyBankedRow["Toronto"], 44)
+			assertCSVFloatEquals(tb, hourlyBankedRow["OT Thunder Bay"], 0)
+			assertCSVFloatEquals(tb, hourlyBankedRow["OT Toronto"], 0)
 
 			salaryStatRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchSalaryStatID)
 			assertCSVFloatEquals(tb, salaryStatRow["hours worked"], 34)
@@ -137,10 +143,37 @@ func TestPayrollTimeReport_AppliesBranchAllocationRules(t *testing.T) {
 			assertCSVFloatEquals(tb, hourlyBankedNoBranchRow["overtime hours to bank"], 4)
 			assertCSVFloatEquals(tb, hourlyBankedNoBranchRow["Thunder Bay"], 20)
 			assertCSVFloatEquals(tb, hourlyBankedNoBranchRow["Toronto"], 24)
+			assertCSVFloatEquals(tb, hourlyBankedNoBranchRow["OT Thunder Bay"], 0)
+			assertCSVFloatEquals(tb, hourlyBankedNoBranchRow["OT Toronto"], 0)
+
+			hourlyOvertimeRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchHourlyOvertimeID)
+			assertCSVFloatEquals(tb, hourlyOvertimeRow["hours worked"], 75)
+			assertCSVFloatEquals(tb, hourlyOvertimeRow["total overtime hours"], 31)
+			assertCSVFloatEquals(tb, hourlyOvertimeRow["Thunder Bay"], 10)
+			assertCSVFloatEquals(tb, hourlyOvertimeRow["Toronto"], 14.5)
+			assertCSVFloatEquals(tb, hourlyOvertimeRow["Ottawa"], 19.5)
+			assertCSVFloatEquals(tb, hourlyOvertimeRow["OT Thunder Bay"], 10)
+			assertCSVFloatEquals(tb, hourlyOvertimeRow["OT Toronto"], 10.5)
+			assertCSVFloatEquals(tb, hourlyOvertimeRow["OT Ottawa"], 10.5)
+
+			hourlyNoNegativeRow := requirePayrollReportRow(tb, rowByPayrollID, payrollBranchHourlyNoNegativeID)
+			assertCSVFloatEquals(tb, hourlyNoNegativeRow["hours worked"], 75)
+			assertCSVFloatEquals(tb, hourlyNoNegativeRow["Thunder Bay"], 0)
+			assertCSVFloatEquals(tb, hourlyNoNegativeRow["Toronto"], 44)
+			assertCSVFloatEquals(tb, hourlyNoNegativeRow["OT Thunder Bay"], 1)
+			assertCSVFloatEquals(tb, hourlyNoNegativeRow["OT Toronto"], 30)
 		},
 	}
 
 	scenario.Test(t)
+}
+
+func overtimeBranchHeaders(branchHeaders []string) []string {
+	headers := make([]string, 0, len(branchHeaders))
+	for _, header := range branchHeaders {
+		headers = append(headers, "OT "+header)
+	}
+	return headers
 }
 
 func requirePayrollReportRow(tb testing.TB, rows map[string]map[string]string, payrollID string) map[string]string {

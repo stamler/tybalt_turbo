@@ -63,3 +63,8 @@ _imported,branch,category,created,date,description,division,hours,id,job,meals_h
 0,80875lm27v8wgi4,,2026-05-19 11:56:00.000Z,2030-01-07,payroll branch banked no branch thunder regular,,20,pbrhbnentryt1,,0,0,,sdyfl3q7j7ap849,pbrhbanknosht1,u_pbranch_hbankno,2026-05-19 11:56:00.000Z,2030-01-12,
 0,xeq9q81q5307f70,,2026-05-19 11:56:00.000Z,2030-01-08,payroll branch banked no branch toronto regular,,28,pbrhbnentryt2,,0,0,,sdyfl3q7j7ap849,pbrhbanknosht1,u_pbranch_hbankno,2026-05-19 11:56:00.000Z,2030-01-12,
 0,,,2026-05-19 11:56:00.000Z,2030-01-09,payroll branch banked no branch rb,,4,pbrhbnentryrb,,0,0,,ji8efjydxmug5da,pbrhbanknosht1,u_pbranch_hbankno,2026-05-19 11:56:00.000Z,2030-01-12,
+0,80875lm27v8wgi4,,2026-05-20 11:56:00.000Z,2030-01-07,payroll branch overtime thunder regular,,20,pbroventrytb1,,0,0,,sdyfl3q7j7ap849,pbrovertimesht1,u_pbranch_hover,2026-05-20 11:56:00.000Z,2030-01-12,
+0,xeq9q81q5307f70,,2026-05-20 11:56:00.000Z,2030-01-08,payroll branch overtime toronto regular,,25,pbroventryto1,,0,0,,sdyfl3q7j7ap849,pbrovertimesht1,u_pbranch_hover,2026-05-20 11:56:00.000Z,2030-01-12,
+0,y61xhc627nkue73,,2026-05-20 11:56:00.000Z,2030-01-09,payroll branch overtime ottawa regular,,30,pbroventryot1,,0,0,,sdyfl3q7j7ap849,pbrovertimesht1,u_pbranch_hover,2026-05-20 11:56:00.000Z,2030-01-12,
+0,80875lm27v8wgi4,,2026-05-20 11:56:00.000Z,2030-01-07,payroll branch no negative thunder regular,,1,pbrnnegentryt1,,0,0,,sdyfl3q7j7ap849,pbrnonegsheet1,u_pbranch_hnoneg,2026-05-20 11:56:00.000Z,2030-01-12,
+0,xeq9q81q5307f70,,2026-05-20 11:56:00.000Z,2030-01-08,payroll branch no negative toronto regular,,74,pbrnnegentryt2,,0,0,,sdyfl3q7j7ap849,pbrnonegsheet1,u_pbranch_hnoneg,2026-05-20 11:56:00.000Z,2030-01-12,

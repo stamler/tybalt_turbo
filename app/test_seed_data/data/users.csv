@@ -41,3 +41,5 @@ created,email,emailVisibility,id,name,password,tokenKey,updated,username,verifie
 2026-05-19 12:00:00.000Z,payroll.branch.hourly.banked@example.com,0,u_pbranch_hbank,Payroll Branch Hourly Banked,a.vQd0,tok_u_pbranch_hbank,2026-05-19 12:00:00.000Z,upbranchhbank,1
 2026-05-19 12:00:00.000Z,payroll.branch.salary.stat@example.com,0,u_pbranch_salstat,Payroll Branch Salary Stat,a.vQd0,tok_u_pbranch_salstat,2026-05-19 12:00:00.000Z,upbranchsalstat,1
 2026-05-19 12:00:00.000Z,payroll.branch.hourly.banked.nobranch@example.com,0,u_pbranch_hbankno,Payroll Branch Hourly Banked No Branch,a.vQd0,tok_u_pbranch_hbankno,2026-05-19 12:00:00.000Z,upbranchhbankno,1
+2026-05-20 12:00:00.000Z,payroll.branch.hourly.overtime@example.com,0,u_pbranch_hover,Payroll Branch Hourly Overtime,a.vQd0,tok_u_pbranch_hover,2026-05-20 12:00:00.000Z,upbranchhover,1
+2026-05-20 12:00:00.000Z,payroll.branch.hourly.no.negative@example.com,0,u_pbranch_hnoneg,Payroll Branch Hourly No Negative,a.vQd0,tok_u_pbranch_hnoneg,2026-05-20 12:00:00.000Z,upbranchhnoneg,1
