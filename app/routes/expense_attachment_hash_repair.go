@@ -19,7 +19,6 @@ import (
 )
 
 const (
-	expenseHashTargetExpenses         = "expenses"
 	expenseHashTargetExpenseDocuments = constants.ExpenseDocumentsCollectionName
 )
 
@@ -60,8 +59,6 @@ type expenseAttachmentMissingMarkResponse struct {
 	ExpenseID               string `json:"expense_id"`
 	Updated                 string `json:"updated"`
 	AttachmentMissingReason string `json:"attachment_missing_reason"`
-	PreviousAttachment      string `json:"previous_attachment"`
-	PreviousAttachmentHash  string `json:"previous_attachment_hash"`
 	PreviousDocumentID      string `json:"previous_attachment_document"`
 	Marked                  bool   `json:"marked"`
 	Noop                    bool   `json:"noop"`
@@ -269,13 +266,9 @@ func markExpenseAttachmentMissing(app core.App, expenseID string, expectedUpdate
 			return &expenseAttachmentHashHTTPError{status: http.StatusConflict, message: "expense changed; refresh before marking attachment missing"}
 		}
 
-		response.PreviousAttachment = strings.TrimSpace(expense.GetString("attachment"))
-		response.PreviousAttachmentHash = strings.TrimSpace(expense.GetString("attachment_hash"))
 		response.PreviousDocumentID = strings.TrimSpace(expense.GetString("attachment_document"))
 		currentReason := strings.TrimSpace(expense.GetString("attachment_missing_reason"))
-		if response.PreviousAttachment == "" &&
-			response.PreviousAttachmentHash == "" &&
-			response.PreviousDocumentID == "" && currentReason != "" {
+		if response.PreviousDocumentID == "" && currentReason != "" {
 			if currentReason == reason {
 				updated = currentUpdated
 				response.Noop = true
@@ -287,9 +280,7 @@ func markExpenseAttachmentMissing(app core.App, expenseID string, expectedUpdate
 		newUpdated := types.NowDateTime()
 		result, err := txApp.DB().NewQuery(`
 			UPDATE expenses
-			SET attachment = '',
-			    attachment_hash = '',
-			    attachment_document = '',
+			SET attachment_document = '',
 			    attachment_missing_reason = {:reason},
 			    updated = {:updated}
 			WHERE id = {:id} AND updated = {:expected_updated}
@@ -342,7 +333,7 @@ func resolveExpenseAttachmentHashTarget(app core.App, expenseID string) (expense
 		return expenseAttachmentHashTargetFromRecord(app, expenseID, expenseHashTargetExpenseDocuments, document)
 	}
 
-	return expenseAttachmentHashTargetFromRecord(app, expenseID, expenseHashTargetExpenses, expense)
+	return expenseAttachmentHashTarget{}, &expenseAttachmentHashHTTPError{status: http.StatusNotFound, message: "expense has no document-backed attachment"}
 }
 
 func expenseAttachmentHashTargetFromRecord(app core.App, expenseID string, collectionName string, record *core.Record) (expenseAttachmentHashTarget, error) {
@@ -407,8 +398,10 @@ func expenseAttachmentHashTable(collectionName string) string {
 	switch collectionName {
 	case expenseHashTargetExpenseDocuments:
 		return constants.ExpenseDocumentsCollectionName
-	default:
+	case "expenses":
 		return "expenses"
+	default:
+		return constants.ExpenseDocumentsCollectionName
 	}
 }
 

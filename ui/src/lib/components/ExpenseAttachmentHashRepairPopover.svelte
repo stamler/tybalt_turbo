@@ -34,8 +34,6 @@
     expense_id: string;
     updated: string;
     attachment_missing_reason: string;
-    previous_attachment: string;
-    previous_attachment_hash: string;
     previous_attachment_document: string;
     marked: boolean;
     noop: boolean;
@@ -147,7 +145,7 @@
         message = "No change made. The attachment was already marked missing with this reason.";
         messageTone = "neutral";
       } else {
-        message = "Attachment marked missing and legacy attachment fields cleared.";
+        message = "Attachment marked missing.";
         messageTone = "orange";
         await onRepaired();
       }

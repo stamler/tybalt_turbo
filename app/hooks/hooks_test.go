@@ -24,6 +24,14 @@ func buildRecordFromMap(collection *core.Collection, m map[string]any) *core.Rec
 				m["kind"] = utilities.DefaultCapitalExpenditureKindID()
 			}
 		}
+		if collection.Name == "expenses" {
+			if _, hasOldAttachmentFixture := m["attachment"]; hasOldAttachmentFixture {
+				if _, hasDocument := m["attachment_document"]; !hasDocument {
+					m["attachment_document"] = "test_attachment_doc"
+				}
+				delete(m, "attachment")
+			}
+		}
 	}
 	record := core.NewRecord(collection)
 	record.Load(m)

@@ -183,7 +183,7 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
                 e.payment_type,
                 CAST(e.distance AS REAL) AS distance,
                 COALESCE(e.cc_last_4_digits, '') AS cc_last_4_digits,
-                COALESCE(ed.attachment, e.attachment, '') AS attachment,
+                COALESCE(ed.attachment, '') AS attachment,
                 TRIM(
                     (CASE WHEN e.allowance_types LIKE '%"Breakfast"%' THEN 'Breakfast ' ELSE '' END) ||
                     (CASE WHEN e.allowance_types LIKE '%"Lunch"%' THEN 'Lunch ' ELSE '' END) ||
@@ -271,7 +271,7 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
                 END AS phase,
                 e.date,
                 e.description,
-                COALESCE(ed.attachment, e.attachment, '') AS attachment,
+                COALESCE(ed.attachment, '') AS attachment,
                 TRIM(
                     (CASE WHEN e.allowance_types LIKE '%"Breakfast"%' THEN 'Breakfast ' ELSE '' END) ||
                     (CASE WHEN e.allowance_types LIKE '%"Lunch"%' THEN 'Lunch ' ELSE '' END) ||

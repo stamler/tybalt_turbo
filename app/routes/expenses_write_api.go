@@ -10,6 +10,7 @@ import (
 
 	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/forms"
+	"github.com/pocketbase/pocketbase/tools/filesystem"
 )
 
 var expenseWriteAllowedFields = map[string]struct{}{
@@ -87,6 +88,7 @@ func saveExpenseFromRequest(app core.App, e *core.RequestEvent, record *core.Rec
 	form := forms.NewRecordUpsert(app, record)
 	form.SetContext(e.Request.Context())
 	form.Load(data)
+	loadVirtualExpenseAttachmentInput(record, data)
 
 	event := &core.RecordRequestEvent{
 		RequestEvent: e,
@@ -116,6 +118,51 @@ func saveExpenseFromRequest(app core.App, e *core.RequestEvent, record *core.Rec
 	}
 
 	return e.JSON(http.StatusOK, event.Record)
+}
+
+func loadVirtualExpenseAttachmentInput(record *core.Record, data map[string]any) {
+	raw, ok := data["attachment"]
+	if !ok {
+		return
+	}
+
+	files := expenseAttachmentFilesFromRequestValue(raw)
+	if len(files) == 0 {
+		return
+	}
+
+	// `attachment` is the durable expense-write API field, not the durable
+	// storage field. While the old expenses.attachment schema field exists,
+	// RecordUpsert.Load attaches uploaded files through PocketBase's normal file
+	// field machinery. After that schema field is removed, RecordUpsert will
+	// correctly ignore the unknown field, so we also stash the same files under
+	// the raw unsaved-file key that ProcessExpense reads.
+	//
+	// This keeps the client contract stable without asking the browser to create
+	// expense_documents directly. The server still owns the transaction that
+	// validates the expense, creates or reuses the document row, links
+	// attachment_document, and rolls back the uploaded document if the expense
+	// save fails.
+	record.SetRaw("attachment:unsaved", files)
+}
+
+func expenseAttachmentFilesFromRequestValue(raw any) []*filesystem.File {
+	switch value := raw.(type) {
+	case *filesystem.File:
+		return []*filesystem.File{value}
+	case []*filesystem.File:
+		return value
+	case []any:
+		files := make([]*filesystem.File, 0, len(value))
+		for _, item := range value {
+			if file, ok := item.(*filesystem.File); ok {
+				files = append(files, file)
+			}
+		}
+		return files
+	default:
+		return nil
+	}
 }
 
 func expenseRecordDataFromRequest(e *core.RequestEvent, record *core.Record) (map[string]any, error) {

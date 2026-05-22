@@ -4,8 +4,6 @@ package main
 import (
 	"archive/zip"
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -1604,7 +1602,7 @@ func TestExpenseDocumentsPhase1CreateAndReuse(t *testing.T) {
 	})
 }
 
-func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
+func TestExpenseDocumentsDocumentOnlyIntegration(t *testing.T) {
 	app := testutils.SetupTestApp(t)
 	t.Cleanup(app.Cleanup)
 
@@ -1619,11 +1617,6 @@ func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
 	reportToken, err := testutils.GenerateRecordToken("users", "fatt@mac.com")
 	if err != nil {
 		t.Fatal(err)
-	}
-
-	hashContent := func(content []byte) string {
-		sum := sha256.Sum256(content)
-		return hex.EncodeToString(sum[:])
 	}
 
 	createMultipartExpense := func(token string, url string, fields map[string]string, filename string, content []byte) string {
@@ -1656,162 +1649,76 @@ func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
 		}
 	}
 
-	bookkeeperSelfExpenseFields := func(description string) map[string]string {
-		return map[string]string{
-			"uid":          "tqqf7q0f3378rvp",
-			"date":         "2024-09-01",
-			"division":     "vccd5fo56ctbigh",
-			"description":  description,
-			"payment_type": "Expense",
-			"kind":         "l3vtlbqg529m52j",
-			"total":        "99",
-			"vendor":       "2zqxtsmymf670ha",
-		}
-	}
-
 	createRegularDocumentExpense := func(description string, content []byte) string {
 		t.Helper()
 		return createMultipartExpense(regularToken, "/api/expenses", regularExpenseFields(description), "receipt.png", content)
-	}
-
-	createBookkeeperDocumentExpense := func(description string, content []byte) string {
-		t.Helper()
-		return createMultipartExpense(bookkeeperToken, "/api/expenses", bookKeeperExpenseFields(map[string]string{
-			"description": description,
-		}), "receipt.png", content)
-	}
-
-	convertCreatedExpenseToLegacyOnly := func(expenseID string, filename string, content []byte) string {
-		t.Helper()
-
-		expense, err := app.FindRecordById("expenses", expenseID)
-		if err != nil {
-			t.Fatalf("failed to load expense %s before legacy conversion: %v", expenseID, err)
-		}
-		legacyPath := expense.BaseFilesPath() + "/" + filename
-
-		fsys, err := app.NewFilesystem()
-		if err != nil {
-			t.Fatalf("failed to open filesystem for legacy conversion: %v", err)
-		}
-		if err := fsys.Upload(content, legacyPath); err != nil {
-			fsys.Close()
-			t.Fatalf("failed to upload legacy attachment %s: %v", legacyPath, err)
-		}
-		if err := fsys.Close(); err != nil {
-			t.Fatalf("failed to close filesystem after legacy conversion: %v", err)
-		}
-
-		attachmentHash := hashContent(content)
-		_, err = app.DB().NewQuery(`
-			UPDATE expenses
-			SET attachment = {:attachment},
-			    attachment_hash = {:attachment_hash},
-			    attachment_document = ''
-			WHERE id = {:id}
-		`).Bind(dbx.Params{
-			"id":              expenseID,
-			"attachment":      filename,
-			"attachment_hash": attachmentHash,
-		}).Execute()
-		if err != nil {
-			t.Fatalf("failed to convert expense %s to legacy-only attachment fields: %v", expenseID, err)
-		}
-
-		// The row was originally created through the document-first API. Remove
-		// that test-created document row so the following assertions exercise the
-		// real legacy-only fallback path rather than an existing document match.
-		if _, err := app.DB().NewQuery(`
-			DELETE FROM expense_documents
-			WHERE attachment_hash = {:attachment_hash}
-		`).Bind(dbx.Params{"attachment_hash": attachmentHash}).Execute(); err != nil {
-			t.Fatalf("failed to remove test-created document row for legacy-only setup: %v", err)
-		}
-
-		return attachmentHash
-	}
-
-	clearCreatedExpenseAttachment := func(expenseID string) {
-		t.Helper()
-		if _, err := app.DB().NewQuery(`
-			UPDATE expenses
-			SET attachment = '',
-			    attachment_hash = '',
-			    attachment_document = ''
-			WHERE id = {:id}
-		`).Bind(dbx.Params{"id": expenseID}).Execute(); err != nil {
-			t.Fatalf("failed to clear test-created expense attachment: %v", err)
-		}
 	}
 
 	markExpenseCommitted := func(expenseID string, weekEnding string) {
 		t.Helper()
 		if _, err := app.DB().NewQuery(`
 			UPDATE expenses
-			SET submitted = 1,
-			    approved = '2026-04-24 09:00:00.000Z',
-			    committer = 'wegviunlyr2jjjv',
-			    committed = '2026-04-24 10:00:00.000Z',
+			SET approved = '2026-04-20 00:00:00.000Z',
+			    committed = '2026-04-20 00:00:00.000Z',
+			    submitted = 1,
 			    committed_week_ending = {:week_ending},
 			    pay_period_ending = {:week_ending},
-			    updated = '2026-04-24 10:00:00.000Z'
+			    updated = '2026-04-20 00:00:00.000Z'
 			WHERE id = {:id}
-		`).Bind(dbx.Params{
-			"id":          expenseID,
-			"week_ending": weekEnding,
-		}).Execute(); err != nil {
+		`).Bind(dbx.Params{"id": expenseID, "week_ending": weekEnding}).Execute(); err != nil {
 			t.Fatalf("failed to mark expense %s committed: %v", expenseID, err)
 		}
 	}
 
-	t.Run("non bookkeepers cannot use source expense reuse", func(t *testing.T) {
-		sourceID := createRegularDocumentExpense("regular source document for denied source reuse", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x51})
-		fields := regularExpenseFields("regular source reuse should fail")
-		fields["source_expense"] = sourceID
+	t.Run("document-backed details and download ignore old expense file columns", func(t *testing.T) {
+		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x55}
+		expenseID := createRegularDocumentExpense("document-only details", content)
+		expense, err := app.FindRecordById("expenses", expenseID)
+		if err != nil {
+			t.Fatalf("failed to load document-backed expense: %v", err)
+		}
+		document, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, expense.GetString("attachment_document"))
+		if err != nil {
+			t.Fatalf("failed to load document-backed attachment: %v", err)
+		}
+
+		detailsRes := performTestAPIRequest(t, app, http.MethodGet, "/api/expenses/details/"+expenseID, nil, map[string]string{
+			"Authorization": regularToken,
+		})
+		mustStatus(t, detailsRes, http.StatusOK)
+		if !strings.Contains(detailsRes.Body.String(), `"attachment":"`+document.GetString("attachment")+`"`) || !strings.Contains(detailsRes.Body.String(), `"attachment_hash":"`+document.GetString("attachment_hash")+`"`) {
+			t.Fatalf("expected details to expose document attachment data, got body=%s", detailsRes.Body.String())
+		}
+		if !strings.Contains(detailsRes.Body.String(), `"attachment_collection_id":"`+constants.ExpenseDocumentsCollectionID+`"`) || !strings.Contains(detailsRes.Body.String(), `"attachment_record_id":"`+document.Id+`"`) {
+			t.Fatalf("expected details to point at expense_documents storage, got body=%s", detailsRes.Body.String())
+		}
+
+		downloadRes := performTestAPIRequest(t, app, http.MethodGet, "/api/expenses/attachment/"+expenseID, nil, map[string]string{
+			"Authorization": regularToken,
+		})
+		mustStatus(t, downloadRes, http.StatusOK)
+		if !bytes.Equal(downloadRes.Body.Bytes(), content) {
+			t.Fatalf("document attachment download body = %x, want %x", downloadRes.Body.Bytes(), content)
+		}
+	})
+
+	t.Run("source reuse requires a document-backed source expense", func(t *testing.T) {
+		sourceID := createMultipartExpense(bookkeeperToken, "/api/expenses", bookKeeperExpenseFields(map[string]string{
+			"description": "bookkeeper documentless source",
+		}), "receipt.png", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x56})
+		if _, err := app.DB().NewQuery("UPDATE expenses SET attachment_document = '' WHERE id = {:id}").
+			Bind(dbx.Params{"id": sourceID}).Execute(); err != nil {
+			t.Fatalf("failed to make source expense documentless: %v", err)
+		}
+		fields := bookKeeperExpenseFields(map[string]string{
+			"description":    "bookkeeper source reuse without document",
+			"source_expense": sourceID,
+		})
 		payload, err := json.Marshal(fields)
 		if err != nil {
 			t.Fatalf("failed to encode source reuse payload: %v", err)
 		}
 		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", bytes.NewReader(payload), map[string]string{
-			"Authorization": regularToken,
-			"Content-Type":  "application/json",
-		})
-		mustStatus(t, res, http.StatusBadRequest)
-		if !strings.Contains(res.Body.String(), `"source_expense":{"code":"book_keeper_required"`) {
-			t.Fatalf("expected book_keeper_required source_expense error, got body=%s", res.Body.String())
-		}
-	})
-
-	t.Run("source expense reuse rejects invisible and attachmentless sources", func(t *testing.T) {
-		invisibleSourceID := createRegularDocumentExpense("regular source invisible to bookkeeper", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x52})
-		fields := bookKeeperExpenseFields(map[string]string{
-			"description":    "bookkeeper invisible source reuse should fail",
-			"source_expense": invisibleSourceID,
-		})
-		payload, err := json.Marshal(fields)
-		if err != nil {
-			t.Fatalf("failed to encode invisible source reuse payload: %v", err)
-		}
-		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", bytes.NewReader(payload), map[string]string{
-			"Authorization": bookkeeperToken,
-			"Content-Type":  "application/json",
-		})
-		mustStatus(t, res, http.StatusBadRequest)
-		if !strings.Contains(res.Body.String(), `"source_expense":{"code":"not_found"`) {
-			t.Fatalf("expected source_expense not_found error, got body=%s", res.Body.String())
-		}
-
-		attachmentlessSourceID := createBookkeeperDocumentExpense("bookkeeper source with attachment cleared", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x53})
-		clearCreatedExpenseAttachment(attachmentlessSourceID)
-		fields = bookKeeperExpenseFields(map[string]string{
-			"description":    "bookkeeper attachmentless source reuse should fail",
-			"source_expense": attachmentlessSourceID,
-		})
-		payload, err = json.Marshal(fields)
-		if err != nil {
-			t.Fatalf("failed to encode attachmentless source reuse payload: %v", err)
-		}
-		res = performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", bytes.NewReader(payload), map[string]string{
 			"Authorization": bookkeeperToken,
 			"Content-Type":  "application/json",
 		})
@@ -1821,141 +1728,8 @@ func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
 		}
 	})
 
-	t.Run("bookkeeper duplicate upload reuse still requires a PO backed target", func(t *testing.T) {
-		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x54}
-		createRegularDocumentExpense("document source for non po bookkeeper duplicate", content)
-		if _, err := app.DB().NewQuery(`
-			UPDATE admin_profiles
-			SET default_branch = '80875lm27v8wgi4'
-			WHERE uid = 'tqqf7q0f3378rvp'
-		`).Execute(); err != nil {
-			t.Fatalf("failed to set bookkeeper default_branch for non-PO duplicate reuse test: %v", err)
-		}
-		body, contentType := mustMultipartExpenseWithContent(t, bookkeeperSelfExpenseFields("bookkeeper non po duplicate should fail"), "receipt.png", content)
-		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
-			"Authorization": bookkeeperToken,
-			"Content-Type":  contentType,
-		})
-		mustStatus(t, res, http.StatusBadRequest)
-		if !strings.Contains(res.Body.String(), `"purchase_order":{"code":"required"`) {
-			t.Fatalf("expected purchase_order required duplicate reuse error, got body=%s", res.Body.String())
-		}
-	})
-
-	t.Run("legacy only details and source reuse migrate through expense documents", func(t *testing.T) {
-		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x55}
-		sourceID := createBookkeeperDocumentExpense("bookkeeper legacy source before migration", content)
-		legacyHash := convertCreatedExpenseToLegacyOnly(sourceID, "legacy-source.png", content)
-
-		detailsRes := performTestAPIRequest(t, app, http.MethodGet, "/api/expenses/details/"+sourceID, nil, map[string]string{
-			"Authorization": bookkeeperToken,
-		})
-		mustStatus(t, detailsRes, http.StatusOK)
-		if !strings.Contains(detailsRes.Body.String(), `"attachment":"legacy-source.png"`) || !strings.Contains(detailsRes.Body.String(), `"attachment_hash":"`+legacyHash+`"`) {
-			t.Fatalf("expected details to expose legacy attachment filename and hash, got body=%s", detailsRes.Body.String())
-		}
-		downloadRes := performTestAPIRequest(t, app, http.MethodGet, "/api/expenses/attachment/"+sourceID, nil, map[string]string{
-			"Authorization": bookkeeperToken,
-		})
-		mustStatus(t, downloadRes, http.StatusOK)
-		if !bytes.Equal(downloadRes.Body.Bytes(), content) {
-			t.Fatalf("legacy attachment download body = %x, want %x", downloadRes.Body.Bytes(), content)
-		}
-
-		fields := bookKeeperExpenseFields(map[string]string{
-			"description":    "bookkeeper source reuse from legacy source",
-			"source_expense": sourceID,
-		})
-		payload, err := json.Marshal(fields)
-		if err != nil {
-			t.Fatalf("failed to encode legacy source reuse payload: %v", err)
-		}
-		reuseRes := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", bytes.NewReader(payload), map[string]string{
-			"Authorization": bookkeeperToken,
-			"Content-Type":  "application/json",
-		})
-		mustStatus(t, reuseRes, http.StatusOK)
-		var created struct {
-			ID string `json:"id"`
-		}
-		if err := json.Unmarshal(reuseRes.Body.Bytes(), &created); err != nil {
-			t.Fatalf("failed to decode source reuse response: %v; body=%s", err, reuseRes.Body.String())
-		}
-		sourceExpense, err := app.FindRecordById("expenses", sourceID)
-		if err != nil {
-			t.Fatalf("failed to reload migrated source expense: %v", err)
-		}
-		reuseExpense, err := app.FindRecordById("expenses", created.ID)
-		if err != nil {
-			t.Fatalf("failed to reload source reuse expense: %v", err)
-		}
-		if sourceExpense.GetString("attachment_document") == "" {
-			t.Fatal("expected source legacy expense to be linked to an expense_document after reuse")
-		}
-		if got := reuseExpense.GetString("attachment_document"); got != sourceExpense.GetString("attachment_document") {
-			t.Fatalf("source reuse document = %q, want migrated source document %q", got, sourceExpense.GetString("attachment_document"))
-		}
-		if sourceExpense.GetString("attachment") != "legacy-source.png" {
-			t.Fatalf("source legacy attachment filename should be preserved until Phase 2 cleanup, got %q", sourceExpense.GetString("attachment"))
-		}
-	})
-
-	t.Run("editing legacy only expenses migrates or replaces the attachment", func(t *testing.T) {
-		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x56}
-		legacyID := createRegularDocumentExpense("regular legacy edit before migration", content)
-		legacyHash := convertCreatedExpenseToLegacyOnly(legacyID, "legacy-edit.png", content)
-
-		patchRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/expenses/"+legacyID, strings.NewReader(`{
-			"description": "regular legacy edit migrated"
-		}`), map[string]string{
-			"Authorization": regularToken,
-			"Content-Type":  "application/json",
-		})
-		mustStatus(t, patchRes, http.StatusOK)
-		legacyExpense, err := app.FindRecordById("expenses", legacyID)
-		if err != nil {
-			t.Fatalf("failed to reload migrated legacy edit expense: %v", err)
-		}
-		migratedDocumentID := legacyExpense.GetString("attachment_document")
-		if migratedDocumentID == "" {
-			t.Fatal("expected editing a legacy-only expense to create an attachment_document")
-		}
-		migratedDocument, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, migratedDocumentID)
-		if err != nil {
-			t.Fatalf("failed to load migrated document: %v", err)
-		}
-		if got := migratedDocument.GetString("attachment_hash"); got != legacyHash {
-			t.Fatalf("migrated document hash = %q, want %q", got, legacyHash)
-		}
-
-		replaceContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x57}
-		replaceOriginalContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5A}
-		replaceID := createRegularDocumentExpense("regular legacy edit before replacement", replaceOriginalContent)
-		convertCreatedExpenseToLegacyOnly(replaceID, "legacy-replaced.png", replaceOriginalContent)
-		body, contentType := mustMultipartExpenseWithContent(t, map[string]string{
-			"description": "regular legacy edit replaced attachment",
-		}, "replacement.png", replaceContent)
-		replaceRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/expenses/"+replaceID, body, map[string]string{
-			"Authorization": regularToken,
-			"Content-Type":  contentType,
-		})
-		mustStatus(t, replaceRes, http.StatusOK)
-		replacedExpense, err := app.FindRecordById("expenses", replaceID)
-		if err != nil {
-			t.Fatalf("failed to reload replaced legacy expense: %v", err)
-		}
-		replacementDocument, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, replacedExpense.GetString("attachment_document"))
-		if err != nil {
-			t.Fatalf("failed to load replacement document: %v", err)
-		}
-		if got, want := replacementDocument.GetString("attachment_hash"), hashContent(replaceContent); got != want {
-			t.Fatalf("replacement document hash = %q, want %q", got, want)
-		}
-	})
-
-	t.Run("generic collection update ignores client supplied attachment document on legacy only expense", func(t *testing.T) {
-		otherContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5B}
-		otherID := createRegularDocumentExpense("regular unrelated document target", otherContent)
+	t.Run("generic collection update ignores client supplied attachment document", func(t *testing.T) {
+		otherID := createRegularDocumentExpense("regular unrelated document target", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5B})
 		otherExpense, err := app.FindRecordById("expenses", otherID)
 		if err != nil {
 			t.Fatalf("failed to load unrelated document expense: %v", err)
@@ -1965,44 +1739,34 @@ func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
 			t.Fatal("expected unrelated expense to have an attachment document")
 		}
 
-		legacyContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5C}
-		legacyID := createRegularDocumentExpense("regular legacy edit with smuggled document", legacyContent)
-		legacyHash := convertCreatedExpenseToLegacyOnly(legacyID, "legacy-smuggled.png", legacyContent)
+		expenseID := createRegularDocumentExpense("regular edit with smuggled document", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5C})
+		expense, err := app.FindRecordById("expenses", expenseID)
+		if err != nil {
+			t.Fatalf("failed to load expense before generic patch: %v", err)
+		}
+		originalDocumentID := expense.GetString("attachment_document")
 
 		body := strings.NewReader(fmt.Sprintf(`{
 				"description": "generic patch must ignore attachment_document",
 				"attachment_document": %q
 			}`, clientSuppliedDocumentID))
-		patchRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/"+legacyID, body, map[string]string{
+		patchRes := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/"+expenseID, body, map[string]string{
 			"Authorization": regularToken,
 			"Content-Type":  "application/json",
 		})
 		mustStatus(t, patchRes, http.StatusOK)
 
-		legacyExpense, err := app.FindRecordById("expenses", legacyID)
+		expense, err = app.FindRecordById("expenses", expenseID)
 		if err != nil {
-			t.Fatalf("failed to reload legacy expense after generic patch: %v", err)
+			t.Fatalf("failed to reload expense after generic patch: %v", err)
 		}
-		resolvedDocumentID := legacyExpense.GetString("attachment_document")
-		if resolvedDocumentID == "" {
-			t.Fatal("expected generic patch to migrate the legacy attachment to an expense document")
-		}
-		if resolvedDocumentID == clientSuppliedDocumentID {
-			t.Fatalf("generic patch preserved client supplied attachment_document %q", clientSuppliedDocumentID)
-		}
-
-		resolvedDocument, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, resolvedDocumentID)
-		if err != nil {
-			t.Fatalf("failed to load resolved legacy document: %v", err)
-		}
-		if got := resolvedDocument.GetString("attachment_hash"); got != legacyHash {
-			t.Fatalf("resolved document hash = %q, want legacy hash %q", got, legacyHash)
+		if got := expense.GetString("attachment_document"); got != originalDocumentID {
+			t.Fatalf("generic patch changed attachment_document to %q, want %q", got, originalDocumentID)
 		}
 	})
 
 	t.Run("generic collection update cannot use client supplied attachment document to bypass attachment requirement", func(t *testing.T) {
-		otherContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5D}
-		otherID := createRegularDocumentExpense("regular unrelated bypass document target", otherContent)
+		otherID := createRegularDocumentExpense("regular unrelated bypass document target", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x5D})
 		otherExpense, err := app.FindRecordById("expenses", otherID)
 		if err != nil {
 			t.Fatalf("failed to load unrelated document expense: %v", err)
@@ -2060,131 +1824,24 @@ func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
 		if expense.GetString("attachment_document") == "" {
 			t.Fatal("expected generic collection upload to create attachment_document")
 		}
-		if expense.GetString("attachment") != "" || expense.GetString("attachment_hash") != "" {
-			t.Fatalf("expected generic collection upload to clear legacy attachment fields, got attachment=%q hash=%q", expense.GetString("attachment"), expense.GetString("attachment_hash"))
-		}
 	})
 
-	t.Run("regular duplicate upload is rejected when the existing hash is legacy only", func(t *testing.T) {
-		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x59}
-		sourceID := createRegularDocumentExpense("regular legacy duplicate source", content)
-		convertCreatedExpenseToLegacyOnly(sourceID, "legacy-duplicate-source.png", content)
-		body, contentType := mustMultipartExpenseWithContent(t, regularExpenseFields("regular duplicate against legacy-only source"), "receipt.png", content)
-		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
-			"Authorization": regularToken,
-			"Content-Type":  contentType,
-		})
-		mustStatus(t, res, http.StatusBadRequest)
-		if !strings.Contains(res.Body.String(), `"attachment":{"code":"duplicate_file"`) {
-			t.Fatalf("expected duplicate_file error for legacy-only duplicate hash, got body=%s", res.Body.String())
-		}
-	})
-
-	t.Run("regular duplicate upload can reuse an orphaned document when mixed legacy rows use other hashes", func(t *testing.T) {
-		legacyContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x62}
-		legacyID := createRegularDocumentExpense("regular unrelated legacy row before orphan reuse", legacyContent)
-		convertCreatedExpenseToLegacyOnly(legacyID, "unrelated-legacy-before-orphan-reuse.png", legacyContent)
-
-		orphanContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x63}
-		orphanSourceID := createRegularDocumentExpense("regular mixed orphan source", orphanContent)
-		orphanSource, err := app.FindRecordById("expenses", orphanSourceID)
-		if err != nil {
-			t.Fatalf("failed to load orphan source expense: %v", err)
-		}
-		documentID := orphanSource.GetString("attachment_document")
-		if documentID == "" {
-			t.Fatal("expected orphan source expense to reference an expense_document")
-		}
-		if err := app.Delete(orphanSource); err != nil {
-			t.Fatalf("failed to delete orphan source expense: %v", err)
-		}
-
-		reuseID := createRegularDocumentExpense("regular mixed orphan reuse succeeds", orphanContent)
-		reuseExpense, err := app.FindRecordById("expenses", reuseID)
-		if err != nil {
-			t.Fatalf("failed to load mixed orphan reuse expense: %v", err)
-		}
-		if got := reuseExpense.GetString("attachment_document"); got != documentID {
-			t.Fatalf("expected regular upload to reuse orphaned document %q, got %q", documentID, got)
-		}
-	})
-
-	t.Run("regular duplicate upload is rejected when an orphaned document hash is still used by legacy expense", func(t *testing.T) {
-		content := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x64}
-		orphanSourceID := createRegularDocumentExpense("regular mixed orphan duplicate source", content)
-		orphanSource, err := app.FindRecordById("expenses", orphanSourceID)
-		if err != nil {
-			t.Fatalf("failed to load mixed orphan duplicate source: %v", err)
-		}
-		documentID := orphanSource.GetString("attachment_document")
-		if documentID == "" {
-			t.Fatal("expected mixed orphan duplicate source to reference an expense_document")
-		}
-		if err := app.Delete(orphanSource); err != nil {
-			t.Fatalf("failed to delete mixed orphan duplicate source: %v", err)
-		}
-
-		legacyID := createRegularDocumentExpense("regular legacy duplicate holder before conversion", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x65})
-		legacyExpense, err := app.FindRecordById("expenses", legacyID)
-		if err != nil {
-			t.Fatalf("failed to load legacy duplicate holder: %v", err)
-		}
-		legacyPath := legacyExpense.BaseFilesPath() + "/legacy-duplicate-holder.png"
-		fsys, err := app.NewFilesystem()
-		if err != nil {
-			t.Fatalf("failed to open filesystem for legacy duplicate holder: %v", err)
-		}
-		if err := fsys.Upload(content, legacyPath); err != nil {
-			fsys.Close()
-			t.Fatalf("failed to upload legacy duplicate holder attachment: %v", err)
-		}
-		if err := fsys.Close(); err != nil {
-			t.Fatalf("failed to close filesystem after legacy duplicate holder upload: %v", err)
-		}
-		if _, err := app.DB().NewQuery(`
-			UPDATE expenses
-			SET attachment = 'legacy-duplicate-holder.png',
-			    attachment_hash = {:attachment_hash},
-			    attachment_document = ''
-			WHERE id = {:id}
-		`).Bind(dbx.Params{
-			"id":              legacyID,
-			"attachment_hash": hashContent(content),
-		}).Execute(); err != nil {
-			t.Fatalf("failed to convert legacy duplicate holder to matching legacy hash: %v", err)
-		}
-
-		body, contentType := mustMultipartExpenseWithContent(t, regularExpenseFields("regular mixed orphan duplicate should fail"), "receipt.png", content)
-		res := performTestAPIRequest(t, app, http.MethodPost, "/api/expenses", body, map[string]string{
-			"Authorization": regularToken,
-			"Content-Type":  contentType,
-		})
-		mustStatus(t, res, http.StatusBadRequest)
-		if !strings.Contains(res.Body.String(), `"attachment":{"code":"duplicate_file"`) {
-			t.Fatalf("expected duplicate_file error for legacy reference to orphaned document hash, got body=%s", res.Body.String())
-		}
-	})
-
-	t.Run("receipt zip and legacy writeback include mixed legacy and document backed attachments", func(t *testing.T) {
+	t.Run("receipt zip and legacy writeback include document backed attachments", func(t *testing.T) {
 		weekEnding := "2026-04-25"
-		legacyContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x60}
 		documentContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x61}
 
-		legacyID := createRegularDocumentExpense("phase1 mixed legacy receipt export", legacyContent)
-		legacyHash := convertCreatedExpenseToLegacyOnly(legacyID, "mixed-legacy.png", legacyContent)
-		documentID := createRegularDocumentExpense("phase1 mixed document receipt export", documentContent)
+		documentID := createRegularDocumentExpense("phase3 document receipt export", documentContent)
 		documentExpense, err := app.FindRecordById("expenses", documentID)
 		if err != nil {
-			t.Fatalf("failed to load document-backed mixed expense: %v", err)
+			t.Fatalf("failed to load document-backed expense: %v", err)
 		}
 		documentRecord, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, documentExpense.GetString("attachment_document"))
 		if err != nil {
-			t.Fatalf("failed to load document-backed mixed expense document: %v", err)
+			t.Fatalf("failed to load document-backed expense document: %v", err)
 		}
 		documentFilename := documentRecord.GetString("attachment")
 		documentHash := documentRecord.GetString("attachment_hash")
 
-		markExpenseCommitted(legacyID, weekEnding)
 		markExpenseCommitted(documentID, weekEnding)
 
 		receiptsRes := performTestAPIRequest(t, app, http.MethodGet, "/api/reports/weekly_receipts/"+weekEnding, nil, map[string]string{
@@ -2218,12 +1875,8 @@ func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
 		if err != nil {
 			t.Fatalf("failed to open receipt zip: %v", err)
 		}
-		zipNames := make([]string, 0, len(archive.File))
-		for _, f := range archive.File {
-			zipNames = append(zipNames, f.Name)
-		}
-		if len(zipNames) != 2 || !strings.Contains(strings.Join(zipNames, "\n"), "mixed-legacy.png") || !strings.Contains(strings.Join(zipNames, "\n"), documentFilename) {
-			t.Fatalf("receipt zip names = %#v, want legacy and document-backed attachments", zipNames)
+		if len(archive.File) != 1 || !strings.Contains(archive.File[0].Name, documentFilename) {
+			t.Fatalf("receipt zip names = %#v, want only document-backed attachment %s", archive.File, documentFilename)
 		}
 
 		writebackRes := performTestAPIRequest(t, app, http.MethodGet, "/api/export_legacy/expenses/2026-04-01", nil, map[string]string{
@@ -2240,24 +1893,18 @@ func TestExpenseDocumentsPhase1LegacyFallbacksAndIntegration(t *testing.T) {
 		if err := json.Unmarshal(writebackRes.Body.Bytes(), &writeback); err != nil {
 			t.Fatalf("failed to decode writeback response: %v; body=%s", err, writebackRes.Body.String())
 		}
-		foundLegacy := false
 		foundDocument := false
 		for _, row := range writeback.Expenses {
-			switch row.ImmutableID {
-			case legacyID:
-				foundLegacy = true
-				if row.Attachment != "mixed-legacy.png" || row.AttachmentHash != legacyHash {
-					t.Fatalf("legacy writeback row = attachment %q hash %q, want mixed-legacy.png %s", row.Attachment, row.AttachmentHash, legacyHash)
-				}
-			case documentID:
-				foundDocument = true
-				if row.Attachment != documentFilename || row.AttachmentHash != documentHash {
-					t.Fatalf("document writeback row = attachment %q hash %q, want %s %s", row.Attachment, row.AttachmentHash, documentFilename, documentHash)
-				}
+			if row.ImmutableID != documentID {
+				continue
+			}
+			foundDocument = true
+			if row.Attachment != documentFilename || row.AttachmentHash != documentHash {
+				t.Fatalf("document writeback row = attachment %q hash %q, want %s %s", row.Attachment, row.AttachmentHash, documentFilename, documentHash)
 			}
 		}
-		if !foundLegacy || !foundDocument {
-			t.Fatalf("writeback missing mixed attachment rows: foundLegacy=%v foundDocument=%v", foundLegacy, foundDocument)
+		if !foundDocument {
+			t.Fatal("writeback missing document-backed attachment row")
 		}
 	})
 }
@@ -2951,7 +2598,21 @@ func TestRejectExpense_CommitHolderCannotRejectUnapprovedExpense(t *testing.T) {
 			`"code":"record_not_approved"`,
 			`"message":"only approved records can be rejected by a commit user"`,
 		},
-		TestAppFactory: testutils.SetupTestApp,
+		TestAppFactory: func(tb testing.TB) *tests.TestApp {
+			app := testutils.SetupTestApp(tb)
+			if _, err := app.NonconcurrentDB().NewQuery(`
+				INSERT INTO expense_documents (id, attachment, attachment_hash, uploaded_by, created, updated)
+				VALUES ('dupecreatedoc01', 'receipt.png', '320d1c9bbc36e84cb1693e47516ebaff0fd83bc5d333f322051edaeec1a33a4a', 'rzr98oadsp9qc11', '2024-09-01 00:00:00.000Z', '2024-09-01 00:00:00.000Z')
+			`).Execute(); err != nil {
+				tb.Fatalf("failed to seed duplicate document: %v", err)
+			}
+			if _, err := app.NonconcurrentDB().NewQuery(`
+				UPDATE expenses SET attachment_document = 'dupecreatedoc01' WHERE id = 'eqhozipupteogp8'
+			`).Execute(); err != nil {
+				tb.Fatalf("failed to link duplicate document fixture: %v", err)
+			}
+			return app
+		},
 	}
 
 	scenario.Test(t)
@@ -2974,7 +2635,21 @@ func TestExpenseCommitQueue_RequiresCommitClaim(t *testing.T) {
 		ExpectedContent: []string{
 			`"message":"you are not authorized to view the expense commit queue"`,
 		},
-		TestAppFactory: testutils.SetupTestApp,
+		TestAppFactory: func(tb testing.TB) *tests.TestApp {
+			app := testutils.SetupTestApp(tb)
+			if _, err := app.NonconcurrentDB().NewQuery(`
+				INSERT INTO expense_documents (id, attachment, attachment_hash, uploaded_by, created, updated)
+				VALUES ('dupeupdatedoc01', 'receipt.png', '5feaca1de4612a336a2f4698af4c15c771485e68e62224d7a1f4d903137565e6', 'rzr98oadsp9qc11', '2024-09-01 00:00:00.000Z', '2024-09-01 00:00:00.000Z')
+			`).Execute(); err != nil {
+				tb.Fatalf("failed to seed duplicate document: %v", err)
+			}
+			if _, err := app.NonconcurrentDB().NewQuery(`
+				UPDATE expenses SET attachment_document = 'dupeupdatedoc01' WHERE id = 'eqhozipupteogp8'
+			`).Execute(); err != nil {
+				tb.Fatalf("failed to link duplicate document fixture: %v", err)
+			}
+			return app
+		},
 	}
 
 	scenario.Test(t)
@@ -3099,18 +2774,26 @@ func TestExpenseCommitQueue_ReturnsDescriptionAttachmentAndRejectedRows(t *testi
 			app := testutils.SetupTestApp(tb)
 
 			_, err := app.NonconcurrentDB().NewQuery(`
+				INSERT INTO expense_documents (id, attachment, attachment_hash, uploaded_by, created, updated)
+				VALUES ('queueattachdoc1', 'queue-receipt.pdf', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'wegviunlyr2jjjv', '2024-11-08 12:34:56.000Z', '2024-11-08 12:34:56.000Z')
+			`).Execute()
+			if err != nil {
+				tb.Fatalf("failed to seed commit queue attachment document: %v", err)
+			}
+
+			_, err = app.NonconcurrentDB().NewQuery(`
 				UPDATE expenses
 				SET rejected = {:rejected},
 				    rejection_reason = {:reason},
 				    rejector = {:rejector},
-				    attachment = {:attachment}
+				    attachment_document = {:attachment_document}
 				WHERE id = {:id}
 			`).Bind(dbx.Params{
-				"id":         "eqhozipupteogp8",
-				"rejected":   "2024-11-08 12:34:56.000Z",
-				"reason":     "Testing rejected approved expense visibility",
-				"rejector":   "wegviunlyr2jjjv",
-				"attachment": "queue-receipt.pdf",
+				"id":                  "eqhozipupteogp8",
+				"rejected":            "2024-11-08 12:34:56.000Z",
+				"reason":              "Testing rejected approved expense visibility",
+				"rejector":            "wegviunlyr2jjjv",
+				"attachment_document": "queueattachdoc1",
 			}).Execute()
 			if err != nil {
 				tb.Fatalf("failed to seed rejected expense commit queue row: %v", err)
@@ -4336,8 +4019,6 @@ func seedExpensesListMixedPaginationFixture(tb testing.TB, app *tests.TestApp) {
 			description,
 			total,
 			payment_type,
-			attachment,
-			attachment_hash,
 			rejector,
 			rejected,
 			rejection_reason,
@@ -4371,8 +4052,6 @@ func seedExpensesListMixedPaginationFixture(tb testing.TB, app *tests.TestApp) {
 			{:description},
 			{:total},
 			{:payment_type},
-			{:attachment},
-			{:attachment_hash},
 			{:rejector},
 			{:rejected},
 			{:rejection_reason},
@@ -4425,8 +4104,6 @@ func seedExpensesListMixedPaginationFixture(tb testing.TB, app *tests.TestApp) {
 			"description":           fmt.Sprintf("Mixed pagination open expense %02d", i),
 			"total":                 100 + i,
 			"payment_type":          "OnAccount",
-			"attachment":            "",
-			"attachment_hash":       "",
 			"rejector":              "",
 			"rejected":              "",
 			"rejection_reason":      "",
@@ -4480,8 +4157,6 @@ func seedExpensesListMixedPaginationFixture(tb testing.TB, app *tests.TestApp) {
 			"description":           fmt.Sprintf("Mixed pagination committed expense %02d", i),
 			"total":                 200 + i,
 			"payment_type":          "OnAccount",
-			"attachment":            "",
-			"attachment_hash":       "",
 			"rejector":              "",
 			"rejected":              "",
 			"rejection_reason":      "",
@@ -4894,72 +4569,37 @@ func TestExpensesCreate_DuplicateAttachmentFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load capital kind: %v", err)
 	}
-	capitalKindID := capitalKind.Id
 
-	// Helper to create multipart form data with a specific file content
-	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
-		m := map[string]any{}
-		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
-			return nil, "", err
-		}
-		if _, exists := m["kind"]; !exists {
-			m["kind"] = capitalKindID
-		}
-		buf := &bytes.Buffer{}
-		w := multipart.NewWriter(buf)
-		for k, v := range m {
-			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
-				return nil, "", err
-			}
-		}
-		fw, err := w.CreateFormFile("attachment", "receipt.png")
-		if err != nil {
-			return nil, "", err
-		}
-		if _, err := fw.Write(fileContent); err != nil {
-			return nil, "", err
-		}
-		contentType := w.FormDataContentType()
-		if err := w.Close(); err != nil {
-			return nil, "", err
-		}
-		return buf, contentType, nil
+	makeMultipartWithContent := func(description string, fileContent []byte) (*bytes.Buffer, string) {
+		return mustMultipartExpenseWithContent(t, map[string]string{
+			"uid":          "rzr98oadsp9qc11",
+			"date":         "2024-09-01",
+			"division":     "vccd5fo56ctbigh",
+			"description":  description,
+			"payment_type": "Expense",
+			"kind":         capitalKind.Id,
+			"total":        "99",
+			"vendor":       "2zqxtsmymf670ha",
+		}, "receipt.png", fileContent)
 	}
 
 	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xDE, 0xAD, 0xBE, 0xEF}
+	firstBody, firstContentType := makeMultipartWithContent("first expense with attachment", duplicateFileContent)
+	first := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", firstBody, map[string]string{
+		"Authorization": recordToken,
+		"Content-Type":  firstContentType,
+	})
+	mustStatus(t, first, http.StatusOK)
 
-	scenario := tests.ApiScenario{
-		Name:           "duplicate attachment fails with field-level error",
-		Method:         http.MethodPost,
-		URL:            "/api/collections/expenses/records",
-		ExpectedStatus: 400,
-		ExpectedContent: []string{
-			`"attachment":{"code":"duplicate_file"`,
-			`"message":"This file has already been uploaded to another expense"`,
-		},
-		ExpectedEvents: map[string]int{
-			"OnRecordCreateRequest": 1,
-		},
-		TestAppFactory: testutils.SetupTestApp,
+	duplicateBody, duplicateContentType := makeMultipartWithContent("second expense with same attachment", duplicateFileContent)
+	duplicate := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", duplicateBody, map[string]string{
+		"Authorization": recordToken,
+		"Content-Type":  duplicateContentType,
+	})
+	mustStatus(t, duplicate, http.StatusBadRequest)
+	if !strings.Contains(duplicate.Body.String(), `"attachment":{"code":"duplicate_file"`) || !strings.Contains(duplicate.Body.String(), `"message":"This file has already been uploaded to another expense"`) {
+		t.Fatalf("expected duplicate attachment field error, got body=%s", duplicate.Body.String())
 	}
-
-	// Create the request body for the duplicate attempt
-	b, ct, err := makeMultipartWithContent(`{
-		"uid": "rzr98oadsp9qc11",
-		"date": "2024-09-01",
-		"division": "vccd5fo56ctbigh",
-		"description": "second expense with same attachment",
-		"payment_type": "Expense",
-		"total": 99,
-		"vendor": "2zqxtsmymf670ha"
-	}`, duplicateFileContent)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scenario.Body = b
-	scenario.Headers = map[string]string{"Authorization": recordToken, "Content-Type": ct}
-
-	scenario.Test(t)
 }
 
 // TestExpensesUpdate_DuplicateAttachmentFails verifies that updating an expense
@@ -4976,71 +4616,37 @@ func TestExpensesUpdate_DuplicateAttachmentFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to load capital kind: %v", err)
 	}
-	capitalKindID := capitalKind.Id
 
-	// Helper to create multipart form data with a specific file content
-	makeMultipartWithContent := func(jsonBody string, fileContent []byte) (*bytes.Buffer, string, error) {
-		m := map[string]any{}
-		if err := json.Unmarshal([]byte(jsonBody), &m); err != nil {
-			return nil, "", err
-		}
-		if _, exists := m["kind"]; !exists {
-			m["kind"] = capitalKindID
-		}
-		buf := &bytes.Buffer{}
-		w := multipart.NewWriter(buf)
-		for k, v := range m {
-			if err := w.WriteField(k, fmt.Sprint(v)); err != nil {
-				return nil, "", err
-			}
-		}
-		fw, err := w.CreateFormFile("attachment", "receipt.png")
-		if err != nil {
-			return nil, "", err
-		}
-		if _, err := fw.Write(fileContent); err != nil {
-			return nil, "", err
-		}
-		contentType := w.FormDataContentType()
-		if err := w.Close(); err != nil {
-			return nil, "", err
-		}
-		return buf, contentType, nil
+	makeMultipartWithContent := func(description string, fileContent []byte) (*bytes.Buffer, string) {
+		return mustMultipartExpenseWithContent(t, map[string]string{
+			"uid":          "rzr98oadsp9qc11",
+			"date":         "2024-09-01",
+			"division":     "vccd5fo56ctbigh",
+			"description":  description,
+			"payment_type": "Expense",
+			"kind":         capitalKind.Id,
+			"total":        "99",
+			"vendor":       "2zqxtsmymf670ha",
+		}, "receipt.png", fileContent)
 	}
 
 	duplicateFileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0xCA, 0xFE, 0xBA, 0xBE}
+	firstBody, firstContentType := makeMultipartWithContent("first update duplicate source", duplicateFileContent)
+	first := performTestAPIRequest(t, app, http.MethodPost, "/api/collections/expenses/records", firstBody, map[string]string{
+		"Authorization": recordToken,
+		"Content-Type":  firstContentType,
+	})
+	mustStatus(t, first, http.StatusOK)
 
-	scenario := tests.ApiScenario{
-		Name:           "updating expense with duplicate attachment fails",
-		Method:         http.MethodPatch,
-		URL:            "/api/collections/expenses/records/2gq9uyxmkcyopa4",
-		ExpectedStatus: 400,
-		ExpectedContent: []string{
-			`"attachment":{"code":"duplicate_file"`,
-			`"message":"This file has already been uploaded to another expense"`,
-		},
-		ExpectedEvents: map[string]int{
-			"OnRecordUpdateRequest": 1,
-		},
-		TestAppFactory: testutils.SetupTestApp,
+	updateBody, updateContentType := makeMultipartWithContent("trying to update with duplicate attachment", duplicateFileContent)
+	update := performTestAPIRequest(t, app, http.MethodPatch, "/api/collections/expenses/records/2gq9uyxmkcyopa4", updateBody, map[string]string{
+		"Authorization": recordToken,
+		"Content-Type":  updateContentType,
+	})
+	mustStatus(t, update, http.StatusBadRequest)
+	if !strings.Contains(update.Body.String(), `"attachment":{"code":"duplicate_file"`) || !strings.Contains(update.Body.String(), `"message":"This file has already been uploaded to another expense"`) {
+		t.Fatalf("expected duplicate attachment field error, got body=%s", update.Body.String())
 	}
-
-	// Create the request body for the update with duplicate attachment
-	b, ct, err := makeMultipartWithContent(`{
-		"date": "2024-09-01",
-		"division": "vccd5fo56ctbigh",
-		"description": "trying to update with duplicate attachment",
-		"payment_type": "Expense",
-		"total": 99,
-		"vendor": "2zqxtsmymf670ha"
-	}`, duplicateFileContent)
-	if err != nil {
-		t.Fatal(err)
-	}
-	scenario.Body = b
-	scenario.Headers = map[string]string{"Authorization": recordToken, "Content-Type": ct}
-
-	scenario.Test(t)
 }
 
 // TestExpensesUpdate_SameAttachmentSucceeds verifies that updating an expense

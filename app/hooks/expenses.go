@@ -263,10 +263,6 @@ func cleanExpense(app core.App, expenseRecord *core.Record, poRecord *core.Recor
 		expenseRecord.Set("total", totalMileageExpense)
 		expenseRecord.Set("vendor", "")
 
-		// Mileage expenses do not have attachments, so we set the attachment
-		// property to an empty string
-		expenseRecord.Set("attachment", "")
-
 		// NOTE: during commit, we re-run the mileage calculation factoring in the
 		// entire year's mileage total that is committed. This solves the issue of
 		// out-of-order mileage expenses and acknowledges only committed expenses as
@@ -350,9 +346,6 @@ func cleanExpense(app core.App, expenseRecord *core.Record, poRecord *core.Recor
 		// payroll and figure out how to calculate the total for imported expenses
 		// that don't have the total property set.
 
-		// Allowance expenses do not have attachments, so we set the attachment
-		// property to an empty string
-		expenseRecord.Set("attachment", "")
 	}
 
 	if purchaseOrderID == "" {
@@ -754,6 +747,23 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		return err
 	}
 
+	// Keep "attachment" as the expense-write request field even though expense
+	// files now live on expense_documents. It is intentionally an input name, not
+	// a storage location:
+	//
+	//   - Users are editing an expense, so the form should continue to have one
+	//     obvious "Attachment" control.
+	//   - Letting the client upload directly to expense_documents would expose a
+	//     document picker/write path that could bypass expense ownership,
+	//     PO-backed duplicate reuse, source_expense visibility, missing-receipt
+	//     handling, and rollback rules.
+	//   - The server needs one transaction-shaped workflow: validate the expense,
+	//     create or reuse the document row, link attachment_document, and clean up
+	//     the document upload if the final expense save fails.
+	//
+	// The custom /api/expenses route also stashes uploaded files under the raw
+	// "attachment:unsaved" key so this hook keeps working after the physical
+	// expenses.attachment file column is removed.
 	NormalizePendingFileNames(expenseRecord, "attachment")
 	requestInfo, requestInfoErr := e.RequestInfo()
 	if requestInfoErr != nil {
@@ -786,9 +796,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}
 	}
 
-	// if the expense record has an attachment, calculate the sha256 hash of the
-	// file so it can be stored or reused through expense_documents after the
-	// expense has passed the rest of its validation.
+	// If the request carried a file in the virtual "attachment" input, hash it
+	// before validation finishes. The hash is used only to create/reuse the
+	// expense_documents row; it must not be treated as a value for the old
+	// expenses.attachment_hash column.
 	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")
 	if hashErr != nil {
 		return hashErr
@@ -888,6 +899,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		expenseRecord.Set("attachment_missing_reason", "")
 	} else if explicitAttachmentRemoval {
 		expenseRecord.Set("attachment_document", "")
+		expenseRecord.Set("attachment", "")
 		expenseRecord.Set("attachment_hash", "")
 		expenseRecord.Set("attachment_missing_reason", "")
 	} else if hasAttachmentIntent {
@@ -897,22 +909,10 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		}
 		applyResolvedExpenseDocument(expenseRecord, documentID)
 		expenseRecord.Set("attachment_missing_reason", "")
-	} else if expenseRecord.GetString("attachment") != "" && originalAttachmentDocument == "" {
-		expenseRecord.Set("attachment_document", "")
-		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
-		if err != nil {
-			return err
-		}
-		applyResolvedExpenseDocument(expenseRecord, documentID)
-		expenseRecord.Set("attachment_missing_reason", "")
-	} else if expenseRecord.GetString("attachment") == "" {
-		if expenseRecord.IsNew() {
-			expenseRecord.Set("attachment_document", "")
-		} else {
-			expenseRecord.Set("attachment_document", originalAttachmentDocument)
-		}
 	} else if !expenseRecord.IsNew() {
 		expenseRecord.Set("attachment_document", originalAttachmentDocument)
+	} else {
+		expenseRecord.Set("attachment_document", "")
 	}
 
 	return nil

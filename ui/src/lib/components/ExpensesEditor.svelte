@@ -282,6 +282,17 @@
       purchase_order: item.purchase_order,
       vendor: item.vendor,
     };
+    // `attachment` is intentionally the expense editor's request field even
+    // though the uploaded file is stored on expense_documents. The user is
+    // editing an expense and should not need to know about the document storage
+    // collection. The backend treats this as a virtual input: it validates the
+    // expense, creates or reuses the document row, links attachment_document,
+    // and rolls everything back together if the expense save fails.
+    //
+    // Do not change this to a direct client upload to expense_documents unless
+    // the backend grows an equivalent transactional API. A direct document write
+    // would make it much easier to create orphaned documents or bypass the
+    // source_expense, duplicate-file, PO-backed reuse, and permission rules.
     const attachment = item.attachment as string | File;
     if ((typeof File !== "undefined" && attachment instanceof File) || attachment === "") {
       payload.attachment = attachment;
@@ -577,7 +588,14 @@
       />
     {/if}
 
-    <!-- File upload for attachment -->
+    <!--
+      Keep fieldName="attachment" as a stable expense-form input, not as a
+      storage contract. The backend converts this virtual request field into an
+      expense_documents row and stores only the attachment_document relation on
+      the expense. This keeps the UI simple and preserves transactional server
+      validation around ownership, duplicate reuse, missing historical receipts,
+      and rollback cleanup.
+    -->
     <DsFileSelect
       bind:record={item}
       {errors}

@@ -38,6 +38,7 @@
   $: hasBookKeeperAccess = $globalStore.claims.includes("book_keeper");
   $: isOwner = expense.creator === viewerId;
   $: isApprover = expense.approver === viewerId;
+  $: hasAttachmentRepairTarget = Boolean(expense.attachment || expense.attachment_document);
 
   async function refreshExpense() {
     try {
@@ -432,6 +433,22 @@
           </button>
         {/if}
       </div>
+    {:else if hasAdminAccess && expense.attachment_document}
+      <div class="flex items-start gap-2">
+        <span class="font-semibold">Attachment:</span>
+        <div class="max-w-2xl rounded-sm border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+          <div class="font-semibold">Attachment document issue</div>
+          <div>The linked document has no downloadable attachment.</div>
+        </div>
+        <button
+          type="button"
+          class="font-mono text-sm text-blue-700 underline decoration-dotted underline-offset-2 hover:text-blue-900"
+          title="Review attachment document issue"
+          on:click={openHashRepairPopover}
+        >
+          Review
+        </button>
+      </div>
     {/if}
 
     {#if expense.pay_period_ending}
@@ -569,7 +586,7 @@
   <ExpenseAttachmentHashRepairPopover
     show={showHashRepairPopover}
     expenseId={expense.id}
-    hasAttachment={Boolean(expense.attachment)}
+    hasAttachment={hasAttachmentRepairTarget}
     currentHash={expense.attachment_hash}
     currentUpdated={expense.updated}
     missingReason={expense.attachment_missing_reason}

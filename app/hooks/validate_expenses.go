@@ -140,15 +140,16 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 	}
 
 	// Require an attachment for all types except Allowance, Mileage, and PersonalReimbursement.
-	// Accept either an already stored filename or a new uploaded file in the current multipart request.
+	// Accept either a document relation, a missing-attachment marker on an existing
+	// historical row, a source expense reuse request, or a new uploaded file in the
+	// current multipart request.
 	requiresAttachment := !(isAllowance || isMileage || isPersonalReimbursement)
 	if requiresAttachment {
-		hasStoredAttachment := expenseRecord.GetString("attachment") != ""
-		hasDocumentAttachment := !expenseRecord.IsNew() && expenseRecord.GetString("attachment_document") != ""
+		hasDocumentAttachment := expenseRecord.GetString("attachment_document") != ""
 		hasMissingAttachmentReason := !expenseRecord.IsNew() && strings.TrimSpace(expenseRecord.GetString("attachment_missing_reason")) != ""
 		hasSourceExpenseAttachment := strings.TrimSpace(expenseRecord.GetString("source_expense")) != ""
 		hasUploadedAttachment := len(expenseRecord.GetUnsavedFiles("attachment")) > 0
-		if !hasStoredAttachment && !hasDocumentAttachment && !hasMissingAttachmentReason && !hasSourceExpenseAttachment && !hasUploadedAttachment {
+		if !hasDocumentAttachment && !hasMissingAttachmentReason && !hasSourceExpenseAttachment && !hasUploadedAttachment {
 			return &errs.HookError{
 				Status:  http.StatusBadRequest,
 				Message: "hook error when validating expense",

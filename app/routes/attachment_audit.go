@@ -111,7 +111,6 @@ type attachmentAuditOrphanedRow struct {
 
 var (
 	attachmentAuditTargets = []attachmentAuditTarget{
-		{Key: "expenses_attachment", Label: "Expenses (legacy attachments)", Collection: "expenses", Field: "attachment"},
 		{Key: "expense_documents_attachment", Label: "Expense Documents", Collection: "expense_documents", Field: "attachment"},
 		{Key: "purchase_orders_attachment", Label: "Purchase Orders", Collection: "purchase_orders", Field: "attachment"},
 	}

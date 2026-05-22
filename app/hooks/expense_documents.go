@@ -1,10 +1,6 @@
 package hooks
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
-	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"tybalt/constants"
@@ -88,10 +84,6 @@ func resolveExpenseDocumentForSave(app core.App, e *core.RecordRequestEvent, att
 		return documentIDFromUploadedExpenseAttachment(app, e, attachmentHash, hasBookKeeperClaim, poBacked)
 	}
 
-	if expenseRecord.GetString("attachment") != "" && expenseRecord.GetString("attachment_document") == "" {
-		return migrateLegacyExpenseAttachmentToDocument(app, e, expenseRecord, e.Auth.Id, false)
-	}
-
 	if expenseRecord.IsNew() {
 		return "", nil
 	}
@@ -110,6 +102,17 @@ func resolveExpenseDocumentForSave(app core.App, e *core.RecordRequestEvent, att
 func applyResolvedExpenseDocument(expenseRecord *core.Record, documentID string) {
 	expenseRecord.Set("attachment_document", documentID)
 	if documentID != "" {
+		// `attachment` is a virtual expense-write input. It deliberately keeps
+		// the old field name at the HTTP/form boundary because callers are
+		// attaching a receipt to an expense, not managing document records by
+		// hand. Storage, identity, and duplicate protection now live on
+		// expense_documents.
+		//
+		// While the legacy columns still exist, PocketBase can otherwise persist
+		// the uploaded file back onto expenses. Clear both old fields before the
+		// expense save so the only durable link is attachment_document. When the
+		// columns are removed, these Set calls become harmless custom-key cleanup
+		// and can go away in the schema-removal pass.
 		expenseRecord.Set("attachment", "")
 		expenseRecord.Set("attachment_hash", "")
 	}
@@ -118,6 +121,7 @@ func applyResolvedExpenseDocument(expenseRecord *core.Record, documentID string)
 func clearExpenseDocumentForAttachmentlessType(expenseRecord *core.Record) {
 	if expensePaymentTypeSkipsAttachment(expenseRecord.GetString("payment_type")) {
 		expenseRecord.Set("attachment_document", "")
+		expenseRecord.Set("attachment", "")
 		expenseRecord.Set("attachment_hash", "")
 	}
 }
@@ -141,11 +145,7 @@ func documentIDFromUploadedExpenseAttachment(app core.App, e *core.RecordRequest
 		if err != nil {
 			return "", err
 		}
-		legacyDuplicate, err := legacyExpenseAttachmentHashExists(app, attachmentHash, e.Record.Id)
-		if err != nil {
-			return "", err
-		}
-		if !documentInUse && !legacyDuplicate {
+		if !documentInUse {
 			return existingDocument.Id, nil
 		}
 		if !hasBookKeeperClaim {
@@ -157,17 +157,10 @@ func documentIDFromUploadedExpenseAttachment(app core.App, e *core.RecordRequest
 		return existingDocument.Id, nil
 	}
 
-	legacyDuplicate, err := legacyExpenseAttachmentHashExists(app, attachmentHash, e.Record.Id)
-	if err != nil {
-		return "", err
-	}
-	if legacyDuplicate && !hasBookKeeperClaim {
-		return "", duplicateAttachmentError()
-	}
-	if legacyDuplicate && !poBacked {
-		return "", duplicateAttachmentPermissionError("purchase_order", "required", "purchase order is required to reuse an attachment")
-	}
-
+	// Read from the virtual expense "attachment" input. For the custom expense
+	// API this may be a raw "attachment:unsaved" value rather than a real
+	// expenses collection file field, which keeps the write path intact after
+	// the legacy file column is removed.
 	files := e.Record.GetUnsavedFiles("attachment")
 	if len(files) != 1 {
 		return "", &errs.HookError{
@@ -196,11 +189,7 @@ func documentIDFromSourceExpense(app core.App, e *core.RecordRequestEvent, sourc
 		return documentID, nil
 	}
 
-	if sourceExpense.GetString("attachment") == "" {
-		return "", duplicateAttachmentPermissionError("source_expense", "missing_attachment", "source expense has no attachment")
-	}
-
-	return migrateLegacyExpenseAttachmentToDocument(app, e, sourceExpense, e.Auth.Id, true)
+	return "", duplicateAttachmentPermissionError("source_expense", "missing_attachment", "source expense has no document-backed attachment")
 }
 
 func findVisibleExpenseForAttachmentReuse(app core.App, auth *core.Record, expenseID string) (*core.Record, error) {
@@ -245,82 +234,23 @@ func findVisibleExpenseForAttachmentReuse(app core.App, auth *core.Record, expen
 	return record, nil
 }
 
-func migrateLegacyExpenseAttachmentToDocument(app core.App, e *core.RecordRequestEvent, expenseRecord *core.Record, fallbackUploaderID string, saveExpenseLink bool) (string, error) {
-	filename := strings.TrimSpace(expenseRecord.GetString("attachment"))
-	if filename == "" {
-		return "", nil
-	}
-
-	attachmentHash := strings.TrimSpace(expenseRecord.GetString("attachment_hash"))
-	var fileBytes []byte
-	var err error
-	if attachmentHash == "" {
-		fileBytes, err = readExpenseFileBytes(app, expenseRecord.BaseFilesPath()+"/"+filename)
-		if err != nil {
-			return "", err
-		}
-		sum := sha256.Sum256(fileBytes)
-		attachmentHash = hex.EncodeToString(sum[:])
-	}
-
-	existingDocument, err := findExpenseDocumentByHash(app, attachmentHash)
-	if err != nil {
-		return "", err
-	}
-	if existingDocument != nil {
-		expenseRecord.Set("attachment_document", existingDocument.Id)
-		if saveExpenseLink {
-			if err := app.Save(expenseRecord); err != nil {
-				return "", err
-			}
-		}
-		return existingDocument.Id, nil
-	}
-
-	if fileBytes == nil {
-		fileBytes, err = readExpenseFileBytes(app, expenseRecord.BaseFilesPath()+"/"+filename)
-		if err != nil {
-			return "", err
-		}
-	}
-	file, err := filesystem.NewFileFromBytes(fileBytes, filename)
-	if err != nil {
-		return "", err
-	}
-
-	uploaderID := strings.TrimSpace(expenseRecord.GetString("creator"))
-	if uploaderID == "" {
-		uploaderID = strings.TrimSpace(expenseRecord.GetString("uid"))
-	}
-	if uploaderID == "" {
-		uploaderID = fallbackUploaderID
-	}
-
-	document, err := createExpenseDocument(app, e, file, attachmentHash, uploaderID)
-	if err != nil {
-		return "", err
-	}
-
-	expenseRecord.Set("attachment_document", document.Id)
-	if saveExpenseLink {
-		if err := app.Save(expenseRecord); err != nil {
-			return "", err
-		}
-	}
-	return document.Id, nil
-}
-
 func findExpenseDocumentByHash(app core.App, attachmentHash string) (*core.Record, error) {
 	if strings.TrimSpace(attachmentHash) == "" {
 		return nil, nil
 	}
-	record, err := app.FindFirstRecordByFilter(constants.ExpenseDocumentsCollectionName, "attachment_hash = {:hash}", dbx.Params{
+	var id string
+	err := app.DB().NewQuery(`
+		SELECT id
+		FROM expense_documents
+		WHERE attachment_hash = {:hash}
+		LIMIT 1
+	`).Bind(dbx.Params{
 		"hash": attachmentHash,
-	})
+	}).Row(&id)
 	if err != nil {
 		return nil, nil
 	}
-	return record, nil
+	return app.FindRecordById(constants.ExpenseDocumentsCollectionName, id)
 }
 
 func expenseDocumentReferencedByAnotherExpense(app core.App, documentID string, currentExpenseID string) (bool, error) {
@@ -342,20 +272,6 @@ func expenseDocumentReferencedByAnotherExpense(app core.App, documentID string, 
 		return false, err
 	}
 	return count > 0, nil
-}
-
-func legacyExpenseAttachmentHashExists(app core.App, attachmentHash string, currentExpenseID string) (bool, error) {
-	if strings.TrimSpace(attachmentHash) == "" {
-		return false, nil
-	}
-	record, err := app.FindFirstRecordByFilter("expenses", "attachment_hash = {:hash} && id != {:id}", dbx.Params{
-		"hash": attachmentHash,
-		"id":   currentExpenseID,
-	})
-	if err != nil {
-		return false, nil
-	}
-	return record != nil, nil
 }
 
 func createExpenseDocument(app core.App, e *core.RecordRequestEvent, file *filesystem.File, attachmentHash string, uploadedBy string) (*core.Record, error) {
@@ -421,28 +337,6 @@ func validateExpenseDocumentFile(file *filesystem.File) error {
 	}
 
 	return nil
-}
-
-func readExpenseFileBytes(app core.App, path string) ([]byte, error) {
-	fsys, err := app.NewFilesystem()
-	if err != nil {
-		return nil, err
-	}
-	defer fsys.Close()
-
-	reader, err := fsys.GetReader(path)
-	if err != nil {
-		return nil, &errs.HookError{
-			Status:  http.StatusInternalServerError,
-			Message: "failed to read legacy expense attachment",
-			Data: map[string]errs.CodeError{
-				"attachment": {Code: "legacy_attachment_read_failed", Message: fmt.Sprintf("failed to read legacy attachment: %v", err)},
-			},
-		}
-	}
-	defer reader.Close()
-
-	return io.ReadAll(reader)
 }
 
 func duplicateAttachmentError() error {

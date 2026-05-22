@@ -6,8 +6,8 @@
 WITH expenses_having_attachments AS (
 SELECT
   e.id,
-  CASE WHEN ed.id IS NOT NULL THEN 'pbc_2089657321' ELSE 'o1vpz1mm7qsfoyy' END AS collection_id,
-  CASE WHEN ed.id IS NOT NULL THEN ed.id ELSE e.id END AS attachment_record_id,
+  'pbc_2089657321' AS collection_id,
+  ed.id AS attachment_record_id,
   e.payment_type,
   p.surname,
   p.given_name,
@@ -16,15 +16,15 @@ SELECT
   substr('  JanFebMarAprMayJunJulAugSepOctNovDec', strftime('%m', e.date) * 3, 3) Month,
   SUBSTRING(e.date, 9, 2) Date,
   e.total,
-  COALESCE(ed.attachment, e.attachment) AS attachment,
-  COALESCE(ed.attachment_hash, e.attachment_hash) AS attachment_hash
+  ed.attachment AS attachment,
+  ed.attachment_hash AS attachment_hash
 FROM Expenses e
 LEFT JOIN admin_profiles ap ON ap.uid = e.uid
 LEFT JOIN profiles p ON p.uid = e.uid
 LEFT JOIN expense_documents ed ON e.attachment_document = ed.id
 WHERE e.{:date_column} = {:date_column_value}
 AND e.committed != ''
-AND COALESCE(ed.attachment, e.attachment) != ''
+AND ed.attachment != ''
 )
 
 SELECT 
