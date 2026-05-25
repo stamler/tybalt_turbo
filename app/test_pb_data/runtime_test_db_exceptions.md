@@ -73,7 +73,7 @@ These tests deliberately corrupt the app environment or inject downstream failur
 - [absorb_test.go](app/absorb_test.go)
   - renames `claims` to `claims_broken` in one unsupported/failure path
 - [routes/expense_attachment_hash_repair_test.go](app/routes/expense_attachment_hash_repair_test.go)
-  - rewrites `expenses.attachment_hash`, `expenses.attachment_missing_reason`, and `expense_documents.attachment_hash`
+  - rewrites `expenses.attachment_missing_reason` and `expense_documents.attachment_hash`
   - reason: verifies the admin attachment repair endpoints against deliberately corrupted or missing attachment state without seeding globally broken attachment rows
 
 ## 5. Mutation Is The Behavior Under Test

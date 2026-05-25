@@ -3,6 +3,7 @@
 package hooks
 
 import (
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
+	"github.com/pocketbase/pocketbase/tools/filesystem"
 )
 
 // The cleanExpense function is used to remove properties from the expense
@@ -761,10 +763,6 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	//     create or reuse the document row, link attachment_document, and clean up
 	//     the document upload if the final expense save fails.
 	//
-	// The custom /api/expenses route also stashes uploaded files under the raw
-	// "attachment:unsaved" key so this hook keeps working after the physical
-	// expenses.attachment file column is removed.
-	NormalizePendingFileNames(expenseRecord, "attachment")
 	requestInfo, requestInfoErr := e.RequestInfo()
 	if requestInfoErr != nil {
 		return &errs.HookError{
@@ -775,6 +773,16 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 			},
 		}
 	}
+	// Both the custom /api/expenses route and PocketBase's generic collection
+	// route carry the upload under request body field "attachment". Since that
+	// field is now virtual, RecordUpsert will not load it into a schema-backed
+	// file column for us. Stash it in the raw unsaved-file slot that PocketBase's
+	// file helpers already read, so the rest of the pipeline can remain identical
+	// to a normal file field without reintroducing durable legacy columns.
+	if err := loadVirtualExpenseAttachmentInput(expenseRecord, requestInfo.Body, e); err != nil {
+		return err
+	}
+	NormalizePendingFileNames(expenseRecord, "attachment")
 	if rawSourceExpenseID, ok := requestInfo.Body["source_expense"]; ok {
 		if sourceExpenseID := strings.TrimSpace(fmt.Sprint(rawSourceExpenseID)); sourceExpenseID != "" {
 			expenseRecord.Set("source_expense", sourceExpenseID)
@@ -798,8 +806,7 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 
 	// If the request carried a file in the virtual "attachment" input, hash it
 	// before validation finishes. The hash is used only to create/reuse the
-	// expense_documents row; it must not be treated as a value for the old
-	// expenses.attachment_hash column.
+	// expense_documents row.
 	attachmentHash, hashErr := CalculateFileFieldHash(e, "attachment")
 	if hashErr != nil {
 		return hashErr
@@ -899,15 +906,13 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 		expenseRecord.Set("attachment_missing_reason", "")
 	} else if explicitAttachmentRemoval {
 		expenseRecord.Set("attachment_document", "")
-		expenseRecord.Set("attachment", "")
-		expenseRecord.Set("attachment_hash", "")
 		expenseRecord.Set("attachment_missing_reason", "")
 	} else if hasAttachmentIntent {
 		documentID, err := resolveExpenseDocumentForSave(app, e, attachmentHash, hasBookKeeperClaim, poRecord != nil)
 		if err != nil {
 			return err
 		}
-		applyResolvedExpenseDocument(expenseRecord, documentID)
+		expenseRecord.Set("attachment_document", documentID)
 		expenseRecord.Set("attachment_missing_reason", "")
 	} else if !expenseRecord.IsNew() {
 		expenseRecord.Set("attachment_document", originalAttachmentDocument)
@@ -916,4 +921,45 @@ func ProcessExpense(app core.App, e *core.RecordRequestEvent) error {
 	}
 
 	return nil
+}
+
+func loadVirtualExpenseAttachmentInput(record *core.Record, body map[string]any, e *core.RecordRequestEvent) error {
+	raw, ok := body["attachment"]
+	files := []*filesystem.File(nil)
+	if ok {
+		files = expenseAttachmentFilesFromRequestValue(raw)
+	}
+
+	if len(files) == 0 && strings.HasPrefix(e.Request.Header.Get("content-type"), "multipart/form-data") {
+		uploaded, err := e.FindUploadedFiles("attachment")
+		if err != nil && !errors.Is(err, http.ErrMissingFile) {
+			return err
+		}
+		files = uploaded
+	}
+
+	if len(files) == 0 {
+		return nil
+	}
+	record.SetRaw("attachment:unsaved", files)
+	return nil
+}
+
+func expenseAttachmentFilesFromRequestValue(raw any) []*filesystem.File {
+	switch value := raw.(type) {
+	case *filesystem.File:
+		return []*filesystem.File{value}
+	case []*filesystem.File:
+		return value
+	case []any:
+		files := make([]*filesystem.File, 0, len(value))
+		for _, item := range value {
+			if file, ok := item.(*filesystem.File); ok {
+				files = append(files, file)
+			}
+		}
+		return files
+	default:
+		return nil
+	}
 }

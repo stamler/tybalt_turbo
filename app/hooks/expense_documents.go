@@ -99,30 +99,9 @@ func resolveExpenseDocumentForSave(app core.App, e *core.RecordRequestEvent, att
 	return original.GetString("attachment_document"), nil
 }
 
-func applyResolvedExpenseDocument(expenseRecord *core.Record, documentID string) {
-	expenseRecord.Set("attachment_document", documentID)
-	if documentID != "" {
-		// `attachment` is a virtual expense-write input. It deliberately keeps
-		// the old field name at the HTTP/form boundary because callers are
-		// attaching a receipt to an expense, not managing document records by
-		// hand. Storage, identity, and duplicate protection now live on
-		// expense_documents.
-		//
-		// While the legacy columns still exist, PocketBase can otherwise persist
-		// the uploaded file back onto expenses. Clear both old fields before the
-		// expense save so the only durable link is attachment_document. When the
-		// columns are removed, these Set calls become harmless custom-key cleanup
-		// and can go away in the schema-removal pass.
-		expenseRecord.Set("attachment", "")
-		expenseRecord.Set("attachment_hash", "")
-	}
-}
-
 func clearExpenseDocumentForAttachmentlessType(expenseRecord *core.Record) {
 	if expensePaymentTypeSkipsAttachment(expenseRecord.GetString("payment_type")) {
 		expenseRecord.Set("attachment_document", "")
-		expenseRecord.Set("attachment", "")
-		expenseRecord.Set("attachment_hash", "")
 	}
 }
 

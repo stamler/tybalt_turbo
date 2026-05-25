@@ -1,2 +1,3 @@
 attachment,attachment_hash,created,id,updated,uploaded_by
 existing-doc.pdf,2f5a8ae84c688675754280b67c7f218294e1b8a9b55fe59ff055cefc111cac47,2026-05-01 00:00:00.000Z,bfexistdoc00001,2026-05-01 00:00:00.000Z,4ssj9f1yg250o9y
+same-attachment.png,5a74a0db0da985edddf9fe8c09f10a6c8a68e7a5e34e8ab87c58ab214a4a2998,2024-09-01 00:00:00.000Z,sameattachdoc01,2024-09-01 00:00:00.000Z,rzr98oadsp9qc11

@@ -1175,16 +1175,6 @@
             "x-sqlite-type": "TEXT"
           },
           {
-            "name": "attachment",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
-            "name": "attachment_hash",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
             "name": "branch",
             "type": "string",
             "x-sqlite-type": "TEXT"
@@ -1331,6 +1321,11 @@
           },
           {
             "name": "vendor",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "attachment_document",
             "type": "string",
             "x-sqlite-type": "TEXT"
           }

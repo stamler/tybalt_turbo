@@ -724,8 +724,8 @@ deliberate `attachment_missing_reason`:
 `attachment_missing_reason` is the permanent audit marker for historical
 receipts that were supposed to exist but were already unrecoverable in the
 legacy system. It must be set only by an admin-only repair endpoint that clears
-the legacy attachment fields in a guarded transaction after the operator has
-verified the receipt cannot be recovered. These rows are not migrated to
+the document relation in a guarded transaction after the operator has verified
+the receipt cannot be recovered. These rows are not migrated to
 `expense_documents`, and Phase 3 should continue to display the missing reason
 instead of treating the expense as an ordinary attachmentless row.
 
@@ -796,7 +796,7 @@ Backend tests should cover:
 - backfill verify refuses bad or missing copies;
 - backfill apply skips already-linked rows and refuses mismatched links.
 - admin repair can mark an unrecoverable historical attachment missing while
-  preserving a text reason and clearing only the legacy attachment fields.
+  preserving a text reason and clearing the document relation.
 
 Frontend tests or manual checks should cover:
 

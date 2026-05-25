@@ -1263,7 +1263,7 @@ func TestExpenseDocumentsPhase1CreateAndReuse(t *testing.T) {
 		return created.ID
 	}
 
-	t.Run("new upload stores document and clears legacy columns", func(t *testing.T) {
+	t.Run("new upload stores document on expense_documents", func(t *testing.T) {
 		expenseID := createRegularExpense("document-first expense", []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x01})
 		expense, err := app.FindRecordById("expenses", expenseID)
 		if err != nil {
@@ -1272,9 +1272,6 @@ func TestExpenseDocumentsPhase1CreateAndReuse(t *testing.T) {
 		documentID := expense.GetString("attachment_document")
 		if documentID == "" {
 			t.Fatal("expected created expense to reference an expense_document")
-		}
-		if expense.GetString("attachment") != "" || expense.GetString("attachment_hash") != "" {
-			t.Fatalf("expected legacy attachment columns to be cleared, got attachment=%q hash=%q", expense.GetString("attachment"), expense.GetString("attachment_hash"))
 		}
 		document, err := app.FindRecordById(constants.ExpenseDocumentsCollectionName, documentID)
 		if err != nil {
@@ -2911,6 +2908,48 @@ func TestSeededExpensesNormalizePayPeriodEndingByCommitStatus(t *testing.T) {
 		if row.PayPeriodEnding == "" {
 			t.Fatalf("committed expense %s has blank pay_period_ending", row.ID)
 		}
+	}
+}
+
+func TestExpenseLegacyAttachmentColumnsRemoved(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	t.Cleanup(app.Cleanup)
+
+	collection, err := app.FindCollectionByNameOrId("expenses")
+	if err != nil {
+		t.Fatalf("failed to load expenses collection: %v", err)
+	}
+	if collection.Fields.GetByName("attachment") != nil {
+		t.Fatal("expenses collection still has legacy attachment field")
+	}
+	if collection.Fields.GetByName("attachment_hash") != nil {
+		t.Fatal("expenses collection still has legacy attachment_hash field")
+	}
+
+	var oldColumns int
+	if err := app.DB().NewQuery(`
+		SELECT COUNT(*)
+		FROM pragma_table_info('expenses')
+		WHERE name IN ('attachment', 'attachment_hash')
+	`).Row(&oldColumns); err != nil {
+		t.Fatalf("failed to inspect expenses table columns: %v", err)
+	}
+	if oldColumns != 0 {
+		t.Fatalf("expenses table has %d legacy attachment columns, want 0", oldColumns)
+	}
+
+	var oldIndexes int
+	if err := app.DB().NewQuery(`
+		SELECT COUNT(*)
+		FROM sqlite_master
+		WHERE type = 'index'
+		  AND tbl_name = 'expenses'
+		  AND name = 'idx_KqwTULTh3p'
+	`).Row(&oldIndexes); err != nil {
+		t.Fatalf("failed to inspect expenses indexes: %v", err)
+	}
+	if oldIndexes != 0 {
+		t.Fatalf("expenses table still has legacy attachment hash index")
 	}
 }
 
@@ -4696,7 +4735,10 @@ func TestExpensesUpdate_SameAttachmentSucceeds(t *testing.T) {
 	}
 
 	fileContent := []byte{0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x12, 0x34, 0x56, 0x78}
-	// The seeded expense fixture already has the same attachment hash as fileContent.
+	const sameAttachmentDocumentID = "sameattachdoc01"
+	// The seeded expense fixture links to an expense_documents row whose hash
+	// matches fileContent, preserving the same-file update coverage without
+	// creating test-only rows in code.
 	scenario := tests.ApiScenario{
 		Name:           "updating expense with its own attachment succeeds",
 		Method:         http.MethodPatch,
@@ -4704,6 +4746,7 @@ func TestExpensesUpdate_SameAttachmentSucceeds(t *testing.T) {
 		ExpectedStatus: 200,
 		ExpectedContent: []string{
 			`"description":"updated description"`,
+			`"attachment_document":"` + sameAttachmentDocumentID + `"`,
 		},
 		ExpectedEvents: map[string]int{
 			"OnRecordUpdate": 1,

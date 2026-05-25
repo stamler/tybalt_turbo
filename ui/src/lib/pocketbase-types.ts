@@ -399,9 +399,7 @@ export type ExpensesRecord = {
   allowance_types: ExpensesAllowanceTypesOptions[];
   approved: IsoDateString;
   approver: RecordIdString;
-  attachment: string;
   attachment_document: RecordIdString;
-  attachment_hash: string;
   attachment_missing_reason: string;
   branch: RecordIdString;
   category: RecordIdString;
