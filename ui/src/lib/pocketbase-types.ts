@@ -640,11 +640,21 @@ export enum ProfilesNotificationTypeOptions {
   "email_text" = "email_text",
   "email_html" = "email_html",
 }
+export enum ProfilesDefaultExpensePaymentTypeOptions {
+  "OnAccount" = "OnAccount",
+  "Expense" = "Expense",
+  "CorporateCreditCard" = "CorporateCreditCard",
+  "Allowance" = "Allowance",
+  "FuelCard" = "FuelCard",
+  "Mileage" = "Mileage",
+  "PersonalReimbursement" = "PersonalReimbursement",
+}
 export type ProfilesRecord = {
   _imported: boolean;
   alternate_manager: RecordIdString;
   created: IsoDateString;
   default_division: RecordIdString;
+  default_expense_payment_type: ProfilesDefaultExpensePaymentTypeOptions;
   default_role: RecordIdString;
   do_not_accept_submissions: boolean;
   given_name: string;

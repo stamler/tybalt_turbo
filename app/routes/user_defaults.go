@@ -11,6 +11,7 @@ type userDefaultsResponse struct {
 	DefaultDivision            string `json:"default_division" db:"default_division"`
 	DefaultRole                string `json:"default_role" db:"default_role"`
 	DefaultBranch              string `json:"default_branch" db:"default_branch"`
+	DefaultExpensePaymentType  string `json:"default_expense_payment_type" db:"default_expense_payment_type"`
 	AllowPersonalReimbursement bool   `json:"allow_personal_reimbursement" db:"allow_personal_reimbursement"`
 }
 
@@ -23,6 +24,7 @@ func createGetUserDefaultsHandler(app core.App) func(e *core.RequestEvent) error
 			SELECT
 				COALESCE(p.default_division, '') AS default_division,
 				COALESCE(p.default_role, '') AS default_role,
+				COALESCE(p.default_expense_payment_type, '') AS default_expense_payment_type,
 				COALESCE(ap.default_branch, '') AS default_branch,
 				COALESCE(ap.allow_personal_reimbursement, 0) AS allow_personal_reimbursement
 			FROM users u

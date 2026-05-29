@@ -4,7 +4,10 @@
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { globalStore } from "$lib/stores/global";
-  import type { ProfilesResponse } from "$lib/pocketbase-types";
+  import {
+    ProfilesDefaultExpensePaymentTypeOptions,
+    type ProfilesResponse,
+  } from "$lib/pocketbase-types";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import { authStore } from "$lib/stores/auth";
   import DSAutoComplete from "$lib/components/DSAutoComplete.svelte";
@@ -12,7 +15,9 @@
   import { managers } from "$lib/stores/managers";
   import { rateRoles } from "$lib/stores/rateRoles";
   import DsCheck from "$lib/components/DsCheck.svelte";
+  import DsSelector from "$lib/components/DSSelector.svelte";
   import { untrack } from "svelte";
+  import { defaultableExpensePaymentTypeOptions } from "$lib/expensePaymentTypes";
 
   // initialize the stores, noop if already initialized
   divisions.init();
@@ -24,10 +29,23 @@
   let item = $state(untrack(() => data.item as ProfilesResponse));
   let saving = $state(false);
   let saveSuccess = $state(false);
+  const paymentTypeOptions = $derived.by(() =>
+    defaultableExpensePaymentTypeOptions($globalStore.allow_personal_reimbursement.value),
+  );
 
   // Sync item with data.item when it changes (e.g., when navigating to different profiles)
   $effect(() => {
     item = data.item as ProfilesResponse;
+  });
+
+  $effect(() => {
+    if (
+      !$globalStore.allow_personal_reimbursement.value &&
+      item.default_expense_payment_type ===
+        ProfilesDefaultExpensePaymentTypeOptions.PersonalReimbursement
+    ) {
+      item.default_expense_payment_type = "" as ProfilesResponse["default_expense_payment_type"];
+    }
   });
 
   async function save() {
@@ -52,6 +70,9 @@
 
       // Show success feedback briefly
       saveSuccess = true;
+      if (item.uid === $authStore?.model?.id) {
+        globalStore.setDefaultExpensePaymentType(item.default_expense_payment_type ?? "");
+      }
       setTimeout(() => {
         saveSuccess = false;
       }, 2000);
@@ -113,6 +134,18 @@
       {#snippet resultTemplate(item)}{item.name}{/snippet}
     </DSAutoComplete>
   {/if}
+  <DsSelector
+    bind:value={item.default_expense_payment_type as string}
+    items={paymentTypeOptions}
+    {errors}
+    fieldName="default_expense_payment_type"
+    uiName="Default Expense Payment Type"
+    clear={true}
+  >
+    {#snippet optionTemplate(item)}
+      {item.name}
+    {/snippet}
+  </DsSelector>
   <DsCheck
     bind:value={item.do_not_accept_submissions as boolean}
     {errors}

@@ -48,6 +48,7 @@ interface StoreState {
     default_division: string;
     default_role: string;
     default_branch: string;
+    default_expense_payment_type: string;
     maxAge: number;
     lastRefresh: Date;
   };
@@ -65,6 +66,7 @@ const createStore = () => {
     default_division: string;
     default_role: string;
     default_branch: string;
+    default_expense_payment_type: string;
     allow_personal_reimbursement: boolean;
   };
   type MaybeAbortError = Partial<ClientResponseError> & {
@@ -121,6 +123,7 @@ const createStore = () => {
       default_division: "",
       default_role: "",
       default_branch: "",
+      default_expense_payment_type: "",
       maxAge: 3600 * 1000,
       lastRefresh: new Date(0),
     },
@@ -151,8 +154,7 @@ const createStore = () => {
           }),
         ]);
 
-        const summaryResponse =
-          summaryResult.status === "fulfilled" ? summaryResult.value : null;
+        const summaryResponse = summaryResult.status === "fulfilled" ? summaryResult.value : null;
         const claimIds =
           claimIdsResult.status === "fulfilled"
             ? claimIdsResult.value.map((claim) => claim.cid)
@@ -280,6 +282,7 @@ const createStore = () => {
               default_division: defaults.default_division ?? "",
               default_role: defaults.default_role ?? "",
               default_branch: defaults.default_branch ?? "",
+              default_expense_payment_type: defaults.default_expense_payment_type ?? "",
               maxAge: state.profile.maxAge,
               lastRefresh: new Date(),
             },
@@ -317,6 +320,7 @@ const createStore = () => {
             default_division: "",
             default_role: "",
             default_branch: "",
+            default_expense_payment_type: "",
             maxAge: state.profile.maxAge,
             lastRefresh: new Date(0),
           },
@@ -385,12 +389,24 @@ const createStore = () => {
     });
   };
 
+  const setDefaultExpensePaymentType = (paymentType: string) => {
+    update((state) => ({
+      ...state,
+      profile: {
+        ...state.profile,
+        default_expense_payment_type: paymentType,
+        lastRefresh: new Date(),
+      },
+    }));
+  };
+
   return {
     subscribe,
     refresh,
     addError,
     dismissError,
     toggleShowAllUi,
+    setDefaultExpensePaymentType,
   };
 };
 
@@ -410,6 +426,7 @@ const wrappedStore: Readable<StoreState> & {
   addError: typeof _globalStore.addError;
   dismissError: typeof _globalStore.dismissError;
   toggleShowAllUi: typeof _globalStore.toggleShowAllUi;
+  setDefaultExpensePaymentType: typeof _globalStore.setDefaultExpensePaymentType;
 } = {
   subscribe: (run: Subscriber<StoreState>, invalidate?: () => void) => {
     return _globalStore.subscribe(
@@ -421,6 +438,7 @@ const wrappedStore: Readable<StoreState> & {
   addError: _globalStore.addError,
   dismissError: _globalStore.dismissError,
   toggleShowAllUi: _globalStore.toggleShowAllUi,
+  setDefaultExpensePaymentType: _globalStore.setDefaultExpensePaymentType,
 };
 
 export const globalStore = wrappedStore;

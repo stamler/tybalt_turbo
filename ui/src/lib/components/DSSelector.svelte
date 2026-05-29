@@ -19,6 +19,7 @@
     uiName,
     clear = false,
     optionTemplate,
+    trailing,
     disabled = false,
   }: {
     value: string | number;
@@ -28,6 +29,7 @@
     uiName: string;
     clear?: boolean;
     optionTemplate: Snippet<[T]>;
+    trailing?: Snippet<[]>;
     disabled?: boolean;
   } = $props();
 
@@ -50,6 +52,9 @@
         <option value={item.id}>{@render optionTemplate(item)}</option>
       {/each}
     </select>
+    {#if trailing !== undefined}
+      {@render trailing()}
+    {/if}
     {#if clear === true && value !== undefined && value !== "" && !disabled}
       <DsActionButton action={clearValue} title="Clear">Clear</DsActionButton>
     {/if}

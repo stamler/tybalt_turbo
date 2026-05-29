@@ -6,6 +6,7 @@ import (
 	"testing"
 	"tybalt/internal/testutils"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -32,6 +33,94 @@ func TestProfilesUpdate_DefaultDivisionInactiveFails(t *testing.T) {
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestProfilesUpdate_DefaultExpensePaymentTypeValidation(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "updating default_expense_payment_type succeeds for valid expense type",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/profiles/records/np26uewnzy56pq7",
+			Body: strings.NewReader(`{
+				"default_expense_payment_type": "Expense"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"default_expense_payment_type":"Expense"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdateRequest":      1,
+				"OnRecordUpdate":             1,
+				"OnRecordUpdateExecute":      1,
+				"OnRecordAfterUpdateSuccess": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "updating default_expense_payment_type fails for invalid expense type",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/profiles/records/np26uewnzy56pq7",
+			Body: strings.NewReader(`{
+				"default_expense_payment_type": "NotARealPaymentType"
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 400,
+			ExpectedContent: []string{
+				`"default_expense_payment_type"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdateRequest": 1,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
+
+func TestUsersDefaultsIncludesDefaultExpensePaymentType(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "user defaults include profile default_expense_payment_type",
+			Method: http.MethodGet,
+			URL:    "/api/users/defaults",
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, e *core.ServeEvent) {
+				t.Helper()
+
+				profile, err := app.FindRecordById("profiles", "np26uewnzy56pq7")
+				if err != nil {
+					t.Fatal(err)
+				}
+				profile.Set("default_expense_payment_type", "Expense")
+				if err := app.Save(profile); err != nil {
+					t.Fatal(err)
+				}
+			},
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"default_expense_payment_type":"Expense"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

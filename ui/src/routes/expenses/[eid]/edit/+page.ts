@@ -29,11 +29,14 @@ export const load: PageLoad<ExpensesPageData> = async ({ params }) => {
       expand: "purchase_order,attachment_document",
     });
     try {
-      const details = await pb.send<ExpensesAugmentedResponse>(`/api/expenses/details/${params.eid}`, {
-        method: "GET",
-      });
+      const details = await pb.send<ExpensesAugmentedResponse>(
+        `/api/expenses/details/${params.eid}`,
+        {
+          method: "GET",
+        },
+      );
       if (details.attachment) {
-        item.attachment = details.attachment;
+        (item as ExpensesResponse & { attachment?: string }).attachment = details.attachment;
       }
     } catch (error) {
       console.warn(`error loading expense attachment metadata: ${error}`);

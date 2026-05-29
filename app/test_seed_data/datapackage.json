@@ -1884,6 +1884,11 @@
             "x-sqlite-type": "TEXT"
           },
           {
+            "name": "default_expense_payment_type",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
             "name": "default_role",
             "type": "string",
             "x-sqlite-type": "TEXT"

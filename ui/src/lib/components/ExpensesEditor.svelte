@@ -29,8 +29,9 @@
     CategoriesResponse,
     ExpensesAllowanceTypesOptions,
     ExpensesRecord,
+    ProfilesResponse,
   } from "$lib/pocketbase-types";
-  import { isExpensesResponse } from "$lib/pocketbase-types";
+  import { ExpensesPaymentTypeOptions, isExpensesResponse } from "$lib/pocketbase-types";
   import DsActionButton from "./DSActionButton.svelte";
   import CumulativePOOverflowModal from "./CumulativePOOverflowModal.svelte";
   import VendorSelector from "./VendorSelector.svelte";
@@ -39,6 +40,11 @@
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
+  import {
+    defaultableExpensePaymentTypeOptions,
+    isExpensePaymentType,
+    selectableExpensePaymentTypeOptions,
+  } from "$lib/expensePaymentTypes";
 
   // initialize the stores, noop if already initialized
   jobs.init();
@@ -55,7 +61,6 @@
     | "description"
     | "total"
     | "payment_type"
-    | "attachment"
     | "job"
     | "category"
     | "kind"
@@ -66,18 +71,21 @@
     | "settled_total"
     | "purchase_order"
     | "vendor"
-  >;
+  > & {
+    attachment?: string | File;
+  };
   type ExpenseSavePayload = Partial<Omit<EditableExpenseFields, "attachment">> & {
     attachment?: string | File;
     source_expense?: string;
   };
 
   let errors = $state({} as Record<string, { message: string; code?: string }>);
-  let item = $state(untrack(() => data.item));
+  let item = $state(untrack(() => data.item as EditableExpenseFields & typeof data.item));
   const dateInputMax = dateInputMaxMonthsAhead(15);
   let overflowModal: CumulativePOOverflowModal;
 
   let categories = $state([] as CategoriesResponse[]);
+  let defaultPaymentTypeApplied = $state(false);
   const syncCategoriesForJob = createJobCategoriesSync((rows) => {
     categories = rows;
   });
@@ -132,7 +140,9 @@
   const existingAttachmentHref = $derived.by(() =>
     data.editing && data.id !== null && item.attachment ? expenseAttachmentHref(data.id) : "",
   );
-  const selectedCurrency = $derived.by(() => $currencies.items.find((row) => row.id === item.currency));
+  const selectedCurrency = $derived.by(() =>
+    $currencies.items.find((row) => row.id === item.currency),
+  );
   const selectedCurrencyCode = $derived.by(() => selectedCurrency?.code ?? "CAD");
   const homeCurrency = $derived.by(() => $currencies.items.find((row) => row.code === "CAD"));
   const fixedHomePaymentType = $derived.by(
@@ -178,7 +188,11 @@
     return item.uid;
   });
   const isEditingAnotherUsersExpense = $derived.by(
-    () => data.editing && authUserID !== "" && effectiveOwnerID !== "" && effectiveOwnerID !== authUserID,
+    () =>
+      data.editing &&
+      authUserID !== "" &&
+      effectiveOwnerID !== "" &&
+      effectiveOwnerID !== authUserID,
   );
   const isEligibleBookkeeperOnBehalfCreate = $derived.by(
     () =>
@@ -191,24 +205,32 @@
       (item.payment_type === "OnAccount" || item.payment_type === "CorporateCreditCard"),
   );
 
-  const allPaymentTypes = [
-    { id: "OnAccount", name: "On Account" },
-    { id: "Expense", name: "Expense" },
-    { id: "CorporateCreditCard", name: "Corporate Credit Card" },
-    { id: "Allowance", name: "Allowance" },
-    { id: "FuelCard", name: "Fuel Card" },
-    { id: "Mileage", name: "Mileage" },
-    { id: "PersonalReimbursement", name: "Personal Reimbursement" },
-  ];
   const paymentTypeOptions = $derived.by(() => {
-    if (
-      $globalStore.allow_personal_reimbursement.value ||
-      item.payment_type === "PersonalReimbursement"
-    ) {
-      return allPaymentTypes;
-    }
-    return allPaymentTypes.filter((t) => t.id !== "PersonalReimbursement");
+    return selectableExpensePaymentTypeOptions(
+      $globalStore.allow_personal_reimbursement.value,
+      item.payment_type,
+    );
   });
+  const defaultablePaymentTypeOptions = $derived.by(() =>
+    defaultableExpensePaymentTypeOptions($globalStore.allow_personal_reimbursement.value),
+  );
+  const defaultExpensePaymentType = $derived(
+    $globalStore.profile.default_expense_payment_type ?? "",
+  );
+  const selectedPaymentTypeIsPinned = $derived(
+    defaultExpensePaymentType !== "" && defaultExpensePaymentType === item.payment_type,
+  );
+  const paymentTypePinTitle = $derived(
+    selectedPaymentTypeIsPinned
+      ? "This is your default payment type"
+      : "Use this payment type by default for new expenses",
+  );
+  const showPaymentTypePin = $derived(
+    authUserID !== "" &&
+      !isEditingAnotherUsersExpense &&
+      isExpensePaymentType(item.payment_type) &&
+      defaultablePaymentTypeOptions.some((option) => option.id === item.payment_type),
+  );
 
   // create a local state object to hold the allowance types
   const allowanceTypes = $state({
@@ -225,6 +247,25 @@
 
   // Default division from caller's profile if creating and empty
   $effect(() => applyDefaultDivisionOnce(item, data.editing));
+
+  $effect(() => {
+    if (data.editing || defaultPaymentTypeApplied || item.purchase_order !== "") {
+      return;
+    }
+    if (!isExpensePaymentType(defaultExpensePaymentType)) {
+      return;
+    }
+    defaultPaymentTypeApplied = true;
+    if (item.payment_type !== ExpensesPaymentTypeOptions.OnAccount) {
+      return;
+    }
+    if (!defaultablePaymentTypeOptions.some((option) => option.id === defaultExpensePaymentType)) {
+      return;
+    }
+
+    item.payment_type = defaultExpensePaymentType;
+    defaultPaymentTypeApplied = true;
+  });
 
   $effect(() => {
     if (item.purchase_order !== "") {
@@ -350,6 +391,41 @@
       }
     }
   }
+
+  async function pinCurrentPaymentType() {
+    if (!isExpensePaymentType(item.payment_type) || authUserID === "") {
+      return;
+    }
+
+    try {
+      const profile = await pb
+        .collection("profiles")
+        .getFirstListItem<ProfilesResponse>(pb.filter("uid={:uid}", { uid: authUserID }), {
+          requestKey: null,
+        });
+      await pb.collection("profiles").update(
+        profile.id,
+        {
+          default_expense_payment_type: item.payment_type,
+        },
+        { requestKey: null },
+      );
+      globalStore.setDefaultExpensePaymentType(item.payment_type);
+      if (errors.global?.code === "default_payment_type_save_failed") {
+        const remainingErrors = { ...errors };
+        delete remainingErrors.global;
+        errors = remainingErrors;
+      }
+    } catch {
+      errors = {
+        ...errors,
+        global: {
+          code: "default_payment_type_save_failed",
+          message: "Could not save your default payment type.",
+        },
+      };
+    }
+  }
 </script>
 
 <CumulativePOOverflowModal bind:this={overflowModal} />
@@ -453,6 +529,16 @@
   >
     {#snippet optionTemplate(item)}
       {item.name}
+    {/snippet}
+    {#snippet trailing()}
+      {#if showPaymentTypePin}
+        <DsActionButton
+          action={pinCurrentPaymentType}
+          icon={selectedPaymentTypeIsPinned ? "mdi:pin" : "mdi:pin-outline"}
+          title={paymentTypePinTitle}
+          color={selectedPaymentTypeIsPinned ? "green" : "yellow"}
+        />
+      {/if}
     {/snippet}
   </DsSelector>
 
