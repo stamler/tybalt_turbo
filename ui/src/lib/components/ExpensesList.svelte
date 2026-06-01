@@ -10,6 +10,7 @@
   import { globalStore } from "$lib/stores/global";
   import {
     formatCurrencyAmount,
+    formatJobLabel,
     openExpenseAttachment,
     shortDate,
     trimmedOrEmpty,
@@ -256,8 +257,7 @@
   }: ExpensesAugmentedResponse)}
     {#if job !== ""}
       <span class="flex items-center gap-1">
-        {job_number} - {client_name}:
-        {job_description}
+        {formatJobLabel({ job_number, client_name, job_description })}
         {#if category !== undefined && category_name}
           <DsLabel color="teal">{category_name}</DsLabel>
         {/if}

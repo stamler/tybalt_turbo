@@ -7,7 +7,12 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
-  import { formatCurrencyAmount, openExpenseAttachment, shortDate } from "$lib/utilities";
+  import {
+    formatCurrencyAmount,
+    formatJobLabel,
+    openExpenseAttachment,
+    shortDate,
+  } from "$lib/utilities";
   import type { PageData } from "./$types";
   import { untrack } from "svelte";
 
@@ -85,17 +90,18 @@
       {/if}
       {#if r.job_number !== ""}
         &nbsp;&middot;&nbsp;
-        {r.job_number}
-        {r.job_description}
-        {#if r.client_name}
-          &nbsp;/ {r.client_name}
-        {/if}
+        {formatJobLabel(r)}
       {/if}
     </div>
   {/snippet}
   {#snippet line3(r: ExpenseCommitQueueRow)}
     <div class="flex items-center gap-2 text-xs text-neutral-600">
-      <span>Date: {shortDate(r.date, true)} · Total: {formatCurrencyAmount(r.total, r.currency_code)}</span>
+      <span
+        >Date: {shortDate(r.date, true)} · Total: {formatCurrencyAmount(
+          r.total,
+          r.currency_code,
+        )}</span
+      >
       {#if r.currency_code !== "CAD"}
         <span>
           Settled CAD: {formatCurrencyAmount(r.settled_total, "CAD")}{#if r.settler_name}

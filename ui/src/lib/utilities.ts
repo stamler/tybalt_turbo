@@ -17,6 +17,42 @@ export const DATE_INPUT_MIN = "2024-06-01";
 export const PAYROLL_OPENING_DATE_EPOCH = "2025-03-02";
 export const PAYROLL_OPENING_DATE_INTERVAL_DAYS = 14;
 
+type JobLabelSource = {
+  id?: string | number | null;
+  number?: string | number | null;
+  job_number?: string | number | null;
+  client?: string | null;
+  client_name?: string | null;
+  description?: string | null;
+  job_description?: string | null;
+};
+
+function cleanLabelPart(value: string | number | null | undefined): string {
+  if (value === null || value === undefined) return "";
+  return String(value).trim();
+}
+
+export function formatJobLabel(job: JobLabelSource | null | undefined): string {
+  if (!job) return "";
+
+  const number = cleanLabelPart(job.number ?? job.job_number);
+  const id = cleanLabelPart(job.id);
+  const client = cleanLabelPart(job.client ?? job.client_name);
+  const description = cleanLabelPart(job.description ?? job.job_description);
+  const displayNumber = number || id;
+
+  if (displayNumber && client && description) {
+    return `${displayNumber} - ${client}: ${description}`;
+  }
+  if (displayNumber && description) {
+    return `${displayNumber} - ${description}`;
+  }
+  if (displayNumber && client) {
+    return `${displayNumber} - ${client}`;
+  }
+  return displayNumber || description || client;
+}
+
 function parseIsoDate(value: string): Date {
   const [year, month, day] = value.split("-").map(Number);
   return new Date(Date.UTC(year, (month ?? 1) - 1, day ?? 1));

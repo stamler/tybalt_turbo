@@ -4,6 +4,7 @@
     applyDefaultDivisionOnce,
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
+    formatJobLabel,
   } from "$lib/utilities";
   import Icon from "@iconify/svelte";
   import { jobs } from "$lib/stores/jobs";
@@ -277,7 +278,9 @@
   const approversUnavailableMessage =
     "Could not load approver eligibility. Resolve the error and try again.";
   const nonOwnerEditMessage = "You can view this purchase order, but only its creator can edit it.";
-  const selectedCurrency = $derived.by(() => $currencies.items.find((row) => row.id === item.currency));
+  const selectedCurrency = $derived.by(() =>
+    $currencies.items.find((row) => row.id === item.currency),
+  );
   const currencySelectionDisabled = $derived.by(() => isChildPO || legacyMode);
   const isEditingAnotherUsersPO = $derived.by(
     () =>
@@ -1213,7 +1216,7 @@
         uiName="Job"
         disabled={isChildPO}
       >
-        {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+        {#snippet resultTemplate(item)}{formatJobLabel(item)}{/snippet}
       </DsAutoComplete>
     {/if}
 

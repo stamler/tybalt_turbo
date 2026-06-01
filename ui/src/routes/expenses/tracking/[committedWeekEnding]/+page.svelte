@@ -3,7 +3,7 @@
   import { globalStore } from "$lib/stores/global";
   import DsList from "$lib/components/DSList.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
-  import { openExpenseAttachment, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { formatJobLabel, openExpenseAttachment, shortDate, trimmedOrEmpty } from "$lib/utilities";
   import Icon from "@iconify/svelte";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
   import { page } from "$app/stores";
@@ -135,8 +135,7 @@
   {#snippet line2(r: GroupedRow)}
     {#if r.job_number !== ""}
       <span class="flex items-center gap-1">
-        {r.job_number} - {r.client_name}:
-        {r.job_description}
+        {formatJobLabel(r)}
         {#if r.category !== "" && r.category_name}
           <DsLabel color="teal">{r.category_name}</DsLabel>
         {/if}

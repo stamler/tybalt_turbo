@@ -1,6 +1,7 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
+  import { formatJobLabel } from "$lib/utilities";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsAutocomplete from "$lib/components/DSAutoComplete.svelte";
   import type { ClientNote, NoteJobOption } from "$lib/types/notes";
@@ -46,7 +47,11 @@
 
   // Clear selectedJob if it's no longer in the jobs list
   $effect(() => {
-    if (selectedJob && selectedJob !== preselectedJobId && !jobs.some((job) => job.id === selectedJob)) {
+    if (
+      selectedJob &&
+      selectedJob !== preselectedJobId &&
+      !jobs.some((job) => job.id === selectedJob)
+    ) {
       selectedJob = "";
     }
   });
@@ -69,7 +74,7 @@
   const jobLabel = (job: Partial<NoteJobOption> | undefined) => {
     const resolved = resolveJob(job);
     if (!resolved) return "";
-    return resolved.number ? `${resolved.number} — ${resolved.description}` : resolved.description;
+    return formatJobLabel(resolved);
   };
 
   function resetForm() {

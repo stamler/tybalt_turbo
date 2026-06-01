@@ -6,6 +6,7 @@
     applyDefaultRoleOnce,
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
+    formatJobLabel,
   } from "$lib/utilities";
   import { divisions } from "$lib/stores/divisions";
   import { jobs } from "$lib/stores/jobs";
@@ -503,7 +504,7 @@
         fieldName="job"
         uiName="Job"
       >
-        {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+        {#snippet resultTemplate(item)}{formatJobLabel(item)}{/snippet}
       </DsAutoComplete>
     {/if}
     {#if item.job && item.job !== "" && associatedJobDivisionCodes.length > 0}

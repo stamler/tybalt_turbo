@@ -4,6 +4,7 @@
     applyDefaultDivisionOnce,
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
+    formatJobLabel,
   } from "$lib/utilities";
   import { jobs } from "$lib/stores/jobs";
   import { branches as branchesStore } from "$lib/stores/branches";
@@ -241,7 +242,7 @@
         fieldName="job"
         uiName="Job"
       >
-        {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+        {#snippet resultTemplate(item)}{formatJobLabel(item)}{/snippet}
       </DsAutoComplete>
     {/if}
   {/if}

@@ -7,7 +7,7 @@
   import type { PageData } from "./$types";
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
-  import { shortDate } from "$lib/utilities";
+  import { formatJobLabel, shortDate } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
   import { onMount, onDestroy, untrack } from "svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
@@ -418,7 +418,10 @@
       {#snippet line1({ expand, job }: TimeEntriesResponse)}
         {#if expand?.time_type !== undefined && ["R", "RT"].includes(expand.time_type.code) && job !== ""}
           <span class="flex items-center gap-1">
-            {expand?.job.number} - {expand?.job.description}
+            {formatJobLabel({
+              number: expand?.job.number,
+              description: expand?.job.description,
+            })}
             {#if expand?.category !== undefined}
               <DsLabel color="teal">{expand?.category.name}</DsLabel>
             {/if}

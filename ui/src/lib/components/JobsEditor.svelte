@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { dateInputMaxMonthsAhead, fetchClientContacts } from "$lib/utilities";
+  import { dateInputMaxMonthsAhead, fetchClientContacts, formatJobLabel } from "$lib/utilities";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
@@ -161,17 +161,6 @@
     { id: "PO", name: "PO" },
     { id: "PA", name: "PA" },
   ];
-
-  function jobLabel(job: Pick<JobApiResponse, "id" | "number" | "description">) {
-    const numberPart = job.number?.trim();
-    const descriptionPart = job.description?.trim();
-
-    const displayNumber = numberPart && numberPart.length > 0 ? numberPart : job.id;
-    const displayDescription =
-      descriptionPart && descriptionPart.length > 0 ? ` — ${descriptionPart}` : "";
-
-    return `${displayNumber}${displayDescription}`;
-  }
 
   // Filter functions for autocomplete - applied to search results, not indices
   const proposalFilter = (job: JobApiResponse) => job.number?.startsWith("P") ?? false;
@@ -1128,9 +1117,7 @@
         fieldName="proposal"
         uiName="Proposal"
       >
-        {#snippet resultTemplate(job)}{jobLabel(
-            job as unknown as Pick<JobApiResponse, "id" | "number" | "description">,
-          )}{/snippet}
+        {#snippet resultTemplate(job)}{formatJobLabel(job)}{/snippet}
       </DsAutoComplete>
     {/if}
     {#if errors.proposal !== undefined && (errors.proposal as { message: string; proposalId?: string }).proposalId}

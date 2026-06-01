@@ -5,6 +5,7 @@
     createJobCategoriesSync,
     dateInputMaxMonthsAhead,
     expenseAttachmentHref,
+    formatJobLabel,
     formatCurrencyAmount,
     indicativeCadAmount,
     openExpenseAttachment,
@@ -562,7 +563,7 @@
           item.payment_type === "PersonalReimbursement"
         )}
     >
-      {#snippet resultTemplate(item)}{item.number} - {item.description}{/snippet}
+      {#snippet resultTemplate(item)}{formatJobLabel(item)}{/snippet}
     </DsAutoComplete>
   {/if}
 

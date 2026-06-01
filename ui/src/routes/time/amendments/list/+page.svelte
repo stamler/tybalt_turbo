@@ -3,6 +3,7 @@
   import DsLabel from "$lib/components/DsLabel.svelte";
   import type { PageData } from "./$types";
   import type { TimeAmendmentsAugmentedResponse } from "$lib/pocketbase-types";
+  import { formatJobLabel } from "$lib/utilities";
   import { untrack } from "svelte";
 
   let { data }: { data: PageData } = $props();
@@ -50,7 +51,7 @@
 }: TimeAmendmentsAugmentedResponse)}
   {#if time_type_code !== undefined && ["R", "RT"].includes(time_type_code) && job_number !== ""}
     <span class="flex items-center gap-1">
-      {job_number} - {job_description}
+      {formatJobLabel({ job_number, job_description })}
       {#if category !== "" && category_name}
         <DsLabel color="teal">{category_name}</DsLabel>
       {/if}

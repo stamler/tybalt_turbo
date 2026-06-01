@@ -9,7 +9,7 @@
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { goto } from "$app/navigation";
-  import { calculateTally } from "$lib/utilities";
+  import { calculateTally, formatJobLabel } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
   import { onMount, onDestroy, untrack } from "svelte";
   import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
@@ -43,7 +43,9 @@
             items = [e.record, ...items].sort((a, b) => b.date.localeCompare(a.date));
             break;
           case "update":
-            items = items.map((item) => (item.id === e.record.id ? e.record : item)).sort((a, b) => b.date.localeCompare(a.date));
+            items = items
+              .map((item) => (item.id === e.record.id ? e.record : item))
+              .sort((a, b) => b.date.localeCompare(a.date));
             break;
           case "delete":
             items = items.filter((item) => item.id !== e.record.id);
@@ -124,7 +126,10 @@
 {#snippet line1({ expand, job }: TimeEntriesResponse)}
   {#if expand?.time_type !== undefined && ["R", "RT"].includes(expand.time_type.code) && job !== ""}
     <span class="flex items-center gap-1">
-      {expand?.job.number} - {expand?.job.description}
+      {formatJobLabel({
+        number: expand?.job.number,
+        description: expand?.job.description,
+      })}
       {#if expand?.category !== undefined}
         <DsLabel color="teal">{expand?.category.name}</DsLabel>
       {/if}

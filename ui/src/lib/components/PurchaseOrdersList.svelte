@@ -16,6 +16,7 @@
   import { authStore } from "$lib/stores/auth";
   import {
     formatCurrencyAmount,
+    formatJobLabel,
     pocketBaseFileHref,
     shortDate,
     trimmedOrEmpty,
@@ -359,8 +360,7 @@
     }: VisiblePurchaseOrderResponse)}
       {#if job_number !== ""}
         <span class="flex items-center gap-1">
-          {job_number} - {client_name}:
-          {job_description}
+          {formatJobLabel({ job_number, client_name, job_description })}
           {#if category_name !== ""}
             <DsLabel color="teal">{category_name}</DsLabel>
           {/if}
