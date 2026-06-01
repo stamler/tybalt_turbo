@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { resolve } from "$app/paths";
   import Icon from "@iconify/svelte";
   import { pb } from "$lib/pocketbase";
   import DsList from "$lib/components/DSList.svelte";
@@ -26,6 +27,7 @@
     data,
     endpoint,
     filter,
+    showInlineAllowanceApprove = false,
     searchBarExtra,
     showLoadMore = true,
   }: {
@@ -33,6 +35,7 @@
     data: ExpensesListData;
     endpoint: string;
     filter?: ((item: ExpensesAugmentedResponse) => boolean) | undefined;
+    showInlineAllowanceApprove?: boolean;
     searchBarExtra?: Snippet;
     showLoadMore?: boolean;
   } = $props();
@@ -86,7 +89,7 @@
       const nextTotalPages = res?.total_pages;
       hasMore =
         nextTotalPages !== undefined ? nextPage < nextTotalPages : newItems.length === limit;
-    } catch (e) {
+    } catch {
       // noop, leave hasMore as-is
     } finally {
       listLoading = false;
@@ -102,8 +105,8 @@
 
       // remove the item from the list
       items = items.filter((item) => item.id !== id);
-    } catch (error: any) {
-      alert(error.data.message);
+    } catch (error: unknown) {
+      alert(apiErrorMessage(error, "Delete failed"));
     }
   }
   async function submit(id: string) {
@@ -111,8 +114,8 @@
       await pb.send(`/api/expenses/${id}/submit`, {
         method: "POST",
       });
-    } catch (error: any) {
-      globalStore.addError(error?.response.error);
+    } catch (error: unknown) {
+      globalStore.addError(apiErrorMessage(error, "Submit failed"));
     }
   }
 
@@ -121,25 +124,62 @@
       await pb.send(`/api/expenses/${id}/recall`, {
         method: "POST",
       });
-    } catch (error: any) {
-      globalStore.addError(error?.response.error);
+    } catch (error: unknown) {
+      globalStore.addError(apiErrorMessage(error, "Recall failed"));
     }
   }
 
-  async function approve(id: string) {
+  function apiErrorMessage(error: unknown, fallback: string): string {
+    const maybeError = error as {
+      response?: { error?: string; message?: string };
+      data?: { message?: string };
+      message?: string;
+    };
+    return (
+      maybeError?.response?.error ||
+      maybeError?.response?.message ||
+      maybeError?.data?.message ||
+      maybeError?.message ||
+      fallback
+    );
+  }
+
+  async function approve(id: string, removeFromListAfterApproval = false) {
     try {
       await pb.send(`/api/expenses/${id}/approve`, {
         method: "POST",
       });
-    } catch (error: any) {
-      globalStore.addError(error?.response.error);
+      if (removeFromListAfterApproval && Array.isArray(items)) {
+        items = items.filter((item) => item.id !== id);
+      }
+    } catch (error: unknown) {
+      globalStore.addError(apiErrorMessage(error, "Approve failed"));
     }
+  }
+
+  function canInlineApproveAllowance(expense: {
+    approver: string;
+    submitted: boolean;
+    approved: string;
+    rejected: string;
+    committed: string;
+    payment_type: string;
+  }): boolean {
+    return (
+      showInlineAllowanceApprove &&
+      expense.payment_type === "Allowance" &&
+      expense.approver === viewerId &&
+      expense.submitted &&
+      expense.approved === "" &&
+      expense.rejected === "" &&
+      expense.committed === ""
+    );
   }
 </script>
 
 <DsList items={visibleItems} search={true} {inListHeader} {searchBarExtra}>
   {#snippet anchor(item: ExpensesAugmentedResponse)}
-    <a href={`/expenses/${item.id}/details`} class="text-blue-600 hover:underline">
+    <a href={resolve(`/expenses/${item.id}/details`)} class="text-blue-600 hover:underline">
       {item.date}
     </a>
   {/snippet}
@@ -251,12 +291,21 @@
     approved,
     rejected,
     committed,
+    payment_type,
   }: ExpensesAugmentedResponse)}
     {#if $expensesEditingEnabled}
       {@const isOwner = creator === viewerId}
       {@const isApprover = approver === viewerId}
       {@const hasApprovalAccess =
         $globalStore.claims.includes("tapr") || $globalStore.claims.includes("book_keeper")}
+      {@const showAllowanceApprove = canInlineApproveAllowance({
+        approver,
+        submitted,
+        approved,
+        rejected,
+        committed,
+        payment_type,
+      })}
       {#if isOwner && !submitted}
         <DsActionButton
           action={`/expenses/${id}/edit`}
@@ -268,9 +317,17 @@
       {#if isOwner && ((submitted && approved === "") || rejected !== "") && committed === ""}
         <DsActionButton action={() => recall(id)} icon="mdi:rewind" title="Recall" color="orange" />
       {/if}
-      {#if isOwner && isApprover && hasApprovalAccess && submitted && approved === "" && rejected === "" && committed === ""}
+      {#if isOwner && isApprover && hasApprovalAccess && submitted && approved === "" && rejected === "" && committed === "" && !showAllowanceApprove}
         <DsActionButton
           action={() => approve(id)}
+          icon="mdi:approve"
+          title="Approve"
+          color="green"
+        />
+      {/if}
+      {#if showAllowanceApprove}
+        <DsActionButton
+          action={() => approve(id, true)}
           icon="mdi:approve"
           title="Approve"
           color="green"

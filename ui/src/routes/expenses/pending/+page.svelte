@@ -4,4 +4,9 @@
   let { data }: { data: ExpensesListData } = $props();
 </script>
 
-<ExpensesList inListHeader="Expenses Pending My Approval" {data} endpoint="/api/expenses/pending" />
+<ExpensesList
+  inListHeader="Expenses Pending My Approval"
+  {data}
+  endpoint="/api/expenses/pending"
+  showInlineAllowanceApprove
+/>
