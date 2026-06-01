@@ -36,7 +36,9 @@
                   item.href.startsWith("/time/tracking") ||
                   item.href.startsWith("/expenses/tracking")
                 ) {
-                  return $globalStore.claims.includes("report") || $globalStore.claims.includes("admin");
+                  return (
+                    $globalStore.claims.includes("report") || $globalStore.claims.includes("admin")
+                  );
                 }
                 if (item.href.startsWith("/time/work-records")) {
                   return (
@@ -168,187 +170,210 @@
     isSidebarOpen = !isSidebarOpen;
   };
 
+  const attentionCountFor = (href: string) => {
+    if (!href) return 0;
+    return $globalStore.attentionCounts.counts[href] ?? 0;
+  };
+
+  const formatAttentionCount = (count: number) => {
+    return count > 99 ? "99+" : String(count);
+  };
+
   const isPrintRoute = $derived($page.url.pathname.endsWith("/print"));
 </script>
 
 {#if isPrintRoute}
   {@render children()}
 {:else}
-<div class="h-screen w-screen overflow-hidden">
-  <!-- Mobile header with hamburger -->
-  <header
-    class="relative flex h-10 w-full items-center justify-between bg-neutral-700 px-3 text-white lg:hidden"
-  >
-    <button onclick={toggleSidebar} class="text-white" aria-label="Toggle Menu">
-      <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          stroke-width="2"
-          d="M4 6h16M4 12h16M4 18h16"
-        />
-      </svg>
-    </button>
-    <span class="absolute left-1/2 -translate-x-1/2 transform text-lg font-semibold">𝕋𝕌ℝ𝔹𝕆</span>
-    <div class="ml-auto flex items-center gap-2">
-      <VersionInfo />
-      {#if $authStore?.isValid}
-        <div class="[&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6">
-          <DsActionButton
-            action={authStore.logout}
-            icon="feather:log-out"
-            title="Logout"
-            color="red"
-            transparentBackground
-          />
-        </div>
-      {/if}
-    </div>
-    {#if $navigating}
-      <!-- Mobile navigation loading bar (green) -->
-      <div
-        class="absolute right-0 bottom-0 left-0 h-[4px] animate-pulse bg-green-500 lg:hidden"
-      ></div>
-    {:else if $tasksLoading}
-      <!-- Mobile tasks loading bar (purple) -->
-      <div
-        class="absolute right-0 bottom-0 left-0 h-[4px] animate-pulse bg-purple-500 lg:hidden"
-      ></div>
-    {/if}
-  </header>
-
-  <div class="flex h-[calc(100vh-2.5rem)] lg:h-screen">
-    <!-- Sidebar -->
-    <aside
-      class={`fixed inset-y-0 left-0 w-screen transform bg-neutral-700 text-white transition-transform duration-300 ease-in-out lg:static lg:w-64 ${
-        isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
-      } z-1100`}
+  <div class="h-screen w-screen overflow-hidden">
+    <!-- Mobile header with hamburger -->
+    <header
+      class="relative flex h-10 w-full items-center justify-between bg-neutral-700 px-3 text-white lg:hidden"
     >
-      <div class="h-full overflow-x-hidden overflow-y-auto">
-        <!-- Desktop brand header -->
-        <div class="hidden h-10 items-center justify-between px-4 text-lg font-semibold lg:flex">
-          <a href="/" class="text-white">𝕋𝕌ℝ𝔹𝕆</a>
-          <VersionInfo />
-        </div>
-        <!-- Mobile close/header -->
-        <div class="flex h-12 items-center justify-between px-4 lg:hidden">
-          <span class="text-xl font-semibold">𝕋𝕌ℝ𝔹𝕆</span>
-          <button onclick={toggleSidebar} aria-label="Close Menu">
-            <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
-          </button>
-        </div>
-        <nav class="mt-2 px-1">
-          {#each navSections as section (section.title)}
-            <div class="mt-2">
-              <p class="p-2 text-lg font-semibold text-neutral-400 uppercase lg:text-xs">
-                {section.title}
-              </p>
-              {#each section.items as item (item.href || item.label)}
-                <div
-                  class="flex h-12 items-center pr-4 lg:h-8 lg:pr-2"
-                  class:justify-between={item.buttons}
-                >
-                  {#if item.href}
-                    <a
-                      href={item.href}
-                      class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
-                      >{item.label}</a
-                    >
-                  {:else}
-                    <span class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl lg:text-sm">
-                      {item.label}
-                    </span>
-                  {/if}
-                  {#if item.buttons}
-                    <div
-                      class="flex items-center gap-1 [&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6"
-                    >
-                      {#each item.buttons as btn (btn.title)}
-                        <DsActionButton
-                          action={btn.action}
-                          icon={btn.icon}
-                          title={btn.title}
-                          color={btn.color}
-                          transparentBackground
-                        />
-                      {/each}
-                    </div>
-                  {:else}
-                    <div class="w-8"></div>
-                  {/if}
-                </div>
-              {/each}
-            </div>
-          {/each}
-          {#if $authStore?.isValid}
-            <div class="mt-2 mb-6">
-              <p class="p-2 text-lg font-semibold text-neutral-400 uppercase lg:text-xs">Account</p>
-              <div class="flex h-12 items-center justify-between pr-4 lg:h-8 lg:pr-2">
-                <a
-                  href={`/profile/${$authStore?.model?.id}`}
-                  class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
-                >
-                  {$authStore?.model?.email}
-                </a>
-                <div
-                  class="flex items-center gap-1 [&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6"
-                >
-                  <DsActionButton
-                    action={() => globalStore.toggleShowAllUi()}
-                    icon={$globalStore.showAllUi ? "mdi:eye-off-outline" : "mdi:eye-outline"}
-                    title={$globalStore.showAllUi ? "Hide All UI" : "Show All UI"}
-                    color={$globalStore.showAllUi ? "gray" : "blue"}
-                    transparentBackground
-                  />
-                  <DsActionButton
-                    action={authStore.logout}
-                    icon="feather:log-out"
-                    title="Logout"
-                    color="red"
-                    transparentBackground
-                  />
-                </div>
-              </div>
-            </div>
-          {/if}
-        </nav>
+      <button onclick={toggleSidebar} class="text-white" aria-label="Toggle Menu">
+        <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 6h16M4 12h16M4 18h16"
+          />
+        </svg>
+      </button>
+      <span class="absolute left-1/2 -translate-x-1/2 transform text-lg font-semibold">𝕋𝕌ℝ𝔹𝕆</span>
+      <div class="ml-auto flex items-center gap-2">
+        <VersionInfo />
+        {#if $authStore?.isValid}
+          <div class="[&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6">
+            <DsActionButton
+              action={authStore.logout}
+              icon="feather:log-out"
+              title="Logout"
+              color="red"
+              transparentBackground
+            />
+          </div>
+        {/if}
       </div>
-    </aside>
-
-    <!-- Main content -->
-    <div class="relative flex-1 overflow-auto bg-white">
-      <ErrorBar />
       {#if $navigating}
-        <!-- Desktop navigation loading bar (green) -->
+        <!-- Mobile navigation loading bar (green) -->
         <div
-          class="absolute top-0 right-0 left-0 z-50 hidden h-[4px] animate-pulse bg-green-500 lg:block"
+          class="absolute right-0 bottom-0 left-0 h-[4px] animate-pulse bg-green-500 lg:hidden"
         ></div>
       {:else if $tasksLoading}
-        <!-- Desktop tasks loading bar (purple) -->
+        <!-- Mobile tasks loading bar (purple) -->
         <div
-          class="absolute top-0 right-0 left-0 z-50 hidden h-[4px] animate-pulse bg-purple-500 lg:block"
+          class="absolute right-0 bottom-0 left-0 h-[4px] animate-pulse bg-purple-500 lg:hidden"
         ></div>
       {/if}
-      <div class="h-full">
-        {@render children()}
-      </div>
-    </div>
+    </header>
 
-    <!-- Overlay for mobile -->
-    {#if isSidebarOpen}
-      <div
-        class="bg-opacity-50 fixed inset-0 z-1000 bg-black lg:hidden"
-        onclick={toggleSidebar}
-        aria-hidden="true"
-      ></div>
-    {/if}
+    <div class="flex h-[calc(100vh-2.5rem)] lg:h-screen">
+      <!-- Sidebar -->
+      <aside
+        class={`fixed inset-y-0 left-0 w-screen transform bg-neutral-700 text-white transition-transform duration-300 ease-in-out lg:static lg:w-64 ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
+        } z-1100`}
+      >
+        <div class="h-full overflow-x-hidden overflow-y-auto">
+          <!-- Desktop brand header -->
+          <div class="hidden h-10 items-center justify-between px-4 text-lg font-semibold lg:flex">
+            <a href="/" class="text-white">𝕋𝕌ℝ𝔹𝕆</a>
+            <VersionInfo />
+          </div>
+          <!-- Mobile close/header -->
+          <div class="flex h-12 items-center justify-between px-4 lg:hidden">
+            <span class="text-xl font-semibold">𝕋𝕌ℝ𝔹𝕆</span>
+            <button onclick={toggleSidebar} aria-label="Close Menu">
+              <svg class="h-8 w-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+          </div>
+          <nav class="mt-2 px-1">
+            {#each navSections as section (section.title)}
+              <div class="mt-2">
+                <p class="p-2 text-lg font-semibold text-neutral-400 uppercase lg:text-xs">
+                  {section.title}
+                </p>
+                {#each section.items as item (item.href || item.label)}
+                  <div
+                    class="flex h-12 items-center pr-4 lg:h-8 lg:pr-2"
+                    class:justify-between={item.buttons}
+                  >
+                    {#if item.href}
+                      <a
+                        href={item.href}
+                        class="ml-4 flex h-full min-w-0 grow items-center justify-between gap-2 rounded-sm px-2 text-xl hover:bg-neutral-600 lg:text-sm"
+                      >
+                        <span class="truncate">{item.label}</span>
+                        {#if attentionCountFor(item.href) > 0}
+                          <span
+                            class="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-red-500 px-1.5 text-xs leading-5 font-semibold text-white"
+                            aria-label={`${attentionCountFor(item.href)} items need attention`}
+                            title={`${attentionCountFor(item.href)} items need attention`}
+                          >
+                            {formatAttentionCount(attentionCountFor(item.href))}
+                          </span>
+                        {/if}
+                      </a>
+                    {:else}
+                      <span
+                        class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl lg:text-sm"
+                      >
+                        {item.label}
+                      </span>
+                    {/if}
+                    {#if item.buttons}
+                      <div
+                        class="flex items-center gap-1 [&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6"
+                      >
+                        {#each item.buttons as btn (btn.title)}
+                          <DsActionButton
+                            action={btn.action}
+                            icon={btn.icon}
+                            title={btn.title}
+                            color={btn.color}
+                            transparentBackground
+                          />
+                        {/each}
+                      </div>
+                    {:else}
+                      <div class="w-8"></div>
+                    {/if}
+                  </div>
+                {/each}
+              </div>
+            {/each}
+            {#if $authStore?.isValid}
+              <div class="mt-2 mb-6">
+                <p class="p-2 text-lg font-semibold text-neutral-400 uppercase lg:text-xs">
+                  Account
+                </p>
+                <div class="flex h-12 items-center justify-between pr-4 lg:h-8 lg:pr-2">
+                  <a
+                    href={`/profile/${$authStore?.model?.id}`}
+                    class="ml-4 flex h-full grow items-center rounded-sm pl-2 text-xl hover:bg-neutral-600 lg:text-sm"
+                  >
+                    {$authStore?.model?.email}
+                  </a>
+                  <div
+                    class="flex items-center gap-1 [&_svg]:h-8 [&_svg]:w-8 lg:[&_svg]:h-6 lg:[&_svg]:w-6"
+                  >
+                    <DsActionButton
+                      action={() => globalStore.toggleShowAllUi()}
+                      icon={$globalStore.showAllUi ? "mdi:eye-off-outline" : "mdi:eye-outline"}
+                      title={$globalStore.showAllUi ? "Hide All UI" : "Show All UI"}
+                      color={$globalStore.showAllUi ? "gray" : "blue"}
+                      transparentBackground
+                    />
+                    <DsActionButton
+                      action={authStore.logout}
+                      icon="feather:log-out"
+                      title="Logout"
+                      color="red"
+                      transparentBackground
+                    />
+                  </div>
+                </div>
+              </div>
+            {/if}
+          </nav>
+        </div>
+      </aside>
+
+      <!-- Main content -->
+      <div class="relative flex-1 overflow-auto bg-white">
+        <ErrorBar />
+        {#if $navigating}
+          <!-- Desktop navigation loading bar (green) -->
+          <div
+            class="absolute top-0 right-0 left-0 z-50 hidden h-[4px] animate-pulse bg-green-500 lg:block"
+          ></div>
+        {:else if $tasksLoading}
+          <!-- Desktop tasks loading bar (purple) -->
+          <div
+            class="absolute top-0 right-0 left-0 z-50 hidden h-[4px] animate-pulse bg-purple-500 lg:block"
+          ></div>
+        {/if}
+        <div class="h-full">
+          {@render children()}
+        </div>
+      </div>
+
+      <!-- Overlay for mobile -->
+      {#if isSidebarOpen}
+        <div
+          class="bg-opacity-50 fixed inset-0 z-1000 bg-black lg:hidden"
+          onclick={toggleSidebar}
+          aria-hidden="true"
+        ></div>
+      {/if}
+    </div>
   </div>
-</div>
 {/if}

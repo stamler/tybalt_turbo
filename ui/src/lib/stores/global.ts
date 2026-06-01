@@ -57,6 +57,11 @@ interface StoreState {
     maxAge: number;
     lastRefresh: Date;
   };
+  attentionCounts: {
+    counts: Record<string, number>;
+    maxAge: number;
+    lastRefresh: Date;
+  };
   error: ClientResponseError | null;
   errorMessages: ErrorMessage[];
 }
@@ -69,6 +74,7 @@ const createStore = () => {
     default_expense_payment_type: string;
     allow_personal_reimbursement: boolean;
   };
+  type AttentionCountsResponse = Record<string, number>;
   type MaybeAbortError = Partial<ClientResponseError> & {
     isAbort?: boolean;
     originalError?: { name?: string };
@@ -79,6 +85,7 @@ const createStore = () => {
   let userClaimsSummaryPromise: Promise<void> | null = null;
   let userPoApproverProfilePromise: Promise<void> | null = null;
   let userDefaultsPromise: Promise<void> | null = null;
+  let attentionCountsPromise: Promise<void> | null = null;
   const isAutoCancelled = (error: unknown): boolean => {
     const err = error as MaybeAbortError;
     if (err?.isAbort) return true;
@@ -130,6 +137,11 @@ const createStore = () => {
     allow_personal_reimbursement: {
       value: false,
       maxAge: 3600 * 1000,
+      lastRefresh: new Date(0),
+    },
+    attentionCounts: {
+      counts: {},
+      maxAge: 60 * 1000,
       lastRefresh: new Date(0),
     },
     error: null,
@@ -304,6 +316,34 @@ const createStore = () => {
     return userDefaultsPromise;
   };
 
+  const loadAttentionCounts = async () => {
+    if (attentionCountsPromise) return attentionCountsPromise;
+    attentionCountsPromise = (async () => {
+      try {
+        const counts = (await pb.send("/api/nav/badges", {
+          method: "GET",
+          requestKey: null,
+        })) as AttentionCountsResponse;
+
+        update((state) => ({
+          ...state,
+          attentionCounts: {
+            counts: counts ?? {},
+            maxAge: state.attentionCounts.maxAge,
+            lastRefresh: new Date(),
+          },
+        }));
+      } catch (error: unknown) {
+        if (isAutoCancelled(error)) return;
+        const typedErr = error as ClientResponseError;
+        console.error("Error loading navigation badges:", typedErr);
+      }
+    })().finally(() => {
+      attentionCountsPromise = null;
+    });
+    return attentionCountsPromise;
+  };
+
   const refresh = async () => {
     if (!get(authStore)?.isValid) {
       update((state) => {
@@ -327,6 +367,11 @@ const createStore = () => {
           allow_personal_reimbursement: {
             value: false,
             maxAge: state.allow_personal_reimbursement.maxAge,
+            lastRefresh: new Date(0),
+          },
+          attentionCounts: {
+            counts: {},
+            maxAge: state.attentionCounts.maxAge,
             lastRefresh: new Date(0),
           },
         };
@@ -356,8 +401,20 @@ const createStore = () => {
         loadUserDefaults();
       }
 
+      if (
+        now.getTime() - state.attentionCounts.lastRefresh.getTime() >=
+        state.attentionCounts.maxAge
+      ) {
+        loadAttentionCounts();
+      }
+
       return newState;
     });
+  };
+
+  const refreshAttentionCounts = async () => {
+    if (!get(authStore)?.isValid) return;
+    await loadAttentionCounts();
   };
 
   const addError = (message: string) => {
@@ -407,6 +464,7 @@ const createStore = () => {
     dismissError,
     toggleShowAllUi,
     setDefaultExpensePaymentType,
+    refreshAttentionCounts,
   };
 };
 
@@ -427,6 +485,7 @@ const wrappedStore: Readable<StoreState> & {
   dismissError: typeof _globalStore.dismissError;
   toggleShowAllUi: typeof _globalStore.toggleShowAllUi;
   setDefaultExpensePaymentType: typeof _globalStore.setDefaultExpensePaymentType;
+  refreshAttentionCounts: typeof _globalStore.refreshAttentionCounts;
 } = {
   subscribe: (run: Subscriber<StoreState>, invalidate?: () => void) => {
     return _globalStore.subscribe(
@@ -439,6 +498,7 @@ const wrappedStore: Readable<StoreState> & {
   dismissError: _globalStore.dismissError,
   toggleShowAllUi: _globalStore.toggleShowAllUi,
   setDefaultExpensePaymentType: _globalStore.setDefaultExpensePaymentType,
+  refreshAttentionCounts: _globalStore.refreshAttentionCounts,
 };
 
 export const globalStore = wrappedStore;

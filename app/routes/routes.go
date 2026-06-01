@@ -161,6 +161,10 @@ func AddRoutes(app core.App) {
 		usersGroup.Bind(apis.RequireAuth("users"))
 		usersGroup.GET("/defaults", createGetUserDefaultsHandler(app))
 
+		navGroup := se.Router.Group("/api/nav")
+		navGroup.Bind(apis.RequireAuth("users"))
+		navGroup.GET("/badges", createGetNavBadgesHandler(app))
+
 		adminProfilesGroup := se.Router.Group("/api/admin_profiles")
 		adminProfilesGroup.Bind(apis.RequireAuth("users"))
 		adminProfilesGroup.GET("/identity", createGetAdminProfileIdentityListHandler(app))
