@@ -161,6 +161,17 @@
     }
   }
 
+  async function copyToNextWeek(id: string) {
+    try {
+      await pb.send(`/api/time_sheets/${id}/copy_to_next_week`, {
+        method: "POST",
+      });
+      goto(`/time/entries/list`);
+    } catch (error: any) {
+      globalStore.addError(getApiErrorMessage(error, "Copy to next week failed"));
+    }
+  }
+
   function openRejectModal(recordId: string) {
     rejectModal?.openModal(recordId);
   }
@@ -228,6 +239,14 @@
       </div>
       <!-- Action Buttons -->
       <div class="flex flex-wrap gap-2 empty:hidden">
+        {#if $timeEditingEnabled && timeSheet.uid === viewerId}
+          <DsActionButton
+            action={() => copyToNextWeek(timeSheet.id)}
+            icon="mdi:content-copy"
+            title="Copy entries to next week"
+            color="green"
+          />
+        {/if}
         {#if timeSheet.committed !== "" && isAdminUser()}
           <DsActionButton
             action={openUncommitConfirm}

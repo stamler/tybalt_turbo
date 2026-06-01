@@ -68,3 +68,7 @@ _imported,branch,category,created,date,description,division,hours,id,job,meals_h
 0,y61xhc627nkue73,,2026-05-20 11:56:00.000Z,2030-01-09,payroll branch overtime ottawa regular,,30,pbroventryot1,,0,0,,sdyfl3q7j7ap849,pbrovertimesht1,u_pbranch_hover,2026-05-20 11:56:00.000Z,2030-01-12,
 0,80875lm27v8wgi4,,2026-05-20 11:56:00.000Z,2030-01-07,payroll branch no negative thunder regular,,1,pbrnnegentryt1,,0,0,,sdyfl3q7j7ap849,pbrnonegsheet1,u_pbranch_hnoneg,2026-05-20 11:56:00.000Z,2030-01-12,
 0,xeq9q81q5307f70,,2026-05-20 11:56:00.000Z,2030-01-08,payroll branch no negative toronto regular,,74,pbrnnegentryt2,,0,0,,sdyfl3q7j7ap849,pbrnonegsheet1,u_pbranch_hnoneg,2026-05-20 11:56:00.000Z,2030-01-12,
+0,,,2026-06-01 12:00:00.000Z,2030-12-30,Copy next source regular one,vccd5fo56ctbigh,8,cpynextent001,,0,0,,sdyfl3q7j7ap849,cpynextsheet001,f2j5a8vk006baub,2026-06-01 12:00:00.000Z,2031-01-04,
+0,,,2026-06-01 12:00:00.000Z,2030-12-31,Copy next source regular two,vccd5fo56ctbigh,4,cpynextent002,,0,0,,sdyfl3q7j7ap849,cpynextsheet001,f2j5a8vk006baub,2026-06-01 12:00:00.000Z,2031-01-04,
+0,,,2026-06-01 12:00:00.000Z,2031-01-27,Copy next duplicate source,vccd5fo56ctbigh,8,cpynextdupe001,,0,0,,sdyfl3q7j7ap849,cpynextdupesht1,f2j5a8vk006baub,2026-06-01 12:00:00.000Z,2031-02-01,
+0,,,2026-06-01 12:00:00.000Z,2031-02-03,Existing loose target entry,vccd5fo56ctbigh,8,cpynextdupetgt,,0,0,,sdyfl3q7j7ap849,,f2j5a8vk006baub,2026-06-01 12:00:00.000Z,2031-02-08,

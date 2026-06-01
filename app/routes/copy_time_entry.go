@@ -13,6 +13,83 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
+type copiedTimeEntry struct {
+	ID         string
+	Date       string
+	WeekEnding string
+}
+
+func copyTimeEntryErrorStatus(err error) int {
+	codeErr, ok := err.(*CodeError)
+	if !ok {
+		return http.StatusBadRequest
+	}
+
+	switch codeErr.Code {
+	case "invalid_date", "invalid_week_ending", "error_saving_record":
+		return http.StatusInternalServerError
+	default:
+		return http.StatusBadRequest
+	}
+}
+
+func copyTimeEntryWithDayOffset(txApp core.App, authRecord *core.Record, original *core.Record, dayOffset int) (copiedTimeEntry, error) {
+	dateStr := original.GetString("date")
+	originalDate, parseErr := time.Parse("2006-01-02", dateStr)
+	if parseErr != nil {
+		return copiedTimeEntry{}, &CodeError{
+			Code:    "invalid_date",
+			Message: fmt.Sprintf("invalid date format on original record: %v", parseErr),
+		}
+	}
+	newDate := originalDate.AddDate(0, 0, dayOffset).Format("2006-01-02")
+
+	collection := original.Collection()
+	newRecord := core.NewRecord(collection)
+
+	for _, field := range collection.Fields {
+		fieldName := field.GetName()
+		switch fieldName {
+		case "id", "created", "updated", "date", "week_ending", "tsid":
+			continue
+		default:
+			newRecord.Set(fieldName, original.Get(fieldName))
+		}
+	}
+
+	newRecord.Set("uid", authRecord.Id)
+	newRecord.Set("date", newDate)
+
+	weekEnding, wkErr := utilities.GenerateWeekEnding(newDate)
+	if wkErr != nil {
+		return copiedTimeEntry{}, &CodeError{
+			Code:    "invalid_week_ending",
+			Message: fmt.Sprintf("error generating week ending: %v", wkErr),
+		}
+	}
+	newRecord.Set("week_ending", weekEnding)
+
+	if err := hooks.ProcessTimeEntry(txApp, &core.RecordRequestEvent{
+		RequestEvent: &core.RequestEvent{App: txApp, Auth: authRecord},
+		Record:       newRecord,
+	}); err != nil {
+		return copiedTimeEntry{}, err
+	}
+
+	if err := txApp.Save(newRecord); err != nil {
+		return copiedTimeEntry{}, &CodeError{
+			Code:    "error_saving_record",
+			Message: fmt.Sprintf("error saving copied record: %v", err),
+		}
+	}
+
+	return copiedTimeEntry{
+		ID:         newRecord.Id,
+		Date:       newDate,
+		WeekEnding: weekEnding,
+	}, nil
+}
+
 // createCopyTimeEntryHandler returns a route handler that duplicates the given
 // time_entries record but with the date moved forward by one day. The handler
 // enforces two constraints:
@@ -69,67 +146,13 @@ func createCopyTimeEntryHandler(app core.App) func(e *core.RequestEvent) error {
 				}
 			}
 
-			// Parse and increment the date
-			dateStr := original.GetString("date")
-			originalDate, parseErr := time.Parse("2006-01-02", dateStr)
-			if parseErr != nil {
-				httpResponseStatusCode = http.StatusInternalServerError
-				return &CodeError{
-					Code:    "invalid_date",
-					Message: fmt.Sprintf("invalid date format on original record: %v", parseErr),
-				}
-			}
-			newDate := originalDate.AddDate(0, 0, 1).Format("2006-01-02")
-
-			// Prepare the new record using the same collection schema
-			collection := original.Collection()
-			newRecord := core.NewRecord(collection)
-
-			// Copy all schema fields except those that must change/are managed
-			for _, field := range collection.Fields {
-				fieldName := field.GetName()
-				switch fieldName {
-				case "id", "created", "updated", "date", "week_ending", "tsid":
-					// skip; handled separately / left blank
-					continue
-				default:
-					newRecord.Set(fieldName, original.Get(fieldName))
-				}
-			}
-
-			// Explicitly set required fields
-			newRecord.Set("uid", userId)
-			newRecord.Set("date", newDate)
-
-			// Calculate correct week_ending based on the new date (Saturday)
-			weekEnding, wkErr := utilities.GenerateWeekEnding(newDate)
-			if wkErr != nil {
-				httpResponseStatusCode = http.StatusInternalServerError
-				return &CodeError{
-					Code:    "invalid_week_ending",
-					Message: fmt.Sprintf("error generating week ending: %v", wkErr),
-				}
-			}
-			newRecord.Set("week_ending", weekEnding)
-			// tsid intentionally left empty so the record is unbundled
-
-			if err := hooks.ProcessTimeEntry(txApp, &core.RecordRequestEvent{
-				RequestEvent: &core.RequestEvent{App: txApp, Auth: authRecord},
-				Record:       newRecord,
-			}); err != nil {
-				httpResponseStatusCode = http.StatusBadRequest
+			copied, err := copyTimeEntryWithDayOffset(txApp, authRecord, original, 1)
+			if err != nil {
+				httpResponseStatusCode = copyTimeEntryErrorStatus(err)
 				return err
 			}
 
-			// Persist the new record (triggers all hooks/validation)
-			if err := txApp.Save(newRecord); err != nil {
-				httpResponseStatusCode = http.StatusInternalServerError
-				return &CodeError{
-					Code:    "error_saving_record",
-					Message: fmt.Sprintf("error saving copied record: %v", err),
-				}
-			}
-			newRecordId = newRecord.Id
+			newRecordId = copied.ID
 			return nil
 		})
 

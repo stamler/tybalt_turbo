@@ -94,6 +94,7 @@ func AddRoutes(app core.App) {
 		tsGroup.Bind(apis.RequireAuth("users"))
 		tsGroup.POST("/{weekEnding}/bundle", createBundleTimesheetHandler(app))
 		tsGroup.POST("/{id}/unbundle", createUnbundleTimesheetHandler(app))
+		tsGroup.POST("/{id}/copy_to_next_week", createCopyTimesheetEntriesNextWeekHandler(app))
 		tsGroup.GET("/{id}/details", createGetTimeSheetDetailsHandler(app))
 		tsGroup.POST("/{id}/approve", createApproveRecordHandler(app, "time_sheets"))
 		tsGroup.POST("/{id}/reject", createRejectRecordHandler(app, "time_sheets"))
