@@ -20,11 +20,7 @@
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import { onMount, untrack } from "svelte";
-  import type {
-    ClientContactsResponse,
-    DivisionsResponse,
-    JobsRecord,
-  } from "$lib/pocketbase-types";
+  import type { ClientContactsResponse, JobsRecord } from "$lib/pocketbase-types";
   import type { JobApiResponse } from "$lib/stores/jobs";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
   import { busdevLeads } from "$lib/stores/busdevLeads";
@@ -310,11 +306,10 @@
     }
   });
 
-  // Mirror backend behavior: when not PO, clear any provided client_po
   $effect(() => {
-    if (item.authorizing_document !== "PO" && item.client_po) {
-      item.client_po = "";
-      if (errors.client_po) clearFieldError("client_po");
+    if (!isProposal && isNewJob && item.authorizing_document !== "PA") {
+      item.authorizing_document = "PA";
+      if (errors.authorizing_document) clearFieldError("authorizing_document");
     }
   });
 
@@ -1044,18 +1039,18 @@
       {/if}
     </p>
 
-    <DsSelector
-      bind:value={item.authorizing_document}
-      items={authorizingDocumentOptions}
-      {errors}
-      fieldName="authorizing_document"
-      uiName="Authorizing Document"
-    >
-      {#snippet optionTemplate(item)}{item.name}{/snippet}
-    </DsSelector>
-    {#if item.authorizing_document === "PO"}
-      <DsTextInput bind:value={item.client_po} {errors} fieldName="client_po" uiName="Client PO" />
+    {#if !isProposal && !isNewJob}
+      <DsSelector
+        bind:value={item.authorizing_document}
+        items={authorizingDocumentOptions}
+        {errors}
+        fieldName="authorizing_document"
+        uiName="Authorizing Document"
+      >
+        {#snippet optionTemplate(item)}{item.name}{/snippet}
+      </DsSelector>
     {/if}
+    <DsTextInput bind:value={item.client_po} {errors} fieldName="client_po" uiName="Client PO" />
     <DsTextInput
       bind:value={item.client_reference_number}
       {errors}
@@ -1156,7 +1151,7 @@
                   uiName="Division"
                   choose={(id) => setAllocationDivision(idx, id)}
                 >
-                  {#snippet resultTemplate(item: DivisionsResponse)}{item.code} - {item.name}{/snippet}
+                  {#snippet resultTemplate(item)}{item.code} - {item.name}{/snippet}
                 </DsAutoComplete>
               </div>
               <input

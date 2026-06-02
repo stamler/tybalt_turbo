@@ -583,7 +583,7 @@ func TestLegacyPurchaseOrdersCustomAPI(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
-				`"uid":{"code":"validation_error","message":"the selected staff member is not an active user","data":null}`,
+				`"uid":{"code":"uid_not_active","message":"the selected staff member is not an active user","data":null}`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 0,

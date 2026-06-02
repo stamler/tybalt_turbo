@@ -236,6 +236,7 @@ func AddRoutes(app core.App) {
 		jobsGroup.Bind(apis.RequireAuth("users"))
 		jobsGroup.POST("", createCreateJobHandler(app))
 		jobsGroup.PUT("/{id}", createUpsertJobHandler(app))
+		jobsGroup.GET("/project_authorization/pending", createGetProjectAuthorizationQueueHandler(app))
 		jobsGroup.GET("/{id}/details", createGetJobDetailsHandler(app))
 		jobsGroup.GET("/{id}/notes", createGetJobNotesHandler(app))
 		jobsGroup.GET("/latest", createGetLatestJobsHandler(app))
@@ -258,6 +259,10 @@ func AddRoutes(app core.App) {
 		jobsGroup.POST("/{id}/set-status", createSetJobStatusHandler(app))
 		jobsGroup.POST("/{id}/set-number", createSetJobNumberHandler(app))
 		jobsGroup.POST("/{id}/close", createCloseJobHandler(app))
+		jobsGroup.POST("/{id}/project_authorization_doc", createUploadProjectAuthorizationDocumentHandler(app))
+		jobsGroup.DELETE("/{id}/project_authorization_doc", createDeleteProjectAuthorizationDocumentHandler(app))
+		jobsGroup.POST("/{id}/project_authorization/approve", createApproveProjectAuthorizationHandler(app))
+		jobsGroup.POST("/{id}/project_authorization/revoke", createRevokeProjectAuthorizationHandler(app))
 		jobsGroup.GET("/{id}/validate-proposal", createValidateProposalHandler(app))
 
 		reportsGroup := se.Router.Group("/api/reports")

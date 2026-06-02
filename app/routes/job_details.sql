@@ -12,6 +12,12 @@ SELECT
   j.authorizing_document AS authorizing_document,
   j.client_po        AS client_po,
   j.client_reference_number AS client_reference_number,
+  j.project_authorization_doc AS project_authorization_doc,
+  j.project_authorization_doc_hash AS project_authorization_doc_hash,
+  j.pa_reviewed AS pa_reviewed,
+  j.pa_reviewer AS pa_reviewer_id,
+  par.given_name AS pa_reviewer_given_name,
+  par.surname AS pa_reviewer_surname,
   j.client           AS client_id,
   cli.name           AS client_name,
   j.contact          AS contact_id,
@@ -38,6 +44,7 @@ SELECT
   j.branch           AS branch_id,
   br.code            AS branch_code,
   br.name            AS branch_name,
+  br.manager         AS branch_manager_id,
   j.rate_sheet       AS rate_sheet_id,
   rs.name            AS rate_sheet_name,
   rs.revision        AS rate_sheet_revision,
@@ -78,6 +85,7 @@ LEFT JOIN clients cli          ON cli.id = j.client
 LEFT JOIN client_contacts cc   ON cc.id  = j.contact
 LEFT JOIN profiles m           ON m.uid  = j.manager
 LEFT JOIN profiles am          ON am.uid = j.alternate_manager
+LEFT JOIN profiles par         ON par.uid = j.pa_reviewer
 LEFT JOIN clients jo           ON jo.id  = j.job_owner
 LEFT JOIN branches br          ON br.id  = j.branch
 LEFT JOIN rate_sheets rs       ON rs.id  = j.rate_sheet

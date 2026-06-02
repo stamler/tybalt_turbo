@@ -3,6 +3,7 @@ package main
 import (
 	"net/http"
 	"testing"
+	"tybalt/hooks"
 	"tybalt/internal/testutils"
 
 	"github.com/pocketbase/dbx"
@@ -120,4 +121,108 @@ func TestBundleTimesheet_SelfManagerWithoutTaprFails(t *testing.T) {
 	}
 
 	scenario.Test(t)
+}
+
+func TestBundleTimesheet_ProjectAuthorizationGate(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "self_apv_yes@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []struct {
+		name            string
+		enforce         bool
+		approved        bool
+		expectedStatus  int
+		expectedContent []string
+	}{
+		{
+			name:           "disabled enforcement allows unapproved project",
+			expectedStatus: http.StatusOK,
+			expectedContent: []string{
+				`"message":"Time sheet processed successfully"`,
+			},
+		},
+		{
+			name:           "enabled enforcement blocks unapproved project",
+			enforce:        true,
+			expectedStatus: http.StatusUnprocessableEntity,
+			expectedContent: []string{
+				`"code":"` + hooks.ProjectAuthorizationNotApprovedCode + `"`,
+				`"blocking_jobs":[`,
+				`"id":"cjf0kt0defhq480"`,
+			},
+		},
+		{
+			name:           "enabled enforcement allows approved project",
+			enforce:        true,
+			approved:       true,
+			expectedStatus: http.StatusOK,
+			expectedContent: []string{
+				`"message":"Time sheet processed successfully"`,
+			},
+		},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			apiScenario := tests.ApiScenario{
+				Name:            scenario.name,
+				Method:          http.MethodPost,
+				URL:             "/api/time_sheets/2024-09-14/bundle",
+				Headers:         map[string]string{"Authorization": recordToken},
+				ExpectedStatus:  scenario.expectedStatus,
+				ExpectedContent: scenario.expectedContent,
+				TestAppFactory: func(tb testing.TB) *tests.TestApp {
+					return setupProjectAuthorizationBundleGateApp(tb, scenario.enforce, scenario.approved)
+				},
+			}
+			apiScenario.Test(t)
+		})
+	}
+}
+
+func setupProjectAuthorizationBundleGateApp(tb testing.TB, enforce bool, approved bool) *tests.TestApp {
+	tb.Helper()
+	app := testutils.SetupTestApp(tb)
+	setProjectAuthorizationBundleGateConfig(tb, app, enforce)
+	if _, err := app.DB().NewQuery(`
+		UPDATE time_entries
+		SET job = 'cjf0kt0defhq480',
+		    role = 'tbgoiwwwfj8cvju',
+		    description = 'PA gate project time',
+		    tsid = ''
+		WHERE id = 'te_self_apv_yes_001'
+	`).Execute(); err != nil {
+		tb.Fatalf("failed to point self-approver time entry at PA-gated project: %v", err)
+	}
+	if approved {
+		if _, err := app.DB().NewQuery(`
+			UPDATE jobs
+			SET project_authorization_doc = 'approved-pa.pdf',
+			    project_authorization_doc_hash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+			    pa_reviewed = '2026-06-02 12:00:00.000Z',
+			    pa_reviewer = 'f2j5a8vk006baub'
+			WHERE id = 'cjf0kt0defhq480'
+		`).Execute(); err != nil {
+			tb.Fatalf("failed to approve PA fixture: %v", err)
+		}
+	}
+	return app
+}
+
+func setProjectAuthorizationBundleGateConfig(tb testing.TB, app *tests.TestApp, enabled bool) {
+	tb.Helper()
+	record, err := app.FindFirstRecordByData("app_config", "key", "jobs")
+	if err != nil {
+		tb.Fatalf("failed to load jobs app_config: %v", err)
+	}
+	if enabled {
+		record.Set("value", `{"create_edit_absorb": true, "enforce_project_authorization": true}`)
+	} else {
+		record.Set("value", `{"create_edit_absorb": true, "enforce_project_authorization": false}`)
+	}
+	if err := app.Save(record); err != nil {
+		tb.Fatalf("failed to save jobs app_config: %v", err)
+	}
 }

@@ -56,6 +56,16 @@ func IsJobsEditingEnabled(app core.App) (bool, error) {
 	return GetConfigBool(app, "jobs", "create_edit_absorb", true)
 }
 
+// IsProjectAuthorizationEnforced checks whether reviewed PA documents are
+// required before downstream project use. Defaults to false (fail-open).
+func IsProjectAuthorizationEnforced(app core.App) bool {
+	enabled, err := GetConfigBool(app, "jobs", "enforce_project_authorization", false)
+	if err != nil {
+		return false
+	}
+	return enabled
+}
+
 // ErrJobsEditingDisabled is returned when job editing is disabled
 var ErrJobsEditingDisabled = &errs.HookError{
 	Status:  http.StatusForbidden,

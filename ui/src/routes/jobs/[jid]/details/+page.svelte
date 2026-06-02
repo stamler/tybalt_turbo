@@ -34,6 +34,14 @@
   let setNumberValue = $state("");
   let setNumberGlobalError = $state<string | null>(null);
   let setNumberErrors = $state({} as Record<string, { message: string }>);
+  let paUploading = $state(false);
+  let paUploadError = $state<string | null>(null);
+  let paRevoking = $state(false);
+  let showPARevokeConfirm = $state(false);
+  let paRevokeError = $state<string | null>(null);
+  let paDeleting = $state(false);
+  let showPADeleteConfirm = $state(false);
+  let paDeleteError = $state<string | null>(null);
   let fastCloseProposal = $state<{
     id: string;
     number: string;
@@ -81,6 +89,31 @@
     !isProposal && data.job.status === "Active" && data.job.imported === true,
   );
   const canSetNumber = $derived($jobsEditingEnabled && $globalStore.claims.includes("admin"));
+  const currentUserID = $derived(pb.authStore.record?.id ?? "");
+  const canUploadProjectAuthorization = $derived(
+    !isProposal &&
+      (Boolean(currentUserID) &&
+        ($globalStore.claims.includes("job") ||
+          currentUserID === data.job.manager?.id ||
+          currentUserID === data.job.alternate_manager?.id ||
+          currentUserID === data.job.branch_manager_id)),
+  );
+  const projectAuthorizationApproved = $derived(
+    Boolean(
+      data.job.project_authorization_doc &&
+        data.job.project_authorization_doc_hash &&
+        data.job.pa_reviewed &&
+        data.job.pa_reviewer?.id,
+    ),
+  );
+  const canRevokeProjectAuthorization = $derived(
+    !isProposal && $globalStore.claims.includes("admin") && projectAuthorizationApproved,
+  );
+  const canDeleteProjectAuthorization = $derived(
+    canUploadProjectAuthorization &&
+      Boolean(data.job.project_authorization_doc) &&
+      !projectAuthorizationApproved,
+  );
   const hasNumberHierarchyWarning = $derived(
     Boolean(data.job.parent_number) ||
       (Array.isArray(data.job.children) && data.job.children.length > 0),
@@ -202,6 +235,70 @@
   function personName(person: any) {
     if (!person) return "";
     return `${person.given_name || person.name || ""} ${person.surname || ""}`.trim();
+  }
+
+  function projectAuthorizationStatus() {
+    if (!data.job.project_authorization_doc) return "PA document missing";
+    if (data.job.pa_reviewed && data.job.pa_reviewer?.id) return "PA approved";
+    return "PA pending Accounting approval";
+  }
+
+  async function uploadProjectAuthorizationDoc(event: Event) {
+    const input = event.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    paUploading = true;
+    paUploadError = null;
+    try {
+      const form = new FormData();
+      form.append("project_authorization_doc", file);
+      await pb.send(`/api/jobs/${data.job.id}/project_authorization_doc`, {
+        method: "POST",
+        body: form,
+      });
+      input.value = "";
+      await invalidateAll();
+    } catch (error: any) {
+      paUploadError =
+        error?.data?.data?.project_authorization_doc?.message ??
+        error?.data?.message ??
+        error?.message ??
+        "Failed to upload PA document.";
+    } finally {
+      paUploading = false;
+    }
+  }
+
+  async function revokeProjectAuthorization() {
+    paRevoking = true;
+    paRevokeError = null;
+    try {
+      await pb.send(`/api/jobs/${data.job.id}/project_authorization/revoke`, { method: "POST" });
+      showPARevokeConfirm = false;
+      await invalidateAll();
+    } catch (error: any) {
+      paRevokeError = error?.data?.message ?? error?.message ?? "Failed to revoke PA approval.";
+    } finally {
+      paRevoking = false;
+    }
+  }
+
+  async function deleteProjectAuthorizationDoc() {
+    paDeleting = true;
+    paDeleteError = null;
+    try {
+      await pb.send(`/api/jobs/${data.job.id}/project_authorization_doc`, { method: "DELETE" });
+      showPADeleteConfirm = false;
+      await invalidateAll();
+    } catch (error: any) {
+      paDeleteError =
+        error?.data?.data?.project_authorization_doc?.message ??
+        error?.data?.message ??
+        error?.message ??
+        "Failed to remove PA document.";
+    } finally {
+      paDeleting = false;
+    }
   }
 
   // Tab management ------------------------------------------------------------
@@ -469,6 +566,35 @@
   />
 
   <DSPopover
+    bind:show={showPARevokeConfirm}
+    title="Revoke PA Approval"
+    subtitle="Revoking approval may block new time bundles, purchase orders, and expenses for this project when PA enforcement is enabled."
+    error={paRevokeError}
+    submitting={paRevoking}
+    submitLabel="Revoke Approval"
+    onSubmit={revokeProjectAuthorization}
+  >
+    <p class="text-sm text-neutral-700">
+      The uploaded PDF and hash will stay on the job. Accounting will need to approve the current
+      document again before the project is treated as PA-approved.
+    </p>
+  </DSPopover>
+
+  <DSPopover
+    bind:show={showPADeleteConfirm}
+    title="Remove PA PDF"
+    subtitle="Removing the uploaded PA will leave this project without a pending document for Accounting review."
+    error={paDeleteError}
+    submitting={paDeleting}
+    submitLabel="Remove PDF"
+    onSubmit={deleteProjectAuthorizationDoc}
+  >
+    <p class="text-sm text-neutral-700">
+      A new signed PA PDF will need to be uploaded before Accounting can approve the project.
+    </p>
+  </DSPopover>
+
+  <DSPopover
     bind:show={showSetNumberModal}
     title="Change Job Number"
     subtitle="Admins can manually override the stored job number without reopening the full editor."
@@ -602,7 +728,7 @@
               {data.job.authorizing_document}
             </div>
           {/if}
-          {#if data.job.authorizing_document === "PO" && data.job.client_po}
+          {#if data.job.client_po}
             <div>
               <span class="font-semibold">Client PO:</span>
               {data.job.client_po}
@@ -614,6 +740,60 @@
               {data.job.client_reference_number}
             </div>
           {/if}
+          <div class="flex flex-col gap-2 rounded-sm border border-neutral-200 p-3">
+            <div>
+              <span class="font-semibold">PA Review:</span>
+              {projectAuthorizationStatus()}
+            </div>
+            {#if data.job.project_authorization_doc_url}
+              <a
+                href={data.job.project_authorization_doc_url}
+                target="_blank"
+                rel="noreferrer"
+                class="text-blue-600 hover:underline"
+              >
+                Open PA PDF
+              </a>
+            {/if}
+            {#if data.job.pa_reviewed && data.job.pa_reviewer?.id}
+              <div>
+                <span class="font-semibold">Reviewed By:</span>
+                {personName(data.job.pa_reviewer)}
+                <span class="text-sm text-neutral-500">
+                  ({shortDate(data.job.pa_reviewed, true)})
+                </span>
+              </div>
+            {/if}
+            {#if canUploadProjectAuthorization && !projectAuthorizationApproved}
+              <label class="flex max-w-sm flex-col gap-1 text-sm">
+                <span class="font-semibold">Upload Signed PA PDF</span>
+                <input
+                  type="file"
+                  accept="application/pdf"
+                  disabled={paUploading}
+                  onchange={uploadProjectAuthorizationDoc}
+                  class="rounded-sm border border-neutral-300 p-2"
+                />
+              </label>
+            {/if}
+            {#if paUploadError}
+              <div class="text-sm text-red-600">{paUploadError}</div>
+            {/if}
+            {#if canDeleteProjectAuthorization}
+              <div>
+                <DsActionButton action={() => (showPADeleteConfirm = true)} color="yellow">
+                  Remove PA PDF
+                </DsActionButton>
+              </div>
+            {/if}
+            {#if canRevokeProjectAuthorization}
+              <div>
+                <DsActionButton action={() => (showPARevokeConfirm = true)} color="red">
+                  Revoke PA Approval
+                </DsActionButton>
+              </div>
+            {/if}
+          </div>
 
           <div>
             <span class="font-semibold">Outstanding Balance:</span>

@@ -44,6 +44,12 @@ type jobDetailsRow struct {
 	AuthorizingDocument       sql.NullString  `db:"authorizing_document"`
 	ClientPO                  sql.NullString  `db:"client_po"`
 	ClientReferenceNumber     sql.NullString  `db:"client_reference_number"`
+	ProjectAuthorizationDoc   sql.NullString  `db:"project_authorization_doc"`
+	ProjectAuthorizationHash  sql.NullString  `db:"project_authorization_doc_hash"`
+	PAReviewed                sql.NullString  `db:"pa_reviewed"`
+	PAReviewerID              sql.NullString  `db:"pa_reviewer_id"`
+	PAReviewerGivenName       sql.NullString  `db:"pa_reviewer_given_name"`
+	PAReviewerSurname         sql.NullString  `db:"pa_reviewer_surname"`
 	ClientID                  string          `db:"client_id"`
 	ClientName                string          `db:"client_name"`
 	ContactID                 sql.NullString  `db:"contact_id"`
@@ -62,6 +68,7 @@ type jobDetailsRow struct {
 	BranchID                  sql.NullString  `db:"branch_id"`
 	BranchCode                sql.NullString  `db:"branch_code"`
 	BranchName                sql.NullString  `db:"branch_name"`
+	BranchManagerID           sql.NullString  `db:"branch_manager_id"`
 	RateSheetID               sql.NullString  `db:"rate_sheet_id"`
 	RateSheetName             sql.NullString  `db:"rate_sheet_name"`
 	RateSheetRevision         sql.NullInt64   `db:"rate_sheet_revision"`
@@ -107,6 +114,11 @@ type JobDetails struct {
 	AuthorizingDocument       string        `json:"authorizing_document"`
 	ClientPO                  string        `json:"client_po"`
 	ClientReferenceNumber     string        `json:"client_reference_number"`
+	ProjectAuthorizationDoc   string        `json:"project_authorization_doc"`
+	ProjectAuthorizationURL   string        `json:"project_authorization_doc_url"`
+	ProjectAuthorizationHash  string        `json:"project_authorization_doc_hash"`
+	PAReviewed                string        `json:"pa_reviewed"`
+	PAReviewer                Person        `json:"pa_reviewer"`
 	Client                    ClientInfo    `json:"client"`
 	Contact                   Person        `json:"contact"`
 	Manager                   Person        `json:"manager"`
@@ -117,6 +129,7 @@ type JobDetails struct {
 	BranchID                  string        `json:"branch_id"`
 	BranchCode                string        `json:"branch_code"`
 	BranchName                string        `json:"branch_name"`
+	BranchManagerID           string        `json:"branch_manager_id"`
 	RateSheet                 RateSheetInfo `json:"rate_sheet"`
 	FnAgreement               bool          `json:"fn_agreement"`
 	ProjectAwardDate          string        `json:"project_award_date"`
@@ -160,6 +173,10 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 
 		var categories []Category
 		_ = json.Unmarshal([]byte(r.CategoriesJSON), &categories)
+		jobsCollection, err := app.FindCollectionByNameOrId("jobs")
+		if err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to load jobs collection", err)
+		}
 
 		// helper to convert NullString to string
 		ns := func(n sql.NullString) string {
@@ -181,6 +198,10 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			AuthorizingDocument:       ns(r.AuthorizingDocument),
 			ClientPO:                  ns(r.ClientPO),
 			ClientReferenceNumber:     ns(r.ClientReferenceNumber),
+			ProjectAuthorizationDoc:   ns(r.ProjectAuthorizationDoc),
+			ProjectAuthorizationHash:  ns(r.ProjectAuthorizationHash),
+			PAReviewed:                ns(r.PAReviewed),
+			PAReviewer:                Person{ID: ns(r.PAReviewerID), GivenName: ns(r.PAReviewerGivenName), Surname: ns(r.PAReviewerSurname)},
 			Client:                    ClientInfo{ID: r.ClientID, Name: r.ClientName},
 			Contact:                   Person{ID: ns(r.ContactID), GivenName: ns(r.ContactGivenName), Surname: ns(r.ContactSurname)},
 			Manager:                   Person{ID: ns(r.ManagerID), GivenName: ns(r.ManagerGivenName), Surname: ns(r.ManagerSurname)},
@@ -191,6 +212,7 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			BranchID:                  ns(r.BranchID),
 			BranchCode:                ns(r.BranchCode),
 			BranchName:                ns(r.BranchName),
+			BranchManagerID:           ns(r.BranchManagerID),
 			RateSheet:                 RateSheetInfo{ID: ns(r.RateSheetID), Name: ns(r.RateSheetName), Revision: int(r.RateSheetRevision.Int64)},
 			FnAgreement:               r.FnAgreement,
 			ProjectAwardDate:          ns(r.ProjectAwardDate),
@@ -204,6 +226,9 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			Projects:                  projects,
 			Children:                  children,
 			Categories:                categories,
+		}
+		if jd.ProjectAuthorizationDoc != "" {
+			jd.ProjectAuthorizationURL = "/api/files/" + jobsCollection.Id + "/" + jd.ID + "/" + jd.ProjectAuthorizationDoc
 		}
 
 		return e.JSON(http.StatusOK, jd)

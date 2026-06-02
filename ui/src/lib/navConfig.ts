@@ -149,6 +149,7 @@ export const navSections: NavSection[] = [
           },
         ],
       },
+      { label: "PA Queue", href: "/jobs/project_authorization", buttons: [] },
       {
         label: "Rate Sheets",
         href: "/rate-sheets/list",

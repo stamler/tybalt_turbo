@@ -133,6 +133,44 @@ func TestJobsUpdate_NumberChangeBlockedByUpdateRule(t *testing.T) {
 	}
 }
 
+func TestJobsUpdate_ProjectAuthorizationFieldsBlockedByUpdateRule(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	protectedFields := []struct {
+		name  string
+		value string
+	}{
+		{name: "project_authorization_doc", value: `"pa.pdf"`},
+		{name: "project_authorization_doc_hash", value: `"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"`},
+		{name: "pa_reviewer", value: `"f2j5a8vk006baub"`},
+		{name: "pa_reviewed", value: `"2026-06-02 12:00:00.000Z"`},
+	}
+
+	for _, field := range protectedFields {
+		scenario := tests.ApiScenario{
+			Name:   "attempting to change " + field.name + " is blocked with 404",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
+			Body: strings.NewReader(`{
+				"` + field.name + `": ` + field.value + `
+			}`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 404,
+			ExpectedContent: []string{
+				`"message":"The requested resource wasn't found."`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdateRequest": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		}
+		scenario.Test(t)
+	}
+}
+
 // jobs: allow updating fields when number is unchanged (control test)
 func TestJobsUpdate_NumberUnchanged_AllowsOtherFieldUpdates(t *testing.T) {
 	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
@@ -168,8 +206,8 @@ func TestJobsUpdate_NumberUnchanged_AllowsOtherFieldUpdates(t *testing.T) {
 	}
 }
 
-// jobs: when authorizing_document is PO, client_po is required (min length > 2)
-func TestJobsUpdate_AuthorizingDocumentPO_Validations(t *testing.T) {
+// jobs: project authorization source of truth is PA review, so legacy PO is no longer valid.
+func TestJobsUpdate_AuthorizingDocumentPA_Validations(t *testing.T) {
 	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
 	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
@@ -178,7 +216,7 @@ func TestJobsUpdate_AuthorizingDocumentPO_Validations(t *testing.T) {
 
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "PO set but missing client_po fails",
+			Name:   "PO set fails even when client_po is blank",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
 			Body: strings.NewReader(`{
@@ -188,7 +226,7 @@ func TestJobsUpdate_AuthorizingDocumentPO_Validations(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"data":{"client_po":{"code":"client_po_min_length"`,
+				`"data":{"authorizing_document":{"code":"must_be_pa"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,
@@ -196,7 +234,7 @@ func TestJobsUpdate_AuthorizingDocumentPO_Validations(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "PO set with short trimmed client_po fails",
+			Name:   "PO set fails even when client_po is present",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
 			Body: strings.NewReader(`{
@@ -206,7 +244,7 @@ func TestJobsUpdate_AuthorizingDocumentPO_Validations(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"data":{"client_po":{"code":"client_po_min_length"`,
+				`"data":{"authorizing_document":{"code":"must_be_pa"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,
@@ -214,18 +252,18 @@ func TestJobsUpdate_AuthorizingDocumentPO_Validations(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "PO set with valid trimmed client_po succeeds",
+			Name:   "PA set with short client_po succeeds and preserves client_po",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
 			Body: strings.NewReader(`{
-                "authorizing_document": "PO",
-                "client_po": "  ABC123  "
+                "authorizing_document": "PA",
+                "client_po": " 12 "
             }`),
 			Headers:        map[string]string{"Authorization": recordToken},
 			ExpectedStatus: 200,
 			ExpectedContent: []string{
-				`"authorizing_document":"PO"`,
-				`"client_po":"ABC123"`,
+				`"authorizing_document":"PA"`,
+				`"client_po":"12"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,

@@ -61,6 +61,9 @@
                 if (item.href.startsWith("/rate-sheets")) {
                   return $globalStore.claims.includes("job");
                 }
+                if (item.href.startsWith("/jobs/project_authorization")) {
+                  return $globalStore.claims.includes("accounting");
+                }
                 if (item.href.startsWith("/reports/expense/queue")) {
                   return $globalStore.claims.includes("commit");
                 }

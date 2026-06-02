@@ -260,8 +260,13 @@ func normalizeLegacyPurchaseOrderValidationError(err error) error {
 	if errors.As(err, &validationErrs) {
 		fieldErrors := make(map[string]errs.CodeError, len(validationErrs))
 		for field, fieldErr := range validationErrs {
+			code := "validation_error"
+			var validationErr validation.Error
+			if errors.As(fieldErr, &validationErr) && validationErr.Code() != "" {
+				code = validationErr.Code()
+			}
 			fieldErrors[field] = errs.CodeError{
-				Code:    "validation_error",
+				Code:    code,
 				Message: fieldErr.Error(),
 			}
 		}

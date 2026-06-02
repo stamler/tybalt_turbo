@@ -173,7 +173,10 @@ SELECT
   po.closed_by_system,
   COALESCE(po.covered_within_project_budget, 0) AS covered_within_project_budget,
   CASE
-    WHEN COALESCE(j.authorizing_document, '') = 'PA' THEN 1
+    WHEN COALESCE(j.project_authorization_doc, '') != ''
+      AND COALESCE(j.project_authorization_doc_hash, '') != ''
+      AND COALESCE(j.pa_reviewed, '') != ''
+      AND COALESCE(j.pa_reviewer, '') != '' THEN 1
     ELSE 0
   END AS has_project_authorization,
   po.priority_second_approver,

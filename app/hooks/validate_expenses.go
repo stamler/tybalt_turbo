@@ -392,6 +392,17 @@ func validateExpense(app core.App, expenseRecord *core.Record, poRecord *core.Re
 				validationsErrors[field] = allocErr
 			}
 		}
+		if validationsErrors["job"] == nil {
+			if authErr := EnsureProjectAuthorizationApprovedForJob(app, jobID, "job"); authErr != nil {
+				if ve, ok := authErr.(validation.Errors); ok {
+					if fieldErr := ve["job"]; fieldErr != nil {
+						validationsErrors["job"] = fieldErr
+					}
+				} else {
+					return authErr
+				}
+			}
+		}
 	}
 
 	return validationsErrors.Filter()

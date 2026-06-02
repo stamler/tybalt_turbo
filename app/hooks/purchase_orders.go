@@ -539,6 +539,17 @@ func ValidatePurchaseOrder(app core.App, purchaseOrderRecord *core.Record, legac
 				validationsErrors[field] = allocErr
 			}
 		}
+		if validationsErrors["job"] == nil {
+			if authErr := EnsureProjectAuthorizationApprovedForJob(app, jobID, "job"); authErr != nil {
+				if ve, ok := authErr.(validation.Errors); ok {
+					if fieldErr := ve["job"]; fieldErr != nil {
+						validationsErrors["job"] = fieldErr
+					}
+				} else {
+					return authErr
+				}
+			}
+		}
 		linkedJobRecord = jobRecord
 	}
 

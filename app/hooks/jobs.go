@@ -18,6 +18,9 @@ import (
 )
 
 func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
+	if err := ProcessJobProjectAuthorizationFields(app, e); err != nil {
+		return err
+	}
 
 	return ProcessJobCore(app, e.Record, e.Auth)
 }
@@ -319,10 +322,8 @@ func cleanJob(app core.App, record *core.Record) error {
 	if !isProposal {
 		// Projects should NOT have proposal_value (but keep time_and_materials - it's shared)
 		record.Set("proposal_value", 0)
-
-		// If authorizing_document != PO, clear any provided client_po
-		if record.GetString("authorizing_document") != "PO" && record.GetString("client_po") != "" {
-			record.Set("client_po", "")
+		if record.IsNew() {
+			record.Set("authorizing_document", "PA")
 		}
 
 		// Centralize outstanding balance normalization for projects only
@@ -627,25 +628,13 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 	// Normalization is handled in cleanJob earlier.
 	if derived == jobTypeProject {
 		authorizingDocument := record.GetString("authorizing_document")
-		if authorizingDocument == "" {
+		if authorizingDocument != "PA" {
 			return 0, &errs.HookError{
 				Status:  http.StatusBadRequest,
-				Message: "authorizing document is required",
+				Message: "authorizing document must be PA for projects",
 				Data: map[string]errs.CodeError{
-					"authorizing_document": {Code: "required", Message: "authorizing_document is required"},
+					"authorizing_document": {Code: "must_be_pa", Message: "project authorizing_document must be PA"},
 				},
-			}
-		}
-		if authorizingDocument == "PO" {
-			clientPO := record.GetString("client_po")
-			if len(clientPO) <= 2 {
-				return 0, &errs.HookError{
-					Status:  http.StatusBadRequest,
-					Message: "client PO must be at least 3 characters when authorizing document is PO",
-					Data: map[string]errs.CodeError{
-						"client_po": {Code: "client_po_min_length", Message: "client_po must be at least 3 characters when authorizing_document is PO"},
-					},
-				}
 			}
 		}
 	}

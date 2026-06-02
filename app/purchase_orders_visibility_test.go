@@ -785,7 +785,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "visible purchase order response includes project authorization and budget coverage flags",
+			Name:   "visible purchase order response includes reviewed project authorization and budget coverage flags",
 			Method: http.MethodGet,
 			URL:    "/api/purchase_orders/visible/2plsetqdxht7esg",
 			Headers: map[string]string{
@@ -807,6 +807,18 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 					"id": "2plsetqdxht7esg",
 				}).Execute(); err != nil {
 					tb.Fatalf("failed seeding budget coverage flag: %v", err)
+				}
+				if _, err := app.DB().NewQuery(`
+					UPDATE jobs
+					SET project_authorization_doc = 'approved-pa.pdf',
+							project_authorization_doc_hash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+							pa_reviewed = '2026-06-02 12:00:00.000Z',
+							pa_reviewer = 'f2j5a8vk006baub'
+					WHERE id = {:id}
+				`).Bind(map[string]any{
+					"id": "cjf0kt0defhq480",
+				}).Execute(); err != nil {
+					tb.Fatalf("failed seeding reviewed PA fields: %v", err)
 				}
 				return app
 			},
