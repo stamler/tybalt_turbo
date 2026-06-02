@@ -72,6 +72,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+      await globalStore.refreshAttentionCounts();
     } catch (error: any) {
       globalStore.addError(error?.response?.message ?? "Failed to cancel purchase order");
     }
@@ -80,6 +81,7 @@
   async function closePurchaseOrder(id: string): Promise<void> {
     try {
       await pb.send(`/api/purchase_orders/${id}/close`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
     } catch (error: any) {
       globalStore.addError(error?.response?.message ?? "Failed to close purchase order");
     }

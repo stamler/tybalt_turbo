@@ -86,6 +86,7 @@ const createStore = () => {
   let userPoApproverProfilePromise: Promise<void> | null = null;
   let userDefaultsPromise: Promise<void> | null = null;
   let attentionCountsPromise: Promise<void> | null = null;
+  let attentionCountsLoadId = 0;
   const isAutoCancelled = (error: unknown): boolean => {
     const err = error as MaybeAbortError;
     if (err?.isAbort) return true;
@@ -316,9 +317,10 @@ const createStore = () => {
     return userDefaultsPromise;
   };
 
-  const loadAttentionCounts = async () => {
-    if (attentionCountsPromise) return attentionCountsPromise;
-    attentionCountsPromise = (async () => {
+  const loadAttentionCounts = async (force = false) => {
+    if (attentionCountsPromise && !force) return attentionCountsPromise;
+    const loadId = ++attentionCountsLoadId;
+    const promise = (async () => {
       try {
         const counts = (await pb.send("/api/nav/badges", {
           method: "GET",
@@ -327,20 +329,27 @@ const createStore = () => {
 
         update((state) => ({
           ...state,
-          attentionCounts: {
-            counts: counts ?? {},
-            maxAge: state.attentionCounts.maxAge,
-            lastRefresh: new Date(),
-          },
+          attentionCounts:
+            loadId === attentionCountsLoadId
+              ? {
+                  counts: counts ?? {},
+                  maxAge: state.attentionCounts.maxAge,
+                  lastRefresh: new Date(),
+                }
+              : state.attentionCounts,
         }));
       } catch (error: unknown) {
+        if (loadId !== attentionCountsLoadId) return;
         if (isAutoCancelled(error)) return;
         const typedErr = error as ClientResponseError;
         console.error("Error loading navigation badges:", typedErr);
       }
     })().finally(() => {
-      attentionCountsPromise = null;
+      if (attentionCountsPromise === promise) {
+        attentionCountsPromise = null;
+      }
     });
+    attentionCountsPromise = promise;
     return attentionCountsPromise;
   };
 
@@ -414,7 +423,7 @@ const createStore = () => {
 
   const refreshAttentionCounts = async () => {
     if (!get(authStore)?.isValid) return;
-    await loadAttentionCounts();
+    await loadAttentionCounts(true);
   };
 
   const addError = (message: string) => {

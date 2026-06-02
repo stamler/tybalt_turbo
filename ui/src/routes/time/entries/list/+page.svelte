@@ -98,6 +98,7 @@
           "Content-Type": "application/json",
         },
       });
+      await globalStore.refreshAttentionCounts();
 
       // navigate to the time sheets list to show the bundled time sheets
       goto(`/time/sheets/list`);

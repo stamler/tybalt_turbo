@@ -35,6 +35,7 @@
   async function commit(id: string) {
     try {
       await pb.send(`/api/expenses/${id}/commit`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
       await refreshRows();
     } catch (error: unknown) {
       const responseError = error as { response?: { error?: string } };

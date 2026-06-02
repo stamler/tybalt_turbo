@@ -47,6 +47,7 @@
           "Content-Type": "application/json",
         },
       });
+      await globalStore.refreshAttentionCounts();
 
       // navigate to the time entries list to show the unbundled time entries
       goto(`/time/entries/list`);
@@ -63,6 +64,7 @@
           "Content-Type": "application/json",
         },
       });
+      await globalStore.refreshAttentionCounts();
     } catch (error: any) {
       globalStore.addError(getApiErrorMessage(error, "Approve failed"));
     }

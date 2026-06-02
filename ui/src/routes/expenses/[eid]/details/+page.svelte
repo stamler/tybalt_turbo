@@ -51,6 +51,7 @@
   async function submitExpense() {
     try {
       await pb.send(`/api/expenses/${expense.id}/submit`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
       await refreshExpense();
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Submit failed");
@@ -60,6 +61,7 @@
   async function recallExpense() {
     try {
       await pb.send(`/api/expenses/${expense.id}/recall`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
       await refreshExpense();
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Recall failed");
@@ -69,6 +71,7 @@
   async function approveExpense() {
     try {
       await pb.send(`/api/expenses/${expense.id}/approve`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
       await refreshExpense();
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Approve failed");
@@ -78,6 +81,7 @@
   async function commitExpense() {
     try {
       await pb.send(`/api/expenses/${expense.id}/commit`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
       await goto(resolve("/reports/expense/queue"));
     } catch (error: any) {
       globalStore.addError(error?.response?.error || "Commit failed");
@@ -90,6 +94,7 @@
     try {
       await pb.send(`/api/expenses/${expense.id}/uncommit`, { method: "POST" });
       showUncommitConfirm = false;
+      await globalStore.refreshAttentionCounts();
       await refreshExpense();
     } catch (error: any) {
       uncommitError = error?.response?.error || "Uncommit failed";
@@ -205,11 +210,15 @@
     </div>
 
     <div>
-      <span class="font-semibold">Total:</span> {formatCurrencyAmount(expense.total, expense.currency_code)}
+      <span class="font-semibold">Total:</span>
+      {formatCurrencyAmount(expense.total, expense.currency_code)}
       {#if expense.purchase_order && expense.po_total && expense.total !== expense.po_total}
         <span
           class="ml-1 inline-block rounded-sm border border-amber-300 bg-amber-100 px-2 py-0.5 text-xs text-amber-600"
-          >PO: {formatCurrencyAmount(expense.po_total, expense.po_currency_code || expense.currency_code)}</span
+          >PO: {formatCurrencyAmount(
+            expense.po_total,
+            expense.po_currency_code || expense.currency_code,
+          )}</span
         >
       {/if}
     </div>
@@ -418,7 +427,9 @@
     {:else if expense.attachment_missing_reason}
       <div class="flex items-start gap-2">
         <span class="font-semibold">Attachment:</span>
-        <div class="max-w-2xl rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <div
+          class="max-w-2xl rounded-sm border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900"
+        >
           <div class="font-semibold">Missing historical attachment</div>
           <div>{expense.attachment_missing_reason}</div>
         </div>
@@ -436,7 +447,9 @@
     {:else if hasAdminAccess && expense.attachment_document}
       <div class="flex items-start gap-2">
         <span class="font-semibold">Attachment:</span>
-        <div class="max-w-2xl rounded-sm border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900">
+        <div
+          class="max-w-2xl rounded-sm border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-900"
+        >
           <div class="font-semibold">Attachment document issue</div>
           <div>The linked document has no downloadable attachment.</div>
         </div>

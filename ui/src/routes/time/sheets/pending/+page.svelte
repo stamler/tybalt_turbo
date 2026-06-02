@@ -18,6 +18,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+      await globalStore.refreshAttentionCounts();
       // remove from list after approving
       items = items.filter((ts: TimeSheetTallyQueryRow) => ts.id !== id);
     } catch (error: any) {

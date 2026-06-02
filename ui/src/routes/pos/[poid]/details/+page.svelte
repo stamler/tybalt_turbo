@@ -35,8 +35,8 @@
   const displayStatus = $derived(isRejected ? "Rejected" : data.po.status);
   const isOwner = $derived(data.po.uid === viewerId);
   const canApproveOrReject = $derived(data.canApproveOrReject);
-  const hasProjectJob = $derived.by(
-    () => Boolean(data.po.job && data.po.job_number && !data.po.job_number.toUpperCase().startsWith("P")),
+  const hasProjectJob = $derived.by(() =>
+    Boolean(data.po.job && data.po.job_number && !data.po.job_number.toUpperCase().startsWith("P")),
   );
   const showProjectAuthorizationBadge = $derived.by(
     () => hasProjectJob && data.po.has_project_authorization,
@@ -58,6 +58,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+      await globalStore.refreshAttentionCounts();
       await goto(resolve("/pos/pending"));
     } catch (e: any) {
       globalStore.addError(e?.response?.message || "Approve failed");
@@ -71,6 +72,7 @@
   async function cancelPo() {
     try {
       await pb.send(`/api/purchase_orders/${data.po.id}/cancel`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
       goto(resolve("/pos/list"));
     } catch (e: any) {
       globalStore.addError(e);
@@ -80,6 +82,7 @@
   async function closePo() {
     try {
       await pb.send(`/api/purchase_orders/${data.po.id}/close`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
       goto(resolve("/pos/list"));
     } catch (e: any) {
       globalStore.addError(e);
@@ -386,7 +389,9 @@
                 {/if}
               </div>
               {#if showProjectAuthorizationHelp && showProjectAuthorizationBadge}
-                <div class="rounded-sm border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-950">
+                <div
+                  class="rounded-sm border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-950"
+                >
                   Procurement assures that this job has a project authorization.
                 </div>
               {/if}

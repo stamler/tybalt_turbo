@@ -226,6 +226,7 @@
 
     try {
       await pb.collection("purchase_orders").delete(id);
+      await globalStore.refreshAttentionCounts();
     } catch (error: any) {
       globalStore.addError(error?.response?.message);
     }
@@ -237,6 +238,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+      await globalStore.refreshAttentionCounts();
       await goto(resolve("/pos/pending"));
     } catch (error: any) {
       globalStore.addError(error?.response?.message);
@@ -249,6 +251,7 @@
         method: "POST",
         headers: { "Content-Type": "application/json" },
       });
+      await globalStore.refreshAttentionCounts();
     } catch (error: any) {
       globalStore.addError(error?.response?.message);
     }
@@ -257,6 +260,7 @@
   async function closePurchaseOrder(id: string) {
     try {
       await pb.send(`/api/purchase_orders/${id}/close`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
 
       // Show success toast
       /*

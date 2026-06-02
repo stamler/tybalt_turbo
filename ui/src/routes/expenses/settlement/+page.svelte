@@ -15,6 +15,7 @@
   } from "$lib/utilities";
   import { resolve } from "$app/paths";
   import { onMount } from "svelte";
+  import { globalStore } from "$lib/stores/global";
 
   let activeTab = $state<"unsettled" | "settled">("unsettled");
   let unsettledRows = $state<ExpenseSettlementRow[]>([]);
@@ -49,9 +50,7 @@
       ]);
       unsettledRows = unsettled;
       settledRows = settled;
-      draftValues = Object.fromEntries(
-        unsettled.map((row) => [row.id, row.settled_total || 0]),
-      );
+      draftValues = Object.fromEntries(unsettled.map((row) => [row.id, row.settled_total || 0]));
     } catch (error: any) {
       errorMessage = error?.response?.message ?? "Failed to load settlement queue";
     } finally {
@@ -70,6 +69,7 @@
         body: JSON.stringify({ settled_total: Number(draftValues[id] ?? 0) }),
         headers: { "Content-Type": "application/json" },
       });
+      await globalStore.refreshAttentionCounts();
       await refreshRows();
     } catch (error: any) {
       errorMessage = error?.response?.message ?? "Failed to save settlement";
@@ -79,6 +79,7 @@
   async function clearSettlement(id: string) {
     try {
       await pb.send(`/api/expenses/${id}/clear_settlement`, { method: "POST" });
+      await globalStore.refreshAttentionCounts();
       await refreshRows();
     } catch (error: any) {
       errorMessage = error?.response?.message ?? "Failed to clear settlement";
@@ -89,13 +90,19 @@
 </script>
 
 {#if errorMessage}
-  <div class="mx-2 mt-2 rounded-sm border border-red-300 bg-red-50 p-3 text-red-700">{errorMessage}</div>
+  <div class="mx-2 mt-2 rounded-sm border border-red-300 bg-red-50 p-3 text-red-700">
+    {errorMessage}
+  </div>
 {/if}
 
 {#if loading}
   <div class="p-2 text-neutral-500">Loading settlement queue…</div>
 {:else}
-  <DSList items={rows} inListHeader={activeTab === "unsettled" ? "Unsettled" : "Settled"} search={true}>
+  <DSList
+    items={rows}
+    inListHeader={activeTab === "unsettled" ? "Unsettled" : "Settled"}
+    search={true}
+  >
     {#snippet searchBarExtra()}
       <div class="flex items-center gap-2 max-[639px]:w-full max-[639px]:flex-wrap">
         <DSToggle
@@ -133,7 +140,11 @@
     {/snippet}
     {#snippet line2(row: ExpenseSettlementRow)}
       {#if activeTab === "unsettled"}
-        {formatCurrencyEquivalent(row.indicative_cad_total, row.currency_rate, row.currency_rate_date)}
+        {formatCurrencyEquivalent(
+          row.indicative_cad_total,
+          row.currency_rate,
+          row.currency_rate_date,
+        )}
       {/if}
     {/snippet}
     {#snippet line3(row: ExpenseSettlementRow)}

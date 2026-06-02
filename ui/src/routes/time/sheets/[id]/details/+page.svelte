@@ -115,6 +115,7 @@
           "Content-Type": "application/json",
         },
       });
+      await globalStore.refreshAttentionCounts();
       await refreshDetails(id);
     } catch (error: any) {
       globalStore.addError(getApiErrorMessage(error, "Approve failed"));
@@ -126,6 +127,7 @@
       await pb.send(`/api/time_sheets/${id}/commit`, {
         method: "POST",
       });
+      await globalStore.refreshAttentionCounts();
       await refreshDetails(id);
     } catch (error: any) {
       globalStore.addError(getApiErrorMessage(error, "Commit failed"));
@@ -140,6 +142,7 @@
         method: "POST",
       });
       showUncommitConfirm = false;
+      await globalStore.refreshAttentionCounts();
       await refreshDetails(id);
     } catch (error: any) {
       uncommitError = getApiErrorMessage(error, "Uncommit failed");
@@ -153,6 +156,7 @@
       await pb.send(`/api/time_sheets/${id}/unbundle`, {
         method: "POST",
       });
+      await globalStore.refreshAttentionCounts();
 
       // navigate to the time entries list to show the unbundled time entries
       goto(`/time/entries/list`);

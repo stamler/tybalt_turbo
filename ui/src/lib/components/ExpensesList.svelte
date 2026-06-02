@@ -103,6 +103,7 @@
 
     try {
       await pb.collection("expenses").delete(id);
+      await globalStore.refreshAttentionCounts();
 
       // remove the item from the list
       items = items.filter((item) => item.id !== id);
@@ -115,6 +116,7 @@
       await pb.send(`/api/expenses/${id}/submit`, {
         method: "POST",
       });
+      await globalStore.refreshAttentionCounts();
     } catch (error: unknown) {
       globalStore.addError(apiErrorMessage(error, "Submit failed"));
     }
@@ -125,6 +127,7 @@
       await pb.send(`/api/expenses/${id}/recall`, {
         method: "POST",
       });
+      await globalStore.refreshAttentionCounts();
     } catch (error: unknown) {
       globalStore.addError(apiErrorMessage(error, "Recall failed"));
     }
@@ -150,6 +153,7 @@
       await pb.send(`/api/expenses/${id}/approve`, {
         method: "POST",
       });
+      await globalStore.refreshAttentionCounts();
       if (removeFromListAfterApproval && Array.isArray(items)) {
         items = items.filter((item) => item.id !== id);
       }

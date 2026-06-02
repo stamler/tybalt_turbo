@@ -33,7 +33,7 @@
         },
       });
 
-      globalStore.refresh();
+      await globalStore.refreshAttentionCounts();
       closeModal();
 
       // emit event to refresh the page to the parent
