@@ -151,6 +151,7 @@ func TestBundleTimesheet_ProjectAuthorizationGate(t *testing.T) {
 				`"code":"` + hooks.ProjectAuthorizationNotApprovedCode + `"`,
 				`"blocking_jobs":[`,
 				`"id":"cjf0kt0defhq480"`,
+				`"manager_name":"Fakesy Manjor"`,
 			},
 		},
 		{

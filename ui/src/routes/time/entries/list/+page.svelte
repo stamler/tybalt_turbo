@@ -9,20 +9,61 @@
   import type { TimeEntriesResponse } from "$lib/pocketbase-types";
   import { globalStore } from "$lib/stores/global";
   import { goto } from "$app/navigation";
+  import { resolve } from "$app/paths";
   import { calculateTally, formatJobLabel } from "$lib/utilities";
   import { type UnsubscribeFunc } from "pocketbase";
-  import { onMount, onDestroy, untrack } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
   import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
   import { getApiErrorMessage } from "$lib/errors";
   let { data }: { data: PageData } = $props();
 
+  const projectAuthorizationNotApprovedCode = "project_authorization_not_approved";
+  const projectAuthorizationEntryMessage = "This job is missing an approved PA document.";
+
   // Local state for items that can be mutated by real-time subscriptions.
-  // untrack() suppresses the "initial value" warning - we handle reactivity via $effect.
-  let items = $state(untrack(() => data.items));
-  $effect(() => {
-    items = data.items;
-  });
+  let items = $derived(data.items);
+  let blockingProjectAuthorizationJobs = $state(new Map<string, BlockingProjectAuthorizationJob>());
+
+  type BlockingProjectAuthorizationJob = {
+    id: string;
+    manager_name: string;
+  };
+
+  type BundleErrorPayload = {
+    code?: unknown;
+    blocking_jobs?: unknown;
+  };
+
+  function getErrorPayload(error: unknown): BundleErrorPayload {
+    if (typeof error !== "object" || error === null) return {};
+    const { response, data } = error as { response?: unknown; data?: unknown };
+    const payload = response ?? data;
+    return typeof payload === "object" && payload !== null ? (payload as BundleErrorPayload) : {};
+  }
+
+  function getBlockingJobsById(
+    blockingJobs: unknown,
+  ): Map<string, BlockingProjectAuthorizationJob> {
+    if (!Array.isArray(blockingJobs)) return new Map();
+
+    return new Map(
+      blockingJobs.flatMap((job: unknown) => {
+        if (typeof job !== "object" || job === null) return [];
+        const { id, manager_name } = job as { id?: unknown; manager_name?: unknown };
+        if (typeof id !== "string") return [];
+        return [
+          [
+            id,
+            {
+              id,
+              manager_name: typeof manager_name === "string" ? manager_name.trim() : "",
+            },
+          ],
+        ];
+      }),
+    );
+  }
 
   // Subscribe to the base collection but update the items from the augmented
   // view
@@ -72,7 +113,7 @@
   async function del(id: string): Promise<void> {
     try {
       await pb.collection("time_entries").delete(id);
-    } catch (error: any) {
+    } catch (error: unknown) {
       globalStore.addError(getApiErrorMessage(error, "Delete failed"));
     }
   }
@@ -85,7 +126,7 @@
           "Content-Type": "application/json",
         },
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       globalStore.addError(getApiErrorMessage(error, "Copy to tomorrow failed"));
     }
   }
@@ -99,10 +140,20 @@
         },
       });
       await globalStore.refreshAttentionCounts();
+      blockingProjectAuthorizationJobs = new Map();
 
       // navigate to the time sheets list to show the bundled time sheets
-      goto(`/time/sheets/list`);
-    } catch (error: any) {
+      goto(resolve("/time/sheets/list"));
+    } catch (error: unknown) {
+      const payload = getErrorPayload(error);
+      const blockingJobsById = getBlockingJobsById(payload.blocking_jobs);
+      if (payload.code === projectAuthorizationNotApprovedCode && blockingJobsById.size > 0) {
+        blockingProjectAuthorizationJobs = blockingJobsById;
+        globalStore.addError(
+          "Some entries cannot be bundled until their project authorization is approved.",
+        );
+        return;
+      }
       globalStore.addError(getApiErrorMessage(error, "Submit failed"));
     }
   }
@@ -140,11 +191,22 @@
 
 {#snippet line2(item: TimeEntriesResponse)}{hoursString(item)}{/snippet}
 
-{#snippet line3({ work_record, description }: TimeEntriesResponse)}
-  {#if work_record !== ""}
-    <span><span class="opacity-50">Work Record</span> {work_record} / </span>
+{#snippet line3(item: TimeEntriesResponse)}
+  {#if item.work_record !== ""}
+    <span><span class="opacity-50">Work Record</span> {item.work_record} / </span>
   {/if}
-  <span class="opacity-50">{description}</span>
+  <span class="opacity-50">{item.description}</span>
+  {@const blockingProjectAuthorizationJob = item.job
+    ? blockingProjectAuthorizationJobs.get(item.job)
+    : undefined}
+  {#if blockingProjectAuthorizationJob}
+    <span class="rounded-sm bg-red-100 px-1.5 py-0.5 text-red-700">
+      {projectAuthorizationEntryMessage}
+      {#if blockingProjectAuthorizationJob.manager_name}
+        Speak with {blockingProjectAuthorizationJob.manager_name}.
+      {/if}
+    </span>
+  {/if}
 {/snippet}
 
 {#snippet actions({ id }: TimeEntriesResponse)}
@@ -205,7 +267,7 @@
         .filter(({ total }) => total > 0)
         .sort((a, b) => a.date.localeCompare(b.date))}
       <div class="mb-1 flex flex-wrap gap-x-3 gap-y-1 text-sm">
-        {#each dailyTotals as { day, total }}
+        {#each dailyTotals as { day, total, date } (date)}
           <span class="whitespace-nowrap">
             <span class="opacity-50">{day}:</span>
             {total}h
