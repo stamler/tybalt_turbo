@@ -1531,6 +1531,26 @@
             "name": "updated",
             "type": "string",
             "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "project_authorization_doc",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "project_authorization_doc_hash",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "pa_reviewer",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "pa_reviewed",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
           }
         ],
         "primaryKey": [

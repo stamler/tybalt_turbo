@@ -403,6 +403,18 @@ func AddHooks(app core.App) {
 		return nil
 	})
 	// hooks for jobs model
+	app.OnRecordCreate("jobs").BindFunc(func(e *core.RecordEvent) error {
+		if err := EnforceProjectAuthorizationSaveInvariant(e.Record, ProjectAuthorizationMutationFromContext(e.Context)); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+	app.OnRecordUpdate("jobs").BindFunc(func(e *core.RecordEvent) error {
+		if err := EnforceProjectAuthorizationSaveInvariant(e.Record, ProjectAuthorizationMutationFromContext(e.Context)); err != nil {
+			return err
+		}
+		return e.Next()
+	})
 	app.OnRecordCreateRequest("jobs").BindFunc(func(e *core.RecordRequestEvent) error {
 		if err := ProcessJob(app, e); err != nil {
 			return AnnotateHookError(app, e, err)

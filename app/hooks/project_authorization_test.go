@@ -1,8 +1,12 @@
 package hooks
 
 import (
+	"context"
+	"errors"
+	"strings"
 	"testing"
 	"tybalt/constants"
+	"tybalt/errs"
 	"tybalt/internal/testseed"
 	"tybalt/utilities"
 
@@ -11,8 +15,11 @@ import (
 )
 
 const (
-	paGateProjectID  = "cjf0kt0defhq480"
-	paGateProposalID = "kyed8fha9uaha27"
+	paGateMissingProjectID  = "pafixmissing01"
+	paGatePendingProjectID  = "pafixpending01"
+	paGateApprovedProjectID = "pafixapprove01"
+	paGateLegacyPOProjectID = "pafixlegacy01"
+	paGateProposalID        = "kyed8fha9uaha27"
 )
 
 func TestEnsureProjectAuthorizationApprovedForJob(t *testing.T) {
@@ -21,7 +28,7 @@ func TestEnsureProjectAuthorizationApprovedForJob(t *testing.T) {
 		defer app.Cleanup()
 		setProjectAuthorizationEnforcementForTest(t, app, false)
 
-		if err := EnsureProjectAuthorizationApprovedForJob(app, paGateProjectID, "job"); err != nil {
+		if err := EnsureProjectAuthorizationApprovedForJob(app, paGateMissingProjectID, "job"); err != nil {
 			t.Fatalf("expected disabled enforcement to allow project, got %v", err)
 		}
 	})
@@ -31,7 +38,7 @@ func TestEnsureProjectAuthorizationApprovedForJob(t *testing.T) {
 		defer app.Cleanup()
 		setProjectAuthorizationEnforcementForTest(t, app, true)
 
-		err := EnsureProjectAuthorizationApprovedForJob(app, paGateProjectID, "job")
+		err := EnsureProjectAuthorizationApprovedForJob(app, paGateMissingProjectID, "job")
 		if err == nil {
 			t.Fatal("expected unapproved project to be blocked")
 		}
@@ -53,11 +60,19 @@ func TestEnsureProjectAuthorizationApprovedForJob(t *testing.T) {
 		app := testseed.NewSeededTestApp(t)
 		defer app.Cleanup()
 		setProjectAuthorizationEnforcementForTest(t, app, true)
-		setProjectAuthorizationApprovedForTest(t, app, paGateProjectID)
 
-		if err := EnsureProjectAuthorizationApprovedForJob(app, paGateProjectID, "job"); err != nil {
+		if err := EnsureProjectAuthorizationApprovedForJob(app, paGateApprovedProjectID, "job"); err != nil {
 			t.Fatalf("expected approved project to be allowed, got %v", err)
 		}
+	})
+
+	t.Run("enabled enforcement blocks legacy PO project", func(t *testing.T) {
+		app := testseed.NewSeededTestApp(t)
+		defer app.Cleanup()
+		setProjectAuthorizationEnforcementForTest(t, app, true)
+
+		err := EnsureProjectAuthorizationApprovedForJob(app, paGateLegacyPOProjectID, "job")
+		assertProjectAuthorizationGateValidationError(t, err, "job")
 	})
 
 	t.Run("enabled enforcement ignores proposals", func(t *testing.T) {
@@ -71,15 +86,129 @@ func TestEnsureProjectAuthorizationApprovedForJob(t *testing.T) {
 	})
 }
 
+func TestProjectAuthorizationSaveInvariantBlocksUntrustedModelSaves(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	AddHooks(app)
+
+	job, err := app.FindRecordById("jobs", paGateMissingProjectID)
+	if err != nil {
+		t.Fatalf("failed to load job: %v", err)
+	}
+	job.Set("project_authorization_doc_hash", strings.Repeat("b", 64))
+
+	err = app.Save(job)
+	assertProjectAuthorizationHookError(t, err, "project_authorization_doc_hash", "not_editable")
+
+	reloaded, err := app.FindRecordById("jobs", paGateMissingProjectID)
+	if err != nil {
+		t.Fatalf("failed to reload job: %v", err)
+	}
+	if reloaded.GetString("project_authorization_doc_hash") != "" {
+		t.Fatalf("untrusted save mutated PA hash to %q", reloaded.GetString("project_authorization_doc_hash"))
+	}
+}
+
+func TestProjectAuthorizationSaveInvariantAllowsTrustedApprovalAndRevocation(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	AddHooks(app)
+
+	job, err := app.FindRecordById("jobs", paGatePendingProjectID)
+	if err != nil {
+		t.Fatalf("failed to load job: %v", err)
+	}
+	job.Set("pa_reviewed", "2026-06-03 12:00:00.000Z")
+	job.Set("pa_reviewer", "f2j5a8vk006baub")
+	err = app.Save(job)
+	assertProjectAuthorizationHookError(t, err, "pa_reviewer", "not_editable")
+
+	job, err = app.FindRecordById("jobs", paGatePendingProjectID)
+	if err != nil {
+		t.Fatalf("failed to reload job: %v", err)
+	}
+	job.Set("pa_reviewed", "2026-06-03 12:00:00.000Z")
+	job.Set("pa_reviewer", "f2j5a8vk006baub")
+	if err := app.SaveWithContext(WithProjectAuthorizationMutation(context.Background(), ProjectAuthorizationMutationApprove), job); err != nil {
+		t.Fatalf("trusted approval save failed: %v", err)
+	}
+
+	job, err = app.FindRecordById("jobs", paGatePendingProjectID)
+	if err != nil {
+		t.Fatalf("failed to reload approved job: %v", err)
+	}
+	if job.GetString("pa_reviewed") == "" || job.GetString("pa_reviewer") != "f2j5a8vk006baub" {
+		t.Fatalf("trusted approval did not persist review fields: reviewed=%q reviewer=%q", job.GetString("pa_reviewed"), job.GetString("pa_reviewer"))
+	}
+
+	job.Set("pa_reviewed", "")
+	job.Set("pa_reviewer", "")
+	if err := app.SaveWithContext(WithProjectAuthorizationMutation(context.Background(), ProjectAuthorizationMutationRevoke), job); err != nil {
+		t.Fatalf("trusted revocation save failed: %v", err)
+	}
+	job, err = app.FindRecordById("jobs", paGatePendingProjectID)
+	if err != nil {
+		t.Fatalf("failed to reload revoked job: %v", err)
+	}
+	if job.GetString("pa_reviewed") != "" || job.GetString("pa_reviewer") != "" {
+		t.Fatalf("trusted revocation did not clear review fields: reviewed=%q reviewer=%q", job.GetString("pa_reviewed"), job.GetString("pa_reviewer"))
+	}
+	if job.GetString("project_authorization_doc") == "" || job.GetString("project_authorization_doc_hash") == "" {
+		t.Fatalf("trusted revocation should preserve document and hash")
+	}
+}
+
+func TestProjectAuthorizationSaveInvariantAllowsTrustedDeleteOnlyWhenUnapproved(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	AddHooks(app)
+
+	job, err := app.FindRecordById("jobs", paGatePendingProjectID)
+	if err != nil {
+		t.Fatalf("failed to load job: %v", err)
+	}
+	job.Set("project_authorization_doc", "")
+	job.Set("project_authorization_doc_hash", "")
+	if err := app.SaveWithContext(WithProjectAuthorizationMutation(context.Background(), ProjectAuthorizationMutationDelete), job); err != nil {
+		t.Fatalf("trusted delete save failed: %v", err)
+	}
+	job, err = app.FindRecordById("jobs", paGatePendingProjectID)
+	if err != nil {
+		t.Fatalf("failed to reload deleted job: %v", err)
+	}
+	if job.GetString("project_authorization_doc") != "" || job.GetString("project_authorization_doc_hash") != "" {
+		t.Fatalf("trusted delete did not clear document and hash: doc=%q hash=%q", job.GetString("project_authorization_doc"), job.GetString("project_authorization_doc_hash"))
+	}
+}
+
+func TestProjectAuthorizationSaveInvariantRejectsTrustedUploadForApprovedJob(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	AddHooks(app)
+
+	job, err := app.FindRecordById("jobs", paGateApprovedProjectID)
+	if err != nil {
+		t.Fatalf("failed to load job: %v", err)
+	}
+	job.Set("project_authorization_doc", "replacement-pa.pdf")
+	job.Set("project_authorization_doc_hash", strings.Repeat("c", 64))
+	job.Set("pa_reviewed", "")
+	job.Set("pa_reviewer", "")
+	err = app.SaveWithContext(WithProjectAuthorizationMutation(context.Background(), ProjectAuthorizationMutationUpload), job)
+	assertProjectAuthorizationHookError(t, err, "project_authorization_doc", "project_authorization_approved_immutable")
+}
+
 func TestProjectAuthorizationPurchaseOrderGate(t *testing.T) {
 	scenarios := []struct {
 		name     string
 		enforce  bool
 		approved bool
+		legacy   bool
 		blocked  bool
 	}{
 		{name: "disabled enforcement allows unapproved project", enforce: false},
 		{name: "enabled enforcement blocks unapproved project", enforce: true, blocked: true},
+		{name: "enabled enforcement blocks legacy PO project", enforce: true, legacy: true, blocked: true},
 		{name: "enabled enforcement allows approved project", enforce: true, approved: true},
 	}
 
@@ -91,8 +220,11 @@ func TestProjectAuthorizationPurchaseOrderGate(t *testing.T) {
 				t.Fatalf("failed to load expenditure kinds config: %v", err)
 			}
 			setProjectAuthorizationEnforcementForTest(t, app, scenario.enforce)
+			jobID := paGateMissingProjectID
 			if scenario.approved {
-				setProjectAuthorizationApprovedForTest(t, app, paGateProjectID)
+				jobID = paGateApprovedProjectID
+			} else if scenario.legacy {
+				jobID = paGateLegacyPOProjectID
 			}
 
 			record := buildRecordFromMap(poCollection, map[string]any{
@@ -106,7 +238,7 @@ func TestProjectAuthorizationPurchaseOrderGate(t *testing.T) {
 				"vendor":       "2zqxtsmymf670ha",
 				"approver":     "f2j5a8vk006baub",
 				"type":         "One-Time",
-				"job":          paGateProjectID,
+				"job":          jobID,
 				"kind":         utilities.DefaultProjectExpenditureKindID(),
 			})
 
@@ -127,10 +259,12 @@ func TestProjectAuthorizationExpenseGate(t *testing.T) {
 		name     string
 		enforce  bool
 		approved bool
+		legacy   bool
 		blocked  bool
 	}{
 		{name: "disabled enforcement allows unapproved project", enforce: false},
 		{name: "enabled enforcement blocks unapproved project", enforce: true, blocked: true},
+		{name: "enabled enforcement blocks legacy PO project", enforce: true, legacy: true, blocked: true},
 		{name: "enabled enforcement allows approved project", enforce: true, approved: true},
 	}
 
@@ -142,8 +276,11 @@ func TestProjectAuthorizationExpenseGate(t *testing.T) {
 				t.Fatalf("failed to load expenditure kinds config: %v", err)
 			}
 			setProjectAuthorizationEnforcementForTest(t, app, scenario.enforce)
+			jobID := paGateMissingProjectID
 			if scenario.approved {
-				setProjectAuthorizationApprovedForTest(t, app, paGateProjectID)
+				jobID = paGateApprovedProjectID
+			} else if scenario.legacy {
+				jobID = paGateLegacyPOProjectID
 			}
 
 			record := buildRecordFromMap(expensesCollection, map[string]any{
@@ -151,7 +288,7 @@ func TestProjectAuthorizationExpenseGate(t *testing.T) {
 				"date":            "2024-09-01",
 				"description":     "PA gate mileage expense",
 				"division":        "vccd5fo56ctbigh",
-				"job":             paGateProjectID,
+				"job":             jobID,
 				"payment_type":    "Mileage",
 				"purchase_order":  "",
 				"total":           constants.NO_PO_EXPENSE_LIMIT + 100,
@@ -169,6 +306,24 @@ func TestProjectAuthorizationExpenseGate(t *testing.T) {
 				t.Fatalf("expected expense to pass PA gate, got %v", err)
 			}
 		})
+	}
+}
+
+func assertProjectAuthorizationHookError(t *testing.T, err error, field string, code string) {
+	t.Helper()
+	if err == nil {
+		t.Fatalf("expected PA hook error for %s", field)
+	}
+	var hookErr *errs.HookError
+	if !errors.As(err, &hookErr) {
+		t.Fatalf("expected HookError, got %T: %v", err, err)
+	}
+	fieldErr, ok := hookErr.Data[field]
+	if !ok {
+		t.Fatalf("expected hook error field %s, got %+v", field, hookErr.Data)
+	}
+	if fieldErr.Code != code {
+		t.Fatalf("hook error code for %s = %s, want %s", field, fieldErr.Code, code)
 	}
 }
 
@@ -204,19 +359,5 @@ func assertProjectAuthorizationGateValidationError(t *testing.T, err error, fiel
 	codeErr, ok := fieldErr.(validation.Error)
 	if !ok || codeErr.Code() != ProjectAuthorizationNotApprovedCode {
 		t.Fatalf("expected project authorization code, got %T %v", fieldErr, fieldErr)
-	}
-}
-
-func setProjectAuthorizationApprovedForTest(t *testing.T, app *tests.TestApp, jobID string) {
-	t.Helper()
-	if _, err := app.DB().NewQuery(`
-		UPDATE jobs
-		SET project_authorization_doc = 'approved-pa.pdf',
-				project_authorization_doc_hash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-				pa_reviewed = '2026-06-02 12:00:00.000Z',
-				pa_reviewer = 'f2j5a8vk006baub'
-		WHERE id = {:id}
-	`).Bind(map[string]any{"id": jobID}).Execute(); err != nil {
-		t.Fatalf("failed to approve PA fixture: %v", err)
 	}
 }

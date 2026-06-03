@@ -150,8 +150,8 @@ func TestBundleTimesheet_ProjectAuthorizationGate(t *testing.T) {
 			expectedContent: []string{
 				`"code":"` + hooks.ProjectAuthorizationNotApprovedCode + `"`,
 				`"blocking_jobs":[`,
-				`"id":"cjf0kt0defhq480"`,
-				`"manager_name":"Fakesy Manjor"`,
+				`"id":"pafixmissing01"`,
+				`"manager_name":"Horace Silver"`,
 			},
 		},
 		{
@@ -187,27 +187,19 @@ func setupProjectAuthorizationBundleGateApp(tb testing.TB, enforce bool, approve
 	tb.Helper()
 	app := testutils.SetupTestApp(tb)
 	setProjectAuthorizationBundleGateConfig(tb, app, enforce)
+	jobID := "pafixmissing01"
+	if approved {
+		jobID = "pafixapprove01"
+	}
 	if _, err := app.DB().NewQuery(`
 		UPDATE time_entries
-		SET job = 'cjf0kt0defhq480',
+		SET job = {:job},
 		    role = 'tbgoiwwwfj8cvju',
 		    description = 'PA gate project time',
 		    tsid = ''
 		WHERE id = 'te_self_apv_yes_001'
-	`).Execute(); err != nil {
+	`).Bind(map[string]any{"job": jobID}).Execute(); err != nil {
 		tb.Fatalf("failed to point self-approver time entry at PA-gated project: %v", err)
-	}
-	if approved {
-		if _, err := app.DB().NewQuery(`
-			UPDATE jobs
-			SET project_authorization_doc = 'approved-pa.pdf',
-			    project_authorization_doc_hash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-			    pa_reviewed = '2026-06-02 12:00:00.000Z',
-			    pa_reviewer = 'f2j5a8vk006baub'
-			WHERE id = 'cjf0kt0defhq480'
-		`).Execute(); err != nil {
-			tb.Fatalf("failed to approve PA fixture: %v", err)
-		}
 	}
 	return app
 }

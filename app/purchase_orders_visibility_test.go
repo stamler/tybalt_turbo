@@ -801,24 +801,14 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 				app := testutils.SetupTestApp(tb)
 				if _, err := app.DB().NewQuery(`
 					UPDATE purchase_orders
-					SET covered_within_project_budget = 1
+					SET covered_within_project_budget = 1,
+					    job = {:job}
 					WHERE id = {:id}
 				`).Bind(map[string]any{
-					"id": "2plsetqdxht7esg",
+					"id":  "2plsetqdxht7esg",
+					"job": "pafixapprove01",
 				}).Execute(); err != nil {
 					tb.Fatalf("failed seeding budget coverage flag: %v", err)
-				}
-				if _, err := app.DB().NewQuery(`
-					UPDATE jobs
-					SET project_authorization_doc = 'approved-pa.pdf',
-							project_authorization_doc_hash = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
-							pa_reviewed = '2026-06-02 12:00:00.000Z',
-							pa_reviewer = 'f2j5a8vk006baub'
-					WHERE id = {:id}
-				`).Bind(map[string]any{
-					"id": "cjf0kt0defhq480",
-				}).Execute(); err != nil {
-					tb.Fatalf("failed seeding reviewed PA fields: %v", err)
 				}
 				return app
 			},

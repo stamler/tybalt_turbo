@@ -83,71 +83,71 @@ func createUploadProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 				"project_authorization_doc",
 			))
 		}
-		job.SetRaw("project_authorization_doc:unsaved", files)
-
-		event := &core.RecordRequestEvent{
-			RequestEvent: e,
-			Record:       job,
-		}
 		attachmentHash, err := hashUploadedFileSHA256(files[0])
 		if err != nil {
 			return e.InternalServerError("failed to hash project authorization document", err)
 		}
-		existingJob, _ := app.FindFirstRecordByFilter("jobs", "project_authorization_doc_hash = {:hash} && id != {:id}", dbx.Params{
-			"hash": attachmentHash,
-			"id":   job.Id,
-		})
-		if existingJob != nil {
-			return projectAuthorizationRouteError(e, projectAuthorizationFieldAPIError(
-				http.StatusBadRequest,
-				"duplicate_file",
-				"this PA document has already been uploaded to another job",
-				"project_authorization_doc",
-			))
-		}
 
-		form := forms.NewRecordUpsert(app, job)
-		form.SetContext(e.Request.Context())
-		form.GrantSuperuserAccess()
-		form.Load(map[string]any{
-			"project_authorization_doc":      files,
-			"project_authorization_doc_hash": attachmentHash,
-			"pa_reviewer":                    "",
-			"pa_reviewed":                    "",
-		})
-
+		var uploaded *core.Record
 		err = app.RunInTransaction(func(txApp core.App) error {
-			form.SetApp(txApp)
-			form.SetRecord(job)
-			if err := hooks.ProcessJobProjectAuthorizationFields(txApp, event); err != nil {
+			txJob, err := txApp.FindRecordById("jobs", job.Id)
+			if err != nil {
+				return projectAuthorizationAPIError(http.StatusNotFound, "job_not_found", "job not found")
+			}
+			if strings.HasPrefix(txJob.GetString("number"), "P") {
+				return projectAuthorizationAPIError(
+					http.StatusBadRequest,
+					"not_project_job",
+					"project authorization documents can only be uploaded to project jobs",
+				)
+			}
+			allowed, err := hooks.CanUploadProjectAuthorizationDocument(txApp, txJob, e.Auth)
+			if err != nil {
 				return err
 			}
-			job.Set("project_authorization_doc", files[0])
-			job.Set("project_authorization_doc_hash", attachmentHash)
-			job.Set("pa_reviewer", "")
-			job.Set("pa_reviewed", "")
+			if !allowed {
+				return projectAuthorizationAPIError(http.StatusForbidden, "forbidden", "you do not have permission to upload this project authorization document")
+			}
+			if txJob.GetString("pa_reviewed") != "" || txJob.GetString("pa_reviewer") != "" {
+				return projectAuthorizationFieldAPIError(
+					http.StatusBadRequest,
+					"project_authorization_approved_immutable",
+					"revoke PA approval before replacing or removing the uploaded document",
+					"project_authorization_doc",
+				)
+			}
+			existingJob, _ := txApp.FindFirstRecordByFilter("jobs", "project_authorization_doc_hash = {:hash} && id != {:id}", dbx.Params{
+				"hash": attachmentHash,
+				"id":   txJob.Id,
+			})
+			if existingJob != nil {
+				return projectAuthorizationFieldAPIError(
+					http.StatusBadRequest,
+					"duplicate_file",
+					"this PA document has already been uploaded to another job",
+					"project_authorization_doc",
+				)
+			}
+
+			form := forms.NewRecordUpsert(txApp, txJob)
+			form.SetContext(hooks.WithProjectAuthorizationMutation(e.Request.Context(), hooks.ProjectAuthorizationMutationUpload))
+			form.GrantSuperuserAccess()
+			form.Load(map[string]any{
+				"project_authorization_doc":      files,
+				"project_authorization_doc_hash": attachmentHash,
+				"pa_reviewer":                    "",
+				"pa_reviewed":                    "",
+			})
 			if err := form.Submit(); err != nil {
 				return err
 			}
-			if _, err := txApp.DB().NewQuery(`
-				UPDATE jobs
-				SET project_authorization_doc_hash = {:hash},
-				    pa_reviewer = '',
-				    pa_reviewed = ''
-				WHERE id = {:id}
-			`).Bind(dbx.Params{
-				"hash": attachmentHash,
-				"id":   job.Id,
-			}).Execute(); err != nil {
-				return err
-			}
-			job.Set("project_authorization_doc_hash", attachmentHash)
+			uploaded = txJob
 			return nil
 		})
 		if err != nil {
 			return projectAuthorizationRouteError(e, err)
 		}
-		return e.JSON(http.StatusOK, job)
+		return e.JSON(http.StatusOK, uploaded)
 	}
 }
 
@@ -201,7 +201,7 @@ func createDeleteProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 			txJob.Set("project_authorization_doc_hash", "")
 			txJob.Set("pa_reviewer", "")
 			txJob.Set("pa_reviewed", "")
-			if err := txApp.Save(txJob); err != nil {
+			if err := txApp.SaveWithContext(hooks.WithProjectAuthorizationMutation(e.Request.Context(), hooks.ProjectAuthorizationMutationDelete), txJob); err != nil {
 				return err
 			}
 			cleared = txJob
@@ -290,7 +290,7 @@ func createApproveProjectAuthorizationHandler(app core.App) func(e *core.Request
 			}
 			job.Set("pa_reviewed", time.Now().UTC())
 			job.Set("pa_reviewer", e.Auth.Id)
-			if err := txApp.Save(job); err != nil {
+			if err := txApp.SaveWithContext(hooks.WithProjectAuthorizationMutation(e.Request.Context(), hooks.ProjectAuthorizationMutationApprove), job); err != nil {
 				return err
 			}
 			approved = job
@@ -316,7 +316,7 @@ func createRevokeProjectAuthorizationHandler(app core.App) func(e *core.RequestE
 			}
 			job.Set("pa_reviewed", "")
 			job.Set("pa_reviewer", "")
-			if err := txApp.Save(job); err != nil {
+			if err := txApp.SaveWithContext(hooks.WithProjectAuthorizationMutation(e.Request.Context(), hooks.ProjectAuthorizationMutationRevoke), job); err != nil {
 				return err
 			}
 			revoked = job
