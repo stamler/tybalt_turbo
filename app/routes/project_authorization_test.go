@@ -31,6 +31,7 @@ const (
 	paPDFContent          = "%PDF-1.4\n% project authorization test\n"
 	paReplacementPDF      = "%PDF-1.4\n% replacement project authorization test\n"
 	paNonPDFContent       = "not a pdf"
+	paHashRepairFakeHash  = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	projectAuthorizationQ = "/api/jobs/" + paTestProjectID
 )
 
@@ -252,6 +253,149 @@ func TestProjectAuthorizationApprovalRejectsBlankStoredHash(t *testing.T) {
 	}
 }
 
+func TestProjectAuthorizationDocHashAuditRequiresAdminAndDocument(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+	adminToken := authTokenForEmail(t, app, paAdminEmail)
+	noClaimsToken := authTokenForEmail(t, app, paNoClaimsEmail)
+
+	noDocument := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc_hash/audit", adminToken, nil)
+	if noDocument.Code != http.StatusNotFound {
+		t.Fatalf("no-document audit status = %d, want %d; body=%s", noDocument.Code, http.StatusNotFound, noDocument.Body.String())
+	}
+
+	uploadProjectAuthorizationDocForHashRepairTest(t, app)
+	audit := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc_hash/audit", noClaimsToken, nil)
+	if audit.Code != http.StatusForbidden {
+		t.Fatalf("non-admin audit status = %d, want %d; body=%s", audit.Code, http.StatusForbidden, audit.Body.String())
+	}
+
+	replace := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc_hash/replace", noClaimsToken, map[string]any{
+		"updated": jobUpdatedForPATest(t, app, paTestProjectID),
+	})
+	if replace.Code != http.StatusForbidden {
+		t.Fatalf("non-admin replace status = %d, want %d; body=%s", replace.Code, http.StatusForbidden, replace.Body.String())
+	}
+}
+
+func TestProjectAuthorizationDocHashAuditReportsUploadedDocument(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+	expectedHash := uploadProjectAuthorizationDocForHashRepairTest(t, app)
+	adminToken := authTokenForEmail(t, app, paAdminEmail)
+
+	audit := auditProjectAuthorizationDocHashForTest(t, app, adminToken, paTestProjectID, http.StatusOK)
+	if audit.JobID != paTestProjectID || audit.TargetCollection != "jobs" || audit.TargetID != paTestProjectID {
+		t.Fatalf("audit target = %+v, want jobs/%s", audit, paTestProjectID)
+	}
+	if !audit.Matches || audit.StoredHash != expectedHash || audit.CalculatedHash != expectedHash {
+		t.Fatalf("audit hashes = %+v, want matching uploaded PA hash %s", audit, expectedHash)
+	}
+	if audit.Filename == "" || !strings.Contains(audit.StoragePath, "/"+paTestProjectID+"/") {
+		t.Fatalf("audit storage target = filename %q path %q, want job file path", audit.Filename, audit.StoragePath)
+	}
+}
+
+func TestProjectAuthorizationDocHashReplaceUpdatesMismatchedHash(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+	expectedHash := uploadProjectAuthorizationDocForHashRepairTest(t, app)
+	// Deliberately corrupt the stored hash after upload; the repair path exists
+	// to recover this inconsistent production state, so a static fixture would
+	// hide the relationship between the real file bytes and the bad hash.
+	setProjectAuthorizationDocHashForPATest(t, app, paTestProjectID, paHashRepairFakeHash)
+	adminToken := authTokenForEmail(t, app, paAdminEmail)
+
+	audit := auditProjectAuthorizationDocHashForTest(t, app, adminToken, paTestProjectID, http.StatusOK)
+	if audit.Matches || audit.StoredHash != paHashRepairFakeHash || audit.CalculatedHash != expectedHash {
+		t.Fatalf("audit = %+v, want mismatched PA hash", audit)
+	}
+
+	replace := replaceProjectAuthorizationDocHashForTest(t, app, adminToken, paTestProjectID, audit.Updated, http.StatusOK)
+	if !replace.Replaced || replace.Noop || replace.PreviousHash != paHashRepairFakeHash || replace.NewHash != expectedHash {
+		t.Fatalf("replace response = %+v, want PA hash replacement", replace)
+	}
+	if got := projectAuthorizationDocHashForPATest(t, app, paTestProjectID); got != expectedHash {
+		t.Fatalf("job PA hash = %s, want %s", got, expectedHash)
+	}
+}
+
+func TestProjectAuthorizationDocHashReplaceNoopsWhenHashAlreadyMatches(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+	expectedHash := uploadProjectAuthorizationDocForHashRepairTest(t, app)
+	adminToken := authTokenForEmail(t, app, paAdminEmail)
+	audit := auditProjectAuthorizationDocHashForTest(t, app, adminToken, paTestProjectID, http.StatusOK)
+
+	replace := replaceProjectAuthorizationDocHashForTest(t, app, adminToken, paTestProjectID, audit.Updated, http.StatusOK)
+	if !replace.Noop || replace.Replaced {
+		t.Fatalf("replace response = %+v, want noop", replace)
+	}
+	if replace.StoredHash != expectedHash || replace.NewHash != expectedHash {
+		t.Fatalf("replace hashes = %+v, want unchanged %s", replace, expectedHash)
+	}
+	if got := projectAuthorizationDocHashForPATest(t, app, paTestProjectID); got != expectedHash {
+		t.Fatalf("job PA hash = %s, want unchanged %s", got, expectedHash)
+	}
+}
+
+func TestProjectAuthorizationDocHashReplaceRejectsBlankOrStaleUpdated(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+	uploadProjectAuthorizationDocForHashRepairTest(t, app)
+	// Deliberately corrupt the stored hash after upload so the replace request
+	// has work to do before the stale timestamp guard rejects it.
+	setProjectAuthorizationDocHashForPATest(t, app, paTestProjectID, paHashRepairFakeHash)
+	adminToken := authTokenForEmail(t, app, paAdminEmail)
+	audit := auditProjectAuthorizationDocHashForTest(t, app, adminToken, paTestProjectID, http.StatusOK)
+
+	blank := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc_hash/replace", adminToken, map[string]any{
+		"updated": "   ",
+	})
+	if blank.Code != http.StatusBadRequest {
+		t.Fatalf("blank updated status = %d, want %d; body=%s", blank.Code, http.StatusBadRequest, blank.Body.String())
+	}
+
+	// Simulate a concurrent job write after audit; this is timestamp state, not
+	// durable business data, so mutating it in-test keeps the stale guard explicit.
+	setJobUpdatedForPATest(t, app, paTestProjectID, "2026-06-03 00:00:00.000Z")
+	stale := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc_hash/replace", adminToken, map[string]any{
+		"updated": audit.Updated,
+	})
+	if stale.Code != http.StatusConflict {
+		t.Fatalf("stale replace status = %d, want %d; body=%s", stale.Code, http.StatusConflict, stale.Body.String())
+	}
+	if got := projectAuthorizationDocHashForPATest(t, app, paTestProjectID); got != paHashRepairFakeHash {
+		t.Fatalf("stale replace changed hash to %s, want %s", got, paHashRepairFakeHash)
+	}
+}
+
+func TestProjectAuthorizationDocHashAuditReportsMissingStorageObject(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+	uploadProjectAuthorizationDocForHashRepairTest(t, app)
+	deleteProjectAuthorizationDocFileForPATest(t, app, paTestProjectID)
+	adminToken := authTokenForEmail(t, app, paAdminEmail)
+
+	auditProjectAuthorizationDocHashForTest(t, app, adminToken, paTestProjectID, http.StatusNotFound)
+}
+
+func TestProjectAuthorizationDocHashReplaceReportsUniqueHashConflict(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+	expectedHash := uploadProjectAuthorizationDocForHashRepairTest(t, app)
+	// Deliberately corrupt two uploaded jobs into a hash-collision scenario;
+	// constructing it after upload exercises the unique-index failure without
+	// making the CSV fixtures permanently inconsistent.
+	setProjectAuthorizationDocHashForPATest(t, app, paTestProjectID, paHashRepairFakeHash)
+	setProjectAuthorizationDocHashForPATest(t, app, paTestOtherProjectID, expectedHash)
+	adminToken := authTokenForEmail(t, app, paAdminEmail)
+	audit := auditProjectAuthorizationDocHashForTest(t, app, adminToken, paTestProjectID, http.StatusOK)
+
+	replace := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc_hash/replace", adminToken, map[string]any{
+		"updated": audit.Updated,
+	})
+	if replace.Code != http.StatusConflict {
+		t.Fatalf("unique conflict status = %d, want %d; body=%s", replace.Code, http.StatusConflict, replace.Body.String())
+	}
+	if got := projectAuthorizationDocHashForPATest(t, app, paTestProjectID); got != paHashRepairFakeHash {
+		t.Fatalf("unique conflict changed hash to %s, want %s", got, paHashRepairFakeHash)
+	}
+}
+
 func TestProjectAuthorizationQueueAndSchema(t *testing.T) {
 	app := newProjectAuthorizationTestApp(t)
 	token := authTokenForEmail(t, app, paJobClaimEmail)
@@ -325,6 +469,106 @@ func TestProjectAuthorizationCustomJobCreateCannotMutateFields(t *testing.T) {
 				t.Fatalf("create response = %d, body=%s", create.Code, create.Body.String())
 			}
 		})
+	}
+}
+
+func auditProjectAuthorizationDocHashForTest(t *testing.T, app *tests.TestApp, token string, jobID string, status int) projectAuthorizationDocHashAuditResponse {
+	t.Helper()
+	rec := performClaimsJSONRequest(t, app, http.MethodPost, "/api/jobs/"+jobID+"/project_authorization_doc_hash/audit", token, nil)
+	if rec.Code != status {
+		t.Fatalf("PA hash audit status = %d, want %d; body=%s", rec.Code, status, rec.Body.String())
+	}
+	if status != http.StatusOK {
+		return projectAuthorizationDocHashAuditResponse{}
+	}
+	var response projectAuthorizationDocHashAuditResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode PA hash audit response: %v", err)
+	}
+	return response
+}
+
+func replaceProjectAuthorizationDocHashForTest(t *testing.T, app *tests.TestApp, token string, jobID string, updated string, status int) projectAuthorizationDocHashReplaceResponse {
+	t.Helper()
+	rec := performClaimsJSONRequest(t, app, http.MethodPost, "/api/jobs/"+jobID+"/project_authorization_doc_hash/replace", token, map[string]any{
+		"updated": updated,
+	})
+	if rec.Code != status {
+		t.Fatalf("PA hash replace status = %d, want %d; body=%s", rec.Code, status, rec.Body.String())
+	}
+	if status != http.StatusOK {
+		return projectAuthorizationDocHashReplaceResponse{}
+	}
+	var response projectAuthorizationDocHashReplaceResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
+		t.Fatalf("failed to decode PA hash replace response: %v", err)
+	}
+	return response
+}
+
+func uploadProjectAuthorizationDocForHashRepairTest(t *testing.T, app *tests.TestApp) string {
+	t.Helper()
+	token := authTokenForEmail(t, app, paJobClaimEmail)
+	rec := performProjectAuthorizationMultipartRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc", token, "project_authorization_doc", "signed-pa.pdf", "application/pdf", []byte(paPDFContent))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("PA upload status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	return projectAuthorizationDocHashForPATest(t, app, paTestProjectID)
+}
+
+func projectAuthorizationDocHashForPATest(t *testing.T, app *tests.TestApp, jobID string) string {
+	t.Helper()
+	var hash string
+	if err := app.DB().NewQuery("SELECT project_authorization_doc_hash FROM jobs WHERE id = {:id}").
+		Bind(dbx.Params{"id": jobID}).Row(&hash); err != nil {
+		t.Fatalf("failed to read PA document hash: %v", err)
+	}
+	return hash
+}
+
+func setProjectAuthorizationDocHashForPATest(t *testing.T, app *tests.TestApp, jobID string, hash string) {
+	t.Helper()
+	if _, err := app.DB().NewQuery("UPDATE jobs SET project_authorization_doc_hash = {:hash} WHERE id = {:id}").
+		Bind(dbx.Params{"hash": hash, "id": jobID}).Execute(); err != nil {
+		t.Fatalf("failed to mutate PA document hash: %v", err)
+	}
+}
+
+func jobUpdatedForPATest(t *testing.T, app *tests.TestApp, jobID string) string {
+	t.Helper()
+	var updated string
+	if err := app.DB().NewQuery("SELECT updated FROM jobs WHERE id = {:id}").
+		Bind(dbx.Params{"id": jobID}).Row(&updated); err != nil {
+		t.Fatalf("failed to read job updated timestamp: %v", err)
+	}
+	return updated
+}
+
+func setJobUpdatedForPATest(t *testing.T, app *tests.TestApp, jobID string, updated string) {
+	t.Helper()
+	if _, err := app.DB().NewQuery("UPDATE jobs SET updated = {:updated} WHERE id = {:id}").
+		Bind(dbx.Params{"updated": updated, "id": jobID}).Execute(); err != nil {
+		t.Fatalf("failed to mutate job updated timestamp: %v", err)
+	}
+}
+
+func deleteProjectAuthorizationDocFileForPATest(t *testing.T, app *tests.TestApp, jobID string) {
+	t.Helper()
+	job, err := app.FindRecordById("jobs", jobID)
+	if err != nil {
+		t.Fatalf("failed to load job: %v", err)
+	}
+	filename := strings.TrimSpace(job.GetString("project_authorization_doc"))
+	if filename == "" {
+		t.Fatal("job has no project authorization document to delete")
+	}
+	fsys, err := app.NewFilesystem()
+	if err != nil {
+		t.Fatalf("failed to open filesystem: %v", err)
+	}
+	defer fsys.Close()
+	if err := fsys.Delete(job.BaseFilesPath() + "/" + filename); err != nil {
+		t.Fatalf("failed to delete PA document fixture file: %v", err)
 	}
 }
 

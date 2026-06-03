@@ -261,6 +261,8 @@ func AddRoutes(app core.App) {
 		jobsGroup.POST("/{id}/close", createCloseJobHandler(app))
 		jobsGroup.POST("/{id}/project_authorization_doc", createUploadProjectAuthorizationDocumentHandler(app))
 		jobsGroup.DELETE("/{id}/project_authorization_doc", createDeleteProjectAuthorizationDocumentHandler(app))
+		jobsGroup.POST("/{id}/project_authorization_doc_hash/audit", createAuditProjectAuthorizationDocHashHandler(app))
+		jobsGroup.POST("/{id}/project_authorization_doc_hash/replace", createReplaceProjectAuthorizationDocHashHandler(app))
 		jobsGroup.POST("/{id}/project_authorization/approve", createApproveProjectAuthorizationHandler(app))
 		jobsGroup.POST("/{id}/project_authorization/revoke", createRevokeProjectAuthorizationHandler(app))
 		jobsGroup.GET("/{id}/validate-proposal", createValidateProposalHandler(app))

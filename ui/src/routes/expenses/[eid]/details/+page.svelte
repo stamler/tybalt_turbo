@@ -4,7 +4,7 @@
   import { globalStore } from "$lib/stores/global";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
-  import ExpenseAttachmentHashRepairPopover from "$lib/components/ExpenseAttachmentHashRepairPopover.svelte";
+  import StoredFileHashRepairPopover from "$lib/components/StoredFileHashRepairPopover.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import UncommitConfirmPopover from "$lib/components/UncommitConfirmPopover.svelte";
   import Icon from "@iconify/svelte";
@@ -596,13 +596,16 @@
     onSubmit={uncommitExpense}
     onCancel={closeUncommitConfirm}
   />
-  <ExpenseAttachmentHashRepairPopover
+  <StoredFileHashRepairPopover
     show={showHashRepairPopover}
-    expenseId={expense.id}
+    recordId={expense.id}
     hasAttachment={hasAttachmentRepairTarget}
     currentHash={expense.attachment_hash}
     currentUpdated={expense.updated}
     missingReason={expense.attachment_missing_reason}
+    auditPath={`/api/expenses/${expense.id}/attachment_hash/audit`}
+    replacePath={`/api/expenses/${expense.id}/attachment_hash/replace`}
+    markMissingPath={`/api/expenses/${expense.id}/attachment_missing/mark`}
     onClose={closeHashRepairPopover}
     onRepaired={refreshExpense}
   />

@@ -15,6 +15,7 @@
   import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
   import DSDateInput from "$lib/components/DSDateInput.svelte";
   import FastCloseConfirmPopover from "$lib/components/FastCloseConfirmPopover.svelte";
+  import StoredFileHashRepairPopover from "$lib/components/StoredFileHashRepairPopover.svelte";
   import { pb } from "$lib/pocketbase";
   import { goto, invalidateAll } from "$app/navigation";
   import { globalStore } from "$lib/stores/global";
@@ -23,6 +24,7 @@
   import { formatCurrency, shortDate } from "$lib/utilities";
   import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
+  import Icon from "@iconify/svelte";
   let awarding = $state(false);
   let validatingForProject = $state(false);
   let closingImportedProject = $state(false);
@@ -42,6 +44,7 @@
   let paDeleting = $state(false);
   let showPADeleteConfirm = $state(false);
   let paDeleteError = $state<string | null>(null);
+  let showPAHashRepairPopover = $state(false);
   let fastCloseProposal = $state<{
     id: string;
     number: string;
@@ -108,6 +111,11 @@
   );
   const canRevokeProjectAuthorization = $derived(
     !isProposal && $globalStore.claims.includes("admin") && projectAuthorizationApproved,
+  );
+  const canRepairProjectAuthorizationHash = $derived(
+    !isProposal &&
+      $globalStore.claims.includes("admin") &&
+      Boolean(data.job.project_authorization_doc),
   );
   const canDeleteProjectAuthorization = $derived(
     canUploadProjectAuthorization &&
@@ -594,6 +602,25 @@
     </p>
   </DSPopover>
 
+  <StoredFileHashRepairPopover
+    show={showPAHashRepairPopover}
+    recordId={data.job.id}
+    title="Project Authorization Document Repair"
+    hasAttachment={Boolean(data.job.project_authorization_doc)}
+    currentHash={data.job.project_authorization_doc_hash}
+    currentUpdated={data.job.updated}
+    auditPath={`/api/jobs/${data.job.id}/project_authorization_doc_hash/audit`}
+    replacePath={`/api/jobs/${data.job.id}/project_authorization_doc_hash/replace`}
+    canMarkMissing={false}
+    auditMatchesMessage="Stored hash matches the PA document."
+    auditMismatchMessage="Stored hash does not match the PA document."
+    replaceConfirmMessage="Replacing this stored hash is irreversible. Verify that the PA PDF opens and is actually usable before accepting the calculated hash."
+    replaceNoopMessage="No change made. The stored hash already matches the PA document."
+    replaceSuccessMessage="Stored hash replaced with the calculated PA document hash."
+    onClose={() => (showPAHashRepairPopover = false)}
+    onRepaired={invalidateAll}
+  />
+
   <DSPopover
     bind:show={showSetNumberModal}
     title="Change Job Number"
@@ -754,6 +781,38 @@
               >
                 Open PA PDF
               </a>
+            {/if}
+            {#if data.job.project_authorization_doc_hash || canRepairProjectAuthorizationHash}
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-semibold">PA Hash:</span>
+                {#if canRepairProjectAuthorizationHash}
+                  <button
+                    type="button"
+                    class="font-mono text-sm text-blue-700 underline decoration-dotted underline-offset-2 hover:text-blue-900"
+                    title="Audit PA document hash"
+                    onclick={() => (showPAHashRepairPopover = true)}
+                  >
+                    {data.job.project_authorization_doc_hash
+                      ? data.job.project_authorization_doc_hash.slice(0, 8)
+                      : "No hash"}
+                  </button>
+                {:else if data.job.project_authorization_doc_hash}
+                  <span class="font-mono text-sm opacity-70">
+                    {data.job.project_authorization_doc_hash.slice(0, 8)}
+                  </span>
+                {/if}
+                {#if data.job.project_authorization_doc_hash}
+                  <button
+                    type="button"
+                    class="text-neutral-500 hover:text-neutral-700"
+                    title="Copy full PA hash"
+                    onclick={() =>
+                      navigator.clipboard.writeText(data.job.project_authorization_doc_hash)}
+                  >
+                    <Icon icon="mdi:content-copy" width="16" />
+                  </button>
+                {/if}
+              </div>
             {/if}
             {#if data.job.pa_reviewed && data.job.pa_reviewer?.id}
               <div>

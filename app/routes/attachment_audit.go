@@ -112,6 +112,7 @@ type attachmentAuditOrphanedRow struct {
 var (
 	attachmentAuditTargets = []attachmentAuditTarget{
 		{Key: "expense_documents_attachment", Label: "Expense Documents", Collection: "expense_documents", Field: "attachment"},
+		{Key: "jobs_project_authorization_doc", Label: "Project Authorization Documents", Collection: "jobs", Field: "project_authorization_doc"},
 		{Key: "purchase_orders_attachment", Label: "Purchase Orders", Collection: "purchase_orders", Field: "attachment"},
 	}
 	attachmentAuditActiveRuns sync.Map
