@@ -34,6 +34,21 @@
   divisions.init();
   rateSheets.init();
 
+  type BackendFieldError = { message: string; code?: string; data?: Record<string, string> };
+  type BackendErrorPayload = {
+    error?: string;
+    message?: string;
+    data?: Record<string, BackendFieldError>;
+  };
+
+  const projectAuthorizationServerFields = [
+    "project_authorization_doc",
+    "project_authorization_doc_hash",
+    "project_authorization_doc_url",
+    "pa_reviewer",
+    "pa_reviewed",
+  ];
+
   let errors = $state({} as Record<string, { message: string }>);
   // Allow extra field `location` introduced by migration to be present on item
   let item = $state(
@@ -191,6 +206,34 @@
     const nextErrors = { ...errors };
     delete nextErrors[fieldName];
     errors = nextErrors;
+  }
+
+  function backendErrorPayload(error: unknown): BackendErrorPayload | undefined {
+    const candidate = error as { data?: BackendErrorPayload; response?: BackendErrorPayload };
+    return candidate?.response ?? candidate?.data;
+  }
+
+  function fieldErrorsWithGlobal(payload?: BackendErrorPayload) {
+    const backendErrors = payload?.data;
+    if (backendErrors && Object.keys(backendErrors).length > 0) {
+      if (backendErrors.global) return backendErrors;
+      return {
+        ...backendErrors,
+        global: {
+          message: payload?.message ?? payload?.error ?? "Save failed. Please fix the highlighted fields.",
+        },
+      };
+    }
+    const backendMessage = payload?.message ?? payload?.error;
+    return backendMessage ? { global: { message: backendMessage } } : {};
+  }
+
+  function jobPayloadForSave(job: JobsRecord | (JobsRecord & Record<string, unknown>)) {
+    const payload = { ...(job as Record<string, unknown>) };
+    for (const field of projectAuthorizationServerFields) {
+      delete payload[field];
+    }
+    return payload;
   }
 
   function addAllocationRow() {
@@ -424,12 +467,12 @@
       if (data.editing && jobId !== null) {
         await pb.send(`/api/jobs/${jobId}`, {
           method: "PUT",
-          body: { job: item, allocations },
+          body: { job: jobPayloadForSave(item), allocations },
         });
       } else {
         const resp = (await pb.send(`/api/jobs`, {
           method: "POST",
-          body: { job: item, allocations },
+          body: { job: jobPayloadForSave(item), allocations },
         })) as { id: string };
         jobId = resp.id;
       }
@@ -470,13 +513,8 @@
       }
     } catch (error: unknown) {
       // Handle special case where backend requires setting proposal to Awarded first
-      const pocket = error as {
-        data?: {
-          error?: string;
-          data?: Record<string, { message: string; code?: string; data?: Record<string, string> }>;
-        };
-      };
-      const hookErrors = pocket?.data?.data;
+      const pocket = backendErrorPayload(error);
+      const hookErrors = pocket?.data;
       const proposalErr = hookErrors?.proposal;
       const proposalId = proposalErr?.data?.proposal_id;
       if (proposalErr?.code === "proposal_not_awarded" && typeof proposalId === "string") {
@@ -491,11 +529,7 @@
             await pb.collection("jobs").update(proposalId, { status: JobsStatusOptions.Awarded });
           } catch (proposalUpdateErr) {
             // Handle proposal update failure - show the actual error with link to edit proposal
-            const proposalErrData = (
-              proposalUpdateErr as {
-                data?: { data?: Record<string, { message: string }> };
-              }
-            )?.data?.data;
+            const proposalErrData = backendErrorPayload(proposalUpdateErr)?.data;
 
             // Build error message with details from backend
             let errorDetails = "";
@@ -522,12 +556,12 @@
             if ((data as JobsPageData).editing && retryJobId !== null) {
               await pb.send(`/api/jobs/${retryJobId}`, {
                 method: "PUT",
-                body: { job: item, allocations },
+                body: { job: jobPayloadForSave(item), allocations },
               });
             } else {
               const resp = (await pb.send(`/api/jobs`, {
                 method: "POST",
-                body: { job: item, allocations },
+                body: { job: jobPayloadForSave(item), allocations },
               })) as { id: string };
               retryJobId = resp.id;
             }
@@ -550,19 +584,12 @@
             return;
           } catch (retryErr) {
             // fall through to display errors from retry
-            const retryData = (
-              retryErr as {
-                data?: { data?: Record<string, { message: string }> };
-              }
-            )?.data?.data;
-            errors = retryData ?? {};
+            errors = fieldErrorsWithGlobal(backendErrorPayload(retryErr));
             return;
           }
         }
       }
-      const backendErrors = pocket?.data?.data as Record<string, { message: string }> | undefined;
-      const backendMessage = pocket?.data?.error;
-      errors = backendErrors ?? (backendMessage ? { global: { message: backendMessage } } : {});
+      errors = fieldErrorsWithGlobal(pocket);
     }
   }
 

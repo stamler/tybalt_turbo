@@ -452,6 +452,10 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 	// endpoint can enforce strict validation for non-legacy data while preserving
 	// legacy-friendly behavior everywhere else.
 	if !isCreate && !forceFullValidation {
+		if err := validateProjectAuthorizingDocument(record, derived); err != nil {
+			return 0, err
+		}
+
 		// If no field other than status changed, treat this as a status-only update.
 		if !utilities.RecordHasMeaningfulChanges(record, "status") {
 			newStatus := status
@@ -624,19 +628,8 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 		}
 	}
 
-	// Enforce authorizing_document/client_po rules for projects (validation only).
-	// Normalization is handled in cleanJob earlier.
-	if derived == jobTypeProject {
-		authorizingDocument := record.GetString("authorizing_document")
-		if authorizingDocument != "PA" {
-			return 0, &errs.HookError{
-				Status:  http.StatusBadRequest,
-				Message: "authorizing document must be PA for projects",
-				Data: map[string]errs.CodeError{
-					"authorizing_document": {Code: "must_be_pa", Message: "project authorizing_document must be PA"},
-				},
-			}
-		}
+	if err := validateProjectAuthorizingDocument(record, derived); err != nil {
+		return 0, err
 	}
 
 	// Enforce status constraints
@@ -868,6 +861,25 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 	}
 
 	return derived, nil
+}
+
+func validateProjectAuthorizingDocument(record *core.Record, derived jobType) error {
+	if derived != jobTypeProject {
+		return nil
+	}
+	if record.GetString("authorizing_document") == "PA" {
+		return nil
+	}
+	return &errs.HookError{
+		Status:  http.StatusBadRequest,
+		Message: "project authorizing document must be PA",
+		Data: map[string]errs.CodeError{
+			"authorizing_document": {
+				Code:    "must_be_pa",
+				Message: "Select PA as the authorizing document before saving this project. Client PO is now a reference field, not an authorization type.",
+			},
+		},
+	}
 }
 
 // jobHasClientNoteForStatus checks if a client_note exists for the given job

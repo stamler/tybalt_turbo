@@ -6,6 +6,7 @@ import (
 	"testing"
 	"tybalt/internal/testutils"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -275,6 +276,55 @@ func TestJobsUpdate_AuthorizingDocumentPA_Validations(t *testing.T) {
 	for _, scenario := range scenarios {
 		scenario.Test(t)
 	}
+}
+
+func setupTestAppWithLegacyPOAuthorizingDocument(tb testing.TB) *tests.TestApp {
+	tb.Helper()
+
+	app := testutils.SetupTestApp(tb)
+	if _, err := app.DB().NewQuery(`
+		UPDATE jobs
+		SET authorizing_document = 'PO',
+		    client_po = 'LEGACY-PO'
+		WHERE id = {:id}
+	`).Bind(dbx.Params{"id": "cjf0kt0defhq480"}).Execute(); err != nil {
+		tb.Fatalf("failed to seed legacy PO authorizing document: %v", err)
+	}
+
+	return app
+}
+
+func TestJobsAPI_LegacyAuthorizingDocumentFailsWithoutOtherJobChanges(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const jobID = "cjf0kt0defhq480"
+	const divisionID = "fy4i9poneukvq9u"
+
+	scenario := tests.ApiScenario{
+		Name:   "saving existing project with unchanged legacy PO authorizing document fails",
+		Method: http.MethodPut,
+		URL:    "/api/jobs/" + jobID,
+		Body: strings.NewReader(`{
+			"job": {
+				"authorizing_document": "PO"
+			},
+			"allocations": [
+				{ "division": "` + divisionID + `", "hours": 1 }
+			]
+		}`),
+		Headers:        map[string]string{"Authorization": recordToken},
+		ExpectedStatus: 400,
+		ExpectedContent: []string{
+			`"data":{"authorizing_document":{"code":"must_be_pa"`,
+			`"message":"Select PA as the authorizing document before saving this project. Client PO is now a reference field, not an authorization type."`,
+		},
+		TestAppFactory: setupTestAppWithLegacyPOAuthorizingDocument,
+	}
+
+	scenario.Test(t)
 }
 
 // jobs: proposal reference validation - Active proposals should trigger "proposal_not_awarded" error
