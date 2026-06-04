@@ -31,10 +31,13 @@ const (
 	paNoClaimsEmail       = "u_no_claims@example.com"
 	paAccountingEmail     = "author@soup.com"
 	paAdminEmail          = "author@soup.com"
+	paPayablesAdminEmail  = "book@keeper.com"
 	paPDFContent          = "%PDF-1.4\n% project authorization test\n"
 	paReplacementPDF      = "%PDF-1.4\n% replacement project authorization test\n"
 	paNonPDFContent       = "not a pdf"
 	paPendingProjectID    = "pafixpending01"
+	paAltManagerProjectID = "paaltmgrjob0001"
+	paBranchProjectID     = "pabrmgrjob0001"
 	paPendingHash         = "006bd775c07b0d78770fb855e5b2e814e98243432cc99f51ea7b0dd4f5914f2d"
 	paBlankHashProjectID  = "pafixblankhash"
 	paStaleHashProjectID  = "pafixstale001"
@@ -47,49 +50,30 @@ func TestProjectAuthorizationDocumentUploadPermissions(t *testing.T) {
 	scenarios := []struct {
 		name   string
 		email  string
-		setup  func(t *testing.T, app *tests.TestApp)
+		jobID  string
 		status int
 	}{
 		{name: "job claim holder", email: paJobClaimEmail, status: http.StatusOK},
 		{name: "assigned manager", email: paManagerEmail, status: http.StatusOK},
-		{
-			name:  "alternate manager",
-			email: paNoClaimsEmail,
-			setup: func(t *testing.T, app *tests.TestApp) {
-				t.Helper()
-				// Vary this fixture in-test because alternate-manager identity is
-				// the behavior under test and the base job fixture has no alternate.
-				setJobFieldForPATest(t, app, paTestProjectID, "alternate_manager", "u_no_claims")
-			},
-			status: http.StatusOK,
-		},
-		{
-			name:  "branch manager",
-			email: paNoClaimsEmail,
-			setup: func(t *testing.T, app *tests.TestApp) {
-				t.Helper()
-				// Branch manager is a new field in this feature, so tests assign it
-				// to an existing branch fixture instead of broadening base access.
-				setBranchManagerForPATest(t, app, "80875lm27v8wgi4", "u_no_claims")
-			},
-			status: http.StatusOK,
-		},
+		{name: "alternate manager", email: paNoClaimsEmail, jobID: paAltManagerProjectID, status: http.StatusOK},
+		{name: "branch manager", email: paNoClaimsEmail, jobID: paBranchProjectID, status: http.StatusOK},
 		{name: "unrelated user", email: paNoClaimsEmail, status: http.StatusForbidden},
 	}
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			app := newProjectAuthorizationTestApp(t)
-			if scenario.setup != nil {
-				scenario.setup(t, app)
+			jobID := scenario.jobID
+			if jobID == "" {
+				jobID = paTestProjectID
 			}
 			token := authTokenForEmail(t, app, scenario.email)
-			rec := performProjectAuthorizationMultipartRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc", token, "project_authorization_doc", "signed-pa.pdf", "application/pdf", []byte(paPDFContent))
+			rec := performProjectAuthorizationMultipartRequest(t, app, http.MethodPost, "/api/jobs/"+jobID+"/project_authorization_doc", token, "project_authorization_doc", "signed-pa.pdf", "application/pdf", []byte(paPDFContent))
 			if rec.Code != scenario.status {
 				t.Fatalf("status = %d, want %d; body=%s", rec.Code, scenario.status, rec.Body.String())
 			}
 			if scenario.status == http.StatusOK {
-				job, err := app.FindRecordById("jobs", paTestProjectID)
+				job, err := app.FindRecordById("jobs", jobID)
 				if err != nil {
 					t.Fatalf("failed to load job: %v", err)
 				}
@@ -407,7 +391,7 @@ func TestProjectAuthorizationDocHashReplaceReportsUniqueHashConflict(t *testing.
 
 func TestProjectAuthorizationQueueAndSchema(t *testing.T) {
 	app := newProjectAuthorizationTestApp(t)
-	token := authTokenForEmail(t, app, paJobClaimEmail)
+	token := authTokenForEmail(t, app, paAccountingEmail)
 	upload := performProjectAuthorizationMultipartRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc", token, "project_authorization_doc", "signed-pa.pdf", "application/pdf", []byte(paPDFContent))
 	if upload.Code != http.StatusOK {
 		t.Fatalf("upload status = %d; body=%s", upload.Code, upload.Body.String())
@@ -428,6 +412,33 @@ func TestProjectAuthorizationQueueAndSchema(t *testing.T) {
 	}
 	if !strings.Contains(string(raw), `"application/pdf"`) || strings.Contains(string(raw), `"image/png"`) {
 		t.Fatalf("unexpected project_authorization_doc field schema: %s", raw)
+	}
+}
+
+func TestProjectAuthorizationQueueRequiresAccountingClaim(t *testing.T) {
+	scenarios := []struct {
+		name   string
+		email  string
+		status int
+	}{
+		{name: "accounting", email: paAccountingEmail, status: http.StatusOK},
+		{name: "payables admin only", email: paPayablesAdminEmail, status: http.StatusForbidden},
+		{name: "no claims", email: paNoClaimsEmail, status: http.StatusForbidden},
+		{name: "unauthenticated", status: http.StatusUnauthorized},
+	}
+
+	for _, scenario := range scenarios {
+		t.Run(scenario.name, func(t *testing.T) {
+			app := newProjectAuthorizationTestApp(t)
+			token := ""
+			if scenario.email != "" {
+				token = authTokenForEmail(t, app, scenario.email)
+			}
+			queue := performClaimsJSONRequest(t, app, http.MethodGet, "/api/jobs/project_authorization/pending", token, nil)
+			if queue.Code != scenario.status {
+				t.Fatalf("queue status = %d, want %d; body=%s", queue.Code, scenario.status, queue.Body.String())
+			}
+		})
 	}
 }
 
@@ -714,25 +725,6 @@ func textprotoMIMEHeader(field string, filename string, contentType string) text
 func sha256HexForPATest(content string) string {
 	sum := sha256.Sum256([]byte(content))
 	return hex.EncodeToString(sum[:])
-}
-
-func setJobFieldForPATest(t *testing.T, app *tests.TestApp, jobID string, field string, value string) {
-	t.Helper()
-	if _, err := app.DB().NewQuery("UPDATE jobs SET " + field + " = {:value} WHERE id = {:id}").Bind(dbx.Params{"value": value, "id": jobID}).Execute(); err != nil {
-		t.Fatalf("failed to update job fixture field %s: %v", field, err)
-	}
-}
-
-func setBranchManagerForPATest(t *testing.T, app *tests.TestApp, branchID string, managerID string) {
-	t.Helper()
-	branch, err := app.FindRecordById("branches", branchID)
-	if err != nil {
-		t.Fatalf("failed to load branch fixture: %v", err)
-	}
-	branch.Set("manager", managerID)
-	if err := app.Save(branch); err != nil {
-		t.Fatalf("failed to save branch manager fixture: %v", err)
-	}
 }
 
 func setProjectAuthorizationApprovedForRouteTest(t *testing.T, app *tests.TestApp, jobID string) {

@@ -623,6 +623,11 @@
             "name": "updated",
             "type": "string",
             "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "manager",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
           }
         ],
         "primaryKey": [

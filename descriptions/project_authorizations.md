@@ -1,7 +1,5 @@
 # Project Authorization Documents
 
-* STATUS: UNIMPLEMENTED, DRAFT, REQUESTING FEEDBACK *
-
 Turbo needs a formal project authorization flow for project jobs. The current
 `jobs.authorizing_document` field records the legacy business authorization type
 (`Unauthorized`, `PO`, or `PA`), but it does not prove that Accounting has
@@ -168,6 +166,7 @@ The queue lists project jobs where:
 
 * `status = "Active"`,
 * `project_authorization_doc` is populated,
+* `project_authorization_doc_hash` is populated,
 * `pa_reviewed` is blank, and
 * `pa_reviewer` is blank.
 

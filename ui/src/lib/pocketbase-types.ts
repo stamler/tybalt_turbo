@@ -226,6 +226,7 @@ export type BranchesRecord = {
   code: string;
   created: IsoDateString;
   id: string;
+  manager: RecordIdString;
   name: string;
   updated: IsoDateString;
 };
