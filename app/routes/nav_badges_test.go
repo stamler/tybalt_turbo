@@ -41,6 +41,7 @@ func TestNavBadgesReturnsUserScopedCounts(t *testing.T) {
 	assertNavBadgeCount(t, counts, navTimeSheetsPendingHref, expectedPendingTimeSheetCount(t, app, userID))
 	assertNavBadgeCount(t, counts, navExpensesPendingHref, expectedPendingExpenseCount(t, app, userID))
 	assertNavBadgeCount(t, counts, navPurchaseOrdersPendingHref, expectedPendingPurchaseOrderCount(t, app, userID))
+	assertNavBadgeCount(t, counts, navProjectAuthorizationHref, expectedProjectAuthorizationQueueCount(t, app))
 
 	if _, ok := counts[navExpenseCommitQueueHref]; ok {
 		t.Fatalf("did not expect %s for user without commit claim; counts=%v", navExpenseCommitQueueHref, counts)
@@ -78,6 +79,9 @@ func TestNavBadgesReturnsAuthorizedQueueCounts(t *testing.T) {
 
 	if _, ok := payablesCounts[navExpenseCommitQueueHref]; ok {
 		t.Fatalf("did not expect %s for payables user without commit claim; counts=%v", navExpenseCommitQueueHref, payablesCounts)
+	}
+	if _, ok := payablesCounts[navProjectAuthorizationHref]; ok {
+		t.Fatalf("did not expect %s for payables user without accounting claim; counts=%v", navProjectAuthorizationHref, payablesCounts)
 	}
 }
 
@@ -147,6 +151,21 @@ func expectedPendingPurchaseOrderCount(t *testing.T, app *tests.TestApp, userID 
 		WHERE is_unapproved_actionable_now = 1
 	`
 	return expectedCount(t, app, query, purchaseOrderVisibilityParams(app, userID, "all", "", "", 0))
+}
+
+func expectedProjectAuthorizationQueueCount(t *testing.T, app *tests.TestApp) int {
+	t.Helper()
+
+	return expectedCount(t, app, `
+		SELECT COUNT(*)
+		FROM jobs j
+		WHERE j.status = 'Active'
+		  AND j.number NOT LIKE 'P%'
+		  AND j.project_authorization_doc != ''
+		  AND j.project_authorization_doc_hash != ''
+		  AND j.pa_reviewed = ''
+		  AND j.pa_reviewer = ''
+	`, dbx.Params{})
 }
 
 func expectedExpenseCommitQueueCount(t *testing.T, app *tests.TestApp) int {

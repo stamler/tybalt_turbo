@@ -265,6 +265,7 @@
         body: form,
       });
       input.value = "";
+      await globalStore.refreshAttentionCounts();
       await invalidateAll();
     } catch (error: any) {
       paUploadError =
@@ -283,6 +284,7 @@
     try {
       await pb.send(`/api/jobs/${data.job.id}/project_authorization/revoke`, { method: "POST" });
       showPARevokeConfirm = false;
+      await globalStore.refreshAttentionCounts();
       await invalidateAll();
     } catch (error: any) {
       paRevokeError = error?.data?.message ?? error?.message ?? "Failed to revoke PA approval.";
@@ -297,6 +299,7 @@
     try {
       await pb.send(`/api/jobs/${data.job.id}/project_authorization_doc`, { method: "DELETE" });
       showPADeleteConfirm = false;
+      await globalStore.refreshAttentionCounts();
       await invalidateAll();
     } catch (error: any) {
       paDeleteError =

@@ -2,6 +2,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { pb } from "$lib/pocketbase";
   import { invalidateAll } from "$app/navigation";
+  import { globalStore } from "$lib/stores/global";
 
   let { data } = $props();
   let openedHashes = $state(new Set<string>());
@@ -20,6 +21,7 @@
         method: "POST",
         body: { project_authorization_doc_hash: item.project_authorization_doc_hash },
       });
+      await globalStore.refreshAttentionCounts();
       await invalidateAll();
     } catch (e: any) {
       error = e?.data?.message ?? e?.message ?? "Failed to approve PA document.";
