@@ -247,7 +247,7 @@
 
   function projectAuthorizationStatus() {
     if (!data.job.project_authorization_doc) return "PA document missing";
-    if (data.job.pa_reviewed && data.job.pa_reviewer?.id) return "PA approved";
+    if (projectAuthorizationApproved) return "PA approved";
     return "PA pending Accounting approval";
   }
 

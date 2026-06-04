@@ -46,6 +46,7 @@
           <th class="p-2">Client</th>
           <th class="p-2">Manager</th>
           <th class="p-2">Branch</th>
+          <th class="p-2">Status</th>
           <th class="p-2">Hash</th>
           <th class="p-2">Actions</th>
         </tr>
@@ -54,7 +55,10 @@
         {#each data.items as item}
           <tr class="border-b border-neutral-200">
             <td class="p-2">
-              <a href={`/jobs/${item.id}/details`} class="font-semibold text-blue-600 hover:underline">
+              <a
+                href={`/jobs/${item.id}/details`}
+                class="font-semibold text-blue-600 hover:underline"
+              >
                 {item.number}
               </a>
               <div class="text-neutral-600">{item.description}</div>
@@ -62,7 +66,11 @@
             <td class="p-2">{item.client_name}</td>
             <td class="p-2">{item.manager_name}</td>
             <td class="p-2">{item.branch_code}</td>
-            <td class="max-w-64 truncate p-2 font-mono text-xs" title={item.project_authorization_doc_hash}>
+            <td class="p-2">{item.status}</td>
+            <td
+              class="max-w-64 truncate p-2 font-mono text-xs"
+              title={item.project_authorization_doc_hash}
+            >
               {item.project_authorization_doc_hash}
             </td>
             <td class="p-2">

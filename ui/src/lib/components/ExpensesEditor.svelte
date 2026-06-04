@@ -46,6 +46,7 @@
     isExpensePaymentType,
     selectableExpensePaymentTypeOptions,
   } from "$lib/expensePaymentTypes";
+  import { withProjectAuthorizationManagerName } from "$lib/projectAuthorization";
 
   // initialize the stores, noop if already initialized
   jobs.init();
@@ -90,6 +91,9 @@
   const syncCategoriesForJob = createJobCategoriesSync((rows) => {
     categories = rows;
   });
+  const selectedJobRecord = $derived.by(
+    () => $jobs.items.find((job) => job.id === (item.job ?? "")) ?? null,
+  );
 
   const selectedKindLabel = $derived.by(() => {
     const match = $expenditureKindsStore.items.find((k) => k.id === item.kind);
@@ -388,7 +392,10 @@
           overflow_amount: parseFloat(errorData.overflow_amount),
         });
       } else {
-        errors = error.data?.data ?? {};
+        errors = withProjectAuthorizationManagerName(
+          error.data?.data ?? {},
+          selectedJobRecord?.manager,
+        );
       }
     }
   }
