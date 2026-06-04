@@ -41,6 +41,33 @@ type storedFileHashReplace struct {
 	Noop         bool
 }
 
+type storedFileHashTargetResponse struct {
+	TargetCollection string `json:"target_collection"`
+	TargetID         string `json:"target_id"`
+	Filename         string `json:"filename"`
+	StoragePath      string `json:"storage_path"`
+	StoredHash       string `json:"stored_hash"`
+	Updated          string `json:"updated"`
+}
+
+type storedFileHashAuditResponse struct {
+	storedFileHashTargetResponse
+	CalculatedHash string `json:"calculated_hash"`
+	Matches        bool   `json:"matches"`
+}
+
+type storedFileHashReplaceRequest struct {
+	Updated string `json:"updated"`
+}
+
+type storedFileHashReplaceResponse struct {
+	storedFileHashAuditResponse
+	PreviousHash string `json:"previous_hash"`
+	NewHash      string `json:"new_hash"`
+	Replaced     bool   `json:"replaced"`
+	Noop         bool   `json:"noop"`
+}
+
 type storedFileHashMessages struct {
 	EmptyStoragePath string
 	OpenFilesystem   string
@@ -76,6 +103,50 @@ func requireAdminForStoredFileHashRepair(app core.App, e *core.RequestEvent) err
 		return e.Error(http.StatusForbidden, "admin claim required", nil)
 	}
 	return nil
+}
+
+func createStoredFileHashAuditHandler[T any](
+	app core.App,
+	audit func(core.App, string) (T, error),
+	routeError func(*core.RequestEvent, error) error,
+) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if err := requireAdminForStoredFileHashRepair(app, e); err != nil {
+			return err
+		}
+		response, err := audit(app, e.Request.PathValue("id"))
+		if err != nil {
+			return routeError(e, err)
+		}
+		return e.JSON(http.StatusOK, response)
+	}
+}
+
+func createStoredFileHashReplaceHandler[T any](
+	app core.App,
+	replace func(core.App, string, string) (T, error),
+	routeError func(*core.RequestEvent, error) error,
+) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if err := requireAdminForStoredFileHashRepair(app, e); err != nil {
+			return err
+		}
+
+		var req storedFileHashReplaceRequest
+		if err := e.BindBody(&req); err != nil {
+			return e.Error(http.StatusBadRequest, "invalid request body", err)
+		}
+		updated := strings.TrimSpace(req.Updated)
+		if updated == "" {
+			return e.Error(http.StatusBadRequest, "updated is required", nil)
+		}
+
+		response, err := replace(app, e.Request.PathValue("id"), updated)
+		if err != nil {
+			return routeError(e, err)
+		}
+		return e.JSON(http.StatusOK, response)
+	}
 }
 
 func auditStoredFileHash(app core.App, resolve func(core.App) (storedFileHashTarget, error), messages storedFileHashMessages) (storedFileHashAudit, error) {
@@ -203,4 +274,33 @@ func calculateStoredFileSHA256(app core.App, storagePath string, messages stored
 		return "", &storedFileHashHTTPError{status: http.StatusInternalServerError, message: messages.HashFailed, err: err}
 	}
 	return hex.EncodeToString(hash.Sum(nil)), nil
+}
+
+func storedFileHashAuditResponseFromStored(audit storedFileHashAudit) storedFileHashAuditResponse {
+	return storedFileHashAuditResponse{
+		storedFileHashTargetResponse: storedFileHashTargetResponseFromStored(audit.Target),
+		CalculatedHash:               audit.CalculatedHash,
+		Matches:                      audit.Matches,
+	}
+}
+
+func storedFileHashReplaceResponseFromStored(replacement storedFileHashReplace) storedFileHashReplaceResponse {
+	return storedFileHashReplaceResponse{
+		storedFileHashAuditResponse: storedFileHashAuditResponseFromStored(replacement.Audit),
+		PreviousHash:                replacement.PreviousHash,
+		NewHash:                     replacement.NewHash,
+		Replaced:                    replacement.Replaced,
+		Noop:                        replacement.Noop,
+	}
+}
+
+func storedFileHashTargetResponseFromStored(target storedFileHashTarget) storedFileHashTargetResponse {
+	return storedFileHashTargetResponse{
+		TargetCollection: target.TargetCollection,
+		TargetID:         target.TargetID,
+		Filename:         target.Filename,
+		StoragePath:      target.StoragePath,
+		StoredHash:       target.StoredHash,
+		Updated:          target.Updated,
+	}
 }

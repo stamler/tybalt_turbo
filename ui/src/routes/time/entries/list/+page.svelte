@@ -16,54 +16,15 @@
   import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
   import { timeEditingDisabledMessage, timeEditingEnabled } from "$lib/stores/appConfig";
   import { getApiErrorMessage } from "$lib/errors";
+  import {
+    projectAuthorizationBlockingJobs,
+    projectAuthorizationEntryMessage,
+  } from "$lib/projectAuthorization";
   let { data }: { data: PageData } = $props();
-
-  const projectAuthorizationNotApprovedCode = "project_authorization_not_approved";
-  const projectAuthorizationEntryMessage = "This job is missing an approved PA document.";
 
   // Local state for items that can be mutated by real-time subscriptions.
   let items = $derived(data.items);
-  let blockingProjectAuthorizationJobs = $state(new Map<string, BlockingProjectAuthorizationJob>());
-
-  type BlockingProjectAuthorizationJob = {
-    id: string;
-    manager_name: string;
-  };
-
-  type BundleErrorPayload = {
-    code?: unknown;
-    blocking_jobs?: unknown;
-  };
-
-  function getErrorPayload(error: unknown): BundleErrorPayload {
-    if (typeof error !== "object" || error === null) return {};
-    const { response, data } = error as { response?: unknown; data?: unknown };
-    const payload = response ?? data;
-    return typeof payload === "object" && payload !== null ? (payload as BundleErrorPayload) : {};
-  }
-
-  function getBlockingJobsById(
-    blockingJobs: unknown,
-  ): Map<string, BlockingProjectAuthorizationJob> {
-    if (!Array.isArray(blockingJobs)) return new Map();
-
-    return new Map(
-      blockingJobs.flatMap((job: unknown) => {
-        if (typeof job !== "object" || job === null) return [];
-        const { id, manager_name } = job as { id?: unknown; manager_name?: unknown };
-        if (typeof id !== "string") return [];
-        return [
-          [
-            id,
-            {
-              id,
-              manager_name: typeof manager_name === "string" ? manager_name.trim() : "",
-            },
-          ],
-        ];
-      }),
-    );
-  }
+  let blockingProjectAuthorizationJobs = $state(projectAuthorizationBlockingJobs(null));
 
   // Subscribe to the base collection but update the items from the augmented
   // view
@@ -145,9 +106,8 @@
       // navigate to the time sheets list to show the bundled time sheets
       goto(resolve("/time/sheets/list"));
     } catch (error: unknown) {
-      const payload = getErrorPayload(error);
-      const blockingJobsById = getBlockingJobsById(payload.blocking_jobs);
-      if (payload.code === projectAuthorizationNotApprovedCode && blockingJobsById.size > 0) {
+      const blockingJobsById = projectAuthorizationBlockingJobs(error);
+      if (blockingJobsById.size > 0) {
         blockingProjectAuthorizationJobs = blockingJobsById;
         globalStore.addError(
           "Some entries cannot be bundled until their project authorization is approved.",

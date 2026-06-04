@@ -8,32 +8,14 @@ import (
 	"github.com/pocketbase/pocketbase/core"
 )
 
-type projectAuthorizationDocHashTarget struct {
-	JobID            string `json:"job_id"`
-	TargetCollection string `json:"target_collection"`
-	TargetID         string `json:"target_id"`
-	Filename         string `json:"filename"`
-	StoragePath      string `json:"storage_path"`
-	StoredHash       string `json:"stored_hash"`
-	Updated          string `json:"updated"`
-}
-
 type projectAuthorizationDocHashAuditResponse struct {
-	projectAuthorizationDocHashTarget
-	CalculatedHash string `json:"calculated_hash"`
-	Matches        bool   `json:"matches"`
-}
-
-type projectAuthorizationDocHashReplaceRequest struct {
-	Updated string `json:"updated"`
+	JobID string `json:"job_id"`
+	storedFileHashAuditResponse
 }
 
 type projectAuthorizationDocHashReplaceResponse struct {
-	projectAuthorizationDocHashAuditResponse
-	PreviousHash string `json:"previous_hash"`
-	NewHash      string `json:"new_hash"`
-	Replaced     bool   `json:"replaced"`
-	Noop         bool   `json:"noop"`
+	JobID string `json:"job_id"`
+	storedFileHashReplaceResponse
 }
 
 var projectAuthorizationDocHashMessages = storedFileHashMessages{
@@ -47,39 +29,11 @@ var projectAuthorizationDocHashMessages = storedFileHashMessages{
 }
 
 func createAuditProjectAuthorizationDocHashHandler(app core.App) func(e *core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		if err := requireAdminForStoredFileHashRepair(app, e); err != nil {
-			return err
-		}
-
-		response, err := auditProjectAuthorizationDocHash(app, e.Request.PathValue("id"))
-		if err != nil {
-			return projectAuthorizationDocHashRouteError(e, err)
-		}
-		return e.JSON(http.StatusOK, response)
-	}
+	return createStoredFileHashAuditHandler(app, auditProjectAuthorizationDocHash, projectAuthorizationDocHashRouteError)
 }
 
 func createReplaceProjectAuthorizationDocHashHandler(app core.App) func(e *core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		if err := requireAdminForStoredFileHashRepair(app, e); err != nil {
-			return err
-		}
-
-		var req projectAuthorizationDocHashReplaceRequest
-		if err := e.BindBody(&req); err != nil {
-			return e.Error(http.StatusBadRequest, "invalid request body", err)
-		}
-		if strings.TrimSpace(req.Updated) == "" {
-			return e.Error(http.StatusBadRequest, "updated is required", nil)
-		}
-
-		response, err := replaceProjectAuthorizationDocHash(app, e.Request.PathValue("id"), strings.TrimSpace(req.Updated))
-		if err != nil {
-			return projectAuthorizationDocHashRouteError(e, err)
-		}
-		return e.JSON(http.StatusOK, response)
-	}
+	return createStoredFileHashReplaceHandler(app, replaceProjectAuthorizationDocHash, projectAuthorizationDocHashRouteError)
 }
 
 func auditProjectAuthorizationDocHash(app core.App, jobID string) (projectAuthorizationDocHashAuditResponse, error) {
@@ -143,30 +97,14 @@ func projectAuthorizationDocHashRouteError(e *core.RequestEvent, err error) erro
 
 func projectAuthorizationDocHashAuditResponseFromStored(jobID string, audit storedFileHashAudit) projectAuthorizationDocHashAuditResponse {
 	return projectAuthorizationDocHashAuditResponse{
-		projectAuthorizationDocHashTarget: projectAuthorizationDocHashTargetFromStored(jobID, audit.Target),
-		CalculatedHash:                    audit.CalculatedHash,
-		Matches:                           audit.Matches,
+		JobID:                       jobID,
+		storedFileHashAuditResponse: storedFileHashAuditResponseFromStored(audit),
 	}
 }
 
 func projectAuthorizationDocHashReplaceResponseFromStored(jobID string, replacement storedFileHashReplace) projectAuthorizationDocHashReplaceResponse {
 	return projectAuthorizationDocHashReplaceResponse{
-		projectAuthorizationDocHashAuditResponse: projectAuthorizationDocHashAuditResponseFromStored(jobID, replacement.Audit),
-		PreviousHash:                             replacement.PreviousHash,
-		NewHash:                                  replacement.NewHash,
-		Replaced:                                 replacement.Replaced,
-		Noop:                                     replacement.Noop,
-	}
-}
-
-func projectAuthorizationDocHashTargetFromStored(jobID string, target storedFileHashTarget) projectAuthorizationDocHashTarget {
-	return projectAuthorizationDocHashTarget{
-		JobID:            jobID,
-		TargetCollection: target.TargetCollection,
-		TargetID:         target.TargetID,
-		Filename:         target.Filename,
-		StoragePath:      target.StoragePath,
-		StoredHash:       target.StoredHash,
-		Updated:          target.Updated,
+		JobID:                         jobID,
+		storedFileHashReplaceResponse: storedFileHashReplaceResponseFromStored(replacement),
 	}
 }

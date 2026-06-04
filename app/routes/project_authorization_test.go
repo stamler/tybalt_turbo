@@ -495,17 +495,7 @@ func TestProjectAuthorizationCustomJobCreateCannotMutateFields(t *testing.T) {
 func auditProjectAuthorizationDocHashForTest(t *testing.T, app *tests.TestApp, token string, jobID string, status int) projectAuthorizationDocHashAuditResponse {
 	t.Helper()
 	rec := performClaimsJSONRequest(t, app, http.MethodPost, "/api/jobs/"+jobID+"/project_authorization_doc_hash/audit", token, nil)
-	if rec.Code != status {
-		t.Fatalf("PA hash audit status = %d, want %d; body=%s", rec.Code, status, rec.Body.String())
-	}
-	if status != http.StatusOK {
-		return projectAuthorizationDocHashAuditResponse{}
-	}
-	var response projectAuthorizationDocHashAuditResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("failed to decode PA hash audit response: %v", err)
-	}
-	return response
+	return decodeJSONResponseForTest[projectAuthorizationDocHashAuditResponse](t, rec, status, "PA hash audit")
 }
 
 func replaceProjectAuthorizationDocHashForTest(t *testing.T, app *tests.TestApp, token string, jobID string, updated string, status int) projectAuthorizationDocHashReplaceResponse {
@@ -513,15 +503,20 @@ func replaceProjectAuthorizationDocHashForTest(t *testing.T, app *tests.TestApp,
 	rec := performClaimsJSONRequest(t, app, http.MethodPost, "/api/jobs/"+jobID+"/project_authorization_doc_hash/replace", token, map[string]any{
 		"updated": updated,
 	})
+	return decodeJSONResponseForTest[projectAuthorizationDocHashReplaceResponse](t, rec, status, "PA hash replace")
+}
+
+func decodeJSONResponseForTest[T any](t *testing.T, rec *httptest.ResponseRecorder, status int, label string) T {
+	t.Helper()
+	var response T
 	if rec.Code != status {
-		t.Fatalf("PA hash replace status = %d, want %d; body=%s", rec.Code, status, rec.Body.String())
+		t.Fatalf("%s status = %d, want %d; body=%s", label, rec.Code, status, rec.Body.String())
 	}
 	if status != http.StatusOK {
-		return projectAuthorizationDocHashReplaceResponse{}
+		return response
 	}
-	var response projectAuthorizationDocHashReplaceResponse
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("failed to decode PA hash replace response: %v", err)
+		t.Fatalf("failed to decode %s response: %v", label, err)
 	}
 	return response
 }

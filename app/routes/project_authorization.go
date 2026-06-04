@@ -18,6 +18,8 @@ import (
 	"github.com/pocketbase/pocketbase/tools/filesystem"
 )
 
+const duplicateProjectAuthorizationDocMessage = "this PA document has already been uploaded to another job"
+
 type projectAuthorizationApproveRequest struct {
 	ProjectAuthorizationDocHash string `json:"project_authorization_doc_hash"`
 }
@@ -49,11 +51,7 @@ func createUploadProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 			return e.NotFoundError("job not found", err)
 		}
 		if strings.HasPrefix(job.GetString("number"), "P") {
-			return projectAuthorizationRouteError(e, projectAuthorizationAPIError(
-				http.StatusBadRequest,
-				"not_project_job",
-				"project authorization documents can only be uploaded to project jobs",
-			))
+			return projectAuthorizationRouteError(e, projectAuthorizationNotProjectJobAPIError("uploaded to"))
 		}
 		allowed, err := hooks.CanUploadProjectAuthorizationDocument(app, job, e.Auth)
 		if err != nil {
@@ -95,11 +93,7 @@ func createUploadProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 				return projectAuthorizationAPIError(http.StatusNotFound, "job_not_found", "job not found")
 			}
 			if strings.HasPrefix(txJob.GetString("number"), "P") {
-				return projectAuthorizationAPIError(
-					http.StatusBadRequest,
-					"not_project_job",
-					"project authorization documents can only be uploaded to project jobs",
-				)
+				return projectAuthorizationNotProjectJobAPIError("uploaded to")
 			}
 			allowed, err := hooks.CanUploadProjectAuthorizationDocument(txApp, txJob, e.Auth)
 			if err != nil {
@@ -108,25 +102,15 @@ func createUploadProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 			if !allowed {
 				return projectAuthorizationAPIError(http.StatusForbidden, "forbidden", "you do not have permission to upload this project authorization document")
 			}
-			if txJob.GetString("pa_reviewed") != "" || txJob.GetString("pa_reviewer") != "" {
-				return projectAuthorizationFieldAPIError(
-					http.StatusBadRequest,
-					"project_authorization_approved_immutable",
-					"revoke PA approval before replacing or removing the uploaded document",
-					"project_authorization_doc",
-				)
+			if projectAuthorizationReviewMetadataPresent(txJob) {
+				return projectAuthorizationApprovedImmutableAPIError()
 			}
 			existingJob, _ := txApp.FindFirstRecordByFilter("jobs", "project_authorization_doc_hash = {:hash} && id != {:id}", dbx.Params{
 				"hash": attachmentHash,
 				"id":   txJob.Id,
 			})
 			if existingJob != nil {
-				return projectAuthorizationFieldAPIError(
-					http.StatusBadRequest,
-					"duplicate_file",
-					"this PA document has already been uploaded to another job",
-					"project_authorization_doc",
-				)
+				return duplicateProjectAuthorizationDocAPIError()
 			}
 
 			form := forms.NewRecordUpsert(txApp, txJob)
@@ -161,11 +145,7 @@ func createDeleteProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 			return e.NotFoundError("job not found", err)
 		}
 		if strings.HasPrefix(job.GetString("number"), "P") {
-			return projectAuthorizationRouteError(e, projectAuthorizationAPIError(
-				http.StatusBadRequest,
-				"not_project_job",
-				"project authorization documents can only be removed from project jobs",
-			))
+			return projectAuthorizationRouteError(e, projectAuthorizationNotProjectJobAPIError("removed from"))
 		}
 		allowed, err := hooks.CanUploadProjectAuthorizationDocument(app, job, e.Auth)
 		if err != nil {
@@ -174,13 +154,8 @@ func createDeleteProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 		if !allowed {
 			return e.ForbiddenError("you do not have permission to remove this project authorization document", nil)
 		}
-		if job.GetString("pa_reviewed") != "" || job.GetString("pa_reviewer") != "" {
-			return projectAuthorizationRouteError(e, projectAuthorizationFieldAPIError(
-				http.StatusBadRequest,
-				"project_authorization_approved_immutable",
-				"revoke PA approval before replacing or removing the uploaded document",
-				"project_authorization_doc",
-			))
+		if projectAuthorizationReviewMetadataPresent(job) {
+			return projectAuthorizationRouteError(e, projectAuthorizationApprovedImmutableAPIError())
 		}
 
 		var cleared *core.Record
@@ -189,13 +164,8 @@ func createDeleteProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 			if err != nil {
 				return projectAuthorizationAPIError(http.StatusNotFound, "job_not_found", "job not found")
 			}
-			if txJob.GetString("pa_reviewed") != "" || txJob.GetString("pa_reviewer") != "" {
-				return projectAuthorizationFieldAPIError(
-					http.StatusBadRequest,
-					"project_authorization_approved_immutable",
-					"revoke PA approval before replacing or removing the uploaded document",
-					"project_authorization_doc",
-				)
+			if projectAuthorizationReviewMetadataPresent(txJob) {
+				return projectAuthorizationApprovedImmutableAPIError()
 			}
 			txJob.Set("project_authorization_doc", "")
 			txJob.Set("project_authorization_doc_hash", "")
@@ -285,7 +255,7 @@ func createApproveProjectAuthorizationHandler(app core.App) func(e *core.Request
 			if currentHash == "" || currentHash != submittedHash {
 				return projectAuthorizationAPIError(http.StatusConflict, "project_authorization_doc_changed", "The project authorization document changed after you opened it. Please review the current document before approving.")
 			}
-			if job.GetString("pa_reviewed") != "" || job.GetString("pa_reviewer") != "" {
+			if projectAuthorizationReviewMetadataPresent(job) {
 				return projectAuthorizationAPIError(http.StatusConflict, "project_authorization_already_approved", "This project authorization document has already been approved.")
 			}
 			job.Set("pa_reviewed", time.Now().UTC())
@@ -357,31 +327,55 @@ func hashUploadedFileSHA256(file *filesystem.File) (string, error) {
 }
 
 func requireAccountingClaim(app core.App, auth *core.Record) error {
+	return requireProjectAuthorizationClaim(app, auth, "accounting", "you do not have permission to approve project authorization documents")
+}
+
+func requireAdminClaim(app core.App, auth *core.Record) error {
+	return requireProjectAuthorizationClaim(app, auth, "admin", "you do not have permission to revoke project authorization approvals")
+}
+
+func requireProjectAuthorizationClaim(app core.App, auth *core.Record, claim string, forbiddenMessage string) error {
 	if auth == nil || auth.Id == "" {
 		return projectAuthorizationAPIError(http.StatusUnauthorized, "unauthorized", "unauthorized")
 	}
-	hasClaim, err := utilities.HasClaim(app, auth, "accounting")
+	hasClaim, err := utilities.HasClaim(app, auth, claim)
 	if err != nil {
 		return err
 	}
 	if !hasClaim {
-		return projectAuthorizationAPIError(http.StatusForbidden, "forbidden", "you do not have permission to approve project authorization documents")
+		return projectAuthorizationAPIError(http.StatusForbidden, "forbidden", forbiddenMessage)
 	}
 	return nil
 }
 
-func requireAdminClaim(app core.App, auth *core.Record) error {
-	if auth == nil || auth.Id == "" {
-		return projectAuthorizationAPIError(http.StatusUnauthorized, "unauthorized", "unauthorized")
-	}
-	hasClaim, err := utilities.HasClaim(app, auth, "admin")
-	if err != nil {
-		return err
-	}
-	if !hasClaim {
-		return projectAuthorizationAPIError(http.StatusForbidden, "forbidden", "you do not have permission to revoke project authorization approvals")
-	}
-	return nil
+func projectAuthorizationReviewMetadataPresent(record *core.Record) bool {
+	return record != nil && (record.GetString("pa_reviewed") != "" || record.GetString("pa_reviewer") != "")
+}
+
+func projectAuthorizationApprovedImmutableAPIError() *projectAuthorizationHTTPError {
+	return projectAuthorizationFieldAPIError(
+		http.StatusBadRequest,
+		"project_authorization_approved_immutable",
+		"revoke PA approval before replacing or removing the uploaded document",
+		"project_authorization_doc",
+	)
+}
+
+func projectAuthorizationNotProjectJobAPIError(action string) *projectAuthorizationHTTPError {
+	return projectAuthorizationAPIError(
+		http.StatusBadRequest,
+		"not_project_job",
+		"project authorization documents can only be "+action+" project jobs",
+	)
+}
+
+func duplicateProjectAuthorizationDocAPIError() *projectAuthorizationHTTPError {
+	return projectAuthorizationFieldAPIError(
+		http.StatusBadRequest,
+		"duplicate_file",
+		duplicateProjectAuthorizationDocMessage,
+		"project_authorization_doc",
+	)
 }
 
 type projectAuthorizationHTTPError struct {
@@ -418,13 +412,7 @@ func projectAuthorizationRouteError(e *core.RequestEvent, err error) error {
 	}
 	if strings.Contains(err.Error(), "idx_jobs_project_authorization_doc_hash") ||
 		strings.Contains(err.Error(), "UNIQUE constraint failed: jobs.project_authorization_doc_hash") {
-		return e.JSON(http.StatusBadRequest, map[string]any{
-			"code":    "duplicate_file",
-			"message": "this PA document has already been uploaded to another job",
-			"data": map[string]any{
-				"project_authorization_doc": map[string]any{"code": "duplicate_file", "message": "this PA document has already been uploaded to another job"},
-			},
-		})
+		return projectAuthorizationRouteError(e, duplicateProjectAuthorizationDocAPIError())
 	}
 	return e.Error(http.StatusInternalServerError, "project authorization request failed", err)
 }

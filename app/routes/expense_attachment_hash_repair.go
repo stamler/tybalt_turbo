@@ -16,24 +16,9 @@ const (
 	expenseHashTargetExpenseDocuments = constants.ExpenseDocumentsCollectionName
 )
 
-type expenseAttachmentHashTarget struct {
-	ExpenseID        string `json:"expense_id"`
-	TargetCollection string `json:"target_collection"`
-	TargetID         string `json:"target_id"`
-	Filename         string `json:"filename"`
-	StoragePath      string `json:"storage_path"`
-	StoredHash       string `json:"stored_hash"`
-	Updated          string `json:"updated"`
-}
-
 type expenseAttachmentHashAuditResponse struct {
-	expenseAttachmentHashTarget
-	CalculatedHash string `json:"calculated_hash"`
-	Matches        bool   `json:"matches"`
-}
-
-type expenseAttachmentHashReplaceRequest struct {
-	Updated string `json:"updated"`
+	ExpenseID string `json:"expense_id"`
+	storedFileHashAuditResponse
 }
 
 type expenseAttachmentMissingMarkRequest struct {
@@ -42,11 +27,8 @@ type expenseAttachmentMissingMarkRequest struct {
 }
 
 type expenseAttachmentHashReplaceResponse struct {
-	expenseAttachmentHashAuditResponse
-	PreviousHash string `json:"previous_hash"`
-	NewHash      string `json:"new_hash"`
-	Replaced     bool   `json:"replaced"`
-	Noop         bool   `json:"noop"`
+	ExpenseID string `json:"expense_id"`
+	storedFileHashReplaceResponse
 }
 
 type expenseAttachmentMissingMarkResponse struct {
@@ -71,39 +53,11 @@ var expenseAttachmentHashMessages = storedFileHashMessages{
 }
 
 func createAuditExpenseAttachmentHashHandler(app core.App) func(e *core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		if err := requireAdminForStoredFileHashRepair(app, e); err != nil {
-			return err
-		}
-
-		response, err := auditExpenseAttachmentHash(app, e.Request.PathValue("id"))
-		if err != nil {
-			return expenseAttachmentHashRouteError(e, err)
-		}
-		return e.JSON(http.StatusOK, response)
-	}
+	return createStoredFileHashAuditHandler(app, auditExpenseAttachmentHash, expenseAttachmentHashRouteError)
 }
 
 func createReplaceExpenseAttachmentHashHandler(app core.App) func(e *core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		if err := requireAdminForStoredFileHashRepair(app, e); err != nil {
-			return err
-		}
-
-		var req expenseAttachmentHashReplaceRequest
-		if err := e.BindBody(&req); err != nil {
-			return e.Error(http.StatusBadRequest, "invalid request body", err)
-		}
-		if strings.TrimSpace(req.Updated) == "" {
-			return e.Error(http.StatusBadRequest, "updated is required", nil)
-		}
-
-		response, err := replaceExpenseAttachmentHash(app, e.Request.PathValue("id"), strings.TrimSpace(req.Updated))
-		if err != nil {
-			return expenseAttachmentHashRouteError(e, err)
-		}
-		return e.JSON(http.StatusOK, response)
-	}
+	return createStoredFileHashReplaceHandler(app, replaceExpenseAttachmentHash, expenseAttachmentHashRouteError)
 }
 
 func createMarkExpenseAttachmentMissingHandler(app core.App) func(e *core.RequestEvent) error {
@@ -278,30 +232,14 @@ func expenseAttachmentHashRouteError(e *core.RequestEvent, err error) error {
 
 func expenseAttachmentHashAuditResponseFromStored(expenseID string, audit storedFileHashAudit) expenseAttachmentHashAuditResponse {
 	return expenseAttachmentHashAuditResponse{
-		expenseAttachmentHashTarget: expenseAttachmentHashTargetFromStored(expenseID, audit.Target),
-		CalculatedHash:              audit.CalculatedHash,
-		Matches:                     audit.Matches,
+		ExpenseID:                   expenseID,
+		storedFileHashAuditResponse: storedFileHashAuditResponseFromStored(audit),
 	}
 }
 
 func expenseAttachmentHashReplaceResponseFromStored(expenseID string, replacement storedFileHashReplace) expenseAttachmentHashReplaceResponse {
 	return expenseAttachmentHashReplaceResponse{
-		expenseAttachmentHashAuditResponse: expenseAttachmentHashAuditResponseFromStored(expenseID, replacement.Audit),
-		PreviousHash:                       replacement.PreviousHash,
-		NewHash:                            replacement.NewHash,
-		Replaced:                           replacement.Replaced,
-		Noop:                               replacement.Noop,
-	}
-}
-
-func expenseAttachmentHashTargetFromStored(expenseID string, target storedFileHashTarget) expenseAttachmentHashTarget {
-	return expenseAttachmentHashTarget{
-		ExpenseID:        expenseID,
-		TargetCollection: target.TargetCollection,
-		TargetID:         target.TargetID,
-		Filename:         target.Filename,
-		StoragePath:      target.StoragePath,
-		StoredHash:       target.StoredHash,
-		Updated:          target.Updated,
+		ExpenseID:                     expenseID,
+		storedFileHashReplaceResponse: storedFileHashReplaceResponseFromStored(replacement),
 	}
 }

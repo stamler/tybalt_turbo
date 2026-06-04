@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -338,17 +337,7 @@ func TestExpenseAttachmentMissingMarkRejectsStaleUpdated(t *testing.T) {
 func auditExpenseAttachmentHashForTest(t *testing.T, app *tests.TestApp, token string, expenseID string, status int) expenseAttachmentHashAuditResponse {
 	t.Helper()
 	rec := performClaimsJSONRequest(t, app, http.MethodPost, "/api/expenses/"+expenseID+"/attachment_hash/audit", token, nil)
-	if rec.Code != status {
-		t.Fatalf("audit status = %d, want %d; body=%s", rec.Code, status, rec.Body.String())
-	}
-	if status != http.StatusOK {
-		return expenseAttachmentHashAuditResponse{}
-	}
-	var response expenseAttachmentHashAuditResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("failed to decode audit response: %v", err)
-	}
-	return response
+	return decodeJSONResponseForTest[expenseAttachmentHashAuditResponse](t, rec, status, "expense attachment hash audit")
 }
 
 func replaceExpenseAttachmentHashForTest(t *testing.T, app *tests.TestApp, token string, expenseID string, updated string, status int) expenseAttachmentHashReplaceResponse {
@@ -356,17 +345,7 @@ func replaceExpenseAttachmentHashForTest(t *testing.T, app *tests.TestApp, token
 	rec := performClaimsJSONRequest(t, app, http.MethodPost, "/api/expenses/"+expenseID+"/attachment_hash/replace", token, map[string]any{
 		"updated": updated,
 	})
-	if rec.Code != status {
-		t.Fatalf("replace status = %d, want %d; body=%s", rec.Code, status, rec.Body.String())
-	}
-	if status != http.StatusOK {
-		return expenseAttachmentHashReplaceResponse{}
-	}
-	var response expenseAttachmentHashReplaceResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("failed to decode replace response: %v", err)
-	}
-	return response
+	return decodeJSONResponseForTest[expenseAttachmentHashReplaceResponse](t, rec, status, "expense attachment hash replace")
 }
 
 func markExpenseAttachmentMissingForTest(t *testing.T, app *tests.TestApp, token string, expenseID string, updated string, reason string, status int) expenseAttachmentMissingMarkResponse {
@@ -375,17 +354,7 @@ func markExpenseAttachmentMissingForTest(t *testing.T, app *tests.TestApp, token
 		"updated": updated,
 		"reason":  reason,
 	})
-	if rec.Code != status {
-		t.Fatalf("mark missing status = %d, want %d; body=%s", rec.Code, status, rec.Body.String())
-	}
-	if status != http.StatusOK {
-		return expenseAttachmentMissingMarkResponse{}
-	}
-	var response expenseAttachmentMissingMarkResponse
-	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("failed to decode mark missing response: %v", err)
-	}
-	return response
+	return decodeJSONResponseForTest[expenseAttachmentMissingMarkResponse](t, rec, status, "expense attachment missing mark")
 }
 
 func linkExpenseToDocumentForHashRepairTest(t *testing.T, app *tests.TestApp, expenseID string, documentID string) {

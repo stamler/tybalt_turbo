@@ -15,6 +15,11 @@ import (
 const (
 	ProjectAuthorizationNotApprovedCode    = "project_authorization_not_approved"
 	ProjectAuthorizationNotApprovedMessage = "This project is not approved for time, purchase orders, or expenses yet. Please speak with the project's manager."
+
+	projectAuthorizationDocField      = "project_authorization_doc"
+	projectAuthorizationDocHashField  = "project_authorization_doc_hash"
+	projectAuthorizationReviewerField = "pa_reviewer"
+	projectAuthorizationReviewedField = "pa_reviewed"
 )
 
 type ProjectAuthorizationMutation string
@@ -27,6 +32,19 @@ const (
 )
 
 type projectAuthorizationMutationContextKey struct{}
+
+var (
+	projectAuthorizationFields = []string{
+		projectAuthorizationDocField,
+		projectAuthorizationDocHashField,
+		projectAuthorizationReviewerField,
+		projectAuthorizationReviewedField,
+	}
+	projectAuthorizationReviewFields = []string{
+		projectAuthorizationReviewerField,
+		projectAuthorizationReviewedField,
+	}
+)
 
 type ProjectAuthorizationBlockingJob struct {
 	ID          string `db:"id" json:"id"`
@@ -65,35 +83,28 @@ func ProcessJobProjectAuthorizationFields(app core.App, e *core.RecordRequestEve
 	}
 
 	if record.IsNew() {
-		record.Set("project_authorization_doc_hash", "")
-		record.Set("pa_reviewer", "")
-		record.Set("pa_reviewed", "")
+		clearProjectAuthorizationStoredState(record)
 		return nil
 	}
 
 	original := record.Original()
 	approved := projectAuthorizationApprovedFieldsPopulated(original)
-	docChanged := strings.TrimSpace(record.GetString("project_authorization_doc")) != strings.TrimSpace(original.GetString("project_authorization_doc")) ||
-		len(record.GetUnsavedFiles("project_authorization_doc")) > 0
-
-	if approved && docChanged {
+	if approved && projectAuthorizationDocumentChanged(record) {
 		return projectAuthorizationHookError(
 			http.StatusBadRequest,
 			"approved project authorization document is immutable",
-			"project_authorization_doc",
+			projectAuthorizationDocField,
 			"project_authorization_approved_immutable",
 			"revoke PA approval before replacing or removing the uploaded document",
 		)
 	}
 
 	if !uploadRoute {
-		record.Set("project_authorization_doc_hash", original.GetString("project_authorization_doc_hash"))
-		record.Set("pa_reviewer", original.GetString("pa_reviewer"))
-		record.Set("pa_reviewed", original.GetString("pa_reviewed"))
+		restoreProjectAuthorizationStoredState(record, original)
 		return nil
 	}
 
-	attachmentHash, err := CalculateFileFieldHash(e, "project_authorization_doc")
+	attachmentHash, err := CalculateFileFieldHash(e, projectAuthorizationDocField)
 	if err != nil {
 		return err
 	}
@@ -101,7 +112,7 @@ func ProcessJobProjectAuthorizationFields(app core.App, e *core.RecordRequestEve
 		return projectAuthorizationHookError(
 			http.StatusBadRequest,
 			"project authorization document upload is required",
-			"project_authorization_doc",
+			projectAuthorizationDocField,
 			"required",
 			"upload a signed PA PDF",
 		)
@@ -115,15 +126,14 @@ func ProcessJobProjectAuthorizationFields(app core.App, e *core.RecordRequestEve
 		return projectAuthorizationHookError(
 			http.StatusBadRequest,
 			"duplicate project authorization document detected",
-			"project_authorization_doc",
+			projectAuthorizationDocField,
 			"duplicate_file",
 			"this PA document has already been uploaded to another job",
 		)
 	}
 
-	record.Set("project_authorization_doc_hash", attachmentHash)
-	record.Set("pa_reviewer", "")
-	record.Set("pa_reviewed", "")
+	record.Set(projectAuthorizationDocHashField, attachmentHash)
+	clearProjectAuthorizationReviewFields(record)
 	return nil
 }
 
@@ -244,10 +254,12 @@ func projectAuthorizationApprovedFieldsPopulated(record *core.Record) bool {
 	if record == nil {
 		return false
 	}
-	return strings.TrimSpace(record.GetString("project_authorization_doc")) != "" &&
-		strings.TrimSpace(record.GetString("project_authorization_doc_hash")) != "" &&
-		strings.TrimSpace(record.GetString("pa_reviewed")) != "" &&
-		strings.TrimSpace(record.GetString("pa_reviewer")) != ""
+	for _, field := range projectAuthorizationFields {
+		if strings.TrimSpace(record.GetString(field)) == "" {
+			return false
+		}
+	}
+	return true
 }
 
 type projectAuthorizationFieldChanges struct {
@@ -258,13 +270,11 @@ type projectAuthorizationFieldChanges struct {
 }
 
 func projectAuthorizationFieldChangesFor(record *core.Record) projectAuthorizationFieldChanges {
-	original := record.Original()
 	return projectAuthorizationFieldChanges{
-		doc: strings.TrimSpace(record.GetString("project_authorization_doc")) != strings.TrimSpace(original.GetString("project_authorization_doc")) ||
-			len(record.GetUnsavedFiles("project_authorization_doc")) > 0,
-		hash:     strings.TrimSpace(record.GetString("project_authorization_doc_hash")) != strings.TrimSpace(original.GetString("project_authorization_doc_hash")),
-		reviewer: strings.TrimSpace(record.GetString("pa_reviewer")) != strings.TrimSpace(original.GetString("pa_reviewer")),
-		reviewed: strings.TrimSpace(record.GetString("pa_reviewed")) != strings.TrimSpace(original.GetString("pa_reviewed")),
+		doc:      projectAuthorizationDocumentChanged(record),
+		hash:     projectAuthorizationStringChanged(record, projectAuthorizationDocHashField),
+		reviewer: projectAuthorizationStringChanged(record, projectAuthorizationReviewerField),
+		reviewed: projectAuthorizationStringChanged(record, projectAuthorizationReviewedField),
 	}
 }
 
@@ -275,15 +285,15 @@ func (changes projectAuthorizationFieldChanges) any() bool {
 func (changes projectAuthorizationFieldChanges) firstField() string {
 	switch {
 	case changes.doc:
-		return "project_authorization_doc"
+		return projectAuthorizationDocField
 	case changes.hash:
-		return "project_authorization_doc_hash"
+		return projectAuthorizationDocHashField
 	case changes.reviewer:
-		return "pa_reviewer"
+		return projectAuthorizationReviewerField
 	case changes.reviewed:
-		return "pa_reviewed"
+		return projectAuthorizationReviewedField
 	default:
-		return "project_authorization_doc"
+		return projectAuthorizationDocField
 	}
 }
 
@@ -292,29 +302,26 @@ func validateProjectAuthorizationUploadSave(record *core.Record) error {
 	if projectAuthorizationReviewMetadataPresent(original) {
 		return projectAuthorizationApprovedImmutableError()
 	}
-	if len(record.GetUnsavedFiles("project_authorization_doc")) == 0 {
+	if len(record.GetUnsavedFiles(projectAuthorizationDocField)) == 0 {
 		return projectAuthorizationHookError(
 			http.StatusBadRequest,
 			"project authorization document upload is required",
-			"project_authorization_doc",
+			projectAuthorizationDocField,
 			"required",
 			"upload a signed PA PDF",
 		)
 	}
-	if strings.TrimSpace(record.GetString("project_authorization_doc_hash")) == "" {
+	if strings.TrimSpace(record.GetString(projectAuthorizationDocHashField)) == "" {
 		return projectAuthorizationHookError(
 			http.StatusBadRequest,
 			"project authorization document hash is required",
-			"project_authorization_doc_hash",
+			projectAuthorizationDocHashField,
 			"required",
 			"project authorization document hash is required",
 		)
 	}
-	if strings.TrimSpace(record.GetString("pa_reviewer")) != "" {
-		return projectAuthorizationNotEditableError("pa_reviewer")
-	}
-	if strings.TrimSpace(record.GetString("pa_reviewed")) != "" {
-		return projectAuthorizationNotEditableError("pa_reviewed")
+	if field := firstPopulatedProjectAuthorizationReviewField(record); field != "" {
+		return projectAuthorizationNotEditableError(field)
 	}
 	return nil
 }
@@ -323,17 +330,8 @@ func validateProjectAuthorizationDeleteSave(record *core.Record) error {
 	if projectAuthorizationReviewMetadataPresent(record.Original()) {
 		return projectAuthorizationApprovedImmutableError()
 	}
-	if strings.TrimSpace(record.GetString("project_authorization_doc")) != "" {
-		return projectAuthorizationNotEditableError("project_authorization_doc")
-	}
-	if strings.TrimSpace(record.GetString("project_authorization_doc_hash")) != "" {
-		return projectAuthorizationNotEditableError("project_authorization_doc_hash")
-	}
-	if strings.TrimSpace(record.GetString("pa_reviewer")) != "" {
-		return projectAuthorizationNotEditableError("pa_reviewer")
-	}
-	if strings.TrimSpace(record.GetString("pa_reviewed")) != "" {
-		return projectAuthorizationNotEditableError("pa_reviewed")
+	if field := firstPopulatedProjectAuthorizationField(record); field != "" {
+		return projectAuthorizationNotEditableError(field)
 	}
 	return nil
 }
@@ -341,52 +339,52 @@ func validateProjectAuthorizationDeleteSave(record *core.Record) error {
 func validateProjectAuthorizationApproveSave(record *core.Record, changes projectAuthorizationFieldChanges) error {
 	original := record.Original()
 	if changes.doc {
-		return projectAuthorizationNotEditableError("project_authorization_doc")
+		return projectAuthorizationNotEditableError(projectAuthorizationDocField)
 	}
 	if changes.hash {
-		return projectAuthorizationNotEditableError("project_authorization_doc_hash")
+		return projectAuthorizationNotEditableError(projectAuthorizationDocHashField)
 	}
 	if projectAuthorizationReviewMetadataPresent(original) {
 		return projectAuthorizationHookError(
 			http.StatusConflict,
 			"project authorization document has already been approved",
-			"pa_reviewed",
+			projectAuthorizationReviewedField,
 			"project_authorization_already_approved",
 			"this project authorization document has already been approved",
 		)
 	}
-	if strings.TrimSpace(original.GetString("project_authorization_doc")) == "" {
+	if strings.TrimSpace(original.GetString(projectAuthorizationDocField)) == "" {
 		return projectAuthorizationHookError(
 			http.StatusBadRequest,
 			"project authorization document is required before approval",
-			"project_authorization_doc",
+			projectAuthorizationDocField,
 			"required",
 			"project authorization document is required before approval",
 		)
 	}
-	if strings.TrimSpace(original.GetString("project_authorization_doc_hash")) == "" {
+	if strings.TrimSpace(original.GetString(projectAuthorizationDocHashField)) == "" {
 		return projectAuthorizationHookError(
 			http.StatusConflict,
 			"project authorization document hash is missing",
-			"project_authorization_doc_hash",
+			projectAuthorizationDocHashField,
 			"project_authorization_doc_changed",
 			"review the current project authorization document before approving",
 		)
 	}
-	if strings.TrimSpace(record.GetString("pa_reviewer")) == "" {
+	if strings.TrimSpace(record.GetString(projectAuthorizationReviewerField)) == "" {
 		return projectAuthorizationHookError(
 			http.StatusBadRequest,
 			"project authorization reviewer is required",
-			"pa_reviewer",
+			projectAuthorizationReviewerField,
 			"required",
 			"project authorization reviewer is required",
 		)
 	}
-	if strings.TrimSpace(record.GetString("pa_reviewed")) == "" {
+	if strings.TrimSpace(record.GetString(projectAuthorizationReviewedField)) == "" {
 		return projectAuthorizationHookError(
 			http.StatusBadRequest,
 			"project authorization reviewed timestamp is required",
-			"pa_reviewed",
+			projectAuthorizationReviewedField,
 			"required",
 			"project authorization reviewed timestamp is required",
 		)
@@ -396,41 +394,65 @@ func validateProjectAuthorizationApproveSave(record *core.Record, changes projec
 
 func validateProjectAuthorizationRevokeSave(record *core.Record, changes projectAuthorizationFieldChanges) error {
 	if changes.doc {
-		return projectAuthorizationNotEditableError("project_authorization_doc")
+		return projectAuthorizationNotEditableError(projectAuthorizationDocField)
 	}
 	if changes.hash {
-		return projectAuthorizationNotEditableError("project_authorization_doc_hash")
+		return projectAuthorizationNotEditableError(projectAuthorizationDocHashField)
 	}
-	if strings.TrimSpace(record.GetString("pa_reviewer")) != "" {
-		return projectAuthorizationNotEditableError("pa_reviewer")
-	}
-	if strings.TrimSpace(record.GetString("pa_reviewed")) != "" {
-		return projectAuthorizationNotEditableError("pa_reviewed")
+	if field := firstPopulatedProjectAuthorizationReviewField(record); field != "" {
+		return projectAuthorizationNotEditableError(field)
 	}
 	return nil
 }
 
 func projectAuthorizationReviewMetadataPresent(record *core.Record) bool {
-	if record == nil {
-		return false
-	}
-	return strings.TrimSpace(record.GetString("pa_reviewed")) != "" ||
-		strings.TrimSpace(record.GetString("pa_reviewer")) != ""
+	return firstPopulatedProjectAuthorizationReviewField(record) != ""
 }
 
 func firstPopulatedProjectAuthorizationField(record *core.Record) string {
-	fields := []string{
-		"project_authorization_doc",
-		"project_authorization_doc_hash",
-		"pa_reviewer",
-		"pa_reviewed",
-	}
+	return firstPopulatedProjectAuthorizationFieldIn(record, projectAuthorizationFields)
+}
+
+func firstPopulatedProjectAuthorizationReviewField(record *core.Record) string {
+	return firstPopulatedProjectAuthorizationFieldIn(record, projectAuthorizationReviewFields)
+}
+
+func firstPopulatedProjectAuthorizationFieldIn(record *core.Record, fields []string) string {
 	for _, field := range fields {
-		if strings.TrimSpace(record.GetString(field)) != "" || len(record.GetUnsavedFiles(field)) > 0 {
+		if projectAuthorizationFieldPopulated(record, field) {
 			return field
 		}
 	}
 	return ""
+}
+
+func projectAuthorizationFieldPopulated(record *core.Record, field string) bool {
+	return record != nil && (strings.TrimSpace(record.GetString(field)) != "" || len(record.GetUnsavedFiles(field)) > 0)
+}
+
+func projectAuthorizationStringChanged(record *core.Record, field string) bool {
+	return strings.TrimSpace(record.GetString(field)) != strings.TrimSpace(record.Original().GetString(field))
+}
+
+func projectAuthorizationDocumentChanged(record *core.Record) bool {
+	return projectAuthorizationStringChanged(record, projectAuthorizationDocField) ||
+		len(record.GetUnsavedFiles(projectAuthorizationDocField)) > 0
+}
+
+func clearProjectAuthorizationStoredState(record *core.Record) {
+	record.Set(projectAuthorizationDocHashField, "")
+	clearProjectAuthorizationReviewFields(record)
+}
+
+func clearProjectAuthorizationReviewFields(record *core.Record) {
+	record.Set(projectAuthorizationReviewerField, "")
+	record.Set(projectAuthorizationReviewedField, "")
+}
+
+func restoreProjectAuthorizationStoredState(record *core.Record, original *core.Record) {
+	for _, field := range projectAuthorizationFields[1:] {
+		record.Set(field, original.GetString(field))
+	}
 }
 
 func isProjectAuthorizationUploadRoute(e *core.RecordRequestEvent) bool {
@@ -446,13 +468,7 @@ func rejectGenericProjectAuthorizationFieldMutation(e *core.RecordRequestEvent) 
 	if err != nil {
 		return err
 	}
-	protectedFields := []string{
-		"project_authorization_doc",
-		"project_authorization_doc_hash",
-		"pa_reviewer",
-		"pa_reviewed",
-	}
-	for _, field := range protectedFields {
+	for _, field := range projectAuthorizationFields {
 		if _, ok := info.Body[field]; ok || len(e.Record.GetUnsavedFiles(field)) > 0 {
 			return projectAuthorizationHookError(
 				http.StatusBadRequest,
@@ -470,7 +486,7 @@ func projectAuthorizationApprovedImmutableError() *errs.HookError {
 	return projectAuthorizationHookError(
 		http.StatusBadRequest,
 		"approved project authorization document is immutable",
-		"project_authorization_doc",
+		projectAuthorizationDocField,
 		"project_authorization_approved_immutable",
 		"revoke PA approval before replacing or removing the uploaded document",
 	)
