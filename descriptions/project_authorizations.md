@@ -87,6 +87,15 @@ non-empty hashes, matching the existing attachment-hash pattern used elsewhere i
 Turbo. The upload path should still translate duplicate-hash constraint failures
 into a validation error on `project_authorization_doc`.
 
+Admin hash repair is an intentional maintenance exception to the ordinary
+server-owned hash flow. Holders of the `admin` claim may use the PA document hash
+repair function to recalculate and replace `project_authorization_doc_hash` from
+the file already stored on the job, including when the PA is already approved,
+without revoking the PA or requiring Accounting to reapprove it. This function is
+admin-only and is designed to repair stored metadata so it matches the existing
+uploaded PDF; it must not replace, remove, or otherwise change the uploaded PA
+document or the approval fields.
+
 ## Upload Permissions
 
 The meeting notes say that either the project manager or a `job` claim holder can
