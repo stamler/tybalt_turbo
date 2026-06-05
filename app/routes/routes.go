@@ -236,6 +236,7 @@ func AddRoutes(app core.App) {
 		jobsGroup.Bind(apis.RequireAuth("users"))
 		jobsGroup.POST("", createCreateJobHandler(app))
 		jobsGroup.PUT("/{id}", createUpsertJobHandler(app))
+		jobsGroup.GET("/project_authorization/missing", createGetMissingProjectAuthorizationHandler(app))
 		jobsGroup.GET("/project_authorization/pending", createGetProjectAuthorizationQueueHandler(app))
 		jobsGroup.GET("/{id}/details", createGetJobDetailsHandler(app))
 		jobsGroup.GET("/{id}/notes", createGetJobNotesHandler(app))

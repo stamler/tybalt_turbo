@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/textproto"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -442,6 +443,110 @@ func TestProjectAuthorizationQueueRequiresAccountingClaim(t *testing.T) {
 	}
 }
 
+func TestProjectAuthorizationMissingQueueSegmentsAndPagination(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+	token := authTokenForEmail(t, app, paAccountingEmail)
+
+	inUse := getMissingProjectAuthorizationsForTest(t, app, token, "in_use", 1, 1, http.StatusOK)
+	if inUse.Total <= 0 || inUse.TotalPages <= 0 {
+		t.Fatalf("in-use response totals = total %d pages %d, want positive", inUse.Total, inUse.TotalPages)
+	}
+	if len(inUse.Items) != 1 || inUse.Items[0].ID != "pamissuse000001" {
+		t.Fatalf("first in-use item = %+v, want pamissuse000001", inUse.Items)
+	}
+	if inUse.Items[0].Priority != projectAuthorizationMissingPriorityInUse || inUse.Items[0].TimeEntryCount == 0 {
+		t.Fatalf("in-use fixture priority/counts = %+v", inUse.Items[0])
+	}
+	if inUse.PendingReviewCount != expectedProjectAuthorizationPendingReviewCount(t, app) {
+		t.Fatalf("pending review count = %d, want %d", inUse.PendingReviewCount, expectedProjectAuthorizationPendingReviewCount(t, app))
+	}
+
+	defaultQueue := getMissingProjectAuthorizationsForTest(t, app, token, "", 1, 1, http.StatusOK)
+	if defaultQueue.Priority != projectAuthorizationMissingPriorityInUse {
+		t.Fatalf("default priority = %q, want in_use", defaultQueue.Priority)
+	}
+	if len(defaultQueue.Items) != 1 || defaultQueue.Items[0].ID != "pamissuse000001" {
+		t.Fatalf("first default item = %+v, want in-use fixture", defaultQueue.Items)
+	}
+
+	recent := getMissingProjectAuthorizationsForTest(t, app, token, "recent", 1, 1, http.StatusOK)
+	if len(recent.Items) != 1 || recent.Items[0].ID != "pamissrecent001" {
+		t.Fatalf("first recent item = %+v, want pamissrecent001", recent.Items)
+	}
+
+	dormant := getMissingProjectAuthorizationsForTest(t, app, token, "dormant", 1, 1, http.StatusOK)
+	if len(dormant.Items) != 1 || dormant.Items[0].ID != "pamissdormant01" {
+		t.Fatalf("first dormant item = %+v, want pamissdormant01", dormant.Items)
+	}
+
+	all := getMissingProjectAuthorizationsForTest(t, app, token, "all", 1, 200, http.StatusOK)
+	ids := missingProjectAuthorizationIDs(all.Items)
+	for _, want := range []string{"pafixmissing01", "pafixblankhash", "pamissuse000001", "pamissrecent001", "pamissdormant01"} {
+		if !ids[want] {
+			t.Fatalf("all missing queue did not include %s; ids=%v", want, ids)
+		}
+	}
+	for _, excluded := range []string{"pafixpending01", "pafixapprove01", "pamissclosed001", "pamissprop00001"} {
+		if ids[excluded] {
+			t.Fatalf("all missing queue included excluded job %s; ids=%v", excluded, ids)
+		}
+	}
+	if all.Counts[projectAuthorizationMissingPriorityAll] != all.Total {
+		t.Fatalf("all total = %d, all count = %d", all.Total, all.Counts[projectAuthorizationMissingPriorityAll])
+	}
+
+	overlargePage := getMissingProjectAuthorizationsForTest(t, app, token, "all", 999, 1, http.StatusOK)
+	if overlargePage.Page != overlargePage.TotalPages {
+		t.Fatalf("overlarge page = %d, want clamped total pages %d", overlargePage.Page, overlargePage.TotalPages)
+	}
+	if overlargePage.Total > 0 && len(overlargePage.Items) == 0 {
+		t.Fatalf("overlarge page returned no items despite total %d: %+v", overlargePage.Total, overlargePage)
+	}
+}
+
+func TestProjectAuthorizationMissingQueueScopesByUploadPermission(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+
+	jobToken := authTokenForEmail(t, app, paJobClaimEmail)
+	jobResponse := getMissingProjectAuthorizationsForTest(t, app, jobToken, "all", 1, 200, http.StatusOK)
+	jobIDs := missingProjectAuthorizationIDs(jobResponse.Items)
+	if !jobIDs["pamissuse000001"] || !jobIDs["paaltmgrjob0001"] {
+		t.Fatalf("job claim holder should see broad missing PA list; ids=%v", jobIDs)
+	}
+
+	scopedToken := authTokenForEmail(t, app, paNoClaimsEmail)
+	scopedResponse := getMissingProjectAuthorizationsForTest(t, app, scopedToken, "all", 1, 200, http.StatusOK)
+	scopedIDs := missingProjectAuthorizationIDs(scopedResponse.Items)
+	if !scopedIDs["paaltmgrjob0001"] || !scopedIDs["pabrmgrjob0001"] {
+		t.Fatalf("scoped user should see alternate-manager and branch-manager jobs; ids=%v", scopedIDs)
+	}
+	scopedDefaultResponse := getMissingProjectAuthorizationsForTest(t, app, scopedToken, "", 1, 50, http.StatusOK)
+	if scopedDefaultResponse.Priority != projectAuthorizationMissingPriorityInUse {
+		t.Fatalf("scoped default priority = %q, want in_use", scopedDefaultResponse.Priority)
+	}
+	if scopedDefaultResponse.PendingReviewCount != 0 {
+		t.Fatalf("scoped pending review count = %d, want 0", scopedDefaultResponse.PendingReviewCount)
+	}
+	if scopedIDs["pamissuse000001"] || scopedIDs["pafixmissing01"] {
+		t.Fatalf("scoped user saw unrelated missing PA jobs; ids=%v", scopedIDs)
+	}
+	for _, item := range scopedResponse.Items {
+		if !item.CanUpload {
+			t.Fatalf("scoped visible item should be uploadable by caller: %+v", item)
+		}
+	}
+
+	payablesToken := authTokenForEmail(t, app, paPayablesAdminEmail)
+	payablesResponse := getMissingProjectAuthorizationsForTest(t, app, payablesToken, "all", 1, 200, http.StatusOK)
+	if payablesResponse.Total != 0 || len(payablesResponse.Items) != 0 {
+		t.Fatalf("unscoped payables user should see no missing PA jobs: %+v", payablesResponse)
+	}
+	payablesOverlargePage := getMissingProjectAuthorizationsForTest(t, app, payablesToken, "all", 999, 50, http.StatusOK)
+	if payablesOverlargePage.Page != 1 || payablesOverlargePage.TotalPages != 0 {
+		t.Fatalf("empty queue page = %d total pages = %d, want page 1 total pages 0", payablesOverlargePage.Page, payablesOverlargePage.TotalPages)
+	}
+}
+
 func TestProjectAuthorizationGenericJobUpdateCannotMutateFields(t *testing.T) {
 	protectedFields := map[string]any{
 		"project_authorization_doc":      "pa.pdf",
@@ -519,6 +624,20 @@ func decodeJSONResponseForTest[T any](t *testing.T, rec *httptest.ResponseRecord
 		t.Fatalf("failed to decode %s response: %v", label, err)
 	}
 	return response
+}
+
+func getMissingProjectAuthorizationsForTest(t *testing.T, app *tests.TestApp, token string, priority string, page int, limit int, status int) projectAuthorizationMissingResponse {
+	t.Helper()
+	rec := performClaimsJSONRequest(t, app, http.MethodGet, "/api/jobs/project_authorization/missing?priority="+priority+"&page="+strconv.Itoa(page)+"&limit="+strconv.Itoa(limit), token, nil)
+	return decodeJSONResponseForTest[projectAuthorizationMissingResponse](t, rec, status, "missing PA queue")
+}
+
+func missingProjectAuthorizationIDs(items []projectAuthorizationMissingRow) map[string]bool {
+	ids := map[string]bool{}
+	for _, item := range items {
+		ids[item.ID] = true
+	}
+	return ids
 }
 
 func projectAuthorizationDocHashForPATest(t *testing.T, app *tests.TestApp, jobID string) string {

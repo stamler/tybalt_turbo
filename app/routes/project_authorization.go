@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 	"tybalt/errs"
@@ -19,6 +20,15 @@ import (
 )
 
 const duplicateProjectAuthorizationDocMessage = "this PA document has already been uploaded to another job"
+
+const (
+	projectAuthorizationMissingPriorityAll     = "all"
+	projectAuthorizationMissingPriorityInUse   = "in_use"
+	projectAuthorizationMissingPriorityRecent  = "recent"
+	projectAuthorizationMissingPriorityDormant = "dormant"
+	projectAuthorizationMissingDefaultLimit    = 50
+	projectAuthorizationMissingMaxLimit        = 200
+)
 
 type projectAuthorizationApproveRequest struct {
 	ProjectAuthorizationDocHash string `json:"project_authorization_doc_hash"`
@@ -40,6 +50,159 @@ type projectAuthorizationQueueRow struct {
 	ProjectAuthorizationDocURL  string `json:"project_authorization_doc_url"`
 	ProjectAuthorizationDocHash string `db:"project_authorization_doc_hash" json:"project_authorization_doc_hash"`
 }
+
+type projectAuthorizationMissingRow struct {
+	ID                          string `db:"id" json:"id"`
+	Number                      string `db:"number" json:"number"`
+	Description                 string `db:"description" json:"description"`
+	ClientID                    string `db:"client_id" json:"client_id"`
+	ClientName                  string `db:"client_name" json:"client_name"`
+	ManagerID                   string `db:"manager_id" json:"manager_id"`
+	ManagerName                 string `db:"manager_name" json:"manager_name"`
+	BranchID                    string `db:"branch_id" json:"branch_id"`
+	BranchCode                  string `db:"branch_code" json:"branch_code"`
+	BranchName                  string `db:"branch_name" json:"branch_name"`
+	Status                      string `db:"status" json:"status"`
+	ProjectAwardDate            string `db:"project_award_date" json:"project_award_date"`
+	Updated                     string `db:"updated" json:"updated"`
+	ProjectAuthorizationDoc     string `db:"project_authorization_doc" json:"project_authorization_doc"`
+	ProjectAuthorizationDocHash string `db:"project_authorization_doc_hash" json:"project_authorization_doc_hash"`
+	ProjectAuthorizationState   string `db:"project_authorization_state" json:"project_authorization_state"`
+	TimeEntryCount              int    `db:"time_entry_count" json:"time_entry_count"`
+	PurchaseOrderCount          int    `db:"purchase_order_count" json:"purchase_order_count"`
+	ActivePurchaseOrderCount    int    `db:"active_purchase_order_count" json:"active_purchase_order_count"`
+	ExpenseCount                int    `db:"expense_count" json:"expense_count"`
+	LatestActivityDate          string `db:"latest_activity_date" json:"latest_activity_date"`
+	Priority                    string `db:"priority" json:"priority"`
+	CanUpload                   bool   `db:"can_upload" json:"can_upload"`
+}
+
+type projectAuthorizationMissingCountRow struct {
+	Priority string `db:"priority"`
+	Count    int    `db:"count"`
+}
+
+type projectAuthorizationMissingResponse struct {
+	Items              []projectAuthorizationMissingRow `json:"items"`
+	Counts             map[string]int                   `json:"counts"`
+	Page               int                              `json:"page"`
+	Limit              int                              `json:"limit"`
+	Total              int                              `json:"total"`
+	TotalPages         int                              `json:"total_pages"`
+	Priority           string                           `json:"priority"`
+	PendingReviewCount int                              `json:"pending_review_count"`
+}
+
+const projectAuthorizationMissingBaseQuery = `
+	WITH missing_jobs AS (
+		SELECT
+		  j.id,
+		  j.number,
+		  j.description,
+		  j.client AS client_id,
+		  c.name AS client_name,
+		  j.manager AS manager_id,
+		  TRIM(COALESCE(mp.given_name, '') || ' ' || COALESCE(mp.surname, '')) AS manager_name,
+		  j.branch AS branch_id,
+		  b.code AS branch_code,
+		  b.name AS branch_name,
+		  j.status,
+		  j.project_award_date,
+		  j.created,
+		  j.updated,
+		  j.project_authorization_doc,
+		  j.project_authorization_doc_hash,
+		  CASE
+		    WHEN COALESCE(j.project_authorization_doc, '') = '' THEN 'missing_pdf'
+		    ELSE 'missing_hash'
+		  END AS project_authorization_state,
+		  CASE
+		    WHEN {:canUploadAll} = 1
+		      OR j.manager = {:uid}
+		      OR j.alternate_manager = {:uid}
+		      OR b.manager = {:uid}
+		    THEN 1
+		    ELSE 0
+		  END AS can_upload
+		FROM jobs j
+		LEFT JOIN clients c ON c.id = j.client
+		LEFT JOIN profiles mp ON mp.uid = j.manager
+		LEFT JOIN branches b ON b.id = j.branch
+		WHERE j.status = 'Active'
+		  AND j.number NOT LIKE 'P%'
+		  AND (
+		    COALESCE(j.project_authorization_doc, '') = ''
+		    OR COALESCE(j.project_authorization_doc_hash, '') = ''
+		  )
+		  AND (
+		    {:canSeeAll} = 1
+		    OR j.manager = {:uid}
+		    OR j.alternate_manager = {:uid}
+		    OR b.manager = {:uid}
+		  )
+	),
+	time_activity AS (
+		SELECT
+		  te.job AS job_id,
+		  COUNT(*) AS time_entry_count,
+		  MAX(te.date) AS latest_time_entry_date
+		FROM time_entries te
+		JOIN missing_jobs mj ON mj.id = te.job
+		WHERE te.job != ''
+		GROUP BY te.job
+	),
+	purchase_order_activity AS (
+		SELECT
+		  po.job AS job_id,
+		  COUNT(*) AS purchase_order_count,
+		  SUM(CASE WHEN po.status = 'Active' THEN 1 ELSE 0 END) AS active_purchase_order_count,
+		  MAX(po.date) AS latest_purchase_order_date
+		FROM purchase_orders po
+		JOIN missing_jobs mj ON mj.id = po.job
+		WHERE po.job != ''
+		GROUP BY po.job
+	),
+	expense_activity AS (
+		SELECT
+		  e.job AS job_id,
+		  COUNT(*) AS expense_count,
+		  MAX(e.date) AS latest_expense_date
+		FROM expenses e
+		JOIN missing_jobs mj ON mj.id = e.job
+		WHERE e.job != ''
+		GROUP BY e.job
+	),
+	enriched AS (
+		SELECT
+		  mj.*,
+		  COALESCE(ta.time_entry_count, 0) AS time_entry_count,
+		  COALESCE(poa.purchase_order_count, 0) AS purchase_order_count,
+		  COALESCE(poa.active_purchase_order_count, 0) AS active_purchase_order_count,
+		  COALESCE(ea.expense_count, 0) AS expense_count,
+		  MAX(
+		    COALESCE(ta.latest_time_entry_date, ''),
+		    COALESCE(poa.latest_purchase_order_date, ''),
+		    COALESCE(ea.latest_expense_date, '')
+		  ) AS latest_activity_date
+		FROM missing_jobs mj
+		LEFT JOIN time_activity ta ON ta.job_id = mj.id
+		LEFT JOIN purchase_order_activity poa ON poa.job_id = mj.id
+		LEFT JOIN expense_activity ea ON ea.job_id = mj.id
+	),
+	classified AS (
+		SELECT
+		  *,
+		  CASE
+		    WHEN time_entry_count + purchase_order_count + expense_count > 0 THEN 'in_use'
+		    WHEN COALESCE(project_award_date, '') >= date('now', '-90 days')
+		      OR substr(COALESCE(updated, ''), 1, 10) >= date('now', '-90 days')
+		      OR substr(COALESCE(created, ''), 1, 10) >= date('now', '-90 days')
+		    THEN 'recent'
+		    ELSE 'dormant'
+		  END AS priority
+		FROM enriched
+	)
+`
 
 func createUploadProjectAuthorizationDocumentHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
@@ -184,6 +347,109 @@ func createDeleteProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 	}
 }
 
+func createGetMissingProjectAuthorizationHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if e.Auth == nil || e.Auth.Id == "" {
+			return projectAuthorizationRouteError(e, projectAuthorizationAPIError(http.StatusUnauthorized, "unauthorized", "unauthorized"))
+		}
+
+		priority := normalizeProjectAuthorizationMissingPriority(e.Request.URL.Query().Get("priority"))
+		page, limit := projectAuthorizationMissingPagination(e.Request.URL.Query().Get("page"), e.Request.URL.Query().Get("limit"))
+		params, err := projectAuthorizationMissingParams(app, e.Auth)
+		if err != nil {
+			return e.InternalServerError("failed to check project authorization permissions", err)
+		}
+		params["priority"] = priority
+
+		counts, err := projectAuthorizationMissingPriorityCounts(app, params)
+		if err != nil {
+			return e.InternalServerError("failed to count missing project authorization jobs", err)
+		}
+		pendingReviewCount := 0
+		hasAccounting, err := utilities.HasClaim(app, e.Auth, "accounting")
+		if err != nil {
+			return e.InternalServerError("failed to check accounting claim", err)
+		}
+		if hasAccounting {
+			pendingReviewCount, err = countProjectAuthorizationPendingReview(app)
+			if err != nil {
+				return e.InternalServerError("failed to count project authorization queue", err)
+			}
+		}
+		total := projectAuthorizationMissingTotalForPriority(counts, priority)
+		totalPages := projectAuthorizationTotalPages(total, limit)
+		if totalPages == 0 {
+			page = 1
+		} else if page > totalPages {
+			page = totalPages
+		}
+		params["limit"] = limit
+		params["offset"] = (page - 1) * limit
+
+		rows := []projectAuthorizationMissingRow{}
+		if err := app.DB().NewQuery(projectAuthorizationMissingBaseQuery + `
+			SELECT
+			  id,
+			  number,
+			  description,
+			  client_id,
+			  client_name,
+			  manager_id,
+			  manager_name,
+			  branch_id,
+			  branch_code,
+			  branch_name,
+			  status,
+			  project_award_date,
+			  updated,
+			  project_authorization_doc,
+			  project_authorization_doc_hash,
+			  project_authorization_state,
+			  time_entry_count,
+			  purchase_order_count,
+			  active_purchase_order_count,
+			  expense_count,
+			  latest_activity_date,
+			  priority,
+			  can_upload
+			FROM classified
+			WHERE {:priority} = 'all' OR priority = {:priority}
+			ORDER BY
+			  CASE priority
+			    WHEN 'in_use' THEN 0
+			    WHEN 'recent' THEN 1
+			    ELSE 2
+			  END,
+			  CASE WHEN priority = 'in_use' THEN latest_activity_date ELSE '' END DESC,
+			  CASE
+			    WHEN priority = 'recent' AND COALESCE(project_award_date, '') != '' THEN project_award_date
+			    WHEN priority = 'recent' THEN substr(COALESCE(updated, ''), 1, 10)
+			    ELSE ''
+			  END DESC,
+			  CASE
+			    WHEN priority = 'dormant' AND COALESCE(project_award_date, '') != '' THEN project_award_date
+			    WHEN priority = 'dormant' THEN substr(COALESCE(updated, ''), 1, 10)
+			    ELSE ''
+			  END ASC,
+			  number ASC
+			LIMIT {:limit} OFFSET {:offset}
+		`).Bind(params).All(&rows); err != nil {
+			return e.InternalServerError("failed to load missing project authorization jobs", err)
+		}
+
+		return e.JSON(http.StatusOK, projectAuthorizationMissingResponse{
+			Items:              rows,
+			Counts:             counts,
+			Page:               page,
+			Limit:              limit,
+			Total:              total,
+			TotalPages:         totalPages,
+			Priority:           priority,
+			PendingReviewCount: pendingReviewCount,
+		})
+	}
+}
+
 func createGetProjectAuthorizationQueueHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		if err := requireAccountingClaim(app, e.Auth); err != nil {
@@ -230,6 +496,134 @@ func createGetProjectAuthorizationQueueHandler(app core.App) func(e *core.Reques
 		}
 		return e.JSON(http.StatusOK, map[string]any{"items": rows})
 	}
+}
+
+func normalizeProjectAuthorizationMissingPriority(raw string) string {
+	switch strings.TrimSpace(raw) {
+	case projectAuthorizationMissingPriorityAll,
+		projectAuthorizationMissingPriorityInUse,
+		projectAuthorizationMissingPriorityRecent,
+		projectAuthorizationMissingPriorityDormant:
+		return strings.TrimSpace(raw)
+	default:
+		return projectAuthorizationMissingPriorityInUse
+	}
+}
+
+func projectAuthorizationMissingPagination(pageRaw string, limitRaw string) (int, int) {
+	page := 1
+	if parsed, err := strconv.Atoi(strings.TrimSpace(pageRaw)); err == nil && parsed > 0 {
+		page = parsed
+	}
+	limit := projectAuthorizationMissingDefaultLimit
+	if parsed, err := strconv.Atoi(strings.TrimSpace(limitRaw)); err == nil && parsed > 0 {
+		limit = parsed
+	}
+	if limit > projectAuthorizationMissingMaxLimit {
+		limit = projectAuthorizationMissingMaxLimit
+	}
+	return page, limit
+}
+
+func projectAuthorizationTotalPages(total int, limit int) int {
+	if total == 0 || limit <= 0 {
+		return 0
+	}
+	return (total + limit - 1) / limit
+}
+
+func projectAuthorizationMissingParams(app core.App, auth *core.Record) (dbx.Params, error) {
+	hasAccounting, err := utilities.HasClaim(app, auth, "accounting")
+	if err != nil {
+		return nil, err
+	}
+	hasJobClaim, err := utilities.HasClaim(app, auth, "job")
+	if err != nil {
+		return nil, err
+	}
+	canSeeAll := 0
+	if hasAccounting || hasJobClaim {
+		canSeeAll = 1
+	}
+	canUploadAll := 0
+	if hasJobClaim {
+		canUploadAll = 1
+	}
+	uid := ""
+	if auth != nil {
+		uid = auth.Id
+	}
+	return dbx.Params{
+		"uid":          uid,
+		"canSeeAll":    canSeeAll,
+		"canUploadAll": canUploadAll,
+	}, nil
+}
+
+func projectAuthorizationMissingPriorityCounts(app core.App, params dbx.Params) (map[string]int, error) {
+	counts := map[string]int{
+		projectAuthorizationMissingPriorityInUse:   0,
+		projectAuthorizationMissingPriorityRecent:  0,
+		projectAuthorizationMissingPriorityDormant: 0,
+		projectAuthorizationMissingPriorityAll:     0,
+	}
+	rows := []projectAuthorizationMissingCountRow{}
+	if err := app.DB().NewQuery(projectAuthorizationMissingBaseQuery + `
+		SELECT priority, COUNT(*) AS count
+		FROM classified
+		GROUP BY priority
+	`).Bind(params).All(&rows); err != nil {
+		return nil, err
+	}
+	for _, row := range rows {
+		counts[row.Priority] = row.Count
+		counts[projectAuthorizationMissingPriorityAll] += row.Count
+	}
+	return counts, nil
+}
+
+func projectAuthorizationMissingTotalForPriority(counts map[string]int, priority string) int {
+	if priority == projectAuthorizationMissingPriorityAll {
+		return counts[projectAuthorizationMissingPriorityAll]
+	}
+	return counts[priority]
+}
+
+func countProjectAuthorizationPendingReview(app core.App) (int, error) {
+	return countNavRows(app, `
+		SELECT COUNT(*)
+		FROM jobs j
+		WHERE j.status = 'Active'
+		  AND j.number NOT LIKE 'P%'
+		  AND j.project_authorization_doc != ''
+		  AND j.project_authorization_doc_hash != ''
+		  AND j.pa_reviewed = ''
+		  AND j.pa_reviewer = ''
+	`, dbx.Params{})
+}
+
+func countProjectAuthorizationMissingForAuth(app core.App, auth *core.Record) (int, error) {
+	params, err := projectAuthorizationMissingParams(app, auth)
+	if err != nil {
+		return 0, err
+	}
+	return countNavRows(app, `
+		SELECT COUNT(*)
+		FROM jobs j
+		LEFT JOIN branches b ON b.id = j.branch
+		WHERE j.status = 'Active'
+		  AND j.number NOT LIKE 'P%'
+		  AND (
+		    COALESCE(j.project_authorization_doc, '') = ''
+		    OR COALESCE(j.project_authorization_doc_hash, '') = ''
+		  )
+		  AND (
+		    {:canSeeAll} = 1
+		    OR j.manager = {:uid}
+		    OR j.alternate_manager = {:uid}
+		    OR b.manager = {:uid}
+		  )
+	`, params)
 }
 
 func createApproveProjectAuthorizationHandler(app core.App) func(e *core.RequestEvent) error {

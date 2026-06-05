@@ -41,7 +41,7 @@ func TestNavBadgesReturnsUserScopedCounts(t *testing.T) {
 	assertNavBadgeCount(t, counts, navTimeSheetsPendingHref, expectedPendingTimeSheetCount(t, app, userID))
 	assertNavBadgeCount(t, counts, navExpensesPendingHref, expectedPendingExpenseCount(t, app, userID))
 	assertNavBadgeCount(t, counts, navPurchaseOrdersPendingHref, expectedPendingPurchaseOrderCount(t, app, userID))
-	assertNavBadgeCount(t, counts, navProjectAuthorizationHref, expectedProjectAuthorizationQueueCount(t, app))
+	assertNavBadgeCount(t, counts, navProjectAuthorizationHref, expectedProjectAuthorizationBadgeCount(t, app, userID, true, true))
 
 	if _, ok := counts[navExpenseCommitQueueHref]; ok {
 		t.Fatalf("did not expect %s for user without commit claim; counts=%v", navExpenseCommitQueueHref, counts)
@@ -83,6 +83,14 @@ func TestNavBadgesReturnsAuthorizedQueueCounts(t *testing.T) {
 	if _, ok := payablesCounts[navProjectAuthorizationHref]; ok {
 		t.Fatalf("did not expect %s for payables user without accounting claim; counts=%v", navProjectAuthorizationHref, payablesCounts)
 	}
+
+	scopedToken := authTokenForEmail(t, app, "u_no_claims@example.com")
+	scopedRec := performClaimsJSONRequest(t, app, http.MethodGet, "/api/nav/badges", scopedToken, nil)
+	if scopedRec.Code != http.StatusOK {
+		t.Fatalf("scoped nav badges status = %d, want %d; body=%s", scopedRec.Code, http.StatusOK, scopedRec.Body.String())
+	}
+	scopedCounts := decodeNavBadgeCounts(t, scopedRec.Body.Bytes())
+	assertNavBadgeCount(t, scopedCounts, navProjectAuthorizationHref, expectedProjectAuthorizationBadgeCount(t, app, "u_no_claims", false, false))
 }
 
 func decodeNavBadgeCounts(t *testing.T, body []byte) map[string]int {
@@ -153,7 +161,17 @@ func expectedPendingPurchaseOrderCount(t *testing.T, app *tests.TestApp, userID 
 	return expectedCount(t, app, query, purchaseOrderVisibilityParams(app, userID, "all", "", "", 0))
 }
 
-func expectedProjectAuthorizationQueueCount(t *testing.T, app *tests.TestApp) int {
+func expectedProjectAuthorizationBadgeCount(t *testing.T, app *tests.TestApp, userID string, hasAccounting bool, hasJobClaim bool) int {
+	t.Helper()
+
+	count := expectedProjectAuthorizationMissingCount(t, app, userID, hasAccounting || hasJobClaim)
+	if hasAccounting {
+		count += expectedProjectAuthorizationPendingReviewCount(t, app)
+	}
+	return count
+}
+
+func expectedProjectAuthorizationPendingReviewCount(t *testing.T, app *tests.TestApp) int {
 	t.Helper()
 
 	return expectedCount(t, app, `
@@ -166,6 +184,32 @@ func expectedProjectAuthorizationQueueCount(t *testing.T, app *tests.TestApp) in
 		  AND j.pa_reviewed = ''
 		  AND j.pa_reviewer = ''
 	`, dbx.Params{})
+}
+
+func expectedProjectAuthorizationMissingCount(t *testing.T, app *tests.TestApp, userID string, canSeeAll bool) int {
+	t.Helper()
+
+	broad := 0
+	if canSeeAll {
+		broad = 1
+	}
+	return expectedCount(t, app, `
+		SELECT COUNT(*)
+		FROM jobs j
+		LEFT JOIN branches b ON b.id = j.branch
+		WHERE j.status = 'Active'
+		  AND j.number NOT LIKE 'P%'
+		  AND (
+		    COALESCE(j.project_authorization_doc, '') = ''
+		    OR COALESCE(j.project_authorization_doc_hash, '') = ''
+		  )
+		  AND (
+		    {:broad} = 1
+		    OR j.manager = {:uid}
+		    OR j.alternate_manager = {:uid}
+		    OR b.manager = {:uid}
+		  )
+	`, dbx.Params{"uid": userID, "broad": broad})
 }
 
 func expectedExpenseCommitQueueCount(t *testing.T, app *tests.TestApp) int {

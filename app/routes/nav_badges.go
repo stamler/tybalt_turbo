@@ -87,20 +87,23 @@ func createGetNavBadgesHandler(app core.App) func(e *core.RequestEvent) error {
 			return e.Error(http.StatusInternalServerError, "failed to check accounting claim", err)
 		}
 		if hasAccounting {
-			projectAuthorizationCount, err := countNavRows(app, `
-				SELECT COUNT(*)
-				FROM jobs j
-				WHERE j.status = 'Active'
-				  AND j.number NOT LIKE 'P%'
-				  AND j.project_authorization_doc != ''
-				  AND j.project_authorization_doc_hash != ''
-				  AND j.pa_reviewed = ''
-				  AND j.pa_reviewer = ''
-			`, dbx.Params{})
+			pendingReviewCount, err := countProjectAuthorizationPendingReview(app)
 			if err != nil {
 				return e.Error(http.StatusInternalServerError, "failed to count project authorization queue", err)
 			}
-			counts[navProjectAuthorizationHref] = projectAuthorizationCount
+			missingCount, err := countProjectAuthorizationMissingForAuth(app, e.Auth)
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to count missing project authorizations", err)
+			}
+			counts[navProjectAuthorizationHref] = pendingReviewCount + missingCount
+		} else {
+			missingCount, err := countProjectAuthorizationMissingForAuth(app, e.Auth)
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to count missing project authorizations", err)
+			}
+			if missingCount > 0 {
+				counts[navProjectAuthorizationHref] = missingCount
+			}
 		}
 
 		hasCommit, err := utilities.HasClaim(app, e.Auth, "commit")

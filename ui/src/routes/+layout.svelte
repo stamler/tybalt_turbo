@@ -62,7 +62,10 @@
                   return $globalStore.claims.includes("job");
                 }
                 if (item.href.startsWith("/jobs/project_authorization")) {
-                  return $globalStore.claims.includes("accounting");
+                  return (
+                    $globalStore.claims.includes("accounting") ||
+                    attentionCountFor(item.href) > 0
+                  );
                 }
                 if (item.href.startsWith("/reports/expense/queue")) {
                   return $globalStore.claims.includes("commit");

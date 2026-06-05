@@ -188,6 +188,68 @@ The queue should include enough context for review:
 The browser must receive the hash for the file being reviewed. Approval then
 submits that exact hash to the server.
 
+## Missing And Incomplete PA Queue
+
+Turbo should also surface active project jobs whose PA document state is missing
+or incomplete so the rollout backlog can be worked before enforcement is enabled.
+This queue is separate from the Accounting approval queue: it is for operational
+follow-up and upload, not Accounting approval.
+
+Add a missing/incomplete queue endpoint:
+
+```text
+GET /api/jobs/project_authorization/missing
+```
+
+Query parameters:
+
+* `priority`: one of `in_use`, `recent`, `dormant`, or `all`; default `in_use`.
+* `page`: positive page number; default `1`.
+* `limit`: positive page size; default `50`, maximum `200`.
+
+The queue lists project jobs where:
+
+* `status = "Active"`,
+* the job is not a proposal record,
+* either `project_authorization_doc` is blank or
+  `project_authorization_doc_hash` is blank.
+
+Visibility is scoped by role:
+
+* users with the `accounting` claim can see all missing/incomplete PA jobs,
+* users with the `job` claim can see all missing/incomplete PA jobs,
+* other users can see only jobs where they are the job manager, alternate
+  manager, or related branch manager.
+
+The response should include enough context for prioritization and upload:
+
+* job id, number, description, client, manager, branch, status,
+* whether the row is missing the PDF or only missing the stored hash,
+* time entry, purchase order, active purchase order, and expense counts,
+* latest downstream activity date,
+* priority segment,
+* whether the caller can upload the PA from the queue,
+* for Accounting users, the pending Accounting review count so the UI can badge
+  the pending-review tab before loading all pending-review rows.
+
+Priority segments are:
+
+* `in_use`: jobs with at least one time entry, purchase order, or expense,
+* `recent`: jobs without downstream activity that were recently created,
+  updated, or awarded,
+* `dormant`: all other missing/incomplete active project jobs,
+* `all`: all visible rows across the three segments.
+
+The default queue segment should be `in_use` because those jobs are most likely
+to block real work once enforcement is enabled. Sorting should keep the most
+urgent work at the top: `in_use` by latest downstream activity descending,
+`recent` by recent award/update date descending, `dormant` by oldest award/update
+date ascending, then job number as a stable tie-breaker.
+
+The missing/incomplete queue should support direct upload for callers who have PA
+upload permission. Users without upload permission should still be able to open
+the job details page for context when the row is visible to them.
+
 ## Approval Endpoint
 
 Add an Accounting-only endpoint:
@@ -393,9 +455,36 @@ present.
 
 ### Accounting Queue
 
-Accounting users should get a queue filtered to pending PA review. The approval
-button should be disabled until the document has been opened or downloaded in
-the current browser session, so the UI encourages actual review before approval.
+Accounting users should get a pending-review tab filtered to uploaded PA
+documents awaiting Accounting approval. The row action should place the "Open
+PDF" control next to the approval action because Accounting is expected to read
+the uploaded PDF before approving it.
+
+The UI does not need to enforce that the PDF was opened in the current browser
+session. Instead, clicking Approve should open a confirmation modal that warns
+the Accounting user what approval means: they are confirming they reviewed the
+uploaded PA PDF, accept it as the authorization document for the job, and agree
+it meets the business criteria required to allow billing and related job activity
+against the project.
+
+### Missing And Incomplete Queue
+
+The project authorization page should be a shared PA work hub rather than only an
+Accounting queue. It should default to the Missing / Incomplete PDF tab and the
+`in_use` priority segment. The missing/incomplete tab should show sub-tabs for
+In Use, Recent, Dormant, and All, with counts for each segment and pagination for
+large backlogs.
+
+Rows should show the job, client, manager, branch, PA state, downstream usage,
+latest activity, and a primary action. Users with PA upload permission should be
+able to upload the PDF directly from the queue. Users without upload permission
+should be routed to the job details page for context.
+
+The navigation entry should be labelled "Project Authorizations". Accounting
+users should always see it, and their badge should combine missing/incomplete
+rows with pending Accounting review rows. Non-accounting users should see the
+navigation entry only when they have a scoped missing/incomplete count greater
+than zero.
 
 ### Downstream Surfaces
 
@@ -439,22 +528,24 @@ alternate approval path.
    hash/review fields and no approved-document delete, clear, replace, or update
    before admin revocation.
 6. Add the Accounting approval queue endpoint/query.
-7. Add the Accounting approval endpoint with hash compare-and-set semantics.
-8. Add the admin revocation endpoint.
-9. Add `jobs.enforce_project_authorization` config lookup with default `false`.
-10. Gate timesheet bundle, purchase order create/update, and expense
+7. Add the missing/incomplete PA queue endpoint with priority segments,
+   pagination, scoped visibility, and upload-permission flags.
+8. Add the Accounting approval endpoint with hash compare-and-set semantics.
+9. Add the admin revocation endpoint.
+10. Add `jobs.enforce_project_authorization` config lookup with default `false`.
+11. Gate timesheet bundle, purchase order create/update, and expense
    create/update when the flag is enabled.
-11. Deprecate project editing of `authorizing_document`: hide it for new project
+12. Deprecate project editing of `authorizing_document`: hide it for new project
    records and have the backend write `PA`; for existing project records, surface
    the legacy value and fail loudly unless the user manually selects `PA`.
-12. Stop requiring `client_po` when `authorizing_document = "PO"` and stop
+13. Stop requiring `client_po` when `authorizing_document = "PO"` and stop
    clearing `client_po` when `authorizing_document != "PO"`.
-13. Show `client_po` and `client_reference_number` in the job editor at all
+14. Show `client_po` and `client_reference_number` in the job editor at all
    times, and show them on job details when present.
-14. Update PO visibility fields that currently expose `has_project_authorization`
+15. Update PO visibility fields that currently expose `has_project_authorization`
    from `authorizing_document = "PA"` if they are meant to mean approved PA.
-15. Add UI controls on job details, Accounting queue UI, and downstream editor
-    error handling.
+16. Add UI controls on job details, the Project Authorizations hub, Accounting
+    review, and downstream editor error handling.
 
 ## Test Coverage
 
@@ -479,6 +570,17 @@ Backend tests should cover:
 * Accounting approval fails when the submitted hash is stale,
 * Accounting approval fails when the PA has already been approved,
 * non-Accounting users cannot approve,
+* missing/incomplete queue defaults to the `in_use` priority,
+* missing/incomplete queue segments active project jobs into `in_use`, `recent`,
+  and `dormant`,
+* missing/incomplete queue excludes closed jobs and proposal records,
+* missing/incomplete queue paginates and clamps out-of-range pages,
+* missing/incomplete queue visibility is broad for Accounting and `job` claim
+  holders but scoped for managers, alternate managers, and branch managers,
+* missing/incomplete queue returns the pending Accounting review count for
+  Accounting users and zero for non-Accounting users,
+* navigation badges include missing/incomplete PA counts and pending Accounting
+  review counts according to the caller's visibility,
 * admin revocation clears only review fields,
 * non-admin users cannot revoke,
 * new project records write `authorizing_document = "PA"` from backend cleaning
