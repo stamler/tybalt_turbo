@@ -18,8 +18,13 @@ const (
 
 	projectAuthorizationDocField      = "project_authorization_doc"
 	projectAuthorizationDocHashField  = "project_authorization_doc_hash"
+	projectAuthorizationUploaderField = "pa_uploader"
+	projectAuthorizationUploadedField = "pa_uploaded"
 	projectAuthorizationReviewerField = "pa_reviewer"
 	projectAuthorizationReviewedField = "pa_reviewed"
+	projectAuthorizationRejectorField = "pa_rejector"
+	projectAuthorizationRejectedField = "pa_rejected"
+	projectAuthorizationReasonField   = "pa_rejection_reason"
 )
 
 type ProjectAuthorizationMutation string
@@ -28,6 +33,7 @@ const (
 	ProjectAuthorizationMutationUpload  ProjectAuthorizationMutation = "upload"
 	ProjectAuthorizationMutationDelete  ProjectAuthorizationMutation = "delete"
 	ProjectAuthorizationMutationApprove ProjectAuthorizationMutation = "approve"
+	ProjectAuthorizationMutationReject  ProjectAuthorizationMutation = "reject"
 	ProjectAuthorizationMutationRevoke  ProjectAuthorizationMutation = "revoke"
 )
 
@@ -37,12 +43,28 @@ var (
 	projectAuthorizationFields = []string{
 		projectAuthorizationDocField,
 		projectAuthorizationDocHashField,
+		projectAuthorizationUploaderField,
+		projectAuthorizationUploadedField,
+		projectAuthorizationReviewerField,
+		projectAuthorizationReviewedField,
+		projectAuthorizationRejectorField,
+		projectAuthorizationRejectedField,
+		projectAuthorizationReasonField,
+	}
+	projectAuthorizationApprovalFields = []string{
+		projectAuthorizationDocField,
+		projectAuthorizationDocHashField,
 		projectAuthorizationReviewerField,
 		projectAuthorizationReviewedField,
 	}
 	projectAuthorizationReviewFields = []string{
 		projectAuthorizationReviewerField,
 		projectAuthorizationReviewedField,
+	}
+	projectAuthorizationRejectionFields = []string{
+		projectAuthorizationRejectorField,
+		projectAuthorizationRejectedField,
+		projectAuthorizationReasonField,
 	}
 )
 
@@ -134,6 +156,7 @@ func ProcessJobProjectAuthorizationFields(app core.App, e *core.RecordRequestEve
 
 	record.Set(projectAuthorizationDocHashField, attachmentHash)
 	clearProjectAuthorizationReviewFields(record)
+	clearProjectAuthorizationRejectionFields(record)
 	return nil
 }
 
@@ -160,6 +183,8 @@ func EnforceProjectAuthorizationSaveInvariant(record *core.Record, mutation Proj
 		return validateProjectAuthorizationDeleteSave(record)
 	case ProjectAuthorizationMutationApprove:
 		return validateProjectAuthorizationApproveSave(record, changes)
+	case ProjectAuthorizationMutationReject:
+		return validateProjectAuthorizationRejectSave(record, changes)
 	case ProjectAuthorizationMutationRevoke:
 		return validateProjectAuthorizationRevokeSave(record, changes)
 	default:
@@ -254,7 +279,7 @@ func projectAuthorizationApprovedFieldsPopulated(record *core.Record) bool {
 	if record == nil {
 		return false
 	}
-	for _, field := range projectAuthorizationFields {
+	for _, field := range projectAuthorizationApprovalFields {
 		if strings.TrimSpace(record.GetString(field)) == "" {
 			return false
 		}
@@ -263,23 +288,33 @@ func projectAuthorizationApprovedFieldsPopulated(record *core.Record) bool {
 }
 
 type projectAuthorizationFieldChanges struct {
-	doc      bool
-	hash     bool
-	reviewer bool
-	reviewed bool
+	doc       bool
+	hash      bool
+	uploader  bool
+	uploaded  bool
+	reviewer  bool
+	reviewed  bool
+	rejector  bool
+	rejected  bool
+	rejection bool
 }
 
 func projectAuthorizationFieldChangesFor(record *core.Record) projectAuthorizationFieldChanges {
 	return projectAuthorizationFieldChanges{
-		doc:      projectAuthorizationDocumentChanged(record),
-		hash:     projectAuthorizationStringChanged(record, projectAuthorizationDocHashField),
-		reviewer: projectAuthorizationStringChanged(record, projectAuthorizationReviewerField),
-		reviewed: projectAuthorizationStringChanged(record, projectAuthorizationReviewedField),
+		doc:       projectAuthorizationDocumentChanged(record),
+		hash:      projectAuthorizationStringChanged(record, projectAuthorizationDocHashField),
+		uploader:  projectAuthorizationStringChanged(record, projectAuthorizationUploaderField),
+		uploaded:  projectAuthorizationStringChanged(record, projectAuthorizationUploadedField),
+		reviewer:  projectAuthorizationStringChanged(record, projectAuthorizationReviewerField),
+		reviewed:  projectAuthorizationStringChanged(record, projectAuthorizationReviewedField),
+		rejector:  projectAuthorizationStringChanged(record, projectAuthorizationRejectorField),
+		rejected:  projectAuthorizationStringChanged(record, projectAuthorizationRejectedField),
+		rejection: projectAuthorizationStringChanged(record, projectAuthorizationReasonField),
 	}
 }
 
 func (changes projectAuthorizationFieldChanges) any() bool {
-	return changes.doc || changes.hash || changes.reviewer || changes.reviewed
+	return changes.doc || changes.hash || changes.uploader || changes.uploaded || changes.reviewer || changes.reviewed || changes.rejector || changes.rejected || changes.rejection
 }
 
 func (changes projectAuthorizationFieldChanges) firstField() string {
@@ -288,10 +323,20 @@ func (changes projectAuthorizationFieldChanges) firstField() string {
 		return projectAuthorizationDocField
 	case changes.hash:
 		return projectAuthorizationDocHashField
+	case changes.uploader:
+		return projectAuthorizationUploaderField
+	case changes.uploaded:
+		return projectAuthorizationUploadedField
 	case changes.reviewer:
 		return projectAuthorizationReviewerField
 	case changes.reviewed:
 		return projectAuthorizationReviewedField
+	case changes.rejector:
+		return projectAuthorizationRejectorField
+	case changes.rejected:
+		return projectAuthorizationRejectedField
+	case changes.rejection:
+		return projectAuthorizationReasonField
 	default:
 		return projectAuthorizationDocField
 	}
@@ -323,6 +368,27 @@ func validateProjectAuthorizationUploadSave(record *core.Record) error {
 	if field := firstPopulatedProjectAuthorizationReviewField(record); field != "" {
 		return projectAuthorizationNotEditableError(field)
 	}
+	if field := firstPopulatedProjectAuthorizationRejectionField(record); field != "" {
+		return projectAuthorizationNotEditableError(field)
+	}
+	if strings.TrimSpace(record.GetString(projectAuthorizationUploaderField)) == "" {
+		return projectAuthorizationHookError(
+			http.StatusBadRequest,
+			"project authorization uploader is required",
+			projectAuthorizationUploaderField,
+			"required",
+			"project authorization uploader is required",
+		)
+	}
+	if strings.TrimSpace(record.GetString(projectAuthorizationUploadedField)) == "" {
+		return projectAuthorizationHookError(
+			http.StatusBadRequest,
+			"project authorization upload timestamp is required",
+			projectAuthorizationUploadedField,
+			"required",
+			"project authorization upload timestamp is required",
+		)
+	}
 	return nil
 }
 
@@ -344,6 +410,21 @@ func validateProjectAuthorizationApproveSave(record *core.Record, changes projec
 	if changes.hash {
 		return projectAuthorizationNotEditableError(projectAuthorizationDocHashField)
 	}
+	if changes.uploader {
+		return projectAuthorizationNotEditableError(projectAuthorizationUploaderField)
+	}
+	if changes.uploaded {
+		return projectAuthorizationNotEditableError(projectAuthorizationUploadedField)
+	}
+	if changes.rejector {
+		return projectAuthorizationNotEditableError(projectAuthorizationRejectorField)
+	}
+	if changes.rejected {
+		return projectAuthorizationNotEditableError(projectAuthorizationRejectedField)
+	}
+	if changes.rejection {
+		return projectAuthorizationNotEditableError(projectAuthorizationReasonField)
+	}
 	if projectAuthorizationReviewMetadataPresent(original) {
 		return projectAuthorizationHookError(
 			http.StatusConflict,
@@ -351,6 +432,15 @@ func validateProjectAuthorizationApproveSave(record *core.Record, changes projec
 			projectAuthorizationReviewedField,
 			"project_authorization_already_approved",
 			"this project authorization document has already been approved",
+		)
+	}
+	if projectAuthorizationRejectionMetadataPresent(original) {
+		return projectAuthorizationHookError(
+			http.StatusConflict,
+			"project authorization document has been rejected",
+			projectAuthorizationRejectedField,
+			"project_authorization_rejected",
+			"replace the rejected project authorization document before approving",
 		)
 	}
 	if strings.TrimSpace(original.GetString(projectAuthorizationDocField)) == "" {
@@ -392,12 +482,113 @@ func validateProjectAuthorizationApproveSave(record *core.Record, changes projec
 	return nil
 }
 
+func validateProjectAuthorizationRejectSave(record *core.Record, changes projectAuthorizationFieldChanges) error {
+	original := record.Original()
+	if changes.doc {
+		return projectAuthorizationNotEditableError(projectAuthorizationDocField)
+	}
+	if changes.hash {
+		return projectAuthorizationNotEditableError(projectAuthorizationDocHashField)
+	}
+	if changes.uploader {
+		return projectAuthorizationNotEditableError(projectAuthorizationUploaderField)
+	}
+	if changes.uploaded {
+		return projectAuthorizationNotEditableError(projectAuthorizationUploadedField)
+	}
+	if changes.reviewer {
+		return projectAuthorizationNotEditableError(projectAuthorizationReviewerField)
+	}
+	if changes.reviewed {
+		return projectAuthorizationNotEditableError(projectAuthorizationReviewedField)
+	}
+	if projectAuthorizationReviewMetadataPresent(original) {
+		return projectAuthorizationHookError(
+			http.StatusConflict,
+			"project authorization document has already been approved",
+			projectAuthorizationReviewedField,
+			"project_authorization_already_approved",
+			"approved project authorization documents cannot be rejected",
+		)
+	}
+	if projectAuthorizationRejectionMetadataPresent(original) {
+		return projectAuthorizationHookError(
+			http.StatusConflict,
+			"project authorization document has already been rejected",
+			projectAuthorizationRejectedField,
+			"project_authorization_already_rejected",
+			"replace the rejected project authorization document before rejecting again",
+		)
+	}
+	if strings.TrimSpace(original.GetString(projectAuthorizationDocField)) == "" {
+		return projectAuthorizationHookError(
+			http.StatusBadRequest,
+			"project authorization document is required before rejection",
+			projectAuthorizationDocField,
+			"required",
+			"project authorization document is required before rejection",
+		)
+	}
+	if strings.TrimSpace(original.GetString(projectAuthorizationDocHashField)) == "" {
+		return projectAuthorizationHookError(
+			http.StatusConflict,
+			"project authorization document hash is missing",
+			projectAuthorizationDocHashField,
+			"project_authorization_doc_changed",
+			"review the current project authorization document before rejecting",
+		)
+	}
+	if strings.TrimSpace(record.GetString(projectAuthorizationRejectorField)) == "" {
+		return projectAuthorizationHookError(
+			http.StatusBadRequest,
+			"project authorization rejector is required",
+			projectAuthorizationRejectorField,
+			"required",
+			"project authorization rejector is required",
+		)
+	}
+	if strings.TrimSpace(record.GetString(projectAuthorizationRejectedField)) == "" {
+		return projectAuthorizationHookError(
+			http.StatusBadRequest,
+			"project authorization rejection timestamp is required",
+			projectAuthorizationRejectedField,
+			"required",
+			"project authorization rejection timestamp is required",
+		)
+	}
+	if strings.TrimSpace(record.GetString(projectAuthorizationReasonField)) == "" {
+		return projectAuthorizationHookError(
+			http.StatusBadRequest,
+			"project authorization rejection reason is required",
+			projectAuthorizationReasonField,
+			"required",
+			"project authorization rejection reason is required",
+		)
+	}
+	return nil
+}
+
 func validateProjectAuthorizationRevokeSave(record *core.Record, changes projectAuthorizationFieldChanges) error {
 	if changes.doc {
 		return projectAuthorizationNotEditableError(projectAuthorizationDocField)
 	}
 	if changes.hash {
 		return projectAuthorizationNotEditableError(projectAuthorizationDocHashField)
+	}
+	if changes.uploader {
+		return projectAuthorizationNotEditableError(projectAuthorizationUploaderField)
+	}
+	if changes.uploaded {
+		return projectAuthorizationNotEditableError(projectAuthorizationUploadedField)
+	}
+	if changes.rejector {
+		return projectAuthorizationNotEditableError(projectAuthorizationRejectorField)
+	}
+	if changes.rejected {
+		return projectAuthorizationNotEditableError(projectAuthorizationRejectedField)
+	}
+	if changes.rejection {
+		return projectAuthorizationNotEditableError(projectAuthorizationReasonField)
 	}
 	if field := firstPopulatedProjectAuthorizationReviewField(record); field != "" {
 		return projectAuthorizationNotEditableError(field)
@@ -409,12 +600,20 @@ func projectAuthorizationReviewMetadataPresent(record *core.Record) bool {
 	return firstPopulatedProjectAuthorizationReviewField(record) != ""
 }
 
+func projectAuthorizationRejectionMetadataPresent(record *core.Record) bool {
+	return firstPopulatedProjectAuthorizationRejectionField(record) != ""
+}
+
 func firstPopulatedProjectAuthorizationField(record *core.Record) string {
 	return firstPopulatedProjectAuthorizationFieldIn(record, projectAuthorizationFields)
 }
 
 func firstPopulatedProjectAuthorizationReviewField(record *core.Record) string {
 	return firstPopulatedProjectAuthorizationFieldIn(record, projectAuthorizationReviewFields)
+}
+
+func firstPopulatedProjectAuthorizationRejectionField(record *core.Record) string {
+	return firstPopulatedProjectAuthorizationFieldIn(record, projectAuthorizationRejectionFields)
 }
 
 func firstPopulatedProjectAuthorizationFieldIn(record *core.Record, fields []string) string {
@@ -441,12 +640,25 @@ func projectAuthorizationDocumentChanged(record *core.Record) bool {
 
 func clearProjectAuthorizationStoredState(record *core.Record) {
 	record.Set(projectAuthorizationDocHashField, "")
+	clearProjectAuthorizationUploadFields(record)
 	clearProjectAuthorizationReviewFields(record)
+	clearProjectAuthorizationRejectionFields(record)
+}
+
+func clearProjectAuthorizationUploadFields(record *core.Record) {
+	record.Set(projectAuthorizationUploaderField, "")
+	record.Set(projectAuthorizationUploadedField, "")
 }
 
 func clearProjectAuthorizationReviewFields(record *core.Record) {
 	record.Set(projectAuthorizationReviewerField, "")
 	record.Set(projectAuthorizationReviewedField, "")
+}
+
+func clearProjectAuthorizationRejectionFields(record *core.Record) {
+	record.Set(projectAuthorizationRejectorField, "")
+	record.Set(projectAuthorizationRejectedField, "")
+	record.Set(projectAuthorizationReasonField, "")
 }
 
 func restoreProjectAuthorizationStoredState(record *core.Record, original *core.Record) {

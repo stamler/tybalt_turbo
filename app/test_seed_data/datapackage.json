@@ -1556,6 +1556,31 @@
             "name": "pa_reviewed",
             "type": "string",
             "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "pa_uploader",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "pa_uploaded",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "pa_rejector",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "pa_rejected",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "pa_rejection_reason",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
           }
         ],
         "primaryKey": [

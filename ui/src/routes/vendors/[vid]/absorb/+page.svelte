@@ -11,7 +11,7 @@
 
 <AbsorbEditor
   collectionName="vendors"
-  targetRecordId={$page.params.vid}
+  targetRecordId={$page.params.vid ?? ""}
   availableRecords={$vendors.items}
   autoCompleteIndex={$vendors.index as unknown as any}
 >

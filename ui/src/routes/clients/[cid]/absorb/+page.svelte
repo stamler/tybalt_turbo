@@ -7,7 +7,7 @@
 
 <AbsorbEditor
   collectionName="clients"
-  targetRecordId={$page.params.cid}
+  targetRecordId={$page.params.cid ?? ""}
   availableRecords={$clients.items}
   autoCompleteIndex={$clients.index as unknown as any}
 >

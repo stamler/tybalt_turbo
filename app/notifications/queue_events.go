@@ -154,6 +154,55 @@ func QueueExpenseRejectedNotifications(app core.App, expense *core.Record, rejec
 	return nil
 }
 
+// QueueProjectAuthorizationRejectedNotifications notifies the uploader that
+// Accounting rejected the uploaded PA package.
+func QueueProjectAuthorizationRejectedNotifications(app core.App, job *core.Record, rejectorUID, reason string) error {
+	uploaderUID := job.GetString("pa_uploader")
+	if uploaderUID == "" {
+		app.Logger().Info(
+			"skipping project authorization rejection notification because uploader is blank",
+			"job_id", job.Id,
+		)
+		return nil
+	}
+
+	rejectorName, _, err := getProfileDisplayName(app, rejectorUID)
+	if err != nil {
+		app.Logger().Error(
+			"error finding PA rejector profile",
+			"rejector_uid", rejectorUID,
+			"error", err,
+		)
+		return fmt.Errorf("error finding PA rejector profile: %v", err)
+	}
+
+	data := map[string]any{
+		"JobNumber":       job.GetString("number"),
+		"JobDescription":  job.GetString("description"),
+		"RejectorName":    rejectorName,
+		"RejectionReason": reason,
+		"ActionURL":       BuildActionURL(app, fmt.Sprintf("/jobs/%s/details", job.Id)),
+	}
+
+	createdCount := createAndSendToRecipients(
+		app,
+		"project_authorization_rejected",
+		[]string{uploaderUID},
+		data,
+		true,
+		rejectorUID,
+		map[string]any{"job_id": job.Id},
+	)
+
+	app.Logger().Info(
+		"created project authorization rejection notifications",
+		"job_id", job.Id,
+		"created_count", createdCount,
+	)
+
+	return nil
+}
+
 // QueueTimesheetSharedNotifications creates immediate notifications for newly
 // added timesheet viewers.
 //

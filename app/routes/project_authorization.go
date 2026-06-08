@@ -11,6 +11,7 @@ import (
 	"time"
 	"tybalt/errs"
 	"tybalt/hooks"
+	"tybalt/notifications"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -34,10 +35,16 @@ type projectAuthorizationApproveRequest struct {
 	ProjectAuthorizationDocHash string `json:"project_authorization_doc_hash"`
 }
 
+type projectAuthorizationRejectRequest struct {
+	ProjectAuthorizationDocHash string `json:"project_authorization_doc_hash"`
+	RejectionReason             string `json:"rejection_reason"`
+}
+
 type projectAuthorizationQueueRow struct {
 	ID                          string `db:"id" json:"id"`
 	Number                      string `db:"number" json:"number"`
 	Description                 string `db:"description" json:"description"`
+	ClientPO                    string `db:"client_po" json:"client_po"`
 	ClientID                    string `db:"client_id" json:"client_id"`
 	ClientName                  string `db:"client_name" json:"client_name"`
 	ManagerID                   string `db:"manager_id" json:"manager_id"`
@@ -77,6 +84,28 @@ type projectAuthorizationMissingRow struct {
 	CanUpload                   bool   `db:"can_upload" json:"can_upload"`
 }
 
+type projectAuthorizationRejectedRow struct {
+	ID                          string `db:"id" json:"id"`
+	Number                      string `db:"number" json:"number"`
+	Description                 string `db:"description" json:"description"`
+	ClientID                    string `db:"client_id" json:"client_id"`
+	ClientName                  string `db:"client_name" json:"client_name"`
+	ManagerID                   string `db:"manager_id" json:"manager_id"`
+	ManagerName                 string `db:"manager_name" json:"manager_name"`
+	BranchID                    string `db:"branch_id" json:"branch_id"`
+	BranchCode                  string `db:"branch_code" json:"branch_code"`
+	BranchName                  string `db:"branch_name" json:"branch_name"`
+	Status                      string `db:"status" json:"status"`
+	ProjectAuthorizationDoc     string `db:"project_authorization_doc" json:"project_authorization_doc"`
+	ProjectAuthorizationDocURL  string `json:"project_authorization_doc_url"`
+	ProjectAuthorizationDocHash string `db:"project_authorization_doc_hash" json:"project_authorization_doc_hash"`
+	PARejectorID                string `db:"pa_rejector_id" json:"pa_rejector_id"`
+	PARejectorName              string `db:"pa_rejector_name" json:"pa_rejector_name"`
+	PARejected                  string `db:"pa_rejected" json:"pa_rejected"`
+	PARejectionReason           string `db:"pa_rejection_reason" json:"pa_rejection_reason"`
+	CanUpload                   bool   `db:"can_upload" json:"can_upload"`
+}
+
 type projectAuthorizationMissingCountRow struct {
 	Priority string `db:"priority"`
 	Count    int    `db:"count"`
@@ -91,6 +120,7 @@ type projectAuthorizationMissingResponse struct {
 	TotalPages         int                              `json:"total_pages"`
 	Priority           string                           `json:"priority"`
 	PendingReviewCount int                              `json:"pending_review_count"`
+	RejectedCount      int                              `json:"rejected_count"`
 }
 
 const projectAuthorizationMissingBaseQuery = `
@@ -279,6 +309,11 @@ func createUploadProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 			form := forms.NewRecordUpsert(txApp, txJob)
 			form.SetContext(hooks.WithProjectAuthorizationMutation(e.Request.Context(), hooks.ProjectAuthorizationMutationUpload))
 			form.GrantSuperuserAccess()
+			txJob.Set("pa_uploader", e.Auth.Id)
+			txJob.Set("pa_uploaded", time.Now().UTC())
+			txJob.Set("pa_rejector", "")
+			txJob.Set("pa_rejected", "")
+			txJob.Set("pa_rejection_reason", "")
 			form.Load(map[string]any{
 				"project_authorization_doc":      files,
 				"project_authorization_doc_hash": attachmentHash,
@@ -332,8 +367,13 @@ func createDeleteProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 			}
 			txJob.Set("project_authorization_doc", "")
 			txJob.Set("project_authorization_doc_hash", "")
+			txJob.Set("pa_uploader", "")
+			txJob.Set("pa_uploaded", "")
 			txJob.Set("pa_reviewer", "")
 			txJob.Set("pa_reviewed", "")
+			txJob.Set("pa_rejector", "")
+			txJob.Set("pa_rejected", "")
+			txJob.Set("pa_rejection_reason", "")
 			if err := txApp.SaveWithContext(hooks.WithProjectAuthorizationMutation(e.Request.Context(), hooks.ProjectAuthorizationMutationDelete), txJob); err != nil {
 				return err
 			}
@@ -375,6 +415,10 @@ func createGetMissingProjectAuthorizationHandler(app core.App) func(e *core.Requ
 			if err != nil {
 				return e.InternalServerError("failed to count project authorization queue", err)
 			}
+		}
+		rejectedCount, err := countProjectAuthorizationRejectedForAuth(app, e.Auth)
+		if err != nil {
+			return e.InternalServerError("failed to count rejected project authorizations", err)
 		}
 		total := projectAuthorizationMissingTotalForPriority(counts, priority)
 		totalPages := projectAuthorizationTotalPages(total, limit)
@@ -446,7 +490,79 @@ func createGetMissingProjectAuthorizationHandler(app core.App) func(e *core.Requ
 			TotalPages:         totalPages,
 			Priority:           priority,
 			PendingReviewCount: pendingReviewCount,
+			RejectedCount:      rejectedCount,
 		})
+	}
+}
+
+func createGetRejectedProjectAuthorizationHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		params, err := projectAuthorizationMissingParams(app, e.Auth)
+		if err != nil {
+			return e.InternalServerError("failed to check project authorization visibility", err)
+		}
+		rows := []projectAuthorizationRejectedRow{}
+		if err := app.DB().NewQuery(`
+			SELECT
+			  j.id,
+			  j.number,
+			  j.description,
+			  j.client AS client_id,
+			  c.name AS client_name,
+			  j.manager AS manager_id,
+			  TRIM(COALESCE(mp.given_name, '') || ' ' || COALESCE(mp.surname, '')) AS manager_name,
+			  j.branch AS branch_id,
+			  b.code AS branch_code,
+			  b.name AS branch_name,
+			  j.status,
+			  j.project_authorization_doc,
+			  j.project_authorization_doc_hash,
+			  j.pa_rejector AS pa_rejector_id,
+			  TRIM(COALESCE(rp.given_name, '') || ' ' || COALESCE(rp.surname, '')) AS pa_rejector_name,
+			  j.pa_rejected,
+			  j.pa_rejection_reason,
+			  CASE
+			    WHEN {:canUploadAll} = 1
+			      OR j.manager = {:uid}
+			      OR j.alternate_manager = {:uid}
+			      OR b.manager = {:uid}
+			    THEN 1
+			    ELSE 0
+			  END AS can_upload
+			FROM jobs j
+			LEFT JOIN clients c ON c.id = j.client
+			LEFT JOIN profiles mp ON mp.uid = j.manager
+			LEFT JOIN profiles rp ON rp.uid = j.pa_rejector
+			LEFT JOIN branches b ON b.id = j.branch
+			WHERE j.status = 'Active'
+			  AND j.number NOT LIKE 'P%'
+			  AND j.project_authorization_doc != ''
+			  AND j.project_authorization_doc_hash != ''
+			  AND (
+			    j.pa_rejected != ''
+			    OR j.pa_rejector != ''
+			    OR j.pa_rejection_reason != ''
+			  )
+			  AND (
+			    {:canSeeAll} = 1
+			    OR j.manager = {:uid}
+			    OR j.alternate_manager = {:uid}
+			    OR b.manager = {:uid}
+			  )
+			ORDER BY j.pa_rejected DESC, j.number
+		`).Bind(params).All(&rows); err != nil {
+			return e.InternalServerError("failed to load rejected project authorizations", err)
+		}
+		jobsCollection, err := app.FindCollectionByNameOrId("jobs")
+		if err != nil {
+			return e.InternalServerError("failed to load jobs collection", err)
+		}
+		for i := range rows {
+			if rows[i].ProjectAuthorizationDoc != "" {
+				rows[i].ProjectAuthorizationDocURL = "/api/files/" + jobsCollection.Id + "/" + rows[i].ID + "/" + rows[i].ProjectAuthorizationDoc
+			}
+		}
+		return e.JSON(http.StatusOK, map[string]any{"items": rows})
 	}
 }
 
@@ -461,6 +577,7 @@ func createGetProjectAuthorizationQueueHandler(app core.App) func(e *core.Reques
 			  j.id,
 			  j.number,
 			  j.description,
+			  j.client_po,
 			  j.client AS client_id,
 			  c.name AS client_name,
 			  j.manager AS manager_id,
@@ -481,6 +598,9 @@ func createGetProjectAuthorizationQueueHandler(app core.App) func(e *core.Reques
 			  AND j.project_authorization_doc_hash != ''
 			  AND j.pa_reviewed = ''
 			  AND j.pa_reviewer = ''
+			  AND j.pa_rejected = ''
+			  AND j.pa_rejector = ''
+			  AND j.pa_rejection_reason = ''
 			ORDER BY j.number
 		`).All(&rows); err != nil {
 			return e.InternalServerError("failed to load PA approval queue", err)
@@ -599,6 +719,9 @@ func countProjectAuthorizationPendingReview(app core.App) (int, error) {
 		  AND j.project_authorization_doc_hash != ''
 		  AND j.pa_reviewed = ''
 		  AND j.pa_reviewer = ''
+		  AND j.pa_rejected = ''
+		  AND j.pa_rejector = ''
+		  AND j.pa_rejection_reason = ''
 	`, dbx.Params{})
 }
 
@@ -616,6 +739,33 @@ func countProjectAuthorizationMissingForAuth(app core.App, auth *core.Record) (i
 		  AND (
 		    COALESCE(j.project_authorization_doc, '') = ''
 		    OR COALESCE(j.project_authorization_doc_hash, '') = ''
+		  )
+		  AND (
+		    {:canSeeAll} = 1
+		    OR j.manager = {:uid}
+		    OR j.alternate_manager = {:uid}
+		    OR b.manager = {:uid}
+		  )
+	`, params)
+}
+
+func countProjectAuthorizationRejectedForAuth(app core.App, auth *core.Record) (int, error) {
+	params, err := projectAuthorizationMissingParams(app, auth)
+	if err != nil {
+		return 0, err
+	}
+	return countNavRows(app, `
+		SELECT COUNT(*)
+		FROM jobs j
+		LEFT JOIN branches b ON b.id = j.branch
+		WHERE j.status = 'Active'
+		  AND j.number NOT LIKE 'P%'
+		  AND j.project_authorization_doc != ''
+		  AND j.project_authorization_doc_hash != ''
+		  AND (
+		    j.pa_rejected != ''
+		    OR j.pa_rejector != ''
+		    OR j.pa_rejection_reason != ''
 		  )
 		  AND (
 		    {:canSeeAll} = 1
@@ -652,6 +802,9 @@ func createApproveProjectAuthorizationHandler(app core.App) func(e *core.Request
 			if projectAuthorizationReviewMetadataPresent(job) {
 				return projectAuthorizationAPIError(http.StatusConflict, "project_authorization_already_approved", "This project authorization document has already been approved.")
 			}
+			if projectAuthorizationRejectionMetadataPresent(job) {
+				return projectAuthorizationAPIError(http.StatusConflict, "project_authorization_rejected", "This project authorization document has been rejected. Please upload a replacement before approving.")
+			}
 			job.Set("pa_reviewed", time.Now().UTC())
 			job.Set("pa_reviewer", e.Auth.Id)
 			if err := txApp.SaveWithContext(hooks.WithProjectAuthorizationMutation(e.Request.Context(), hooks.ProjectAuthorizationMutationApprove), job); err != nil {
@@ -664,6 +817,70 @@ func createApproveProjectAuthorizationHandler(app core.App) func(e *core.Request
 			return projectAuthorizationRouteError(e, err)
 		}
 		return e.JSON(http.StatusOK, approved)
+	}
+}
+
+func createRejectProjectAuthorizationHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		if err := requireAccountingClaim(app, e.Auth); err != nil {
+			return projectAuthorizationRouteError(e, err)
+		}
+		var req projectAuthorizationRejectRequest
+		if err := e.BindBody(&req); err != nil {
+			return e.BadRequestError("invalid rejection request", err)
+		}
+		submittedHash := strings.TrimSpace(req.ProjectAuthorizationDocHash)
+		reason := strings.TrimSpace(req.RejectionReason)
+		if len(reason) < 4 {
+			return projectAuthorizationRouteError(e, projectAuthorizationFieldAPIError(
+				http.StatusBadRequest,
+				"rejection_reason_too_short",
+				"rejection reason must be at least 4 characters long",
+				"rejection_reason",
+			))
+		}
+
+		var rejected *core.Record
+		err := app.RunInTransaction(func(txApp core.App) error {
+			job, err := txApp.FindRecordById("jobs", e.Request.PathValue("id"))
+			if err != nil {
+				return projectAuthorizationAPIError(http.StatusNotFound, "job_not_found", "job not found")
+			}
+			if job.GetString("project_authorization_doc") == "" {
+				return projectAuthorizationFieldAPIError(http.StatusBadRequest, "required", "project authorization document is required before rejection", "project_authorization_doc")
+			}
+			currentHash := strings.TrimSpace(job.GetString("project_authorization_doc_hash"))
+			if currentHash == "" || currentHash != submittedHash {
+				return projectAuthorizationAPIError(http.StatusConflict, "project_authorization_doc_changed", "The project authorization document changed after you opened it. Please review the current document before rejecting.")
+			}
+			if projectAuthorizationReviewMetadataPresent(job) {
+				return projectAuthorizationAPIError(http.StatusConflict, "project_authorization_already_approved", "This project authorization document has already been approved.")
+			}
+			if projectAuthorizationRejectionMetadataPresent(job) {
+				return projectAuthorizationAPIError(http.StatusConflict, "project_authorization_already_rejected", "This project authorization document has already been rejected.")
+			}
+			job.Set("pa_rejected", time.Now().UTC())
+			job.Set("pa_rejector", e.Auth.Id)
+			job.Set("pa_rejection_reason", reason)
+			if err := txApp.SaveWithContext(hooks.WithProjectAuthorizationMutation(e.Request.Context(), hooks.ProjectAuthorizationMutationReject), job); err != nil {
+				return err
+			}
+			rejected = job
+			return nil
+		})
+		if err != nil {
+			return projectAuthorizationRouteError(e, err)
+		}
+		if rejected != nil {
+			if notifErr := notifications.QueueProjectAuthorizationRejectedNotifications(app, rejected, e.Auth.Id, reason); notifErr != nil {
+				app.Logger().Error(
+					"error queueing project authorization rejection notifications",
+					"job_id", rejected.Id,
+					"error", notifErr,
+				)
+			}
+		}
+		return e.JSON(http.StatusOK, rejected)
 	}
 }
 
@@ -744,6 +961,10 @@ func requireProjectAuthorizationClaim(app core.App, auth *core.Record, claim str
 
 func projectAuthorizationReviewMetadataPresent(record *core.Record) bool {
 	return record != nil && (record.GetString("pa_reviewed") != "" || record.GetString("pa_reviewer") != "")
+}
+
+func projectAuthorizationRejectionMetadataPresent(record *core.Record) bool {
+	return record != nil && (record.GetString("pa_rejected") != "" || record.GetString("pa_rejector") != "" || record.GetString("pa_rejection_reason") != "")
 }
 
 func projectAuthorizationApprovedImmutableAPIError() *projectAuthorizationHTTPError {

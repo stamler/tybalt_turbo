@@ -46,10 +46,19 @@ type jobDetailsRow struct {
 	ClientReferenceNumber     sql.NullString  `db:"client_reference_number"`
 	ProjectAuthorizationDoc   sql.NullString  `db:"project_authorization_doc"`
 	ProjectAuthorizationHash  sql.NullString  `db:"project_authorization_doc_hash"`
+	PAUploaded                sql.NullString  `db:"pa_uploaded"`
+	PAUploaderID              sql.NullString  `db:"pa_uploader_id"`
+	PAUploaderGivenName       sql.NullString  `db:"pa_uploader_given_name"`
+	PAUploaderSurname         sql.NullString  `db:"pa_uploader_surname"`
 	PAReviewed                sql.NullString  `db:"pa_reviewed"`
 	PAReviewerID              sql.NullString  `db:"pa_reviewer_id"`
 	PAReviewerGivenName       sql.NullString  `db:"pa_reviewer_given_name"`
 	PAReviewerSurname         sql.NullString  `db:"pa_reviewer_surname"`
+	PARejected                sql.NullString  `db:"pa_rejected"`
+	PARejectorID              sql.NullString  `db:"pa_rejector_id"`
+	PARejectorGivenName       sql.NullString  `db:"pa_rejector_given_name"`
+	PARejectorSurname         sql.NullString  `db:"pa_rejector_surname"`
+	PARejectionReason         sql.NullString  `db:"pa_rejection_reason"`
 	ClientID                  string          `db:"client_id"`
 	ClientName                string          `db:"client_name"`
 	ContactID                 sql.NullString  `db:"contact_id"`
@@ -117,8 +126,13 @@ type JobDetails struct {
 	ProjectAuthorizationDoc   string        `json:"project_authorization_doc"`
 	ProjectAuthorizationURL   string        `json:"project_authorization_doc_url"`
 	ProjectAuthorizationHash  string        `json:"project_authorization_doc_hash"`
+	PAUploaded                string        `json:"pa_uploaded"`
+	PAUploader                Person        `json:"pa_uploader"`
 	PAReviewed                string        `json:"pa_reviewed"`
 	PAReviewer                Person        `json:"pa_reviewer"`
+	PARejected                string        `json:"pa_rejected"`
+	PARejector                Person        `json:"pa_rejector"`
+	PARejectionReason         string        `json:"pa_rejection_reason"`
 	Client                    ClientInfo    `json:"client"`
 	Contact                   Person        `json:"contact"`
 	Manager                   Person        `json:"manager"`
@@ -200,8 +214,13 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			ClientReferenceNumber:     ns(r.ClientReferenceNumber),
 			ProjectAuthorizationDoc:   ns(r.ProjectAuthorizationDoc),
 			ProjectAuthorizationHash:  ns(r.ProjectAuthorizationHash),
+			PAUploaded:                ns(r.PAUploaded),
+			PAUploader:                Person{ID: ns(r.PAUploaderID), GivenName: ns(r.PAUploaderGivenName), Surname: ns(r.PAUploaderSurname)},
 			PAReviewed:                ns(r.PAReviewed),
 			PAReviewer:                Person{ID: ns(r.PAReviewerID), GivenName: ns(r.PAReviewerGivenName), Surname: ns(r.PAReviewerSurname)},
+			PARejected:                ns(r.PARejected),
+			PARejector:                Person{ID: ns(r.PARejectorID), GivenName: ns(r.PARejectorGivenName), Surname: ns(r.PARejectorSurname)},
+			PARejectionReason:         ns(r.PARejectionReason),
 			Client:                    ClientInfo{ID: r.ClientID, Name: r.ClientName},
 			Contact:                   Person{ID: ns(r.ContactID), GivenName: ns(r.ContactGivenName), Surname: ns(r.ContactSurname)},
 			Manager:                   Person{ID: ns(r.ManagerID), GivenName: ns(r.ManagerGivenName), Surname: ns(r.ManagerSurname)},

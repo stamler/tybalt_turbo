@@ -17,6 +17,7 @@ import (
 	"time"
 	"tybalt/hooks"
 	"tybalt/internal/testseed"
+	"tybalt/notifications"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/apis"
@@ -83,6 +84,9 @@ func TestProjectAuthorizationDocumentUploadPermissions(t *testing.T) {
 				}
 				if job.GetString("pa_reviewed") != "" || job.GetString("pa_reviewer") != "" {
 					t.Fatalf("upload should leave approval blank; reviewed=%q reviewer=%q", job.GetString("pa_reviewed"), job.GetString("pa_reviewer"))
+				}
+				if job.GetString("pa_uploader") == "" || job.GetString("pa_uploaded") == "" {
+					t.Fatalf("upload should record uploader metadata; uploader=%q uploaded=%q", job.GetString("pa_uploader"), job.GetString("pa_uploaded"))
 				}
 			}
 		})
@@ -216,6 +220,118 @@ func TestProjectAuthorizationApprovalAndRevocation(t *testing.T) {
 	job, _ = app.FindRecordById("jobs", paTestProjectID)
 	if got := job.GetString("project_authorization_doc_hash"); got != sha256HexForPATest(paReplacementPDF) {
 		t.Fatalf("replacement hash = %s, want %s", got, sha256HexForPATest(paReplacementPDF))
+	}
+}
+
+func TestProjectAuthorizationRejection(t *testing.T) {
+	app := newProjectAuthorizationTestApp(t)
+	jobToken := authTokenForEmail(t, app, paJobClaimEmail)
+	accountingToken := authTokenForEmail(t, app, paAccountingEmail)
+	noClaimsToken := authTokenForEmail(t, app, paNoClaimsEmail)
+
+	upload := performProjectAuthorizationMultipartRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc", jobToken, "project_authorization_doc", "signed-pa.pdf", "application/pdf", []byte(paPDFContent))
+	if upload.Code != http.StatusOK {
+		t.Fatalf("upload status = %d; body=%s", upload.Code, upload.Body.String())
+	}
+	hash := sha256HexForPATest(paPDFContent)
+
+	shortReason := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization/reject", accountingToken, map[string]any{
+		"project_authorization_doc_hash": hash,
+		"rejection_reason":               "bad",
+	})
+	if shortReason.Code != http.StatusBadRequest || !strings.Contains(shortReason.Body.String(), "rejection_reason_too_short") {
+		t.Fatalf("short-reason response = %d, body=%s", shortReason.Code, shortReason.Body.String())
+	}
+
+	nonAccounting := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization/reject", noClaimsToken, map[string]any{
+		"project_authorization_doc_hash": hash,
+		"rejection_reason":               "Missing approval signature",
+	})
+	if nonAccounting.Code != http.StatusForbidden {
+		t.Fatalf("non-accounting rejection status = %d, want forbidden; body=%s", nonAccounting.Code, nonAccounting.Body.String())
+	}
+
+	stale := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization/reject", accountingToken, map[string]any{
+		"project_authorization_doc_hash": strings.Repeat("a", 64),
+		"rejection_reason":               "Missing approval signature",
+	})
+	if stale.Code != http.StatusConflict || !strings.Contains(stale.Body.String(), "project_authorization_doc_changed") {
+		t.Fatalf("stale rejection response = %d, body=%s", stale.Code, stale.Body.String())
+	}
+
+	beforeNotifications := countNotificationsForTemplate(t, app, "project_authorization_rejected")
+	const reason = "Missing approval signature"
+	reject := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization/reject", accountingToken, map[string]any{
+		"project_authorization_doc_hash": hash,
+		"rejection_reason":               reason,
+	})
+	if reject.Code != http.StatusOK {
+		t.Fatalf("reject status = %d; body=%s", reject.Code, reject.Body.String())
+	}
+	job, err := app.FindRecordById("jobs", paTestProjectID)
+	if err != nil {
+		t.Fatalf("failed to load rejected job: %v", err)
+	}
+	if job.GetString("project_authorization_doc") == "" || job.GetString("project_authorization_doc_hash") != hash {
+		t.Fatalf("rejection should preserve document/hash; doc=%q hash=%q", job.GetString("project_authorization_doc"), job.GetString("project_authorization_doc_hash"))
+	}
+	if job.GetString("pa_rejected") == "" || job.GetString("pa_rejector") != "f2j5a8vk006baub" || job.GetString("pa_rejection_reason") != reason {
+		t.Fatalf("rejection fields rejected=%q rejector=%q reason=%q", job.GetString("pa_rejected"), job.GetString("pa_rejector"), job.GetString("pa_rejection_reason"))
+	}
+	if got := countNotificationsForTemplate(t, app, "project_authorization_rejected"); got != beforeNotifications+1 {
+		t.Fatalf("project authorization rejection notifications = %d, want %d", got, beforeNotifications+1)
+	}
+
+	details := performClaimsJSONRequest(t, app, http.MethodGet, projectAuthorizationQ+"/details", accountingToken, nil)
+	if details.Code != http.StatusOK ||
+		!strings.Contains(details.Body.String(), `"pa_uploader"`) ||
+		!strings.Contains(details.Body.String(), `"pa_uploaded"`) ||
+		!strings.Contains(details.Body.String(), `"pa_rejector"`) ||
+		!strings.Contains(details.Body.String(), `"pa_rejected"`) ||
+		!strings.Contains(details.Body.String(), `"pa_rejection_reason":"`+reason+`"`) {
+		t.Fatalf("job details did not expose PA audit/rejection fields; status=%d body=%s", details.Code, details.Body.String())
+	}
+
+	queue := performClaimsJSONRequest(t, app, http.MethodGet, "/api/jobs/project_authorization/pending", accountingToken, nil)
+	if queue.Code != http.StatusOK || strings.Contains(queue.Body.String(), paTestProjectID) {
+		t.Fatalf("rejected PA should leave pending queue; status=%d body=%s", queue.Code, queue.Body.String())
+	}
+
+	rejectedQueue := getRejectedProjectAuthorizationsForTest(t, app, accountingToken, http.StatusOK)
+	rejectedIDs := rejectedProjectAuthorizationIDs(rejectedQueue)
+	if !rejectedIDs[paTestProjectID] {
+		t.Fatalf("rejected PA should appear in rejected queue; ids=%v", rejectedIDs)
+	}
+	rejectedBody := performClaimsJSONRequest(t, app, http.MethodGet, "/api/jobs/project_authorization/rejected", accountingToken, nil)
+	if rejectedBody.Code != http.StatusOK ||
+		!strings.Contains(rejectedBody.Body.String(), `"pa_rejection_reason":"`+reason+`"`) ||
+		!strings.Contains(rejectedBody.Body.String(), `"pa_rejector_name":"`) {
+		t.Fatalf("rejected queue did not expose rejection details; status=%d body=%s", rejectedBody.Code, rejectedBody.Body.String())
+	}
+
+	missingWithRejectedCount := getMissingProjectAuthorizationsForTest(t, app, accountingToken, "all", 1, 200, http.StatusOK)
+	if missingWithRejectedCount.RejectedCount == 0 {
+		t.Fatalf("missing response rejected_count = %d, want positive", missingWithRejectedCount.RejectedCount)
+	}
+
+	approveRejected := performClaimsJSONRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization/approve", accountingToken, map[string]any{
+		"project_authorization_doc_hash": hash,
+	})
+	if approveRejected.Code != http.StatusConflict || !strings.Contains(approveRejected.Body.String(), "project_authorization_rejected") {
+		t.Fatalf("approve rejected response = %d, body=%s", approveRejected.Code, approveRejected.Body.String())
+	}
+
+	replaceAfterReject := performProjectAuthorizationMultipartRequest(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc", jobToken, "project_authorization_doc", "replacement-pa.pdf", "application/pdf", []byte(paReplacementPDF))
+	if replaceAfterReject.Code != http.StatusOK {
+		t.Fatalf("replace after reject status = %d; body=%s", replaceAfterReject.Code, replaceAfterReject.Body.String())
+	}
+	job, _ = app.FindRecordById("jobs", paTestProjectID)
+	if job.GetString("pa_rejected") != "" || job.GetString("pa_rejector") != "" || job.GetString("pa_rejection_reason") != "" {
+		t.Fatalf("replacement should clear rejection fields; rejected=%q rejector=%q reason=%q", job.GetString("pa_rejected"), job.GetString("pa_rejector"), job.GetString("pa_rejection_reason"))
+	}
+	rejectedAfterReplacement := getRejectedProjectAuthorizationsForTest(t, app, accountingToken, http.StatusOK)
+	if rejectedProjectAuthorizationIDs(rejectedAfterReplacement)[paTestProjectID] {
+		t.Fatalf("replacement should remove job from rejected queue: %+v", rejectedAfterReplacement)
 	}
 }
 
@@ -402,6 +518,9 @@ func TestProjectAuthorizationQueueAndSchema(t *testing.T) {
 	if queue.Code != http.StatusOK || !strings.Contains(queue.Body.String(), paTestProjectID) || !strings.Contains(queue.Body.String(), sha256HexForPATest(paPDFContent)) {
 		t.Fatalf("queue response = %d, body=%s", queue.Code, queue.Body.String())
 	}
+	if !strings.Contains(queue.Body.String(), `"client_po":"PA-QUEUE-PO"`) {
+		t.Fatalf("queue response should include client_po; body=%s", queue.Body.String())
+	}
 
 	jobsCollection, err := app.FindCollectionByNameOrId("jobs")
 	if err != nil {
@@ -551,8 +670,13 @@ func TestProjectAuthorizationGenericJobUpdateCannotMutateFields(t *testing.T) {
 	protectedFields := map[string]any{
 		"project_authorization_doc":      "pa.pdf",
 		"project_authorization_doc_hash": strings.Repeat("a", 64),
+		"pa_uploader":                    "f2j5a8vk006baub",
+		"pa_uploaded":                    "2026-06-02 11:00:00.000Z",
 		"pa_reviewer":                    "f2j5a8vk006baub",
 		"pa_reviewed":                    "2026-06-02 12:00:00.000Z",
+		"pa_rejector":                    "f2j5a8vk006baub",
+		"pa_rejected":                    "2026-06-02 13:00:00.000Z",
+		"pa_rejection_reason":            "Missing signature",
 	}
 
 	for field, value := range protectedFields {
@@ -576,8 +700,13 @@ func TestProjectAuthorizationCustomJobCreateCannotMutateFields(t *testing.T) {
 	protectedFields := map[string]any{
 		"project_authorization_doc":      "pa.pdf",
 		"project_authorization_doc_hash": strings.Repeat("a", 64),
+		"pa_uploader":                    "f2j5a8vk006baub",
+		"pa_uploaded":                    "2026-06-02 11:00:00.000Z",
 		"pa_reviewer":                    "f2j5a8vk006baub",
 		"pa_reviewed":                    "2026-06-02 12:00:00.000Z",
+		"pa_rejector":                    "f2j5a8vk006baub",
+		"pa_rejected":                    "2026-06-02 13:00:00.000Z",
+		"pa_rejection_reason":            "Missing signature",
 	}
 
 	for field, value := range protectedFields {
@@ -632,7 +761,24 @@ func getMissingProjectAuthorizationsForTest(t *testing.T, app *tests.TestApp, to
 	return decodeJSONResponseForTest[projectAuthorizationMissingResponse](t, rec, status, "missing PA queue")
 }
 
+func getRejectedProjectAuthorizationsForTest(t *testing.T, app *tests.TestApp, token string, status int) []projectAuthorizationRejectedRow {
+	t.Helper()
+	rec := performClaimsJSONRequest(t, app, http.MethodGet, "/api/jobs/project_authorization/rejected", token, nil)
+	response := decodeJSONResponseForTest[struct {
+		Items []projectAuthorizationRejectedRow `json:"items"`
+	}](t, rec, status, "rejected PA queue")
+	return response.Items
+}
+
 func missingProjectAuthorizationIDs(items []projectAuthorizationMissingRow) map[string]bool {
+	ids := map[string]bool{}
+	for _, item := range items {
+		ids[item.ID] = true
+	}
+	return ids
+}
+
+func rejectedProjectAuthorizationIDs(items []projectAuthorizationRejectedRow) map[string]bool {
 	ids := map[string]bool{}
 	for _, item := range items {
 		ids[item.ID] = true
@@ -648,6 +794,20 @@ func projectAuthorizationDocHashForPATest(t *testing.T, app *tests.TestApp, jobI
 		t.Fatalf("failed to read PA document hash: %v", err)
 	}
 	return hash
+}
+
+func countNotificationsForTemplate(t *testing.T, app *tests.TestApp, code string) int {
+	t.Helper()
+	var count int
+	if err := app.DB().NewQuery(`
+		SELECT COUNT(*)
+		FROM notifications n
+		JOIN notification_templates t ON t.id = n.template
+		WHERE t.code = {:code}
+	`).Bind(dbx.Params{"code": code}).Row(&count); err != nil {
+		t.Fatalf("failed to count notifications for template %s: %v", code, err)
+	}
+	return count
 }
 
 func setProjectAuthorizationDocHashForPATest(t *testing.T, app *tests.TestApp, jobID string, hash string) {
@@ -824,6 +984,7 @@ func performBlockingProjectAuthorizationMultipartRequest(t *testing.T, app *test
 func newProjectAuthorizationTestApp(t *testing.T) *tests.TestApp {
 	t.Helper()
 	app := testseed.NewSeededTestApp(t)
+	notifications.SetSendNotificationAsyncForTest(app, false)
 	hooks.AddHooks(app)
 	AddRoutes(app)
 	return app

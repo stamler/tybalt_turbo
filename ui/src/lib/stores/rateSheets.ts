@@ -1,8 +1,8 @@
 import { createCollectionStore } from "./collectionStore";
 import { pb } from "$lib/pocketbase";
+import type { BaseSystemFields } from "$lib/pocketbase-types";
 
-export interface RateSheetResponse {
-  id: string;
+export interface RateSheetResponse extends BaseSystemFields {
   name: string;
   effective_date: string;
   revision: number;

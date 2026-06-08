@@ -95,14 +95,22 @@ func createGetNavBadgesHandler(app core.App) func(e *core.RequestEvent) error {
 			if err != nil {
 				return e.Error(http.StatusInternalServerError, "failed to count missing project authorizations", err)
 			}
-			counts[navProjectAuthorizationHref] = pendingReviewCount + missingCount
+			rejectedCount, err := countProjectAuthorizationRejectedForAuth(app, e.Auth)
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to count rejected project authorizations", err)
+			}
+			counts[navProjectAuthorizationHref] = pendingReviewCount + missingCount + rejectedCount
 		} else {
 			missingCount, err := countProjectAuthorizationMissingForAuth(app, e.Auth)
 			if err != nil {
 				return e.Error(http.StatusInternalServerError, "failed to count missing project authorizations", err)
 			}
-			if missingCount > 0 {
-				counts[navProjectAuthorizationHref] = missingCount
+			rejectedCount, err := countProjectAuthorizationRejectedForAuth(app, e.Auth)
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to count rejected project authorizations", err)
+			}
+			if missingCount+rejectedCount > 0 {
+				counts[navProjectAuthorizationHref] = missingCount + rejectedCount
 			}
 		}
 

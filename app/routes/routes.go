@@ -238,6 +238,7 @@ func AddRoutes(app core.App) {
 		jobsGroup.PUT("/{id}", createUpsertJobHandler(app))
 		jobsGroup.GET("/project_authorization/missing", createGetMissingProjectAuthorizationHandler(app))
 		jobsGroup.GET("/project_authorization/pending", createGetProjectAuthorizationQueueHandler(app))
+		jobsGroup.GET("/project_authorization/rejected", createGetRejectedProjectAuthorizationHandler(app))
 		jobsGroup.GET("/{id}/details", createGetJobDetailsHandler(app))
 		jobsGroup.GET("/{id}/notes", createGetJobNotesHandler(app))
 		jobsGroup.GET("/latest", createGetLatestJobsHandler(app))
@@ -265,6 +266,7 @@ func AddRoutes(app core.App) {
 		jobsGroup.POST("/{id}/project_authorization_doc_hash/audit", createAuditProjectAuthorizationDocHashHandler(app))
 		jobsGroup.POST("/{id}/project_authorization_doc_hash/replace", createReplaceProjectAuthorizationDocHashHandler(app))
 		jobsGroup.POST("/{id}/project_authorization/approve", createApproveProjectAuthorizationHandler(app))
+		jobsGroup.POST("/{id}/project_authorization/reject", createRejectProjectAuthorizationHandler(app))
 		jobsGroup.POST("/{id}/project_authorization/revoke", createRevokeProjectAuthorizationHandler(app))
 		jobsGroup.GET("/{id}/validate-proposal", createValidateProposalHandler(app))
 

@@ -122,7 +122,7 @@
     // schema validation (!)
     // https://github.com/pocketbase/pocketbase/discussions/2881 so we
     // need a correct value in the payload just to make it to the hook
-    item.creator = $authStore?.model?.id;
+    item.creator = $authStore?.model?.id ?? "";
 
     // set a dummy value for week_ending to satisfy the schema non-empty
     // requirement. This will be changed in the backend to the correct

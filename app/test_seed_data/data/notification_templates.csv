@@ -72,3 +72,16 @@ One or more timesheets are awaiting your approval.
 Please review and approve or reject them here:
 
 {{.ActionURL}}",2025-11-17 19:30:28.346Z
+project_authorization_rejected,2026-06-08 12:00:00.000Z,Sent to the uploader when Accounting rejects a project authorization document,,parejecttpl0001,Project authorization rejected,"Hello {{.RecipientName}},
+
+Accounting rejected the project authorization document for {{.JobNumber}} - {{.JobDescription}}.
+
+Rejected by: {{.RejectorName}}
+
+Reason:
+
+{{.RejectionReason}}
+
+Please review the job and upload a replacement PA document here:
+
+{{.ActionURL}}",2026-06-08 12:00:00.000Z

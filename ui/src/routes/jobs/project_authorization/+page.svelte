@@ -4,10 +4,10 @@
   import { pb } from "$lib/pocketbase";
   import { invalidateAll } from "$app/navigation";
   import { globalStore } from "$lib/stores/global";
-  import { pocketBaseFileHref } from "$lib/utilities";
+  import { pocketBaseFileHref, shortDate } from "$lib/utilities";
 
   type Priority = "in_use" | "recent" | "dormant" | "all";
-  type Tab = "missing" | "pending";
+  type Tab = "missing" | "pending" | "rejected";
 
   type MissingItem = {
     id: string;
@@ -34,9 +34,24 @@
     total_pages: number;
     priority: Priority;
     pending_review_count: number;
+    rejected_count: number;
   };
 
   type PendingItem = {
+    id: string;
+    number: string;
+    description: string;
+    client_po: string;
+    client_name: string;
+    manager_name: string;
+    branch_code: string;
+    status: string;
+    project_authorization_doc: string;
+    project_authorization_doc_url: string;
+    project_authorization_doc_hash: string;
+  };
+
+  type RejectedItem = {
     id: string;
     number: string;
     description: string;
@@ -47,6 +62,10 @@
     project_authorization_doc: string;
     project_authorization_doc_url: string;
     project_authorization_doc_hash: string;
+    pa_rejector_name: string;
+    pa_rejected: string;
+    pa_rejection_reason: string;
+    can_upload: boolean;
   };
 
   let { data } = $props();
@@ -56,11 +75,18 @@
   let pendingItems = $state<PendingItem[]>([]);
   let pendingLoaded = $state(false);
   let pendingLoading = $state(false);
+  let rejectedItems = $state<RejectedItem[]>([]);
+  let rejectedLoaded = $state(false);
+  let rejectedLoading = $state(false);
   let missingLoading = $state(false);
   let uploading = $state<string | null>(null);
   let approving = $state<string | null>(null);
   let approveTarget = $state<PendingItem | null>(null);
   let approveConfirmError = $state<string | null>(null);
+  let rejecting = $state<string | null>(null);
+  let rejectTarget = $state<PendingItem | null>(null);
+  let rejectionReason = $state("");
+  let rejectConfirmError = $state<string | null>(null);
   let error = $state<string | null>(null);
 
   const priorities: { id: Priority; label: string }[] = [
@@ -74,15 +100,22 @@
   const pendingReviewCount = $derived(
     pendingLoaded ? pendingItems.length : (missing.pending_review_count ?? 0),
   );
+  const rejectedCount = $derived(
+    rejectedLoaded ? rejectedItems.length : (missing.rejected_count ?? 0),
+  );
 
   $effect(() => {
     if (activeTab === "pending" && canReviewPending && !pendingLoaded && !pendingLoading) {
       pendingLoaded = true;
       void loadPending();
     }
+    if (activeTab === "rejected" && !rejectedLoaded && !rejectedLoading) {
+      rejectedLoaded = true;
+      void loadRejected();
+    }
   });
 
-  function fileHref(item: PendingItem) {
+  function fileHref(item: Pick<PendingItem, "id" | "project_authorization_doc">) {
     return item.project_authorization_doc
       ? pocketBaseFileHref("jobs", item.id, item.project_authorization_doc)
       : "";
@@ -101,6 +134,22 @@
       error = e?.data?.message ?? e?.message ?? "Failed to load PA documents pending review.";
     } finally {
       pendingLoading = false;
+    }
+  }
+
+  async function loadRejected() {
+    rejectedLoading = true;
+    error = null;
+    try {
+      const response = await pb.send("/api/jobs/project_authorization/rejected", { method: "GET" });
+      rejectedItems = (response.items ?? []).map((item: RejectedItem) => ({
+        ...item,
+        project_authorization_doc_url: fileHref(item),
+      }));
+    } catch (e: any) {
+      error = e?.data?.message ?? e?.message ?? "Failed to load rejected PA documents.";
+    } finally {
+      rejectedLoading = false;
     }
   }
 
@@ -130,6 +179,19 @@
     approveConfirmError = null;
   }
 
+  function openRejectConfirm(item: PendingItem) {
+    rejectTarget = item;
+    rejectionReason = "";
+    rejectConfirmError = null;
+  }
+
+  function closeRejectConfirm() {
+    if (rejecting) return;
+    rejectTarget = null;
+    rejectionReason = "";
+    rejectConfirmError = null;
+  }
+
   async function approve(item: PendingItem) {
     approving = item.id;
     approveConfirmError = null;
@@ -154,7 +216,43 @@
     void approve(approveTarget);
   }
 
-  async function uploadProjectAuthorization(item: MissingItem, event: Event) {
+  async function reject(item: PendingItem) {
+    const reason = rejectionReason.trim();
+    if (reason.length < 4) {
+      rejectConfirmError = "Rejection reason must be at least 4 characters long.";
+      return;
+    }
+    rejecting = item.id;
+    rejectConfirmError = null;
+    try {
+      await pb.send(`/api/jobs/${item.id}/project_authorization/reject`, {
+        method: "POST",
+        body: {
+          project_authorization_doc_hash: item.project_authorization_doc_hash,
+          rejection_reason: reason,
+        },
+      });
+      rejectTarget = null;
+      rejectionReason = "";
+      await loadPending();
+      if (rejectedLoaded) {
+        await loadRejected();
+      }
+      await globalStore.refreshAttentionCounts();
+      await invalidateAll();
+    } catch (e: any) {
+      rejectConfirmError = e?.data?.message ?? e?.message ?? "Failed to reject PA document.";
+    } finally {
+      rejecting = null;
+    }
+  }
+
+  function confirmRejectTarget() {
+    if (!rejectTarget) return;
+    void reject(rejectTarget);
+  }
+
+  async function uploadProjectAuthorization(item: { id: string }, event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
@@ -171,6 +269,9 @@
       await loadMissing(missing.priority, missing.page);
       if (pendingLoaded) {
         await loadPending();
+      }
+      if (rejectedLoaded) {
+        await loadRejected();
       }
       await globalStore.refreshAttentionCounts();
       await invalidateAll();
@@ -228,6 +329,17 @@
         {/if}
       </button>
     {/if}
+    <button
+      class={`px-3 py-2 text-sm font-semibold ${activeTab === "rejected" ? "border-b-2 border-blue-600 text-blue-700" : "text-neutral-600"}`}
+      onclick={() => (activeTab = "rejected")}
+    >
+      Rejected PA Documents
+      {#if rejectedCount > 0}
+        <span class="ml-1 rounded-full bg-red-500 px-1.5 text-xs text-white">
+          {rejectedCount}
+        </span>
+      {/if}
+    </button>
   </div>
 
   {#if activeTab === "missing"}
@@ -336,13 +448,14 @@
         </div>
       </div>
     </div>
-  {:else if canReviewPending}
+  {:else if activeTab === "pending" && canReviewPending}
     <div class="overflow-x-auto">
       <table class="min-w-full border-collapse text-left text-sm">
         <thead>
           <tr class="border-b border-neutral-300">
             <th class="p-2">Job</th>
             <th class="p-2">Client</th>
+            <th class="p-2">Client PO</th>
             <th class="p-2">Manager</th>
             <th class="p-2">Branch</th>
             <th class="p-2">Status</th>
@@ -360,6 +473,7 @@
                 <div class="text-neutral-600">{item.description}</div>
               </td>
               <td class="p-2">{item.client_name}</td>
+              <td class="p-2">{item.client_po || "-"}</td>
               <td class="p-2">{item.manager_name}</td>
               <td class="p-2">{item.branch_code}</td>
               <td class="p-2">{item.status}</td>
@@ -383,8 +497,17 @@
                     action={() => openApproveConfirm(item)}
                     color="green"
                     loading={approving === item.id}
+                    disabled={rejecting !== null}
                   >
                     Approve
+                  </DsActionButton>
+                  <DsActionButton
+                    action={() => openRejectConfirm(item)}
+                    color="red"
+                    loading={rejecting === item.id}
+                    disabled={approving !== null}
+                  >
+                    Reject
                   </DsActionButton>
                 </div>
               </td>
@@ -396,6 +519,78 @@
 
     {#if pendingLoaded && pendingItems.length === 0}
       <p class="text-neutral-600">No PA documents are pending Accounting review.</p>
+    {/if}
+  {:else if activeTab === "rejected"}
+    <div class="overflow-x-auto">
+      <table class="min-w-full border-collapse text-left text-sm">
+        <thead>
+          <tr class="border-b border-neutral-300">
+            <th class="p-2">Job</th>
+            <th class="p-2">Client</th>
+            <th class="p-2">Manager</th>
+            <th class="p-2">Branch</th>
+            <th class="p-2">Rejected By</th>
+            <th class="p-2">Reason</th>
+            <th class="p-2">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each rejectedItems as item}
+            <tr class="border-b border-neutral-200">
+              <td class="p-2">
+                <a href={`/jobs/${item.id}/details`} class="font-semibold text-blue-600 hover:underline">
+                  {item.number}
+                </a>
+                <div class="text-neutral-600">{item.description}</div>
+              </td>
+              <td class="p-2">{item.client_name}</td>
+              <td class="p-2">{item.manager_name}</td>
+              <td class="p-2">{item.branch_code}</td>
+              <td class="p-2">
+                {item.pa_rejector_name || "-"}
+                {#if item.pa_rejected}
+                  <div class="text-xs text-neutral-500">{shortDate(item.pa_rejected, true)}</div>
+                {/if}
+              </td>
+              <td class="max-w-md p-2">{item.pa_rejection_reason || "-"}</td>
+              <td class="p-2">
+                <div class="flex flex-wrap items-center gap-2">
+                  <a
+                    href={item.project_authorization_doc_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    class="text-blue-600 hover:underline"
+                  >
+                    Open PDF
+                  </a>
+                  {#if item.can_upload}
+                    <label
+                      class={`inline-flex cursor-pointer text-blue-600 hover:underline ${uploading !== null ? "pointer-events-none opacity-60" : ""}`}
+                    >
+                      {uploading === item.id ? "Uploading..." : "Upload Replacement"}
+                      <input
+                        type="file"
+                        accept="application/pdf"
+                        disabled={uploading !== null}
+                        onchange={(event) => uploadProjectAuthorization(item, event)}
+                        class="sr-only"
+                      />
+                    </label>
+                  {:else}
+                    <a href={`/jobs/${item.id}/details`} class="text-blue-600 hover:underline">
+                      Open Job
+                    </a>
+                  {/if}
+                </div>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+
+    {#if rejectedLoaded && rejectedItems.length === 0}
+      <p class="text-neutral-600">No PA documents have been rejected.</p>
     {/if}
   {/if}
 
@@ -419,6 +614,33 @@
           This means you are agreeing the document meets the business criteria required to allow
           billing and related job activity against this project.
         </p>
+      </div>
+    </DSPopover>
+  {/if}
+
+  {#if rejectTarget}
+    <DSPopover
+      show={Boolean(rejectTarget)}
+      title="Reject Project Authorization"
+      subtitle={`${rejectTarget.number} - ${rejectTarget.description}`}
+      error={rejectConfirmError}
+      submitting={rejecting === rejectTarget.id}
+      submitLabel="Reject PA"
+      onSubmit={confirmRejectTarget}
+      onCancel={closeRejectConfirm}
+    >
+      <div class="space-y-3 text-sm text-neutral-700">
+        <p>
+          Rejecting this PA records that Accounting reviewed the uploaded PDF and found it
+          incomplete or unacceptable. The uploader will be notified with the reason below.
+        </p>
+        <label class="flex flex-col gap-1">
+          <span class="font-semibold">Rejection Reason</span>
+          <textarea
+            bind:value={rejectionReason}
+            class="min-h-28 rounded-sm border border-neutral-300 p-2"
+          ></textarea>
+        </label>
       </div>
     </DSPopover>
   {/if}

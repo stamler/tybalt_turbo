@@ -14,10 +14,19 @@ SELECT
   j.client_reference_number AS client_reference_number,
   j.project_authorization_doc AS project_authorization_doc,
   j.project_authorization_doc_hash AS project_authorization_doc_hash,
+  j.pa_uploaded AS pa_uploaded,
+  j.pa_uploader AS pa_uploader_id,
+  pau.given_name AS pa_uploader_given_name,
+  pau.surname AS pa_uploader_surname,
   j.pa_reviewed AS pa_reviewed,
   j.pa_reviewer AS pa_reviewer_id,
   par.given_name AS pa_reviewer_given_name,
   par.surname AS pa_reviewer_surname,
+  j.pa_rejected AS pa_rejected,
+  j.pa_rejector AS pa_rejector_id,
+  paj.given_name AS pa_rejector_given_name,
+  paj.surname AS pa_rejector_surname,
+  j.pa_rejection_reason AS pa_rejection_reason,
   j.client           AS client_id,
   cli.name           AS client_name,
   j.contact          AS contact_id,
@@ -85,7 +94,9 @@ LEFT JOIN clients cli          ON cli.id = j.client
 LEFT JOIN client_contacts cc   ON cc.id  = j.contact
 LEFT JOIN profiles m           ON m.uid  = j.manager
 LEFT JOIN profiles am          ON am.uid = j.alternate_manager
+LEFT JOIN profiles pau         ON pau.uid = j.pa_uploader
 LEFT JOIN profiles par         ON par.uid = j.pa_reviewer
+LEFT JOIN profiles paj         ON paj.uid = j.pa_rejector
 LEFT JOIN clients jo           ON jo.id  = j.job_owner
 LEFT JOIN branches br          ON br.id  = j.branch
 LEFT JOIN rate_sheets rs       ON rs.id  = j.rate_sheet

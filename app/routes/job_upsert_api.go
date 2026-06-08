@@ -37,8 +37,13 @@ type existingJobAllocation struct {
 var projectAuthorizationJobWriteFields = map[string]struct{}{
 	"project_authorization_doc":      {},
 	"project_authorization_doc_hash": {},
+	"pa_uploader":                    {},
+	"pa_uploaded":                    {},
 	"pa_reviewer":                    {},
 	"pa_reviewed":                    {},
+	"pa_rejector":                    {},
+	"pa_rejected":                    {},
+	"pa_rejection_reason":            {},
 }
 
 func projectAuthorizationJobWriteError(field string) *errs.HookError {

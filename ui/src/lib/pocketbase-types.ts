@@ -544,6 +544,15 @@ export type JobsRecord = {
   proposal_opening_date: string;
   proposal_submission_due_date: string;
   proposal_value: number;
+  project_authorization_doc: string;
+  project_authorization_doc_hash: string;
+  pa_rejected: IsoDateString;
+  pa_rejection_reason: string;
+  pa_rejector: RecordIdString;
+  pa_reviewed: IsoDateString;
+  pa_reviewer: RecordIdString;
+  pa_uploaded: IsoDateString;
+  pa_uploader: RecordIdString;
   status: JobsStatusOptions;
   time_and_materials: boolean;
   updated: IsoDateString;

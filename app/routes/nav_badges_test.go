@@ -165,6 +165,7 @@ func expectedProjectAuthorizationBadgeCount(t *testing.T, app *tests.TestApp, us
 	t.Helper()
 
 	count := expectedProjectAuthorizationMissingCount(t, app, userID, hasAccounting || hasJobClaim)
+	count += expectedProjectAuthorizationRejectedCount(t, app, userID, hasAccounting || hasJobClaim)
 	if hasAccounting {
 		count += expectedProjectAuthorizationPendingReviewCount(t, app)
 	}
@@ -183,6 +184,9 @@ func expectedProjectAuthorizationPendingReviewCount(t *testing.T, app *tests.Tes
 		  AND j.project_authorization_doc_hash != ''
 		  AND j.pa_reviewed = ''
 		  AND j.pa_reviewer = ''
+		  AND j.pa_rejected = ''
+		  AND j.pa_rejector = ''
+		  AND j.pa_rejection_reason = ''
 	`, dbx.Params{})
 }
 
@@ -202,6 +206,35 @@ func expectedProjectAuthorizationMissingCount(t *testing.T, app *tests.TestApp, 
 		  AND (
 		    COALESCE(j.project_authorization_doc, '') = ''
 		    OR COALESCE(j.project_authorization_doc_hash, '') = ''
+		  )
+		  AND (
+		    {:broad} = 1
+		    OR j.manager = {:uid}
+		    OR j.alternate_manager = {:uid}
+		    OR b.manager = {:uid}
+		  )
+	`, dbx.Params{"uid": userID, "broad": broad})
+}
+
+func expectedProjectAuthorizationRejectedCount(t *testing.T, app *tests.TestApp, userID string, canSeeAll bool) int {
+	t.Helper()
+
+	broad := 0
+	if canSeeAll {
+		broad = 1
+	}
+	return expectedCount(t, app, `
+		SELECT COUNT(*)
+		FROM jobs j
+		LEFT JOIN branches b ON b.id = j.branch
+		WHERE j.status = 'Active'
+		  AND j.number NOT LIKE 'P%'
+		  AND j.project_authorization_doc != ''
+		  AND j.project_authorization_doc_hash != ''
+		  AND (
+		    j.pa_rejected != ''
+		    OR j.pa_rejector != ''
+		    OR j.pa_rejection_reason != ''
 		  )
 		  AND (
 		    {:broad} = 1

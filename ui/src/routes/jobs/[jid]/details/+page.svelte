@@ -10,6 +10,7 @@
   import TimeTabContent from "$lib/components/jobs/TimeTabContent.svelte";
   import ExpensesTabContent from "$lib/components/jobs/ExpensesTabContent.svelte";
   import POsTabContent from "$lib/components/jobs/POsTabContent.svelte";
+  import ProjectAuthorizationDetails from "$lib/components/jobs/ProjectAuthorizationDetails.svelte";
   import StaffSummaryContent from "$lib/components/jobs/StaffSummaryContent.svelte";
   import DivisionsSummaryContent from "$lib/components/jobs/DivisionsSummaryContent.svelte";
   import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
@@ -24,7 +25,6 @@
   import { formatCurrency, shortDate } from "$lib/utilities";
   import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
-  import Icon from "@iconify/svelte";
   let awarding = $state(false);
   let validatingForProject = $state(false);
   let closingImportedProject = $state(false);
@@ -108,6 +108,15 @@
         data.job.pa_reviewed &&
         data.job.pa_reviewer?.id,
     ),
+  );
+  const projectAuthorizationRejected = $derived(
+    Boolean(data.job.pa_rejected || data.job.pa_rejector?.id || data.job.pa_rejection_reason),
+  );
+  const projectAuthorizationComplete = $derived(
+    projectAuthorizationApproved && !projectAuthorizationRejected,
+  );
+  const projectAuthorizationNeedsAttention = $derived(
+    !isProposal && !projectAuthorizationComplete,
   );
   const canRevokeProjectAuthorization = $derived(
     !isProposal && $globalStore.claims.includes("admin") && projectAuthorizationApproved,
@@ -248,6 +257,7 @@
   function projectAuthorizationStatus() {
     if (!data.job.project_authorization_doc) return "PA document missing";
     if (projectAuthorizationApproved) return "PA approved";
+    if (projectAuthorizationRejected) return "PA rejected by Accounting";
     return "PA pending Accounting approval";
   }
 
@@ -679,6 +689,25 @@
       <div><span class="font-semibold">Status:</span> {data.job.status}</div>
     {/if}
 
+    {#if projectAuthorizationNeedsAttention}
+      <ProjectAuthorizationDetails
+        job={data.job}
+        status={projectAuthorizationStatus()}
+        approved={projectAuthorizationApproved}
+        rejected={projectAuthorizationRejected}
+        canUpload={canUploadProjectAuthorization}
+        uploading={paUploading}
+        uploadError={paUploadError}
+        onUpload={uploadProjectAuthorizationDoc}
+        canDelete={canDeleteProjectAuthorization}
+        onDelete={() => (showPADeleteConfirm = true)}
+        canRevoke={canRevokeProjectAuthorization}
+        onRevoke={() => (showPARevokeConfirm = true)}
+        canRepairHash={canRepairProjectAuthorizationHash}
+        onRepairHash={() => (showPAHashRepairPopover = true)}
+      />
+    {/if}
+
     <details class="space-y-2">
       <summary class="cursor-pointer font-semibold text-neutral-700">Additional Details</summary>
       <div class="space-y-2">
@@ -770,92 +799,24 @@
               {data.job.client_reference_number}
             </div>
           {/if}
-          <div class="flex flex-col gap-2 rounded-sm border border-neutral-200 p-3">
-            <div>
-              <span class="font-semibold">PA Review:</span>
-              {projectAuthorizationStatus()}
-            </div>
-            {#if data.job.project_authorization_doc_url}
-              <a
-                href={data.job.project_authorization_doc_url}
-                target="_blank"
-                rel="noreferrer"
-                class="text-blue-600 hover:underline"
-              >
-                Open PA PDF
-              </a>
-            {/if}
-            {#if data.job.project_authorization_doc_hash || canRepairProjectAuthorizationHash}
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="font-semibold">PA Hash:</span>
-                {#if canRepairProjectAuthorizationHash}
-                  <button
-                    type="button"
-                    class="font-mono text-sm text-blue-700 underline decoration-dotted underline-offset-2 hover:text-blue-900"
-                    title="Audit PA document hash"
-                    onclick={() => (showPAHashRepairPopover = true)}
-                  >
-                    {data.job.project_authorization_doc_hash
-                      ? data.job.project_authorization_doc_hash.slice(0, 8)
-                      : "No hash"}
-                  </button>
-                {:else if data.job.project_authorization_doc_hash}
-                  <span class="font-mono text-sm opacity-70">
-                    {data.job.project_authorization_doc_hash.slice(0, 8)}
-                  </span>
-                {/if}
-                {#if data.job.project_authorization_doc_hash}
-                  <button
-                    type="button"
-                    class="text-neutral-500 hover:text-neutral-700"
-                    title="Copy full PA hash"
-                    onclick={() =>
-                      navigator.clipboard.writeText(data.job.project_authorization_doc_hash)}
-                  >
-                    <Icon icon="mdi:content-copy" width="16" />
-                  </button>
-                {/if}
-              </div>
-            {/if}
-            {#if data.job.pa_reviewed && data.job.pa_reviewer?.id}
-              <div>
-                <span class="font-semibold">Reviewed By:</span>
-                {personName(data.job.pa_reviewer)}
-                <span class="text-sm text-neutral-500">
-                  ({shortDate(data.job.pa_reviewed, true)})
-                </span>
-              </div>
-            {/if}
-            {#if canUploadProjectAuthorization && !projectAuthorizationApproved}
-              <label class="flex max-w-sm flex-col gap-1 text-sm">
-                <span class="font-semibold">Upload Signed PA PDF</span>
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  disabled={paUploading}
-                  onchange={uploadProjectAuthorizationDoc}
-                  class="rounded-sm border border-neutral-300 p-2"
-                />
-              </label>
-            {/if}
-            {#if paUploadError}
-              <div class="text-sm text-red-600">{paUploadError}</div>
-            {/if}
-            {#if canDeleteProjectAuthorization}
-              <div>
-                <DsActionButton action={() => (showPADeleteConfirm = true)} color="yellow">
-                  Remove PA PDF
-                </DsActionButton>
-              </div>
-            {/if}
-            {#if canRevokeProjectAuthorization}
-              <div>
-                <DsActionButton action={() => (showPARevokeConfirm = true)} color="red">
-                  Revoke PA Approval
-                </DsActionButton>
-              </div>
-            {/if}
-          </div>
+          {#if !projectAuthorizationNeedsAttention}
+            <ProjectAuthorizationDetails
+              job={data.job}
+              status={projectAuthorizationStatus()}
+              approved={projectAuthorizationApproved}
+              rejected={projectAuthorizationRejected}
+              canUpload={canUploadProjectAuthorization}
+              uploading={paUploading}
+              uploadError={paUploadError}
+              onUpload={uploadProjectAuthorizationDoc}
+              canDelete={canDeleteProjectAuthorization}
+              onDelete={() => (showPADeleteConfirm = true)}
+              canRevoke={canRevokeProjectAuthorization}
+              onRevoke={() => (showPARevokeConfirm = true)}
+              canRepairHash={canRepairProjectAuthorizationHash}
+              onRepairHash={() => (showPAHashRepairPopover = true)}
+            />
+          {/if}
 
           <div>
             <span class="font-semibold">Outstanding Balance:</span>
