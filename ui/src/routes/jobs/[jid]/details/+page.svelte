@@ -261,7 +261,7 @@
     return "PA pending Accounting approval";
   }
 
-  async function uploadProjectAuthorizationDoc(event: Event) {
+  async function uploadProjectAuthorizationDoc(event: Event, certified: boolean) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
@@ -270,6 +270,7 @@
     try {
       const form = new FormData();
       form.append("project_authorization_doc", file);
+      form.append("project_authorization_certified", String(certified));
       await pb.send(`/api/jobs/${data.job.id}/project_authorization_doc`, {
         method: "POST",
         body: form,

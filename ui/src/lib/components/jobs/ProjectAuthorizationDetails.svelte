@@ -46,7 +46,7 @@
     canUpload: boolean;
     uploading: boolean;
     uploadError: string | null;
-    onUpload: (event: Event) => void;
+    onUpload: (event: Event, certified: boolean) => void;
     canDelete: boolean;
     onDelete: () => void;
     canRevoke: boolean;
@@ -55,9 +55,16 @@
     onRepairHash: () => void;
   } = $props();
 
+  let uploadCertified = $state(false);
+
   function personName(person?: Person) {
     if (!person) return "";
     return `${person.given_name || person.name || ""} ${person.surname || ""}`.trim();
+  }
+
+  function handleUpload(event: Event) {
+    onUpload(event, uploadCertified);
+    uploadCertified = false;
   }
 </script>
 
@@ -144,16 +151,25 @@
     </div>
   {/if}
   {#if canUpload && !approved}
-    <label class="flex max-w-sm flex-col gap-1 text-sm">
-      <span class="font-semibold">Upload Signed PA PDF</span>
-      <input
-        type="file"
-        accept="application/pdf"
-        disabled={uploading}
-        onchange={onUpload}
-        class="rounded-sm border border-neutral-300 p-2"
-      />
-    </label>
+    <div class="flex max-w-xl flex-col gap-2 text-sm">
+      <label class="flex items-start gap-2">
+        <input type="checkbox" bind:checked={uploadCertified} disabled={uploading} class="mt-1" />
+        <span>
+          I certify that the attached PDF contains a completed TBT Engineering Project Authorization
+          Form. The PDF may also include additional supporting documentation.
+        </span>
+      </label>
+      <label class="flex max-w-sm flex-col gap-1">
+        <span class="font-semibold">Upload Signed PA PDF</span>
+        <input
+          type="file"
+          accept="application/pdf"
+          disabled={uploading || !uploadCertified}
+          onchange={handleUpload}
+          class="rounded-sm border border-neutral-300 p-2"
+        />
+      </label>
+    </div>
   {/if}
   {#if uploadError}
     <div class="text-sm text-red-600">{uploadError}</div>

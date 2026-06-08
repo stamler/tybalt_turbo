@@ -79,6 +79,7 @@
   let rejectedLoaded = $state(false);
   let rejectedLoading = $state(false);
   let missingLoading = $state(false);
+  let uploadCertifications = $state<Record<string, boolean>>({});
   let uploading = $state<string | null>(null);
   let approving = $state<string | null>(null);
   let approveTarget = $state<PendingItem | null>(null);
@@ -252,20 +253,31 @@
     void reject(rejectTarget);
   }
 
+  function setUploadCertification(id: string, certified: boolean) {
+    uploadCertifications = { ...uploadCertifications, [id]: certified };
+  }
+
   async function uploadProjectAuthorization(item: { id: string }, event: Event) {
     const input = event.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
+    if (!uploadCertifications[item.id]) {
+      error = "Confirm that the PDF contains a completed TBT Engineering Project Authorization Form.";
+      input.value = "";
+      return;
+    }
     uploading = item.id;
     error = null;
     try {
       const form = new FormData();
       form.append("project_authorization_doc", file);
+      form.append("project_authorization_certified", "true");
       await pb.send(`/api/jobs/${item.id}/project_authorization_doc`, {
         method: "POST",
         body: form,
       });
       input.value = "";
+      setUploadCertification(item.id, false);
       await loadMissing(missing.priority, missing.page);
       if (pendingLoaded) {
         await loadPending();
@@ -398,18 +410,38 @@
                 <td class="p-2">{item.latest_activity_date || "-"}</td>
                 <td class="p-2">
                   {#if item.can_upload}
-                    <label
-                      class={`inline-flex cursor-pointer text-blue-600 hover:underline ${uploading !== null ? "pointer-events-none opacity-60" : ""}`}
-                    >
-                      {uploading === item.id ? "Uploading..." : "Upload PA"}
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        disabled={uploading !== null}
-                        onchange={(event) => uploadProjectAuthorization(item, event)}
-                        class="sr-only"
-                      />
-                    </label>
+                    <div class="flex max-w-sm flex-col gap-2">
+                      <label class="flex items-start gap-2 text-xs text-neutral-700">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(uploadCertifications[item.id])}
+                          disabled={uploading !== null}
+                          onchange={(event) =>
+                            setUploadCertification(
+                              item.id,
+                              (event.currentTarget as HTMLInputElement).checked,
+                            )}
+                          class="mt-0.5"
+                        />
+                        <span>
+                          I certify that the attached PDF contains a completed TBT Engineering
+                          Project Authorization Form. The PDF may also include additional supporting
+                          documentation.
+                        </span>
+                      </label>
+                      <label
+                        class={`inline-flex cursor-pointer text-blue-600 hover:underline ${uploading !== null || !uploadCertifications[item.id] ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        {uploading === item.id ? "Uploading..." : "Upload PA"}
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          disabled={uploading !== null || !uploadCertifications[item.id]}
+                          onchange={(event) => uploadProjectAuthorization(item, event)}
+                          class="sr-only"
+                        />
+                      </label>
+                    </div>
                   {:else}
                     <a href={`/jobs/${item.id}/details`} class="text-blue-600 hover:underline">
                       Open Job
@@ -564,18 +596,38 @@
                     Open PDF
                   </a>
                   {#if item.can_upload}
-                    <label
-                      class={`inline-flex cursor-pointer text-blue-600 hover:underline ${uploading !== null ? "pointer-events-none opacity-60" : ""}`}
-                    >
-                      {uploading === item.id ? "Uploading..." : "Upload Replacement"}
-                      <input
-                        type="file"
-                        accept="application/pdf"
-                        disabled={uploading !== null}
-                        onchange={(event) => uploadProjectAuthorization(item, event)}
-                        class="sr-only"
-                      />
-                    </label>
+                    <div class="flex max-w-sm flex-col gap-2">
+                      <label class="flex items-start gap-2 text-xs text-neutral-700">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(uploadCertifications[item.id])}
+                          disabled={uploading !== null}
+                          onchange={(event) =>
+                            setUploadCertification(
+                              item.id,
+                              (event.currentTarget as HTMLInputElement).checked,
+                            )}
+                          class="mt-0.5"
+                        />
+                        <span>
+                          I certify that the attached PDF contains a completed TBT Engineering
+                          Project Authorization Form. The PDF may also include additional supporting
+                          documentation.
+                        </span>
+                      </label>
+                      <label
+                        class={`inline-flex cursor-pointer text-blue-600 hover:underline ${uploading !== null || !uploadCertifications[item.id] ? "pointer-events-none opacity-60" : ""}`}
+                      >
+                        {uploading === item.id ? "Uploading..." : "Upload Replacement"}
+                        <input
+                          type="file"
+                          accept="application/pdf"
+                          disabled={uploading !== null || !uploadCertifications[item.id]}
+                          onchange={(event) => uploadProjectAuthorization(item, event)}
+                          class="sr-only"
+                        />
+                      </label>
+                    </div>
                   {:else}
                     <a href={`/jobs/${item.id}/details`} class="text-blue-600 hover:underline">
                       Open Job

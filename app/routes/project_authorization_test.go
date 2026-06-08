@@ -94,6 +94,15 @@ func TestProjectAuthorizationDocumentUploadPermissions(t *testing.T) {
 }
 
 func TestProjectAuthorizationUploadRejectsNonPDFAndDuplicateHash(t *testing.T) {
+	t.Run("missing-certification", func(t *testing.T) {
+		app := newProjectAuthorizationTestApp(t)
+		token := authTokenForEmail(t, app, paJobClaimEmail)
+		rec := performProjectAuthorizationMultipartRequestWithCertification(t, app, http.MethodPost, projectAuthorizationQ+"/project_authorization_doc", token, "project_authorization_doc", "signed-pa.pdf", "application/pdf", []byte(paPDFContent), false)
+		if rec.Code != http.StatusBadRequest || !strings.Contains(rec.Body.String(), "project_authorization_certified") {
+			t.Fatalf("missing certification response = %d, body=%s", rec.Code, rec.Body.String())
+		}
+	})
+
 	t.Run("non-pdf", func(t *testing.T) {
 		app := newProjectAuthorizationTestApp(t)
 		token := authTokenForEmail(t, app, paJobClaimEmail)
@@ -858,6 +867,11 @@ func deleteProjectAuthorizationDocFileForPATest(t *testing.T, app *tests.TestApp
 
 func performProjectAuthorizationMultipartRequest(t *testing.T, app *tests.TestApp, method string, path string, token string, field string, filename string, contentType string, content []byte) *httptest.ResponseRecorder {
 	t.Helper()
+	return performProjectAuthorizationMultipartRequestWithCertification(t, app, method, path, token, field, filename, contentType, content, true)
+}
+
+func performProjectAuthorizationMultipartRequestWithCertification(t *testing.T, app *tests.TestApp, method string, path string, token string, field string, filename string, contentType string, content []byte, certified bool) *httptest.ResponseRecorder {
+	t.Helper()
 
 	baseRouter, err := apis.NewRouter(app)
 	if err != nil {
@@ -872,6 +886,11 @@ func performProjectAuthorizationMultipartRequest(t *testing.T, app *tests.TestAp
 	}
 	if _, err := part.Write(content); err != nil {
 		t.Fatalf("failed to write multipart content: %v", err)
+	}
+	if certified {
+		if err := writer.WriteField("project_authorization_certified", "true"); err != nil {
+			t.Fatalf("failed to write certification field: %v", err)
+		}
 	}
 	if err := writer.Close(); err != nil {
 		t.Fatalf("failed to close multipart writer: %v", err)
@@ -928,6 +947,9 @@ func performBlockingProjectAuthorizationMultipartRequest(t *testing.T, app *test
 	}
 	if _, err := part.Write(content); err != nil {
 		t.Fatalf("failed to write multipart content: %v", err)
+	}
+	if err := writer.WriteField("project_authorization_certified", "true"); err != nil {
+		t.Fatalf("failed to write certification field: %v", err)
 	}
 	if err := writer.Close(); err != nil {
 		t.Fatalf("failed to close multipart writer: %v", err)

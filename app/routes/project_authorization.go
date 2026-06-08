@@ -253,6 +253,14 @@ func createUploadProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 		if !allowed {
 			return e.ForbiddenError("you do not have permission to upload this project authorization document", nil)
 		}
+		if !projectAuthorizationUploadCertified(e.Request.FormValue("project_authorization_certified")) {
+			return projectAuthorizationRouteError(e, projectAuthorizationFieldAPIError(
+				http.StatusBadRequest,
+				"required",
+				"confirm that the PDF contains a completed TBT Engineering Project Authorization Form",
+				"project_authorization_certified",
+			))
+		}
 
 		files, err := e.FindUploadedFiles("project_authorization_doc")
 		if err != nil && !errors.Is(err, http.ErrMissingFile) {
@@ -330,6 +338,15 @@ func createUploadProjectAuthorizationDocumentHandler(app core.App) func(e *core.
 			return projectAuthorizationRouteError(e, err)
 		}
 		return e.JSON(http.StatusOK, uploaded)
+	}
+}
+
+func projectAuthorizationUploadCertified(value string) bool {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "1", "true", "yes", "on":
+		return true
+	default:
+		return false
 	}
 }
 
