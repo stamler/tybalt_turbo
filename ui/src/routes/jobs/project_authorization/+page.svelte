@@ -262,7 +262,8 @@
     const file = input.files?.[0];
     if (!file) return;
     if (!uploadCertifications[item.id]) {
-      error = "Confirm that the PDF contains a completed TBT Engineering Project Authorization Form.";
+      error =
+        "Confirm that the PDF contains a completed TBT Engineering Project Authorization Form.";
       input.value = "";
       return;
     }
@@ -424,15 +425,19 @@
                           class="mt-0.5"
                         />
                         <span>
-                          I certify that the attached PDF contains a completed TBT Engineering
-                          Project Authorization Form. The PDF may also include additional supporting
+                          I certify that the file I'm attaching contains a completed TBT Engineering
+                          Project Authorization Form. It may also include additional supporting
                           documentation.
                         </span>
                       </label>
                       <label
-                        class={`inline-flex cursor-pointer text-blue-600 hover:underline ${uploading !== null || !uploadCertifications[item.id] ? "pointer-events-none opacity-60" : ""}`}
+                        class={`inline-flex w-fit rounded-sm border px-3 py-2 font-semibold ${uploading !== null || !uploadCertifications[item.id] ? "cursor-not-allowed border-neutral-300 bg-neutral-100 text-neutral-500" : "cursor-pointer border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"}`}
                       >
-                        {uploading === item.id ? "Uploading..." : "Upload PA"}
+                        {uploading === item.id
+                          ? "Uploading..."
+                          : uploadCertifications[item.id]
+                            ? "Click to select PA PDF"
+                            : "Agree to the above checkbox"}
                         <input
                           type="file"
                           accept="application/pdf"
@@ -499,7 +504,10 @@
           {#each pendingItems as item}
             <tr class="border-b border-neutral-200">
               <td class="p-2">
-                <a href={`/jobs/${item.id}/details`} class="font-semibold text-blue-600 hover:underline">
+                <a
+                  href={`/jobs/${item.id}/details`}
+                  class="font-semibold text-blue-600 hover:underline"
+                >
                   {item.number}
                 </a>
                 <div class="text-neutral-600">{item.description}</div>
@@ -570,7 +578,10 @@
           {#each rejectedItems as item}
             <tr class="border-b border-neutral-200">
               <td class="p-2">
-                <a href={`/jobs/${item.id}/details`} class="font-semibold text-blue-600 hover:underline">
+                <a
+                  href={`/jobs/${item.id}/details`}
+                  class="font-semibold text-blue-600 hover:underline"
+                >
                   {item.number}
                 </a>
                 <div class="text-neutral-600">{item.description}</div>
@@ -610,15 +621,19 @@
                           class="mt-0.5"
                         />
                         <span>
-                          I certify that the attached PDF contains a completed TBT Engineering
-                          Project Authorization Form. The PDF may also include additional supporting
+                          I certify that the file I'm attaching contains a completed TBT Engineering
+                          Project Authorization Form. It may also include additional supporting
                           documentation.
                         </span>
                       </label>
                       <label
-                        class={`inline-flex cursor-pointer text-blue-600 hover:underline ${uploading !== null || !uploadCertifications[item.id] ? "pointer-events-none opacity-60" : ""}`}
+                        class={`inline-flex w-fit rounded-sm border px-3 py-2 font-semibold ${uploading !== null || !uploadCertifications[item.id] ? "cursor-not-allowed border-neutral-300 bg-neutral-100 text-neutral-500" : "cursor-pointer border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"}`}
                       >
-                        {uploading === item.id ? "Uploading..." : "Upload Replacement"}
+                        {uploading === item.id
+                          ? "Uploading..."
+                          : uploadCertifications[item.id]
+                            ? "Click to select replacement PA PDF"
+                            : "Agree to the above checkbox"}
                         <input
                           type="file"
                           accept="application/pdf"

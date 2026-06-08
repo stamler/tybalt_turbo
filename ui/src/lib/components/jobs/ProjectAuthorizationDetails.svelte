@@ -56,6 +56,13 @@
   } = $props();
 
   let uploadCertified = $state(false);
+  let hasExistingDocument = $derived(
+    Boolean(
+      job.project_authorization_doc ||
+      job.project_authorization_doc_url ||
+      job.project_authorization_doc_hash,
+    ),
+  );
 
   function personName(person?: Person) {
     if (!person) return "";
@@ -121,6 +128,9 @@
           <Icon icon="mdi:content-copy" width="16" />
         </button>
       {/if}
+      {#if canDelete}
+        <DsActionButton action={onDelete} color="yellow">Remove PA PDF</DsActionButton>
+      {/if}
     </div>
   {/if}
   {#if job.pa_reviewed && job.pa_reviewer?.id}
@@ -150,38 +160,86 @@
       {/if}
     </div>
   {/if}
-  {#if canUpload && !approved}
-    <div class="flex max-w-xl flex-col gap-2 text-sm">
-      <label class="flex items-start gap-2">
-        <input type="checkbox" bind:checked={uploadCertified} disabled={uploading} class="mt-1" />
-        <span>
-          I certify that the attached PDF contains a completed TBT Engineering Project Authorization
-          Form. The PDF may also include additional supporting documentation.
-        </span>
-      </label>
-      <label class="flex max-w-sm flex-col gap-1">
-        <span class="font-semibold">Upload Signed PA PDF</span>
-        <input
-          type="file"
-          accept="application/pdf"
-          disabled={uploading || !uploadCertified}
-          onchange={handleUpload}
-          class="rounded-sm border border-neutral-300 p-2"
-        />
-      </label>
-    </div>
-  {/if}
-  {#if uploadError}
-    <div class="text-sm text-red-600">{uploadError}</div>
-  {/if}
-  {#if canDelete}
-    <div>
+  {#if canDelete && !(job.project_authorization_doc_hash || canRepairHash)}
+    <div class="flex items-center gap-2">
       <DsActionButton action={onDelete} color="yellow">Remove PA PDF</DsActionButton>
     </div>
   {/if}
   {#if canRevoke}
-    <div>
+    <div class="flex items-center gap-2">
       <DsActionButton action={onRevoke} color="red">Revoke PA Approval</DsActionButton>
     </div>
+  {/if}
+  {#if canUpload && !approved}
+    {#if hasExistingDocument}
+      <div class="mt-1 border-t border-neutral-200 pt-3">
+        <div class="mb-2 text-xs font-semibold text-neutral-500 uppercase">Replace PA PDF</div>
+        <div class="flex max-w-xl flex-col gap-2 text-sm">
+          <label class="flex items-start gap-2">
+            <input
+              type="checkbox"
+              bind:checked={uploadCertified}
+              disabled={uploading}
+              class="mt-1"
+            />
+            <span>
+              I certify that the file I'm attaching contains a completed TBT Engineering Project
+              Authorization Form. It may also include additional supporting documentation.
+            </span>
+          </label>
+          <label class="flex max-w-sm flex-col gap-1">
+            <span class="font-semibold">Upload Signed PA PDF</span>
+            <span
+              class={`inline-flex w-fit rounded-sm border px-3 py-2 font-semibold ${uploading || !uploadCertified ? "cursor-not-allowed border-neutral-300 bg-neutral-100 text-neutral-500" : "cursor-pointer border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"}`}
+            >
+              {uploading
+                ? "Uploading..."
+                : uploadCertified
+                  ? "Click to select PA PDF"
+                  : "Agree to the above checkbox"}
+              <input
+                type="file"
+                accept="application/pdf"
+                disabled={uploading || !uploadCertified}
+                onchange={handleUpload}
+                class="sr-only"
+              />
+            </span>
+          </label>
+        </div>
+      </div>
+    {:else}
+      <div class="flex max-w-xl flex-col gap-2 text-sm">
+        <label class="flex items-start gap-2">
+          <input type="checkbox" bind:checked={uploadCertified} disabled={uploading} class="mt-1" />
+          <span>
+            I certify that the file I'm attaching contains a completed TBT Engineering Project
+            Authorization Form. It may also include additional supporting documentation.
+          </span>
+        </label>
+        <label class="flex max-w-sm flex-col gap-1">
+          <span class="font-semibold">Upload Signed PA PDF</span>
+          <span
+            class={`inline-flex w-fit rounded-sm border px-3 py-2 font-semibold ${uploading || !uploadCertified ? "cursor-not-allowed border-neutral-300 bg-neutral-100 text-neutral-500" : "cursor-pointer border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100"}`}
+          >
+            {uploading
+              ? "Uploading..."
+              : uploadCertified
+                ? "Click to select PA PDF"
+                : "Agree to the above checkbox"}
+            <input
+              type="file"
+              accept="application/pdf"
+              disabled={uploading || !uploadCertified}
+              onchange={handleUpload}
+              class="sr-only"
+            />
+          </span>
+        </label>
+      </div>
+    {/if}
+  {/if}
+  {#if uploadError}
+    <div class="text-sm text-red-600">{uploadError}</div>
   {/if}
 </div>
