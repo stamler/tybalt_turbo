@@ -41,12 +41,18 @@
     data?: Record<string, BackendFieldError>;
   };
 
+  // Keep in sync with projectAuthorizationJobWriteFields in app/routes/job_upsert_api.go.
   const projectAuthorizationServerFields = [
     "project_authorization_doc",
     "project_authorization_doc_hash",
     "project_authorization_doc_url",
+    "pa_uploader",
+    "pa_uploaded",
     "pa_reviewer",
     "pa_reviewed",
+    "pa_rejector",
+    "pa_rejected",
+    "pa_rejection_reason",
   ];
 
   let errors = $state({} as Record<string, { message: string }>);
