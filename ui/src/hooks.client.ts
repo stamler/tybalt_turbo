@@ -78,7 +78,7 @@ window.addEventListener(AUTH_SESSION_EXPIRED_EVENT, (event) => {
     event instanceof CustomEvent && typeof event.detail?.message === "string"
       ? event.detail.message
       : "Your session expired. Sign in again to continue.";
-  globalStore.addError(message);
+  globalStore.addError(message, { source: "auth-session" });
 });
 
 // STEP 3: Initialize the Svelte store with current auth state
@@ -123,6 +123,8 @@ pb.authStore.onChange(() => {
     authStore.setupTokenRefresh();
 
     if (!authIdentityChanged) return;
+
+    globalStore.clearErrors({ source: "auth-session" });
 
     // initialize stores
     /*

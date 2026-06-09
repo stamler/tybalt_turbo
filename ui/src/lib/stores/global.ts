@@ -18,6 +18,7 @@ import type { Readable, Subscriber } from "svelte/store";
 interface ErrorMessage {
   message: string;
   id: string;
+  source?: "auth-session";
 }
 
 interface StoreState {
@@ -426,12 +427,12 @@ const createStore = () => {
     await loadAttentionCounts(true);
   };
 
-  const addError = (message: string) => {
+  const addError = (message: string, options: { source?: ErrorMessage["source"] } = {}) => {
     update((state) => {
       const id = crypto.randomUUID();
       return {
         ...state,
-        errorMessages: [...state.errorMessages, { message, id }],
+        errorMessages: [...state.errorMessages, { message, id, source: options.source }],
       };
     });
   };
@@ -440,6 +441,15 @@ const createStore = () => {
     update((state) => ({
       ...state,
       errorMessages: state.errorMessages.filter((error) => error.id !== id),
+    }));
+  };
+
+  const clearErrors = (options: { source?: ErrorMessage["source"] } = {}) => {
+    update((state) => ({
+      ...state,
+      errorMessages: options.source
+        ? state.errorMessages.filter((error) => error.source !== options.source)
+        : [],
     }));
   };
 
@@ -471,6 +481,7 @@ const createStore = () => {
     refresh,
     addError,
     dismissError,
+    clearErrors,
     toggleShowAllUi,
     setDefaultExpensePaymentType,
     refreshAttentionCounts,
@@ -492,6 +503,7 @@ const wrappedStore: Readable<StoreState> & {
   refresh: typeof _globalStore.refresh;
   addError: typeof _globalStore.addError;
   dismissError: typeof _globalStore.dismissError;
+  clearErrors: typeof _globalStore.clearErrors;
   toggleShowAllUi: typeof _globalStore.toggleShowAllUi;
   setDefaultExpensePaymentType: typeof _globalStore.setDefaultExpensePaymentType;
   refreshAttentionCounts: typeof _globalStore.refreshAttentionCounts;
@@ -505,6 +517,7 @@ const wrappedStore: Readable<StoreState> & {
   refresh: _globalStore.refresh,
   addError: _globalStore.addError,
   dismissError: _globalStore.dismissError,
+  clearErrors: _globalStore.clearErrors,
   toggleShowAllUi: _globalStore.toggleShowAllUi,
   setDefaultExpensePaymentType: _globalStore.setDefaultExpensePaymentType,
   refreshAttentionCounts: _globalStore.refreshAttentionCounts,
