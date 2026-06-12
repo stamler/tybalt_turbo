@@ -170,6 +170,8 @@ uid = @request.auth.id &&
     @request.auth.id = uid ||
     @request.auth.id = approver ||
     @request.auth.id = second_approver ||
+    job.manager = @request.auth.id ||
+    job.alternate_manager = @request.auth.id ||
     @request.auth.user_claims_via_uid.cid.name ?= ""report""
   )
 ) ||
@@ -235,6 +237,8 @@ second_approval = """" &&
     @request.auth.id = uid ||
     @request.auth.id = approver ||
     @request.auth.id = second_approver ||
+    job.manager = @request.auth.id ||
+    job.alternate_manager = @request.auth.id ||
     @request.auth.user_claims_via_uid.cid.name ?= ""report""
   )
 ) ||
@@ -363,6 +367,8 @@ creator = @request.auth.id ||
     @request.auth.id = uid ||
     @request.auth.id = approver ||
     @request.auth.id = second_approver ||
+    job.manager = @request.auth.id ||
+    job.alternate_manager = @request.auth.id ||
     @request.auth.user_claims_via_uid.cid.name ?= ""report""
   )
 ) ||
@@ -381,6 +387,8 @@ creator = @request.auth.id ||
     @request.auth.id = uid ||
     @request.auth.id = approver ||
     @request.auth.id = second_approver ||
+    job.manager = @request.auth.id ||
+    job.alternate_manager = @request.auth.id ||
     @request.auth.user_claims_via_uid.cid.name ?= ""report""
   )
 ) ||

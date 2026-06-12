@@ -130,6 +130,92 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 
+		{
+			Name:   "visible API hides a closed PO from a non participant who is not the job manager",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/pojmghidden0001",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusNotFound,
+			ExpectedContent: []string{
+				`"code":"po_not_found_or_not_visible"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "job manager can view linked closed PO through visible API",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/pojmgclosed0001",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"pojmgclosed0001"`,
+				`"status":"Closed"`,
+				`"job":"pojmgrclosed01"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "alternate job manager can view linked cancelled PO through visible API",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/pojmgcancel0001",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"pojmgcancel0001"`,
+				`"status":"Cancelled"`,
+				`"job":"pojmgrcancel01"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "job manager can view linked closed PO through collection API",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders/records/pojmgclosed0001",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"pojmgclosed0001"`,
+				`"status":"Closed"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "alternate job manager can view linked cancelled PO through augmented collection API",
+			Method: http.MethodGet,
+			URL:    "/api/collections/purchase_orders_augmented/records/pojmgcancel0001",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"pojmgcancel0001"`,
+				`"status":"Cancelled"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "search API includes terminal POs visible through job manager relationship",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/search",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"pojmgclosed0001"`,
+				`"status":"Closed"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+
 		// Approver can see an Unapproved PO they're assigned to.
 		{
 			Name:   "approver can see an Unapproved PO they're assigned to",
@@ -444,13 +530,13 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 
-		// Approver cannot see a Cancelled PO they didn't approve
+		// An unrelated PO approver cannot see a Cancelled PO they didn't approve or manage
 		{
-			Name:   "approver cannot see a Cancelled PO they didn't approve",
+			Name:   "unrelated PO approver cannot see a Cancelled PO they didn't approve or manage",
 			Method: http.MethodGet,
 			URL:    "/api/collections/purchase_orders/records/1cqrvp4mna33k2b", // Cancelled PO with orphan@poapprover.com as approver
 			Headers: map[string]string{
-				"Authorization": approverToken, // Fakesy Manjor is not the approver of this PO
+				"Authorization": halToken, // Hal is neither a participant nor a manager for this PO
 			},
 			ExpectedStatus: http.StatusNotFound, // Should get 404 as they don't have permission
 			ExpectedContent: []string{

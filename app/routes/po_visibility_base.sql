@@ -257,6 +257,10 @@ SELECT
   -- Note that expense owners are intentionally not included here unless they
   -- are also a PO participant or report holder. This is one source of the
   -- "expense owner may see expense but not PO" discrepancy documented above.
+  --
+  -- Job managers and alternate managers are included for job-linked POs so
+  -- project leadership can inspect terminal purchase orders after closure or
+  -- cancellation without broadening unrelated POs.
   CASE
     WHEN
       po.status IN ('Cancelled', 'Closed')
@@ -264,6 +268,8 @@ SELECT
         po.uid = {:userId}
         OR po.approver = {:userId}
         OR po.second_approver = {:userId}
+        OR j.manager = {:userId}
+        OR j.alternate_manager = {:userId}
         OR caller_context.has_report_claim = 1
       )
     THEN 1

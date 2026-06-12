@@ -4463,7 +4463,7 @@ func TestPurchaseOrderExpensesRouteRespectsExpenseVisibility(t *testing.T) {
 		{
 			Name:           "commit holder cannot use purchase order details route when purchase order itself is not visible",
 			Method:         http.MethodGet,
-			URL:            "/api/purchase_orders/visible/0pia83nnprdlzf8/expenses",
+			URL:            "/api/purchase_orders/visible/pojmghidden0001/expenses",
 			Headers:        map[string]string{"Authorization": commitToken},
 			ExpectedStatus: 404,
 			ExpectedContent: []string{
