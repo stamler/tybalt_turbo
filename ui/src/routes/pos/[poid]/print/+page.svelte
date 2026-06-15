@@ -202,16 +202,53 @@
     </tbody>
   </table>
 
-  <!-- Invoice Instructions -->
+  <!-- Billing Instructions -->
   <div class="p-4" style="border: 1px solid black; margin-top: 1rem;">
     <div class="text-xs font-semibold tracking-[0.2em] text-neutral-600 uppercase">
-      Invoice Instructions
+      Billing Instructions
     </div>
-    <p class="mt-2 text-sm leading-6">
-      Please include purchase order {displayValue(po.po_number, "number")} on all invoices and supporting
-      documents. Submit invoices through your billing contact and reach out to your project representative
-      if billing details need to be confirmed.
-    </p>
+    <table
+      class="mt-3 text-sm"
+      style="width: 100%; border-collapse: collapse; table-layout: fixed;"
+    >
+      <tbody>
+        <tr>
+          <td
+            style="width: 33.333%; vertical-align: top; padding-right: 0.75rem; border-right: 1px solid #d4d4d4;"
+          >
+            <div class="font-semibold">Submit Invoices</div>
+            <p class="mt-1 leading-5">
+              <span class="font-semibold">accounting@tbte.ca</span>
+            </p>
+            <p class="mt-2 leading-5">
+              TBT Engineering Limited<br /> 1918 Yonge Street<br /> Thunder Bay, ON P7E 6T9
+            </p>
+            <p class="mt-2 leading-5">T: 1-866-624-8378</p>
+          </td>
+          <td
+            style="width: 33.333%; vertical-align: top; padding: 0 0.75rem; border-right: 1px solid #d4d4d4;"
+          >
+            <div class="font-semibold">Payment Details</div>
+            <p class="mt-1 leading-5">
+              Include available payment options with your invoice, such as mailing address or
+              banking information.
+            </p>
+            <p class="mt-2 leading-5">TBTE can issue payment by credit card, cheque, or EFT.</p>
+          </td>
+          <td style="width: 33.333%; vertical-align: top; padding-left: 0.75rem;">
+            <div class="font-semibold">PO Requirements</div>
+            <p class="mt-1 leading-5">
+              Include PO
+              <span class="font-semibold">{displayValue(po.po_number, "number")}</span>
+              on each invoice. Invoices received without POs will be declined.
+            </p>
+            <p class="mt-2 leading-5">
+              The PO must match the amount on file. Each new purchase will have its own approved PO.
+            </p>
+          </td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </article>
 
