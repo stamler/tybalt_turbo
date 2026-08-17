@@ -5,6 +5,37 @@ import (
 	"tybalt/internal/testseed"
 )
 
+func TestIsMultipleOfPointFive(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   float64
+		wantErr bool
+	}{
+		{name: "negative half hour", value: -0.5},
+		{name: "negative boundary", value: -18},
+		{name: "zero", value: 0},
+		{name: "positive half hour", value: 0.5},
+		{name: "positive boundary", value: 18},
+		{name: "negative quarter hour", value: -0.25, wantErr: true},
+		{name: "positive quarter hour", value: 0.25, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := IsMultipleOfPointFive()(tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Fatalf("IsMultipleOfPointFive() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestIsPositiveMultipleOfPointFiveRejectsNegativeValues(t *testing.T) {
+	if err := IsPositiveMultipleOfPointFive()(-0.5); err == nil {
+		t.Fatal("expected IsPositiveMultipleOfPointFive to reject a negative value")
+	}
+}
+
 func TestGenerateCommittedPayPeriodEnding(t *testing.T) {
 	tests := []struct {
 		name                string

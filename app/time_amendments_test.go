@@ -2,6 +2,7 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 	"testing"
@@ -10,6 +11,54 @@ import (
 
 	"github.com/pocketbase/pocketbase/tests"
 )
+
+func TestTimeAmendmentsSignedHours(t *testing.T) {
+	creatorToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name           string
+		hours          string
+		expectedStatus int
+		expectedBody   string
+	}{
+		{name: "negative half hour amendment is accepted", hours: "-0.5", expectedStatus: http.StatusOK, expectedBody: `"hours":-0.5`},
+		{name: "negative eighteen hour boundary is accepted", hours: "-18", expectedStatus: http.StatusOK, expectedBody: `"hours":-18`},
+		{name: "positive half hour amendment remains accepted", hours: "0.5", expectedStatus: http.StatusOK, expectedBody: `"hours":0.5`},
+		{name: "negative quarter hour amendment is rejected", hours: "-0.25", expectedStatus: http.StatusBadRequest, expectedBody: `"code":"validation_not_multiple_of_point_five"`},
+		{name: "hours below schema lower bound are rejected", hours: "-18.5", expectedStatus: http.StatusBadRequest, expectedBody: `"code":"validation_min_number_constraint"`},
+	}
+
+	for _, tt := range cases {
+		t.Run(tt.name, func(t *testing.T) {
+			scenario := tests.ApiScenario{
+				Name:   tt.name,
+				Method: http.MethodPost,
+				URL:    "/api/collections/time_amendments/records",
+				Body: strings.NewReader(fmt.Sprintf(`{
+					"creator": "f2j5a8vk006baub",
+					"time_type": "sdyfl3q7j7ap849",
+					"uid": "rzr98oadsp9qc11",
+					"date": "2024-09-02",
+					"division": "vccd5fo56ctbigh",
+					"branch": "80875lm27v8wgi4",
+					"description": "signed hours amendment",
+					"hours": %s,
+					"skip_tsid_check": true
+				}`, tt.hours)),
+				Headers:        map[string]string{"Authorization": creatorToken},
+				ExpectedStatus: tt.expectedStatus,
+				TestAppFactory: testutils.SetupTestApp,
+			}
+			if tt.expectedBody != "" {
+				scenario.ExpectedContent = []string{tt.expectedBody}
+			}
+			scenario.Test(t)
+		})
+	}
+}
 
 func TestTimeAmendmentsCreate(t *testing.T) {
 	creatorToken, err := testutils.GenerateRecordToken("users", "author@soup.com")

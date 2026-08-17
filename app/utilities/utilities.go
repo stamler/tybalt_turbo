@@ -253,6 +253,23 @@ func PoApproverPropsHasDivisionPermission(app core.App, claimId string, division
 	}
 }
 
+// IsMultipleOfPointFive validates that a number is a multiple of 0.5. Both
+// positive and negative values are accepted because time amendments can
+// correct committed hours in either direction.
+func IsMultipleOfPointFive() validation.RuleFunc {
+	return func(value any) error {
+		s, _ := value.(float64)
+		if s == 0 {
+			return nil
+		}
+		// return error if s is not a multiple of 0.5
+		if s/0.5 != float64(int(s/0.5)) {
+			return validation.NewError("validation_not_multiple_of_point_five", "must be a multiple of 0.5")
+		}
+		return nil
+	}
+}
+
 func IsPositiveMultipleOfPointFive() validation.RuleFunc {
 	return func(value any) error {
 		s, _ := value.(float64)

@@ -103,7 +103,7 @@ func validateTimeAmendment(app core.App, timeAmendmentRecord *core.Record, requi
 	// The second pass performs everything else (cross-field validation, field
 	// values, etc.)
 	otherValidationsErrors := validation.Errors{
-		"hours":                 validation.Validate(timeAmendmentRecord.Get("hours"), validation.By(utilities.IsPositiveMultipleOfPointFive())),
+		"hours":                 validation.Validate(timeAmendmentRecord.Get("hours"), validation.By(utilities.IsMultipleOfPointFive())),
 		"date":                  validation.Validate(timeAmendmentRecord.Get("date"), validation.By(utilities.IsValidDate)),
 		"global":                validation.Validate(totalHours, validation.Max(18.0).Error("Total hours must not exceed 18")),
 		"meals_hours":           validation.Validate(timeAmendmentRecord.Get("meals_hours"), validation.Max(3.0).Error("Meals Hours must not exceed 3")),

@@ -286,7 +286,7 @@
       uiName="Hours"
       type="number"
       step={0.5}
-      min={0}
+      min={-18}
       max={18}
     />
   {/if}

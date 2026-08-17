@@ -89,6 +89,7 @@ func TestValidateTimeEntry(t *testing.T) {
 		"missing date":              {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
 		"invalid date string":       {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "20240122", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
 		"invalid leap year":         {timeTypeCode: "R", valid: false, field: "date", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2023-02-29", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
+		"negative hours":            {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": -0.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
 		"hours not multiple of 0.5": {timeTypeCode: "R", valid: false, field: "hours", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 1.4, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
 		"work record without job":   {timeTypeCode: "R", valid: false, field: "work_record", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "DE", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "F23-137", "payout_request_amount": 0.0})},
 		"missing division":          {timeTypeCode: "R", valid: false, field: "division", record: buildRecordFromMap(timeEntriesCollection, map[string]any{"time_type": "dummy", "date": "2024-01-22", "division": "", "meals_hours": 1.0, "hours": 1.5, "job": "", "description": "This is more than 5 chars", "work_record": "", "payout_request_amount": 0.0})},
@@ -144,6 +145,45 @@ func TestValidateTimeEntry(t *testing.T) {
 			}
 			if got == nil && !tt.valid {
 				t.Errorf("passed validation but expected invalid")
+			}
+		})
+	}
+}
+
+func TestValidateTimeAmendment_AllowsSignedHalfHourHours(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+
+	timeAmendmentsCollection, err := app.FindCollectionByNameOrId("time_amendments")
+	if err != nil {
+		t.Fatalf("failed to load time_amendments collection: %v", err)
+	}
+
+	tests := []struct {
+		name    string
+		hours   float64
+		wantErr bool
+	}{
+		{name: "negative half hour", hours: -0.5},
+		{name: "negative boundary", hours: -18},
+		{name: "positive half hour", hours: 0.5},
+		{name: "negative quarter hour", hours: -0.25, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			record := buildRecordFromMap(timeAmendmentsCollection, map[string]any{
+				"time_type":             "dummy",
+				"date":                  "2024-01-22",
+				"division":              "DE",
+				"hours":                 tt.hours,
+				"description":           "Amendment correction",
+				"payout_request_amount": 0.0,
+			})
+
+			got := validateTimeAmendment(app, record, []string{"date", "time_type", "division", "hours", "description"})
+			if (got != nil) != tt.wantErr {
+				t.Fatalf("validateTimeAmendment() error = %v, wantErr %v", got, tt.wantErr)
 			}
 		})
 	}
