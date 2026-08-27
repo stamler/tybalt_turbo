@@ -271,7 +271,7 @@
     return e?.status === 0 && (e?.message ?? "").toLowerCase().includes("aborted");
   };
   const firstPoolEmptyMessage =
-    "No eligible first-stage approvers can approve this amount for the selected division and kind. Contact an administrator.";
+    "No eligible primary approvers are available for this purchase order. Contact an administrator.";
   const secondPoolEmptyMessage =
     "Second approval is required, but no second-stage approver can final-approve this amount.";
   const approversLoadingMessage =
@@ -644,7 +644,7 @@
 
       // Auto-self only when the caller is actually in the first-stage pool.
       // Otherwise keep the approver selector visible (including empty-state),
-      // except for self-bypass mode where dual-required is requester-qualified.
+      // except when a dual-required requester can give final approval.
       showApproverField = !firstStageRequesterQualifies && !dualBypassSelfMode;
 
       // Show second approver selector only when candidates are available.
@@ -784,8 +784,8 @@
         return;
       }
 
-      // Self-bypass mode: dual-required + requester qualifies for second stage.
-      // Hide both selectors and persist self-ownership for both stages.
+      // A final-qualified requester can own both stages of a dual-required PO.
+      // Hide both selectors and persist the requester for both stages.
       if (isDualBypassSelfMode) {
         item.approver = item.uid;
         item.priority_second_approver = item.uid;

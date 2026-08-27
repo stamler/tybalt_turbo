@@ -38,6 +38,8 @@ After you save a purchase order, it appears as unapproved and enters the approva
 
 Some purchase orders need one approval. Others need two, depending on the kind and total value. Approvers are notified when they have items waiting, and they can also check the Pending My Approval tab under Purchase Orders.
 
+For a purchase order that needs two approvals, the primary approver vets the request. This person checks the need for the purchase and the request details. The second approver has authority for the full purchase order amount and gives final financial approval. This process reduces unnecessary requests for approvers who have higher limits.
+
 To review a purchase order, open it from the list. On the details page, the assigned approver can approve or reject it. If second approval is required, the purchase order stays unapproved until that final approval is complete. Once all required approvals are finished, the purchase order becomes active and receives a purchase order number.
 
 ## Editing a purchase order

@@ -63,6 +63,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 	// Municipal division ID for testing
 	municipalDivision := "2rrfy6m2c8hazjy"
 	drillingServicesDivision := "fy4i9poneukvq9u"
+	informationTechnologyDivision := "vccd5fo56ctbigh"
 	makeApproversURLWithKindAndJob := func(path string, division string, amount string, kindID string, hasJob bool) string {
 		params := url.Values{}
 		params.Set("division", division)
@@ -87,7 +88,6 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				`"id":"wegviunlyr2jjjv"`, // Fakesy Manjor
-				//`"id":"66ct66w380ob6w8"`, // Shallow Hal, removed since the max_amount is too high
 				`"id":"4r70mfovf22m9uh"`, // Orphaned POApprover
 				`"given_name"`,
 				`"surname"`,
@@ -108,7 +108,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "first approvers returns empty list when no first-stage approver can approve the amount",
+			Name:   "primary approver list is empty when no single-stage approver can cover the amount",
 			Method: http.MethodGet,
 			URL: makeApproversURLWithKindAndJob(
 				"/api/purchase_orders/approvers",
@@ -146,7 +146,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "requester with non-zero kind limit appears in first approvers for dual-required amount",
+			Name:   "final-qualified requester appears in primary approvers for dual-required amount",
 			Method: http.MethodGet,
 			URL:    makeApproversURL("/api/purchase_orders/approvers", municipalDivision, fmt.Sprintf("%d", int(tier1)+1)),
 			Headers: map[string]string{
@@ -155,6 +155,23 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				`"id":"66ct66w380ob6w8"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "dual-stage primary list includes qualified approvers whose limit is below the PO amount",
+			Method: http.MethodGet,
+			URL:    makeApproversURL("/api/purchase_orders/approvers", informationTechnologyDivision, "3000"),
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"6bq4j0eb26631dy"`, // Tier Two has a 2500 limit.
+				`"id":"t4g84hfvkt1v9j3"`, // Tier TwoB has a 2500 limit.
+			},
+			NotExpectedContent: []string{
+				`"id":"66ct66w380ob6w8"`, // Shallow Hal can final-approve this amount.
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -191,7 +208,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "amount exceeding first threshold returns only approvers with max_amount less than or equal to second threshold for second approvers call",
+			Name:   "second approvers include only approvers whose limit covers the full amount",
 			Method: http.MethodGet,
 			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier1)+1)),
 			Headers: map[string]string{
@@ -228,7 +245,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "user with max_amount between first and second thresholds receives empty list for amount in within their max_amount and division restrictions for second approvers call",
+			Name:   "final-qualified requester with division access receives requester-qualifies result",
 			Method: http.MethodGet,
 			URL:    makeApproversURL("/api/purchase_orders/second_approvers", drillingServicesDivision, fmt.Sprintf("%d", int(tier1)+1)),
 			Headers: map[string]string{
@@ -245,7 +262,7 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "user with max_amount between first and second thresholds receives non-empty list for amount in within their max_amount but outside of their division restrictions for second approvers call",
+			Name:   "requester without division access receives eligible second approvers",
 			Method: http.MethodGet,
 			URL:    makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier1)+1)),
 			Headers: map[string]string{

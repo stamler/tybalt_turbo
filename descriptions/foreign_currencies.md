@@ -69,8 +69,9 @@ unless the FX provider, derived-field semantics, and migration strategy are rede
   - Compute `approval_total_home = approval_total * currency.rate`.
   - For CAD, `approval_total_home` = `approval_total` (rate is 1).
 - **Child POs**: Must inherit parent's `currency` (validated in existing child PO rules).
-- **Approval threshold comparison**: Use `approval_total_home` (not `approval_total`)
-  against the CAD-denominated limits in `po_approver_props`.
+- **Approval policy comparison**: Use `approval_total_home` (not `approval_total`)
+  when Turbo compares the PO amount with the second-approval threshold and the
+  CAD-denominated limits in `po_approver_props`.
 - **Approver pool determination**: Use `approval_total_home` when resolving eligible
   first-stage and second-stage approvers.
 
@@ -406,7 +407,7 @@ correct, but the external reporting/writeback contract should be treated as inco
 
 | Area                          | Impact                                                                 |
 |-------------------------------|------------------------------------------------------------------------|
-| Approval policy resolution    | Use `approval_total_home` instead of `approval_total` for threshold checks and approver eligibility. |
+| Approval policy resolution    | Use `approval_total_home` instead of `approval_total` to decide if two approvals are required and to compare approver limits with the PO amount. |
 | Cumulative PO overflow check  | No change — sums are in PO currency, expense inherits PO currency.     |
 | One-Time/Recurring PO caps    | No change — comparison in PO currency.                                 |
 | No-PO expense limit ($100)    | Compare `settled_total` (CAD) against the limit.                       |

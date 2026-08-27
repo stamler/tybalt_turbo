@@ -198,18 +198,12 @@ func GetPOApproverPolicy(
 			continue
 		}
 
-		// Dual-stage pools are intentionally disjoint:
-		// first-stage limits are <= threshold, while second-stage limits must be
-		// > threshold and also >= amount. Candidates between threshold and amount
-		// are excluded from both pools because they can neither start nor finish.
-		if candidate.LimitValue <= secondApprovalThreshold {
+		// Dual-stage pools are intentionally disjoint. An eligible approver whose
+		// limit is below the PO amount can vet the request at the first stage. An
+		// approver whose limit covers the amount gives final approval.
+		if candidate.LimitValue < amount {
 			policy.FirstStageApprovers = append(policy.FirstStageApprovers, candidate.Approver)
 			policy.firstStageLimits[candidate.ID] = candidate.LimitValue
-			continue
-		}
-
-		// Second-stage pool must be able to fully approve this amount.
-		if candidate.LimitValue < amount {
 			continue
 		}
 

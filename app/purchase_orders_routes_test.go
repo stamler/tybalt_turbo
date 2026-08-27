@@ -45,7 +45,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	poApproverSelfBypassToken, err := testutils.GenerateRecordToken("users", "u_po_bypass_001@example.com")
+	primaryVetterOwnerToken, err := testutils.GenerateRecordToken("users", "u_po_bypass_001@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,6 +143,60 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "primary approver whose limit is below the PO amount can give first approval",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/pooverlimit0001/approve",
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": tier2Token,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				fmt.Sprintf(`"approved":"%s`, currentDate),
+				`"status":"Unapproved"`,
+				`"approver":"6bq4j0eb26631dy"`,
+				`"second_approver":""`,
+				`"second_approval":""`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "primary approver whose limit is below the PO amount cannot give final approval",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/pooverlimit0002/approve",
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": tier2Token,
+			},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized_approval"`,
+				`"message":"you are not authorized to perform second approval on this purchase order"`,
+			},
+			ExpectedEvents: map[string]int{
+				"*": 0,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "final approver whose limit covers the PO amount can approve after an over-limit primary vetter",
+			Method: http.MethodPost,
+			URL:    "/api/purchase_orders/pooverlimit0002/approve",
+			Body:   strings.NewReader(`{}`),
+			Headers: map[string]string{
+				"Authorization": po_approver_tier3Token,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"approved":"2026-08-27 12:00:00.000Z"`,
+				fmt.Sprintf(`"second_approval":"%s`, currentDate),
+				`"status":"Active"`,
+				`"approver":"6bq4j0eb26631dy"`,
+				`"second_approver":"66ct66w380ob6w8"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "po_approver_tier2 claim holder completes both approvals in one call even when not assigned approver",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/46efdq319b22480/approve", // Using existing Unapproved PO with total 862.12
@@ -229,7 +283,7 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "first approval still returns first_pool_empty when first-stage pool is empty and caller is not bypass-eligible",
+			Name:   "first approval rejects an assigned approver who is not in the expanded first-stage pool",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/pofirstempty001/approve",
 			Body:   strings.NewReader(`{}`),
@@ -238,8 +292,8 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
-				`"code":"first_pool_empty"`,
-				`"message":"first approval pool is empty for this purchase order; contact an administrator"`,
+				`"code":"invalid_approver_for_stage"`,
+				`"message":"assigned approver is not valid for first-stage approval"`,
 			},
 			ExpectedEvents: map[string]int{
 				"*": 0,
@@ -247,12 +301,12 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "first approval succeeds when caller is assigned owner with non-zero kind limit even if first-stage pool is empty",
+			Name:   "first approval succeeds when caller is assigned owner with a positive limit below the PO amount",
 			Method: http.MethodPost,
 			URL:    "/api/purchase_orders/poselfbypass01/approve",
 			Body:   strings.NewReader(`{}`),
 			Headers: map[string]string{
-				"Authorization": poApproverSelfBypassToken,
+				"Authorization": primaryVetterOwnerToken,
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{

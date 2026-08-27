@@ -26,7 +26,7 @@
       approver for post-first-approval records).
     - Policy-based second-stage visibility (eligible second approvers).
   - Actionability (pending queue) is intentionally narrower than visibility:
-    - Stage 1 assigned-first-approver path (including assigned approver self-bypass).
+    - Stage 1 assigned-primary-approver path, including the requester exception.
     - Stage 2 priority owner path.
     - Stage 2 fallback after timeout path.
 
@@ -362,8 +362,8 @@ SELECT
   -- Flag: Actionable "pending now" semantics.
   --
   -- This encodes queue ownership paths used by /pending:
-  --  1) Stage 1 assigned approver path (including first-stage pool partition rule
-  --     and assigned-approver self-bypass for dual-stage records).
+  --  1) Stage 1 assigned approver path (including the first-stage pool rule and
+  --     the final-qualified requester exception for dual-stage records).
   --  2) Stage 2 priority-second-approver exclusive path.
   --  3) Stage 2 fallback path after timeout.
   CASE
@@ -391,13 +391,16 @@ SELECT
               AND cpl.resolved_limit IS NOT NULL
               AND (
                 (
-                  -- Dual-stage case: first-stage pool is <= threshold.
+                  -- Dual-stage case: first-stage vetter has a positive limit
+                  -- that does not cover the full PO amount.
                   cpl.second_approval_threshold > 0
                   AND COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total) > cpl.second_approval_threshold
-                  AND cpl.resolved_limit <= cpl.second_approval_threshold
+                  AND cpl.resolved_limit > 0
+                  AND cpl.resolved_limit < COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total)
                 )
                 OR (
-                  -- Dual-stage assigned-approver self-bypass path.
+                  -- Dual-stage requester exception. The preceding rule already
+                  -- covers owners whose limit is below the PO amount.
                   cpl.second_approval_threshold > 0
                   AND COALESCE(NULLIF(po.approval_total_home, 0), po.approval_total) > cpl.second_approval_threshold
                   AND po.uid = {:userId}

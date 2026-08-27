@@ -124,8 +124,11 @@ A PO contributes to a user's count only when all are true:
 8. User can approve the PO division
 9. User is second-stage eligible for the PO kind/amount:
    - resolved limit column is used by kind/job context
-   - limit `> second_approval_threshold`
    - limit `>= approval_total`
+
+The threshold determines if the PO requires two approvals. After two approvals
+are required, the PO amount determines second-stage eligibility. The threshold
+does not separate the approver pools.
 
 `T` is loaded from `app_config.purchase_orders.second_stage_timeout_hours` with backend fallback to `24` hours when missing/invalid/non-positive.
 

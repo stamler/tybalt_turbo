@@ -51,20 +51,17 @@ Turbo requires second approval only when both conditions are true:
 
 If second approval is not required, the primary approver gives final approval. Turbo includes only users whose limit is equal to or greater than the purchase order amount.
 
-If second approval is required, Turbo includes users whose limit is equal to or less than the second-approval threshold. These users perform the first-stage review.
+If second approval is required, Turbo includes users whose positive limit is less than the purchase order amount. These users perform the first-stage review. Their limit can be greater than the second-approval threshold.
 
 This design lets staff who are closer to the purchase vet the purchase order before it goes to the second approver. These staff can check the need for the purchase and the details of the request. The second approver can be further removed from the purchase and gives final financial approval.
 
 This design also reduces approval noise. Approval noise means too many unnecessary requests for users who have higher approval limits. The first-stage review helps these users focus on requests that need their financial authority.
 
-Turbo has one requester exception. For a purchase order that requires second approval, Turbo also includes the requester when the requester has a positive limit for the expenditure kind. This exception lets the requester assign the purchase order to themselves for first approval.
+Turbo has one requester exception. For a purchase order that requires second approval, Turbo also includes the requester when the requester can give final approval. This exception lets the requester assign the purchase order to themselves.
 
 ## Populate the Second Approver list
 
-Turbo populates this list only when second approval is required. Turbo includes users who meet both conditions:
-
-- The user's limit is greater than the second-approval threshold.
-- The user's limit is equal to or greater than the purchase order amount.
+Turbo populates this list only when second approval is required. Turbo includes users whose limit is equal to or greater than the purchase order amount.
 
 These users can give final financial approval.
 
@@ -74,4 +71,4 @@ If second approval is required and no valid second approver exists, Turbo return
 
 ## Important result
 
-The two pools are separate. A user does not appear in either list when the user's limit is greater than the second-approval threshold but less than the purchase order amount. The requester exception can add that user to the Primary Approver list only when that user is also the requester.
+The two pools are separate. A user with a positive limit below the purchase order amount can appear only in the Primary Approver list. A user whose limit covers the purchase order amount can appear only in the Second Approver list. The requester exception can also add a final-qualified requester to the Primary Approver list.

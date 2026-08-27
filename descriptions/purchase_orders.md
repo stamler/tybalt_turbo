@@ -20,9 +20,10 @@ Global `po_approval_thresholds` tiers are no longer used.
 
 - If `expenditure_kinds.second_approval_threshold` is `0` (or null-coalesced to `0`), dual approval is never required for that kind.
 - In that case, there is no first-stage/second-stage split: first-stage candidates are all eligible approvers with `limit >= approval_total`.
-- A high-authority approver appears as "second approver only" only when both conditions are true:
+- A high-authority approver normally appears only as a second approver when both conditions are true:
   - `second_approval_threshold > 0`
   - `approval_total > second_approval_threshold`
+- The final-qualified requester exception can also add that approver to the Primary Approver list for their own PO.
 
 ## Expenditure Kinds and Limit Columns
 
@@ -86,8 +87,13 @@ Eligibility always requires:
 
 If dual approval is required:
 
-- First-stage pool: eligible approvers with `limit <= second_approval_threshold`
-- Second-stage pool: eligible approvers with `limit > second_approval_threshold` and `limit >= approval_total`
+- First-stage pool: eligible approvers with `limit < approval_total`
+- Second-stage pool: eligible approvers with `limit >= approval_total`
+
+The first-stage pool can include an approver whose limit is greater than the
+second-approval threshold. This rule lets a person who is close to the purchase
+vet the request. The second-stage approver still has the financial authority to
+approve the full amount.
 
 If dual approval is not required:
 
@@ -112,7 +118,7 @@ Behavior by policy state:
 `GET /api/purchase_orders/approvers` returns the first-stage pool for the evaluated PO context.
 
 - If requester is in the first-stage pool, UI may auto-assign requester.
-- For dual-required contexts, if requester is not first-stage-qualified but has a non-zero resolved kind limit, endpoint also includes requester as an extra candidate (to support owner self-assignment).
+- For dual-required contexts, if the requester can give final approval, the endpoint also includes the requester as an extra candidate. This rule supports owner self-assignment.
 - If no first-stage approvers qualify and requester is not included via the rule above, endpoint returns `200` with an empty list (`[]`).
 
 ## Editor UX (Current)
@@ -121,20 +127,20 @@ Behavior by policy state:
 - If required and second-stage candidates are available, show the `priority_second_approver` selector.
 - If required and no second-stage candidates are available, show an error state with explanation/diagnostics ("Why?").
 - If second approval is not required, no second-approver status hint is shown.
-- Own-PO bypass UX exception: when PO is dual-required and requester is second-stage-qualified (`requester_qualifies`), hide both approver selectors and persist `approver = requester`, `priority_second_approver = requester`.
-- Separate first-stage self-assignment UX: when dual-required and requester has a non-zero resolved kind limit, requester may appear in first-approver options (even if above first-stage threshold), allowing auto/self assignment of `approver = requester` while still requiring a valid second-stage `priority_second_approver` unless requester is also second-stage-qualified.
+- Own-PO automatic assignment: when the PO is dual-required and the requester can give final approval (`requester_qualifies`), hide both approver selectors. Persist `approver = requester` and `priority_second_approver = requester`.
+- Final-qualified requester exception: for a dual-required PO, a requester who can give final approval can also be the first approver.
 
 ## Required Assignment Rules on Save
 
 For dual-required POs (`approval_total > second_approval_threshold`):
 
-- `approver` is required and must be in first-stage pool, except for the owner self-assignment exception below
+- `approver` is required and must be in the first-stage pool, except for the final-qualified requester exception below
 - `priority_second_approver` is required and must be in second-stage pool
-- first-stage pool must be non-empty unless `approver` is valid via the owner self-assignment exception below
+- first-stage pool must be non-empty unless `approver` is valid through the final-qualified requester exception below
 - second-stage pool must be non-empty
-- Owner self-assignment exception: allow `approver = uid` when all are true:
+- Final-qualified requester exception: allow `approver = uid` outside the first-stage pool when all are true:
   - PO is dual-required
-  - `uid` has a non-zero resolved kind limit for the PO context
+  - `uid` is in the second-stage pool and can give final approval
 
 For single-stage POs:
 
@@ -258,7 +264,7 @@ Route: `POST /api/purchase_orders/{id}/approve`
 When PO is not first-approved yet (`approved` empty):
 
 - Caller must equal assigned `approver`
-- Assigned `approver` must still be valid first-stage approver, or valid via owner self-assignment bypass on dual-required records (`approver = uid` and `uid` has non-zero resolved kind limit)
+- Assigned `approver` must still be a valid first-stage approver. For a dual-required PO, a final-qualified requester can also be the assigned first approver.
 - Sets:
   - `approved = now`
   - `approver = caller`
@@ -381,7 +387,7 @@ Current canonical views:
 ## Lifecycle Summary
 
 1. PO created as `Unapproved`
-2. Stage 1 performed by assigned first approver (or by owner self-assignment bypass / bypass fast path)
+2. Stage 1 performed by the assigned first approver, the final-qualified requester, or the combined-approval fast path
 3. If dual-required, pending queue ownership is priority-owner first, then broader pool after timeout; final approval authorization remains any second-stage-eligible approver
 4. PO becomes `Active` only when approval requirements are fully satisfied
 5. Active PO is later cancelled/closed per existing status rules

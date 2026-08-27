@@ -32,6 +32,13 @@ For POs, not by manager. Turbo either:
 
 For expenses, yes: the approver is automatically set to the submitter's manager.
 
+**What is the difference between the primary approver and the second approver?**
+
+For a PO that requires two approvals, the primary approver vets the request.
+This person checks the need for the purchase and the request details. The second
+approver has authority for the full PO amount and gives final financial approval.
+This process reduces unnecessary requests for approvers who have higher limits.
+
 **If an approver name appears automatically, should staff leave it?**
 
 If Turbo auto-assigns an approver, that assignment is intentional. If it shows a selector, the options shown are valid approvers for that PO.

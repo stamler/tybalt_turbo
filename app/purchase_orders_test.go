@@ -1430,13 +1430,13 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		})
 	}
 	{
-		// Dual-required self-first assignment is allowed for owners with a non-zero
-		// kind limit, even if they are above the first-stage threshold.
+		// A dual-required PO can assign its owner as the primary vetter when the
+		// owner's positive kind limit is below the PO amount.
 		json := fmt.Sprintf(`{
 			"uid": "etysnrlup2f6bak",
 			"date": "2024-09-01",
 			"division": "vccd5fo56ctbigh",
-			"description": "dual required self first with non-zero limit",
+			"description": "dual required owner primary vetter",
 			"payment_type": "Expense",
 			"total": %.2f,
 			"vendor": "2zqxtsmymf670ha",
@@ -1451,7 +1451,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			t.Fatal(err)
 		}
 		scenarios = append(scenarios, tests.ApiScenario{
-			Name:           "dual-required save allows self assignment for creator with non-zero kind limit",
+			Name:           "dual-required save allows owner assignment when owner limit is below PO amount",
 			Method:         http.MethodPost,
 			URL:            "/api/collections/purchase_orders/records",
 			Body:           b,
@@ -1471,12 +1471,53 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 		})
 	}
 	{
-		// Dual-required self-bypass setup is allowed when creator is second-stage qualified.
+		// A primary approver can vet a dual-stage PO when their positive limit is
+		// below the full amount, even when it is above the second-approval threshold.
+		json := fmt.Sprintf(`{
+			"uid": "rzr98oadsp9qc11",
+			"date": "2024-09-01",
+			"division": "vccd5fo56ctbigh",
+			"description": "dual required over-limit primary approver",
+			"payment_type": "Expense",
+			"total": %.2f,
+			"vendor": "2zqxtsmymf670ha",
+			"approver": "6bq4j0eb26631dy",
+			"priority_second_approver": "66ct66w380ob6w8",
+			"status": "Unapproved",
+			"type": "One-Time",
+			"kind": "%s"
+		}`, 3000.0, capitalKindID)
+		b, ct, err := makeMultipart(json)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "dual-required save allows a primary approver whose limit is below the PO amount",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"approver":"6bq4j0eb26631dy"`,
+				`"priority_second_approver":"66ct66w380ob6w8"`,
+				`"approved":""`,
+				`"second_approval":""`,
+				`"status":"Unapproved"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the approval-required notification
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
+	{
+		// The final-qualified requester exception permits owner assignment.
 		json := fmt.Sprintf(`{
 			"uid": "66ct66w380ob6w8",
 			"date": "2024-09-01",
 			"division": "vccd5fo56ctbigh",
-			"description": "dual required self bypass setup",
+			"description": "dual required final-qualified owner assignment",
 			"payment_type": "Expense",
 			"total": %.2f,
 			"vendor": "2zqxtsmymf670ha",
@@ -1516,7 +1557,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			"uid": "rzr98oadsp9qc11",
 			"date": "2024-09-01",
 			"division": "vccd5fo56ctbigh",
-			"description": "dual required self bypass invalid",
+			"description": "dual required invalid owner assignment",
 			"payment_type": "Expense",
 			"total": %.2f,
 			"vendor": "2zqxtsmymf670ha",

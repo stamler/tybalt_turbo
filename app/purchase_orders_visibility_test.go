@@ -79,9 +79,9 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Generate token for Shallow Hal (owner self-bypass with non-zero limit but
-	// insufficient final limit for the full PO amount).
-	poApproverSelfBypassToken, err := testutils.GenerateRecordToken("users", "u_po_bypass_001@example.com")
+	// Generate token for Shallow Hal. This owner is an assigned primary vetter
+	// whose positive limit is below the PO amount.
+	primaryVetterOwnerToken, err := testutils.GenerateRecordToken("users", "u_po_bypass_001@example.com")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -744,7 +744,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "pending endpoint includes assigned approver self-bypass for dual-stage records",
+			Name:   "pending endpoint includes final-qualified owner through requester exception",
 			Method: http.MethodGet,
 			URL:    "/api/purchase_orders/pending",
 			Headers: map[string]string{
@@ -757,11 +757,24 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "pending endpoint includes owner self-bypass when caller has non-zero kind limit but cannot final-approve amount",
+			Name:   "pending endpoint includes an assigned primary vetter whose limit is below the PO amount",
 			Method: http.MethodGet,
 			URL:    "/api/purchase_orders/pending",
 			Headers: map[string]string{
-				"Authorization": poApproverSelfBypassToken,
+				"Authorization": prioritySecondApproverToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"pooverlimit0001"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "pending endpoint includes assigned owner whose limit is below the PO amount",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/pending",
+			Headers: map[string]string{
+				"Authorization": primaryVetterOwnerToken,
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
