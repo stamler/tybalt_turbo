@@ -399,6 +399,42 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			ExpectedContent: []string{
 				`"id":"2blv18f40i2q373"`,
 				`"status":"Unapproved"`,
+				`"approver_name":"Fakesy Manjor"`,
+				`"kind_name":"project"`,
+				`"kind_label":"Project"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible PO does not replace an invalid kind with a legacy fallback",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/poinvalkind0001",
+			Headers: map[string]string{
+				"Authorization": creatorToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"poinvalkind0001"`,
+				`"kind":"kind_missing_123"`,
+				`"kind_name":""`,
+				`"kind_label":""`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible active PO includes branch display metadata",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/legacyedit0001",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"legacyedit0001"`,
+				`"branch":"80875lm27v8wgi4"`,
+				`"branch_code":"ThunderBay"`,
+				`"branch_name":"Thunder Bay"`,
+				`"kind_label":"Capital"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -476,6 +512,36 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 				`"id":"1cqrvp4mna33k2b"`,
 				`"status":"Cancelled"`,
 				`"uid":"4ssj9f1yg250o9y"`, // noclaims@example.com's ID
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible cancelled PO includes canceller name",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/1cqrvp4mna33k2b",
+			Headers: map[string]string{
+				"Authorization": noclaimsToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"1cqrvp4mna33k2b"`,
+				`"canceller":"tqqf7q0f3378rvp"`,
+				`"canceller_name":"Ultra Chifres"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:   "visible closed PO includes closer name",
+			Method: http.MethodGet,
+			URL:    "/api/purchase_orders/visible/po_child_childseq_001",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusOK,
+			ExpectedContent: []string{
+				`"id":"po_child_childseq_001"`,
+				`"closer":"f2j5a8vk006baub"`,
+				`"closer_name":"Horace Silver"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

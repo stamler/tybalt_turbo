@@ -161,6 +161,7 @@ SELECT
   po.second_approval,
   po.canceller,
   po.cancelled,
+  po.branch,
   po.job,
   po.category,
   po.kind,
@@ -231,6 +232,8 @@ SELECT
   COALESCE((p2.given_name || ' ' || p2.surname), '') AS second_approver_name,
   COALESCE((p3.given_name || ' ' || p3.surname), '') AS priority_second_approver_name,
   COALESCE((p4.given_name || ' ' || p4.surname), '') AS rejector_name,
+  COALESCE((p5.given_name || ' ' || p5.surname), '') AS canceller_name,
+  COALESCE((p6.given_name || ' ' || p6.surname), '') AS closer_name,
   COALESCE(po2.po_number, '') AS parent_po_number,
   COALESCE(v.name, '') AS vendor_name,
   COALESCE(v.alias, '') AS vendor_alias,
@@ -241,6 +244,10 @@ SELECT
   COALESCE(d.code, '') AS division_code,
   COALESCE(d.name, '') AS division_name,
   COALESCE(c.name, '') AS category_name,
+  COALESCE(br.code, '') AS branch_code,
+  COALESCE(br.name, '') AS branch_name,
+  COALESCE(ek_display.name, ek_display_fallback.name, '') AS kind_name,
+  COALESCE(ek_display.en_ui_label, ek_display_fallback.en_ui_label, '') AS kind_label,
 
   -- Flag: Active records are visible to any authenticated user.
   --
@@ -447,6 +454,8 @@ LEFT JOIN profiles AS p1 ON po.approver = p1.uid
 LEFT JOIN profiles AS p2 ON po.second_approver = p2.uid
 LEFT JOIN profiles AS p3 ON po.priority_second_approver = p3.uid
 LEFT JOIN profiles AS p4 ON po.rejector = p4.uid
+LEFT JOIN profiles AS p5 ON po.canceller = p5.uid
+LEFT JOIN profiles AS p6 ON po.closer = p6.uid
 LEFT JOIN purchase_orders AS po2 ON po.parent_po = po2.id
 LEFT JOIN vendors AS v ON po.vendor = v.id
 LEFT JOIN jobs AS j ON po.job = j.id
@@ -454,4 +463,9 @@ LEFT JOIN divisions AS d ON po.division = d.id
 LEFT JOIN categories AS c ON po.category = c.id
 LEFT JOIN clients AS cl ON j.client = cl.id
 LEFT JOIN currencies AS cur ON po.currency = cur.id
+LEFT JOIN branches AS br ON po.branch = br.id
+LEFT JOIN expenditure_kinds AS ek_display ON po.kind = ek_display.id
+LEFT JOIN expenditure_kinds AS ek_display_fallback
+  ON TRIM(COALESCE(po.kind, '')) = ''
+  AND ek_display_fallback.name = CASE WHEN po.job != '' THEN 'project' ELSE 'capital' END
 CROSS JOIN caller_context

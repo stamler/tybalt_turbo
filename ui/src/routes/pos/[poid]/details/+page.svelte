@@ -32,7 +32,28 @@
   const secondApproverMeta = $derived(data.secondApproverDiagnostics?.meta ?? null);
   const hasSecondApproverAlert = $derived(secondApproverMeta?.status === "required_no_candidates");
   const isRejected = $derived(data.po.status === "Unapproved" && data.po.rejected !== "");
-  const displayStatus = $derived(isRejected ? "Rejected" : data.po.status);
+  const isAwaitingFirstApproval = $derived(
+    data.po.status === "Unapproved" && !isRejected && data.po.approved === "",
+  );
+  const isFirstApprovedPending = $derived(
+    data.po.status === "Unapproved" &&
+      !isRejected &&
+      data.po.approved !== "" &&
+      data.po.second_approval === "",
+  );
+  const displayStatus = $derived(
+    isRejected
+      ? "Rejected"
+      : isAwaitingFirstApproval
+        ? "Awaiting first approval"
+        : isFirstApprovedPending
+          ? secondApproverMeta?.second_approval_required === true
+            ? "Awaiting second approval"
+            : secondApproverMeta?.second_approval_required === false
+              ? "Awaiting activation"
+              : "Approval pending"
+          : data.po.status,
+  );
   const isOwner = $derived(data.po.uid === viewerId);
   const canApproveOrReject = $derived(data.canApproveOrReject);
   const hasProjectJob = $derived.by(() =>
@@ -52,6 +73,19 @@
     await invalidateAll();
   }
 
+  function getErrorMessage(error: unknown, fallback: string): string {
+    if (typeof error === "object" && error !== null && "response" in error) {
+      const response = (error as { response?: { message?: unknown } }).response;
+      if (typeof response?.message === "string" && response.message !== "") {
+        return response.message;
+      }
+    }
+    if (error instanceof Error && error.message !== "") {
+      return error.message;
+    }
+    return fallback;
+  }
+
   async function approvePo() {
     try {
       await pb.send(`/api/purchase_orders/${data.po.id}/approve`, {
@@ -60,8 +94,8 @@
       });
       await globalStore.refreshAttentionCounts();
       await goto(resolve("/pos/pending"));
-    } catch (e: any) {
-      globalStore.addError(e?.response?.message || "Approve failed");
+    } catch (error: unknown) {
+      globalStore.addError(getErrorMessage(error, "Approve failed"));
     }
   }
 
@@ -74,8 +108,8 @@
       await pb.send(`/api/purchase_orders/${data.po.id}/cancel`, { method: "POST" });
       await globalStore.refreshAttentionCounts();
       goto(resolve("/pos/list"));
-    } catch (e: any) {
-      globalStore.addError(e);
+    } catch (error: unknown) {
+      globalStore.addError(getErrorMessage(error, "Cancel failed"));
     }
   }
 
@@ -84,8 +118,8 @@
       await pb.send(`/api/purchase_orders/${data.po.id}/close`, { method: "POST" });
       await globalStore.refreshAttentionCounts();
       goto(resolve("/pos/list"));
-    } catch (e: any) {
-      globalStore.addError(e);
+    } catch (error: unknown) {
+      globalStore.addError(getErrorMessage(error, "Close failed"));
     }
   }
 
@@ -108,8 +142,8 @@
       await pb.send(`/api/purchase_orders/${data.po.id}/make_cumulative`, { method: "POST" });
       showConvertPopover = false;
       await refreshDetails();
-    } catch (e: any) {
-      const message = e?.response?.message ?? "Failed to convert purchase order to Cumulative.";
+    } catch (error: unknown) {
+      const message = getErrorMessage(error, "Failed to convert purchase order to Cumulative.");
       convertError = message;
       globalStore.addError(message);
     } finally {
@@ -227,7 +261,7 @@
               </div>
               <div>eligibility limit rule: {secondApproverMeta.limit_column || "n/a"}</div>
               <div>division: {data.po.division_code || data.po.division || "n/a"}</div>
-              <div>kind: {data.po.kind || "n/a"}</div>
+              <div>kind: {data.po.kind_label || data.po.kind_name || "n/a"}</div>
               <div>has job: {data.po.job ? "yes" : "no"}</div>
             </div>
           {/if}
@@ -299,6 +333,25 @@
         </div>
       {/if}
 
+      <div>
+        <span class="font-semibold">Kind:</span>
+        {data.po.kind_label || data.po.kind_name || "Not recorded"}
+      </div>
+
+      <div>
+        <span class="font-semibold">Branch:</span>
+        {#if data.po.branch_code && data.po.branch_name}
+          {data.po.branch_code} — {data.po.branch_name}
+        {:else}
+          {data.po.branch_name || data.po.branch_code || "Not recorded"}
+        {/if}
+      </div>
+
+      <div>
+        <span class="font-semibold">Assigned Approver:</span>
+        {data.po.approver_name || "Not assigned"}
+      </div>
+
       {#if data.po.payment_type}
         <div><span class="font-semibold">Payment Type:</span> {data.po.payment_type}</div>
       {/if}
@@ -342,7 +395,7 @@
         <div>
           <span class="font-semibold">Cancelled:</span>
           {shortDate(data.po.cancelled)}{#if data.po.canceller}
-            by {data.po.canceller}{/if}
+            by {data.po.canceller_name || data.po.canceller}{/if}
         </div>
       {/if}
 
@@ -350,7 +403,7 @@
         <div>
           <span class="font-semibold">Closed:</span>
           {shortDate(data.po.closed)}{#if data.po.closer}
-            by {data.po.closer}{/if}
+            by {data.po.closer_name || data.po.closer}{/if}
         </div>
       {/if}
 

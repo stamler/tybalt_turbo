@@ -25,6 +25,7 @@ SELECT
   second_approval,
   canceller,
   cancelled,
+  branch,
   job,
   category,
   kind,
@@ -56,6 +57,8 @@ SELECT
   second_approver_name,
   priority_second_approver_name,
   rejector_name,
+  canceller_name,
+  closer_name,
   parent_po_number,
   vendor_name,
   vendor_alias,
@@ -65,7 +68,11 @@ SELECT
   job_description,
   division_code,
   division_name,
-  category_name
+  category_name,
+  branch_code,
+  branch_name,
+  kind_name,
+  kind_label
 FROM visibility_base
 WHERE
   (

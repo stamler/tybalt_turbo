@@ -106,6 +106,7 @@ type purchaseOrderVisibilityRow struct {
 	SecondApproval             string  `db:"second_approval" json:"second_approval"`
 	Canceller                  string  `db:"canceller" json:"canceller"`
 	Cancelled                  string  `db:"cancelled" json:"cancelled"`
+	Branch                     string  `db:"branch" json:"branch"`
 	Job                        string  `db:"job" json:"job"`
 	Category                   string  `db:"category" json:"category"`
 	Kind                       string  `db:"kind" json:"kind"`
@@ -137,6 +138,8 @@ type purchaseOrderVisibilityRow struct {
 	SecondApproverName         string  `db:"second_approver_name" json:"second_approver_name"`
 	PrioritySecondApproverName string  `db:"priority_second_approver_name" json:"priority_second_approver_name"`
 	RejectorName               string  `db:"rejector_name" json:"rejector_name"`
+	CancellerName              string  `db:"canceller_name" json:"canceller_name"`
+	CloserName                 string  `db:"closer_name" json:"closer_name"`
 	ParentPONumber             string  `db:"parent_po_number" json:"parent_po_number"`
 	VendorName                 string  `db:"vendor_name" json:"vendor_name"`
 	VendorAlias                string  `db:"vendor_alias" json:"vendor_alias"`
@@ -147,6 +150,10 @@ type purchaseOrderVisibilityRow struct {
 	DivisionCode               string  `db:"division_code" json:"division_code"`
 	DivisionName               string  `db:"division_name" json:"division_name"`
 	CategoryName               string  `db:"category_name" json:"category_name"`
+	BranchCode                 string  `db:"branch_code" json:"branch_code"`
+	BranchName                 string  `db:"branch_name" json:"branch_name"`
+	KindName                   string  `db:"kind_name" json:"kind_name"`
+	KindLabel                  string  `db:"kind_label" json:"kind_label"`
 }
 
 func buildSecondApproversMeta(
