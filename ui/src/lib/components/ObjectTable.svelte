@@ -12,6 +12,7 @@
     // a function applied to each value in the specified column to format it
     columnFormatters: Record<string, (<T>(value: T) => string | T) | "dollars" | "percent">;
     omitColumns?: string[];
+    columnOrder?: string[];
     columnLabels?: Record<string, string>;
     columnLinks?: Record<string, (row: Record<string, any>) => string | null | undefined>;
   }
@@ -33,13 +34,20 @@
   let instanceId = $state("");
   let idVariableName = $state("id");
 
-  let columns = $derived(
-    internalTableData.length > 0
-      ? Object.keys(internalTableData[0]).filter(
-          (col) => col !== `_idx_${instanceId}` && !tableConfig.omitColumns.includes(col),
-        )
-      : [],
-  );
+  let columns = $derived.by(() => {
+    if (internalTableData.length === 0) return [];
+
+    const availableColumns = Object.keys(internalTableData[0]).filter(
+      (col) => col !== `_idx_${instanceId}` && !(tableConfig.omitColumns ?? []).includes(col),
+    );
+    if (!tableConfig.columnOrder?.length) return availableColumns;
+
+    const requestedColumns = tableConfig.columnOrder.filter((col: string) =>
+      availableColumns.includes(col),
+    );
+    const remainingColumns = availableColumns.filter((col) => !requestedColumns.includes(col));
+    return [...requestedColumns, ...remainingColumns];
+  });
 
   let columnAlignments = $derived(
     internalTableData.length > 0

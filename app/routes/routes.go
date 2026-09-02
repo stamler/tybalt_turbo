@@ -52,6 +52,17 @@ func requireReportClaim(app core.App, auth *core.Record) error {
 	return nil
 }
 
+func requireKPIClaim(app core.App, auth *core.Record) error {
+	hasKPIClaim, err := utilities.HasClaim(app, auth, "kpi")
+	if err != nil {
+		return err
+	}
+	if !hasKPIClaim {
+		return apis.NewForbiddenError("you are not authorized to view KPI reports", nil)
+	}
+	return nil
+}
+
 // Define request bodies for the handlers
 type RejectionRequest struct {
 	RejectionReason string `json:"rejection_reason"`
@@ -290,6 +301,16 @@ func AddRoutes(app core.App) {
 		reportsGroup.GET("/payables_spreadsheet_monthly/{yymm}", reports.CreatePayablesSpreadsheetMonthlyHandler(app))
 		reportsGroup.GET("/time_entry_branch_mismatches", createTimeEntryBranchMismatchesReportHandler(app))
 		reportsGroup.GET("/active_jobs", createActiveJobsReportHandler(app))
+
+		kpiReportsGroup := se.Router.Group("/api/kpi/reports")
+		kpiReportsGroup.Bind(apis.RequireAuth("users"))
+		kpiReportsGroup.BindFunc(func(e *core.RequestEvent) error {
+			if err := requireKPIClaim(app, e.Auth); err != nil {
+				return err
+			}
+			return e.Next()
+		})
+		kpiReportsGroup.GET("/employee_branch_hours", reports.CreateEmployeeBranchHoursReportHandler(app))
 
 		// Admin stats dashboard
 		statsGroup := se.Router.Group("/api/stats")

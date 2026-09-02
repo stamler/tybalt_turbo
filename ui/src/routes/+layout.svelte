@@ -32,6 +32,9 @@
             // Filter items within each section
             const filteredItems = section.items
               .filter((item) => {
+                if (item.requiredClaim) {
+                  return $globalStore.claims.includes(item.requiredClaim);
+                }
                 if (
                   item.href.startsWith("/time/tracking") ||
                   item.href.startsWith("/expenses/tracking")
@@ -124,9 +127,9 @@
             return { ...section, items: filteredItems };
           })
           .filter((section) => {
-            // Hide the entire "Reports" section if the user lacks the 'report' claim
+            // KPI-only users still need the Reports section for the KPI index.
             if (section.title === "Reports") {
-              return $globalStore.claims.includes("report");
+              return $globalStore.claims.includes("report") || $globalStore.claims.includes("kpi");
             }
             // Hide sections that become empty after filtering
             return section.items.length > 0;

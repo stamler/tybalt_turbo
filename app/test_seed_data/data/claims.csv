@@ -20,3 +20,4 @@ created,description,id,name,updated
 2026-03-17 22:00:47.501Z,"Can edit specific fields on admin_profiles records",ahs37mw4sp2b59n,hr,2026-03-17 22:00:47.501Z
 2026-04-28 00:00:00.000Z,Can create eligible PO-linked expenses on behalf of the purchase order owner,bookkeeperclm01,book_keeper,2026-04-28 00:00:00.000Z
 2026-04-29 00:00:00.000Z,Can manage identity repair fields and authorized providers for users,itclaim00000001,it,2026-04-29 00:00:00.000Z
+2026-09-02 00:00:00.000Z,Can view management KPI reports,kpihoursclaim01,kpi,2026-09-02 00:00:00.000Z

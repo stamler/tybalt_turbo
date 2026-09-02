@@ -14,6 +14,7 @@ export interface NavItem {
   label: string;
   href: string;
   buttons: NavButton[];
+  requiredClaim?: string;
 }
 
 export interface NavSection {
@@ -187,17 +188,19 @@ export const navSections: NavSection[] = [
   {
     title: "Reports",
     items: [
-      { label: "Payroll", href: "/reports/payroll", buttons: [] },
-      { label: "Weekly", href: "/reports/weekly", buttons: [] },
-      { label: "Time Off", href: "/time/off/all", buttons: [] },
+      { label: "Payroll", href: "/reports/payroll", buttons: [], requiredClaim: "report" },
+      { label: "Weekly", href: "/reports/weekly", buttons: [], requiredClaim: "report" },
+      { label: "Time Off", href: "/time/off/all", buttons: [], requiredClaim: "report" },
       {
         label: "Payables Spreadsheet",
         href: "/reports/payables-spreadsheet",
         buttons: [],
+        requiredClaim: "report",
       },
       {
         label: "Branch Mismatches CSV",
         href: "",
+        requiredClaim: "report",
         buttons: [
           {
             action: downloadTimeEntryBranchMismatchesCsv,
@@ -210,6 +213,7 @@ export const navSections: NavSection[] = [
       {
         label: "Active Jobs",
         href: "",
+        requiredClaim: "report",
         buttons: [
           {
             action: downloadActiveJobsCsv,
@@ -219,6 +223,7 @@ export const navSections: NavSection[] = [
           },
         ],
       },
+      { label: "KPI", href: "/reports/kpi", buttons: [], requiredClaim: "kpi" },
     ],
   },
   {
