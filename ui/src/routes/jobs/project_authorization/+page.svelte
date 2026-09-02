@@ -705,8 +705,7 @@
           <span class="font-semibold">Rejection Reason</span>
           <textarea
             bind:value={rejectionReason}
-            class="min-h-28 rounded-sm border border-neutral-300 p-2"
-          ></textarea>
+            class="min-h-28 rounded-sm border border-neutral-300 p-2"></textarea>
         </label>
       </div>
     </DSPopover>

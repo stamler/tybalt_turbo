@@ -62,8 +62,7 @@
         <textarea
           bind:value={rejectionReason}
           placeholder="Enter rejection reason"
-          class="rounded-sm bg-neutral-700 p-2"
-        ></textarea>
+          class="rounded-sm bg-neutral-700 p-2"></textarea>
       </div>
       <div class="gap-2">
         <DsActionButton action={rejectRecord}>Reject</DsActionButton>

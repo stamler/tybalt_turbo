@@ -1,7 +1,7 @@
 # Multi-stage Dockerfile for Tybalt PocketBase Application with Litestream
 
 # Stage 1: Build the Svelte UI
-FROM node:20-alpine AS ui-builder
+FROM node:24-alpine AS ui-builder
 
 WORKDIR /app
 
