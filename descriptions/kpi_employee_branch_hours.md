@@ -20,6 +20,29 @@ separates hours assigned to a job from hours that have no job.
 - Start and end dates are inclusive.
 - Selecting dates does not run the report. The user must select Update.
 - The table is sortable and has a CSV download action.
+- The branch resource-flow action opens management summaries calculated from
+  the current report response. It does not make another API request.
+
+## Branch Resource Flow
+
+The branch matrix treats an employee's `defaultBranch` as the staff home branch
+and the time-entry branch as the work branch. Each cell contains job hours for
+that home-branch and work-branch pair. The matrix can show hours, each cell's
+share of the home branch's qualifying staff time, or each cell's share of the
+work branch's staffing.
+
+The selected-branch view shows:
+
+- local work completed by the branch's employees;
+- staff hours supplied to other branches;
+- hours supplied by other branches to this branch's work;
+- no-job R/RT hours and their share of qualifying staff time; and
+- the resource balance, defined as outside staff received minus staff supplied.
+
+Selecting a matrix cell or branch-flow bar lists the contributing employees.
+No-job hours are presented separately and are not treated as a work branch.
+These measures describe resource allocation. They do not by themselves measure
+sales, backlog, revenue, margin, or business-development performance.
 
 ## API
 

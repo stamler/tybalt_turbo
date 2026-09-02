@@ -1,5 +1,7 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
+  import Icon from "@iconify/svelte";
+  import BranchResourceFlowDialog from "$lib/components/BranchResourceFlowDialog.svelte";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
   import ObjectTable from "$lib/components/ObjectTable.svelte";
@@ -36,6 +38,7 @@
   let loaded = $state(false);
   let errorMessage = $state("");
   let initialRequestStarted = $state(false);
+  let showBranchResourceFlow = $state(false);
 
   const canView = $derived($globalStore.claims.includes("kpi"));
   const dateError = $derived(
@@ -131,39 +134,69 @@
 
   {#if canView}
     <section class="mb-5 rounded-xl border border-neutral-200 bg-neutral-50 p-4 shadow-sm">
-      <div class="flex flex-wrap items-end gap-4">
-        <label class="grid gap-1 text-sm font-medium text-neutral-700">
-          Start date
-          <DsDateInput bind:value={draftStartDate} max={draftEndDate || undefined} />
-        </label>
-        <label class="grid gap-1 text-sm font-medium text-neutral-700">
-          End date
-          <DsDateInput bind:value={draftEndDate} min={draftStartDate || undefined} />
-        </label>
-        <DsActionButton
-          action={updateReport}
-          {loading}
-          disabled={!!dateError}
-          title="Update report"
-          color="blue">Update</DsActionButton
-        >
+      <div class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
+        <div>
+          <div class="flex flex-wrap items-end gap-4">
+            <label class="grid gap-1 text-sm font-medium text-neutral-700">
+              Start date
+              <DsDateInput bind:value={draftStartDate} max={draftEndDate || undefined} />
+            </label>
+            <label class="grid gap-1 text-sm font-medium text-neutral-700">
+              End date
+              <DsDateInput bind:value={draftEndDate} min={draftStartDate || undefined} />
+            </label>
+            <DsActionButton
+              action={updateReport}
+              {loading}
+              disabled={!!dateError}
+              title="Update report"
+              color="blue">Update</DsActionButton
+            >
+            {#if loaded && !errorMessage}
+              <DsActionButton
+                action={downloadReport}
+                disabled={loading}
+                icon="mdi:file-download-outline"
+                title="Download CSV"
+                color="green"
+              />
+            {/if}
+          </div>
+          {#if dateError}
+            <p class="mt-2 text-sm text-red-700">{dateError}</p>
+          {:else if loaded}
+            <p class="mt-2 text-sm text-neutral-500">
+              Showing {appliedStartDate} through {appliedEndDate}, inclusive.
+            </p>
+          {/if}
+        </div>
         {#if loaded && !errorMessage}
-          <DsActionButton
-            action={downloadReport}
-            disabled={loading}
-            icon="mdi:file-download-outline"
-            title="Download CSV"
-            color="green"
-          />
+          <button
+            type="button"
+            class="group flex min-h-14 w-full items-center gap-3 overflow-hidden rounded-lg bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-4 py-2 text-left text-white shadow-lg ring-1 shadow-indigo-900/20 ring-white/20 transition hover:-translate-y-0.5 hover:from-blue-600 hover:via-indigo-600 hover:to-violet-600 hover:shadow-xl focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 xl:w-auto"
+            disabled={loading || report.rows.length === 0}
+            aria-label="Explore branch resource flow"
+            onclick={() => (showBranchResourceFlow = true)}
+          >
+            <span
+              class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-white/15 transition group-hover:bg-white/25"
+            >
+              <Icon icon="mdi:chart-sankey-variant" width="27" />
+            </span>
+            <span>
+              <span class="block text-base leading-tight font-bold">Explore Branch Flow</span>
+              <span class="mt-0.5 block text-xs text-blue-100"
+                >See how staff and work move between branches</span
+              >
+            </span>
+            <Icon
+              icon="mdi:arrow-right"
+              width="22"
+              class="ml-1 transition-transform group-hover:translate-x-1"
+            />
+          </button>
         {/if}
       </div>
-      {#if dateError}
-        <p class="mt-2 text-sm text-red-700">{dateError}</p>
-      {:else if loaded}
-        <p class="mt-2 text-sm text-neutral-500">
-          Showing {appliedStartDate} through {appliedEndDate}, inclusive.
-        </p>
-      {/if}
     </section>
 
     {#if errorMessage}
@@ -189,6 +222,14 @@
     </div>
   {/if}
 </main>
+
+<BranchResourceFlowDialog
+  bind:show={showBranchResourceFlow}
+  columns={report.columns}
+  rows={report.rows}
+  startDate={appliedStartDate}
+  endDate={appliedEndDate}
+/>
 
 <style>
   .report-table :global(table) {
