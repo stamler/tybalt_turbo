@@ -125,8 +125,7 @@
       resetForm();
     } catch (error: unknown) {
       const pocketError = error as
-        | { data?: { data?: Record<string, { message: string }> } }
-        | undefined;
+        { data?: { data?: Record<string, { message: string }> } } | undefined;
       const hookErrors = pocketError?.data?.data;
       if (hookErrors) {
         errors = hookErrors;

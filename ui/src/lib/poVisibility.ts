@@ -2,13 +2,7 @@ import { pb } from "$lib/pocketbase";
 import type { PurchaseOrdersAugmentedResponse } from "$lib/pocketbase-types";
 
 export type VisiblePOScope =
-  | "all"
-  | "mine"
-  | "active"
-  | "rejected"
-  | "stale"
-  | "expiring"
-  | "approved_by_me_awaiting_second";
+  "all" | "mine" | "active" | "rejected" | "stale" | "expiring" | "approved_by_me_awaiting_second";
 
 export type VisiblePurchaseOrderResponse = PurchaseOrdersAugmentedResponse & {
   branch: string;

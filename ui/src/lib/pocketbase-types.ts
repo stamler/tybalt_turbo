@@ -145,9 +145,9 @@ export type AbsorbActionsRecord<Tabsorbed_records = unknown, Tupdated_references
 };
 
 export enum AdminProfilesSkipMinTimeCheckOptions {
-  "no" = "no",
-  "on_next_bundle" = "on_next_bundle",
-  "yes" = "yes",
+  no = "no",
+  on_next_bundle = "on_next_bundle",
+  yes = "yes",
 }
 export type AdminProfilesRecord = {
   _imported: boolean;
@@ -175,9 +175,9 @@ export type AdminProfilesRecord = {
 };
 
 export enum AdminProfilesAugmentedSkipMinTimeCheckOptions {
-  "no" = "no",
-  "on_next_bundle" = "on_next_bundle",
-  "yes" = "yes",
+  no = "no",
+  on_next_bundle = "on_next_bundle",
+  yes = "yes",
 }
 export type AdminProfilesAugmentedRecord = {
   active?: boolean;
@@ -261,7 +261,7 @@ export type ClientContactsRecord = {
 
 export enum ClientNotesJobStatusChangedToOptions {
   "No Bid" = "No Bid",
-  "Cancelled" = "Cancelled",
+  Cancelled = "Cancelled",
 }
 export type ClientNotesRecord = {
   client: RecordIdString;
@@ -317,20 +317,20 @@ export type ExpenditureKindsRecord = {
 };
 
 export enum ExpenseAllowanceTotalsPaymentTypeOptions {
-  "OnAccount" = "OnAccount",
-  "Expense" = "Expense",
-  "CorporateCreditCard" = "CorporateCreditCard",
-  "Allowance" = "Allowance",
-  "FuelCard" = "FuelCard",
-  "Mileage" = "Mileage",
-  "PersonalReimbursement" = "PersonalReimbursement",
+  OnAccount = "OnAccount",
+  Expense = "Expense",
+  CorporateCreditCard = "CorporateCreditCard",
+  Allowance = "Allowance",
+  FuelCard = "FuelCard",
+  Mileage = "Mileage",
+  PersonalReimbursement = "PersonalReimbursement",
 }
 
 export enum ExpenseAllowanceTotalsAllowanceTypesOptions {
-  "Lodging" = "Lodging",
-  "Breakfast" = "Breakfast",
-  "Lunch" = "Lunch",
-  "Dinner" = "Dinner",
+  Lodging = "Lodging",
+  Breakfast = "Breakfast",
+  Lunch = "Lunch",
+  Dinner = "Dinner",
 }
 export type ExpenseAllowanceTotalsRecord = {
   allowance_description: string;
@@ -380,20 +380,20 @@ export type ExpenseRatesRecord<Tmileage = unknown> = {
 };
 
 export enum ExpensesPaymentTypeOptions {
-  "OnAccount" = "OnAccount",
-  "Expense" = "Expense",
-  "CorporateCreditCard" = "CorporateCreditCard",
-  "Allowance" = "Allowance",
-  "FuelCard" = "FuelCard",
-  "Mileage" = "Mileage",
-  "PersonalReimbursement" = "PersonalReimbursement",
+  OnAccount = "OnAccount",
+  Expense = "Expense",
+  CorporateCreditCard = "CorporateCreditCard",
+  Allowance = "Allowance",
+  FuelCard = "FuelCard",
+  Mileage = "Mileage",
+  PersonalReimbursement = "PersonalReimbursement",
 }
 
 export enum ExpensesAllowanceTypesOptions {
-  "Lodging" = "Lodging",
-  "Breakfast" = "Breakfast",
-  "Lunch" = "Lunch",
-  "Dinner" = "Dinner",
+  Lodging = "Lodging",
+  Breakfast = "Breakfast",
+  Lunch = "Lunch",
+  Dinner = "Dinner",
 }
 export type ExpensesRecord = {
   _imported: boolean;
@@ -435,20 +435,20 @@ export type ExpensesRecord = {
 };
 
 export enum ExpensesAugmentedPaymentTypeOptions {
-  "OnAccount" = "OnAccount",
-  "Expense" = "Expense",
-  "CorporateCreditCard" = "CorporateCreditCard",
-  "Allowance" = "Allowance",
-  "FuelCard" = "FuelCard",
-  "Mileage" = "Mileage",
-  "PersonalReimbursement" = "PersonalReimbursement",
+  OnAccount = "OnAccount",
+  Expense = "Expense",
+  CorporateCreditCard = "CorporateCreditCard",
+  Allowance = "Allowance",
+  FuelCard = "FuelCard",
+  Mileage = "Mileage",
+  PersonalReimbursement = "PersonalReimbursement",
 }
 
 export enum ExpensesAugmentedAllowanceTypesOptions {
-  "Lodging" = "Lodging",
-  "Breakfast" = "Breakfast",
-  "Lunch" = "Lunch",
-  "Dinner" = "Dinner",
+  Lodging = "Lodging",
+  Breakfast = "Breakfast",
+  Lunch = "Lunch",
+  Dinner = "Dinner",
 }
 export type ExpensesAugmentedRecord = {
   allowance_types: ExpensesAugmentedAllowanceTypesOptions[];
@@ -509,12 +509,12 @@ export type ExpensesAugmentedRecord = {
 };
 
 export enum JobsStatusOptions {
-  "Active" = "Active",
-  "Closed" = "Closed",
-  "Cancelled" = "Cancelled",
-  "Awarded" = "Awarded",
+  Active = "Active",
+  Closed = "Closed",
+  Cancelled = "Cancelled",
+  Awarded = "Awarded",
   "Not Awarded" = "Not Awarded",
-  "Submitted" = "Submitted",
+  Submitted = "Submitted",
   "In Progress" = "In Progress",
   "No Bid" = "No Bid",
 }
@@ -584,10 +584,10 @@ export type NotificationTemplatesRecord = {
 };
 
 export enum NotificationsStatusOptions {
-  "pending" = "pending",
-  "inflight" = "inflight",
-  "sent" = "sent",
-  "error" = "error",
+  pending = "pending",
+  inflight = "inflight",
+  sent = "sent",
+  error = "error",
 }
 export type NotificationsRecord<Tdata = unknown> = {
   created: IsoDateString;
@@ -647,17 +647,17 @@ export type RateRolesRecord = {
 };
 
 export enum ProfilesNotificationTypeOptions {
-  "email_text" = "email_text",
-  "email_html" = "email_html",
+  email_text = "email_text",
+  email_html = "email_html",
 }
 export enum ProfilesDefaultExpensePaymentTypeOptions {
-  "OnAccount" = "OnAccount",
-  "Expense" = "Expense",
-  "CorporateCreditCard" = "CorporateCreditCard",
-  "Allowance" = "Allowance",
-  "FuelCard" = "FuelCard",
-  "Mileage" = "Mileage",
-  "PersonalReimbursement" = "PersonalReimbursement",
+  OnAccount = "OnAccount",
+  Expense = "Expense",
+  CorporateCreditCard = "CorporateCreditCard",
+  Allowance = "Allowance",
+  FuelCard = "FuelCard",
+  Mileage = "Mileage",
+  PersonalReimbursement = "PersonalReimbursement",
 }
 export type ProfilesRecord = {
   _imported: boolean;
@@ -677,28 +677,28 @@ export type ProfilesRecord = {
 };
 
 export enum PurchaseOrdersStatusOptions {
-  "Unapproved" = "Unapproved",
-  "Active" = "Active",
-  "Cancelled" = "Cancelled",
-  "Closed" = "Closed",
+  Unapproved = "Unapproved",
+  Active = "Active",
+  Cancelled = "Cancelled",
+  Closed = "Closed",
 }
 
 export enum PurchaseOrdersTypeOptions {
   "One-Time" = "One-Time",
-  "Cumulative" = "Cumulative",
-  "Recurring" = "Recurring",
+  Cumulative = "Cumulative",
+  Recurring = "Recurring",
 }
 
 export enum PurchaseOrdersFrequencyOptions {
-  "Weekly" = "Weekly",
-  "Biweekly" = "Biweekly",
-  "Monthly" = "Monthly",
+  Weekly = "Weekly",
+  Biweekly = "Biweekly",
+  Monthly = "Monthly",
 }
 
 export enum PurchaseOrdersPaymentTypeOptions {
-  "OnAccount" = "OnAccount",
-  "Expense" = "Expense",
-  "CorporateCreditCard" = "CorporateCreditCard",
+  OnAccount = "OnAccount",
+  Expense = "Expense",
+  CorporateCreditCard = "CorporateCreditCard",
 }
 export type PurchaseOrdersRecord = {
   _imported: boolean;
@@ -744,28 +744,28 @@ export type PurchaseOrdersRecord = {
 };
 
 export enum PurchaseOrdersAugmentedStatusOptions {
-  "Unapproved" = "Unapproved",
-  "Active" = "Active",
-  "Cancelled" = "Cancelled",
-  "Closed" = "Closed",
+  Unapproved = "Unapproved",
+  Active = "Active",
+  Cancelled = "Cancelled",
+  Closed = "Closed",
 }
 
 export enum PurchaseOrdersAugmentedTypeOptions {
   "One-Time" = "One-Time",
-  "Cumulative" = "Cumulative",
-  "Recurring" = "Recurring",
+  Cumulative = "Cumulative",
+  Recurring = "Recurring",
 }
 
 export enum PurchaseOrdersAugmentedFrequencyOptions {
-  "Weekly" = "Weekly",
-  "Biweekly" = "Biweekly",
-  "Monthly" = "Monthly",
+  Weekly = "Weekly",
+  Biweekly = "Biweekly",
+  Monthly = "Monthly",
 }
 
 export enum PurchaseOrdersAugmentedPaymentTypeOptions {
-  "OnAccount" = "OnAccount",
-  "Expense" = "Expense",
-  "CorporateCreditCard" = "CorporateCreditCard",
+  OnAccount = "OnAccount",
+  Expense = "Expense",
+  CorporateCreditCard = "CorporateCreditCard",
 }
 export type PurchaseOrdersAugmentedRecord = {
   approval_total: number;
@@ -1020,8 +1020,8 @@ export type UsersRecord = {
 };
 
 export enum VendorsStatusOptions {
-  "Active" = "Active",
-  "Inactive" = "Inactive",
+  Active = "Active",
+  Inactive = "Inactive",
 }
 export type VendorsRecord = {
   _imported: boolean;

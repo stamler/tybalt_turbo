@@ -35,10 +35,7 @@ export type PurchaseOrdersPageData = PageData<PurchaseOrdersRecord | PurchaseOrd
   loadError?: string;
 };
 export type SecondApproverStatus =
-  | "not_required"
-  | "requester_qualifies"
-  | "candidates_available"
-  | "required_no_candidates";
+  "not_required" | "requester_qualifies" | "candidates_available" | "required_no_candidates";
 export type SecondApproversResponse = {
   approvers: PoApproversResponse[];
   meta: {
@@ -85,7 +82,7 @@ export type ClientsPageData = PageData<ClientsRecord> & {
 };
 export type ClientDetailsPageData = {
   client: ClientDetails;
-  jobs: any[];
+  jobs: unknown[];
   notes: ClientNotesResponse[];
   noteJobs: JobsRecord[];
   tab: string;
