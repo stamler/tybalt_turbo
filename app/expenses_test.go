@@ -2720,6 +2720,9 @@ func TestExpenseCommitQueue_ReturnsApprovedUncommittedExpenses(t *testing.T) {
 				if row.Approved == "" {
 					t.Fatalf("queue row %q unexpectedly had empty approved timestamp", row.ID)
 				}
+				if row.Rejected != "" {
+					t.Fatalf("queue row %q unexpectedly had rejected timestamp %q", row.ID, row.Rejected)
+				}
 				if row.Committed != "" {
 					t.Fatalf("queue row %q unexpectedly had committed timestamp %q", row.ID, row.Committed)
 				}
@@ -2739,6 +2742,7 @@ func TestExpenseCommitQueue_ReturnsApprovedUncommittedExpenses(t *testing.T) {
 			for _, id := range []string{
 				"exp_approve_closed_po_1",
 				"su3hyft6n9rlt7d",
+				"queuereject0001",
 			} {
 				if expenseCommitQueueContains(rows, id) {
 					t.Fatalf("expected expense commit queue to exclude %q", id)
@@ -2750,14 +2754,14 @@ func TestExpenseCommitQueue_ReturnsApprovedUncommittedExpenses(t *testing.T) {
 	scenario.Test(t)
 }
 
-func TestExpenseCommitQueue_ReturnsDescriptionAttachmentAndRejectedRows(t *testing.T) {
+func TestExpenseCommitQueue_ReturnsDescriptionAndAttachment(t *testing.T) {
 	commitToken, err := testutils.GenerateRecordToken("users", "fakemanager@fakesite.xyz")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	scenario := tests.ApiScenario{
-		Name:   "commit queue includes description attachment and rejected approved rows",
+		Name:   "commit queue includes description and attachment",
 		Method: http.MethodGet,
 		URL:    "/api/expenses/commit_queue",
 		Headers: map[string]string{
@@ -2770,30 +2774,15 @@ func TestExpenseCommitQueue_ReturnsDescriptionAttachmentAndRejectedRows(t *testi
 		TestAppFactory: func(tb testing.TB) *tests.TestApp {
 			app := testutils.SetupTestApp(tb)
 
+			// Link existing fixtures to check attachment projection without changing
+			// the expense's approval state or creating another document.
 			_, err := app.NonconcurrentDB().NewQuery(`
-				INSERT INTO expense_documents (id, attachment, attachment_hash, uploaded_by, created, updated)
-				VALUES ('queueattachdoc1', 'queue-receipt.pdf', 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb', 'wegviunlyr2jjjv', '2024-11-08 12:34:56.000Z', '2024-11-08 12:34:56.000Z')
+				UPDATE expenses
+				SET attachment_document = 'sameattachdoc01'
+				WHERE id = 'eqhozipupteogp8'
 			`).Execute()
 			if err != nil {
-				tb.Fatalf("failed to seed commit queue attachment document: %v", err)
-			}
-
-			_, err = app.NonconcurrentDB().NewQuery(`
-				UPDATE expenses
-				SET rejected = {:rejected},
-				    rejection_reason = {:reason},
-				    rejector = {:rejector},
-				    attachment_document = {:attachment_document}
-				WHERE id = {:id}
-			`).Bind(dbx.Params{
-				"id":                  "eqhozipupteogp8",
-				"rejected":            "2024-11-08 12:34:56.000Z",
-				"reason":              "Testing rejected approved expense visibility",
-				"rejector":            "wegviunlyr2jjjv",
-				"attachment_document": "queueattachdoc1",
-			}).Execute()
-			if err != nil {
-				tb.Fatalf("failed to seed rejected expense commit queue row: %v", err)
+				tb.Fatalf("failed to link commit queue attachment document: %v", err)
 			}
 
 			return app
@@ -2805,11 +2794,11 @@ func TestExpenseCommitQueue_ReturnsDescriptionAttachmentAndRejectedRows(t *testi
 			if row.Description != "An approved expense against a Cumulative purchase_orders record. This should commit well because the total is less than than maximum allowed amount by the purchase_orders record." {
 				t.Fatalf("description = %q, want seeded expense description", row.Description)
 			}
-			if row.Attachment != "queue-receipt.pdf" {
-				t.Fatalf("attachment = %q, want %q", row.Attachment, "queue-receipt.pdf")
+			if row.Attachment != "same-attachment.png" {
+				t.Fatalf("attachment = %q, want %q", row.Attachment, "same-attachment.png")
 			}
-			if row.Rejected != "2024-11-08 12:34:56.000Z" {
-				t.Fatalf("rejected = %q, want %q", row.Rejected, "2024-11-08 12:34:56.000Z")
+			if row.Rejected != "" {
+				t.Fatalf("rejected = %q, want empty timestamp", row.Rejected)
 			}
 			if row.Approved == "" {
 				t.Fatalf("approved unexpectedly empty for row %q", row.ID)

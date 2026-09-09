@@ -6,6 +6,8 @@ The expenses system depends on the purchase_orders system and the job categories
 
 The user can create, edit, delete, and submit expenses with the expenses system. Additionally, the user can view a list of all their expenses. Each expense has an approver which is set by a hook when the expense is created or updated and is based on the manager of the user who created the expense. This information comes from the user's profile. The approver can approve or reject expenses submitted by their direct reports. Users with the `commit` claim can also reject expenses. When an expense is approved, the `approved` property is set to the current timestamp. When an expense is rejected, the `rejected` property is set to the current timestamp, the `rejector` property is set to the id of the user who rejected the expense, and a rejection reason is provided. Note: rejection does not clear `approved` — an expense can have both `approved` and `rejected` set simultaneously. `Recall` clears both `approved` and `rejected`. Expenses must be committed by a user with the `commit` claim prior to being paid out.
 
+The Commit Queue and its sidebar count exclude rejected expenses. Rejected expenses remain available to their creator for recall and correction. They return to the queue after resubmission and approval, subject to the existing settlement requirements.
+
 There are two paths to creating expenses, the first is directly through the new expense page, the second is via submitting an expense against an existing purchase order. There is no facility to specify a PO number when creating an expense from scratch. If a PO number is required, the user must submit an expense against an existing purchase order.
 
 ### Creating an expense from scratch

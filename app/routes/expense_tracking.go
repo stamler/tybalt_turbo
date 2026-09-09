@@ -239,8 +239,8 @@ func createExpenseTrackingListHandler(app core.App) func(e *core.RequestEvent) e
 	}
 }
 
-// createExpenseCommitQueueHandler returns all submitted + uncommitted expenses
-// (org-wide) for the expense commit queue.
+// createExpenseCommitQueueHandler returns approved expenses awaiting commitment.
+// Rejected expenses and expenses awaiting required settlement are excluded.
 func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		if err := requireExpenseCommitQueueViewer(app, e.Auth); err != nil {
@@ -304,6 +304,7 @@ func createExpenseCommitQueueHandler(app core.App) func(e *core.RequestEvent) er
             WHERE e.submitted = 1
               AND e.committed = ''
               AND e.approved != ''
+              AND e.rejected = ''
               AND NOT (
                 COALESCE(cur.code, 'CAD') != 'CAD'
                 AND e.payment_type IN ('OnAccount', 'CorporateCreditCard')

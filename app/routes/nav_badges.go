@@ -126,6 +126,7 @@ func createGetNavBadgesHandler(app core.App) func(e *core.RequestEvent) error {
 				WHERE e.submitted = 1
 				  AND e.committed = ''
 				  AND e.approved != ''
+				  AND e.rejected = ''
 				  AND NOT (
 				    COALESCE(cur.code, 'CAD') != 'CAD'
 				    AND e.payment_type IN ('OnAccount', 'CorporateCreditCard')

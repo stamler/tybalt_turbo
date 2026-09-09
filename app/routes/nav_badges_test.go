@@ -93,6 +93,71 @@ func TestNavBadgesReturnsAuthorizedQueueCounts(t *testing.T) {
 	assertNavBadgeCount(t, scopedCounts, navProjectAuthorizationHref, expectedProjectAuthorizationBadgeCount(t, app, "u_no_claims", false, false))
 }
 
+func TestExpenseCommitQueueAndBadgeRemoveRejectedExpense(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	t.Cleanup(app.Cleanup)
+	hooks.AddHooks(app)
+	AddRoutes(app)
+
+	token := authTokenForEmail(t, app, "fakemanager@fakesite.xyz")
+	expenseID := "b4o6xph4ngwx4nw"
+	readQueue := func(wantPresent bool) int {
+		t.Helper()
+		res := performClaimsJSONRequest(t, app, http.MethodGet, "/api/expenses/commit_queue", token, nil)
+		if res.Code != http.StatusOK {
+			t.Fatalf("queue status = %d; body=%s", res.Code, res.Body.String())
+		}
+		var rows []expenseTrackingListRow
+		if err := json.Unmarshal(res.Body.Bytes(), &rows); err != nil {
+			t.Fatal(err)
+		}
+		found := false
+		for _, row := range rows {
+			if row.ID == expenseID {
+				found = true
+			}
+			if row.Rejected != "" {
+				t.Fatalf("rejected expense %q remains in queue", row.ID)
+			}
+		}
+		if found != wantPresent {
+			t.Fatalf("expense present = %t, want %t", found, wantPresent)
+		}
+		badges := performClaimsJSONRequest(t, app, http.MethodGet, "/api/nav/badges", token, nil)
+		if badges.Code != http.StatusOK {
+			t.Fatalf("badge status = %d; body=%s", badges.Code, badges.Body.String())
+		}
+		assertNavBadgeCount(t, decodeNavBadgeCounts(t, badges.Body.Bytes()), navExpenseCommitQueueHref, len(rows))
+		return len(rows)
+	}
+
+	before := readQueue(true)
+	// Use the reject API to test the transition of an existing approved fixture.
+	rejected := performClaimsJSONRequest(t, app, http.MethodPost, "/api/expenses/"+expenseID+"/reject", token, map[string]any{
+		"rejection_reason": "Receipt requires correction",
+	})
+	if rejected.Code != http.StatusOK {
+		t.Fatalf("reject status = %d; body=%s", rejected.Code, rejected.Body.String())
+	}
+	if after := readQueue(false); after != before-1 {
+		t.Fatalf("queue count = %d, want %d after rejection", after, before-1)
+	}
+
+	commit := performClaimsJSONRequest(t, app, http.MethodPost, "/api/expenses/"+expenseID+"/commit", token, nil)
+	if commit.Code != http.StatusBadRequest {
+		t.Fatalf("rejected expense commit status = %d; body=%s", commit.Code, commit.Body.String())
+	}
+	var failure struct {
+		Code string `json:"code"`
+	}
+	if err := json.Unmarshal(commit.Body.Bytes(), &failure); err != nil {
+		t.Fatal(err)
+	}
+	if failure.Code != "record_rejected" {
+		t.Fatalf("commit error code = %q, want record_rejected", failure.Code)
+	}
+}
+
 func decodeNavBadgeCounts(t *testing.T, body []byte) map[string]int {
 	t.Helper()
 
@@ -255,6 +320,7 @@ func expectedExpenseCommitQueueCount(t *testing.T, app *tests.TestApp) int {
 		WHERE e.submitted = 1
 		  AND e.committed = ''
 		  AND e.approved != ''
+		  AND e.rejected = ''
 		  AND NOT (
 		    COALESCE(cur.code, 'CAD') != 'CAD'
 		    AND e.payment_type IN ('OnAccount', 'CorporateCreditCard')
