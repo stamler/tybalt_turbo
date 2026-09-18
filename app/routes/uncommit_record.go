@@ -144,7 +144,9 @@ func maybeReopenPurchaseOrderAfterExpenseUncommit(app core.App, expenseRecord *c
 		}
 		shouldReopen = countResult.Count == 0
 	case "Recurring":
-		exhausted, err := utilities.RecurringPurchaseOrderExhausted(app, purchaseOrderRecord)
+		// Pass 0 because the uncommit is already saved in this transaction.
+		// The query counts only the expenses that remain committed.
+		exhausted, err := utilities.RecurringPurchaseOrderExhausted(app, purchaseOrderRecord, 0)
 		if err != nil {
 			return err
 		}

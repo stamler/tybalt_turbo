@@ -239,7 +239,9 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 						purchaseOrderRecord.Set("status", "Closed")
 						dirtyPurchaseOrderRecord = true
 					case "Recurring":
-						exhausted, err := utilities.RecurringPurchaseOrderExhausted(app, purchaseOrderRecord)
+						// Pass 1 for this commit because its committed state is not saved yet.
+						// Other uncommitted expenses do not contribute to the count.
+						exhausted, err := utilities.RecurringPurchaseOrderExhausted(txApp, purchaseOrderRecord, 1)
 						if err != nil {
 							return err
 						}

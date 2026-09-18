@@ -684,11 +684,14 @@ func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord
 	return int(occurrences), totalValue, nil
 }
 
-// return true if the recurring purchase order has been exhausted, false otherwise
-func RecurringPurchaseOrderExhausted(app core.App, purchaseOrderRecord *core.Record) (bool, error) {
-	// TODO: implement issue #13, check if an expense has been committed for each
-	// recurrence of the PO and set the Status to Closed if so, otherwise doing nothing.
-
+// RecurringPurchaseOrderExhausted reports whether saved committed expenses plus
+// pendingCommits reach or exceed the permitted count.
+//
+// pendingCommits counts expenses being committed in the current transaction
+// whose committed state has not yet been saved. It does not count drafts or
+// other uncommitted expenses. Pass 1 before saving the current commit. Pass 0
+// after saving an uncommit. Use the current transaction's app for the query.
+func RecurringPurchaseOrderExhausted(app core.App, purchaseOrderRecord *core.Record, pendingCommits int) (bool, error) {
 	// Count only committed expenses for the purchase order.
 	query := app.DB().NewQuery("SELECT COUNT(*) AS count FROM expenses WHERE purchase_order = {:purchaseOrder} AND committed != ''")
 	query.Bind(dbx.Params{"purchaseOrder": purchaseOrderRecord.Id})
@@ -707,9 +710,8 @@ func RecurringPurchaseOrderExhausted(app core.App, purchaseOrderRecord *core.Rec
 		return false, err
 	}
 
-	// return true if the committed expenses count is not less than the maximum
-	// allowed, false otherwise
-	return !(committedExpensesCount < maxExpenses), nil
+	// Include unsaved commits when comparing the count with the permitted limit.
+	return committedExpensesCount+pendingCommits >= maxExpenses, nil
 }
 
 // return the total of all expenses associated with the purchase order. If

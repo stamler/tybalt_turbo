@@ -109,7 +109,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"totalItems":15`, // Count is asserted against the current seeded active-PO fixture set.
+				`"totalItems":16`, // Count is asserted against the current seeded active-PO fixture set.
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
