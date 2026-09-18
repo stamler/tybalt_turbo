@@ -9,7 +9,7 @@ export const load: PageLoad = async () => {
     // load required data
     items = await pb
       .collection("payroll_report_week_endings")
-      .getFullList<PayrollReportWeekEndingsResponse>();
+      .getFullList<PayrollReportWeekEndingsResponse>({ sort: "-week_ending" });
     return { items };
   } catch (error) {
     console.error(`loading data: ${error}`);
