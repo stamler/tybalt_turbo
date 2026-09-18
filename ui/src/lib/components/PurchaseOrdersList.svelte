@@ -186,7 +186,8 @@
         // only non-One-Time POs can be closed manually
         if ($globalStore.claims.includes("payables_admin")) {
           // user has payables_admin claim
-          // return true if there is at least one committed expense associated with the PO
+          // Show Close for eligible POs. The server checks pending expenses at
+          // closure time and returns the approval or commitment work still needed.
           return po.committed_expenses_count > 0;
         }
       }

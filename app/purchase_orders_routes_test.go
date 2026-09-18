@@ -519,16 +519,14 @@ func TestPurchaseOrdersRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:           "caller with the payables_admin claim can close Active Cumulative purchase_orders records",
+			Name:           "payables_admin cannot close an Active Cumulative PO with an approved uncommitted expense",
 			Method:         http.MethodPost,
 			URL:            "/api/purchase_orders/ly8xyzpuj79upq1/close",
 			Headers:        map[string]string{"Authorization": closeToken},
-			ExpectedStatus: http.StatusOK,
+			ExpectedStatus: http.StatusBadRequest,
 			ExpectedContent: []string{
-				`"status":"Closed"`,
-				fmt.Sprintf(`"closed":"%s`, currentDate),
-				`"closer":"tqqf7q0f3378rvp"`,
-				`"closed_by_system":false`,
+				`"code":"pending_expenses"`,
+				`"message":"This PO has one or more approved expenses awaiting commitment."`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnBeforeApiError": 0,

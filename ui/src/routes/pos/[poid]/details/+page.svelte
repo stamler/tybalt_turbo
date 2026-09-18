@@ -114,6 +114,8 @@
   }
 
   async function closePo() {
+    // The server checks pending expenses in the closure transaction. Display its
+    // message so the user knows which approval or commitment work remains.
     try {
       await pb.send(`/api/purchase_orders/${data.po.id}/close`, { method: "POST" });
       await globalStore.refreshAttentionCounts();

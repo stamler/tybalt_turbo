@@ -259,7 +259,8 @@ The current implemented lifecycle for legacy POs is:
 - `Cumulative` legacy POs auto-close when committed expenses reach or exceed the PO total
 - active legacy POs may be cancelled through the normal cancel route only when they have no associated expenses and the caller has `payables_admin`
 - cancelled legacy POs remain visible but are no longer editable through the hidden legacy editor
-- active cumulative legacy POs may be manually closed through the normal close route only when they have at least one committed expense and the caller has `payables_admin`
+- active cumulative legacy POs may be manually closed through the normal close route only when they have at least one committed expense, the caller has `payables_admin`, and no submitted, uncommitted, non-rejected expense remains
+- the [manual closure rules](purchase_orders.md#closure) also define the pending approval and commitment messages; rejected expenses, drafts, and recalled expenses do not block closure
 
 ## UI Safety Behavior
 

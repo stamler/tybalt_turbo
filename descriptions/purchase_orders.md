@@ -397,8 +397,8 @@ Current canonical views:
 | PO Type    | Description                                                                  | May be Closed Manually                                              | May be Canceled if status is Active                  | Closed Automatically                     |
 |------------|------------------------------------------------------------------------------|---------------------------------------------------------------------|------------------------------------------------------|------------------------------------------|
 | One-Time   | Valid for a single expense                                                   | No                                                                  | Yes, by `payables_admin` if no expenses are attached | When an expense is committed             |
-| Recurring  | Valid for a fixed number of expenses not exceeding specified value           | Yes, if status is `Active` and has at least 1 **committed** expense | Yes, by `payables_admin` if no expenses are attached | When final expected expense is committed |
-| Cumulative | Valid for multiple expenses where sum of values does not exceed the PO total | Yes, if status is `Active` and has at least 1 **committed** expense | Yes, by `payables_admin` if no expenses are attached | When committed total reaches PO total    |
+| Recurring  | Valid for a fixed number of expenses not exceeding specified value           | Yes, subject to the manual closure rules below | Yes, by `payables_admin` if no expenses are attached | When final expected expense is committed |
+| Cumulative | Valid for multiple expenses where sum of values does not exceed the PO total | Yes, subject to the manual closure rules below | Yes, by `payables_admin` if no expenses are attached | When committed total reaches PO total    |
 
 Operational handlers:
 
@@ -537,10 +537,21 @@ Manual closure rules:
 - Only `Recurring` and `Cumulative` POs may be manually closed.
 - PO must be `Active`.
 - PO must have at least one associated **committed** expense.
+- No associated expense may be submitted, uncommitted, and not rejected. This includes approved expenses that still await commitment or foreign-currency settlement.
+- Rejected expenses, drafts, and recalled expenses do not block closure. Rejection retains `submitted` and can retain `approved`, so the check must exclude rejected expenses explicitly.
+- The server checks pending expenses in the closure transaction. A blocked request returns HTTP 400 with code `pending_expenses` and leaves the PO unchanged. A failed expense lookup also prevents closure.
+- The message identifies the pending work:
+  - Awaiting approval: `This PO has one or more expenses awaiting approval by {list of names}.`
+  - Awaiting commitment: `This PO has one or more approved expenses awaiting commitment.`
+  - If both states are present, both sentences are returned, with the approval sentence first.
+- Names come from the assigned expense approvers, not the PO approvers. Each person is listed once, sorted by display name, with user ID as a stable tie-breaker. A missing profile or blank name is represented by `an approver whose name is unavailable`; it never removes the block.
+- The list, search, and detail screens display the server message. The Close button remains available for otherwise eligible POs so the user can see why closure is blocked.
 - On success:
   - `closer` is set
   - `closed` timestamp is set
   - `status` becomes `Closed`
+
+After closure, drafts and corrected rejected expenses cannot be submitted against this PO because expense submission requires an active PO. These manual closure rules also apply to legacy POs.
 
 Automatic closure rules:
 
@@ -548,7 +559,7 @@ Automatic closure rules:
 - `Recurring`: closes when all expected expenses are committed.
 - `Cumulative`: closes when committed total reaches PO total.
 
-Automatic close sets `closed_by_system = true`.
+Automatic close sets `closed_by_system = true`. It does not use the manual pending-expense check and can still leave other expenses pending when the amount or recurrence limit is reached.
 
 ## API Endpoints (Non-approver-list)
 

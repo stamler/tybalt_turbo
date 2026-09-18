@@ -58,6 +58,7 @@
   }
 
   function poMayBeClosedByUser(po: POSearchApiResponse): boolean {
+    // The server checks pending expenses when Close is used and explains the block.
     return (
       po.status === "Active" &&
       po.type !== "One-Time" &&

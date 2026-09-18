@@ -3,6 +3,7 @@ package routes
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"tybalt/utilities"
@@ -84,6 +85,21 @@ func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) er
 				}
 			}
 
+			// Check inside the closure transaction: a closed PO cannot accept further
+			// expense approval or commitment. Automatic closure has separate rules.
+			pendingMessage, err := pendingPurchaseOrderExpensesMessage(txApp, po.Id)
+			if err != nil {
+				httpResponseStatusCode = http.StatusInternalServerError
+				return &CodeError{
+					Code:    "error_fetching_expenses",
+					Message: fmt.Sprintf("error fetching pending expenses: %v", err),
+				}
+			}
+			if pendingMessage != "" {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{Code: "pending_expenses", Message: pendingMessage}
+			}
+
 			// Update the purchase order status to Closed
 			po.Set("closed", time.Now())
 			po.Set("closer", authRecord.Id)
@@ -122,4 +138,57 @@ func createClosePurchaseOrderHandler(app core.App) func(e *core.RequestEvent) er
 		}
 		return e.JSON(http.StatusOK, closedPO)
 	}
+}
+
+// pendingPurchaseOrderExpensesMessage describes work that blocks manual closure.
+// Rejection retains submitted and can retain approved, so it must be excluded
+// explicitly. Drafts and recalled expenses do not block closure. Do not reuse the
+// commit queue filter here: approved expenses also block while awaiting settlement.
+func pendingPurchaseOrderExpensesMessage(app core.App, purchaseOrderID string) (string, error) {
+	var pending []struct {
+		Approver     string `db:"approver"`
+		ApproverName string `db:"approver_name"`
+		Approved     bool   `db:"approved"`
+	}
+	// DISTINCT lists each assigned expense approver once per approval state.
+	// LEFT JOIN preserves blocking expenses even when a profile is missing.
+	err := app.DB().NewQuery(`
+		SELECT DISTINCT e.approver,
+			TRIM(COALESCE(p.given_name, '') || ' ' || COALESCE(p.surname, '')) AS approver_name,
+			(COALESCE(e.approved, '') != '') AS approved
+		FROM expenses e
+		LEFT JOIN profiles p ON p.uid = e.approver
+		WHERE e.purchase_order = {:poId}
+			AND e.submitted = 1
+			AND COALESCE(e.committed, '') = ''
+			AND COALESCE(e.rejected, '') = ''
+		ORDER BY approver_name, e.approver
+	`).Bind(dbx.Params{"poId": purchaseOrderID}).All(&pending)
+	if err != nil {
+		return "", err
+	}
+
+	var names []string
+	var awaitingCommitment, missingName bool
+	for _, expense := range pending {
+		if expense.Approved {
+			awaitingCommitment = true
+		} else if strings.TrimSpace(expense.ApproverName) == "" {
+			missingName = true
+		} else {
+			names = append(names, expense.ApproverName)
+		}
+	}
+	if missingName {
+		// Missing display data must not remove the block or leave an empty list.
+		names = append(names, "an approver whose name is unavailable")
+	}
+	var messages []string
+	if len(names) > 0 {
+		messages = append(messages, "This PO has one or more expenses awaiting approval by "+strings.Join(names, ", ")+".")
+	}
+	if awaitingCommitment {
+		messages = append(messages, "This PO has one or more approved expenses awaiting commitment.")
+	}
+	return strings.Join(messages, " "), nil
 }
