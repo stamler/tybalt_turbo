@@ -39,6 +39,42 @@ CSV exports include the rate sheet name and revision, estimated and unpriced
 hours, and pricing status. The shared query in `app/routes/job_priced_time_entries.sql`
 keeps the pricing and entry selection rules the same for both summaries.
 
+### Summary Display
+
+Both summaries show four columns: Staff member or Division, Hours, Value, and
+Share. Staff names and division codes/names share one cell. A single total row
+replaces the repeated total column.
+
+The question-mark button opens the calculation rules and rate-sheet details.
+Normal amounts have no status label. Affected amounts have a clickable
+`Estimated` label when employee defaults are used, or `Partial` when some hours
+cannot be priced. The explanation states how many hours are affected. Partial
+takes priority when a row contains both estimated and unpriced hours. If all
+nonzero hours in a row are unpriced, its value is shown as `—`, not `$0.00`.
+
+When no rate sheet is assigned, one notice above the table explains employee
+defaults. Repeated Estimated labels are hidden in this case; Partial labels
+remain visible. The total follows the same rules and is labelled Known total
+when it is incomplete.
+
+Column headings sort the table. Clicking a table value filters it; clicking a
+filter removes it. With filters active, the footer shows the visible total.
+Shares still use the full job/date-range value as the denominator. CSV exports
+always contain all API rows for that date range, including pricing metadata
+and status fields hidden from the table.
+
+Help panels support keyboard and touch use, Escape, an explicit close button,
+and clicks outside the panel. They appear above the table's scroll area so
+horizontal scrolling cannot clip them. A date or job change clears old results;
+late responses cannot replace the current range. Load failures are shown
+separately from empty results.
+
+UI checks run with `npm run test:time-summary` and
+`npm run test:time-summary-browser` from `ui/`. The browser checks use fixture
+responses and real components in Chromium. They require Playwright and an
+installed browser. Set `PLAYWRIGHT_MODULE` to use an external Playwright module
+and `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome browser.
+
 ## Branch Resolution
 
 `time_entries.branch` now follows the same precedence as `purchase_orders`:

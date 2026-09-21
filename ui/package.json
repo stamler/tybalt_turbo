@@ -11,7 +11,9 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
     "test:branch-flow": "node --test --experimental-strip-types tests/branchResourceFlow.test.ts",
     "lint": "prettier --check . && eslint .",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "test:time-summary": "node --test --experimental-strip-types tests/timeSummary.test.ts",
+    "test:time-summary-browser": "node tests/timeSummary.browser.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -1,36 +1,39 @@
 <script lang="ts">
   import { resolve } from "$app/paths";
-
-  let { rateSheet } = $props<{
-    rateSheet?: { id: string; name: string; revision: number };
-  }>();
+  import TimeSummaryHelp from "./TimeSummaryHelp.svelte";
+  import type { RateSheet } from "./timeSummary";
+  let { rateSheet }: { rateSheet?: RateSheet } = $props();
 </script>
 
-<div class="mb-3 space-y-1 text-sm text-neutral-600">
+<TimeSummaryHelp title="How time values are calculated">
   {#if rateSheet?.id}
     <p>
-      Job rates come from the current rate sheet:
-      <a
+      Rate sheet: <a
         class="text-blue-600 hover:underline"
         href={resolve("/rate-sheets/[id]/details", { id: rateSheet.id })}
-      >
-        {rateSheet.name} (rev. {rateSheet.revision})</a
+        >{rateSheet.name} (rev. {rateSheet.revision})</a
       >.
     </p>
-  {:else}
-    <p>No rate sheet is assigned to this job. Employee default charge-out rates are used.</p>
   {/if}
   <p>
-    Regular rates only. Includes committed and uncommitted time entries. Excludes meal hours and
-    time amendments from values.
+    Each entry uses the regular rate for its role from the job's assigned sheet. If no job rate
+    matches, an employee default charge-out rate greater than zero is used.
   </p>
   <p>
-    Rate sheet means all priced hours use job rates. Estimated means some hours use employee default
-    charge-out rates because no job rate matches. Incomplete means some hours have neither a
-    matching job rate nor an employee default rate greater than zero.
+    Estimated amounts include employee defaults. Partial amounts exclude hours that cannot be
+    priced. If no hours can be priced, the value is shown as —.
   </p>
   <p>
-    Known values include estimates and exclude unpriced hours. Percentages are unavailable when the
-    total is incomplete or zero. Changes to job rates or employee defaults recalculate past values.
+    Includes committed and uncommitted entries in the selected dates. Excludes meal hours, time
+    amendments, and overtime billing.
   </p>
-</div>
+  <p>
+    Shares use the full value for the job and date range. They are unavailable when that value is
+    incomplete or zero.
+  </p>
+  <p>
+    Click column headings to sort and table values to filter. The total follows the visible rows;
+    the CSV always includes the full date range and all pricing details.
+  </p>
+  <p>Changes to the assigned sheet, job rates, or employee defaults recalculate past values.</p>
+</TimeSummaryHelp>
