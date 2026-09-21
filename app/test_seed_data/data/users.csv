@@ -43,3 +43,6 @@ created,email,emailVisibility,id,name,password,tokenKey,updated,username,verifie
 2026-05-19 12:00:00.000Z,payroll.branch.hourly.banked.nobranch@example.com,0,u_pbranch_hbankno,Payroll Branch Hourly Banked No Branch,a.vQd0,tok_u_pbranch_hbankno,2026-05-19 12:00:00.000Z,upbranchhbankno,1
 2026-05-20 12:00:00.000Z,payroll.branch.hourly.overtime@example.com,0,u_pbranch_hover,Payroll Branch Hourly Overtime,a.vQd0,tok_u_pbranch_hover,2026-05-20 12:00:00.000Z,upbranchhover,1
 2026-05-20 12:00:00.000Z,payroll.branch.hourly.no.negative@example.com,0,u_pbranch_hnoneg,Payroll Branch Hourly No Negative,a.vQd0,tok_u_pbranch_hnoneg,2026-05-20 12:00:00.000Z,upbranchhnoneg,1
+2026-09-21 12:00:00.000Z,valuation1@example.com,0,uvaluation00001,Valuation 1,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,valuationfixturekey1,2026-09-21 12:00:00.000Z,valuation1,1
+2026-09-21 12:00:00.000Z,valuation2@example.com,0,uvaluation00002,Valuation 2,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,valuationfixturekey2,2026-09-21 12:00:00.000Z,valuation2,1
+2026-09-21 12:00:00.000Z,valuation3@example.com,0,uvaluation00003,Valuation 3,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,valuationfixturekey3,2026-09-21 12:00:00.000Z,valuation3,1

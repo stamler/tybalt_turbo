@@ -16,3 +16,5 @@ active,created,effective_date,id,name,revision,updated
 0,2026-03-09 00:00:00.000Z,2026-03-01,rsdupbase0001,Duplicate Test Sheet,0,2026-03-09 00:00:00.000Z
 0,2026-03-09 00:00:00.000Z,2026-01-01,rsrevbase0001,Revise Test Sheet,0,2026-03-09 00:00:00.000Z
 1,,2025-01-01,test_rs_alt_actv,Test Alternative Active Rate Sheet,0,
+0,2026-09-21 12:00:00.000Z,2034-01-01,rsvaluation0001,Summary valuation fixture,0,2026-09-21 12:00:00.000Z
+1,2026-09-21 12:00:00.000Z,2034-01-02,rsvaluation0002,Summary valuation fixture,1,2026-09-21 12:00:00.000Z

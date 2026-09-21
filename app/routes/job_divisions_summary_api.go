@@ -13,13 +13,11 @@ var jobDivisionsSummaryQuery string
 
 // JobDivisionSummaryRow models a single row from job_divisions_summary.sql
 type JobDivisionSummaryRow struct {
-	Number               string  `db:"number" json:"number"`
-	DivisionCode         string  `db:"division_code" json:"division_code"`
-	DivisionName         string  `db:"division_name" json:"division_name"`
-	JobHours             float64 `db:"hours" json:"hours"`
-	DivisionValueDollars float64 `db:"value" json:"value"`
-	Total                float64 `db:"total" json:"total"`
-	DivisionValuePercent float64 `db:"percent" json:"percent"`
+	JobTimeValuation
+	Number       string  `db:"number" json:"number"`
+	DivisionCode string  `db:"division_code" json:"division_code"`
+	DivisionName string  `db:"division_name" json:"division_name"`
+	JobHours     float64 `db:"hours" json:"hours"`
 }
 
 // createGetJobDivisionsSummaryHandler executes job_divisions_summary.sql for a job and date range
@@ -43,8 +41,8 @@ func createGetJobDivisionsSummaryHandler(app core.App) func(e *core.RequestEvent
 			"end_date":   endDate,
 		}
 
-		var rows []JobDivisionSummaryRow
-		if err := app.DB().NewQuery(jobDivisionsSummaryQuery).Bind(params).All(&rows); err != nil {
+		rows := []JobDivisionSummaryRow{}
+		if err := app.DB().NewQuery(jobPricedTimeEntriesQuery + jobDivisionsSummaryQuery).Bind(params).All(&rows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 

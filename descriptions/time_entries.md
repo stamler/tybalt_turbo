@@ -1,7 +1,43 @@
 # Time Entries
 
-This note documents create/update behavior for `time_entries`, with special
-attention to how the `branch` field is resolved.
+This note documents time-entry processing and job summary values.
+
+## Job Summary Values
+
+The Staff summary and Divisions summary on Job Details calculate values in SQL.
+Each time entry uses the regular rate for its recorded `role` from the exact
+`rate_sheet` revision assigned to its job. The calculation is `hours * rate`.
+If the job has no rate sheet, the entry has no role, or no rate matches that
+role, use the employee's `admin_profiles.default_charge_out_rate` when it is
+greater than zero. Entries are priced before they are grouped by employee or
+division. A matching job rate always takes priority over the employee default.
+
+Both summaries include committed and uncommitted time entries within the
+selected dates, including both date limits. They exclude time amendments.
+Meal hours are not priced. Overtime rates are not used because time entries
+do not identify which hours attract an overtime billing rate.
+
+An inactive sheet remains valid for a job that already uses it. The summaries
+do not select revisions by entry date or switch to the latest active revision.
+Changes to the assigned sheet, its rates, or employee default rates recalculate
+past values; these summaries do not preserve historical billing values.
+
+Hours priced with employee defaults are reported as `estimated_hours`. Hours
+with neither a matching job rate nor a positive employee default remain in the
+hours total and are reported as `unpriced_hours`. `value` and `total` include
+estimates but exclude unpriced hours. `value_status` and `total_status` are:
+
+- `Rate sheet`: no hours use an employee default or remain unpriced.
+- `Estimated`: some hours use an employee default, and no hours remain unpriced.
+- `Incomplete`: some hours remain unpriced, even if other hours use defaults.
+
+Percentages are available for complete estimates. They are null when the total
+is incomplete or zero. A range without entries returns an empty array.
+Zero-hour entries do not make a total estimated or incomplete.
+
+CSV exports include the rate sheet name and revision, estimated and unpriced
+hours, and pricing status. The shared query in `app/routes/job_priced_time_entries.sql`
+keeps the pricing and entry selection rules the same for both summaries.
 
 ## Branch Resolution
 

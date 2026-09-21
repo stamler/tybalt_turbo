@@ -13,13 +13,11 @@ var jobStaffSummaryQuery string
 
 // JobStaffSummaryRow models a single row from job_staff_summary.sql
 type JobStaffSummaryRow struct {
+	JobTimeValuation
 	Number     string  `db:"number" json:"number"`
 	GivenName  string  `db:"given_name" json:"given_name"`
 	Surname    string  `db:"surname" json:"surname"`
 	Hours      float64 `db:"hours" json:"hours"`
-	Value      float64 `db:"value" json:"value"`
-	Total      float64 `db:"total" json:"total"`
-	Percent    float64 `db:"percent" json:"percent"`
 	MealsHours float64 `db:"meals_hours" json:"meals_hours"`
 	UID        string  `db:"uid" json:"uid"`
 }
@@ -45,8 +43,8 @@ func createGetJobStaffSummaryHandler(app core.App) func(e *core.RequestEvent) er
 			"end_date":   endDate,
 		}
 
-		var rows []JobStaffSummaryRow
-		if err := app.DB().NewQuery(jobStaffSummaryQuery).Bind(params).All(&rows); err != nil {
+		rows := []JobStaffSummaryRow{}
+		if err := app.DB().NewQuery(jobPricedTimeEntriesQuery + jobStaffSummaryQuery).Bind(params).All(&rows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 

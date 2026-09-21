@@ -42,3 +42,6 @@ _imported,alternate_manager,created,default_division,default_expense_payment_typ
 0,,2026-05-19 12:00:00.000Z,vccd5fo56ctbigh,,,0,Branch,prof_pbranch_hbn,f2j5a8vk006baub,email_text,HourlyBankNo,u_pbranch_hbankno,2026-05-19 12:00:00.000Z
 0,,2026-05-20 12:00:00.000Z,vccd5fo56ctbigh,,,0,Branch,prof_pbranch_ho1,f2j5a8vk006baub,email_text,HourlyOvertime,u_pbranch_hover,2026-05-20 12:00:00.000Z
 0,,2026-05-20 12:00:00.000Z,vccd5fo56ctbigh,,,0,Branch,prof_pbranch_hn1,f2j5a8vk006baub,email_text,HourlyNoNegative,u_pbranch_hnoneg,2026-05-20 12:00:00.000Z
+0,,2026-09-21 12:00:00.000Z,kxedrbp7vj2mtjd,,,0,Valuation1,pvaluation00001,dkv192wxprcqmho,email_text,Summary,uvaluation00001,2026-09-21 12:00:00.000Z
+0,,2026-09-21 12:00:00.000Z,kxedrbp7vj2mtjd,,,0,Valuation2,pvaluation00002,dkv192wxprcqmho,email_text,Summary,uvaluation00002,2026-09-21 12:00:00.000Z
+0,,2026-09-21 12:00:00.000Z,kxedrbp7vj2mtjd,,,0,Valuation3,pvaluation00003,dkv192wxprcqmho,email_text,Summary,uvaluation00003,2026-09-21 12:00:00.000Z

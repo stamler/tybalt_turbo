@@ -1024,7 +1024,12 @@
           />
         </div>
       </div>
-      <StaffSummaryContent jobId={data.job.id} startDate={timeRangeStart} endDate={timeRangeEnd} />
+      <StaffSummaryContent
+        rateSheet={data.job.rate_sheet}
+        jobId={data.job.id}
+        startDate={timeRangeStart}
+        endDate={timeRangeEnd}
+      />
     </div>
 
     <!-- Divisions summary -->
@@ -1048,6 +1053,7 @@
         </div>
       </div>
       <DivisionsSummaryContent
+        rateSheet={data.job.rate_sheet}
         jobId={data.job.id}
         startDate={timeRangeStart}
         endDate={timeRangeEnd}
