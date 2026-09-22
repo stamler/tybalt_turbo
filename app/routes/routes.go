@@ -265,6 +265,7 @@ func AddRoutes(app core.App) {
 		jobsGroup.GET("/{id}/expenses/list", createGetJobExpensesHandler(app))
 		jobsGroup.GET("/{id}/pos/summary", createGetJobPOSummaryHandler(app))
 		jobsGroup.GET("/{id}/pos/list", createGetJobPOsHandler(app))
+		jobsGroup.GET("/{id}/wip", createGetJobWIPHandler(app))
 		jobsGroup.GET("/{id}", createGetJobsHandler(app))
 		jobsGroup.GET("", createGetJobsHandler(app))
 		jobsGroup.GET("/unused", createGetUnusedJobsHandler(app))

@@ -13,7 +13,9 @@
     "lint": "prettier --check . && eslint .",
     "format": "prettier --write .",
     "test:time-summary": "node --test --experimental-strip-types tests/timeSummary.test.ts",
-    "test:time-summary-browser": "node tests/timeSummary.browser.mjs"
+    "test:time-summary-browser": "node tests/timeSummary.browser.mjs",
+    "test:wip": "node --test --experimental-strip-types tests/wip.test.ts",
+    "test:wip-browser": "node tests/wip.browser.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

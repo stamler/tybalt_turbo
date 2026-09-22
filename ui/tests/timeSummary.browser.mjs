@@ -1,59 +1,11 @@
-// Run with an installed Playwright, or set PLAYWRIGHT_MODULE to its module path.
-// Only framework services are stubbed; the real components, SDK, CSV helper,
-// styles, and native popover controls run in Chromium.
+// Only framework services are stubbed; real components run in Chromium.
 import assert from "node:assert/strict";
-import { readFile, mkdtemp, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { createRequire } from "node:module";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import { createServer } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
-const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
-const root = fileURLToPath(new URL("../", import.meta.url));
+import { readFile } from "node:fs/promises";
+import { runBrowserHarness } from "./browserHarness.mjs";
 const fixtures = JSON.parse(
   await readFile(new URL("./fixtures/timeSummary.json", import.meta.url), "utf8"),
 );
-const services = {
-  "$app/paths": "export const resolve = (route, params) => route.replace('[id]', params.id);",
-  "$app/navigation": "export const goto = (url) => { location.href = url; };",
-  "$env/static/public": "export const PUBLIC_POCKETBASE_URL = location.origin;",
-  "summary-test-global":
-    "import { writable } from 'svelte/store'; export const globalStore = writable({claims:[]});",
-};
-const cacheDir = await mkdtemp(path.join(tmpdir(), "tybalt-summary-vite-"));
-const server = await createServer({
-  root,
-  configFile: false,
-  cacheDir,
-  plugins: [
-    {
-      name: "summary-test-services",
-      enforce: "pre",
-      resolveId(id) {
-        if (id in services) return `\0${id}`;
-      },
-      load(id) {
-        return services[id.slice(1)];
-      },
-    },
-    svelte({ configFile: false }),
-  ],
-  resolve: {
-    alias: [
-      { find: "$lib/stores/global", replacement: "summary-test-global" },
-      { find: "$lib", replacement: path.join(root, "src/lib") },
-    ],
-  },
-  server: { host: "127.0.0.1", port: 0 },
-});
-let browser;
-try {
-  await server.listen();
-  const address = server.httpServer.address();
-  browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL });
-  const page = await browser.newPage({ viewport: { width: 1000, height: 760 } });
+await runBrowserHarness(async (page, origin) => {
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
   await page.route("**/api/jobs/**", async (route) => {
@@ -73,7 +25,7 @@ try {
       .fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(rows) })
       .catch(() => {});
   });
-  await page.goto(`http://127.0.0.1:${address.port}/tests/fixtures/timeSummary.html`);
+  await page.goto(`${origin}/tests/fixtures/timeSummary.html`);
   await page.getByRole("table").waitFor();
   if (process.env.SUMMARY_SCREENSHOT)
     await page.screenshot({
@@ -192,8 +144,4 @@ try {
   console.log(
     "Time summary browser checks passed: layout, sorting, filters, CSV, all pricing states, keyboard help, dismiss controls, load failures, stale responses, and mobile layout.",
   );
-} finally {
-  await browser?.close();
-  await server.close();
-  await rm(cacheDir, { recursive: true, force: true });
-}
+});

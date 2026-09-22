@@ -75,6 +75,9 @@ responses and real components in Chromium. They require Playwright and an
 installed browser. Set `PLAYWRIGHT_MODULE` to use an external Playwright module
 and `PLAYWRIGHT_CHANNEL=chrome` to use an installed Chrome browser.
 
+The [Job WIP report](job_wip.md) also uses the shared time pricing query. It
+combines time values with optional committed expenses and remaining active POs.
+
 ## Branch Resolution
 
 `time_entries.branch` now follows the same precedence as `purchase_orders`:

@@ -197,6 +197,9 @@ func TestSyncCurrencyRates_UpdatesNonHomeCurrenciesOnly(t *testing.T) {
 					{"d":"2026-04-03","FXJPYCAD":{"v":"0.0093"}}
 				]
 			}`)
+		case strings.Contains(r.URL.Path, "FXCHFCAD"):
+			// The WIP fixture starts without a rate. A sync must fill it too.
+			fmt.Fprint(w, `{"observations":[{"d":"2026-04-03","FXCHFCAD":{"v":"1.6000"}}]}`)
 		default:
 			t.Fatalf("unexpected currency rate request: %s", r.URL.Path)
 		}
@@ -229,9 +232,14 @@ func TestSyncCurrencyRates_UpdatesNonHomeCurrenciesOnly(t *testing.T) {
 	if reloadedCAD.GetFloat("rate") != 1 || !strings.HasPrefix(reloadedCAD.GetString("rate_date"), "2026-01-01") {
 		t.Fatalf("expected CAD rate to remain unchanged, got rate=%v rate_date=%q", reloadedCAD.GetFloat("rate"), reloadedCAD.GetString("rate_date"))
 	}
-	if len(requestedSeries) != 2 ||
+	chf := loadCurrencyByCode(t, app, "CHF")
+	if chf.GetFloat("rate") != 1.6 || !strings.HasPrefix(chf.GetString("rate_date"), "2026-04-03") {
+		t.Fatalf("expected the missing CHF rate to be filled, got rate=%v rate_date=%q", chf.GetFloat("rate"), chf.GetString("rate_date"))
+	}
+	if len(requestedSeries) != 3 ||
 		!strings.Contains(strings.Join(requestedSeries, ","), "FXUSDCAD") ||
-		!strings.Contains(strings.Join(requestedSeries, ","), "FXJPYCAD") {
+		!strings.Contains(strings.Join(requestedSeries, ","), "FXJPYCAD") ||
+		!strings.Contains(strings.Join(requestedSeries, ","), "FXCHFCAD") {
 		t.Fatalf("expected lookups for each non-home currency, got %v", requestedSeries)
 	}
 }
