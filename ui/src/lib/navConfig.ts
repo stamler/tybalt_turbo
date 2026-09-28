@@ -1,4 +1,5 @@
 import { downloadActiveJobsCsv, downloadTimeEntryBranchMismatchesCsv } from "$lib/navActions";
+import { canViewPOApprovers } from "$lib/poApprovalLimits";
 
 export interface NavButton {
   action: string | (() => void | Promise<void>);
@@ -12,6 +13,7 @@ export interface NavItem {
   href: string;
   buttons: NavButton[];
   requiredClaim?: string;
+  canView?: (claims: string[]) => boolean;
 }
 
 export interface NavSection {
@@ -178,7 +180,12 @@ export const navSections: NavSection[] = [
         ],
       },
       { label: "Absorb Actions", href: "/absorb/actions", buttons: [] },
-      { label: "PO Approvers", href: "/pos/approval-limits", buttons: [], requiredClaim: "report" },
+      {
+        label: "PO Approvers",
+        href: "/pos/approval-limits",
+        buttons: [],
+        canView: canViewPOApprovers,
+      },
       { label: "Admin Profiles", href: "/admin_profiles/list", buttons: [] },
       { label: "Claims", href: "/claims/list", buttons: [] },
     ],

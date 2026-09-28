@@ -9,6 +9,7 @@ import (
 	"tybalt/hooks"
 	"tybalt/internal/testseed"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -24,8 +25,8 @@ func TestPOApprovalLimitsAccess(t *testing.T) {
 	}{
 		{"anonymous", "", http.StatusUnauthorized},
 		{"no claims", "u_no_claims@example.com", http.StatusForbidden},
-		{"approver only", "tier2@poapprover.com", http.StatusForbidden},
-		{"report", "fatt@mac.com", http.StatusOK},
+		{"approver only", "tier2@poapprover.com", http.StatusOK},
+		{"report and approver", "fatt@mac.com", http.StatusOK},
 		{"admin only", "admin.only@example.com", http.StatusForbidden},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -40,24 +41,57 @@ func TestPOApprovalLimitsAccess(t *testing.T) {
 		})
 	}
 
-	// Revoke the report claim in this isolated fixture DB. An existing token
-	// must lose access immediately, without waiting for the UI to refresh.
-	token := authTokenForEmail(t, app, "fatt@mac.com")
-	if _, err := app.DB().NewQuery(`DELETE FROM user_claims WHERE id = 'p5hg1ck0cbjrp0z'`).Execute(); err != nil {
-		t.Fatal(err)
-	}
-	rec := performClaimsJSONRequest(t, app, http.MethodGet, "/api/purchase_orders/approval_limits", token, nil)
-	if rec.Code != http.StatusForbidden {
-		t.Fatalf("revoked claim status = %d, want 403", rec.Code)
+}
+
+func TestPOApprovalLimitsClaimRevocation(t *testing.T) {
+	for _, tc := range []struct {
+		name, email string
+		claimIDs    []string
+	}{
+		{"report removed first", "fatt@mac.com", []string{"p5hg1ck0cbjrp0z", "6dqxhrtmxin2jz5"}},
+		{"approver removed first", "fatt@mac.com", []string{"6dqxhrtmxin2jz5", "p5hg1ck0cbjrp0z"}},
+		{"approver only", "tier2@poapprover.com", []string{"9azfu0gh25n6mjm"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := testseed.NewSeededTestApp(t)
+			t.Cleanup(app.Cleanup)
+			hooks.AddHooks(app)
+			AddRoutes(app)
+			token := authTokenForEmail(t, app, tc.email)
+			readPOApprovalLimits(t, app, token)
+			// Remove claims only in this isolated fixture DB to test an existing
+			// token after each revocation. Either remaining claim must allow access.
+			for i, id := range tc.claimIDs {
+				if _, err := app.DB().NewQuery(`DELETE FROM user_claims WHERE id = {:id}`).Bind(dbx.Params{"id": id}).Execute(); err != nil {
+					t.Fatal(err)
+				}
+				want := http.StatusOK
+				if i == len(tc.claimIDs)-1 {
+					want = http.StatusForbidden
+				}
+				rec := performClaimsJSONRequest(t, app, http.MethodGet, "/api/purchase_orders/approval_limits", token, nil)
+				if rec.Code != want {
+					t.Fatalf("after revoking %s: status = %d, want %d; body=%s", id, rec.Code, want, rec.Body.String())
+				}
+			}
+		})
 	}
 }
 
 func TestPOApprovalLimitsDataAndReadOnlyAccess(t *testing.T) {
+	for _, email := range []string{"fatt@mac.com", "tier2@poapprover.com"} {
+		t.Run(email, func(t *testing.T) {
+			testPOApprovalLimitsDataAndReadOnlyAccess(t, email)
+		})
+	}
+}
+
+func testPOApprovalLimitsDataAndReadOnlyAccess(t *testing.T, email string) {
 	app := testseed.NewSeededTestApp(t)
 	t.Cleanup(app.Cleanup)
 	hooks.AddHooks(app)
 	AddRoutes(app)
-	token := authTokenForEmail(t, app, "fatt@mac.com")
+	token := authTokenForEmail(t, app, email)
 
 	// Give one existing fixture distinct amounts so swapped category columns
 	// cannot pass the test. This change exists only in this isolated test DB.
@@ -128,7 +162,7 @@ func TestPOApprovalLimitsDataAndReadOnlyAccess(t *testing.T) {
 	// Reading the report must not grant access to the existing write API.
 	write := performClaimsJSONRequest(t, app, http.MethodPatch, "/api/collections/po_approver_props/records/"+props.Id, token, map[string]any{"max_amount": 999999})
 	if write.Code < 400 {
-		t.Fatalf("report holder could edit limits: %d %s", write.Code, write.Body.String())
+		t.Fatalf("report reader could edit limits: %d %s", write.Code, write.Body.String())
 	}
 	for _, method := range []string{http.MethodPost, http.MethodPatch, http.MethodDelete} {
 		rec := performClaimsJSONRequest(t, app, method, "/api/purchase_orders/approval_limits", token, map[string]any{"max_amount": 999999})

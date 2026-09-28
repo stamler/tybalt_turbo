@@ -17,6 +17,8 @@
   >Test access
   <select aria-label="Test access" bind:value={access}>
     <option value="report">Report</option>
+    <option value="po_approver">PO approver</option>
+    <option value="report,po_approver">Report and PO approver</option>
     <option value="admin">Admin</option>
     <option value="report,admin">Report and admin</option>
     <option value="none">None</option>
@@ -25,3 +27,11 @@
 <Page />
 
 <output hidden data-testid="nav-config">{JSON.stringify(navSections)}</output>
+<output hidden data-testid="nav-access">
+  {String(
+    navSections
+      .flatMap((section) => section.items)
+      .find((item) => item.href === "/pos/approval-limits")
+      ?.canView?.($testStore.claims),
+  )}
+</output>

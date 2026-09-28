@@ -1,3 +1,7 @@
+export function canViewPOApprovers(claims: string[]): boolean {
+  return claims.includes("report") || claims.includes("po_approver");
+}
+
 export type POApprovalLimitField =
   | "max_amount"
   | "project_max"

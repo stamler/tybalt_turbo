@@ -31,8 +31,11 @@
         const filteredItems = section.items
           .filter((item) => {
             // Show All UI bypasses the usual filters. PO Approvers must still
-            // require the claim set on its nav item.
+            // pass the access check set on its nav item.
             if ($globalStore.showAllUi && item.href !== "/pos/approval-limits") return true;
+            if (item.canView) {
+              return item.canView($globalStore.claims);
+            }
             if (item.requiredClaim) {
               return $globalStore.claims.includes(item.requiredClaim);
             }

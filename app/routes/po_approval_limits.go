@@ -48,6 +48,9 @@ type poApprovalLimitsResponse struct {
 func createGetPOApprovalLimitsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		allowed, err := utilities.HasClaim(app, e.Auth, "report")
+		if err == nil && !allowed {
+			allowed, err = utilities.HasClaim(app, e.Auth, "po_approver")
+		}
 		if err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to check approval-limit access", err)
 		}

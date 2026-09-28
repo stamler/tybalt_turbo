@@ -127,7 +127,7 @@ await runBrowserHarness(async (page, origin) => {
   const approversIndex = business.findIndex((item) => item.label === "PO Approvers");
   assert.equal(business[approversIndex - 1].label, "Absorb Actions");
   assert.equal(business[approversIndex + 1].label, "Admin Profiles");
-  assert.equal(business[approversIndex].requiredClaim, "report");
+  assert.equal((await page.getByTestId("nav-access").textContent()).trim(), "true");
   assert.equal(
     sections
       .flatMap((section) => section.items)
@@ -203,15 +203,29 @@ await runBrowserHarness(async (page, origin) => {
   await page.getByText("No active PO approvers found.").waitFor();
   const beforeDenied = methods.length;
   await page.getByLabel("Test access").selectOption("none");
-  await page.getByText("You need the report claim to view PO approval limits.").waitFor();
+  await page
+    .getByText("You need the report or po_approver claim to view PO approval limits.")
+    .waitFor();
   assert.equal(methods.length, beforeDenied, "unauthorized page must not load the report");
+  assert.equal((await page.getByTestId("nav-access").textContent()).trim(), "false");
   mode = "normal";
   await page.getByLabel("Test access").selectOption("admin");
-  await page.getByText("You need the report claim to view PO approval limits.").waitFor();
+  await page
+    .getByText("You need the report or po_approver claim to view PO approval limits.")
+    .waitFor();
   assert.equal(methods.length, beforeDenied, "admin alone must not load the report");
+  assert.equal((await page.getByTestId("nav-access").textContent()).trim(), "false");
   await page.getByLabel("Test access").selectOption("report,admin");
   await table.waitFor();
   assert.equal(await table.locator("tbody tr").count(), 4);
+  for (const access of ["po_approver", "report,po_approver"]) {
+    await page.getByLabel("Test access").selectOption("none");
+    await page.getByRole("alert").waitFor();
+    await page.getByLabel("Test access").selectOption(access);
+    await table.waitFor();
+    assert.equal(await table.locator("tbody tr").count(), 4);
+    assert.equal((await page.getByTestId("nav-access").textContent()).trim(), "true");
+  }
   assert.deepEqual([...new Set(methods)], ["GET"]);
   assert.deepEqual(errors, []);
 });
