@@ -1,7 +1,4 @@
-import {
-  downloadActiveJobsCsv,
-  downloadTimeEntryBranchMismatchesCsv,
-} from "$lib/navActions";
+import { downloadActiveJobsCsv, downloadTimeEntryBranchMismatchesCsv } from "$lib/navActions";
 
 export interface NavButton {
   action: string | (() => void | Promise<void>);
@@ -181,6 +178,7 @@ export const navSections: NavSection[] = [
         ],
       },
       { label: "Absorb Actions", href: "/absorb/actions", buttons: [] },
+      { label: "PO Approvers", href: "/pos/approval-limits", buttons: [], requiredClaim: "report" },
       { label: "Admin Profiles", href: "/admin_profiles/list", buttons: [] },
       { label: "Claims", href: "/claims/list", buttons: [] },
     ],

@@ -25,115 +25,113 @@
   let isSidebarOpen = $state(false);
 
   let navSections = $derived(
-    $globalStore.showAllUi
-      ? allNavSections
-      : allNavSections
-          .map((section) => {
-            // Filter items within each section
-            const filteredItems = section.items
-              .filter((item) => {
-                if (item.requiredClaim) {
-                  return $globalStore.claims.includes(item.requiredClaim);
-                }
-                if (
-                  item.href.startsWith("/time/tracking") ||
-                  item.href.startsWith("/expenses/tracking")
-                ) {
-                  return (
-                    $globalStore.claims.includes("report") || $globalStore.claims.includes("admin")
-                  );
-                }
-                if (item.href.startsWith("/time/work-records")) {
-                  return (
-                    $globalStore.claims.includes("report") ||
-                    $globalStore.claims.includes("work_record")
-                  );
-                }
-                if (
-                  item.href.startsWith("/time/sheets/pending") ||
-                  item.href.startsWith("/time/sheets/approved") ||
-                  item.href.startsWith("/expenses/pending") ||
-                  item.href.startsWith("/expenses/approved") ||
-                  item.href.startsWith("/pos/pending")
-                ) {
-                  return $globalStore.claims.includes("tapr");
-                }
-                if (item.href.startsWith("/absorb/actions")) {
-                  return $globalStore.claims.includes("absorb");
-                }
-                if (item.href.startsWith("/rate-sheets")) {
-                  return $globalStore.claims.includes("job");
-                }
-                if (item.href.startsWith("/jobs/project_authorization")) {
-                  return (
-                    $globalStore.claims.includes("accounting") ||
-                    attentionCountFor(item.href) > 0
-                  );
-                }
-                if (item.href.startsWith("/reports/expense/queue")) {
-                  return $globalStore.claims.includes("commit");
-                }
-                if (item.href.startsWith("/expenses/settlement")) {
-                  return $globalStore.claims.includes("payables_admin");
-                }
-                if (item.href.startsWith("/reports/")) {
-                  return $globalStore.claims.includes("report");
-                }
-                if (item.href.startsWith("/time/amendments")) {
-                  return (
-                    $globalStore.claims.includes("tame") || $globalStore.claims.includes("report")
-                  );
-                }
-                if (item.href === "/admin_profiles/list") {
-                  return (
-                    $globalStore.claims.includes("admin") ||
-                    $globalStore.claims.includes("hr") ||
-                    $globalStore.claims.includes("time_off_manager") ||
-                    $globalStore.claims.includes("it")
-                  );
-                }
-                if (
-                  item.href.startsWith("/admin_profiles") ||
-                  item.href.startsWith("/currencies") ||
-                  item.href.startsWith("/timetypes") ||
-                  item.href.startsWith("/divisions") ||
-                  item.href.startsWith("/machine_secrets") ||
-                  item.href.startsWith("/attachment_audit")
-                ) {
-                  return $globalStore.claims.includes("admin");
-                }
-                return true; // Keep item if no specific claim is required
-              })
-              .map((item) => {
-                const gatedButtons = (item.buttons || []).filter((btn) => {
-                  if (
-                    btn.action === "/jobs/add" ||
-                    btn.action === "/jobs/unused" ||
-                    btn.action === "/jobs/stale" ||
-                    btn.action === "/jobs/latest" ||
-                    btn.action === "/clients/add"
-                  ) {
-                    return $globalStore.claims.includes("job");
-                  }
-                  if (btn.action === "/vendors/add") {
-                    return $globalStore.claims.includes("payables_admin");
-                  }
-                  return true;
-                });
-                return { ...item, buttons: gatedButtons };
-              });
-
-            // Return the section with filtered items
-            return { ...section, items: filteredItems };
-          })
-          .filter((section) => {
-            // KPI-only users still need the Reports section for the KPI index.
-            if (section.title === "Reports") {
-              return $globalStore.claims.includes("report") || $globalStore.claims.includes("kpi");
+    allNavSections
+      .map((section) => {
+        // Filter items within each section
+        const filteredItems = section.items
+          .filter((item) => {
+            // Show All UI bypasses the usual filters. PO Approvers must still
+            // require the claim set on its nav item.
+            if ($globalStore.showAllUi && item.href !== "/pos/approval-limits") return true;
+            if (item.requiredClaim) {
+              return $globalStore.claims.includes(item.requiredClaim);
             }
-            // Hide sections that become empty after filtering
-            return section.items.length > 0;
-          }),
+            if (
+              item.href.startsWith("/time/tracking") ||
+              item.href.startsWith("/expenses/tracking")
+            ) {
+              return (
+                $globalStore.claims.includes("report") || $globalStore.claims.includes("admin")
+              );
+            }
+            if (item.href.startsWith("/time/work-records")) {
+              return (
+                $globalStore.claims.includes("report") ||
+                $globalStore.claims.includes("work_record")
+              );
+            }
+            if (
+              item.href.startsWith("/time/sheets/pending") ||
+              item.href.startsWith("/time/sheets/approved") ||
+              item.href.startsWith("/expenses/pending") ||
+              item.href.startsWith("/expenses/approved") ||
+              item.href.startsWith("/pos/pending")
+            ) {
+              return $globalStore.claims.includes("tapr");
+            }
+            if (item.href.startsWith("/absorb/actions")) {
+              return $globalStore.claims.includes("absorb");
+            }
+            if (item.href.startsWith("/rate-sheets")) {
+              return $globalStore.claims.includes("job");
+            }
+            if (item.href.startsWith("/jobs/project_authorization")) {
+              return $globalStore.claims.includes("accounting") || attentionCountFor(item.href) > 0;
+            }
+            if (item.href.startsWith("/reports/expense/queue")) {
+              return $globalStore.claims.includes("commit");
+            }
+            if (item.href.startsWith("/expenses/settlement")) {
+              return $globalStore.claims.includes("payables_admin");
+            }
+            if (item.href.startsWith("/reports/")) {
+              return $globalStore.claims.includes("report");
+            }
+            if (item.href.startsWith("/time/amendments")) {
+              return $globalStore.claims.includes("tame") || $globalStore.claims.includes("report");
+            }
+            if (item.href === "/admin_profiles/list") {
+              return (
+                $globalStore.claims.includes("admin") ||
+                $globalStore.claims.includes("hr") ||
+                $globalStore.claims.includes("time_off_manager") ||
+                $globalStore.claims.includes("it")
+              );
+            }
+            if (
+              item.href.startsWith("/admin_profiles") ||
+              item.href.startsWith("/currencies") ||
+              item.href.startsWith("/timetypes") ||
+              item.href.startsWith("/divisions") ||
+              item.href.startsWith("/machine_secrets") ||
+              item.href.startsWith("/attachment_audit")
+            ) {
+              return $globalStore.claims.includes("admin");
+            }
+            return true; // Keep item if no specific claim is required
+          })
+          .map((item) => {
+            if ($globalStore.showAllUi) return item;
+            const gatedButtons = (item.buttons || []).filter((btn) => {
+              if (
+                btn.action === "/jobs/add" ||
+                btn.action === "/jobs/unused" ||
+                btn.action === "/jobs/stale" ||
+                btn.action === "/jobs/latest" ||
+                btn.action === "/clients/add"
+              ) {
+                return $globalStore.claims.includes("job");
+              }
+              if (btn.action === "/vendors/add") {
+                return $globalStore.claims.includes("payables_admin");
+              }
+              return true;
+            });
+            return { ...item, buttons: gatedButtons };
+          });
+
+        // Return the section with filtered items
+        return { ...section, items: filteredItems };
+      })
+      .filter((section) => {
+        if ($globalStore.showAllUi) return true;
+        // KPI-only users still need the Reports section for the KPI index.
+        if (section.title === "Reports") {
+          return $globalStore.claims.includes("report") || $globalStore.claims.includes("kpi");
+        }
+        // Hide sections that become empty after filtering
+        return section.items.length > 0;
+      }),
   );
 
   // Helper store that reflects whether any task is running

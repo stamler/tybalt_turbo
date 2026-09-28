@@ -15,7 +15,8 @@
     "test:time-summary": "node --test --experimental-strip-types tests/timeSummary.test.ts",
     "test:time-summary-browser": "node tests/timeSummary.browser.mjs",
     "test:wip": "node --test --experimental-strip-types tests/wip.test.ts",
-    "test:wip-browser": "node tests/wip.browser.mjs"
+    "test:wip-browser": "node tests/wip.browser.mjs",
+    "test:po-approval-limits-browser": "node tests/poApprovalLimits.browser.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

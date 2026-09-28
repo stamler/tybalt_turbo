@@ -197,6 +197,7 @@ func AddRoutes(app core.App) {
 		poGroup.GET("/visible/{id}/expenses", createGetPurchaseOrderExpensesHandler(app))
 		poGroup.GET("/search", createGetSearchablePurchaseOrdersHandler(app))
 		poGroup.GET("/approvers", createGetApproversHandler(app, false))
+		poGroup.GET("/approval_limits", createGetPOApprovalLimitsHandler(app))
 		poGroup.GET("/second_approvers", createGetApproversHandler(app, true))
 
 		// PO mutation routes are gated on expenses editing via middleware

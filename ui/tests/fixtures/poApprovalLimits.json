@@ -1,0 +1,108 @@
+{
+  "items": [
+    {
+      "id": "all",
+      "given_name": "Avery",
+      "surname": "Able",
+      "configured": true,
+      "max_amount": 10000,
+      "project_max": 20000,
+      "sponsorship_max": 3000,
+      "staff_and_social_max": 4000,
+      "media_and_event_max": 5000,
+      "computer_max": 6000,
+      "divisions": []
+    },
+    {
+      "id": "limited",
+      "given_name": "Bailey",
+      "surname": "Baker",
+      "configured": true,
+      "max_amount": 500,
+      "project_max": 500,
+      "sponsorship_max": 0,
+      "staff_and_social_max": 0,
+      "media_and_event_max": 0,
+      "computer_max": 0,
+      "divisions": ["eng"]
+    },
+    {
+      "id": "missing",
+      "given_name": "Casey",
+      "surname": "Carter",
+      "configured": false,
+      "max_amount": 0,
+      "project_max": 0,
+      "sponsorship_max": 0,
+      "staff_and_social_max": 0,
+      "media_and_event_max": 0,
+      "computer_max": 0,
+      "divisions": []
+    },
+    {
+      "id": "mixed",
+      "given_name": "Drew",
+      "surname": "Dover",
+      "configured": true,
+      "max_amount": 250,
+      "project_max": 25000,
+      "sponsorship_max": 150,
+      "staff_and_social_max": 4500,
+      "media_and_event_max": 250,
+      "computer_max": 6500,
+      "divisions": ["admin"]
+    }
+  ],
+  "categories": [
+    {
+      "id": "project",
+      "label": "Project",
+      "limit_field": "project_max",
+      "second_approval_threshold": 500
+    },
+    {
+      "id": "capital",
+      "label": "Capital",
+      "limit_field": "max_amount",
+      "second_approval_threshold": 500
+    },
+    {
+      "id": "staff",
+      "label": "Staff and Social",
+      "limit_field": "staff_and_social_max",
+      "second_approval_threshold": 0
+    },
+    {
+      "id": "sponsor",
+      "label": "Sponsorship",
+      "limit_field": "sponsorship_max",
+      "second_approval_threshold": 0
+    },
+    {
+      "id": "media",
+      "label": "Media/Advertising",
+      "limit_field": "media_and_event_max",
+      "second_approval_threshold": 0
+    },
+    {
+      "id": "computer",
+      "label": "Computers/Software",
+      "limit_field": "computer_max",
+      "second_approval_threshold": 500
+    }
+  ],
+  "divisions": [
+    {
+      "id": "eng",
+      "code": "ENG",
+      "name": "Engineering",
+      "active": true
+    },
+    {
+      "id": "admin",
+      "code": "ADM",
+      "name": "Administration and business services",
+      "active": true
+    }
+  ]
+}
