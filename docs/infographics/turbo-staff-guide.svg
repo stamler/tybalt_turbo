@@ -1,0 +1,321 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="2260" viewBox="0 0 1600 2260" role="img" aria-labelledby="title desc">
+<title id="title">Turbo: Spend, record, approve</title>
+<desc id="desc">Draft guide to purchase orders, expenses, time sheets, and approval amounts. Three separate workflows and a guide to PO requirements. Amounts shown as examples are not live company settings.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#8A98A6"/></marker></defs>
+<rect x="0" y="0" width="1600" height="2260" rx="0" fill="#F5F7FA" stroke="none"/>
+<rect x="0" y="0" width="1600" height="236" rx="0" fill="#172C42" stroke="none"/>
+<text x="64" y="55" font-family="Arial, Helvetica, sans-serif" font-size="20" font-weight="700" fill="#AFCBE6">
+<tspan x="64" dy="0">TURBO  /  STAFF GUIDE</tspan>
+</text>
+<text x="64" y="126" font-family="Arial, Helvetica, sans-serif" font-size="62" font-weight="700" fill="#FFFFFF">
+<tspan x="64" dy="0">Spend, record, approve.</tspan>
+</text>
+<text x="64" y="180" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="400" fill="#DFE9F3">
+<tspan x="64" dy="0">POs authorise purchases. Expenses record costs. Time sheets record work.</tspan>
+</text>
+<rect x="1250" y="30" width="286" height="40" rx="20" fill="#2D435A" stroke="none"/>
+<text x="1271" y="57" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#FFFFFF">
+<tspan x="1271" dy="0">DRAFT 01  ·  28 SEP 2026</tspan>
+</text>
+<text x="64" y="283" font-family="Arial, Helvetica, sans-serif" font-size="19" font-weight="700" fill="#526579">
+<tspan x="64" dy="0">THREE PATHS. EACH HAS ITS OWN APPROVAL.</tspan>
+</text>
+<text x="64" y="341" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#285EA8">
+<tspan x="64" dy="0">01</tspan>
+</text>
+<text x="120" y="341" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="700" fill="#213547">
+<tspan x="120" dy="0">Request a purchase</tspan>
+</text>
+<text x="120" y="379" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400" fill="#526579">
+<tspan x="120" dy="0">Check whether a PO is required. Use the guide below.</tspan>
+</text>
+<rect x="64" y="408" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="64" y="408" width="5" height="178" rx="0" fill="#285EA8" stroke="none"/>
+<text x="86" y="438" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#285EA8">
+<tspan x="86" dy="0">YOU</tspan>
+</text>
+<text x="86" y="473" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="86" dy="0">Create the PO</tspan>
+</text>
+<text x="86" y="509" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="86" dy="0">Set the spending category,</tspan>
+<tspan x="86" dy="29">division, payment type and</tspan>
+<tspan x="86" dy="29">job, when applicable.</tspan>
+</text>
+<polyline points="402,496 433,496" fill="none" stroke="#8A98A6" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="444" y="408" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="444" y="408" width="5" height="178" rx="0" fill="#285EA8" stroke="none"/>
+<text x="466" y="438" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#285EA8">
+<tspan x="466" dy="0">PO APPROVER</tspan>
+</text>
+<text x="466" y="473" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="466" dy="0">Approve or review</tspan>
+</text>
+<text x="466" y="509" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="466" dy="0">One step: final approval.</tspan>
+<tspan x="466" dy="29">Two steps: initial review.</tspan>
+<tspan x="466" dy="29">Turbo checks eligibility.</tspan>
+</text>
+<polyline points="782,496 813,496" fill="none" stroke="#8A98A6" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+<rect x="824" y="408" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="824" y="408" width="5" height="178" rx="0" fill="#285EA8" stroke="none"/>
+<text x="846" y="438" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#285EA8">
+<tspan x="846" dy="0">IF REQUIRED</tspan>
+</text>
+<text x="846" y="473" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="846" dy="0">Final approval</tspan>
+</text>
+<text x="846" y="509" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="846" dy="0">Above the threshold, final</tspan>
+<tspan x="846" dy="29">authority must cover the</tspan>
+<tspan x="846" dy="29">full approval amount.</tspan>
+</text>
+<polyline points="1162,496 1193,496" fill="none" stroke="#8A98A6" stroke-width="2.5" stroke-dasharray="7 6" marker-end="url(#arrow)"/>
+<rect x="1204" y="408" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="1204" y="408" width="5" height="178" rx="0" fill="#285EA8" stroke="none"/>
+<text x="1226" y="438" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#285EA8">
+<tspan x="1226" dy="0">TURBO</tspan>
+</text>
+<text x="1226" y="473" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="1226" dy="0">PO becomes Active</tspan>
+</text>
+<text x="1226" y="509" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="1226" dy="0">The required approvals</tspan>
+<tspan x="1226" dy="29">are complete. You can now</tspan>
+<tspan x="1226" dy="29">record expenses on this PO.</tspan>
+</text>
+<text x="64" y="624" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="64" dy="0">Turbo can combine approval steps when policy allows. A PO alone does not record the actual expense.</tspan>
+</text>
+<polyline points="1369,589 1369,655 42,655 42,863 62,863" fill="none" stroke="#8A98A6" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="503" y="638" width="620" height="34" rx="0" fill="#F5F7FA" stroke="none"/>
+<text x="524" y="663" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#285EA8">
+<tspan x="524" dy="0">OPEN THE ACTIVE PO → CREATE ITS EXPENSE</tspan>
+</text>
+<text x="64" y="707" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#16766C">
+<tspan x="64" dy="0">02</tspan>
+</text>
+<text x="120" y="707" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="700" fill="#213547">
+<tspan x="120" dy="0">Record an expense</tspan>
+</text>
+<text x="120" y="745" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400" fill="#526579">
+<tspan x="120" dy="0">Supplier invoice, corporate Visa purchase, out-of-pocket expense, allowance or mileage.</tspan>
+</text>
+<rect x="64" y="774" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="64" y="774" width="5" height="178" rx="0" fill="#16766C" stroke="none"/>
+<text x="86" y="804" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#16766C">
+<tspan x="86" dy="0">YOU</tspan>
+</text>
+<text x="86" y="839" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="86" dy="0">Enter cost + evidence</tspan>
+</text>
+<text x="86" y="875" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="86" dy="0">Start from the Active PO,</tspan>
+<tspan x="86" dy="29">or create a new expense</tspan>
+<tspan x="86" dy="29">when no PO is required.</tspan>
+</text>
+<polyline points="402,862 433,862" fill="none" stroke="#8A98A6" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="444" y="774" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="444" y="774" width="5" height="178" rx="0" fill="#16766C" stroke="none"/>
+<text x="466" y="804" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#16766C">
+<tspan x="466" dy="0">YOU</tspan>
+</text>
+<text x="466" y="839" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="466" dy="0">Check and submit</tspan>
+</text>
+<text x="466" y="875" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="466" dy="0">Check the payment type,</tspan>
+<tspan x="466" dy="29">job, division and amount.</tspan>
+<tspan x="466" dy="29">Add required documents.</tspan>
+</text>
+<polyline points="782,862 813,862" fill="none" stroke="#8A98A6" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="824" y="774" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="824" y="774" width="5" height="178" rx="0" fill="#16766C" stroke="none"/>
+<text x="846" y="804" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#16766C">
+<tspan x="846" dy="0">ASSIGNED APPROVER</tspan>
+</text>
+<text x="846" y="839" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="846" dy="0">Review the expense</tspan>
+</text>
+<text x="846" y="875" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="846" dy="0">Approve the submitted cost,</tspan>
+<tspan x="846" dy="29">or reject it with a reason.</tspan>
+<tspan x="846" dy="29">This is separate from the PO.</tspan>
+</text>
+<polyline points="1162,862 1193,862" fill="none" stroke="#8A98A6" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="1204" y="774" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="1204" y="774" width="5" height="178" rx="0" fill="#16766C" stroke="none"/>
+<text x="1226" y="804" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#16766C">
+<tspan x="1226" dy="0">AUTHORISED STAFF</tspan>
+</text>
+<text x="1226" y="839" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="1226" dy="0">Commit the expense</tspan>
+</text>
+<text x="1226" y="875" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="1226" dy="0">Finalise the approved record</tspan>
+<tspan x="1226" dy="29">for accounting and payroll</tspan>
+<tspan x="1226" dy="29">processing, as applicable.</tspan>
+</text>
+<text x="64" y="990" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="64" dy="0">Rejected expense? Recall, correct and resubmit. Foreign-currency expenses need settlement before commit.</tspan>
+</text>
+<text x="64" y="1081" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#6C54A0">
+<tspan x="64" dy="0">03</tspan>
+</text>
+<text x="120" y="1081" font-family="Arial, Helvetica, sans-serif" font-size="31" font-weight="700" fill="#213547">
+<tspan x="120" dy="0">Record your time</tspan>
+</text>
+<text x="120" y="1119" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400" fill="#526579">
+<tspan x="120" dy="0">Use time entries for work hours. A PO is not part of the time-sheet approval path.</tspan>
+</text>
+<rect x="64" y="1148" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="64" y="1148" width="5" height="178" rx="0" fill="#6C54A0" stroke="none"/>
+<text x="86" y="1178" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#6C54A0">
+<tspan x="86" dy="0">YOU</tspan>
+</text>
+<text x="86" y="1213" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="86" dy="0">Enter daily hours</tspan>
+</text>
+<text x="86" y="1249" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="86" dy="0">Choose the job, division</tspan>
+<tspan x="86" dy="29">and role when required.</tspan>
+<tspan x="86" dy="29">Add the work details.</tspan>
+</text>
+<polyline points="402,1236 433,1236" fill="none" stroke="#8A98A6" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="444" y="1148" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="444" y="1148" width="5" height="178" rx="0" fill="#6C54A0" stroke="none"/>
+<text x="466" y="1178" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#6C54A0">
+<tspan x="466" dy="0">YOU</tspan>
+</text>
+<text x="466" y="1213" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="466" dy="0">Submit the week</tspan>
+</text>
+<text x="466" y="1249" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="466" dy="0">Check the week’s entries.</tspan>
+<tspan x="466" dy="29">Submit them as a time sheet</tspan>
+<tspan x="466" dy="29">for the Saturday week end.</tspan>
+</text>
+<polyline points="782,1236 813,1236" fill="none" stroke="#8A98A6" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="824" y="1148" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="824" y="1148" width="5" height="178" rx="0" fill="#6C54A0" stroke="none"/>
+<text x="846" y="1178" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#6C54A0">
+<tspan x="846" dy="0">ASSIGNED APPROVER</tspan>
+</text>
+<text x="846" y="1213" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="846" dy="0">Review the time sheet</tspan>
+</text>
+<text x="846" y="1249" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="846" dy="0">Approve the submitted hours,</tspan>
+<tspan x="846" dy="29">or reject the time sheet</tspan>
+<tspan x="846" dy="29">with a reason.</tspan>
+</text>
+<polyline points="1162,1236 1193,1236" fill="none" stroke="#8A98A6" stroke-width="2.5" marker-end="url(#arrow)"/>
+<rect x="1204" y="1148" width="330" height="178" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="1204" y="1148" width="5" height="178" rx="0" fill="#6C54A0" stroke="none"/>
+<text x="1226" y="1178" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#6C54A0">
+<tspan x="1226" dy="0">AUTHORISED STAFF</tspan>
+</text>
+<text x="1226" y="1213" font-family="Arial, Helvetica, sans-serif" font-size="25" font-weight="700" fill="#213547">
+<tspan x="1226" dy="0">Commit the time sheet</tspan>
+</text>
+<text x="1226" y="1249" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="1226" dy="0">Finalise the approved record</tspan>
+<tspan x="1226" dy="29">for payroll processing</tspan>
+<tspan x="1226" dy="29">and reporting.</tspan>
+</text>
+<text x="64" y="1364" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="64" dy="0">Rejected time sheet? Recall, correct and resubmit. Required project authorisation must be approved before submission.</tspan>
+</text>
+<rect x="64" y="1404" width="1472" height="2" rx="0" fill="#DCE3EB" stroke="none"/>
+<text x="64" y="1457" font-family="Arial, Helvetica, sans-serif" font-size="36" font-weight="700" fill="#213547">
+<tspan x="64" dy="0">Know which amount matters</tspan>
+</text>
+<rect x="64" y="1490" width="472" height="486" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="564" y="1490" width="472" height="486" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<rect x="1064" y="1490" width="472" height="486" rx="12" fill="#FFFFFF" stroke="#DCE3EB"/>
+<text x="88" y="1530" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#285EA8">
+<tspan x="88" dy="0">A  /  WHEN A PO IS REQUIRED</tspan>
+</text>
+<text x="88" y="1571" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#213547">
+<tspan x="88" dy="0">Invoice, card or Expense</tspan>
+</text>
+<text x="88" y="1613" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="400" fill="#213547">
+<tspan x="88" dy="0">With a job → PO at any amount.</tspan>
+<tspan x="88" dy="34">Without a job → PO at or above</tspan>
+<tspan x="88" dy="34">the configured no-PO limit.</tspan>
+</text>
+<rect x="88" y="1715" width="424" height="103" rx="8" fill="#EEF3FA" stroke="none"/>
+<text x="106" y="1747" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#285EA8">
+<tspan x="106" dy="0">IF THE LIMIT IS $100 CAD</tspan>
+</text>
+<text x="106" y="1785" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#213547">
+<tspan x="106" dy="0">$99.99: no PO  ·  $100: PO</tspan>
+</text>
+<text x="88" y="1858" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="88" dy="0">$100 is the software default.</tspan>
+<tspan x="88" dy="31">Confirm the live setting before use.</tspan>
+<tspan x="88" dy="31">See the exceptions below.</tspan>
+</text>
+<text x="588" y="1530" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#285EA8">
+<tspan x="588" dy="0">B  /  THE PO APPROVAL TOTAL</tspan>
+</text>
+<text x="588" y="1571" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#213547">
+<tspan x="588" dy="0">Use the full commitment</tspan>
+</text>
+<text x="588" y="1613" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400" fill="#213547">
+<tspan x="588" dy="0">One-Time / Cumulative: full PO total.</tspan>
+<tspan x="588" dy="34">Recurring: amount × all occurrences.</tspan>
+<tspan x="588" dy="34">Approval checks use CAD.</tspan>
+</text>
+<rect x="588" y="1715" width="424" height="103" rx="8" fill="#EEF3FA" stroke="none"/>
+<text x="606" y="1747" font-family="Arial, Helvetica, sans-serif" font-size="17" font-weight="700" fill="#285EA8">
+<tspan x="606" dy="0">RECURRING EXAMPLE ONLY</tspan>
+</text>
+<text x="606" y="1785" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#213547">
+<tspan x="606" dy="0">$500 × 12 = $6,000 CAD</tspan>
+</text>
+<text x="588" y="1858" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="588" dy="0">Second approval applies above a</tspan>
+<tspan x="588" dy="31">positive category threshold. At the</tspan>
+<tspan x="588" dy="31">threshold, one step is enough.</tspan>
+</text>
+<text x="1088" y="1530" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#285EA8">
+<tspan x="1088" dy="0">C  /  WHO CAN APPROVE</tspan>
+</text>
+<text x="1088" y="1571" font-family="Arial, Helvetica, sans-serif" font-size="26" font-weight="700" fill="#213547">
+<tspan x="1088" dy="0">Check PO Approvers</tspan>
+</text>
+<text x="1088" y="1613" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400" fill="#213547">
+<tspan x="1088" dy="0">Use the correct spending category</tspan>
+<tspan x="1088" dy="34">and division. The final approver’s</tspan>
+<tspan x="1088" dy="34">limit must cover the approval total.</tspan>
+</text>
+<rect x="1088" y="1715" width="424" height="103" rx="8" fill="#EEF3FA" stroke="none"/>
+<text x="1106" y="1747" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="700" fill="#285EA8">
+<tspan x="1106" dy="0">PURCHASE ORDERS → PO APPROVERS</tspan>
+</text>
+<text x="1106" y="1785" font-family="Arial, Helvetica, sans-serif" font-size="23" font-weight="700" fill="#213547">
+<tspan x="1106" dy="0">Current limits + threshold help</tspan>
+</text>
+<text x="1088" y="1858" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#526579">
+<tspan x="1088" dy="0">$0 means no authority in that category.</tspan>
+<tspan x="1088" dy="31">Access needs report permission.</tspan>
+<tspan x="1088" dy="31">Ask your approver if unavailable.</tspan>
+</text>
+<text x="64" y="2023" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="700" fill="#9D5C17">
+<tspan x="64" dy="0">PO EXCEPTIONS</tspan>
+</text>
+<text x="64" y="2063" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400" fill="#213547">
+<tspan x="64" dy="0">Mileage, Fuel Card, Allowance and enabled Personal Reimbursement entries do not require a PO.</tspan>
+</text>
+<text x="64" y="2098" font-family="Arial, Helvetica, sans-serif" font-size="22" font-weight="400" fill="#213547">
+<tspan x="64" dy="0">Payables administrators can bypass the amount limit for On Account entries; the job rule still applies.</tspan>
+</text>
+<rect x="64" y="2140" width="1472" height="2" rx="0" fill="#DCE3EB" stroke="none"/>
+<text x="64" y="2178" font-family="Arial, Helvetica, sans-serif" font-size="21" font-weight="400" fill="#213547">
+<tspan x="64" dy="0">A job links time, expenses and POs to the same project. A corporate card is a payment type, not an approval exemption.</tspan>
+</text>
+<text x="64" y="2220" font-family="Arial, Helvetica, sans-serif" font-size="18" font-weight="400" fill="#526579">
+<tspan x="64" dy="0">Draft based on current application rules · Amount examples are not live settings · Commit does not mean paid</tspan>
+</text>
+</svg>

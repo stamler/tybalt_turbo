@@ -1,0 +1,418 @@
+<?xml version='1.0' encoding='utf-8'?>
+<mxfile host="app.diagrams.net" type="device">
+  <diagram id="turbo-guide" name="Staff guide — draft 01">
+    <mxGraphModel dx="1600" dy="2260" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1600" pageHeight="2260" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="2" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#F5F7FA;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="0" y="0" width="1600" height="2260" />
+        </mxCell>
+        <mxCell id="3" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#172C42;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="0" y="0" width="1600" height="236" />
+        </mxCell>
+        <mxCell id="4" value="TURBO  /  STAFF GUIDE" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=20;fontColor=#AFCBE6;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="35" width="1400" height="36.0" />
+        </mxCell>
+        <mxCell id="5" value="Spend, record, approve." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=62;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="64" width="1400" height="94.8" />
+        </mxCell>
+        <mxCell id="6" value="POs authorise purchases. Expenses record costs. Time sheets record work." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#DFE9F3;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="155" width="1400" height="43.0" />
+        </mxCell>
+        <mxCell id="7" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#2D435A;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1250" y="30" width="286" height="40" />
+        </mxCell>
+        <mxCell id="8" value="DRAFT 01  ·  28 SEP 2026" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=18;fontColor=#FFFFFF;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1271" y="39" width="250" height="33.2" />
+        </mxCell>
+        <mxCell id="9" value="THREE PATHS. EACH HAS ITS OWN APPROVAL." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=19;fontColor=#526579;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="264" width="1400" height="34.599999999999994" />
+        </mxCell>
+        <mxCell id="10" value="01" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=24;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="317" width="55" height="41.599999999999994" />
+        </mxCell>
+        <mxCell id="11" value="Request a purchase" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=31;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="120" y="310" width="1380" height="51.4" />
+        </mxCell>
+        <mxCell id="12" value="Check whether a PO is required. Use the guide below." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=22;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="120" y="357" width="1380" height="38.8" />
+        </mxCell>
+        <mxCell id="13" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="408" width="330" height="178" />
+        </mxCell>
+        <mxCell id="14" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#285EA8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="408" width="5" height="178" />
+        </mxCell>
+        <mxCell id="15" value="YOU" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="86" y="422" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="16" value="Create the PO" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="86" y="448" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="17" value="Set the spending category,&#10;division, payment type and&#10;job, when applicable." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="86" y="488" width="286" height="95" />
+        </mxCell>
+        <mxCell id="18" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="402" y="496" />
+            <mxPoint as="targetPoint" x="433" y="496" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="19" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="444" y="408" width="330" height="178" />
+        </mxCell>
+        <mxCell id="20" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#285EA8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="444" y="408" width="5" height="178" />
+        </mxCell>
+        <mxCell id="21" value="PO APPROVER" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="466" y="422" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="22" value="Approve or review" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="466" y="448" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="23" value="One step: final approval.&#10;Two steps: initial review.&#10;Turbo checks eligibility." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="466" y="488" width="286" height="95" />
+        </mxCell>
+        <mxCell id="24" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=1;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="782" y="496" />
+            <mxPoint as="targetPoint" x="813" y="496" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="25" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="824" y="408" width="330" height="178" />
+        </mxCell>
+        <mxCell id="26" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#285EA8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="824" y="408" width="5" height="178" />
+        </mxCell>
+        <mxCell id="27" value="IF REQUIRED" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="846" y="422" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="28" value="Final approval" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="846" y="448" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="29" value="Above the threshold, final&#10;authority must cover the&#10;full approval amount." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="846" y="488" width="286" height="95" />
+        </mxCell>
+        <mxCell id="30" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=1;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="1162" y="496" />
+            <mxPoint as="targetPoint" x="1193" y="496" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="31" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1204" y="408" width="330" height="178" />
+        </mxCell>
+        <mxCell id="32" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#285EA8;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1204" y="408" width="5" height="178" />
+        </mxCell>
+        <mxCell id="33" value="TURBO" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1226" y="422" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="34" value="PO becomes Active" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1226" y="448" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="35" value="The required approvals&#10;are complete. You can now&#10;record expenses on this PO." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1226" y="488" width="286" height="95" />
+        </mxCell>
+        <mxCell id="36" value="Turbo can combine approval steps when policy allows. A PO alone does not record the actual expense." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="603" width="1400" height="37.4" />
+        </mxCell>
+        <mxCell id="37" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="1369" y="589" />
+            <mxPoint as="targetPoint" x="62" y="863" />
+            <Array as="points">
+              <mxPoint x="1369" y="655" />
+              <mxPoint x="42" y="655" />
+              <mxPoint x="42" y="863" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="38" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#F5F7FA;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="503" y="638" width="620" height="34" />
+        </mxCell>
+        <mxCell id="39" value="OPEN THE ACTIVE PO → CREATE ITS EXPENSE" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=18;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="524" y="645" width="580" height="33.2" />
+        </mxCell>
+        <mxCell id="40" value="02" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=24;fontColor=#16766C;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="683" width="55" height="41.599999999999994" />
+        </mxCell>
+        <mxCell id="41" value="Record an expense" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=31;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="120" y="676" width="1380" height="51.4" />
+        </mxCell>
+        <mxCell id="42" value="Supplier invoice, corporate Visa purchase, out-of-pocket expense, allowance or mileage." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=22;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="120" y="723" width="1380" height="38.8" />
+        </mxCell>
+        <mxCell id="43" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="774" width="330" height="178" />
+        </mxCell>
+        <mxCell id="44" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#16766C;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="774" width="5" height="178" />
+        </mxCell>
+        <mxCell id="45" value="YOU" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#16766C;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="86" y="788" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="46" value="Enter cost + evidence" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="86" y="814" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="47" value="Start from the Active PO,&#10;or create a new expense&#10;when no PO is required." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="86" y="854" width="286" height="95" />
+        </mxCell>
+        <mxCell id="48" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="402" y="862" />
+            <mxPoint as="targetPoint" x="433" y="862" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="49" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="444" y="774" width="330" height="178" />
+        </mxCell>
+        <mxCell id="50" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#16766C;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="444" y="774" width="5" height="178" />
+        </mxCell>
+        <mxCell id="51" value="YOU" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#16766C;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="466" y="788" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="52" value="Check and submit" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="466" y="814" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="53" value="Check the payment type,&#10;job, division and amount.&#10;Add required documents." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="466" y="854" width="286" height="95" />
+        </mxCell>
+        <mxCell id="54" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="782" y="862" />
+            <mxPoint as="targetPoint" x="813" y="862" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="55" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="824" y="774" width="330" height="178" />
+        </mxCell>
+        <mxCell id="56" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#16766C;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="824" y="774" width="5" height="178" />
+        </mxCell>
+        <mxCell id="57" value="ASSIGNED APPROVER" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#16766C;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="846" y="788" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="58" value="Review the expense" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="846" y="814" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="59" value="Approve the submitted cost,&#10;or reject it with a reason.&#10;This is separate from the PO." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="846" y="854" width="286" height="95" />
+        </mxCell>
+        <mxCell id="60" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="1162" y="862" />
+            <mxPoint as="targetPoint" x="1193" y="862" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="61" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1204" y="774" width="330" height="178" />
+        </mxCell>
+        <mxCell id="62" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#16766C;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1204" y="774" width="5" height="178" />
+        </mxCell>
+        <mxCell id="63" value="AUTHORISED STAFF" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#16766C;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1226" y="788" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="64" value="Commit the expense" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1226" y="814" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="65" value="Finalise the approved record&#10;for accounting and payroll&#10;processing, as applicable." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1226" y="854" width="286" height="95" />
+        </mxCell>
+        <mxCell id="66" value="Rejected expense? Recall, correct and resubmit. Foreign-currency expenses need settlement before commit." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="969" width="1400" height="37.4" />
+        </mxCell>
+        <mxCell id="67" value="03" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=24;fontColor=#6C54A0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="1057" width="55" height="41.599999999999994" />
+        </mxCell>
+        <mxCell id="68" value="Record your time" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=31;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="120" y="1050" width="1380" height="51.4" />
+        </mxCell>
+        <mxCell id="69" value="Use time entries for work hours. A PO is not part of the time-sheet approval path." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=22;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="120" y="1097" width="1380" height="38.8" />
+        </mxCell>
+        <mxCell id="70" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="1148" width="330" height="178" />
+        </mxCell>
+        <mxCell id="71" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#6C54A0;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="1148" width="5" height="178" />
+        </mxCell>
+        <mxCell id="72" value="YOU" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#6C54A0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="86" y="1162" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="73" value="Enter daily hours" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="86" y="1188" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="74" value="Choose the job, division&#10;and role when required.&#10;Add the work details." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="86" y="1228" width="286" height="95" />
+        </mxCell>
+        <mxCell id="75" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="402" y="1236" />
+            <mxPoint as="targetPoint" x="433" y="1236" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="76" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="444" y="1148" width="330" height="178" />
+        </mxCell>
+        <mxCell id="77" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#6C54A0;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="444" y="1148" width="5" height="178" />
+        </mxCell>
+        <mxCell id="78" value="YOU" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#6C54A0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="466" y="1162" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="79" value="Submit the week" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="466" y="1188" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="80" value="Check the week’s entries.&#10;Submit them as a time sheet&#10;for the Saturday week end." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="466" y="1228" width="286" height="95" />
+        </mxCell>
+        <mxCell id="81" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="782" y="1236" />
+            <mxPoint as="targetPoint" x="813" y="1236" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="82" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="824" y="1148" width="330" height="178" />
+        </mxCell>
+        <mxCell id="83" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#6C54A0;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="824" y="1148" width="5" height="178" />
+        </mxCell>
+        <mxCell id="84" value="ASSIGNED APPROVER" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#6C54A0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="846" y="1162" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="85" value="Review the time sheet" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="846" y="1188" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="86" value="Approve the submitted hours,&#10;or reject the time sheet&#10;with a reason." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="846" y="1228" width="286" height="95" />
+        </mxCell>
+        <mxCell id="87" style="edgeStyle=none;rounded=0;html=0;endArrow=block;endFill=1;strokeColor=#8A98A6;strokeWidth=2;dashed=0;" edge="1" parent="1">
+          <mxGeometry as="geometry" relative="1">
+            <mxPoint as="sourcePoint" x="1162" y="1236" />
+            <mxPoint as="targetPoint" x="1193" y="1236" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="88" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1204" y="1148" width="330" height="178" />
+        </mxCell>
+        <mxCell id="89" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#6C54A0;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1204" y="1148" width="5" height="178" />
+        </mxCell>
+        <mxCell id="90" value="AUTHORISED STAFF" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#6C54A0;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1226" y="1162" width="286" height="30.4" />
+        </mxCell>
+        <mxCell id="91" value="Commit the time sheet" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=25;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1226" y="1188" width="286" height="43.0" />
+        </mxCell>
+        <mxCell id="92" value="Finalise the approved record&#10;for payroll processing&#10;and reporting." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1226" y="1228" width="286" height="95" />
+        </mxCell>
+        <mxCell id="93" value="Rejected time sheet? Recall, correct and resubmit. Required project authorisation must be approved before submission." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="1343" width="1400" height="37.4" />
+        </mxCell>
+        <mxCell id="94" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#DCE3EB;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="1404" width="1472" height="2" />
+        </mxCell>
+        <mxCell id="95" value="Know which amount matters" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=36;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="1421" width="1400" height="58.4" />
+        </mxCell>
+        <mxCell id="96" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="1490" width="472" height="486" />
+        </mxCell>
+        <mxCell id="97" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="564" y="1490" width="472" height="486" />
+        </mxCell>
+        <mxCell id="98" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#FFFFFF;strokeColor=#DCE3EB;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1064" y="1490" width="472" height="486" />
+        </mxCell>
+        <mxCell id="99" value="A  /  WHEN A PO IS REQUIRED" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=18;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="88" y="1512" width="424" height="33.2" />
+        </mxCell>
+        <mxCell id="100" value="Invoice, card or Expense" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=26;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="88" y="1545" width="424" height="44.4" />
+        </mxCell>
+        <mxCell id="101" value="With a job → PO at any amount.&#10;Without a job → PO at or above&#10;the configured no-PO limit." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=23;fontColor=#213547;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="88" y="1590" width="424" height="110" />
+        </mxCell>
+        <mxCell id="102" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#EEF3FA;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="88" y="1715" width="424" height="103" />
+        </mxCell>
+        <mxCell id="103" value="IF THE LIMIT IS $100 CAD" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=17;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="106" y="1730" width="388" height="31.799999999999997" />
+        </mxCell>
+        <mxCell id="104" value="$99.99: no PO  ·  $100: PO" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=24;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="106" y="1761" width="388" height="41.599999999999994" />
+        </mxCell>
+        <mxCell id="105" value="$100 is the software default.&#10;Confirm the live setting before use.&#10;See the exceptions below." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="88" y="1837" width="424" height="101" />
+        </mxCell>
+        <mxCell id="106" value="B  /  THE PO APPROVAL TOTAL" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=18;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="588" y="1512" width="424" height="33.2" />
+        </mxCell>
+        <mxCell id="107" value="Use the full commitment" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=26;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="588" y="1545" width="424" height="44.4" />
+        </mxCell>
+        <mxCell id="108" value="One-Time / Cumulative: full PO total.&#10;Recurring: amount × all occurrences.&#10;Approval checks use CAD." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=22;fontColor=#213547;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="588" y="1591" width="424" height="110" />
+        </mxCell>
+        <mxCell id="109" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#EEF3FA;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="588" y="1715" width="424" height="103" />
+        </mxCell>
+        <mxCell id="110" value="RECURRING EXAMPLE ONLY" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=17;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="606" y="1730" width="388" height="31.799999999999997" />
+        </mxCell>
+        <mxCell id="111" value="$500 × 12 = $6,000 CAD" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=26;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="606" y="1759" width="388" height="44.4" />
+        </mxCell>
+        <mxCell id="112" value="Second approval applies above a&#10;positive category threshold. At the&#10;threshold, one step is enough." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="588" y="1837" width="424" height="101" />
+        </mxCell>
+        <mxCell id="113" value="C  /  WHO CAN APPROVE" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=18;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1088" y="1512" width="424" height="33.2" />
+        </mxCell>
+        <mxCell id="114" value="Check PO Approvers" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=26;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1088" y="1545" width="424" height="44.4" />
+        </mxCell>
+        <mxCell id="115" value="Use the correct spending category&#10;and division. The final approver’s&#10;limit must cover the approval total." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=22;fontColor=#213547;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1088" y="1591" width="424" height="110" />
+        </mxCell>
+        <mxCell id="116" value="" style="rounded=1;arcSize=8;whiteSpace=wrap;html=0;fillColor=#EEF3FA;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1088" y="1715" width="424" height="103" />
+        </mxCell>
+        <mxCell id="117" value="PURCHASE ORDERS → PO APPROVERS" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=16;fontColor=#285EA8;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1106" y="1731" width="388" height="30.4" />
+        </mxCell>
+        <mxCell id="118" value="Current limits + threshold help" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=23;fontColor=#213547;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1106" y="1762" width="388" height="40.199999999999996" />
+        </mxCell>
+        <mxCell id="119" value="$0 means no authority in that category.&#10;Access needs report permission.&#10;Ask your approver if unavailable." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="1088" y="1837" width="424" height="101" />
+        </mxCell>
+        <mxCell id="120" value="PO EXCEPTIONS" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=18;fontColor=#9D5C17;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="2005" width="1400" height="33.2" />
+        </mxCell>
+        <mxCell id="121" value="Mileage, Fuel Card, Allowance and enabled Personal Reimbursement entries do not require a PO." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=22;fontColor=#213547;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="2041" width="1400" height="38.8" />
+        </mxCell>
+        <mxCell id="122" value="Payables administrators can bypass the amount limit for On Account entries; the job rule still applies." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=22;fontColor=#213547;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="2076" width="1400" height="38.8" />
+        </mxCell>
+        <mxCell id="123" value="" style="rounded=0;arcSize=8;whiteSpace=wrap;html=0;fillColor=#DCE3EB;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="2140" width="1472" height="2" />
+        </mxCell>
+        <mxCell id="124" value="A job links time, expenses and POs to the same project. A corporate card is a payment type, not an approval exemption." style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=21;fontColor=#213547;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="2157" width="1400" height="37.4" />
+        </mxCell>
+        <mxCell id="125" value="Draft based on current application rules · Amount examples are not live settings · Commit does not mean paid" style="text;html=0;whiteSpace=wrap;overflow=hidden;align=left;verticalAlign=top;spacing=0;fontFamily=Arial;fontSize=18;fontColor=#526579;fontStyle=0;" vertex="1" parent="1">
+          <mxGeometry as="geometry" x="64" y="2202" width="1400" height="33.2" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
