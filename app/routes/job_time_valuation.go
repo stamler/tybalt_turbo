@@ -2,6 +2,9 @@ package routes
 
 import _ "embed"
 
+// singleJobScopeQuery also keeps the Staff and Divisions summaries on the shared pricing path.
+const singleJobScopeQuery = `WITH selected_jobs AS (SELECT * FROM jobs WHERE id = {:job_id})`
+
 //go:embed job_priced_time_entries.sql
 var jobPricedTimeEntriesQuery string
 

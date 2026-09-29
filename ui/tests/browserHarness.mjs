@@ -10,7 +10,8 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 const require = createRequire(import.meta.url);
 const root = fileURLToPath(new URL("../", import.meta.url));
 const services = {
-  "$app/paths": "export const resolve = (route, params) => route.replace('[id]', params.id);",
+  "$app/paths":
+    "export const resolve = (route, params) => Object.entries(params ?? {}).reduce((url, [key, value]) => url.replace('[' + key + ']', value), route);",
   "$app/navigation": "export const goto = (url) => { location.href = url; };",
   "$env/static/public": "export const PUBLIC_POCKETBASE_URL = location.origin;",
   "summary-test-global":

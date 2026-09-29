@@ -1,5 +1,9 @@
 <script lang="ts">
   import { formatCurrency } from "$lib/utilities";
+  import WIPControls from "./WIPControls.svelte";
+  import WIPNoRateSheet from "./WIPNoRateSheet.svelte";
+  import WIPFactorNotice from "./WIPFactorNotice.svelte";
+  import WIPHelp from "./WIPHelp.svelte";
   import TimeSummaryHelp from "./TimeSummaryHelp.svelte";
   import { wipView, type JobWIP } from "./wip";
   let { data }: { data: JobWIP } = $props();
@@ -17,59 +21,11 @@
       <h2 class="text-lg font-semibold">Work in progress</h2>
       <p class="text-sm text-neutral-600">Job to date · {data.as_of} · CAD</p>
     </div>
-    <TimeSummaryHelp title="How WIP is calculated">
-      <p>
-        WIP compares recorded time, included expenses, and remaining active PO commitments with the
-        project value. It does not measure work completed or cash paid.
-      </p>
-      <p>
-        Time uses the same job rates and employee defaults as the Staff and Divisions summaries,
-        including committed and uncommitted entries. Meal hours, amendments, and overtime billing
-        are excluded.
-      </p>
-      <p>
-        Expenses include committed, non-rejected records through the report date. Foreign expenses
-        use settled CAD amounts.
-      </p>
-      <p>
-        Active POs include future commitments. Their remaining value subtracts committed expenses,
-        even when Include committed expenses is off. Recurring POs use the full approved value
-        across all occurrences. Each remaining balance is at least zero.
-      </p>
-      <p>
-        Foreign PO balances are converted using the current exchange rate, so they are estimates.
-        Amounts with missing settlement, exchange rates, or recurring approval values are marked
-        Partial.
-      </p>
-      <p>
-        The table and budget bar show percentages of project value. The optional chart shows shares
-        of the included total. Only this job is included; child jobs are separate.
-      </p>
-    </TimeSummaryHelp>
+    <WIPHelp />
   </div>
 
-  <div class="flex flex-wrap gap-x-6 gap-y-3">
-    <label class="flex items-center gap-2"
-      ><input type="checkbox" bind:checked={includeExpenses} />Include committed expenses</label
-    >
-    <label class="flex items-center gap-2"
-      ><input type="checkbox" bind:checked={includePOs} />Include active POs</label
-    >
-  </div>
-
-  {#if data.no_rate_sheet}
-    <TimeSummaryHelp
-      label="No rate sheet · employee rates used where available"
-      title="Time uses employee defaults"
-      warning
-    >
-      <p>
-        This job has no rate sheet. Time uses employee default charge-out rates greater than zero. {data.estimated_hours.toFixed(
-          2,
-        )} hours use defaults; {data.unpriced_hours.toFixed(2)} hours remain unpriced.
-      </p>
-    </TimeSummaryHelp>
-  {/if}
+  <WIPControls bind:includeExpenses bind:includePOs />
+  <WIPNoRateSheet {data} />
 
   <div
     class="rounded-lg border border-neutral-200 bg-neutral-50 p-4"
@@ -177,32 +133,7 @@
             </th>
             <td class="px-2 py-3 text-right">
               <div>{row.partial && row.value === 0 ? "—" : formatCurrency(row.value)}</div>
-              {#if row.partial || row.estimated}
-                <TimeSummaryHelp
-                  label={row.partial ? "Partial" : "Estimated"}
-                  title={`${row.name}: value details`}
-                  warning
-                >
-                  {#if row.key === "time"}
-                    <p>
-                      {data.hours.toFixed(2)} recorded hours. {data.estimated_hours.toFixed(2)} hours
-                      use employee default charge-out rates; {data.unpriced_hours.toFixed(2)} hours cannot
-                      be priced and are excluded from the value.
-                    </p>
-                  {:else if row.key === "expenses"}
-                    <p>
-                      {data.unpriced_expenses} committed expenses have no settled CAD amount. Their values
-                      are excluded.
-                    </p>
-                  {:else}
-                    <p>
-                      {data.estimated_pos} active PO balances use current exchange rates. {data.unpriced_pos}
-                      active POs cannot be valued because an exchange rate or recurring approval value
-                      is missing. Their values are excluded.
-                    </p>
-                  {/if}
-                </TimeSummaryHelp>
-              {/if}
+              <WIPFactorNotice {data} {row} />
             </td>
             <td class="px-2 py-3 text-right">{percent(row.percent)}</td>
           </tr>

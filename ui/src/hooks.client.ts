@@ -4,11 +4,12 @@ import { AUTH_CONFIG } from "$lib/config";
 import { jobs } from "$lib/stores/jobs";
 import { vendors } from "$lib/stores/vendors";
 import { clients } from "$lib/stores/clients";
+import { branches } from "$lib/stores/branches";
 import { divisions } from "$lib/stores/divisions";
 import { timeTypes } from "$lib/stores/time_types";
 import { globalStore } from "$lib/stores/global";
 
-const allStores = [jobs, vendors, clients, divisions, timeTypes];
+const allStores = [jobs, vendors, clients, divisions, branches, timeTypes];
 
 type AuthIdentityRecord = {
   id?: string;

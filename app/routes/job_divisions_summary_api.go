@@ -42,7 +42,7 @@ func createGetJobDivisionsSummaryHandler(app core.App) func(e *core.RequestEvent
 		}
 
 		rows := []JobDivisionSummaryRow{}
-		if err := app.DB().NewQuery(jobPricedTimeEntriesQuery + jobDivisionsSummaryQuery).Bind(params).All(&rows); err != nil {
+		if err := app.DB().NewQuery(singleJobScopeQuery + jobPricedTimeEntriesQuery + jobDivisionsSummaryQuery).Bind(params).All(&rows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 

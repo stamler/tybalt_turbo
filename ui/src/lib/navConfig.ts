@@ -1,4 +1,5 @@
 import { downloadActiveJobsCsv, downloadTimeEntryBranchMismatchesCsv } from "$lib/navActions";
+import { canViewWIPReports } from "$lib/reports/wipReports";
 import { canViewPOApprovers } from "$lib/poApprovalLimits";
 
 export interface NavButton {
@@ -13,7 +14,7 @@ export interface NavItem {
   href: string;
   buttons: NavButton[];
   requiredClaim?: string;
-  canView?: (claims: string[]) => boolean;
+  canView?: (claims: string[], isBranchManager?: boolean) => boolean;
 }
 
 export interface NavSection {
@@ -148,6 +149,14 @@ export const navSections: NavSection[] = [
             color: "green",
           },
         ],
+      },
+      { label: "My WIP", href: "/jobs/wip/my", buttons: [] },
+      { label: "Branch WIP", href: "/jobs/wip/branch", buttons: [], canView: canViewWIPReports },
+      {
+        label: "Division WIP",
+        href: "/jobs/wip/division",
+        buttons: [],
+        canView: canViewWIPReports,
       },
       { label: "Project Authorizations", href: "/jobs/project_authorization", buttons: [] },
       {

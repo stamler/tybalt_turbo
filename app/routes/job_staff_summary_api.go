@@ -44,7 +44,7 @@ func createGetJobStaffSummaryHandler(app core.App) func(e *core.RequestEvent) er
 		}
 
 		rows := []JobStaffSummaryRow{}
-		if err := app.DB().NewQuery(jobPricedTimeEntriesQuery + jobStaffSummaryQuery).Bind(params).All(&rows); err != nil {
+		if err := app.DB().NewQuery(singleJobScopeQuery + jobPricedTimeEntriesQuery + jobStaffSummaryQuery).Bind(params).All(&rows); err != nil {
 			return e.Error(http.StatusInternalServerError, "failed to execute query: "+err.Error(), err)
 		}
 

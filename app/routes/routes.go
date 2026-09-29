@@ -283,6 +283,12 @@ func AddRoutes(app core.App) {
 		jobsGroup.POST("/{id}/project_authorization/revoke", createRevokeProjectAuthorizationHandler(app))
 		jobsGroup.GET("/{id}/validate-proposal", createValidateProposalHandler(app))
 
+		wipGroup := se.Router.Group("/api/wip")
+		wipGroup.Bind(apis.RequireAuth("users"))
+		for _, mode := range []string{"my", "branch", "division"} {
+			wipGroup.GET("/"+mode, createGetWIPReportHandler(app, mode))
+		}
+
 		reportsGroup := se.Router.Group("/api/reports")
 		reportsGroup.Bind(apis.RequireAuth("users"))
 		reportsGroup.BindFunc(func(e *core.RequestEvent) error {

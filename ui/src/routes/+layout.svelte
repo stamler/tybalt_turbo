@@ -10,6 +10,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import VersionInfo from "$lib/components/VersionInfo.svelte";
   import { navigating } from "$app/stores";
+  import { branches } from "$lib/stores/branches";
   import { tasks } from "$lib/stores/tasks";
   import { navSections as allNavSections } from "$lib/navConfig";
   import { appConfig } from "$lib/stores/appConfig";
@@ -30,12 +31,14 @@
         // Filter items within each section
         const filteredItems = section.items
           .filter((item) => {
-            // Show All UI bypasses the usual filters. PO Approvers must still
-            // pass the access check set on its nav item.
-            if ($globalStore.showAllUi && item.href !== "/pos/approval-limits") return true;
+            // Explicit access checks also apply when Show All UI is enabled.
             if (item.canView) {
-              return item.canView($globalStore.claims);
+              return item.canView(
+                $globalStore.claims,
+                $branches.items.some((branch) => branch.manager === $authStore?.model?.id),
+              );
             }
+            if ($globalStore.showAllUi) return true;
             if (item.requiredClaim) {
               return $globalStore.claims.includes(item.requiredClaim);
             }

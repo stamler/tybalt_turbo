@@ -36,7 +36,7 @@ func createGetJobWIPHandler(app core.App) func(e *core.RequestEvent) error {
 		var row JobWIP
 		// This is a current report, not a historical snapshot. Active POs may
 		// cover future work. Time and expenses only include dates through today.
-		err := app.DB().NewQuery(jobPricedTimeEntriesQuery + jobWIPQuery).Bind(dbx.Params{
+		err := app.DB().NewQuery(singleJobScopeQuery + jobPricedTimeEntriesQuery + jobWIPQuery + ` SELECT * FROM wip_values`).Bind(dbx.Params{
 			"job_id":     e.Request.PathValue("id"),
 			"start_date": "",
 			"end_date":   time.Now().UTC().Format("2006-01-02"),
