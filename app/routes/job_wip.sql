@@ -12,7 +12,8 @@
     COALESCE(SUM(hours) FILTER (WHERE sheet_rate IS NULL AND COALESCE(rate_sheet, '') != ''
       AND COALESCE(role, '') != ''), 0) AS missing_role_rate_hours
   FROM priced_entries GROUP BY job
-), committed_expenses AS (
+), committed_expenses AS MATERIALIZED (
+  -- Reuse these rows for job expenses and PO spend instead of reading twice.
   SELECT e.*,
     CASE
       WHEN e.settled_total > 0 THEN e.settled_total

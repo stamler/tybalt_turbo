@@ -61,6 +61,7 @@ func TestWIPReportSelectionAndValues(t *testing.T) {
 		{"personal scope ignores caller supplied manager", "valuation1@example.com", "/my?uid=uvaluation00003&manager=uvaluation00003", []string{"000001", "000002", "000003", "000005", "000006", "000007", "000008", "000009"}, 2},
 		{"alternate manager is not job manager", "valuation3@example.com", "/my", []string{"000010"}, 0},
 		{"no qualifying projects is empty", "valuation2@example.com", "/my", []string{}, 0},
+		{"only unvalued projects returns the exclusion count", "time@test.com", "/my", []string{}, 1},
 		{"branch selection uses job branch", "u_no_claims@example.com", "/branch?branch=2b65d8161y8hx95", []string{"000002"}, -1},
 		{"division defaults to recorded work hours", "time@test.com", "/division?division=0vqgq5fktoen3rr", []string{"000001", "000002", "000008", "000010"}, 2},
 		{"division can include allocations without work hours", "time@test.com", "/division?division=0vqgq5fktoen3rr&require_time=false", []string{"000001", "000002", "000003", "000005", "000006", "000007", "000008", "000010"}, 2},

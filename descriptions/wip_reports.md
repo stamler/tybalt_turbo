@@ -70,7 +70,9 @@ Cannot rank and does not change their values or percentages.
 ## Shared code
 
 `GET /api/wip/my`, `/api/wip/branch`, and `/api/wip/division` return WIP factors
-for all selected jobs in one SQL query. Branch accepts an optional `branch` ID;
+for selected jobs with a positive project value in one pricing query. A small
+scope query counts included and excluded jobs first; an empty included scope
+skips pricing. Branch accepts an optional `branch` ID;
 division requires `division` and accepts `require_time=true|false` (default true).
 Responses contain `items`, `as_of`, and `excluded_project_value`.
 
@@ -87,7 +89,11 @@ the server's PO balances.
 branch selection, division membership, recorded-hours filters, whole-job values,
 parent/child separation, missing rates, unpriced amounts, and invalid requests.
 The new job fixtures include authorization data to keep them out of unrelated
-missing-authorization queues. No migration is needed.
+missing-authorization queues. Migration `1790712255_wip_lookup_indexes.go` adds
+job/date expense lookups and positive-hour job/division/date time lookups through
+the PocketBase collection schema. Its rollback removes only these two indexes.
+See [WIP performance](wip_performance.md) for measurements and the repeatable
+read-only benchmark.
 
 UI tests are `npm run test:wip-reports` and `npm run test:wip-reports-browser`.
 Browser tests cover ranking, notices, keyboard controls, navigation access,

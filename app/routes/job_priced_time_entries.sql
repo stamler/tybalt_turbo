@@ -8,8 +8,10 @@
     rse.rate AS sheet_rate,
     -- A zero or missing employee default cannot supply a dollar value.
     CASE WHEN ap.default_charge_out_rate > 0 THEN ap.default_charge_out_rate END AS default_rate
-  FROM time_entries te
-  JOIN selected_jobs j ON te.job = j.id
+  -- Start with the selected jobs so a materialized report scope does not cause
+  -- SQLite to scan every time entry before it applies the job filter.
+  FROM selected_jobs j
+  CROSS JOIN time_entries te ON te.job = j.id
   LEFT JOIN rate_sheets rs ON rs.id = j.rate_sheet
   LEFT JOIN rate_sheet_entries rse
     ON rse.rate_sheet = j.rate_sheet AND rse.role = te.role

@@ -23,6 +23,8 @@
   let trigger: HTMLButtonElement;
   let panel: HTMLDivElement;
   let open = $state(false);
+  // Build contents on first use, then retain loaded details between opens.
+  let activated = $state(false);
   let position = $state({ top: 0, left: 0 });
 
   function placePanel() {
@@ -47,7 +49,10 @@
 
   function onToggle(event: ToggleEvent) {
     open = event.newState === "open";
-    if (open) placePanel();
+    if (open) {
+      activated = true;
+      placePanel();
+    }
   }
 
   $effect(() => {
@@ -101,17 +106,19 @@
   style:visibility={open ? "visible" : "hidden"}
   class="fixed inset-auto m-0 max-h-[calc(100dvh-1.5rem)] w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-md border border-neutral-300 bg-white p-4 text-left text-sm font-normal whitespace-normal text-neutral-800 shadow-lg"
 >
-  <div class="mb-2 flex items-start justify-between gap-3">
-    <span class="font-semibold">{title}</span>
-    <button
-      type="button"
-      popovertarget={id}
-      popovertargetaction="hide"
-      aria-label="Close explanation"
-      class="inline-flex min-h-8 min-w-8 items-center justify-center rounded-sm hover:bg-neutral-100"
-    >
-      <Icon icon="mdi:close" width="18" aria-hidden="true" />
-    </button>
-  </div>
-  <div class="space-y-2">{@render children()}</div>
+  {#if activated}
+    <div class="mb-2 flex items-start justify-between gap-3">
+      <span class="font-semibold">{title}</span>
+      <button
+        type="button"
+        popovertarget={id}
+        popovertargetaction="hide"
+        aria-label="Close explanation"
+        class="inline-flex min-h-8 min-w-8 items-center justify-center rounded-sm hover:bg-neutral-100"
+      >
+        <Icon icon="mdi:close" width="18" aria-hidden="true" />
+      </button>
+    </div>
+    <div class="space-y-2">{@render children()}</div>
+  {/if}
 </div>

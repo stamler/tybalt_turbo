@@ -1,5 +1,6 @@
-WITH selected_jobs AS (
-  SELECT j.* FROM jobs j
+WITH report_jobs AS (
+  SELECT j.id, j.number, j.description, j.client, j.manager, j.branch,
+    j.rate_sheet, j.project_value FROM jobs j
   WHERE j.status = 'Active' AND j.number NOT LIKE 'P%'
     AND ({:mode} != 'my' OR j.manager = {:uid})
     AND ({:mode} != 'branch' OR {:branch} = '' OR j.branch = {:branch})
@@ -11,4 +12,7 @@ WITH selected_jobs AS (
           AND te.hours > 0 AND te.date <= {:end_date}
       ))
     ))
+), selected_jobs AS MATERIALIZED (
+  -- Unvalued jobs contribute to the exclusion count, not to WIP pricing.
+  SELECT * FROM report_jobs WHERE project_value > 0
 )

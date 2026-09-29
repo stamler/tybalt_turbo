@@ -262,6 +262,11 @@ await runBrowserHarness(async (page, origin) => {
     "rows fit on one line",
   );
   const detailButton = page.getByRole("button", { name: "Project details: 26-001", exact: true });
+  assert.equal(
+    await page.getByText("Bridge assessment", { exact: true }).count(),
+    0,
+    "closed project popups do not build their contents before first use",
+  );
   await detailButton.focus();
   await page.keyboard.press("Enter");
   const details = page.getByRole("dialog", { name: "Project details: 26-001", exact: true });
