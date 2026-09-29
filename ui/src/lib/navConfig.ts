@@ -9,12 +9,16 @@ export interface NavButton {
   color?: string;
 }
 
-export interface NavItem {
+export interface NavLink {
   label: string;
   href: string;
-  buttons: NavButton[];
   requiredClaim?: string;
   canView?: (claims: string[], isBranchManager?: boolean) => boolean;
+}
+
+export interface NavItem extends NavLink {
+  buttons: NavButton[];
+  children?: NavLink[];
 }
 
 export interface NavSection {
@@ -150,13 +154,15 @@ export const navSections: NavSection[] = [
           },
         ],
       },
-      { label: "My WIP", href: "/jobs/wip/my", buttons: [] },
-      { label: "Branch WIP", href: "/jobs/wip/branch", buttons: [], canView: canViewWIPReports },
       {
-        label: "Division WIP",
-        href: "/jobs/wip/division",
+        label: "WIP",
+        href: "",
         buttons: [],
-        canView: canViewWIPReports,
+        children: [
+          { label: "My WIP", href: "/jobs/wip/my" },
+          { label: "Branch", href: "/jobs/wip/branch", canView: canViewWIPReports },
+          { label: "Division", href: "/jobs/wip/division", canView: canViewWIPReports },
+        ],
       },
       { label: "Project Authorizations", href: "/jobs/project_authorization", buttons: [] },
       {

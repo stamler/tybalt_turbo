@@ -27,7 +27,9 @@
     Partial.
   </p>
   <p>
-    Percentages use the project value. The optional Job Details chart shows shares of the included
-    total. Each job’s WIP excludes its parent and child jobs.
+    The percentage is (time value + selected expenses + selected remaining active POs) ÷ project
+    value × 100. Remaining is project value minus that same selected total. Negative balances show
+    amounts over the project value. The checkboxes select which amounts to include. The optional Job
+    Details chart shows shares of that total. Each job’s WIP excludes its parent and child jobs.
   </p>
 </TimeSummaryHelp>

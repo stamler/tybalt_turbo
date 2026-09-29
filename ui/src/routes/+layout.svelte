@@ -14,6 +14,7 @@
   import { tasks } from "$lib/stores/tasks";
   import { navSections as allNavSections } from "$lib/navConfig";
   import { appConfig } from "$lib/stores/appConfig";
+  import NavFlyout from "$lib/components/NavFlyout.svelte";
 
   // Initialize app config store globally (idempotent, so safe to call here)
   appConfig.init();
@@ -279,7 +280,18 @@
                     class="flex h-12 items-center pr-4 lg:h-8 lg:pr-2"
                     class:justify-between={item.buttons}
                   >
-                    {#if item.href}
+                    {#if item.children}
+                      <NavFlyout
+                        label={item.label}
+                        items={item.children}
+                        pathname={$page.url.pathname}
+                        claims={$globalStore.claims}
+                        isBranchManager={$branches.items.some(
+                          (branch) => branch.manager === $authStore?.model?.id,
+                        )}
+                        showAllUi={$globalStore.showAllUi}
+                      />
+                    {:else if item.href}
                       <a
                         href={item.href}
                         class="ml-4 flex h-full min-w-0 grow items-center justify-between gap-2 rounded-sm px-2 text-xl hover:bg-neutral-600 lg:text-sm"

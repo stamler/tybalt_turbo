@@ -4,7 +4,13 @@
   SELECT job, COALESCE(SUM(value), 0) AS time_value,
     COALESCE(SUM(hours), 0) AS hours,
     COALESCE(SUM(estimated_hours), 0) AS estimated_hours,
-    COALESCE(SUM(unpriced_hours), 0) AS unpriced_hours
+    COALESCE(SUM(unpriced_hours), 0) AS unpriced_hours,
+    -- Explain why the assigned sheet cannot price these hours. These counts
+    -- include both employee-rate estimates and hours that remain unpriced.
+    COALESCE(SUM(hours) FILTER (WHERE sheet_rate IS NULL AND COALESCE(rate_sheet, '') != ''
+      AND COALESCE(role, '') = ''), 0) AS missing_role_hours,
+    COALESCE(SUM(hours) FILTER (WHERE sheet_rate IS NULL AND COALESCE(rate_sheet, '') != ''
+      AND COALESCE(role, '') != ''), 0) AS missing_role_rate_hours
   FROM priced_entries GROUP BY job
 ), committed_expenses AS (
   SELECT e.*,
@@ -60,6 +66,8 @@ SELECT j.id AS job_id, COALESCE(j.project_value, 0) AS project_value,
   COALESCE(t.hours, 0) AS hours,
   COALESCE(t.estimated_hours, 0) AS estimated_hours,
   COALESCE(t.unpriced_hours, 0) AS unpriced_hours,
+  COALESCE(t.missing_role_hours, 0) AS missing_role_hours,
+  COALESCE(t.missing_role_rate_hours, 0) AS missing_role_rate_hours,
   ROUND(COALESCE(e.expense_value, 0), 2) AS expense_value,
   COALESCE(e.unpriced_expenses, 0) AS unpriced_expenses,
   ROUND(COALESCE(p.po_value, 0), 2) AS po_value,

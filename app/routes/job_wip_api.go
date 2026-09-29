@@ -17,18 +17,20 @@ var jobWIPQuery string
 // JobWIP contains separate CAD factors. Inclusion controls never change the
 // expense deduction from active POs; this prevents duplicate commitments.
 type JobWIP struct {
-	ProjectValue     float64 `db:"project_value" json:"project_value"`
-	AsOf             string  `db:"as_of" json:"as_of"`
-	NoRateSheet      bool    `db:"no_rate_sheet" json:"no_rate_sheet"`
-	TimeValue        float64 `db:"time_value" json:"time_value"`
-	Hours            float64 `db:"hours" json:"hours"`
-	EstimatedHours   float64 `db:"estimated_hours" json:"estimated_hours"`
-	UnpricedHours    float64 `db:"unpriced_hours" json:"unpriced_hours"`
-	ExpenseValue     float64 `db:"expense_value" json:"expense_value"`
-	UnpricedExpenses int     `db:"unpriced_expenses" json:"unpriced_expenses"`
-	POValue          float64 `db:"po_value" json:"po_value"`
-	UnpricedPOs      int     `db:"unpriced_pos" json:"unpriced_pos"`
-	EstimatedPOs     int     `db:"estimated_pos" json:"estimated_pos"`
+	MissingRoleHours     float64 `db:"missing_role_hours" json:"missing_role_hours"`
+	MissingRoleRateHours float64 `db:"missing_role_rate_hours" json:"missing_role_rate_hours"`
+	ProjectValue         float64 `db:"project_value" json:"project_value"`
+	AsOf                 string  `db:"as_of" json:"as_of"`
+	NoRateSheet          bool    `db:"no_rate_sheet" json:"no_rate_sheet"`
+	TimeValue            float64 `db:"time_value" json:"time_value"`
+	Hours                float64 `db:"hours" json:"hours"`
+	EstimatedHours       float64 `db:"estimated_hours" json:"estimated_hours"`
+	UnpricedHours        float64 `db:"unpriced_hours" json:"unpriced_hours"`
+	ExpenseValue         float64 `db:"expense_value" json:"expense_value"`
+	UnpricedExpenses     int     `db:"unpriced_expenses" json:"unpriced_expenses"`
+	POValue              float64 `db:"po_value" json:"po_value"`
+	UnpricedPOs          int     `db:"unpriced_pos" json:"unpriced_pos"`
+	EstimatedPOs         int     `db:"estimated_pos" json:"estimated_pos"`
 }
 
 func createGetJobWIPHandler(app core.App) func(e *core.RequestEvent) error {

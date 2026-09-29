@@ -96,7 +96,7 @@ func TestWIPReportSelectionAndValues(t *testing.T) {
 					switch row.ID {
 					case "jobwiprpt000001":
 						// Whole-job totals include other divisions, even in the division report.
-						want := routes.JobWIP{ProjectValue: 10000, AsOf: got.AsOf, TimeValue: 849.5, Hours: 3.5, EstimatedHours: .5, ExpenseValue: 800, POValue: 3565, EstimatedPOs: 1}
+						want := routes.JobWIP{ProjectValue: 10000, AsOf: got.AsOf, TimeValue: 849.5, Hours: 3.5, EstimatedHours: .5, MissingRoleHours: .5, ExpenseValue: 800, POValue: 3565, EstimatedPOs: 1}
 						if row.JobWIP != want {
 							tb.Errorf("whole-job values = %+v; want %+v", row.JobWIP, want)
 						}

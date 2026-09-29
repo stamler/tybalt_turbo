@@ -6,7 +6,7 @@
   import WIPHelp from "./WIPHelp.svelte";
   import TimeSummaryHelp from "./TimeSummaryHelp.svelte";
   import { wipView, type JobWIP } from "./wip";
-  let { data }: { data: JobWIP } = $props();
+  let { data, jobId }: { data: JobWIP; jobId: string } = $props();
   let includeExpenses = $state(true);
   let includePOs = $state(true);
   let showChart = $state(false);
@@ -133,7 +133,7 @@
             </th>
             <td class="px-2 py-3 text-right">
               <div>{row.partial && row.value === 0 ? "—" : formatCurrency(row.value)}</div>
-              <WIPFactorNotice {data} {row} />
+              <WIPFactorNotice {data} {row} {jobId} />
             </td>
             <td class="px-2 py-3 text-right">{percent(row.percent)}</td>
           </tr>

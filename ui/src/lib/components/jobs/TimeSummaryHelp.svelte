@@ -7,11 +7,17 @@
     title,
     children,
     warning = false,
+    iconOnly = false,
+    icon = "mdi:help-circle-outline",
+    symbol,
   }: {
     label?: string;
     title: string;
     children: Snippet;
     warning?: boolean;
+    iconOnly?: boolean;
+    icon?: string;
+    symbol?: string;
   } = $props();
   const id = $props.id();
   let trigger: HTMLButtonElement;
@@ -49,9 +55,12 @@
     const dismissOnScroll = (event: Event) => {
       if (!(event.target instanceof Node) || !panel.contains(event.target)) panel.hidePopover();
     };
+    const observer = new ResizeObserver(placePanel);
+    observer.observe(panel);
     window.addEventListener("resize", placePanel);
     window.addEventListener("scroll", dismissOnScroll, true);
     return () => {
+      observer.disconnect();
       window.removeEventListener("resize", placePanel);
       window.removeEventListener("scroll", dismissOnScroll, true);
     };
@@ -70,8 +79,12 @@
     ? 'text-amber-800'
     : 'text-neutral-600'}"
 >
-  {#if label}<span>{label}</span>{/if}
-  <Icon icon="mdi:help-circle-outline" width="16" aria-hidden="true" />
+  {#if label && !iconOnly}<span>{label}</span>{/if}
+  {#if symbol}
+    <span aria-hidden="true" class="font-semibold">{symbol}</span>
+  {:else}
+    <Icon {icon} width="16" aria-hidden="true" />
+  {/if}
 </button>
 
 <!-- Native popovers use the top layer, so table overflow cannot clip them.
@@ -86,7 +99,7 @@
   style:top={`${position.top}px`}
   style:left={`${position.left}px`}
   style:visibility={open ? "visible" : "hidden"}
-  class="fixed inset-auto m-0 max-h-[calc(100dvh-1.5rem)] w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-md border border-neutral-300 bg-white p-4 text-left text-sm font-normal text-neutral-800 shadow-lg"
+  class="fixed inset-auto m-0 max-h-[calc(100dvh-1.5rem)] w-80 max-w-[calc(100vw-1.5rem)] overflow-y-auto rounded-md border border-neutral-300 bg-white p-4 text-left text-sm font-normal whitespace-normal text-neutral-800 shadow-lg"
 >
   <div class="mb-2 flex items-start justify-between gap-3">
     <span class="font-semibold">{title}</span>

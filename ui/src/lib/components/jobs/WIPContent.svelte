@@ -41,7 +41,7 @@
       >
     </div>
   {:else if data}
-    <WIPSummary {data} />
+    <WIPSummary {data} {jobId} />
   {:else}
     <p role="status" class="text-neutral-600">Loading WIP…</p>
   {/if}

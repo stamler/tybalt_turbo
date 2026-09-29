@@ -23,7 +23,7 @@ func TestJobWIP(t *testing.T) {
 		want      routes.JobWIP
 	}{
 		{"all factors without duplicate PO spend", "jobwip000000001", routes.JobWIP{
-			ProjectValue: 10000, TimeValue: 849.5, Hours: 3.5, EstimatedHours: .5,
+			ProjectValue: 10000, TimeValue: 849.5, Hours: 3.5, EstimatedHours: .5, MissingRoleHours: .5,
 			ExpenseValue: 800, POValue: 3565, EstimatedPOs: 1,
 		}},
 		{"no sheet uses defaults and retains unpriced hours", "jobwip000000002", routes.JobWIP{
@@ -31,6 +31,10 @@ func TestJobWIP(t *testing.T) {
 		}},
 		{"missing settlement exchange rate and recurring approval", "jobwip000000003", routes.JobWIP{
 			ProjectValue: 10000, UnpricedExpenses: 1, UnpricedPOs: 2,
+		}},
+		{"assigned sheet explains missing roles and missing rates", "jobwipreason001", routes.JobWIP{
+			ProjectValue: 10000, TimeValue: 4496, Hours: 15, EstimatedHours: 4, UnpricedHours: 6,
+			MissingRoleHours: 3, MissingRoleRateHours: 7,
 		}},
 		{"empty job with zero project value", "jobwip000000004", routes.JobWIP{}},
 	}

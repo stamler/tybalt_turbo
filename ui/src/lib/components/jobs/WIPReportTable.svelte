@@ -2,65 +2,108 @@
   import { resolve } from "$app/paths";
   import { formatCurrency } from "$lib/utilities";
   import type { rankWIP } from "$lib/reports/wipReports";
+  import TimeSummaryHelp from "./TimeSummaryHelp.svelte";
   import WIPFactorNotice from "./WIPFactorNotice.svelte";
+  import WIPPercentage from "./WIPPercentage.svelte";
   import WIPNoRateSheet from "./WIPNoRateSheet.svelte";
-  let { rows, title }: { rows: ReturnType<typeof rankWIP>; title: string } = $props();
+  let {
+    rows,
+    title,
+    includeExpenses,
+    includePOs,
+  }: {
+    rows: ReturnType<typeof rankWIP>;
+    title: string;
+    includeExpenses: boolean;
+    includePOs: boolean;
+  } = $props();
 </script>
 
-<div class="overflow-x-auto rounded-lg border border-neutral-200">
+<!-- svelte-ignore a11y_no_noninteractive_tabindex (Keyboard users need to scroll the table.) -->
+<div class="overflow-x-auto" role="region" aria-label={title} tabindex="0">
   <table class="w-full text-sm tabular-nums">
     <caption class="sr-only">{title}</caption>
-    <thead class="bg-neutral-50">
-      <tr class="border-b border-neutral-200">
-        <th scope="col" class="px-3 py-3 text-left">Project</th>
-        <th scope="col" class="px-3 py-3 text-right">Project value</th>
-        <th scope="col" class="px-3 py-3 text-right">Time value</th>
-        <th scope="col" class="px-3 py-3 text-right">Expenses</th>
-        <th scope="col" class="px-3 py-3 text-right">Remaining active POs</th>
-        <th scope="col" class="px-3 py-3 text-right">Included value</th>
-        <th scope="col" class="px-3 py-3 text-right">% of project</th>
+    <thead class="bg-neutral-100">
+      <tr class="border-b border-neutral-300 whitespace-nowrap">
+        <th scope="col" class="px-2 py-2 text-left">Project</th>
+        <th scope="col" class="px-2 py-2 text-left">Client</th>
+        <th scope="col" class="px-2 py-2 text-right">Project value</th>
+        <th scope="col" class="px-2 py-2 text-right">Time</th>
+        {#if includeExpenses}<th scope="col" class="px-2 py-2 text-right">Expenses</th>{/if}
+        {#if includePOs}<th scope="col" class="px-2 py-2 text-right">POs</th>{/if}
+        <th scope="col" class="px-2 py-2 text-right">% of project</th>
+        <th scope="col" class="px-2 py-2 text-right">Remaining</th>
       </tr>
     </thead>
     <tbody>
       {#each rows as { data, view } (data.id)}
         <tr
-          class="border-b border-neutral-200 align-top last:border-0"
+          class="h-9 border-b border-neutral-200 hover:bg-neutral-50"
           data-testid={`report-${data.id}`}
         >
-          <th scope="row" class="min-w-64 px-3 py-3 text-left font-normal">
-            <a
-              class="font-semibold text-blue-700 underline"
-              href={resolve("/jobs/[jid]/details", { jid: data.id })}>{data.number}</a
-            >
-            <p>{data.description}</p>
-            <p class="mt-1 text-xs text-neutral-600">
-              {data.client} · {data.manager} · {data.branch || "No branch"}
-            </p>
-            <WIPNoRateSheet {data} />
+          <th scope="row" class="px-2 py-0 text-left font-normal whitespace-nowrap">
+            <span class="inline-flex items-center">
+              <a
+                class="font-semibold text-blue-700 underline"
+                href={resolve("/jobs/[jid]/details", { jid: data.id })}>{data.number}</a
+              >
+              <TimeSummaryHelp
+                title={`Project details: ${data.number}`}
+                icon="mdi:text-box-outline"
+              >
+                <p class="font-medium">{data.description}</p>
+                <dl class="space-y-1">
+                  <div>
+                    <dt class="inline font-medium">Client:</dt>
+                    <dd class="inline">{data.client || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt class="inline font-medium">Manager:</dt>
+                    <dd class="inline">{data.manager || "—"}</dd>
+                  </div>
+                  <div>
+                    <dt class="inline font-medium">Branch:</dt>
+                    <dd class="inline">{data.branch || "No branch"}</dd>
+                  </div>
+                </dl>
+              </TimeSummaryHelp>
+            </span>
           </th>
-          <td class="px-3 py-3 text-right whitespace-nowrap"
+          <td class="px-2 py-0"
+            ><span class="block max-w-64 truncate" title={data.client}>{data.client || "—"}</span
+            ></td
+          >
+          <td class="px-2 py-0 text-right whitespace-nowrap"
             >{formatCurrency(data.project_value)}</td
           >
-          {#each view.rows as row (row.key)}
-            <td
-              class="px-3 py-3 text-right whitespace-nowrap"
-              class:text-neutral-500={!row.included}
-            >
-              <div>{row.partial && row.value === 0 ? "—" : formatCurrency(row.value)}</div>
-              {#if !row.included}<div class="text-xs">Excluded</div>{/if}
-              <WIPFactorNotice {data} {row} />
+          {#each view.rows.filter((row) => row.included) as row (row.key)}
+            <td class="px-2 py-0 text-right whitespace-nowrap">
+              <span class="inline-flex items-center">
+                {#if row.key === "time"}
+                  <WIPFactorNotice {data} {row} jobId={data.id} compact />
+                  <WIPNoRateSheet {data} compact />
+                {/if}
+                <span>{row.partial && row.value === 0 ? "—" : formatCurrency(row.value)}</span>
+                {#if row.key !== "time"}<WIPFactorNotice
+                    {data}
+                    {row}
+                    jobId={data.id}
+                    compact
+                  />{/if}
+              </span>
             </td>
           {/each}
-          <td class="px-3 py-3 text-right whitespace-nowrap">
-            {view.partial && view.total === 0 ? "—" : formatCurrency(view.total)}
-            {#if view.partial}<div class="text-xs text-amber-800">Known value only</div>
-            {:else if view.estimated}<div class="text-xs text-amber-800">Estimated</div>{/if}
+          <td class="px-2 py-0 text-right whitespace-nowrap">
+            <WIPPercentage percent={view.percent} />
           </td>
           <td
-            class="px-3 py-3 text-right font-semibold whitespace-nowrap"
-            class:text-red-700={view.percent !== null && view.percent > 100}
+            class="px-2 py-0 text-right whitespace-nowrap"
+            class:text-red-700={view.balance !== null && view.balance < 0}
+            title={view.balance === null
+              ? "Unavailable: some included amounts cannot be priced."
+              : undefined}
           >
-            {view.percent === null ? "—" : `${view.percent.toFixed(1)}%`}
+            {view.balance === null ? "—" : formatCurrency(view.balance)}
           </td>
         </tr>
       {/each}

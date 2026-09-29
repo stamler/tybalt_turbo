@@ -3,7 +3,7 @@
 -- recalculate past values. Keep the existing selection of committed and
 -- uncommitted entries; amendments and meals are not part of the value.
 , entry_rates AS (
-  SELECT te.job, te.uid, te.division, te.hours, te.meals_hours, j.number,
+  SELECT te.job, te.uid, te.division, te.hours, te.meals_hours, te.role, j.number, j.rate_sheet,
     COALESCE(rs.name, '') AS rate_sheet_name, rs.revision AS rate_sheet_revision,
     rse.rate AS sheet_rate,
     -- A zero or missing employee default cannot supply a dollar value.

@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { canViewWIPReports, rankWIP, type WIPReportData } from "../src/lib/reports/wipReports.ts";
+import {
+  filterWIP,
+  canViewWIPReports,
+  rankWIP,
+  type WIPReportData,
+} from "../src/lib/reports/wipReports.ts";
 const data: WIPReportData = JSON.parse(
   readFileSync(new URL("./fixtures/wipReports.json", import.meta.url), "utf8"),
 );
@@ -62,4 +67,80 @@ test("management WIP requires a branch manager, kpi, or admin", () => {
   assert.equal(canViewWIPReports([], true), true);
   assert.equal(canViewWIPReports(["kpi"]), true);
   assert.equal(canViewWIPReports(["admin"]), true);
+});
+
+test("remaining sorts signed dollar balances rather than percentages or magnitudes", () => {
+  const base = { ...data.items[0], expense_value: 0, po_value: 0 };
+  const rows = [
+    { ...base, id: "small-over", project_value: 100, time_value: 200 },
+    { ...base, id: "large-over", project_value: 10000, time_value: 15000 },
+    { ...base, id: "zero", project_value: 100, time_value: 100 },
+    { ...base, id: "under", project_value: 100, time_value: 50 },
+    data.items.find((row) => row.id === "partial")!,
+  ];
+  assert.equal(rankWIP(rows, true, true)[0].data.id, "small-over");
+  const ranked = rankWIP(rows, true, true, "remaining");
+  assert.deepEqual(
+    ranked.map((row) => row.data.id),
+    ["large-over", "small-over", "zero", "under", "partial"],
+  );
+  assert.deepEqual(
+    ranked.map((row) => row.view.balance),
+    [-5000, -100, 0, 50, null],
+  );
+});
+
+test("remaining respects selected factors, restores complete rows, and keeps stable ties", () => {
+  for (const expenses of [false, true]) {
+    for (const pos of [false, true]) {
+      const ranked = rankWIP(data.items, expenses, pos, "remaining");
+      assert.equal(
+        ranked.find((row) => row.data.id === "normal")!.view.balance,
+        60000 - (expenses ? 10000 : 0) - (pos ? 15000 : 0),
+      );
+      assert.equal(ranked.find((row) => row.data.id === "unknown-po")!.view.balance === null, pos);
+      assert.equal(
+        ranked.find((row) => row.data.id === "unknown-expense")!.view.balance === null,
+        expenses,
+      );
+    }
+  }
+  const row = data.items[0];
+  assert.deepEqual(
+    rankWIP(
+      [
+        { ...row, number: "2", id: "b" },
+        { ...row, number: "1", id: "z" },
+        { ...row, number: "2", id: "a" },
+      ],
+      true,
+      true,
+      "remaining",
+    ).map((row) => row.data.id),
+    ["z", "a", "b"],
+  );
+  assert.deepEqual(rankWIP([], true, true, "remaining"), []);
+});
+
+test("search matches identity and hidden details, with all words required", () => {
+  const row = {
+    ...data.items[0],
+    client: "Acme Rail",
+    manager: "Jane Smith",
+    description: "Bridge repair",
+    branch: "Thunder Bay",
+  };
+  for (const term of [
+    "26-001",
+    "ACME",
+    "jane smith",
+    "bridge",
+    "thunder",
+    "  Acme  bridge Jane ",
+  ]) {
+    assert.deepEqual(filterWIP([row], term), [row]);
+  }
+  assert.deepEqual(filterWIP([row], "acme missing"), []);
+  assert.deepEqual(filterWIP([row], "   "), [row]);
+  assert.deepEqual(filterWIP([], "acme"), []);
 });

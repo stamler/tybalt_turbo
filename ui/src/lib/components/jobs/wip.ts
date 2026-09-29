@@ -6,6 +6,8 @@ export type JobWIP = {
   hours: number;
   estimated_hours: number;
   unpriced_hours: number;
+  missing_role_hours: number;
+  missing_role_rate_hours: number;
   expense_value: number;
   unpriced_expenses: number;
   po_value: number;

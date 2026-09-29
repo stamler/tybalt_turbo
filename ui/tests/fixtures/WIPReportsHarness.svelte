@@ -1,21 +1,17 @@
 <script lang="ts">
-  import { resolve } from "$app/paths";
+  import NavFlyout from "../../src/lib/components/NavFlyout.svelte";
   import WIPReport from "../../src/lib/components/jobs/WIPReport.svelte";
   import { navSections } from "../../src/lib/navConfig";
   import type { WIPMode } from "../../src/lib/reports/wipReports";
   let mode = $state<WIPMode>("my");
   let access = $state("kpi");
+  let showAllUi = $state(false);
   let defaultDivision = $state("civil");
   const claims = $derived(access === "kpi" || access === "admin" ? [access] : []);
   const manager = $derived(access === "manager");
-  const items = $derived(
-    navSections
-      .find((section) => section.title === "Business")!
-      .items.filter(
-        (item) =>
-          item.href.startsWith("/jobs/wip/") && (!item.canView || item.canView(claims, manager)),
-      ),
-  );
+  const wipNav = navSections
+    .find((section) => section.title === "Business")!
+    .items.find((item) => item.label === "WIP")!;
 </script>
 
 <div class="p-4">
@@ -37,12 +33,17 @@
       ><option value="civil">Civil</option><option value="">None</option></select
     ></label
   >
-  <nav aria-label="WIP navigation">
-    {#each items as item (item.href)}<a
-        class="mr-4"
-        href={resolve(item.href as `/jobs/wip/${WIPMode}`)}>{item.label}</a
-      >{/each}
+  <nav aria-label="WIP navigation" class="flex h-12 w-64 overflow-hidden bg-neutral-700 text-white">
+    <NavFlyout
+      label={wipNav.label}
+      items={wipNav.children!}
+      pathname={`/jobs/wip/${mode}`}
+      {claims}
+      isBranchManager={manager}
+      {showAllUi}
+    />
   </nav>
+  <label><input type="checkbox" bind:checked={showAllUi} />Show All UI</label>
 </div>
 {#key `${mode}:${defaultDivision}`}
   <WIPReport

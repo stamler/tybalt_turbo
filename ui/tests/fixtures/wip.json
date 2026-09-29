@@ -11,7 +11,9 @@
     "unpriced_expenses": 0,
     "po_value": 15000,
     "unpriced_pos": 0,
-    "estimated_pos": 0
+    "estimated_pos": 0,
+    "missing_role_hours": 0,
+    "missing_role_rate_hours": 0
   },
   "over": {
     "project_value": 50000,
@@ -25,7 +27,9 @@
     "unpriced_expenses": 0,
     "po_value": 15000,
     "unpriced_pos": 0,
-    "estimated_pos": 0
+    "estimated_pos": 0,
+    "missing_role_hours": 0,
+    "missing_role_rate_hours": 0
   },
   "partial": {
     "project_value": 100000,
@@ -39,7 +43,9 @@
     "unpriced_expenses": 0,
     "po_value": 15000,
     "unpriced_pos": 0,
-    "estimated_pos": 0
+    "estimated_pos": 0,
+    "missing_role_hours": 0,
+    "missing_role_rate_hours": 0
   },
   "unknown-po": {
     "project_value": 100000,
@@ -53,7 +59,9 @@
     "unpriced_expenses": 0,
     "po_value": 15000,
     "unpriced_pos": 1,
-    "estimated_pos": 1
+    "estimated_pos": 1,
+    "missing_role_hours": 0,
+    "missing_role_rate_hours": 0
   },
   "unknown-expense": {
     "project_value": 100000,
@@ -67,7 +75,9 @@
     "unpriced_expenses": 1,
     "po_value": 15000,
     "unpriced_pos": 0,
-    "estimated_pos": 1
+    "estimated_pos": 1,
+    "missing_role_hours": 0,
+    "missing_role_rate_hours": 0
   },
   "zero-project": {
     "project_value": 0,
@@ -81,7 +91,9 @@
     "unpriced_expenses": 0,
     "po_value": 15000,
     "unpriced_pos": 0,
-    "estimated_pos": 0
+    "estimated_pos": 0,
+    "missing_role_hours": 0,
+    "missing_role_rate_hours": 0
   },
   "empty": {
     "project_value": 100000,
@@ -95,7 +107,9 @@
     "unpriced_expenses": 0,
     "po_value": 0,
     "unpriced_pos": 0,
-    "estimated_pos": 0
+    "estimated_pos": 0,
+    "missing_role_hours": 0,
+    "missing_role_rate_hours": 0
   },
   "negative": {
     "project_value": 100000,
@@ -109,6 +123,8 @@
     "unpriced_expenses": 0,
     "po_value": 15000,
     "unpriced_pos": 0,
-    "estimated_pos": 0
+    "estimated_pos": 0,
+    "missing_role_hours": 0,
+    "missing_role_rate_hours": 0
   }
 }
