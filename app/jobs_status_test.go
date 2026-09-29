@@ -558,7 +558,7 @@ func TestNewProposal_StatusRestrictions(t *testing.T) {
 }
 
 // TestProjectStatus_ValueRequirement verifies that projects with Active/Closed status
-// must have project_value > 0 or time_and_materials = true.
+// must have project_value > 0, including Time and Materials projects.
 // Cancelled projects do NOT have this requirement.
 //
 // Test data: Uses existing client (ee3xvodl583b61o), contact (235g6k01xx3sdjk),
@@ -585,6 +585,7 @@ func TestProjectStatus_ValueRequirement(t *testing.T) {
 				"project_award_date": "2024-12-01",
 				"authorizing_document": "Unauthorized",
 				"status": "Active",
+				"project_completion_date": "2027-12-31",
 				"location": "87G8Q2GX+HV"
 			}`),
 			Headers: map[string]string{
@@ -593,7 +594,7 @@ func TestProjectStatus_ValueRequirement(t *testing.T) {
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
 				`"code":"value_required_for_status"`,
-				`"projects with status Active or Closed must have a project value or be marked as time and materials"`,
+				`"projects with status Active or Closed must have a project value greater than zero"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -661,6 +662,7 @@ func TestProjectStatus_ValueRequirement(t *testing.T) {
 				"project_award_date": "2024-12-01",
 				"authorizing_document": "Unauthorized",
 				"status": "Active",
+				"project_completion_date": "2027-12-31",
 				"project_value": 100000,
 				"location": "87G8Q2GX+HV"
 			}`),
@@ -675,7 +677,7 @@ func TestProjectStatus_ValueRequirement(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:   "new project Active with time_and_materials succeeds",
+			Name:   "new project Active with time_and_materials but no value fails",
 			Method: http.MethodPost,
 			URL:    "/api/collections/jobs/records",
 			Body: strings.NewReader(`{
@@ -688,16 +690,16 @@ func TestProjectStatus_ValueRequirement(t *testing.T) {
 				"project_award_date": "2024-12-01",
 				"authorizing_document": "Unauthorized",
 				"status": "Active",
+				"project_completion_date": "2027-12-31",
 				"time_and_materials": true,
 				"location": "87G8Q2GX+HV"
 			}`),
 			Headers: map[string]string{
 				"Authorization": recordToken,
 			},
-			ExpectedStatus: 200,
+			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"status":"Active"`,
-				`"time_and_materials":true`,
+				`"code":"value_required_for_status"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},
@@ -715,6 +717,7 @@ func TestProjectStatus_ValueRequirement(t *testing.T) {
 				"project_award_date": "2024-12-01",
 				"authorizing_document": "Unauthorized",
 				"status": "Active",
+				"project_completion_date": "2027-12-31",
 				"project_value": 50000,
 				"time_and_materials": true,
 				"location": "87G8Q2GX+HV"

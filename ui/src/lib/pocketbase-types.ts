@@ -539,6 +539,7 @@ export type JobsRecord = {
   outstanding_balance: number;
   outstanding_balance_date: string;
   project_award_date: string;
+  project_completion_date: string;
   project_value: number;
   proposal: RecordIdString;
   proposal_opening_date: string;

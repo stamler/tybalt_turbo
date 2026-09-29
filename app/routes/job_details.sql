@@ -44,6 +44,7 @@ SELECT
   pr.number          AS proposal_number,
   j.fn_agreement     AS fn_agreement,
   j.project_award_date AS project_award_date,
+  j.project_completion_date AS project_completion_date,
   j.proposal_opening_date AS proposal_opening_date,
   j.proposal_submission_due_date AS proposal_submission_due_date,
   j.proposal_value AS proposal_value,

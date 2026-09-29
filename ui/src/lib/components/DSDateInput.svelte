@@ -7,6 +7,7 @@
     min = undefined,
     max = undefined,
     disabled = false,
+    required = false,
   }: {
     value: string;
     id?: string;
@@ -15,6 +16,7 @@
     min?: string;
     max?: string;
     disabled?: boolean;
+    required?: boolean;
   } = $props();
 </script>
 
@@ -27,4 +29,5 @@
   max={max ?? undefined}
   bind:value
   {disabled}
+  {required}
 />

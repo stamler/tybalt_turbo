@@ -47,6 +47,7 @@ export const load: PageLoad<JobsPageData> = async ({ params, url }) => {
     client_reference_number: "",
     // Set project_award_date to today if setAwardToday param is present
     project_award_date: setAwardToday ? getTodayDateString() : "",
+    project_completion_date: "",
     proposal_opening_date: "",
     proposal_submission_due_date: "",
     // Copy proposal_value to project_value (user can edit before saving)

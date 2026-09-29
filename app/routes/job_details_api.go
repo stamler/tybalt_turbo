@@ -83,6 +83,7 @@ type jobDetailsRow struct {
 	RateSheetRevision         sql.NullInt64   `db:"rate_sheet_revision"`
 	FnAgreement               bool            `db:"fn_agreement"`
 	ProjectAwardDate          sql.NullString  `db:"project_award_date"`
+	ProjectCompletionDate     sql.NullString  `db:"project_completion_date"`
 	ProposalOpeningDate       sql.NullString  `db:"proposal_opening_date"`
 	ProposalSubmissionDueDate sql.NullString  `db:"proposal_submission_due_date"`
 	ProposalValue             sql.NullFloat64 `db:"proposal_value"`
@@ -147,6 +148,7 @@ type JobDetails struct {
 	RateSheet                 RateSheetInfo `json:"rate_sheet"`
 	FnAgreement               bool          `json:"fn_agreement"`
 	ProjectAwardDate          string        `json:"project_award_date"`
+	ProjectCompletionDate     string        `json:"project_completion_date"`
 	ProposalOpeningDate       string        `json:"proposal_opening_date"`
 	ProposalSubmissionDueDate string        `json:"proposal_submission_due_date"`
 	ProposalValue             float64       `json:"proposal_value"`
@@ -235,6 +237,7 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			RateSheet:                 RateSheetInfo{ID: ns(r.RateSheetID), Name: ns(r.RateSheetName), Revision: int(r.RateSheetRevision.Int64)},
 			FnAgreement:               r.FnAgreement,
 			ProjectAwardDate:          ns(r.ProjectAwardDate),
+			ProjectCompletionDate:     ns(r.ProjectCompletionDate),
 			ProposalOpeningDate:       ns(r.ProposalOpeningDate),
 			ProposalSubmissionDueDate: ns(r.ProposalSubmissionDueDate),
 			ProposalValue:             r.ProposalValue.Float64,

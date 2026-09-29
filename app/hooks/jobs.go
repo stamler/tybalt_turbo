@@ -254,6 +254,34 @@ func ensureOutstandingBalancePermission(app core.App, jobRecord *core.Record, au
 	}
 }
 
+// validateProjectCompletionDate requires a date only for Active projects.
+// Closed and Cancelled projects can stay blank, including during quick close.
+func validateProjectCompletionDate(record *core.Record, derived jobType) *errs.HookError {
+	date := record.GetString("project_completion_date")
+	if date == "" {
+		if derived == jobTypeProject && record.GetString("status") == "Active" {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "project completion date is required",
+				Data: map[string]errs.CodeError{
+					"project_completion_date": {Code: "required_for_active_project", Message: "Enter a project completion date for an Active project. An estimate is acceptable."},
+				},
+			}
+		}
+		return nil
+	}
+	if _, err := time.Parse("2006-01-02", date); err != nil {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: "invalid project completion date",
+			Data: map[string]errs.CodeError{
+				"project_completion_date": {Code: "invalid_date_format", Message: "Enter a valid project completion date in YYYY-MM-DD format."},
+			},
+		}
+	}
+	return nil
+}
+
 // validateProposalDateOrder ensures the proposal submission due date is on or
 // after the proposal opening date. Both dates must be non-empty strings in
 // "YYYY-MM-DD" format.
@@ -444,6 +472,11 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 		derived = typeFromNumber(original.GetString("number"))
 	}
 
+	// Check the resulting status before the status-only update shortcut.
+	if err := validateProjectCompletionDate(record, derived); err != nil {
+		return 0, err
+	}
+
 	// Allow status-only updates to pass without tripping other validations.
 	// This compensates for relaxed update rules while preserving status constraints.
 	//
@@ -471,9 +504,6 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 								"status": {Code: "invalid_status_for_type", Message: "projects may be Active, Closed or Cancelled"},
 							},
 						}
-					}
-					if err := validateJobValueRequirement(record, derived, newStatus, "status"); err != nil {
-						return 0, err
 					}
 				} else { // proposal
 					// Proposals: allowed statuses are In Progress, Submitted, Awarded, Not Awarded, Cancelled, No Bid
@@ -513,6 +543,11 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 							}
 						}
 					}
+				}
+			}
+			if derived == jobTypeProject {
+				if err := validateJobValueRequirement(record, derived, status, "project_value"); err != nil {
+					return 0, err
 				}
 			}
 			return derived, nil
@@ -894,23 +929,22 @@ func jobHasClientNoteForStatus(app core.App, jobID string, targetStatus string) 
 	return note != nil, nil
 }
 
-// validateJobValueRequirement checks that jobs have either a value or time_and_materials set.
-// For projects (Active/Closed): requires project_value > 0 OR time_and_materials = true
+// validateJobValueRequirement checks the value requirement for each job type.
+// Active and Closed projects require project_value > 0, including Time and Materials.
 // For proposals (Submitted/Awarded/Not Awarded): requires proposal_value > 0 OR time_and_materials = true
-// The errorField parameter determines which field the error is attached to ("status" for status-only
-// updates, or "project_value"/"proposal_value" for full validation).
+// errorField selects the field that shows the validation error.
 func validateJobValueRequirement(record *core.Record, derived jobType, status string, errorField string) *errs.HookError {
 	timeAndMaterials := record.GetBool("time_and_materials")
 
 	if derived == jobTypeProject {
 		if status == "Active" || status == "Closed" {
 			projectValue := record.GetInt("project_value")
-			if projectValue <= 0 && !timeAndMaterials {
+			if projectValue <= 0 {
 				return &errs.HookError{
 					Status:  http.StatusBadRequest,
-					Message: "project value or time and materials required",
+					Message: "project value must be greater than zero",
 					Data: map[string]errs.CodeError{
-						errorField: {Code: "value_required_for_status", Message: "projects with status Active or Closed must have a project value or be marked as time and materials"},
+						errorField: {Code: "value_required_for_status", Message: "projects with status Active or Closed must have a project value greater than zero"},
 					},
 				}
 			}

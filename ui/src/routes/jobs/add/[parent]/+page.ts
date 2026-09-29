@@ -21,6 +21,7 @@ export const load: PageLoad<JobsPageData> = async ({ params }) => {
     branch: "",
     location: "",
     project_award_date: "",
+    project_completion_date: "",
     proposal_opening_date: "",
     proposal_submission_due_date: "",
     // set parent to the route param

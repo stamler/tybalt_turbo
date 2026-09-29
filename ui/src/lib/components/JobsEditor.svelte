@@ -828,6 +828,37 @@
       </span>
     {/if}
 
+    {#if !isProposal}
+      <span
+        class="flex w-full items-center gap-2 {errors.project_completion_date !== undefined
+          ? 'bg-red-200'
+          : ''}"
+      >
+        <label
+          for="project_completion_date"
+          title="Required for Active projects. An estimate is acceptable. Update this date when the expected completion date changes."
+          >Project Completion Date{item.status === JobsStatusOptions.Active ? " *" : ""}</label
+        >
+        <DsDateInput
+          class="flex-1 md:flex-none"
+          name="project_completion_date"
+          required={item.status === JobsStatusOptions.Active}
+          bind:value={item.project_completion_date}
+        />
+        {#if item.project_completion_date}
+          <DsActionButton
+            icon="mdi:close"
+            title="Clear completion date"
+            color="red"
+            action={() => (item.project_completion_date = "")}
+          />
+        {/if}
+        {#if errors.project_completion_date !== undefined}
+          <span class="text-red-600">{errors.project_completion_date.message}</span>
+        {/if}
+      </span>
+    {/if}
+
     {#if !hideProposalDates}
       <span
         class="flex w-full items-center gap-2 {errors.proposal_opening_date !== undefined
@@ -1046,7 +1077,8 @@
           type="number"
           class="rounded-sm border border-neutral-300 px-2 py-1"
           bind:value={item.project_value as number}
-          min={0}
+          required={item.status === JobsStatusOptions.Active || item.status === JobsStatusOptions.Closed}
+          min={item.status === JobsStatusOptions.Active || item.status === JobsStatusOptions.Closed ? 1 : 0}
           step={1}
         />
         {#if errors.project_value !== undefined}
@@ -1067,8 +1099,8 @@
         Proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be
         marked as Time and Materials. If both, interpret proposal value as a maximum.
       {:else}
-        Projects with status Active or Closed must have a project value or be marked as Time and
-        Materials. If both, interpret project value as a maximum.
+        Projects with status Active or Closed must have a project value greater than zero.
+        For Time and Materials projects, interpret project value as a maximum.
       {/if}
     </p>
 

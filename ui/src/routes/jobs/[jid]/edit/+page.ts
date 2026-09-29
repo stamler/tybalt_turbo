@@ -23,6 +23,7 @@ export const load: PageLoad<JobsPageData> = async ({ params }) => {
     client_po: "",
     client_reference_number: "",
     project_award_date: "",
+    project_completion_date: "",
     proposal_opening_date: "",
     proposal_submission_due_date: "",
   };

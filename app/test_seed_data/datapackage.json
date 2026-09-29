@@ -1581,6 +1581,11 @@
             "name": "pa_rejection_reason",
             "type": "string",
             "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "project_completion_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
           }
         ],
         "primaryKey": [

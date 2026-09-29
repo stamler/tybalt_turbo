@@ -888,6 +888,13 @@
           </div>
         {/if}
 
+        {#if !isProposal && data.job.project_completion_date}
+          <div>
+            <span class="font-semibold">Project Completion Date:</span>
+            {data.job.project_completion_date}
+          </div>
+        {/if}
+
         {#if isProposal}
           <div>
             <span class="font-semibold">Proposal Value:</span>

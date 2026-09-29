@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Project completion date browser tests</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { mount } from "svelte";
+      import JobsEditor from "../../src/lib/components/JobsEditor.svelte";
+      import item from "./projectCompletionDate.json";
+      import "/src/app.css";
+      const proposal = new URLSearchParams(location.search).has("proposal");
+      if (proposal) {
+        item.number = "P86-9006";
+        item.status = "In Progress";
+        item.project_award_date = "";
+        item.proposal_opening_date = "2025-01-01";
+        item.proposal_submission_due_date = "2025-01-10";
+      }
+      mount(JobsEditor, {
+        target: document.getElementById("app"),
+        props: { data: { item, id: item.id, editing: true, categories: [] } },
+      });
+    </script>
+  </body>
+</html>
