@@ -114,3 +114,17 @@ shows loading, retry, and empty states, and keeps loaded results while the same
 report data remains displayed. A changed report discards those results. The
 query uses current job and sheet data; the report date limits entry dates, not
 historical sheet assignments. Opening the popup alone makes no extra request.
+
+## Direct links
+
+Branch and division selections update the URL fragment: `#branch=<record-id>`
+or `#division=<record-id>`. Copy the address after selecting an entry to share
+the report. Reload, Back, and Forward restore that selection. Record IDs keep
+links valid when names change. The login redirect preserves the fragment for
+signed-out users. Existing access rules still apply.
+
+Without a matching fragment, the report uses the user's normal default. An
+explicit empty value (`#branch=` or `#division=`) keeps All branches or no
+division selected after reload. An unknown ID shows a selection error and does
+not request a report. Search, sort, and inclusion checkboxes remain local to
+the page; they are not included in the link. No server routes or queries change.

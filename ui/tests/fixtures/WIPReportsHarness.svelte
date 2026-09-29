@@ -3,7 +3,9 @@
   import WIPReport from "../../src/lib/components/jobs/WIPReport.svelte";
   import { navSections } from "../../src/lib/navConfig";
   import type { WIPMode } from "../../src/lib/reports/wipReports";
-  let mode = $state<WIPMode>("my");
+  let mode = $state<WIPMode>(
+    (new URLSearchParams(window.location.search).get("mode") as WIPMode) || "my",
+  );
   let access = $state("kpi");
   let showAllUi = $state(false);
   let defaultDivision = $state("civil");
@@ -16,7 +18,12 @@
 
 <div class="p-4">
   <label
-    >Report <select aria-label="Report" bind:value={mode}
+    >Report <select
+      aria-label="Report"
+      bind:value={mode}
+      onchange={() => {
+        window.location.hash = "";
+      }}
       ><option value="my">My WIP</option><option value="branch">Branch WIP</option><option
         value="division">Division WIP</option
       ></select

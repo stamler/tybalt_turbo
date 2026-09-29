@@ -18,7 +18,8 @@
     "test:wip-browser": "node tests/wip.browser.mjs",
     "test:po-approval-limits-browser": "node tests/poApprovalLimits.browser.mjs",
     "test:wip-reports": "node --test --experimental-strip-types tests/wipReports.test.ts",
-    "test:wip-reports-browser": "node tests/wipReports.browser.mjs"
+    "test:wip-reports-browser": "node tests/wipReports.browser.mjs",
+    "test:wip-links-login-browser": "node tests/wipLinksLogin.browser.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -18,34 +18,38 @@ const services = {
     "import { writable } from 'svelte/store'; export const globalStore = writable({claims:[]});",
 };
 
-export async function runBrowserHarness(check) {
+export async function runBrowserHarness(check, { app = false } = {}) {
   const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
   const cacheDir = await mkdtemp(path.join(tmpdir(), "tybalt-browser-vite-"));
   let server, browser;
   try {
     server = await createServer({
       root,
-      configFile: false,
+      configFile: app ? undefined : false,
       cacheDir,
-      plugins: [
-        {
-          name: "test-services",
-          enforce: "pre",
-          resolveId(id) {
-            if (id in services) return `\0${id}`;
+      plugins: app
+        ? []
+        : [
+            {
+              name: "test-services",
+              enforce: "pre",
+              resolveId(id) {
+                if (id in services) return `\0${id}`;
+              },
+              load(id) {
+                return services[id.slice(1)];
+              },
+            },
+            svelte({ configFile: false }),
+          ],
+      resolve: app
+        ? undefined
+        : {
+            alias: [
+              { find: "$lib/stores/global", replacement: "summary-test-global" },
+              { find: "$lib", replacement: path.join(root, "src/lib") },
+            ],
           },
-          load(id) {
-            return services[id.slice(1)];
-          },
-        },
-        svelte({ configFile: false }),
-      ],
-      resolve: {
-        alias: [
-          { find: "$lib/stores/global", replacement: "summary-test-global" },
-          { find: "$lib", replacement: path.join(root, "src/lib") },
-        ],
-      },
       server: { host: "127.0.0.1", port: 0 },
     });
     await server.listen();

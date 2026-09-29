@@ -168,7 +168,9 @@
   // route guards
   $effect(() => {
     if (browser && !$authStore?.isValid && $page.url.pathname !== "/login") {
-      goto(`/login?redirect=${encodeURIComponent($page.url.pathname + $page.url.search)}`);
+      goto(
+        `/login?redirect=${encodeURIComponent($page.url.pathname + $page.url.search + $page.url.hash)}`,
+      );
     } else if (browser && $authStore?.isValid && $page.url.pathname === "/login") {
       const redirectUrl = sessionStorage.getItem("redirectUrl");
       if (redirectUrl) {

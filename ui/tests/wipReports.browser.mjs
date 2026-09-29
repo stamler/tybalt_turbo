@@ -543,6 +543,106 @@ await runBrowserHarness(async (page, origin) => {
       { exact: true },
     )
     .waitFor();
+  empty = false;
+  employeeOnly = false;
+  percentageExamples = false;
+  const branchUrl = `${origin}/tests/fixtures/wipReports.html?mode=branch`;
+  const divisionUrl = `${origin}/tests/fixtures/wipReports.html?mode=division`;
+  const branchSelect = page.getByLabel("Branch", { exact: true });
+  const northTable = page.getByRole("table", { name: "North: ranked WIP", exact: true });
+  const southTable = page.getByRole("table", { name: "South: ranked WIP", exact: true });
+  const requestStart = requests.length;
+  await page.goto(`${branchUrl}#branch=south`);
+  await southTable.waitFor();
+  assert.equal(await branchSelect.inputValue(), "south");
+  assert.deepEqual(
+    requests.slice(requestStart).map((url) => url.searchParams.get("branch")),
+    ["south"],
+    "A direct link fetches only its selected branch, not the default first.",
+  );
+  const arrowSpacing = await branchSelect.evaluate((el) => {
+    const arrow = el.parentElement.querySelector("svg").getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    return {
+      right: box.right - arrow.right,
+      center: arrow.y + arrow.height / 2 - box.y - box.height / 2,
+      appearance: getComputedStyle(el).appearance,
+    };
+  });
+  assert.equal(arrowSpacing.appearance, "none");
+  assert.ok(Math.abs(arrowSpacing.right - 8) < 1);
+  assert.ok(Math.abs(arrowSpacing.center) < 1);
+  await branchSelect.selectOption("north");
+  await northTable.waitFor();
+  assert.equal(new URL(page.url()).hash, "#branch=north");
+  await page.goBack();
+  await southTable.waitFor();
+  assert.equal(await branchSelect.inputValue(), "south");
+  await page.goForward();
+  await northTable.waitFor();
+  assert.equal(await branchSelect.inputValue(), "north");
+  await branchSelect.selectOption("");
+  await southTable.waitFor();
+  assert.equal(new URL(page.url()).hash, "#branch=");
+  await page.reload();
+  await southTable.waitFor();
+  await northTable.waitFor();
+  assert.equal(await branchSelect.inputValue(), "");
+  const invalidStart = requests.length;
+  await page.goto(`${branchUrl}#branch=missing`);
+  await page
+    .getByRole("alert")
+    .getByText("The linked branch is not available. Select a branch.")
+    .waitFor();
+  assert.equal(requests.length, invalidStart, "Invalid links must not fetch all branches.");
+  await branchSelect.selectOption("");
+  await northTable.waitFor();
+  await southTable.waitFor();
+  assert.equal(await page.getByRole("alert").count(), 0);
+  const divisionStart = requests.length;
+  await page.goto(`${divisionUrl}#division=structural`);
+  await page.getByTestId("report-normal").waitFor();
+  await page.getByLabel("Must include STR hours", { exact: true }).waitFor();
+  assert.deepEqual(
+    requests.slice(divisionStart).map((url) => url.searchParams.get("division")),
+    ["structural"],
+  );
+  await page.reload();
+  await page.getByLabel("Must include STR hours", { exact: true }).waitFor();
+  await page.getByRole("button", { name: "Clear", exact: true }).click();
+  await page.getByText("Select a division to view its projects.", { exact: true }).waitFor();
+  assert.equal(new URL(page.url()).hash, "#division=");
+  await page.reload();
+  await page.getByText("Select a division to view its projects.", { exact: true }).waitFor();
+  await division.fill("CIV");
+  await division.press("ArrowDown");
+  await division.press("Enter");
+  await page.getByTestId("report-normal").waitFor();
+  assert.equal(new URL(page.url()).hash, "#division=civil");
+  await page.goBack();
+  await page.getByText("Select a division to view its projects.", { exact: true }).waitFor();
+  await page.goForward();
+  await page.getByLabel("Must include CIV hours", { exact: true }).waitFor();
+  const invalidDivisionStart = requests.length;
+  await page.goto(`${divisionUrl}#division=%ZZ`);
+  await page
+    .getByRole("alert")
+    .getByText("The linked division is not available. Select a division.")
+    .waitFor();
+  assert.equal(requests.length, invalidDivisionStart);
+  await division.fill("STR");
+  await division.press("ArrowDown");
+  await division.press("Enter");
+  await page.getByTestId("report-normal").waitFor();
+  assert.equal(new URL(page.url()).hash, "#division=structural");
+  await page.getByLabel("Access", { exact: true }).selectOption("ordinary");
+  await page.getByRole("alert").waitFor();
+  const deniedStart = requests.length;
+  await page.evaluate(() => {
+    window.location.hash = "division=civil";
+  });
+  await page.waitForTimeout(100);
+  assert.equal(requests.length, deniedStart, "Linked selections do not bypass report access.");
   // Use a small destination page to verify real link navigation without app authentication.
   await page.route("**/jobs/wip/*", (route) =>
     route.fulfill({ contentType: "text/html", body: "<h1>Selected WIP view</h1>" }),

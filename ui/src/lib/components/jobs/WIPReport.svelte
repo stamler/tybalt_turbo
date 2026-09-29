@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
   import MiniSearch from "minisearch";
   import { pb } from "$lib/pocketbase";
@@ -34,6 +35,34 @@
   let branch = $state(initialBranch);
   // svelte-ignore state_referenced_locally
   let division = $state(initialDivision);
+  let selectionReady = $state(false);
+  let selectionError = $state("");
+
+  function readSelection() {
+    if (mode === "my") return;
+    const linked = new URLSearchParams(window.location.hash.slice(1)).get(mode);
+    const selected = linked ?? (mode === "branch" ? initialBranch : initialDivision);
+    const choices = mode === "branch" ? branches : divisions;
+    const valid = !selected || choices.some((item) => item.id === selected);
+    selectionError = valid ? "" : `The linked ${mode} is not available. Select a ${mode}.`;
+    if (mode === "branch") branch = selected;
+    else division = valid ? selected : "";
+  }
+
+  function select(value: string) {
+    selectionError = "";
+    if (mode === "branch") branch = value;
+    else division = value;
+    // Keep an empty value explicit so reload does not restore the user's default.
+    window.location.hash = new URLSearchParams({ [mode]: value }).toString();
+  }
+
+  onMount(() => {
+    readSelection();
+    selectionReady = true;
+    window.addEventListener("hashchange", readSelection);
+    return () => window.removeEventListener("hashchange", readSelection);
+  });
   const divisionCode = $derived(divisions.find((item) => item.id === division)?.code);
   let requireTime = $state(true);
   let includeExpenses = $state(true);
@@ -81,7 +110,13 @@
     void retry;
     data = null;
     error = "";
-    if (!permitted || (reportMode === "division" && !selectedDivision)) return;
+    if (
+      !selectionReady ||
+      selectionError ||
+      !permitted ||
+      (reportMode === "division" && !selectedDivision)
+    )
+      return;
     let current = true;
     const controller = new AbortController();
     pb.send<WIPReportData>(`/api/wip/${reportMode}`, {
@@ -132,20 +167,33 @@
           >{filtered.length} of {data.items.length} projects</span
         >{/if}
       {#if mode === "branch"}
-        <select
-          aria-label="Branch"
-          class="h-9 min-w-0 flex-1 basis-48 rounded-sm border border-neutral-300 bg-white px-2 sm:max-w-72"
-          bind:value={branch}
-        >
-          <option value="">All branches</option>
-          {#each branches as item (item.id)}<option value={item.id}>{item.name}</option>{/each}
-        </select>
+        <span class="relative min-w-0 flex-1 basis-48 sm:max-w-72">
+          <select
+            aria-label="Branch"
+            class="h-9 w-full appearance-none rounded-sm border border-neutral-300 bg-white pr-8 pl-3"
+            bind:value={() => branch, select}
+          >
+            {#if selectionError}<option value={branch} disabled>Select a branch</option>{/if}
+            <option value="">All branches</option>
+            {#each branches as item (item.id)}<option value={item.id}>{item.name}</option>{/each}
+          </select>
+          <svg
+            aria-hidden="true"
+            class="pointer-events-none absolute top-1/2 right-2 h-4 w-4 -translate-y-1/2 text-neutral-600"
+            viewBox="0 0 20 20"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.5"
+          >
+            <path d="m6 8 4 4 4-4" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </span>
       {:else if mode === "division"}
         <div
           class="min-w-0 flex-1 basis-64 rounded-sm border border-neutral-300 bg-white px-2 py-1 sm:max-w-md"
         >
           <DSAutoComplete
-            bind:value={division}
+            bind:value={() => division, select}
             index={divisionIndex}
             errors={{}}
             fieldName="division"
@@ -206,7 +254,9 @@
         <WIPHelp />
       </div>
     </div>
-    {#if error}
+    {#if selectionError}
+      <p role="alert" class="p-4 text-red-700">{selectionError}</p>
+    {:else if error}
       <div role="alert" class="flex items-center gap-3 p-4 text-red-700">
         <p>{error}</p>
         <button class="rounded-sm border px-3 py-2" onclick={() => retry++}>Try again</button>
