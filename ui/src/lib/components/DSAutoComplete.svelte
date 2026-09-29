@@ -179,7 +179,9 @@
     <span class="flex w-full gap-2">
       <label for={`autocomplete-input-${thisId}`}>{uiName}</label>
       {#if value && value !== ""}
-        <span class={disabled ? "opacity-50" : ""}>{@render resultTemplate(item)}</span>
+        <span class="min-w-0 flex-1 {disabled ? 'opacity-50' : ''}">
+          {@render resultTemplate(item)}
+        </span>
         {#if !disabled}
           <DsActionButton action={clearValue}>Clear</DsActionButton>
         {/if}
