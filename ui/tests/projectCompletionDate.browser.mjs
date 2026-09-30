@@ -34,12 +34,14 @@ await runBrowserHarness(async (page, origin) => {
   });
   await page.goto(`${origin}/tests/fixtures/projectCompletionDate.html`);
   const date = page.locator('input[name="project_completion_date"]');
+  const award = page.locator('input[name="project_award_date"]');
   const status = page.locator('select[name="status"]');
   const value = page.locator('input[name="project_value"]');
   await date.waitFor();
   assert.equal(await date.getAttribute("required"), "");
   assert.equal(await date.evaluate((input) => input.validity.valueMissing), true);
   assert.equal(await date.getAttribute("max"), null);
+  assert.equal(await date.getAttribute("min"), "2025-01-15");
   assert.match(
     await page.locator('label[for="project_completion_date"]').getAttribute("title"),
     /estimate is acceptable/,
@@ -69,6 +71,17 @@ await runBrowserHarness(async (page, origin) => {
   assert.equal(await date.evaluate((input) => input.checkValidity()), true);
   await page.getByTitle("Clear completion date", { exact: true }).click();
   assert.equal(await date.inputValue(), "");
+  await date.fill("2025-01-14");
+  assert.equal(await date.evaluate((input) => input.validity.rangeUnderflow), true);
+  await date.fill("2025-01-15");
+  assert.equal(await date.evaluate((input) => input.checkValidity()), true);
+  await award.fill("2025-01-16");
+  assert.equal(await date.getAttribute("min"), "2025-01-16");
+  assert.equal(await date.evaluate((input) => input.validity.rangeUnderflow), true);
+  await award.fill("");
+  assert.equal(await date.getAttribute("min"), null);
+  assert.equal(await date.evaluate((input) => input.checkValidity()), true);
+  await award.fill("2025-01-15");
   await date.fill("2025-02-01");
   assert.equal(await date.evaluate((input) => input.checkValidity()), true);
 

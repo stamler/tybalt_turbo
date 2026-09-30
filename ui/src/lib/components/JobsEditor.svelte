@@ -842,6 +842,7 @@
         <DsDateInput
           class="flex-1 md:flex-none"
           name="project_completion_date"
+          min={item.project_award_date || undefined}
           required={item.status === JobsStatusOptions.Active}
           bind:value={item.project_completion_date}
         />

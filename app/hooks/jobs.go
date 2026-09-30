@@ -270,13 +270,36 @@ func validateProjectCompletionDate(record *core.Record, derived jobType) *errs.H
 		}
 		return nil
 	}
-	if _, err := time.Parse("2006-01-02", date); err != nil {
+	completion, err := time.Parse("2006-01-02", date)
+	if err != nil {
 		return &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "invalid project completion date",
 			Data: map[string]errs.CodeError{
 				"project_completion_date": {Code: "invalid_date_format", Message: "Enter a valid project completion date in YYYY-MM-DD format."},
 			},
+		}
+	}
+	// Legacy projects can have no award date. Compare dates only when both exist.
+	if awardDate := record.GetString("project_award_date"); awardDate != "" {
+		award, err := time.Parse("2006-01-02", awardDate)
+		if err != nil {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "invalid project award date",
+				Data: map[string]errs.CodeError{
+					"project_award_date": {Code: "invalid_date_format", Message: "Enter a valid project award date in YYYY-MM-DD format."},
+				},
+			}
+		}
+		if completion.Before(award) {
+			return &errs.HookError{
+				Status:  http.StatusBadRequest,
+				Message: "project completion date must be on or after project award date",
+				Data: map[string]errs.CodeError{
+					"project_completion_date": {Code: "date_order_invalid", Message: "Project completion date must be on or after project award date."},
+				},
+			}
 		}
 	}
 	return nil

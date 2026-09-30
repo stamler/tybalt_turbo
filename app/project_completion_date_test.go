@@ -25,6 +25,16 @@ func TestProjectCompletionDateUpdates(t *testing.T) {
 		{"active edit keeps saved estimate", "pcactivedated01", `{"description":"Changed description"}`, ""},
 		{"active date cannot be cleared", "pcactivedated01", `{"project_completion_date":""}`, "required_for_active_project"},
 		{"past date accepted", "pcactiveblank01", `{"project_completion_date":"2025-02-01"}`, ""},
+		{"completion before award rejected", "pcactiveblank01", `{"project_completion_date":"2025-01-14"}`, "date_order_invalid"},
+		{"completion on award date accepted", "pcactiveblank01", `{"project_completion_date":"2025-01-15"}`, ""},
+		{"award moved after completion rejected", "pcactivedated01", `{"project_award_date":"2028-01-01"}`, "date_order_invalid"},
+		{"award moved to completion accepted", "pcactivedated01", `{"project_award_date":"2027-12-31"}`, ""},
+		{"both dates changed together", "pcactivedated01", `{"project_award_date":"2028-01-01","project_completion_date":"2028-01-02"}`, ""},
+		{"closed completion before award rejected", "pcclosedblank01", `{"project_completion_date":"2025-01-14"}`, "date_order_invalid"},
+		{"cancelled completion before award rejected", "pccancelblank01", `{"project_completion_date":"2025-01-14"}`, "date_order_invalid"},
+		{"legacy missing award accepts completion", "cjf0kt0defhq480", `{"project_completion_date":"2025-02-01"}`, ""},
+		{"unchanged dates checked on close", "pcorderearly001", `{"status":"Closed"}`, "date_order_invalid"},
+		{"unchanged dates checked on save", "pcorderearly001", `{}`, "date_order_invalid"},
 		{"leap day accepted", "pcactiveblank01", `{"project_completion_date":"2028-02-29"}`, ""},
 		{"invalid leap day rejected", "pcactiveblank01", `{"project_completion_date":"2027-02-29"}`, "invalid_date_format"},
 		{"impossible date rejected", "pcactiveblank01", `{"project_completion_date":"2026-02-31"}`, "invalid_date_format"},
@@ -62,7 +72,7 @@ func TestProjectCompletionDateUpdates(t *testing.T) {
 						tb.Fatal(err)
 					}
 					expected := ""
-					if tc.id == "pcactivedated01" {
+					if tc.id == "pcactivedated01" || tc.id == "pcorderearly001" {
 						expected = "2027-12-31"
 					}
 					var patch map[string]any
@@ -76,6 +86,14 @@ func TestProjectCompletionDateUpdates(t *testing.T) {
 					}
 					if got := record.GetString("project_completion_date"); got != expected {
 						tb.Fatalf("saved date = %q, want %q", got, expected)
+					}
+					if award, ok := patch["project_award_date"].(string); ok {
+						if tc.code != "" {
+							award = "2025-01-15"
+						}
+						if got := record.GetString("project_award_date"); got != award {
+							tb.Fatalf("saved award date = %q, want %q", got, award)
+						}
 					}
 				},
 			}
@@ -101,6 +119,8 @@ func TestProjectCompletionDateCreate(t *testing.T) {
 	}{
 		{"active missing", "Active", "", "", 400},
 		{"active estimate", "Active", "2027-12-31", "", 200},
+		{"active before award", "Active", "2025-01-14", "", 400},
+		{"active on award date", "Active", "2025-01-15", "", 200},
 		{"active invalid", "Active", "2026-02-31", "", 400},
 		{"closed missing", "Closed", "", "", 200},
 		{"cancelled missing", "Cancelled", "", "", 200},
@@ -129,6 +149,9 @@ func TestProjectCompletionDateCreate(t *testing.T) {
 				code := "required_for_active_project"
 				if tc.date != "" {
 					code = "invalid_date_format"
+				}
+				if tc.date == "2025-01-14" {
+					code = "date_order_invalid"
 				}
 				content = []string{`"project_completion_date":`, `"code":"` + code + `"`}
 			}
@@ -159,4 +182,29 @@ func TestProjectCompletionDateQuickCloseAndDetails(t *testing.T) {
 	}
 	scenario := tests.ApiScenario{Name: "details returns completion date", Method: http.MethodGet, URL: "/api/jobs/pcactivedated01/details", Headers: map[string]string{"Authorization": token}, ExpectedStatus: 200, ExpectedContent: []string{`"project_completion_date":"2027-12-31"`}, TestAppFactory: testutils.SetupTestApp}
 	scenario.Test(t)
+}
+
+func TestProjectCompletionDateInvalidAward(t *testing.T) {
+	token, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, collectionAPI := range []bool{false, true} {
+		patch := `{"project_award_date":"2025-02-31"}`
+		method, url, body := http.MethodPut, "/api/jobs/pcactivedated01", `{"job":`+patch+`,"allocations":[{"division":"fy4i9poneukvq9u","hours":10}]}`
+		if collectionAPI {
+			method, url, body = http.MethodPatch, "/api/collections/jobs/records/pcactivedated01", patch
+		}
+		scenario := tests.ApiScenario{
+			Name:            "invalid award date cannot be used for comparison " + method,
+			Method:          method,
+			URL:             url,
+			Body:            strings.NewReader(body),
+			Headers:         map[string]string{"Authorization": token},
+			ExpectedStatus:  http.StatusBadRequest,
+			ExpectedContent: []string{`"project_award_date":{"code":"invalid_date_format"`},
+			TestAppFactory:  testutils.SetupTestApp,
+		}
+		scenario.Test(t)
+	}
 }
