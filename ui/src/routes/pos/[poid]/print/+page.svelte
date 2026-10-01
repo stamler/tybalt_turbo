@@ -1,11 +1,13 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { authorizedAmountText } from "$lib/poPrint";
   import type { PageData } from "./$types";
-  import { formatCurrencyAmount, shortDate, trimmedOrEmpty } from "$lib/utilities";
+  import { shortDate, trimmedOrEmpty } from "$lib/utilities";
 
   let { data }: { data: PageData } = $props();
 
   const po = $derived(data.po);
+  const amountText = $derived(authorizedAmountText(po, data.printOptions));
 
   function displayValue(value: string | null | undefined, fallback = "Not specified"): string {
     return trimmedOrEmpty(value) || fallback;
@@ -22,12 +24,6 @@
           .filter(Boolean)
           .join(" / ")
       : "",
-  );
-  const recurringPeriodLabel = $derived(trimmedOrEmpty(po.frequency) || "period");
-  const authorizedAmountText = $derived(
-    po.type === "Recurring"
-      ? `${formatCurrencyAmount(po.total, po.currency_code)} / ${recurringPeriodLabel}`
-      : formatCurrencyAmount(po.total, po.currency_code),
   );
 
   onMount(() => {
@@ -100,7 +96,7 @@
                 </td>
                 <td style="padding: 0.25rem 0; vertical-align: top;">
                   <div class="font-semibold">Authorized Amount</div>
-                  <div>{authorizedAmountText}</div>
+                  <div>{amountText}</div>
                 </td>
               </tr>
               <tr>
@@ -130,14 +126,6 @@
                   <td colspan="2" style="padding: 0.25rem 0; vertical-align: top;">
                     <div class="font-semibold">Recurring Schedule</div>
                     <div>{recurringDetails}</div>
-                  </td>
-                </tr>
-              {/if}
-              {#if po.type === "Recurring"}
-                <tr>
-                  <td colspan="2" style="padding: 0.25rem 0; vertical-align: top;">
-                    <div class="font-semibold">Maximum Authorized Total</div>
-                    <div>{formatCurrencyAmount(po.approval_total, po.currency_code)}</div>
                   </td>
                 </tr>
               {/if}
@@ -243,7 +231,7 @@
               on each invoice. Invoices received without POs will be declined.
             </p>
             <p class="mt-2 leading-5">
-              The PO must match the amount on file. Each new purchase will have its own approved PO.
+              Supply goods or services only within the authorized amount and terms shown on this PO.
             </p>
           </td>
         </tr>

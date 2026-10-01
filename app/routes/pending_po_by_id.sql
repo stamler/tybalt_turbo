@@ -52,6 +52,7 @@ SELECT
   recurring_expected_occurrences,
   recurring_remaining_occurrences,
   remaining_amount,
+  print_max_amount,
   uid_name,
   approver_name,
   second_approver_name,

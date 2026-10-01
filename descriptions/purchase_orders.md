@@ -685,3 +685,33 @@ Notes:
 - Long-term cleanup options are either:
   - fully align PocketBase rules to the route visibility contract, or
   - eliminate remaining native PO reads so all PO visibility comes from one route contract.
+
+## Printed PO amounts
+
+The Print action on an Active PO opens print options. The amount defaults to the
+approved amount for One-Time POs, the amount per period for Recurring POs, or the
+remaining balance after committed expenses for Cumulative POs. The read-only
+`print_max_amount` API field supplies this limit in the PO currency. The existing
+`remaining_amount` field still includes uncommitted expenses.
+
+Users can enter a lower positive amount and select Plus tax, Plus shipping, or
+both. An unchecked charge is included in the printed amount, if applicable.
+Additional charges require a lower printed amount and acknowledgement of the
+warning. The allowance is the print limit minus the printed amount; tax and
+shipping share this allowance when both are selected. Changing any option clears
+the acknowledgement. Zero or negative balances prevent printing.
+
+The print page reads the current PO and validates the options again. Invalid or
+incomplete options fail without opening the print dialog. A changed limit requires
+a new acknowledgement when additional charges are selected. A direct print link
+without options uses the current default amount and no additional charges.
+
+The vendor sees the selected Authorized Amount and terms. Internal approval
+limits, unused allowances, and warnings are omitted. Recurring POs retain the
+period label but omit Maximum Authorized Total. This lets users match the vendor's
+quote without showing the unused internal approval allowance.
+
+Print options are held in the new tab only. The page address contains an opaque
+key, so browser print footers cannot expose the internal approval allowance.
+Options reset for each new Print action. A generated document keeps its values
+for repeat printing. Printing does not change the stored PO or expense rules.

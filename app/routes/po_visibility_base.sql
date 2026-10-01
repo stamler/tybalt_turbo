@@ -227,6 +227,13 @@ SELECT
     ELSE
       po.total - COALESCE((SELECT SUM(expenses.total) FROM expenses WHERE expenses.purchase_order = po.id), 0)
   END AS remaining_amount,
+  -- Printing uses committed expenses only, in the PO currency.
+  ROUND(CASE
+    WHEN po.type = 'Cumulative' THEN
+      po.total - COALESCE((SELECT SUM(expenses.total) FROM expenses
+        WHERE expenses.purchase_order = po.id AND expenses.committed != ''), 0)
+    ELSE po.total
+  END, 2) AS print_max_amount,
   COALESCE((p0.given_name || ' ' || p0.surname), '') AS uid_name,
   COALESCE((p1.given_name || ' ' || p1.surname), '') AS approver_name,
   COALESCE((p2.given_name || ' ' || p2.surname), '') AS second_approver_name,

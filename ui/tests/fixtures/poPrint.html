@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PO print tests</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { mount } from "svelte";
+      import Button from "/src/lib/components/POPrintButton.svelte";
+      import PrintPage from "/src/routes/pos/[poid]/print/+page.svelte";
+      import { load } from "/src/routes/pos/[poid]/print/+page.ts";
+      import "/src/app.css";
+      window.printCalls = 0;
+      window.print = () => {
+        window.printCalls++;
+      };
+      const target = document.getElementById("app");
+      if (location.pathname.startsWith("/pos/")) {
+        try {
+          const data = await load({ params: { poid: "printpo" }, url: new URL(location.href) });
+          mount(PrintPage, { target, props: { data } });
+        } catch (error) {
+          target.setAttribute("role", "alert");
+          target.textContent = `${error.status}: ${error.body?.message || error.message}`;
+        }
+      } else mount(Button, { target, props: { poId: "printpo" } });
+    </script>
+  </body>
+</html>

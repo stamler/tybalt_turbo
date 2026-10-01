@@ -133,6 +133,7 @@ type purchaseOrderVisibilityRow struct {
 	RecurringExpectedCount     int     `db:"recurring_expected_occurrences" json:"recurring_expected_occurrences"`
 	RecurringRemainingCount    int     `db:"recurring_remaining_occurrences" json:"recurring_remaining_occurrences"`
 	RemainingAmount            float64 `db:"remaining_amount" json:"remaining_amount"`
+	PrintMaxAmount             float64 `db:"print_max_amount" json:"print_max_amount"`
 	UIDName                    string  `db:"uid_name" json:"uid_name"`
 	ApproverName               string  `db:"approver_name" json:"approver_name"`
 	SecondApproverName         string  `db:"second_approver_name" json:"second_approver_name"`

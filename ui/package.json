@@ -20,7 +20,9 @@
     "test:wip-reports": "node --test --experimental-strip-types tests/wipReports.test.ts",
     "test:wip-reports-browser": "node tests/wipReports.browser.mjs",
     "test:wip-links-login-browser": "node tests/wipLinksLogin.browser.mjs",
-    "test:project-completion-date-browser": "node tests/projectCompletionDate.browser.mjs"
+    "test:project-completion-date-browser": "node tests/projectCompletionDate.browser.mjs",
+    "test:po-print": "node --test --experimental-strip-types tests/poPrint.test.ts",
+    "test:po-print-browser": "node tests/poPrint.browser.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

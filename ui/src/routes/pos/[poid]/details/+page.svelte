@@ -5,6 +5,7 @@
   import DSPopover from "$lib/components/DSPopover.svelte";
   import RejectModal from "$lib/components/RejectModal.svelte";
   import Icon from "@iconify/svelte";
+  import POPrintButton from "$lib/components/POPrintButton.svelte";
   import {
     formatCurrencyAmount,
     formatCurrencyEquivalent,
@@ -567,15 +568,7 @@
 
   {#if data.po.status === "Active"}
     <div class="flex flex-wrap gap-2">
-      <a
-        href={resolve(`/pos/${data.po.id}/print`)}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="inline-flex items-center gap-2 rounded-xs bg-blue-200 px-3 py-1 text-neutral-700 hover:bg-blue-300 hover:text-blue-500 active:text-blue-800 active:shadow-inner"
-      >
-        <Icon icon="mdi:printer-outline" width="20px" />
-        <span>Print</span>
-      </a>
+      <POPrintButton poId={data.po.id} />
     </div>
   {/if}
 

@@ -1,17 +1,24 @@
 import type { PageLoad } from "./$types";
 import { error, isHttpError } from "@sveltejs/kit";
 import { fetchVisiblePO } from "$lib/poVisibility";
-import type { PurchaseOrdersAugmentedResponse } from "$lib/pocketbase-types";
+import { readPOPrintRequest } from "$lib/poPrint";
 
-export const load: PageLoad = async ({ params }) => {
+export const load: PageLoad = async ({ params, url }) => {
   try {
-    const po = (await fetchVisiblePO(params.poid)) as PurchaseOrdersAugmentedResponse;
+    const po = await fetchVisiblePO(params.poid);
 
     if (po.status !== "Active") {
       throw error(404, "Printable purchase order not found");
     }
 
-    return { po };
+    try {
+      return {
+        po,
+        printOptions: readPOPrintRequest(po, params.poid, url.searchParams, sessionStorage),
+      };
+    } catch (err) {
+      throw error(400, err instanceof Error ? err.message : "Invalid print options.");
+    }
   } catch (err: unknown) {
     if (isHttpError(err)) throw err;
 

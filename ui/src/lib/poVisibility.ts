@@ -18,6 +18,7 @@ export type VisiblePurchaseOrderResponse = PurchaseOrdersAugmentedResponse & {
   recurring_expected_occurrences: number;
   recurring_remaining_occurrences: number;
   remaining_amount: number;
+  print_max_amount: number;
 };
 
 export async function fetchVisiblePOs(
