@@ -1,12 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"math"
 	"net/http"
 	"testing"
 	"tybalt/internal/testutils"
 
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -14,6 +16,19 @@ func TestPurchaseOrderPrintBalance(t *testing.T) {
 	token, err := testutils.GenerateRecordToken("users", "time@test.com")
 	if err != nil {
 		t.Fatal(err)
+	}
+	snapshotPO := func(t testing.TB, app *tests.TestApp, id string) []byte {
+		t.Helper()
+		record, err := app.FindRecordById("purchase_orders", id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// Capture all stored fields, including approval state and timestamps.
+		snapshot, err := json.Marshal(record.FieldsData())
+		if err != nil {
+			t.Fatal(err)
+		}
+		return snapshot
 	}
 	for _, tc := range []struct {
 		name, id string
@@ -27,6 +42,7 @@ func TestPurchaseOrderPrintBalance(t *testing.T) {
 		{"one-time uses approved amount", "2plsetqdxht7esg", 132.10},
 		{"recurring uses amount per period", "d8463q483f3da28", 144},
 	} {
+		var before []byte
 		scenario := tests.ApiScenario{
 			Name: tc.name, Method: http.MethodGet,
 			URL:             "/api/purchase_orders/visible/" + tc.id,
@@ -34,13 +50,14 @@ func TestPurchaseOrderPrintBalance(t *testing.T) {
 			ExpectedStatus:  http.StatusOK,
 			ExpectedContent: []string{`"print_max_amount":`},
 			TestAppFactory:  testutils.SetupTestApp,
+			BeforeTestFunc: func(t testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
+				before = snapshotPO(t, app, tc.id)
+			},
 			AfterTestFunc: func(t testing.TB, app *tests.TestApp, res *http.Response) {
 				defer res.Body.Close()
 				var row struct {
 					PrintMaxAmount  *float64 `json:"print_max_amount"`
 					RemainingAmount float64  `json:"remaining_amount"`
-					Total           float64  `json:"total"`
-					Updated         string   `json:"updated"`
 				}
 				if err := json.NewDecoder(res.Body).Decode(&row); err != nil {
 					t.Fatal(err)
@@ -51,12 +68,8 @@ func TestPurchaseOrderPrintBalance(t *testing.T) {
 				if tc.id == "poprint00000001" && row.RemainingAmount != 6600 {
 					t.Fatalf("provisional balance must still include uncommitted expenses, got %.2f", row.RemainingAmount)
 				}
-				record, err := app.FindRecordById("purchase_orders", tc.id)
-				if err != nil {
-					t.Fatal(err)
-				}
-				if record.GetFloat("total") != row.Total || record.GetString("updated") != row.Updated {
-					t.Fatal("reading the print balance changed the PO")
+				if after := snapshotPO(t, app, tc.id); !bytes.Equal(before, after) {
+					t.Fatalf("reading the print balance changed the PO\nbefore: %s\nafter: %s", before, after)
 				}
 			},
 		}
