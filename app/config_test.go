@@ -326,6 +326,7 @@ func TestJobCreationAllowedWhenEditingEnabled(t *testing.T) {
 			Body: strings.NewReader(`{
 				"job": {
 					"description": "Test job creation when enabled",
+					"invoicing_information": "painvoice000002",
 					"location": "8FW4V75J+QQ",
 					"branch": "` + branchID + `",
 					"client": "` + clientID + `",

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Client editor checks</title>
+  </head>
+  <body>
+    <div class="p-4"><div id="app" class="mx-auto w-full max-w-3xl p-3"></div></div>
+    <script type="module">
+      import { mount } from "svelte";
+      import ContactEditor from "../../src/lib/components/clients/ContactEditor.svelte";
+      import InvoicingEditor from "../../src/lib/components/clients/InvoicingEditor.svelte";
+      import ClientsEditor from "../../src/lib/components/ClientsEditor.svelte";
+      import { globalStore } from "$lib/stores/global";
+      import { pb } from "$lib/pocketbase";
+      import { authStore } from "$lib/stores/auth";
+      import "/src/app.css";
+      const query = new URLSearchParams(location.search);
+      pb.authStore.save(
+        `${btoa(JSON.stringify({ alg: "none" }))}.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.fixture`,
+        { id: "test-user", collectionName: "users" },
+      );
+      authStore.refresh();
+      globalStore.set({
+        claims: query.has("none")
+          ? []
+          : query.has("readonly") || query.has("time")
+            ? ["time"]
+            : ["job", "absorb"],
+      });
+      const client = {
+        id: "client1",
+        name: "Example Client",
+        address: "1 Main Street",
+        city: "Thunder Bay",
+        business_development_lead: "lead1",
+        invoicing_profiles: query.has("profiles")
+          ? [
+              {
+                id: "capital-profile",
+                client: "client1",
+                contact: "contact1",
+                name: "Capital projects",
+                invoicing_instructions: "Include the capital project number.\nSend a PDF invoice.",
+                fax: "555-0100",
+              },
+              {
+                id: "maintenance-profile",
+                client: "client1",
+                contact: "contact1",
+                name: "Maintenance",
+                invoicing_instructions: "Include the maintenance work order.",
+                fax: "",
+              },
+              {
+                id: "other-profile",
+                client: "client1",
+                contact: "contact2",
+                name: "Other recipient",
+                invoicing_instructions: "Other recipient only.",
+                fax: "",
+              },
+            ]
+          : [],
+      };
+      if (query.has("profiles-many"))
+        client.invoicing_profiles = Array.from({ length: 100 }, (_, index) => ({
+          id: `capital-${index + 1}`,
+          client: "client1",
+          contact: "contact1",
+          name: `Capital ${index + 1}`,
+          invoicing_instructions: `Project code ${index + 1}`,
+          fax: "",
+        }));
+      const contacts = Array.from({ length: query.has("many") ? 100 : 2 }, (_, index) => ({
+        id: `contact${index + 1}`,
+        client: "client1",
+        given_name: index === 0 ? "Alex" : "Contact",
+        surname: index === 0 ? "Client" : String(index + 1),
+        email: `person${index + 1}@example.com`,
+        job_count: query.has("used") ? 2 : 0,
+        profile_count: 0,
+      }));
+      window.saved = [];
+      window.savedModes = [];
+      window.cancelled = 0;
+      window.deleted = 0;
+      let returnFailed = false;
+      const callbacks = {
+        onSaved: (record, mode) => {
+          if (query.has("fail-return") && !returnFailed) {
+            returnFailed = true;
+            throw new Error("Return page failed.");
+          }
+          window.saved.push(record);
+          window.savedModes.push(mode);
+        },
+        onCancel: () => window.cancelled++,
+        onDeleted: () => window.deleted++,
+      };
+      if (query.has("contact"))
+        mount(ContactEditor, {
+          target: document.getElementById("app"),
+          props: { clientId: "client1", record: query.has("new") ? {} : contacts[0], ...callbacks },
+        });
+      else if (query.has("client"))
+        mount(ClientsEditor, {
+          target: document.getElementById("app"),
+          props: {
+            data: {
+              item: client,
+              id: query.has("new") ? null : "client1",
+              editing: !query.has("new"),
+              client_contacts: contacts,
+            },
+            ...callbacks,
+          },
+        });
+      else
+        mount(InvoicingEditor, {
+          target: document.getElementById("app"),
+          props: {
+            client,
+            contacts,
+            projectContact: "contact1",
+            record: query.has("edit")
+              ? {
+                  id: "profile1",
+                  creator: "test-user",
+                  name: "Existing setup",
+                  contact: "contact1",
+                  job_count: 4,
+                }
+              : {},
+            ...callbacks,
+          },
+        });
+    </script>
+  </body>
+</html>

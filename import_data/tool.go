@@ -1649,6 +1649,16 @@ func deleteAllFromTables(dbPath string, tables []string) error {
 	}
 
 	for _, tbl := range tables {
+		if tbl == "jobs" || tbl == "clients" || tbl == "client_contacts" {
+			if err := load.CheckClientBillingImport(tx); err != nil {
+				_ = tx.Rollback()
+				return err
+			}
+			break
+		}
+	}
+
+	for _, tbl := range tables {
 		result, err := tx.Exec("DELETE FROM " + tbl)
 		if err != nil {
 			_ = tx.Rollback()

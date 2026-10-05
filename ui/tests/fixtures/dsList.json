@@ -1,0 +1,14 @@
+[
+  { "id": "1", "name": "Alex Adams", "email": "a@example.test", "group": "North" },
+  { "id": "2", "name": "Blair Brown", "email": "b@example.test", "group": "South" },
+  { "id": "3", "name": "Casey Clark", "email": "c@example.test", "group": "North" },
+  { "id": "4", "name": "Devon Davis", "email": "d@example.test", "group": "South" },
+  { "id": "5", "name": "Ellis Evans", "email": "e@example.test", "group": "North" },
+  { "id": "6", "name": "Frankie Fox", "email": "f@example.test", "group": "South" },
+  { "id": "7", "name": "Gale Green", "email": "g@example.test", "group": "North" },
+  { "id": "8", "name": "Hayden Hall", "email": "h@example.test", "group": "South" },
+  { "id": "9", "name": "Indigo Irwin", "email": "i@example.test", "group": "North" },
+  { "id": "10", "name": "Jordan Jones", "email": "j@example.test", "group": "South" },
+  { "id": "11", "name": "Kai King", "email": "k@example.test", "group": "North" },
+  { "id": "12", "name": "Logan Lee", "email": "accounts@example.test", "group": "South" }
+]

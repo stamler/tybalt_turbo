@@ -959,7 +959,6 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
 				`"id":"2plsetqdxht7esg"`,
-				`"has_project_authorization":true`,
 				`"covered_within_project_budget":true`,
 			},
 			TestAppFactory: func(tb testing.TB) *tests.TestApp {

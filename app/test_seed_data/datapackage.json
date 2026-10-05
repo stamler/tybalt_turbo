@@ -767,6 +767,36 @@
             "name": "updated",
             "type": "string",
             "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "address",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "city",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "province_state",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "postal_code",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "country",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "phone",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
           }
         ],
         "primaryKey": [
@@ -873,6 +903,36 @@
           },
           {
             "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "address",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "city",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "province_state",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "postal_code",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "country",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "phone",
             "type": "string",
             "x-sqlite-type": "TEXT"
           }
@@ -1538,52 +1598,12 @@
             "x-sqlite-type": "TEXT"
           },
           {
-            "name": "project_authorization_doc",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
-            "name": "project_authorization_doc_hash",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
-            "name": "pa_reviewer",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
-            "name": "pa_reviewed",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
-            "name": "pa_uploader",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
-            "name": "pa_uploaded",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
-            "name": "pa_rejector",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
-            "name": "pa_rejected",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
-            "name": "pa_rejection_reason",
-            "type": "string",
-            "x-sqlite-type": "TEXT"
-          },
-          {
             "name": "project_completion_date",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "invoicing_information",
             "type": "string",
             "x-sqlite-type": "TEXT"
           }
@@ -3090,6 +3110,66 @@
       "x-groups": [
         "test-full",
         "import-baseline"
+      ]
+    },
+    {
+      "name": "client_invoicing_information",
+      "path": "data/client_invoicing_information.csv",
+      "schema": {
+        "primaryKey": [
+          "id"
+        ],
+        "fields": [
+          {
+            "name": "id",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "created",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "updated",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "client",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "contact",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "invoicing_instructions",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "fax",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "creator",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          }
+        ]
+      },
+      "x-groups": [
+        "test-full",
+        "test-minimal"
       ]
     }
   ]

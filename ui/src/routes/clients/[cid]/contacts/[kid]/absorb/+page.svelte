@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ClientWorkspaceShell from "$lib/components/ClientWorkspaceShell.svelte";
   import type { PageData } from "./$types";
   import AbsorbEditor from "$lib/components/AbsorbEditor.svelte";
   import type { ClientContactsResponse } from "$lib/pocketbase-types";
@@ -23,13 +24,16 @@
   }
 </script>
 
-<AbsorbEditor
-  collectionName="client_contacts"
-  targetRecordId={$page.params.kid!}
-  {availableRecords}
-  autoCompleteIndex={autoCompleteIndex as unknown as any}
->
-  {#snippet recordSnippet(item: ClientContactsResponse)}
-    {item.given_name} {item.surname} — {item.email}
-  {/snippet}
-</AbsorbEditor>
+<ClientWorkspaceShell clientId={data.client.id} clientName={data.client.name}>
+  <AbsorbEditor
+    collectionName="client_contacts"
+    returnTo={data.returnTo}
+    targetRecordId={$page.params.kid!}
+    {availableRecords}
+    autoCompleteIndex={autoCompleteIndex as unknown as any}
+  >
+    {#snippet recordSnippet(item: ClientContactsResponse)}
+      {item.given_name} {item.surname} — {item.email}
+    {/snippet}
+  </AbsorbEditor>
+</ClientWorkspaceShell>

@@ -1,4 +1,5 @@
-import type { JobsRecord, CategoriesResponse } from "$lib/pocketbase-types";
+import type { JobsRecord } from "$lib/pocketbase-types";
+import { error } from "@sveltejs/kit";
 import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 import type { JobsPageData } from "$lib/svelte-types";
@@ -27,7 +28,6 @@ export const load: PageLoad<JobsPageData> = async ({ params }) => {
     proposal_opening_date: "",
     proposal_submission_due_date: "",
   };
-  const defaultCategories = [] as CategoriesResponse[];
   let item: JobsRecord;
   try {
     item = await pb.collection("jobs").getOne(params.jid);
@@ -49,13 +49,8 @@ export const load: PageLoad<JobsPageData> = async ({ params }) => {
       id: params.jid,
       categories,
     };
-  } catch (error) {
-    console.error(`error loading data, returning default item: ${error}`);
-    return {
-      item: { ...defaultItem } as JobsRecord,
-      editing: false,
-      id: null,
-      categories: defaultCategories,
-    };
+  } catch (cause) {
+    const status = (cause as { status?: number }).status;
+    throw error(status === 403 || status === 404 ? status : 500, "Could not load this job.");
   }
 };

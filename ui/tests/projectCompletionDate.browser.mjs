@@ -18,9 +18,18 @@ await runBrowserHarness(async (page, origin) => {
         }),
       });
     }
-    const items = request.url().includes("job_time_allocations")
-      ? [{ id: "allocation", division: "fy4i9poneukvq9u", hours: 10 }]
-      : [];
+    const items = request.url().includes("client_invoicing_information")
+      ? [
+          {
+            id: "painvoice000002",
+            client: "lb0fnenkeyitsny",
+            contact: "nh5u9z3cyknjclv",
+            name: "Accounts payable",
+          },
+        ]
+      : request.url().includes("job_time_allocations")
+        ? [{ id: "allocation", division: "fy4i9poneukvq9u", hours: 10 }]
+        : [];
     await route.fulfill({
       contentType: "application/json",
       body: JSON.stringify({
@@ -85,7 +94,9 @@ await runBrowserHarness(async (page, origin) => {
   await date.fill("2025-02-01");
   assert.equal(await date.evaluate((input) => input.checkValidity()), true);
 
-  await page.locator('form[enctype="multipart/form-data"]').evaluate((form) => form.requestSubmit());
+  await page
+    .locator('form[enctype="multipart/form-data"]')
+    .evaluate((form) => form.requestSubmit());
   await page.getByText("Enter a valid completion date.", { exact: true }).waitFor();
   assert.equal(saves.length, 1);
   assert.equal(saves[0].job.project_completion_date, "2025-02-01");

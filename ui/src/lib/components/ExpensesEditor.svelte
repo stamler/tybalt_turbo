@@ -46,7 +46,6 @@
     isExpensePaymentType,
     selectableExpensePaymentTypeOptions,
   } from "$lib/expensePaymentTypes";
-  import { withProjectAuthorizationManagerName } from "$lib/projectAuthorization";
 
   // initialize the stores, noop if already initialized
   jobs.init();
@@ -392,10 +391,7 @@
           overflow_amount: parseFloat(errorData.overflow_amount),
         });
       } else {
-        errors = withProjectAuthorizationManagerName(
-          error.data?.data ?? {},
-          selectedJobRecord?.manager,
-        );
+        errors = error.data?.data ?? {};
       }
     }
   }

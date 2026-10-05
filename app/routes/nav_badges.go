@@ -13,7 +13,6 @@ const (
 	navTimeSheetsPendingHref     = "/time/sheets/pending"
 	navExpensesPendingHref       = "/expenses/pending"
 	navPurchaseOrdersPendingHref = "/pos/pending"
-	navProjectAuthorizationHref  = "/jobs/project_authorization"
 	navExpenseCommitQueueHref    = "/reports/expense/queue"
 	navExpenseSettlementHref     = "/expenses/settlement"
 )
@@ -81,38 +80,6 @@ func createGetNavBadgesHandler(app core.App) func(e *core.RequestEvent) error {
 			return e.Error(http.StatusInternalServerError, "failed to count pending purchase orders", err)
 		}
 		counts[navPurchaseOrdersPendingHref] = purchaseOrdersPendingCount
-
-		hasAccounting, err := utilities.HasClaim(app, e.Auth, "accounting")
-		if err != nil {
-			return e.Error(http.StatusInternalServerError, "failed to check accounting claim", err)
-		}
-		if hasAccounting {
-			pendingReviewCount, err := countProjectAuthorizationPendingReview(app)
-			if err != nil {
-				return e.Error(http.StatusInternalServerError, "failed to count project authorization queue", err)
-			}
-			missingCount, err := countProjectAuthorizationMissingForAuth(app, e.Auth)
-			if err != nil {
-				return e.Error(http.StatusInternalServerError, "failed to count missing project authorizations", err)
-			}
-			rejectedCount, err := countProjectAuthorizationRejectedForAuth(app, e.Auth)
-			if err != nil {
-				return e.Error(http.StatusInternalServerError, "failed to count rejected project authorizations", err)
-			}
-			counts[navProjectAuthorizationHref] = pendingReviewCount + missingCount + rejectedCount
-		} else {
-			missingCount, err := countProjectAuthorizationMissingForAuth(app, e.Auth)
-			if err != nil {
-				return e.Error(http.StatusInternalServerError, "failed to count missing project authorizations", err)
-			}
-			rejectedCount, err := countProjectAuthorizationRejectedForAuth(app, e.Auth)
-			if err != nil {
-				return e.Error(http.StatusInternalServerError, "failed to count rejected project authorizations", err)
-			}
-			if missingCount+rejectedCount > 0 {
-				counts[navProjectAuthorizationHref] = missingCount + rejectedCount
-			}
-		}
 
 		hasCommit, err := utilities.HasClaim(app, e.Auth, "commit")
 		if err != nil {

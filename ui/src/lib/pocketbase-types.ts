@@ -6,6 +6,7 @@ import type PocketBase from "pocketbase";
 import type { RecordService } from "pocketbase";
 
 export enum Collections {
+  ClientInvoicingInformation = "client_invoicing_information",
   Authorigins = "_authOrigins",
   Externalauths = "_externalAuths",
   Mfas = "_mfas",
@@ -249,6 +250,13 @@ export type ClaimsRecord = {
 };
 
 export type ClientContactsRecord = {
+  address?: string;
+  city?: string;
+  province_state?: string;
+  postal_code?: string;
+  country?: string;
+  phone?: string;
+
   _imported: boolean;
   client: RecordIdString;
   created: IsoDateString;
@@ -276,6 +284,13 @@ export type ClientNotesRecord = {
 };
 
 export type ClientsRecord = {
+  address?: string;
+  city?: string;
+  province_state?: string;
+  postal_code?: string;
+  country?: string;
+  phone?: string;
+
   _imported: boolean;
   business_development_lead: RecordIdString;
   created: IsoDateString;
@@ -519,6 +534,7 @@ export enum JobsStatusOptions {
   "No Bid" = "No Bid",
 }
 export type JobsRecord = {
+  invoicing_information?: RecordIdString;
   _imported: boolean;
   alternate_manager: RecordIdString;
   authorizing_document: string;
@@ -545,15 +561,6 @@ export type JobsRecord = {
   proposal_opening_date: string;
   proposal_submission_due_date: string;
   proposal_value: number;
-  project_authorization_doc: string;
-  project_authorization_doc_hash: string;
-  pa_rejected: IsoDateString;
-  pa_rejection_reason: string;
-  pa_rejector: RecordIdString;
-  pa_reviewed: IsoDateString;
-  pa_reviewer: RecordIdString;
-  pa_uploaded: IsoDateString;
-  pa_uploader: RecordIdString;
   status: JobsStatusOptions;
   time_and_materials: boolean;
   updated: IsoDateString;
@@ -1227,6 +1234,7 @@ export type ZipCacheResponse<Tfilenames = unknown, Thashes = unknown, Texpand = 
 // Types containing all Records and Responses, useful for creating typing helper functions
 
 export type CollectionRecords = {
+  client_invoicing_information: ClientInvoicingInformationRecord;
   _authOrigins: AuthoriginsRecord;
   _externalAuths: ExternalauthsRecord;
   _mfas: MfasRecord;
@@ -1282,6 +1290,7 @@ export type CollectionRecords = {
 };
 
 export type CollectionResponses = {
+  client_invoicing_information: ClientInvoicingInformationResponse;
   _authOrigins: AuthoriginsResponse;
   _externalAuths: ExternalauthsResponse;
   _mfas: MfasResponse;
@@ -1339,6 +1348,9 @@ export type CollectionResponses = {
 // https://github.com/pocketbase/js-sdk#specify-typescript-definitions
 
 export type TypedPocketBase = PocketBase & {
+  collection(
+    idOrName: "client_invoicing_information",
+  ): RecordService<ClientInvoicingInformationResponse>;
   collection(idOrName: "_authOrigins"): RecordService<AuthoriginsResponse>;
   collection(idOrName: "_externalAuths"): RecordService<ExternalauthsResponse>;
   collection(idOrName: "_mfas"): RecordService<MfasResponse>;
@@ -1442,3 +1454,17 @@ export type ClientDetails = {
   }[];
   referencing_jobs_count: number;
 };
+
+export type ClientInvoicingInformationRecord = {
+  id: string;
+  created: IsoDateString;
+  creator: RecordIdString;
+  updated: IsoDateString;
+  name: string;
+  client: RecordIdString;
+  contact: RecordIdString;
+  invoicing_instructions: string;
+  fax: string;
+};
+export type ClientInvoicingInformationResponse<Texpand = unknown> =
+  ClientInvoicingInformationRecord & BaseSystemFields<Texpand>;

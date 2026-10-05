@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"time"
 
-	"tybalt/hooks"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -75,18 +74,6 @@ func createBundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error
 			})
 			if err != nil {
 				return fmt.Errorf("error fetching time entries: %v", err)
-			}
-			blockingJobs, err := hooks.UnapprovedProjectAuthorizationJobsForTimeEntries(txApp, userId, weekEnding)
-			if err != nil {
-				return fmt.Errorf("error checking project authorization approvals: %v", err)
-			}
-			if len(blockingJobs) > 0 {
-				transactionError = &CodeError{
-					Code:    hooks.ProjectAuthorizationNotApprovedCode,
-					Message: hooks.ProjectAuthorizationNotApprovedMessage,
-				}
-				httpResponseStatusCode = http.StatusUnprocessableEntity
-				return transactionError
 			}
 
 			// Load the user's admin_profile record to get values for the new
@@ -241,10 +228,6 @@ func createBundleTimesheetHandler(app core.App) func(e *core.RequestEvent) error
 				body := map[string]interface{}{
 					"message": codeError.Message,
 					"code":    codeError.Code,
-				}
-				if codeError.Code == hooks.ProjectAuthorizationNotApprovedCode {
-					blockingJobs, _ := hooks.UnapprovedProjectAuthorizationJobsForTimeEntries(app, userId, weekEnding)
-					body["blocking_jobs"] = blockingJobs
 				}
 				return e.JSON(httpResponseStatusCode, body)
 			}

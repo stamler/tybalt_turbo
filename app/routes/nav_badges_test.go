@@ -41,7 +41,6 @@ func TestNavBadgesReturnsUserScopedCounts(t *testing.T) {
 	assertNavBadgeCount(t, counts, navTimeSheetsPendingHref, expectedPendingTimeSheetCount(t, app, userID))
 	assertNavBadgeCount(t, counts, navExpensesPendingHref, expectedPendingExpenseCount(t, app, userID))
 	assertNavBadgeCount(t, counts, navPurchaseOrdersPendingHref, expectedPendingPurchaseOrderCount(t, app, userID))
-	assertNavBadgeCount(t, counts, navProjectAuthorizationHref, expectedProjectAuthorizationBadgeCount(t, app, userID, true, true))
 
 	if _, ok := counts[navExpenseCommitQueueHref]; ok {
 		t.Fatalf("did not expect %s for user without commit claim; counts=%v", navExpenseCommitQueueHref, counts)
@@ -80,8 +79,8 @@ func TestNavBadgesReturnsAuthorizedQueueCounts(t *testing.T) {
 	if _, ok := payablesCounts[navExpenseCommitQueueHref]; ok {
 		t.Fatalf("did not expect %s for payables user without commit claim; counts=%v", navExpenseCommitQueueHref, payablesCounts)
 	}
-	if _, ok := payablesCounts[navProjectAuthorizationHref]; ok {
-		t.Fatalf("did not expect %s for payables user without accounting claim; counts=%v", navProjectAuthorizationHref, payablesCounts)
+	if _, ok := payablesCounts["/jobs/project_authorization"]; ok {
+		t.Fatalf("retired project authorization badge must not be returned; counts=%v", payablesCounts)
 	}
 
 	scopedToken := authTokenForEmail(t, app, "u_no_claims@example.com")
@@ -90,7 +89,9 @@ func TestNavBadgesReturnsAuthorizedQueueCounts(t *testing.T) {
 		t.Fatalf("scoped nav badges status = %d, want %d; body=%s", scopedRec.Code, http.StatusOK, scopedRec.Body.String())
 	}
 	scopedCounts := decodeNavBadgeCounts(t, scopedRec.Body.Bytes())
-	assertNavBadgeCount(t, scopedCounts, navProjectAuthorizationHref, expectedProjectAuthorizationBadgeCount(t, app, "u_no_claims", false, false))
+	if _, ok := scopedCounts["/jobs/project_authorization"]; ok {
+		t.Fatal("retired project authorization badge must not be returned")
+	}
 }
 
 func TestExpenseCommitQueueAndBadgeRemoveRejectedExpense(t *testing.T) {
@@ -224,90 +225,6 @@ func expectedPendingPurchaseOrderCount(t *testing.T, app *tests.TestApp, userID 
 		WHERE is_unapproved_actionable_now = 1
 	`
 	return expectedCount(t, app, query, purchaseOrderVisibilityParams(app, userID, "all", "", "", 0))
-}
-
-func expectedProjectAuthorizationBadgeCount(t *testing.T, app *tests.TestApp, userID string, hasAccounting bool, hasJobClaim bool) int {
-	t.Helper()
-
-	count := expectedProjectAuthorizationMissingCount(t, app, userID, hasAccounting || hasJobClaim)
-	count += expectedProjectAuthorizationRejectedCount(t, app, userID, hasAccounting || hasJobClaim)
-	if hasAccounting {
-		count += expectedProjectAuthorizationPendingReviewCount(t, app)
-	}
-	return count
-}
-
-func expectedProjectAuthorizationPendingReviewCount(t *testing.T, app *tests.TestApp) int {
-	t.Helper()
-
-	return expectedCount(t, app, `
-		SELECT COUNT(*)
-		FROM jobs j
-		WHERE j.status = 'Active'
-		  AND j.number NOT LIKE 'P%'
-		  AND j.project_authorization_doc != ''
-		  AND j.project_authorization_doc_hash != ''
-		  AND j.pa_reviewed = ''
-		  AND j.pa_reviewer = ''
-		  AND j.pa_rejected = ''
-		  AND j.pa_rejector = ''
-		  AND j.pa_rejection_reason = ''
-	`, dbx.Params{})
-}
-
-func expectedProjectAuthorizationMissingCount(t *testing.T, app *tests.TestApp, userID string, canSeeAll bool) int {
-	t.Helper()
-
-	broad := 0
-	if canSeeAll {
-		broad = 1
-	}
-	return expectedCount(t, app, `
-		SELECT COUNT(*)
-		FROM jobs j
-		LEFT JOIN branches b ON b.id = j.branch
-		WHERE j.status = 'Active'
-		  AND j.number NOT LIKE 'P%'
-		  AND (
-		    COALESCE(j.project_authorization_doc, '') = ''
-		    OR COALESCE(j.project_authorization_doc_hash, '') = ''
-		  )
-		  AND (
-		    {:broad} = 1
-		    OR j.manager = {:uid}
-		    OR j.alternate_manager = {:uid}
-		    OR b.manager = {:uid}
-		  )
-	`, dbx.Params{"uid": userID, "broad": broad})
-}
-
-func expectedProjectAuthorizationRejectedCount(t *testing.T, app *tests.TestApp, userID string, canSeeAll bool) int {
-	t.Helper()
-
-	broad := 0
-	if canSeeAll {
-		broad = 1
-	}
-	return expectedCount(t, app, `
-		SELECT COUNT(*)
-		FROM jobs j
-		LEFT JOIN branches b ON b.id = j.branch
-		WHERE j.status = 'Active'
-		  AND j.number NOT LIKE 'P%'
-		  AND j.project_authorization_doc != ''
-		  AND j.project_authorization_doc_hash != ''
-		  AND (
-		    j.pa_rejected != ''
-		    OR j.pa_rejector != ''
-		    OR j.pa_rejection_reason != ''
-		  )
-		  AND (
-		    {:broad} = 1
-		    OR j.manager = {:uid}
-		    OR j.alternate_manager = {:uid}
-		    OR b.manager = {:uid}
-		  )
-	`, dbx.Params{"uid": userID, "broad": broad})
 }
 
 func expectedExpenseCommitQueueCount(t *testing.T, app *tests.TestApp) int {

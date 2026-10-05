@@ -6,6 +6,7 @@
   import { pb } from "$lib/pocketbase";
   import { onMount } from "svelte";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
+  import { saveErrorMessage } from "$lib/utilities";
 
   type StaleJob = JobApiResponse & { last_reference: string; last_reference_type: string };
 
@@ -15,6 +16,8 @@
   let prefix = $state("");
   let age = $state(180);
   let mutatingById = $state<Record<string, boolean>>({});
+  // A failed status change stays beside its job until the next attempt.
+  let statusErrorById = $state<Record<string, string>>({});
 
   const load = async () => {
     const p = prefix.trim();
@@ -38,11 +41,15 @@
 
   const setStatus = async (jobId: string, status: JobsStatusOptions) => {
     mutatingById = { ...mutatingById, [jobId]: true };
+    statusErrorById = { ...statusErrorById, [jobId]: "" };
     try {
       await pb.collection("jobs").update(jobId, { status });
       await load();
     } catch (e) {
-      console.error("Failed to update job status", e);
+      statusErrorById = {
+        ...statusErrorById,
+        [jobId]: saveErrorMessage(e, `The status could not be set to ${status}.`),
+      };
     } finally {
       mutatingById = { ...mutatingById, [jobId]: false };
     }
@@ -91,6 +98,14 @@
           — {last_reference_type.replace("_", " ")}
         {/if}
       </span>
+    {/snippet}
+    {#snippet line2({ id }: StaleJob)}
+      {#if statusErrorById[id]}
+        <p role="alert" class="text-sm text-red-700">
+          {statusErrorById[id]}
+          <a href="/jobs/{id}/edit" class="text-blue-700 underline">Edit job</a>
+        </p>
+      {/if}
     {/snippet}
     {#snippet actions({ id, number }: StaleJob)}
       <span class="mr-1 text-sm text-neutral-600">Set Status:</span>

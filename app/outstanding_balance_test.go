@@ -44,7 +44,7 @@ func TestOutstandingBalance_UpdateWithJobClaim_Succeeds(t *testing.T) {
 				`"outstanding_balance":2500.5`,
 				`"outstanding_balance_date":"` + today + `"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -77,7 +77,7 @@ func TestOutstandingBalance_UpdateWithoutJobClaim_Fails(t *testing.T) {
 			ExpectedContent: []string{
 				`"message":"The requested resource wasn't found."`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 

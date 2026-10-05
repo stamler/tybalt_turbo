@@ -19,12 +19,15 @@
     recordSnippet,
     availableRecords,
     autoCompleteIndex = null,
+    returnTo,
   }: {
     collectionName: string;
     targetRecordId: string;
     recordSnippet: Snippet<[T]>;
     availableRecords: T[];
     autoCompleteIndex?: MiniSearch<T> | null;
+    // The caller validates this optional client-workspace return route.
+    returnTo?: string;
   } = $props();
 
   // Collections that affect jobs when absorbed
@@ -41,6 +44,7 @@
   let recordsToAbsorb = $state<string[]>([]);
   let selectedRecord = $state<string>("");
   let existingAbsorbAction = $state<AbsorbActionsResponse | null>(null);
+  let mergeCompleted = $state(false);
   let items = $state<T[]>([]);
   let targetRecord = $state<T | null>(null);
 
@@ -69,6 +73,10 @@
   });
 
   function goBack() {
+    if (returnTo) {
+      goto(returnTo);
+      return;
+    }
     if (typeof window !== "undefined" && window.history.length > 1) {
       window.history.back();
     } else {
@@ -106,6 +114,7 @@
   });
 
   async function handleAbsorb() {
+    errors = {};
     try {
       await pb.send(`/api/${collectionName}/${targetRecordId}/absorb`, {
         method: "POST",
@@ -114,8 +123,9 @@
         },
       });
 
-      // Redirect to absorb actions page after successful absorption
-      goto("/absorb/actions");
+      // Keep the pending action and the project return link together.
+      if (returnTo) mergeCompleted = true;
+      else goto("/absorb/actions");
     } catch (error: unknown) {
       if (error instanceof Error) {
         errors = { global: { message: error.message } };
@@ -152,7 +162,7 @@
         <DsActionButton action={goBack} color="neutral">Go Back</DsActionButton>
       </div>
     </div>
-  {:else if existingAbsorbAction}
+  {:else if existingAbsorbAction || mergeCompleted}
     <div class="rounded-sm border-2 border-yellow-500 bg-yellow-50 p-4">
       <div class="mb-2 text-yellow-900">
         <p class="font-semibold">There is a pending absorb action for this collection.</p>
@@ -164,7 +174,7 @@
       <div class="mb-3">
         <DsActionButton action={goBack} color="neutral">Back</DsActionButton>
       </div>
-      <AbsorbList {collectionName} />
+      <AbsorbList {collectionName} {returnTo} />
     </div>
   {:else}
     <div class="flex flex-col gap-2">
@@ -233,7 +243,9 @@
       <DsActionButton action={handleAbsorb}>Absorb</DsActionButton>
       <DsActionButton
         action={() =>
-          getAbsorbRedirectUrl(collectionName, targetRecordId, $page.params.cid).then(goto)}
+          returnTo
+            ? goto(returnTo)
+            : getAbsorbRedirectUrl(collectionName, targetRecordId, $page.params.cid).then(goto)}
         >Cancel</DsActionButton
       >
     </div>

@@ -1,6 +1,7 @@
 package load
 
 import (
+	"database/sql"
 	"fmt"
 	"log"
 	"regexp"
@@ -333,8 +334,23 @@ func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTable
 	insertedCount := 0
 	failureCount := 0
 
-	// Prepare the query once (more efficient)
+	// Keep the billing check and replacement writes in one transaction.
+	// Other imports retain their existing behavior; failed rows still count and continue.
+	var billingTx *sql.Tx
+	if sqliteTableName == "jobs" || sqliteTableName == "clients" || sqliteTableName == "client_contacts" {
+		billingTx, err = db.DB().Begin()
+		if err != nil {
+			panic(err)
+		}
+		defer billingTx.Rollback()
+		if err = CheckClientBillingImport(billingTx); err != nil {
+			panic(err)
+		}
+	}
 	q := db.NewQuery(insertSQL)
+	if billingTx != nil {
+		q = dbx.NewQuery(db, billingTx, insertSQL)
+	}
 
 	// Iterate through the items (still includes potentially bad first item)
 	for _, item := range items {
@@ -347,6 +363,12 @@ func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTable
 			continue // Continue with the next item
 		}
 		insertedCount++
+	}
+
+	if billingTx != nil {
+		if err = billingTx.Commit(); err != nil {
+			panic(err)
+		}
 	}
 
 	fmt.Printf("Finished insertion into %s: %d successful, %d failures\n", sqliteTableName, insertedCount, failureCount)

@@ -16,8 +16,11 @@
 
   let {
     collectionName = undefined,
+    returnTo,
   }: {
     collectionName?: string;
+    // The caller validates this optional client-workspace return route.
+    returnTo?: string;
   } = $props();
 
   let errors = $state<Record<string, { message: string }>>({});
@@ -63,7 +66,7 @@
     try {
       await pb.send(`/api/${item.collection_name}/undo_absorb`, { method: "POST" });
       // After successful undo, redirect to appropriate page
-      const url = await getAbsorbRedirectUrl(item.collection_name, item.target_id);
+      const url = returnTo || (await getAbsorbRedirectUrl(item.collection_name, item.target_id));
       goto(url);
     } catch (error: unknown) {
       if (error instanceof Error) {
@@ -80,7 +83,7 @@
     try {
       await pb.collection("absorb_actions").delete(item.id);
       // After successful commit, redirect to appropriate page
-      const url = await getAbsorbRedirectUrl(item.collection_name, item.target_id);
+      const url = returnTo || (await getAbsorbRedirectUrl(item.collection_name, item.target_id));
       goto(url);
     } catch (error: unknown) {
       if (error instanceof Error) {

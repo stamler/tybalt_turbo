@@ -14,6 +14,7 @@ var importBaselineEmptyTables = []string{
 	"admin_profiles",
 	"categories",
 	"client_contacts",
+	"client_invoicing_information",
 	"client_notes",
 	"clients",
 	"currencies",

@@ -1,11 +1,24 @@
 <script lang="ts">
-  import { dateInputMaxMonthsAhead, fetchClientContacts, formatJobLabel } from "$lib/utilities";
+  import {
+    dateInputMaxMonthsAhead,
+    fetchClientContacts,
+    formatJobLabel,
+    formatDateTime,
+  } from "$lib/utilities";
+  import { globalStore } from "$lib/stores/global";
+  import InvoicingProfileEmptyState from "./clients/InvoicingProfileEmptyState.svelte";
+  import {
+    clearClientWorkflowDraft,
+    keepClientWorkflowDraft,
+    readClientWorkflowDraft,
+    type ClientWorkflowTarget,
+  } from "$lib/clientWorkflowNavigation";
   import { pb } from "$lib/pocketbase";
   import DsTextInput from "$lib/components/DSTextInput.svelte";
   import DsDateInput from "$lib/components/DSDateInput.svelte";
   import DsSelector from "$lib/components/DSSelector.svelte";
   import DsAutoComplete from "$lib/components/DSAutoComplete.svelte";
-  import { goto } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
   import DSLocationPicker from "./DSLocationPicker.svelte";
@@ -20,7 +33,11 @@
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import { onMount, untrack } from "svelte";
-  import type { ClientContactsResponse, JobsRecord } from "$lib/pocketbase-types";
+  import type {
+    ClientContactsResponse,
+    ClientInvoicingInformationResponse,
+    JobsRecord,
+  } from "$lib/pocketbase-types";
   import type { JobApiResponse } from "$lib/stores/jobs";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
   import { busdevLeads } from "$lib/stores/busdevLeads";
@@ -41,29 +58,72 @@
     data?: Record<string, BackendFieldError>;
   };
 
-  // Keep in sync with projectAuthorizationJobWriteFields in app/routes/job_upsert_api.go.
-  const projectAuthorizationServerFields = [
-    "project_authorization_doc",
-    "project_authorization_doc_hash",
-    "project_authorization_doc_url",
-    "pa_uploader",
-    "pa_uploaded",
-    "pa_reviewer",
-    "pa_reviewed",
-    "pa_rejector",
-    "pa_rejected",
-    "pa_rejection_reason",
-  ];
+  const hasJobClaim = $derived($globalStore.claims.includes("job"));
 
   let errors = $state({} as Record<string, { message: string }>);
+  const restored = untrack(() =>
+    readClientWorkflowDraft<{
+      item: JobsRecord;
+      categories: JobsPageData["categories"];
+      newCategories: string[];
+      categoriesToDelete: string[];
+      allocations: { division: string; hours: number }[];
+      newCategory: string;
+      allocationsLoaded: boolean;
+      loadedJob: string;
+      selectedProfile?: string;
+    }>(`job:${data.id || "new"}`, pb.authStore.record?.id || ""),
+  );
   // Allow extra field `location` introduced by migration to be present on item
   let item = $state(
-    untrack(() => data.item) as JobsRecord | (JobsRecord & Record<string, unknown>),
+    untrack(() => restored?.item || data.item) as
+      JobsRecord | (JobsRecord & Record<string, unknown>),
   );
-  let categories = $state(untrack(() => data.categories));
+  let categories = $state(untrack(() => restored?.categories || data.categories));
   const dateInputMax = dateInputMaxMonthsAhead(15);
   let client_contacts = $state([] as ClientContactsResponse[]);
   let clientContactsRequestId = 0;
+
+  let invoicingProfiles = $state<ClientInvoicingInformationResponse[]>([]);
+  let invoicingProfilesLoading = $state(false);
+  let invoicingProfilesError = $state(false);
+  let invoicingProfilesRequestId = 0;
+  let profileClient = untrack(() => item.client);
+
+  function loadInvoicingProfiles(client: string) {
+    const requestId = ++invoicingProfilesRequestId;
+    invoicingProfiles = [];
+    invoicingProfilesLoading = !!client;
+    invoicingProfilesError = false;
+    if (!client) return;
+    pb.collection("client_invoicing_information")
+      .getFullList({ filter: pb.filter("client={:client}", { client }), requestKey: null })
+      .then((rows) => {
+        if (requestId !== invoicingProfilesRequestId) return;
+        invoicingProfiles = rows;
+        invoicingProfilesLoading = false;
+        if (
+          item.invoicing_information &&
+          !rows.some((row) => row.id === item.invoicing_information)
+        )
+          item.invoicing_information = "";
+      })
+      .catch(() => {
+        if (requestId !== invoicingProfilesRequestId) return;
+        invoicingProfilesLoading = false;
+        invoicingProfilesError = true;
+      });
+  }
+
+  // A profile belongs to one client, so changing the client clears the selection.
+  $effect(() => {
+    const client = item.client;
+    untrack(() => {
+      if (client !== profileClient) item.invoicing_information = "";
+      profileClient = client;
+      loadInvoicingProfiles(client);
+    });
+  });
 
   // Default status will be set reactively based on job type
   // For now, initialize to empty and let the $effect handle it
@@ -74,6 +134,7 @@
   item.description = item.description ?? "";
   item.client = item.client ?? "";
   item.contact = item.contact ?? "";
+  item.invoicing_information = item.invoicing_information ?? "";
   item.alternate_manager = item.alternate_manager ?? "";
   item.proposal = item.proposal ?? "";
   item.job_owner = item.job_owner ?? "";
@@ -86,8 +147,15 @@
   item.proposal_value = item.proposal_value ?? 0;
   item.time_and_materials = item.time_and_materials ?? false;
   (item as Record<string, unknown>).rate_sheet = (item as Record<string, unknown>).rate_sheet ?? "";
+  // The job fields as loaded, after the defaults above. A save that leaves them
+  // unchanged sends only allocations, which an older project can save without a
+  // profile. A draft kept during client maintenance carries the original value.
+  const loadedJob = untrack(() => restored?.loadedJob ?? JSON.stringify($state.snapshot(item)));
+  // A profile created, copied, or reused during client maintenance is selected in
+  // the restored draft but not yet saved with the job.
+  const returnedProfile = restored?.selectedProfile ?? "";
 
-  let newCategory = $state("");
+  let newCategory = $state(untrack(() => restored?.newCategory || ""));
 
   // Comment modal state for No Bid / Cancelled status changes
   let showStatusCommentModal = $state(false);
@@ -97,12 +165,13 @@
   let statusCommentSubmitting = $state(false);
   let statusCommentConfirming = $state(false);
   let previousStatus = $state<JobsStatusOptions | undefined>(item.status);
-  let newCategories = $state([] as string[]);
-  let categoriesToDelete = $state([] as string[]);
+  let newCategories = $state(untrack(() => restored?.newCategories || ([] as string[])));
+  let categoriesToDelete = $state(untrack(() => restored?.categoriesToDelete || ([] as string[])));
 
   // Allocations editor state
   type AllocationRow = { division: string; hours: number };
-  let allocations = $state([] as AllocationRow[]);
+  let allocationsLoaded = $state(restored?.allocationsLoaded ?? false);
+  let allocations = $state(untrack(() => restored?.allocations || ([] as AllocationRow[])));
 
   // Add Client popover state
   let showAddClientPopover = $state(false);
@@ -110,14 +179,6 @@
   let newClientBusdevLead = $state("");
   let newClientSubmitting = $state(false);
   let newClientError = $state<string | null>(null);
-
-  // Add Contact popover state
-  let showAddContactPopover = $state(false);
-  let newContactGivenName = $state("");
-  let newContactSurname = $state("");
-  let newContactEmail = $state("");
-  let newContactSubmitting = $state(false);
-  let newContactError = $state<string | null>(null);
 
   // Initialize busdevLeads store for the Add Client popover
   busdevLeads.init();
@@ -226,7 +287,8 @@
       return {
         ...backendErrors,
         global: {
-          message: payload?.message ?? payload?.error ?? "Save failed. Please fix the highlighted fields.",
+          message:
+            payload?.message ?? payload?.error ?? "Save failed. Please fix the highlighted fields.",
         },
       };
     }
@@ -236,9 +298,6 @@
 
   function jobPayloadForSave(job: JobsRecord | (JobsRecord & Record<string, unknown>)) {
     const payload = { ...(job as Record<string, unknown>) };
-    for (const field of projectAuthorizationServerFields) {
-      delete payload[field];
-    }
     return payload;
   }
 
@@ -267,7 +326,9 @@
           .getFullList<{ id: string; job: string; division: string; hours: number }>({
             filter: `job="${(data as JobsPageData).id}"`,
           });
-        allocations = list.map((r) => ({ division: r.division, hours: r.hours ?? 0 }));
+        if (!restored?.allocationsLoaded)
+          allocations = list.map((r) => ({ division: r.division, hours: r.hours ?? 0 }));
+        allocationsLoaded = true;
 
         // Check for stored validation errors from "Create referencing project" flow
         if (typeof sessionStorage !== "undefined") {
@@ -295,6 +356,27 @@
     } catch (error) {
       console.error("Failed to load job form data", error);
     }
+  });
+
+  // Name a profile by its name or recipient, then its instructions. Add the
+  // creation date and time when two profiles would otherwise read the same.
+  function invoicingProfileText(profile: ClientInvoicingInformationResponse) {
+    const recipient = client_contacts.find((contact) => contact.id === profile.contact);
+    const name = profile.name || (recipient ? formatContactName(recipient) : "Invoice recipient");
+    return profile.invoicing_instructions ? `${name} — ${profile.invoicing_instructions}` : name;
+  }
+  function invoicingProfileLabel(profile: ClientInvoicingInformationResponse) {
+    const text = invoicingProfileText(profile);
+    const repeated = invoicingProfiles.some(
+      (other) => other.id !== profile.id && invoicingProfileText(other) === text,
+    );
+    return repeated ? `${text} (created ${formatDateTime(profile.created)})` : text;
+  }
+
+  // After returning from client maintenance, show the newly selected profile.
+  onMount(() => {
+    if (returnedProfile)
+      document.getElementById("invoicing-profile-field")?.scrollIntoView({ block: "center" });
   });
 
   function formatContactName(contact: ClientContactsResponse) {
@@ -458,6 +540,30 @@
     event.preventDefault();
 
     errors = {};
+    if (allocations.some((allocation) => !Number.isInteger(allocation.hours))) {
+      setFieldError("allocations", "Allocation hours must be whole numbers.");
+      return;
+    }
+    const allocationsOnly = data.editing && JSON.stringify($state.snapshot(item)) === loadedJob;
+    if (
+      !isProposal &&
+      !allocationsOnly &&
+      (invoicingProfilesLoading ||
+        invoicingProfilesError ||
+        !invoicingProfiles.some((profile) => profile.id === item.invoicing_information))
+    ) {
+      setFieldError(
+        "invoicing_information",
+        invoicingProfilesError
+          ? "Could not load invoicing profiles. Try again."
+          : invoicingProfilesLoading
+            ? "Invoicing profiles are still loading. Try again in a moment."
+            : invoicingProfiles.length
+              ? "Select an invoicing profile for this client."
+              : "This client needs an invoicing profile before project changes can be saved.",
+      );
+      return;
+    }
     if (item.manager && item.alternate_manager && item.manager === item.alternate_manager) {
       setFieldError("alternate_manager", alternateManagerErrorMessage);
       return;
@@ -473,7 +579,7 @@
       if (data.editing && jobId !== null) {
         await pb.send(`/api/jobs/${jobId}`, {
           method: "PUT",
-          body: { job: jobPayloadForSave(item), allocations },
+          body: allocationsOnly ? { allocations } : { job: jobPayloadForSave(item), allocations },
         });
       } else {
         const resp = (await pb.send(`/api/jobs`, {
@@ -500,6 +606,7 @@
       }
 
       errors = {};
+      clearClientWorkflowDraft();
       // Check if we should redirect to create project page after fixing proposal errors
       if (data.editing && data.id !== null) {
         const redirectKey = `redirect_to_create_project_${data.id}`;
@@ -581,6 +688,7 @@
               await pb.collection("categories").delete(categoryId);
             }
             errors = {};
+            clearClientWorkflowDraft();
             // Redirect to job details for new jobs, jobs list for edits
             if ((data as JobsPageData).editing && (data as JobsPageData).id !== null) {
               goto("/jobs/list");
@@ -683,70 +791,32 @@
     }
   }
 
-  function openAddContactPopover() {
-    newContactGivenName = "";
-    newContactSurname = "";
-    newContactEmail = "";
-    newContactError = null;
-    showAddContactPopover = true;
-  }
-
-  function closeAddContactPopover() {
-    showAddContactPopover = false;
-    newContactGivenName = "";
-    newContactSurname = "";
-    newContactEmail = "";
-    newContactError = null;
-  }
-
-  // Get the selected client's name for display in the Add Contact popover
-  const selectedClientName = $derived.by(() => {
-    if (!item.client || !$clients.items) return "";
-    const client = $clients.items.find((c: { id: string }) => c.id === item.client);
-    return client?.name ?? "";
-  });
-
-  async function createNewContact() {
-    if (!newContactGivenName.trim() && !newContactSurname.trim()) {
-      newContactError = "At least given name or surname is required";
-      return;
-    }
-    if (!item.client) {
-      newContactError = "No client selected";
-      return;
-    }
-
-    newContactSubmitting = true;
-    newContactError = null;
-
+  async function manageClient(target: ClientWorkflowTarget = "workspace") {
     try {
-      const createdContact = await pb.collection("client_contacts").create({
-        client: item.client,
-        given_name: newContactGivenName.trim(),
-        surname: newContactSurname.trim(),
-        email: newContactEmail.trim(),
-      });
-
-      // Add the new contact to the local client_contacts list
-      client_contacts = [...client_contacts, createdContact];
-
-      // Select the newly created contact
-      item.contact = createdContact.id;
-
-      closeAddContactPopover();
-    } catch (error: any) {
-      const hookErrors = error?.data?.data;
-      if (hookErrors?.given_name?.message) {
-        newContactError = hookErrors.given_name.message;
-      } else if (hookErrors?.surname?.message) {
-        newContactError = hookErrors.surname.message;
-      } else if (hookErrors?.email?.message) {
-        newContactError = hookErrors.email.message;
-      } else {
-        newContactError = error?.message ?? "Failed to create contact";
-      }
-    } finally {
-      newContactSubmitting = false;
+      const href = keepClientWorkflowDraft(
+        `job:${data.id || "new"}`,
+        pb.authStore.record?.id || "",
+        $state.snapshot({
+          item,
+          categories,
+          newCategories,
+          categoriesToDelete,
+          allocations,
+          allocationsLoaded,
+          newCategory,
+          loadedJob,
+        }),
+        item.client || "",
+        item.contact || "",
+        target,
+        (url) => replaceState(url, {}),
+      );
+      await goto(href);
+    } catch (error) {
+      setFieldError(
+        "global",
+        error instanceof Error ? error.message : "Could not keep the project draft.",
+      );
     }
   }
 </script>
@@ -950,7 +1020,7 @@
             {#snippet resultTemplate(client)}{client.name}{/snippet}
           </DsAutoComplete>
         </div>
-        {#if !item.client}
+        {#if !item.client && hasJobClaim}
           <DsActionButton
             action={openAddClientPopover}
             icon="feather:plus-circle"
@@ -980,9 +1050,9 @@
             {/each}
           </select>
         </span>
-        {#if item.client && !item.contact}
+        {#if item.client && !item.contact && hasJobClaim}
           <DsActionButton
-            action={openAddContactPopover}
+            action={() => manageClient("contact")}
             icon="feather:plus-circle"
             color="green"
             title="Add new contact"
@@ -993,6 +1063,80 @@
         <span class="text-red-600">{errors.contact.message}</span>
       {/if}
     </div>
+
+    {#if isProposal && item.client && hasJobClaim}
+      <button
+        type="button"
+        class="self-start text-sm text-blue-700 underline"
+        onclick={() => manageClient()}>Manage client contacts and invoicing</button
+      >
+    {/if}
+    {#if !isProposal}
+      <div
+        id="invoicing-profile-field"
+        class="flex w-full flex-col gap-1 {errors.invoicing_information !== undefined
+          ? 'bg-red-200'
+          : ''}"
+      >
+        <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+          {#if item.client && !invoicingProfilesLoading && !invoicingProfilesError && invoicingProfiles.length}
+            <label for="invoicing_information">Invoicing profile</label>
+            <select
+              id="invoicing_information"
+              name="invoicing_information"
+              class="min-w-0 flex-1 rounded-sm border border-neutral-300 px-1"
+              bind:value={item.invoicing_information}
+              ><option value="">Select invoicing profile</option
+              >{#each invoicingProfiles as profile}<option value={profile.id}
+                  >{invoicingProfileLabel(profile)}</option
+                >{/each}</select
+            >
+            {#if hasJobClaim}<button
+                type="button"
+                class="text-sm text-blue-700 underline"
+                onclick={() => manageClient()}>Manage client contacts and invoicing</button
+              >{/if}
+          {:else}
+            <span>Invoicing profile</span>
+            {#if !item.client}
+              <span class="text-neutral-600">Select a client first.</span>
+            {:else if invoicingProfilesLoading}
+              <span role="status" class="text-neutral-600">Loading invoicing profiles…</span>
+            {:else if invoicingProfilesError}
+              <span role="alert" class="text-red-700">
+                Could not load invoicing profiles.
+                <button
+                  type="button"
+                  class="ml-1 text-blue-700 underline"
+                  onclick={() => loadInvoicingProfiles(item.client)}>Try again</button
+                >
+              </span>
+            {:else}
+              <InvoicingProfileEmptyState
+                canEdit={hasJobClaim}
+                hasContacts={client_contacts.length > 0}
+                oncreate={() => manageClient("invoicing")}
+                onaddcontact={() => manageClient("contact")}
+              />
+            {/if}
+          {/if}
+        </div>
+        {#if returnedProfile && item.invoicing_information === returnedProfile}
+          <p role="status" class="text-sm text-green-800">
+            Invoicing profile selected. Save the job to keep it.
+          </p>
+        {:else if data.editing && !item.invoicing_information}
+          <p class="text-sm text-neutral-700">
+            {invoicingProfiles.length
+              ? "This project has no invoicing profile yet. Choose one to save changes to the project; division hours can be saved without one."
+              : "Division hours can still be saved without an invoicing profile."}
+          </p>
+        {/if}
+        {#if errors.invoicing_information !== undefined}
+          <span class="text-red-600">{errors.invoicing_information.message}</span>
+        {/if}
+      </div>
+    {/if}
 
     {#if $profiles.index !== null}
       <DsAutoComplete
@@ -1078,8 +1222,11 @@
           type="number"
           class="rounded-sm border border-neutral-300 px-2 py-1"
           bind:value={item.project_value as number}
-          required={item.status === JobsStatusOptions.Active || item.status === JobsStatusOptions.Closed}
-          min={item.status === JobsStatusOptions.Active || item.status === JobsStatusOptions.Closed ? 1 : 0}
+          required={item.status === JobsStatusOptions.Active ||
+            item.status === JobsStatusOptions.Closed}
+          min={item.status === JobsStatusOptions.Active || item.status === JobsStatusOptions.Closed
+            ? 1
+            : 0}
           step={1}
         />
         {#if errors.project_value !== undefined}
@@ -1100,8 +1247,8 @@
         Proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be
         marked as Time and Materials. If both, interpret proposal value as a maximum.
       {:else}
-        Projects with status Active or Closed must have a project value greater than zero.
-        For Time and Materials projects, interpret project value as a maximum.
+        Projects with status Active or Closed must have a project value greater than zero. For Time
+        and Materials projects, interpret project value as a maximum.
       {/if}
     </p>
 
@@ -1224,7 +1371,8 @@
                 class="w-28 rounded-sm border border-neutral-300 px-2 py-1"
                 type="number"
                 min={0}
-                step={0.5}
+                aria-label={`Hours for division ${idx + 1}`}
+                step={1}
                 bind:value={row.hours}
                 oninput={(e) => {
                   const v = parseFloat((e.target as HTMLInputElement).value || "0");
@@ -1385,8 +1533,7 @@
       rows="4"
       placeholder="Enter your comment..."
       bind:value={statusComment}
-      disabled={statusCommentSubmitting}
-    ></textarea>
+      disabled={statusCommentSubmitting}></textarea>
   </DSPopover>
 {/if}
 
@@ -1451,53 +1598,5 @@
       <span class="text-sm font-semibold">Business Development Lead</span>
       <span class="text-sm text-neutral-500">No eligible Business Development Leads found.</span>
     {/if}
-  </div>
-</DSPopover>
-
-<!-- Add Contact Popover -->
-<DSPopover
-  bind:show={showAddContactPopover}
-  title="Add New Contact"
-  subtitle="Adding contact for: {selectedClientName}"
-  error={newContactError}
-  submitting={newContactSubmitting}
-  submitLabel="Create Contact"
-  onSubmit={createNewContact}
-  onCancel={closeAddContactPopover}
->
-  <div class="flex flex-col gap-1">
-    <label class="text-sm font-semibold" for="new_contact_given_name">Given Name</label>
-    <input
-      id="new_contact_given_name"
-      type="text"
-      class="rounded-sm border border-neutral-300 px-2 py-1"
-      placeholder="Given name"
-      bind:value={newContactGivenName}
-      disabled={newContactSubmitting}
-    />
-  </div>
-
-  <div class="flex flex-col gap-1">
-    <label class="text-sm font-semibold" for="new_contact_surname">Surname</label>
-    <input
-      id="new_contact_surname"
-      type="text"
-      class="rounded-sm border border-neutral-300 px-2 py-1"
-      placeholder="Surname"
-      bind:value={newContactSurname}
-      disabled={newContactSubmitting}
-    />
-  </div>
-
-  <div class="flex flex-col gap-1">
-    <label class="text-sm font-semibold" for="new_contact_email">Email</label>
-    <input
-      id="new_contact_email"
-      type="email"
-      class="rounded-sm border border-neutral-300 px-2 py-1"
-      placeholder="Email"
-      bind:value={newContactEmail}
-      disabled={newContactSubmitting}
-    />
   </div>
 </DSPopover>

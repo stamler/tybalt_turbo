@@ -11,6 +11,18 @@ import { pb } from "$lib/pocketbase";
 import { get } from "svelte/store";
 import { globalStore } from "$lib/stores/global";
 
+type SaveErrorResponse = { message?: string; data?: Record<string, { message?: string }> };
+
+// Describe a failed save with the API's field messages when it sent any,
+// otherwise with its overall message.
+export function saveErrorMessage(error: unknown, fallback: string): string {
+  const response = (error as { response?: SaveErrorResponse } | null)?.response;
+  const fields = Object.values(response?.data ?? {})
+    .map((field) => field?.message)
+    .filter(Boolean);
+  return fields.length ? fields.join(" ") : response?.message || fallback;
+}
+
 export const DATE_INPUT_MIN = "2024-06-01";
 // Keep this aligned with the backend payroll cadence in app/constants/constants.go:
 // opening dates are the Sunday immediately after PAYROLL_EPOCH.
@@ -873,7 +885,7 @@ export async function getAbsorbRedirectUrl(
       const contact = await pb.collection("client_contacts").getOne(targetRecordId);
       finalClientId = contact.client;
     }
-    return `/clients/${finalClientId}/edit`;
+    return `/clients/${finalClientId}/details#contacts`;
   } else {
     // For other collections, redirect to the list page
     return `/${collectionName}/list`;

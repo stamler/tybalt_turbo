@@ -1,7 +1,9 @@
 package routes
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -235,6 +237,10 @@ func AbsorbRecords(app core.App, collectionName string, targetID string, idsToAb
 			}
 		}
 
+		if err := validateMergedClientReferences(txApp, refTracker.updates, false); err != nil {
+			return err
+		}
+
 		// Update the absorb action with the reference updates
 		updatedRefs, err := refTracker.serialize()
 		if err != nil {
@@ -370,12 +376,12 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 				for field, value := range recordData {
 					record.Set(field, value)
 				}
-			// Use SaveNoValidate to bypass schema validation since absorbed records
-			// may predate current validation rules (e.g., required fields that were
-			// added after the record was originally created/imported)
-			if err := txApp.SaveNoValidate(record); err != nil {
-				return fmt.Errorf("error recreating record: %w", err)
-			}
+				// Use SaveNoValidate to bypass schema validation since absorbed records
+				// may predate current validation rules (e.g., required fields that were
+				// added after the record was originally created/imported)
+				if err := txApp.SaveNoValidate(record); err != nil {
+					return fmt.Errorf("error recreating record: %w", err)
+				}
 			}
 
 			// Step 4b: Restore References
@@ -400,6 +406,10 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 						}
 					}
 				}
+			}
+
+			if err := validateMergedClientReferences(txApp, updatedRefs, true); err != nil {
+				return err
 			}
 
 			// Step 4c: Clean Up
@@ -430,7 +440,6 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 		})
 	}
 }
-
 
 // getAbsorbAction returns the existing absorb action for the collection or nil if none exists
 func getAbsorbAction(app core.App, collectionName string) (*AbsorbAction, error) {
@@ -569,4 +578,32 @@ func (rt *referenceTracker) trackUpdate(table, column, recordId, oldValue string
 
 func (rt *referenceTracker) serialize() ([]byte, error) {
 	return json.Marshal(rt.updates)
+}
+
+// validateMergedClientReferences checks the final state of every job, contact and
+// invoicing profile that a merge or undo rewrote. Their client relations must still
+// agree, including references created after the original merge. Undo skips
+// records that were deleted since the merge.
+func validateMergedClientReferences(app core.App, updates map[string]map[string]map[string]string, skipDeleted bool) error {
+	for _, table := range []string{"jobs", "client_contacts", "client_invoicing_information"} {
+		ids := map[string]bool{}
+		for _, changes := range updates[table] {
+			for id := range changes {
+				ids[id] = true
+			}
+		}
+		for id := range ids {
+			record, err := app.FindRecordById(table, id)
+			if skipDeleted && errors.Is(err, sql.ErrNoRows) {
+				continue
+			}
+			if err != nil {
+				return err
+			}
+			if err := utilities.ValidateClientReferences(app, record); err != nil {
+				return fmt.Errorf("merge would leave %s %s linked to another client: %w", table, id, err)
+			}
+		}
+	}
+	return nil
 }

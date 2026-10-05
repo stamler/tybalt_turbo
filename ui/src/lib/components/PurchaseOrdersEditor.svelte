@@ -52,7 +52,6 @@
   import { expensesEditingEnabled, legacyPOCreateUpdateEnabled } from "$lib/stores/appConfig";
   import { globalStore } from "$lib/stores/global";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
-  import { withProjectAuthorizationManagerName } from "$lib/projectAuthorization";
 
   // initialize the stores, noop if already initialized
   jobs.init();
@@ -861,7 +860,7 @@
     } catch (error: any) {
       const fieldErrors = error?.response?.data ?? error?.data?.data;
       if (fieldErrors && typeof fieldErrors === "object" && Object.keys(fieldErrors).length > 0) {
-        errors = withProjectAuthorizationManagerName(fieldErrors, selectedJobRecord?.manager);
+        errors = fieldErrors;
         return;
       }
 

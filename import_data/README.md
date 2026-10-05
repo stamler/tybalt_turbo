@@ -154,3 +154,7 @@ go run cmd/main.go migrate up
 ```
 
 This adds the `_imported` boolean field (default `false`) to all relevant collections.
+
+### Client billing profiles
+
+The jobs import replaces clients, contacts, and jobs. It cannot preserve locally maintained invoicing profiles or their job links. The importer therefore stops this phase before deletion when any invoicing profile exists. Direct imports into these three tables use the same check. Databases with no profiles retain the existing import behavior, including per-row failure reporting. Other import phases are unchanged. This check does not depend on project request settings or approval data.

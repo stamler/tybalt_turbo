@@ -6,18 +6,17 @@
   import type { PageData } from "./$types";
   import { onMount } from "svelte";
   import DSTabBar, { type TabItem } from "$lib/components/DSTabBar.svelte";
+  import InvoicingInstructions from "$lib/components/clients/InvoicingInstructions.svelte";
   import JobDetailTab from "$lib/components/jobs/JobDetailTab.svelte";
   import TimeTabContent from "$lib/components/jobs/TimeTabContent.svelte";
   import ExpensesTabContent from "$lib/components/jobs/ExpensesTabContent.svelte";
   import POsTabContent from "$lib/components/jobs/POsTabContent.svelte";
   import WIPContent from "$lib/components/jobs/WIPContent.svelte";
-  import ProjectAuthorizationDetails from "$lib/components/jobs/ProjectAuthorizationDetails.svelte";
   import StaffSummaryContent from "$lib/components/jobs/StaffSummaryContent.svelte";
   import DivisionsSummaryContent from "$lib/components/jobs/DivisionsSummaryContent.svelte";
   import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
   import DSDateInput from "$lib/components/DSDateInput.svelte";
   import FastCloseConfirmPopover from "$lib/components/FastCloseConfirmPopover.svelte";
-  import StoredFileHashRepairPopover from "$lib/components/StoredFileHashRepairPopover.svelte";
   import { pb } from "$lib/pocketbase";
   import { goto, invalidateAll } from "$app/navigation";
   import { globalStore } from "$lib/stores/global";
@@ -37,15 +36,6 @@
   let setNumberValue = $state("");
   let setNumberGlobalError = $state<string | null>(null);
   let setNumberErrors = $state({} as Record<string, { message: string }>);
-  let paUploading = $state(false);
-  let paUploadError = $state<string | null>(null);
-  let paRevoking = $state(false);
-  let showPARevokeConfirm = $state(false);
-  let paRevokeError = $state<string | null>(null);
-  let paDeleting = $state(false);
-  let showPADeleteConfirm = $state(false);
-  let paDeleteError = $state<string | null>(null);
-  let showPAHashRepairPopover = $state(false);
   let fastCloseProposal = $state<{
     id: string;
     number: string;
@@ -93,45 +83,6 @@
     !isProposal && data.job.status === "Active" && data.job.imported === true,
   );
   const canSetNumber = $derived($jobsEditingEnabled && $globalStore.claims.includes("admin"));
-  const currentUserID = $derived(pb.authStore.record?.id ?? "");
-  const canUploadProjectAuthorization = $derived(
-    !isProposal &&
-      (Boolean(currentUserID) &&
-        ($globalStore.claims.includes("job") ||
-          currentUserID === data.job.manager?.id ||
-          currentUserID === data.job.alternate_manager?.id ||
-          currentUserID === data.job.branch_manager_id)),
-  );
-  const projectAuthorizationApproved = $derived(
-    Boolean(
-      data.job.project_authorization_doc &&
-        data.job.project_authorization_doc_hash &&
-        data.job.pa_reviewed &&
-        data.job.pa_reviewer?.id,
-    ),
-  );
-  const projectAuthorizationRejected = $derived(
-    Boolean(data.job.pa_rejected || data.job.pa_rejector?.id || data.job.pa_rejection_reason),
-  );
-  const projectAuthorizationComplete = $derived(
-    projectAuthorizationApproved && !projectAuthorizationRejected,
-  );
-  const projectAuthorizationNeedsAttention = $derived(
-    !isProposal && !projectAuthorizationComplete,
-  );
-  const canRevokeProjectAuthorization = $derived(
-    !isProposal && $globalStore.claims.includes("admin") && projectAuthorizationApproved,
-  );
-  const canRepairProjectAuthorizationHash = $derived(
-    !isProposal &&
-      $globalStore.claims.includes("admin") &&
-      Boolean(data.job.project_authorization_doc),
-  );
-  const canDeleteProjectAuthorization = $derived(
-    canUploadProjectAuthorization &&
-      Boolean(data.job.project_authorization_doc) &&
-      !projectAuthorizationApproved,
-  );
   const hasNumberHierarchyWarning = $derived(
     Boolean(data.job.parent_number) ||
       (Array.isArray(data.job.children) && data.job.children.length > 0),
@@ -253,75 +204,6 @@
   function personName(person: any) {
     if (!person) return "";
     return `${person.given_name || person.name || ""} ${person.surname || ""}`.trim();
-  }
-
-  function projectAuthorizationStatus() {
-    if (!data.job.project_authorization_doc) return "PA document missing";
-    if (projectAuthorizationApproved) return "PA approved";
-    if (projectAuthorizationRejected) return "PA rejected by Accounting";
-    return "PA pending Accounting approval";
-  }
-
-  async function uploadProjectAuthorizationDoc(event: Event, certified: boolean) {
-    const input = event.currentTarget as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-    paUploading = true;
-    paUploadError = null;
-    try {
-      const form = new FormData();
-      form.append("project_authorization_doc", file);
-      form.append("project_authorization_certified", String(certified));
-      await pb.send(`/api/jobs/${data.job.id}/project_authorization_doc`, {
-        method: "POST",
-        body: form,
-      });
-      input.value = "";
-      await globalStore.refreshAttentionCounts();
-      await invalidateAll();
-    } catch (error: any) {
-      paUploadError =
-        error?.data?.data?.project_authorization_doc?.message ??
-        error?.data?.message ??
-        error?.message ??
-        "Failed to upload PA document.";
-    } finally {
-      paUploading = false;
-    }
-  }
-
-  async function revokeProjectAuthorization() {
-    paRevoking = true;
-    paRevokeError = null;
-    try {
-      await pb.send(`/api/jobs/${data.job.id}/project_authorization/revoke`, { method: "POST" });
-      showPARevokeConfirm = false;
-      await globalStore.refreshAttentionCounts();
-      await invalidateAll();
-    } catch (error: any) {
-      paRevokeError = error?.data?.message ?? error?.message ?? "Failed to revoke PA approval.";
-    } finally {
-      paRevoking = false;
-    }
-  }
-
-  async function deleteProjectAuthorizationDoc() {
-    paDeleting = true;
-    paDeleteError = null;
-    try {
-      await pb.send(`/api/jobs/${data.job.id}/project_authorization_doc`, { method: "DELETE" });
-      showPADeleteConfirm = false;
-      await globalStore.refreshAttentionCounts();
-      await invalidateAll();
-    } catch (error: any) {
-      paDeleteError =
-        error?.data?.data?.project_authorization_doc?.message ??
-        error?.data?.message ??
-        error?.message ??
-        "Failed to remove PA document.";
-    } finally {
-      paDeleting = false;
-    }
   }
 
   // Tab management ------------------------------------------------------------
@@ -594,54 +476,6 @@
   />
 
   <DSPopover
-    bind:show={showPARevokeConfirm}
-    title="Revoke PA Approval"
-    subtitle="Revoking approval may block new time bundles, purchase orders, and expenses for this project when PA enforcement is enabled."
-    error={paRevokeError}
-    submitting={paRevoking}
-    submitLabel="Revoke Approval"
-    onSubmit={revokeProjectAuthorization}
-  >
-    <p class="text-sm text-neutral-700">
-      The uploaded PDF and hash will stay on the job. Accounting will need to approve the current
-      document again before the project is treated as PA-approved.
-    </p>
-  </DSPopover>
-
-  <DSPopover
-    bind:show={showPADeleteConfirm}
-    title="Remove PA PDF"
-    subtitle="Removing the uploaded PA will leave this project without a pending document for Accounting review."
-    error={paDeleteError}
-    submitting={paDeleting}
-    submitLabel="Remove PDF"
-    onSubmit={deleteProjectAuthorizationDoc}
-  >
-    <p class="text-sm text-neutral-700">
-      A new signed PA PDF will need to be uploaded before Accounting can approve the project.
-    </p>
-  </DSPopover>
-
-  <StoredFileHashRepairPopover
-    show={showPAHashRepairPopover}
-    recordId={data.job.id}
-    title="Project Authorization Document Repair"
-    hasAttachment={Boolean(data.job.project_authorization_doc)}
-    currentHash={data.job.project_authorization_doc_hash}
-    currentUpdated={data.job.updated}
-    auditPath={`/api/jobs/${data.job.id}/project_authorization_doc_hash/audit`}
-    replacePath={`/api/jobs/${data.job.id}/project_authorization_doc_hash/replace`}
-    canMarkMissing={false}
-    auditMatchesMessage="Stored hash matches the PA document."
-    auditMismatchMessage="Stored hash does not match the PA document."
-    replaceConfirmMessage="Replacing this stored hash is irreversible. Verify that the PA PDF opens and is actually usable before accepting the calculated hash."
-    replaceNoopMessage="No change made. The stored hash already matches the PA document."
-    replaceSuccessMessage="Stored hash replaced with the calculated PA document hash."
-    onClose={() => (showPAHashRepairPopover = false)}
-    onRepaired={invalidateAll}
-  />
-
-  <DSPopover
     bind:show={showSetNumberModal}
     title="Change Job Number"
     subtitle="Admins can manually override the stored job number without reopening the full editor."
@@ -672,7 +506,9 @@
               : "s"}.
           </p>
         {/if}
-        <p class="mt-1">If related job numbers should stay aligned, update those records separately.</p>
+        <p class="mt-1">
+          If related job numbers should stay aligned, update those records separately.
+        </p>
       </div>
     {/if}
   </DSPopover>
@@ -694,25 +530,6 @@
     <div><span class="font-semibold">Description:</span> {data.job.description}</div>
     {#if data.job.status}
       <div><span class="font-semibold">Status:</span> {data.job.status}</div>
-    {/if}
-
-    {#if projectAuthorizationNeedsAttention}
-      <ProjectAuthorizationDetails
-        job={data.job}
-        status={projectAuthorizationStatus()}
-        approved={projectAuthorizationApproved}
-        rejected={projectAuthorizationRejected}
-        canUpload={canUploadProjectAuthorization}
-        uploading={paUploading}
-        uploadError={paUploadError}
-        onUpload={uploadProjectAuthorizationDoc}
-        canDelete={canDeleteProjectAuthorization}
-        onDelete={() => (showPADeleteConfirm = true)}
-        canRevoke={canRevokeProjectAuthorization}
-        onRevoke={() => (showPARevokeConfirm = true)}
-        canRepairHash={canRepairProjectAuthorizationHash}
-        onRepairHash={() => (showPAHashRepairPopover = true)}
-      />
     {/if}
 
     <details class="space-y-2">
@@ -748,6 +565,31 @@
 
         {#if data.job.contact && (data.job.contact.given_name || data.job.contact.surname)}
           <div><span class="font-semibold">Contact:</span> {personName(data.job.contact)}</div>
+        {/if}
+
+        {#if data.job.invoicing_information}
+          <div class="space-y-1">
+            <div>
+              <span class="font-semibold">Invoicing profile:</span>
+              <a
+                class="text-blue-600 hover:underline"
+                href={`/clients/${data.job.client.id}/details?show_invoicing=${data.job.invoicing_information}#invoicing`}
+              >
+                {data.job.invoicing_profile_name ||
+                  data.job.invoice_contact_name ||
+                  "Client invoicing profile"}
+              </a>
+            </div>
+            {#if data.job.invoicing_profile_name && data.job.invoice_contact_name}<div>
+                Send invoices to {data.job.invoice_contact_name}
+              </div>{/if}
+            {#if data.job.invoice_contact_email}<a
+                class="text-blue-600 hover:underline"
+                href={`mailto:${data.job.invoice_contact_email}`}
+                >{data.job.invoice_contact_email}</a
+              >{/if}
+            <InvoicingInstructions text={data.job.invoice_instructions || ""} />
+          </div>
         {/if}
 
         {#if data.job.manager && (data.job.manager.given_name || data.job.manager.surname)}
@@ -805,24 +647,6 @@
               <span class="font-semibold">Client Reference Number:</span>
               {data.job.client_reference_number}
             </div>
-          {/if}
-          {#if !projectAuthorizationNeedsAttention}
-            <ProjectAuthorizationDetails
-              job={data.job}
-              status={projectAuthorizationStatus()}
-              approved={projectAuthorizationApproved}
-              rejected={projectAuthorizationRejected}
-              canUpload={canUploadProjectAuthorization}
-              uploading={paUploading}
-              uploadError={paUploadError}
-              onUpload={uploadProjectAuthorizationDoc}
-              canDelete={canDeleteProjectAuthorization}
-              onDelete={() => (showPADeleteConfirm = true)}
-              canRevoke={canRevokeProjectAuthorization}
-              onRevoke={() => (showPARevokeConfirm = true)}
-              canRepairHash={canRepairProjectAuthorizationHash}
-              onRepairHash={() => (showPAHashRepairPopover = true)}
-            />
           {/if}
 
           <div>

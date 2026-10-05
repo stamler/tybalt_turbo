@@ -1,0 +1,5 @@
+id,value,key,description
+030887mb4spir3z,"{""project_authorization_rejected"":true,""po_active"":false}",,
+58lzohds2s9ho7o,"{""create_edit_absorb"":false,""enforce_project_authorization"":true,""custom_setting"":""keep this""}",jobs,"When create_edit_absorb is true, jobs can be created, edited, and absorbs can be performed. If missing or false, jobs cannot be created or edited and absorbs cannot be performed."
+migjoblegacy001,"{""enforce_project_authorization"":true}",jobs,Legacy authorization setting only.
+mignotlegacy001,"{""project_authorization_rejected"":true}",notifications,Legacy authorization notice only.

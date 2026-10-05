@@ -42,8 +42,8 @@ func TestAttachmentAuditTargetsRequireAdminAndExcludeGeneratedFileCollections(t 
 	if !attachmentAuditTargetsContain(targets, "purchase_orders_attachment") {
 		t.Fatal("expected purchase_orders attachment audit target")
 	}
-	if !attachmentAuditTargetsContain(targets, "jobs_project_authorization_doc") {
-		t.Fatal("expected jobs project authorization document audit target")
+	if attachmentAuditTargetsContain(targets, "jobs_project_authorization_doc") {
+		t.Fatal("retired project authorization target must not be available")
 	}
 	if attachmentAuditTargetsContain(targets, "zip_cache") {
 		t.Fatal("expected generated zip_cache files to be excluded")

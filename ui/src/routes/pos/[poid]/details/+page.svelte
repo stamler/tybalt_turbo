@@ -23,7 +23,6 @@
   const viewerId = pb.authStore.record?.id ?? "";
   let rejectModal: RejectModal;
   let showSecondApproverWhy = $state(false);
-  let showProjectAuthorizationHelp = $state(false);
   let showBudgetCoverageHelp = $state(false);
   let showConvertPopover = $state(false);
   let convertError = $state<string | null>(null);
@@ -59,9 +58,6 @@
   const canApproveOrReject = $derived(data.canApproveOrReject);
   const hasProjectJob = $derived.by(() =>
     Boolean(data.po.job && data.po.job_number && !data.po.job_number.toUpperCase().startsWith("P")),
-  );
-  const showProjectAuthorizationBadge = $derived.by(
-    () => hasProjectJob && data.po.has_project_authorization,
   );
   const isPayablesAdmin = $derived(
     $globalStore.showAllUi || $globalStore.claims.includes("payables_admin"),
@@ -429,28 +425,10 @@
                 >
                   {data.po.job_number}
                 </a>
-                {#if showProjectAuthorizationBadge}
-                  <button
-                    type="button"
-                    class="rounded-sm border border-emerald-300 bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-900 hover:bg-emerald-200"
-                    onclick={() => {
-                      showProjectAuthorizationHelp = !showProjectAuthorizationHelp;
-                    }}
-                  >
-                    PA
-                  </button>
-                {/if}
                 {#if data.po.job_description}
                   <span>— {data.po.job_description}</span>
                 {/if}
               </div>
-              {#if showProjectAuthorizationHelp && showProjectAuthorizationBadge}
-                <div
-                  class="rounded-sm border border-emerald-200 bg-emerald-50 p-2 text-sm text-emerald-950"
-                >
-                  Procurement assures that this job has a project authorization.
-                </div>
-              {/if}
             </div>
           {/if}
 

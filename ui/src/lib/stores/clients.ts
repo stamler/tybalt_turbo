@@ -48,7 +48,7 @@ export const clients = createCollectionStore<any>(
   },
   // onUpdate – re-fetch and replace existing entry in the store
   /*
-   * NOTE: ClientsEditor.svelte calls clients.refresh(id) after it creates,
+   * NOTE: ContactEditor.svelte calls clients.refresh(id) after it creates,
    * updates or deletes related client_contacts. That manual refresh invokes
    * this onUpdate callback a second time for the same client (once for the
    * original client.save / contact mutation via realtime, and once for the

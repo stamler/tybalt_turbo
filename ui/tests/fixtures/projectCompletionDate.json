@@ -28,14 +28,6 @@
   "status": "Active",
   "time_and_materials": true,
   "updated": "2025-11-03 21:59:22.493Z",
-  "project_authorization_doc": "",
-  "project_authorization_doc_hash": "",
-  "pa_reviewer": "",
-  "pa_reviewed": "",
-  "pa_uploader": "",
-  "pa_uploaded": "",
-  "pa_rejector": "",
-  "pa_rejected": "",
-  "pa_rejection_reason": "",
-  "project_completion_date": ""
+  "project_completion_date": "",
+  "invoicing_information": "painvoice000002"
 }

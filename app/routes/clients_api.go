@@ -1,9 +1,13 @@
 package routes
 
 import (
+	"database/sql"
 	_ "embed" // for go:embed
 	"encoding/json"
+	"errors"
 	"net/http"
+
+	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/core"
@@ -55,19 +59,60 @@ type clientDetailsRow struct {
 	LeadSurname            string  `db:"lead_surname"`
 	LeadEmail              string  `db:"lead_email"`
 	ReferencingJobsCount   int     `db:"referencing_jobs_count"`
+	Address                string  `db:"address"`
+	City                   string  `db:"city"`
+	ProvinceState          string  `db:"province_state"`
+	PostalCode             string  `db:"postal_code"`
+	Country                string  `db:"country"`
+	Phone                  string  `db:"phone"`
+}
+
+// ClientContact includes both project use and use through an invoicing profile.
+// Each job counts once even when it uses the contact in both roles.
+type ClientContact struct {
+	Contact
+	Client        string `json:"client"`
+	Address       string `json:"address"`
+	City          string `json:"city"`
+	ProvinceState string `json:"province_state"`
+	PostalCode    string `json:"postal_code"`
+	Country       string `json:"country"`
+	Phone         string `json:"phone"`
+	JobCount      int    `json:"job_count"`
+	ProfileCount  int    `json:"profile_count"`
+}
+
+type ClientInvoicingProfile struct {
+	ID                    string `json:"id"`
+	Name                  string `json:"name"`
+	Client                string `json:"client"`
+	Contact               string `json:"contact"`
+	Fax                   string `json:"fax"`
+	InvoicingInstructions string `json:"invoicing_instructions"`
+	JobCount              int    `json:"job_count"`
+	Creator               string `json:"creator"`
+	CreatorName           string `json:"creator_name"`
+	Created               string `json:"created"`
 }
 
 type ClientDetails struct {
-	ID                     string    `json:"id"`
-	Name                   string    `json:"name"`
-	BusinessDevelopmentUID string    `json:"business_development_lead"`
-	LeadGivenName          string    `json:"lead_given_name"`
-	LeadSurname            string    `json:"lead_surname"`
-	LeadEmail              string    `json:"lead_email"`
-	OutstandingBalance     float64   `json:"outstanding_balance"`
-	OutstandingBalanceDate string    `json:"outstanding_balance_date"`
-	Contacts               []Contact `json:"contacts"`
-	ReferencingJobsCount   int       `json:"referencing_jobs_count"`
+	ID                     string                   `json:"id"`
+	Name                   string                   `json:"name"`
+	BusinessDevelopmentUID string                   `json:"business_development_lead"`
+	LeadGivenName          string                   `json:"lead_given_name"`
+	LeadSurname            string                   `json:"lead_surname"`
+	LeadEmail              string                   `json:"lead_email"`
+	OutstandingBalance     float64                  `json:"outstanding_balance"`
+	OutstandingBalanceDate string                   `json:"outstanding_balance_date"`
+	Contacts               []ClientContact          `json:"contacts"`
+	InvoicingProfiles      []ClientInvoicingProfile `json:"invoicing_profiles"`
+	ReferencingJobsCount   int                      `json:"referencing_jobs_count"`
+	Address                string                   `json:"address"`
+	City                   string                   `json:"city"`
+	ProvinceState          string                   `json:"province_state"`
+	PostalCode             string                   `json:"postal_code"`
+	Country                string                   `json:"country"`
+	Phone                  string                   `json:"phone"`
 }
 
 type BusdevLead struct {
@@ -90,6 +135,25 @@ func createGetBusdevLeadsHandler(app core.App) func(e *core.RequestEvent) error 
 func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		id := e.Request.PathValue("id")
+		if id != "" {
+			// Details include invoicing profiles, whose collection read rule requires
+			// an active account. Keep the same rule for this combined response.
+			active, err := utilities.IsUserActive(app, e.Auth.Id)
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to check account status", err)
+			}
+			if !active {
+				return e.Error(http.StatusForbidden, "an active account is required to view client details", nil)
+			}
+			details, err := queryClientDetails(app, id)
+			if errors.Is(err, sql.ErrNoRows) {
+				return e.Error(http.StatusNotFound, "client not found", nil)
+			}
+			if err != nil {
+				return e.Error(http.StatusInternalServerError, "failed to load client details", err)
+			}
+			return e.JSON(http.StatusOK, details)
+		}
 
 		var rows []clientRow
 		if err := app.DB().NewQuery(clientsQuery).Bind(dbx.Params{"id": id}).All(&rows); err != nil {
@@ -108,17 +172,6 @@ func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 			}
 		}
 
-		if id != "" {
-			if len(rows) == 0 {
-				return e.Error(http.StatusNotFound, "client not found", nil)
-			}
-			details, err := queryClientDetails(app, id)
-			if err != nil {
-				return e.Error(http.StatusInternalServerError, "failed to load client details", err)
-			}
-			return e.JSON(http.StatusOK, details)
-		}
-
 		resp := make([]Client, len(rows))
 		for i, r := range rows {
 			resp[i] = toClient(r)
@@ -130,14 +183,15 @@ func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 func queryClientDetails(app core.App, id string) (*ClientDetails, error) {
 	var row struct {
 		clientDetailsRow
-		ContactsJSON string `db:"contacts_json"`
+		ContactsJSON          string `db:"contacts_json"`
+		InvoicingProfilesJSON string `db:"invoicing_profiles_json"`
 	}
 
 	if err := app.DB().NewQuery(clientDetailsQuery).Bind(dbx.Params{"id": id}).One(&row); err != nil {
 		return nil, err
 	}
 
-	var contacts []Contact
+	var contacts []ClientContact
 	if row.ContactsJSON != "" {
 		if err := json.Unmarshal([]byte(row.ContactsJSON), &contacts); err != nil {
 			return nil, err
@@ -146,7 +200,13 @@ func queryClientDetails(app core.App, id string) (*ClientDetails, error) {
 
 	// When no contacts exist we still want an empty slice in the JSON response, not null.
 	if contacts == nil {
-		contacts = []Contact{}
+		contacts = []ClientContact{}
+	}
+	profiles := []ClientInvoicingProfile{}
+	if row.InvoicingProfilesJSON != "" {
+		if err := json.Unmarshal([]byte(row.InvoicingProfilesJSON), &profiles); err != nil {
+			return nil, err
+		}
 	}
 
 	return &ClientDetails{
@@ -159,6 +219,13 @@ func queryClientDetails(app core.App, id string) (*ClientDetails, error) {
 		OutstandingBalance:     row.OutstandingBalance,
 		OutstandingBalanceDate: row.OutstandingBalanceDate,
 		Contacts:               contacts,
+		InvoicingProfiles:      profiles,
 		ReferencingJobsCount:   row.ReferencingJobsCount,
+		Address:                row.Address,
+		City:                   row.City,
+		ProvinceState:          row.ProvinceState,
+		PostalCode:             row.PostalCode,
+		Country:                row.Country,
+		Phone:                  row.Phone,
 	}, nil
 }

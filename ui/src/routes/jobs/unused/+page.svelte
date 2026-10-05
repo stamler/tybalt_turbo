@@ -6,12 +6,15 @@
   import { pb } from "$lib/pocketbase";
   import { onMount } from "svelte";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
+  import { saveErrorMessage } from "$lib/utilities";
 
   let items = $state<JobApiResponse[] | undefined>(undefined);
   let loading = $state(false);
   let errorMessage = $state<string | null>(null);
   let prefix = $state("");
   let mutatingById = $state<Record<string, boolean>>({});
+  // A failed status change stays beside its job until the next attempt.
+  let statusErrorById = $state<Record<string, string>>({});
 
   const load = async () => {
     const p = prefix.trim();
@@ -40,11 +43,15 @@
 
   const setStatus = async (jobId: string, status: JobsStatusOptions) => {
     mutatingById = { ...mutatingById, [jobId]: true };
+    statusErrorById = { ...statusErrorById, [jobId]: "" };
     try {
       await pb.collection("jobs").update(jobId, { status });
       await load();
     } catch (e) {
-      console.error("Failed to update job status", e);
+      statusErrorById = {
+        ...statusErrorById,
+        [jobId]: saveErrorMessage(e, `The status could not be set to ${status}.`),
+      };
     } finally {
       mutatingById = { ...mutatingById, [jobId]: false };
     }
@@ -80,6 +87,14 @@
     {#snippet line1({ branch }: JobApiResponse)}{#if branch}<DsLabel color="neutral"
           >{branch}</DsLabel
         >{/if}{/snippet}
+    {#snippet line2({ id }: JobApiResponse)}
+      {#if statusErrorById[id]}
+        <p role="alert" class="text-sm text-red-700">
+          {statusErrorById[id]}
+          <a href="/jobs/{id}/edit" class="text-blue-700 underline">Edit job</a>
+        </p>
+      {/if}
+    {/snippet}
     {#snippet actions({ id, number }: JobApiResponse)}
       {#if number?.startsWith("P")}
         <DsActionButton

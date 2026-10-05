@@ -4,4 +4,6 @@
   let { data }: { data: PageData } = $props();
 </script>
 
-<JobsEditor {data} />
+{#key data.id}
+  <JobsEditor {data} />
+{/key}

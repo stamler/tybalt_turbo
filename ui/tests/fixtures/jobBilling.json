@@ -1,0 +1,108 @@
+{
+  "auth": {
+    "id": "f2j5a8vk006baub",
+    "collectionName": "users",
+    "collectionId": "_pb_users_auth_",
+    "email": "billing@example.test",
+    "verified": true
+  },
+  "client": {
+    "id": "lb0fnenkeyitsny",
+    "name": "Billing Client",
+    "contacts": [
+      {
+        "id": "nh5u9z3cyknjclv",
+        "client": "lb0fnenkeyitsny",
+        "given_name": "Robin",
+        "surname": "Recipient",
+        "email": "robin@example.test",
+        "job_count": 1,
+        "profile_count": 1
+      },
+      {
+        "id": "duplicatecontact",
+        "client": "lb0fnenkeyitsny",
+        "given_name": "Robin",
+        "surname": "Duplicate",
+        "email": "duplicate@example.test",
+        "job_count": 0,
+        "profile_count": 0
+      }
+    ],
+    "invoicing_profiles": [],
+    "referencing_jobs_count": 1
+  },
+  "otherClient": {
+    "id": "otherclient0001",
+    "name": "Other Client",
+    "contacts": [],
+    "invoicing_profiles": []
+  },
+  "profile": {
+    "id": "painvoice000002",
+    "client": "lb0fnenkeyitsny",
+    "contact": "nh5u9z3cyknjclv",
+    "name": "Existing profile",
+    "invoicing_instructions": "Email invoices monthly.",
+    "fax": "",
+    "creator": "f2j5a8vk006baub",
+    "created": "2026-10-01 00:00:00.000Z",
+    "job_count": 1
+  },
+  "createdProfile": {
+    "id": "createdprofile1",
+    "name": "New invoice destination"
+  },
+  "copiedProfile": {
+    "id": "copiedprofile01",
+    "name": "Copied invoice destination"
+  },
+  "allocations": [
+    {
+      "id": "allocation00001",
+      "job": "pcactiveblank01",
+      "division": "fy4i9poneukvq9u",
+      "hours": 10
+    }
+  ],
+  "divisions": [
+    {
+      "id": "fy4i9poneukvq9u",
+      "code": "ENG",
+      "name": "Engineering"
+    }
+  ],
+  "branches": [
+    {
+      "id": "80875lm27v8wgi4",
+      "code": "TB",
+      "name": "Thunder Bay"
+    }
+  ],
+  "profiles": [
+    {
+      "id": "staffprofile001",
+      "uid": "f2j5a8vk006baub",
+      "given_name": "Morgan",
+      "surname": "Manager"
+    }
+  ],
+  "absorbAction": {
+    "id": "contactmerge001",
+    "collection_name": "client_contacts",
+    "target_id": "nh5u9z3cyknjclv",
+    "absorbed_records": [
+      {
+        "id": "duplicatecontact",
+        "client": "lb0fnenkeyitsny",
+        "given_name": "Robin",
+        "surname": "Duplicate",
+        "email": "duplicate@example.test",
+        "job_count": 0,
+        "profile_count": 0
+      }
+    ],
+    "updated_references": {},
+    "created": "2026-10-01 00:00:00.000Z"
+  }
+}

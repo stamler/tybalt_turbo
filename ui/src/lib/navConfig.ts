@@ -164,7 +164,6 @@ export const navSections: NavSection[] = [
           { label: "Division", href: "/jobs/wip/division", canView: canViewWIPReports },
         ],
       },
-      { label: "Project Authorizations", href: "/jobs/project_authorization", buttons: [] },
       {
         label: "Rate Sheets",
         href: "/rate-sheets/list",

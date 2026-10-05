@@ -64,7 +64,7 @@ func TestProjectCompletionDateUpdates(t *testing.T) {
 				status, content = http.StatusBadRequest, []string{`"project_completion_date":`, `"code":"` + tc.code + `"`}
 			}
 			scenario := tests.ApiScenario{
-				Name: name, Method: method, URL: url, Body: strings.NewReader(body), Headers: map[string]string{"Authorization": token}, ExpectedStatus: status, ExpectedContent: content, TestAppFactory: testutils.SetupTestApp,
+				Name: name, Method: method, URL: url, Body: strings.NewReader(body), Headers: map[string]string{"Authorization": token}, ExpectedStatus: status, ExpectedContent: content, TestAppFactory: setupJobsWithBillingFixtures,
 				AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 					// Read the stored fixture after the request to check persistence or rollback.
 					record, err := app.FindRecordById("jobs", tc.id)
@@ -107,7 +107,7 @@ func TestProjectCompletionDateCreate(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := testutils.SetupTestApp(t)
+	app := setupJobsWithBillingFixtures(t)
 	defer app.Cleanup()
 	fixture, err := app.FindRecordById("jobs", "pcactiveblank01")
 	if err != nil {
@@ -131,7 +131,7 @@ func TestProjectCompletionDateCreate(t *testing.T) {
 		for _, collectionAPI := range []bool{false, true} {
 			// Build a request from a CSV fixture; do not insert setup records.
 			job := map[string]any{}
-			for _, field := range []string{"description", "client", "contact", "manager", "branch", "location", "project_award_date", "rate_sheet"} {
+			for _, field := range []string{"invoicing_information", "description", "client", "contact", "manager", "branch", "location", "project_award_date", "rate_sheet"} {
 				job[field] = fixture.GetString(field)
 			}
 			job["project_value"] = fixture.GetInt("project_value")
@@ -155,7 +155,7 @@ func TestProjectCompletionDateCreate(t *testing.T) {
 				}
 				content = []string{`"project_completion_date":`, `"code":"` + code + `"`}
 			}
-			scenario := tests.ApiScenario{Name: name, Method: http.MethodPost, URL: url, Body: strings.NewReader(string(body)), Headers: map[string]string{"Authorization": token}, ExpectedStatus: tc.want, ExpectedContent: content, TestAppFactory: testutils.SetupTestApp}
+			scenario := tests.ApiScenario{Name: name, Method: http.MethodPost, URL: url, Body: strings.NewReader(string(body)), Headers: map[string]string{"Authorization": token}, ExpectedStatus: tc.want, ExpectedContent: content, TestAppFactory: setupJobsWithBillingFixtures}
 			scenario.Test(t)
 		}
 	}
@@ -167,7 +167,7 @@ func TestProjectCompletionDateQuickCloseAndDetails(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, id := range []string{"pcactiveblank01", "pcimportblank01"} {
-		scenario := tests.ApiScenario{Name: "quick close without date " + id, Method: http.MethodPost, URL: "/api/jobs/" + id + "/close", Headers: map[string]string{"Authorization": token}, ExpectedStatus: 200, ExpectedContent: []string{`"status":"Closed"`}, TestAppFactory: testutils.SetupTestApp,
+		scenario := tests.ApiScenario{Name: "quick close without date " + id, Method: http.MethodPost, URL: "/api/jobs/" + id + "/close", Headers: map[string]string{"Authorization": token}, ExpectedStatus: 200, ExpectedContent: []string{`"status":"Closed"`}, TestAppFactory: setupJobsWithBillingFixtures,
 			AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
 				record, err := app.FindRecordById("jobs", id)
 				if err != nil {
@@ -180,7 +180,7 @@ func TestProjectCompletionDateQuickCloseAndDetails(t *testing.T) {
 		}
 		scenario.Test(t)
 	}
-	scenario := tests.ApiScenario{Name: "details returns completion date", Method: http.MethodGet, URL: "/api/jobs/pcactivedated01/details", Headers: map[string]string{"Authorization": token}, ExpectedStatus: 200, ExpectedContent: []string{`"project_completion_date":"2027-12-31"`}, TestAppFactory: testutils.SetupTestApp}
+	scenario := tests.ApiScenario{Name: "details returns completion date", Method: http.MethodGet, URL: "/api/jobs/pcactivedated01/details", Headers: map[string]string{"Authorization": token}, ExpectedStatus: 200, ExpectedContent: []string{`"project_completion_date":"2027-12-31"`}, TestAppFactory: setupJobsWithBillingFixtures}
 	scenario.Test(t)
 }
 
@@ -203,7 +203,7 @@ func TestProjectCompletionDateInvalidAward(t *testing.T) {
 			Headers:         map[string]string{"Authorization": token},
 			ExpectedStatus:  http.StatusBadRequest,
 			ExpectedContent: []string{`"project_award_date":{"code":"invalid_date_format"`},
-			TestAppFactory:  testutils.SetupTestApp,
+			TestAppFactory:  setupJobsWithBillingFixtures,
 		}
 		scenario.Test(t)
 	}

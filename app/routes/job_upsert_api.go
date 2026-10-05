@@ -34,31 +34,6 @@ type existingJobAllocation struct {
 	Hours    float64 `db:"hours"`
 }
 
-var projectAuthorizationJobWriteFields = map[string]struct{}{
-	"project_authorization_doc":      {},
-	"project_authorization_doc_hash": {},
-	"pa_uploader":                    {},
-	"pa_uploaded":                    {},
-	"pa_reviewer":                    {},
-	"pa_reviewed":                    {},
-	"pa_rejector":                    {},
-	"pa_rejected":                    {},
-	"pa_rejection_reason":            {},
-}
-
-func projectAuthorizationJobWriteError(field string) *errs.HookError {
-	return &errs.HookError{
-		Status:  http.StatusBadRequest,
-		Message: "project authorization fields are not editable through this endpoint",
-		Data: map[string]errs.CodeError{
-			field: {
-				Code:    "not_editable",
-				Message: "project authorization fields must be changed through the dedicated PA endpoints",
-			},
-		},
-	}
-}
-
 func allocationDivisionFieldName(index int) string {
 	return fmt.Sprintf("allocation_division_%d", index)
 }
@@ -194,10 +169,6 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 					case "id", "collectionId", "collectionName", "created", "updated", "divisions":
 						// ignore
 					default:
-						if _, protected := projectAuthorizationJobWriteFields[k]; protected {
-							httpResponseStatusCode = http.StatusBadRequest
-							return projectAuthorizationJobWriteError(k)
-						}
 						jobRec.Set(k, v)
 					}
 				}
@@ -406,10 +377,6 @@ func createCreateJobHandler(app core.App) func(e *core.RequestEvent) error {
 					case "id", "collectionId", "collectionName", "created", "updated", "divisions":
 						// ignore
 					default:
-						if _, protected := projectAuthorizationJobWriteFields[k]; protected {
-							httpResponseStatusCode = http.StatusBadRequest
-							return projectAuthorizationJobWriteError(k)
-						}
 						jobRec.Set(k, v)
 					}
 				}

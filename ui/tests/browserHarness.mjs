@@ -12,19 +12,25 @@ const root = fileURLToPath(new URL("../", import.meta.url));
 const services = {
   "$app/paths":
     "export const resolve = (route, params) => Object.entries(params ?? {}).reduce((url, [key, value]) => url.replace('[' + key + ']', value), route);",
-  "$app/navigation": "export const goto = (url) => { location.href = url; };",
+  "$app/navigation":
+    "export const goto = (url) => { location.href = url; }; export const beforeNavigate = () => {}; export const invalidateAll = async () => {}; export const replaceState = (url, state) => history.replaceState(state, '', url);",
   "$env/static/public": "export const PUBLIC_POCKETBASE_URL = location.origin;",
   "summary-test-global":
-    "import { writable } from 'svelte/store'; export const globalStore = writable({claims:[]});",
+    "import { writable } from 'svelte/store'; export const globalStore = Object.assign(writable({claims:[]}), { refreshAttentionCounts: async () => {} });",
 };
 
-export async function runBrowserHarness(check, { app = false } = {}) {
+export async function runBrowserHarness(
+  check,
+  { app = false, services: serviceOverrides = {} } = {},
+) {
+  const resolvedServices = { ...services, ...serviceOverrides };
   const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "playwright");
   const cacheDir = await mkdtemp(path.join(tmpdir(), "tybalt-browser-vite-"));
   let server, browser;
   try {
     server = await createServer({
       root,
+      publicDir: "static",
       configFile: app ? undefined : false,
       cacheDir,
       plugins: app
@@ -34,10 +40,10 @@ export async function runBrowserHarness(check, { app = false } = {}) {
               name: "test-services",
               enforce: "pre",
               resolveId(id) {
-                if (id in services) return `\0${id}`;
+                if (id in resolvedServices) return `\0${id}`;
               },
               load(id) {
-                return services[id.slice(1)];
+                return resolvedServices[id.slice(1)];
               },
             },
             svelte({ configFile: false }),
@@ -59,6 +65,6 @@ export async function runBrowserHarness(check, { app = false } = {}) {
   } finally {
     await browser?.close();
     await server?.close();
-    await rm(cacheDir, { recursive: true, force: true });
+    await rm(cacheDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
   }
 }

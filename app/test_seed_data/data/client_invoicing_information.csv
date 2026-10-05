@@ -1,0 +1,7 @@
+id,created,updated,client,contact,invoicing_instructions,fax,name,creator
+painvoice000001,2026-09-30 00:00:00.000Z,2026-09-30 00:00:00.000Z,pqpd90fqd5ohjcs,184qbpajciwrrp2,Email invoices monthly.,,,
+painvoice000002,2026-09-30 00:00:00.000Z,2026-09-30 00:00:00.000Z,lb0fnenkeyitsny,nh5u9z3cyknjclv,,,,
+painvoice000003,2026-09-30 00:00:00.000Z,2026-09-30 00:00:00.000Z,ee3xvodl583b61o,235g6k01xx3sdjk,,,,
+cwinvoice000001,2026-10-01 00:00:00.000Z,2026-10-01 00:00:00.000Z,cwclient0000001,cwcontact000001,Include the purchase order.,807-555-0199,Capital projects,
+cwinvoice000002,2026-10-01 00:00:00.000Z,2026-10-01 00:00:00.000Z,cwclient0000001,cwcontact000001,,,Maintenance,
+cwinvoice000003,2026-10-01 00:00:00.000Z,2026-10-01 00:00:00.000Z,cwclient0000001,cwcontact000002,,,,

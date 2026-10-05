@@ -54,7 +54,7 @@ func TestProjectValueUpdates(t *testing.T) {
 				Headers:         map[string]string{"Authorization": token},
 				ExpectedStatus:  tc.want,
 				ExpectedContent: content,
-				TestAppFactory:  testutils.SetupTestApp,
+				TestAppFactory:  setupJobsWithBillingFixtures,
 			}
 			scenario.Test(t)
 		}
@@ -66,7 +66,7 @@ func TestProjectValueCreateWithAndWithoutTimeAndMaterials(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app := testutils.SetupTestApp(t)
+	app := setupJobsWithBillingFixtures(t)
 	defer app.Cleanup()
 	fixture, err := app.FindRecordById("jobs", "pcactivedated01")
 	if err != nil {
@@ -78,7 +78,7 @@ func TestProjectValueCreateWithAndWithoutTimeAndMaterials(t *testing.T) {
 				for _, collectionAPI := range []bool{false, true} {
 					// Build the request from a CSV fixture without changing the stored fixture.
 					job := map[string]any{}
-					for _, field := range []string{"description", "client", "contact", "manager", "branch", "location", "project_award_date", "project_completion_date", "rate_sheet"} {
+					for _, field := range []string{"invoicing_information", "description", "client", "contact", "manager", "branch", "location", "project_award_date", "project_completion_date", "rate_sheet"} {
 						job[field] = fixture.GetString(field)
 					}
 					job["status"], job["project_value"], job["time_and_materials"] = status, value, tm
@@ -103,7 +103,7 @@ func TestProjectValueCreateWithAndWithoutTimeAndMaterials(t *testing.T) {
 						Headers:         map[string]string{"Authorization": token},
 						ExpectedStatus:  want,
 						ExpectedContent: content,
-						TestAppFactory:  testutils.SetupTestApp,
+						TestAppFactory:  setupJobsWithBillingFixtures,
 					}
 					scenario.Test(t)
 				}
@@ -124,7 +124,7 @@ func TestProjectValueQuickClose(t *testing.T) {
 		Headers:         map[string]string{"Authorization": token},
 		ExpectedStatus:  http.StatusBadRequest,
 		ExpectedContent: []string{`"code":"value_required_for_status"`},
-		TestAppFactory:  testutils.SetupTestApp,
+		TestAppFactory:  setupJobsWithBillingFixtures,
 	}
 	scenario.Test(t)
 }

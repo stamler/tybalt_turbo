@@ -1,0 +1,4 @@
+scenario,profile_table,profile_id,blocked
+old database,false,,false
+empty profiles,true,,false
+saved profile,true,billingfixture1,true

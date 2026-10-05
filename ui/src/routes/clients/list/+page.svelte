@@ -46,7 +46,7 @@
     {/snippet}
     {#snippet actions({ id })}
       <DsActionButton
-        action={`/clients/${id}/edit`}
+        action={`/clients/${id}/details?edit=client`}
         icon="mdi:edit-outline"
         title="Edit"
         color="blue"

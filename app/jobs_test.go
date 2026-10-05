@@ -32,7 +32,7 @@ func TestJobsReadEndpoints_ExposeStatusAndImportedFields(t *testing.T) {
 				`"status":"Active"`,
 				`"imported":true`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 		{
 			Name:   "job details endpoint includes imported",
@@ -46,7 +46,7 @@ func TestJobsReadEndpoints_ExposeStatusAndImportedFields(t *testing.T) {
 				`"id":"` + jobID + `"`,
 				`"imported":true`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -82,7 +82,7 @@ func TestJobAllocations_PutTransactionalUpdate(t *testing.T) {
 			ExpectedStatus:  200,
 			ExpectedContent: []string{`{"id":"` + jobID + `"}`},
 			ExpectedEvents:  map[string]int{},
-			TestAppFactory:  testutils.SetupTestApp,
+			TestAppFactory:  setupJobsWithBillingFixtures,
 		},
 		{
 			Name:            "job details includes allocations",
@@ -91,7 +91,7 @@ func TestJobAllocations_PutTransactionalUpdate(t *testing.T) {
 			Headers:         map[string]string{"Authorization": recordToken},
 			ExpectedStatus:  200,
 			ExpectedContent: []string{`"allocations":[`, `"hours":10`},
-			TestAppFactory:  testutils.SetupTestApp,
+			TestAppFactory:  setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -125,7 +125,7 @@ func TestJobsUpdate_NumberChangeBlockedByUpdateRule(t *testing.T) {
 				// updateRule blocks the request before reaching hooks
 				"OnRecordUpdateRequest": 0,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -134,45 +134,6 @@ func TestJobsUpdate_NumberChangeBlockedByUpdateRule(t *testing.T) {
 	}
 }
 
-func TestJobsUpdate_ProjectAuthorizationFieldsBlockedByUpdateRule(t *testing.T) {
-	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	protectedFields := []struct {
-		name  string
-		value string
-	}{
-		{name: "project_authorization_doc", value: `"pa.pdf"`},
-		{name: "project_authorization_doc_hash", value: `"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"`},
-		{name: "pa_reviewer", value: `"f2j5a8vk006baub"`},
-		{name: "pa_reviewed", value: `"2026-06-02 12:00:00.000Z"`},
-	}
-
-	for _, field := range protectedFields {
-		scenario := tests.ApiScenario{
-			Name:   "attempting to change " + field.name + " is blocked with 404",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
-			Body: strings.NewReader(`{
-				"` + field.name + `": ` + field.value + `
-			}`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 404,
-			ExpectedContent: []string{
-				`"message":"The requested resource wasn't found."`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdateRequest": 0,
-			},
-			TestAppFactory: testutils.SetupTestApp,
-		}
-		scenario.Test(t)
-	}
-}
-
-// jobs: allow updating fields when number is unchanged (control test)
 func TestJobsUpdate_NumberUnchanged_AllowsOtherFieldUpdates(t *testing.T) {
 	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
 	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
@@ -198,7 +159,7 @@ func TestJobsUpdate_NumberUnchanged_AllowsOtherFieldUpdates(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -232,7 +193,7 @@ func TestJobsUpdate_AuthorizingDocumentPA_Validations(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 		{
 			Name:   "PO set fails even when client_po is present",
@@ -250,7 +211,7 @@ func TestJobsUpdate_AuthorizingDocumentPA_Validations(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 		{
 			Name:   "PA set with short client_po succeeds and preserves client_po",
@@ -269,7 +230,7 @@ func TestJobsUpdate_AuthorizingDocumentPA_Validations(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -281,7 +242,7 @@ func TestJobsUpdate_AuthorizingDocumentPA_Validations(t *testing.T) {
 func setupTestAppWithLegacyPOAuthorizingDocument(tb testing.TB) *tests.TestApp {
 	tb.Helper()
 
-	app := testutils.SetupTestApp(tb)
+	app := setupJobsWithBillingFixtures(tb)
 	if _, err := app.DB().NewQuery(`
 		UPDATE jobs
 		SET authorizing_document = 'PO',
@@ -346,6 +307,7 @@ func TestJobsCreate_ProposalReferenceValidation(t *testing.T) {
 				"description": "Test job with active proposal",
 				"client": "ee3xvodl583b61o",
 				"contact": "235g6k01xx3sdjk",
+					"invoicing_information": "painvoice000003",
 				"manager": "f2j5a8vk006baub",
 				"authorizing_document": "Unauthorized",
 				"branch": "80875lm27v8wgi4",
@@ -363,7 +325,7 @@ func TestJobsCreate_ProposalReferenceValidation(t *testing.T) {
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -394,6 +356,7 @@ func TestJobsCreateViaAPI_NumberAssigned(t *testing.T) {
 					"description": "Test job via API",
 					"client": "ee3xvodl583b61o",
 					"contact": "235g6k01xx3sdjk",
+					"invoicing_information": "painvoice000003",
 					"manager": "f2j5a8vk006baub",
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
@@ -410,7 +373,7 @@ func TestJobsCreateViaAPI_NumberAssigned(t *testing.T) {
 			ExpectedContent: []string{
 				`"id":`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -441,6 +404,7 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 					"description": "Test job without location",
 					"client": "ee3xvodl583b61o",
 					"contact": "235g6k01xx3sdjk",
+					"invoicing_information": "painvoice000003",
 					"manager": "f2j5a8vk006baub",
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
@@ -457,7 +421,7 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 			ExpectedContent: []string{
 				`"data":{"location":{"code":"invalid_or_missing"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 		{
 			Name:   "creating job with invalid date configuration fails",
@@ -468,6 +432,7 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 					"description": "Test job with invalid dates",
 					"client": "ee3xvodl583b61o",
 					"contact": "235g6k01xx3sdjk",
+					"invoicing_information": "painvoice000003",
 					"manager": "f2j5a8vk006baub",
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
@@ -485,7 +450,7 @@ func TestJobsCreateViaAPI_ValidationErrors(t *testing.T) {
 			ExpectedContent: []string{
 				`"data":{"project_award_date":{"code":"invalid_date_configuration"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -524,7 +489,7 @@ func TestJobsUpdateViaAPI_ValidationErrors(t *testing.T) {
 			ExpectedContent: []string{
 				`"data":{"status":{"code":"invalid_status_for_type"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -558,6 +523,7 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 					"description": "Test job with inactive manager",
 					"client": "ee3xvodl583b61o",
 					"contact": "235g6k01xx3sdjk",
+					"invoicing_information": "painvoice000003",
 					"manager": "` + inactiveUserID + `",
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
@@ -574,7 +540,7 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 			ExpectedContent: []string{
 				`"data":{"manager":{"code":"manager_not_active"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 		{
 			Name:   "creating job with inactive alternate_manager fails",
@@ -585,6 +551,7 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 					"description": "Test job with inactive alternate manager",
 					"client": "ee3xvodl583b61o",
 					"contact": "235g6k01xx3sdjk",
+					"invoicing_information": "painvoice000003",
 					"manager": "` + activeManagerID + `",
 					"alternate_manager": "` + inactiveUserID + `",
 					"authorizing_document": "Unauthorized",
@@ -602,7 +569,7 @@ func TestJobsCreate_InactiveManagerRejected(t *testing.T) {
 			ExpectedContent: []string{
 				`"data":{"alternate_manager":{"code":"alternate_manager_not_active"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -630,6 +597,7 @@ func TestJobsAPI_RequiresAtLeastOneAllocation(t *testing.T) {
 					"description": "Test job without allocations",
 					"client": "ee3xvodl583b61o",
 					"contact": "235g6k01xx3sdjk",
+					"invoicing_information": "painvoice000003",
 					"manager": "f2j5a8vk006baub",
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
@@ -645,7 +613,7 @@ func TestJobsAPI_RequiresAtLeastOneAllocation(t *testing.T) {
 				`"data":{"allocations":{"code":"required"`,
 				`"message":"at least one allocation is required"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 		{
 			Name:   "updating job without allocations fails",
@@ -663,7 +631,7 @@ func TestJobsAPI_RequiresAtLeastOneAllocation(t *testing.T) {
 				`"data":{"allocations":{"code":"required"`,
 				`"message":"at least one allocation is required"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 
@@ -701,6 +669,7 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 					"description": "Test job with inactive division",
 					"client": "ee3xvodl583b61o",
 					"contact": "235g6k01xx3sdjk",
+					"invoicing_information": "painvoice000003",
 					"manager": "f2j5a8vk006baub",
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
@@ -718,7 +687,7 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 				`"data":{"allocation_division_0":{"code":"division_not_active"`,
 				`"message":"selected division is inactive"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 		{
 			Name:   "creating job with active division in allocations succeeds",
@@ -729,6 +698,7 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 					"description": "Test job with active division",
 					"client": "ee3xvodl583b61o",
 					"contact": "235g6k01xx3sdjk",
+					"invoicing_information": "painvoice000003",
 					"manager": "f2j5a8vk006baub",
 					"authorizing_document": "Unauthorized",
 					"branch": "80875lm27v8wgi4",
@@ -745,7 +715,7 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 			ExpectedContent: []string{
 				`"id":`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 		{
 			Name:   "updating job with inactive division in allocations fails",
@@ -763,7 +733,7 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 				`"data":{"allocation_division_0":{"code":"division_not_active"`,
 				`"message":"selected division is inactive"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 		{
 			Name:   "updating job with active division in allocations succeeds",
@@ -780,7 +750,7 @@ func TestJobsAPI_InactiveDivisionFails(t *testing.T) {
 			ExpectedContent: []string{
 				`"id":"` + existingJobID + `"`,
 			},
-			TestAppFactory: testutils.SetupTestApp,
+			TestAppFactory: setupJobsWithBillingFixtures,
 		},
 	}
 

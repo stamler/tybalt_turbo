@@ -476,9 +476,17 @@ const createStore = () => {
     }));
   };
 
+  // Route guards read claims during load, possibly before the first refresh.
+  // Load them only when they are missing or stale.
+  const ensureClaims = async () => {
+    const { lastRefresh, maxAge } = get({ subscribe }).user_claims_summary;
+    if (Date.now() - lastRefresh.getTime() >= maxAge) await loadUserClaimsSummary();
+  };
+
   return {
     subscribe,
     refresh,
+    ensureClaims,
     addError,
     dismissError,
     clearErrors,
@@ -501,6 +509,7 @@ const proxyHandler: ProxyHandler<StoreState> = {
 
 const wrappedStore: Readable<StoreState> & {
   refresh: typeof _globalStore.refresh;
+  ensureClaims: typeof _globalStore.ensureClaims;
   addError: typeof _globalStore.addError;
   dismissError: typeof _globalStore.dismissError;
   clearErrors: typeof _globalStore.clearErrors;
@@ -515,6 +524,7 @@ const wrappedStore: Readable<StoreState> & {
     );
   },
   refresh: _globalStore.refresh,
+  ensureClaims: _globalStore.ensureClaims,
   addError: _globalStore.addError,
   dismissError: _globalStore.dismissError,
   clearErrors: _globalStore.clearErrors,

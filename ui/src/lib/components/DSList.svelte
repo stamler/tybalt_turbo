@@ -6,6 +6,15 @@
   let {
     items,
     search = false,
+    searchTerm = $bindable(""),
+    searchText,
+    searchPlaceholder = "search...",
+    pagination = false,
+    page = $bindable(1),
+    perPage = $bindable(20),
+    onStateChange,
+    emptyMessage = "No matching items.",
+    highlightId,
     inListHeader,
     groupHeader,
     groupField, // if groupField is set, group the items by this field
@@ -24,6 +33,15 @@
   }: {
     items: T[];
     search?: boolean;
+    searchTerm?: string;
+    searchText?: (item: T) => string;
+    searchPlaceholder?: string;
+    pagination?: boolean;
+    page?: number;
+    perPage?: number;
+    onStateChange?: (state: { searchTerm: string; page: number; perPage: number }) => void;
+    emptyMessage?: string;
+    highlightId?: string;
     inListHeader?: string;
     groupHeader?: Snippet<[string]>;
     groupField?: string;
@@ -41,12 +59,11 @@
     searchBarExtra?: Snippet;
   } = $props();
 
-  let searchTerm = $state("");
-
   function searchString(item: T) {
     if (item === undefined || item === null) {
       return "";
     }
+    if (searchText) return searchText(item).toLowerCase();
     const fields = [] as string[];
     if (item.expand !== undefined) {
       // if the item has an expand property, get all the keys from the expand
@@ -88,6 +105,28 @@
       .slice() // shallow copy https://github.com/vuejs/vuefire/issues/244
       .filter((p) => searchString(p).indexOf(searchTerm.toLowerCase()) >= 0);
   });
+
+  // Pagination is opt-in and applies after filtering the complete flat list.
+  const canPaginate = $derived(pagination && groupField === undefined && processorFn === undefined);
+  const pageSizes = [10, 20, 50];
+  const safePerPage = $derived(pageSizes.includes(perPage) ? perPage : 20);
+  // A list that fits on the smallest page needs no page controls.
+  const showPageControls = $derived(canPaginate && processedItems.length > pageSizes[0]);
+  const totalPages = $derived(
+    canPaginate ? Math.max(1, Math.ceil(processedItems.length / safePerPage)) : 1,
+  );
+  const activePage = $derived(
+    Math.min(Math.max(1, Number.isSafeInteger(page) ? page : 1), totalPages),
+  );
+  const visibleItems = $derived(
+    canPaginate
+      ? processedItems.slice((activePage - 1) * safePerPage, activePage * safePerPage)
+      : processedItems,
+  );
+  function changeList(nextPage = 1) {
+    page = nextPage;
+    onStateChange?.({ searchTerm, page, perPage: safePerPage });
+  }
 
   // groupKeys
   // Computes the ordered list of group headers to render when `groupField` is set.
@@ -162,19 +201,25 @@
 </script>
 
 <ul
-  class="grid grid-cols-[auto_1fr_auto] {stripeMap ? '' : '[&>li:not(.inlistheader):nth-child(even)]:bg-neutral-100 [&>li:not(.inlistheader):nth-child(odd)]:bg-neutral-200'}"
+  class="grid grid-cols-[auto_minmax(0,1fr)_auto] {stripeMap
+    ? ''
+    : '[&>li:not(.inlistheader):nth-child(even)]:bg-neutral-100 [&>li:not(.inlistheader):nth-child(odd)]:bg-neutral-200'}"
 >
   {#if search && processorFn === undefined}
     <li
-      id="listbar"
+      data-listbar
       class="col-span-3 flex items-center gap-x-2 p-2 max-[639px]:flex-wrap max-[639px]:gap-2"
       class:bg-neutral-200={!!stripeMap}
     >
       <input
-        id="searchbox"
-        type="textbox"
-        placeholder="search..."
+        type="search"
+        aria-label={searchPlaceholder}
+        placeholder={searchPlaceholder}
         bind:value={searchTerm}
+        oninput={(event) => {
+          searchTerm = event.currentTarget.value;
+          changeList();
+        }}
         class="flex-1 rounded-sm border border-neutral-300 px-1 py-1 text-base max-[639px]:basis-full max-[639px]:px-2 max-[639px]:py-2 max-[639px]:text-lg"
       />
       {#if groupField === undefined}
@@ -196,8 +241,17 @@
 
   {#snippet itemList(_processedItems: T[])}
     {#each _processedItems as item}
-      <li class="contents" class:bg-neutral-100={stripeMap?.get(item.id) === "bg-neutral-100"} class:bg-neutral-200={stripeMap?.get(item.id) === "bg-neutral-200"}>
-        <div class="col-span-3 grid grid-cols-subgrid items-center bg-inherit">
+      <li
+        class="contents"
+        class:bg-neutral-100={stripeMap?.get(item.id) === "bg-neutral-100"}
+        class:bg-neutral-200={stripeMap?.get(item.id) === "bg-neutral-200"}
+      >
+        <div
+          data-highlighted={item.id === highlightId ? "true" : undefined}
+          class="col-span-3 grid grid-cols-subgrid items-center {item.id === highlightId
+            ? 'bg-green-100'
+            : 'bg-inherit'}"
+        >
           {#if anchor !== undefined}
             <div class="flex min-w-24 items-center justify-center p-2">
               {@render anchor(item)}
@@ -205,8 +259,8 @@
           {:else}
             <div class="w-4"></div>
           {/if}
-          <div class="flex flex-col py-2">
-            <div class="headline_wrapper flex items-center gap-2">
+          <div class="flex min-w-0 flex-col py-2 break-words">
+            <div class="headline_wrapper flex flex-wrap items-center gap-2">
               <span class="font-bold">{@render headline(item)}</span>
               {#if byline !== undefined}
                 <span class="byline">{@render byline(item)}</span>
@@ -240,13 +294,52 @@
       {@render itemList(processedItems[group])}
       {#if groupFooter !== undefined}
         <li class="contents">
-          <div class="col-span-3 grid grid-cols-subgrid items-center bg-inherit" class:!bg-neutral-200={!!stripeMap}>
+          <div
+            class="col-span-3 grid grid-cols-subgrid items-center bg-inherit"
+            class:!bg-neutral-200={!!stripeMap}
+          >
             {@render groupFooter(group, processedItems[group])}
           </div>
         </li>
       {/if}
     {/each}
   {:else}
-    {@render itemList(processedItems)}
+    {@render itemList(visibleItems)}
+    {#if canPaginate && processedItems.length === 0}
+      <li class="col-span-3 p-3 text-neutral-600">{emptyMessage}</li>
+    {/if}
   {/if}
 </ul>
+{#if showPageControls}
+  <div class="flex flex-wrap items-center justify-between gap-2 bg-neutral-100 p-2">
+    <label class="flex items-center gap-2">
+      Rows
+      <select
+        aria-label={`${searchPlaceholder} rows per page`}
+        class="rounded-sm border border-neutral-300 bg-white p-1"
+        value={safePerPage}
+        onchange={(event) => {
+          perPage = Number(event.currentTarget.value);
+          changeList();
+        }}
+      >
+        {#each pageSizes as size}<option value={size}>{size}</option>{/each}
+      </select>
+    </label>
+    <span>Page {activePage} / {totalPages}</span>
+    <div class="flex gap-2">
+      <button
+        type="button"
+        class="rounded-sm bg-neutral-200 px-2 py-1 hover:bg-neutral-300 disabled:opacity-40"
+        disabled={activePage <= 1}
+        onclick={() => changeList(activePage - 1)}>← Prev</button
+      >
+      <button
+        type="button"
+        class="rounded-sm bg-neutral-200 px-2 py-1 hover:bg-neutral-300 disabled:opacity-40"
+        disabled={activePage >= totalPages}
+        onclick={() => changeList(activePage + 1)}>Next →</button
+      >
+    </div>
+  </div>
+{/if}

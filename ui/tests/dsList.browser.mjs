@@ -1,0 +1,38 @@
+import assert from "node:assert/strict";
+import { runBrowserHarness } from "./browserHarness.mjs";
+await runBrowserHarness(async (page, origin) => {
+  const errors = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  await page.goto(`${origin}/tests/fixtures/dsList.html`);
+  const paged = page.getByRole("region", { name: "Paged list", exact: true });
+  await paged.locator("[data-row]").first().waitFor();
+  assert.equal(await paged.locator("[data-row]").count(), 10);
+  await paged.getByRole("button", { name: "Next →" }).click();
+  assert.equal(await paged.locator("[data-row]").count(), 2);
+  assert.match(await paged.innerText(), /Page 2 \/ 2/);
+  await paged.getByRole("searchbox").fill("alex");
+  assert.equal(await paged.locator("[data-row]").count(), 1);
+  assert.match(await paged.innerText(), /Alex Adams/);
+  // A list that fits on the smallest page hides its page controls.
+  assert.equal(await paged.getByRole("button", { name: "Next →" }).count(), 0);
+  await paged.getByRole("searchbox").fill("ACCOUNTS@");
+  assert.match(await paged.innerText(), /Logan Lee/);
+  await paged.getByRole("searchbox").fill("no match");
+  assert.equal(await paged.locator("[data-row]").count(), 0);
+  assert.match(await paged.innerText(), /No matching items/);
+  await paged.getByRole("searchbox").fill("");
+  await paged.getByRole("combobox").selectOption("20");
+  assert.equal(await paged.locator("[data-row]").count(), 12);
+  const plain = page.getByRole("region", { name: "Default list", exact: true });
+  assert.equal(await plain.locator("[data-row]").count(), 12);
+  assert.equal(await plain.getByRole("button", { name: "Next →" }).count(), 0);
+  await plain.getByRole("searchbox").fill("north");
+  assert.equal(await plain.locator("[data-row]").count(), 6);
+  const grouped = page.getByRole("region", { name: "Grouped list", exact: true });
+  assert.equal(await grouped.locator("[data-row]").count(), 12);
+  await grouped.getByRole("searchbox").fill("logan");
+  assert.equal(await grouped.locator("[data-row]").count(), 1);
+  assert.match(await grouped.innerText(), /South/);
+  assert.deepEqual(errors, []);
+  console.log("DSList filtering, pagination, default and grouped regressions passed");
+});
