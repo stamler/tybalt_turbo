@@ -43,6 +43,9 @@ func createGetNavBadgesHandler(app core.App) func(e *core.RequestEvent) error {
 		}
 
 		counts := map[string]int{}
+		if err := addProjectWorkflowBadges(app, e.Auth, counts); err != nil {
+			return err
+		}
 		userID := e.Auth.Id
 
 		timeSheetsPendingCount, err := countNavRows(app, `

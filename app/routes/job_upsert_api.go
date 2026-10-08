@@ -148,18 +148,49 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 				}
 			}
 
-			// Authorization: holders of 'job' claim OR job manager/alternate_manager
+			// Read the current assignment inside the save transaction.
 			hasJobClaim, claimErr := utilities.HasClaim(txApp, authRecord, "job")
 			if claimErr != nil {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{Code: "claim_check_failed", Message: claimErr.Error()}
 			}
-			managerID := jobRec.GetString("manager")
-			altManagerID := jobRec.GetString("alternate_manager")
-			isJobManager := authRecord.Id != "" && (authRecord.Id == managerID || authRecord.Id == altManagerID)
-			if !hasJobClaim && !isJobManager {
+			isManager := jobRec.GetString("manager") == authRecord.Id || jobRec.GetString("alternate_manager") == authRecord.Id
+			isProposal := strings.HasPrefix(jobRec.GetString("number"), "P")
+			// An empty job object is still a full job save and must keep its validation.
+			allocationOnly := req.Job == nil
+			if !hasJobClaim && (!isManager || (!allocationOnly && !isProposal)) {
 				httpResponseStatusCode = http.StatusForbidden
-				return apis.NewForbiddenError("you are not authorized to update this job", nil)
+				return &CodeError{Code: "job_edit_forbidden", Message: "only job claim holders may change project fields; assigned managers may save allocations only"}
+			}
+
+			// The existing editor sends only allocations for managers without the job
+			// claim. Do not run full job validation or save the job record here: old
+			// projects may lack billing data, and their approved fields must not change.
+			// Keep the editing switch and terminal proposal rule in this path because
+			// ProcessJobCore normally checks them during a full job edit.
+			if allocationOnly {
+				active, err := utilities.IsUserActive(txApp, authRecord.Id)
+				if err != nil {
+					httpResponseStatusCode = http.StatusInternalServerError
+					return err
+				}
+				if !active {
+					httpResponseStatusCode = http.StatusForbidden
+					return &CodeError{Code: "inactive_user", Message: "an active user is required"}
+				}
+				enabled, err := utilities.IsJobsEditingEnabled(txApp)
+				if err != nil {
+					httpResponseStatusCode = http.StatusInternalServerError
+					return err
+				}
+				if !enabled {
+					httpResponseStatusCode = utilities.ErrJobsEditingDisabled.Status
+					return utilities.ErrJobsEditingDisabled
+				}
+				if isProposal && jobRec.GetString("status") == "Cancelled" {
+					httpResponseStatusCode = http.StatusBadRequest
+					return &CodeError{Code: "cancelled_proposal_immutable", Message: "cancelled proposals cannot be modified"}
+				}
 			}
 
 			// Update job fields (ignore id/system fields)
@@ -169,21 +200,25 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 					case "id", "collectionId", "collectionName", "created", "updated", "divisions":
 						// ignore
 					default:
-						jobRec.Set(k, v)
+						if jobRec.Collection().Fields.GetByName(k) != nil {
+							jobRec.Set(k, v)
+						}
 					}
 				}
 			}
 
 			// Run job validation and business rules (this will also handle number generation for creates)
-			if err := hooks.ProcessJobCore(txApp, jobRec, authRecord); err != nil {
-				// If it's a HookError, preserve the status code
-				var hookErr *errs.HookError
-				if errors.As(err, &hookErr) {
-					httpResponseStatusCode = hookErr.Status
-				} else {
-					httpResponseStatusCode = http.StatusBadRequest
+			if !allocationOnly {
+				if err := hooks.ProcessJobCore(txApp, jobRec, authRecord); err != nil {
+					// If it's a HookError, preserve the status code
+					var hookErr *errs.HookError
+					if errors.As(err, &hookErr) {
+						httpResponseStatusCode = hookErr.Status
+					} else {
+						httpResponseStatusCode = http.StatusBadRequest
+					}
+					return err
 				}
-				return err
 			}
 
 			// Validate all divisions exist and are active
@@ -233,28 +268,34 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 			// Allocation edits count as job edits for writeback tracking.
 			allocationsChanged := allocationsDiffer(existingAllocations, req.Allocations)
 
-			if err := txApp.Save(jobRec); err != nil {
-				httpResponseStatusCode = http.StatusBadRequest
-				// Check if it's a validation error with field-level details
-				var validationErrs validation.Errors
-				if errors.As(err, &validationErrs) {
-					// Convert to HookError format for consistent frontend handling
-					fieldErrors := make(map[string]errs.CodeError)
-					for field, fieldErr := range validationErrs {
-						fieldErrors[field] = errs.CodeError{
-							Code:    "validation_error",
-							Message: fieldErr.Error(),
+			// A no-op must not replace allocation IDs or invalidate a pending review.
+			if allocationOnly && !allocationsChanged {
+				return nil
+			}
+			if !allocationOnly {
+				if err := txApp.Save(jobRec); err != nil {
+					httpResponseStatusCode = http.StatusBadRequest
+					// Check if it's a validation error with field-level details
+					var validationErrs validation.Errors
+					if errors.As(err, &validationErrs) {
+						// Convert to HookError format for consistent frontend handling
+						fieldErrors := make(map[string]errs.CodeError)
+						for field, fieldErr := range validationErrs {
+							fieldErrors[field] = errs.CodeError{
+								Code:    "validation_error",
+								Message: fieldErr.Error(),
+							}
+						}
+						return &errs.HookError{
+							Status:  http.StatusBadRequest,
+							Message: "validation failed",
+							Data:    fieldErrors,
 						}
 					}
-					return &errs.HookError{
-						Status:  http.StatusBadRequest,
-						Message: "validation failed",
-						Data:    fieldErrors,
+					return &CodeError{
+						Code:    "error_saving_job",
+						Message: fmt.Sprintf("error saving job: %v", err),
 					}
-				}
-				return &CodeError{
-					Code:    "error_saving_job",
-					Message: fmt.Sprintf("error saving job: %v", err),
 				}
 			}
 			if allocationsChanged {

@@ -35,6 +35,8 @@ SELECT
   trim(ic.given_name || ' ' || ic.surname) AS invoice_contact_name,
   ic.email AS invoice_contact_email,
   ip.invoicing_instructions AS invoice_instructions,
+  j.request_creator, j.request_created, j.request_submitted,
+  j.created_by, j.creation_completed,
   j.proposal_opening_date AS proposal_opening_date,
   j.proposal_submission_due_date AS proposal_submission_due_date,
   j.proposal_value AS proposal_value,

@@ -49,7 +49,7 @@ func TestClientBillingImportGuard(t *testing.T) {
 				t.Fatal(err)
 			}
 			defer tx.Rollback()
-			if blocked := CheckClientBillingImport(tx) != nil; blocked != (row[3] == "true") {
+			if blocked := CheckLocalDataImport(tx) != nil; blocked != (row[3] == "true") {
 				t.Fatalf("blocked=%v", blocked)
 			}
 		})

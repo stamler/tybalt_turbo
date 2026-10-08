@@ -24,23 +24,13 @@ func ProcessJob(app core.App, e *core.RecordRequestEvent) error {
 // ProcessJobCore enforces business rules for job creation and updates.
 // It operates on plain records rather than RecordRequestEvent, making it reusable
 // from both PocketBase hooks and custom API endpoints.
+// Project writes use full validation, except a status-only project retirement.
 func ProcessJobCore(app core.App, jobRecord *core.Record, authRecord *core.Record) error {
-	return processJobCoreWithMode(app, jobRecord, authRecord, false)
+	fullValidation := !isProposalRecord(jobRecord) && !isProjectRetirement(jobRecord)
+	return processJobCoreWithMode(app, jobRecord, authRecord, fullValidation)
 }
 
-// ProcessJobCoreStrict enforces the same rules as ProcessJobCore but disables
-// the "status-only update" fast-path.
-//
-// Why this exists:
-//   - Most update flows intentionally allow status-only edits without requiring the
-//     entire record to pass full-field validation (legacy-friendly behavior).
-//   - The dedicated fast-close API needs the opposite behavior for non-imported
-//     jobs: it must run strict/full validation so policy bypass applies ONLY to
-//     imported legacy jobs.
-//
-// Design intent:
-// - Keep existing API/hook behavior unchanged by default (ProcessJobCore).
-// - Offer an explicit strict entrypoint for endpoints that need full validation.
+// ProcessJobCoreStrict validates all job fields, including status-only edits.
 func ProcessJobCoreStrict(app core.App, jobRecord *core.Record, authRecord *core.Record) error {
 	return processJobCoreWithMode(app, jobRecord, authRecord, true)
 }
@@ -55,6 +45,9 @@ func processJobCoreWithMode(app core.App, jobRecord *core.Record, authRecord *co
 	}
 	if !enabled {
 		return utilities.ErrJobsEditingDisabled
+	}
+	if err := validateProjectJobWrite(app, jobRecord, authRecord); err != nil {
+		return err
 	}
 
 	// Cancelled proposals are terminal - reject all modifications
@@ -150,6 +143,7 @@ func processJobCoreWithMode(app core.App, jobRecord *core.Record, authRecord *co
 		utilities.MarkImportedFalseIfChanged(jobRecord)
 	}
 
+	jobRecord.Set("@projectWorkflowValidated", projectWorkflowValidatedState{fingerprint: projectWorkflowFingerprint(jobRecord)})
 	return nil
 }
 
@@ -354,6 +348,18 @@ func isProposalRecord(record *core.Record) bool {
 	return projectAwardDate == "" && proposalOpeningDate != "" && proposalSubmissionDueDate != ""
 }
 
+// isProjectRetirement reports a save that only sets an existing project to Closed
+// or Cancelled. Staff can retire older projects without completing the data the
+// new workflow requires. Setting a project Active does not qualify: an Active
+// project can receive new time, expenses, and purchase orders.
+func isProjectRetirement(record *core.Record) bool {
+	if record.IsNew() || isProposalRecord(record) || utilities.RecordHasMeaningfulChanges(record, "status") {
+		return false
+	}
+	status := record.GetString("status")
+	return status != record.Original().GetString("status") && (status == "Closed" || status == "Cancelled")
+}
+
 // cleanJob removes or normalizes fields that are not applicable based on the
 // job type. In particular, proposals must not carry authorizing_document,
 // client_po, or client_reference_number.
@@ -496,13 +502,7 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 		return 0, err
 	}
 
-	// Allow status-only updates to pass without tripping other validations.
-	// This compensates for relaxed update rules while preserving status constraints.
-	//
-	// forceFullValidation lets callers explicitly disable this shortcut. We use
-	// that in the dedicated fast-close endpoint for non-imported jobs so the
-	// endpoint can enforce strict validation for non-legacy data while preserving
-	// legacy-friendly behavior everywhere else.
+	// Preserve the existing proposal status-only path. Project writes use full validation.
 	if !isCreate && !forceFullValidation {
 		if err := validateProjectAuthorizingDocument(record, derived); err != nil {
 			return 0, err
@@ -1001,6 +1001,9 @@ func validateJobValueRequirement(record *core.Record, derived jobType, status st
 	timeAndMaterials := record.GetBool("time_and_materials")
 
 	if derived == jobTypeProject {
+		if projectWorkflowOperation(record) == ProjectWorkflowMutationRestoreValue {
+			return nil
+		}
 		if status == "Active" || status == "Closed" {
 			projectValue := record.GetInt("project_value")
 			if projectValue <= 0 {

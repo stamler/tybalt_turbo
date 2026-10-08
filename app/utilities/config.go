@@ -1,7 +1,9 @@
 package utilities
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 
@@ -54,6 +56,30 @@ func GetConfigBool(app core.App, domainKey string, property string, defaultValue
 // Defaults to true (fail-open) if config is missing.
 func IsJobsEditingEnabled(app core.App) (bool, error) {
 	return GetConfigBool(app, "jobs", "create_edit_absorb", true)
+}
+
+// IsJobRequestApprovalRequired reads the project creation flag.
+func IsJobRequestApprovalRequired(app core.App) (bool, error) {
+	record, err := app.FindFirstRecordByData("app_config", "key", "jobs")
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	var config map[string]any
+	if err := json.Unmarshal([]byte(record.GetString("value")), &config); err != nil {
+		return false, err
+	}
+	raw, exists := config["require_job_request_approval"]
+	if !exists {
+		return false, nil
+	}
+	enabled, valid := raw.(bool)
+	if !valid {
+		return false, fmt.Errorf("jobs.require_job_request_approval must be Boolean")
+	}
+	return enabled, nil
 }
 
 // ErrJobsEditingDisabled is returned when job editing is disabled

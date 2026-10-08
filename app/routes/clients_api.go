@@ -71,10 +71,11 @@ type clientDetailsRow struct {
 }
 
 // ClientContact includes both project use and use through an invoicing profile.
-// Each job counts once even when it uses the contact in both roles.
+// Each job or request counts once even when it uses the contact in both roles.
 type ClientContact struct {
 	Contact
 	Client        string `json:"client"`
+	NoEmail       bool   `json:"no_email"`
 	Address       string `json:"address"`
 	City          string `json:"city"`
 	ProvinceState string `json:"province_state"`
@@ -82,6 +83,7 @@ type ClientContact struct {
 	Country       string `json:"country"`
 	Phone         string `json:"phone"`
 	JobCount      int    `json:"job_count"`
+	RequestCount  int    `json:"request_count"`
 	ProfileCount  int    `json:"profile_count"`
 }
 
@@ -94,6 +96,7 @@ type ClientInvoicingProfile struct {
 	Fax                   string `json:"fax"`
 	InvoicingInstructions string `json:"invoicing_instructions"`
 	JobCount              int    `json:"job_count"`
+	RequestCount          int    `json:"request_count"`
 	Creator               string `json:"creator"`
 	CreatorName           string `json:"creator_name"`
 	Created               string `json:"created"`

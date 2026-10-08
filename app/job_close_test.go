@@ -7,6 +7,7 @@ import (
 	"tybalt/internal/testutils"
 
 	"github.com/pocketbase/dbx"
+	"github.com/pocketbase/pocketbase/core"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -231,6 +232,10 @@ func TestCloseJob_Authorization(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	managerToken, err := testutils.GenerateRecordToken("users", allocationManagerEmail)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	const projectID = "fcprojimpnoprop1"
 
@@ -257,6 +262,26 @@ func TestCloseJob_Authorization(t *testing.T) {
 				`"code":"unauthorized"`,
 			},
 			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			// Managers without the job claim may change allocations only.
+			Name:   "manager without job claim rejected",
+			Method: http.MethodPost,
+			URL:    "/api/jobs/" + projectID + "/close",
+			Headers: map[string]string{
+				"Authorization": managerToken,
+			},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"code":"unauthorized"`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+			BeforeTestFunc: func(tb testing.TB, app *tests.TestApp, _ *core.ServeEvent) {
+				// Assign the fixture user without the job claim as manager.
+				if _, err := app.DB().NewQuery("UPDATE jobs SET manager = {:uid} WHERE id = {:id}").Bind(dbx.Params{"uid": allocationManagerID, "id": projectID}).Execute(); err != nil {
+					tb.Fatal(err)
+				}
+			},
 		},
 	}
 

@@ -358,25 +358,24 @@ func CreateUndoAbsorbHandler(app core.App, collectionName string) func(e *core.R
 			}
 		}
 
-		// Step 3: Parse Stored Data
-		// Deserialize the JSON data stored in the absorb action record.
-		// This includes both the original records that were absorbed and
-		// a map of all reference updates that were made.
-		var absorbedRecords []map[string]interface{}
-		if err := json.Unmarshal(action.AbsorbedRecords, &absorbedRecords); err != nil {
-			return apis.NewApiError(http.StatusInternalServerError, "Failed to parse absorbed records", err)
-		}
-
-		// updatedRefs is serialized as updates[table][column][recordId] = oldValue
-		var updatedRefs map[string]map[string]map[string]string
-		if err := json.Unmarshal(action.UpdatedReferences, &updatedRefs); err != nil {
-			return apis.NewApiError(http.StatusInternalServerError, "Failed to parse updated references", err)
-		}
-
 		// Step 4: Execute Undo Operation
 		// Perform all undo operations in a single transaction to ensure data consistency.
 		// If any part fails, the entire undo operation is rolled back.
 		err = app.RunInTransaction(func(txApp core.App) error {
+			// Creation can transfer request references to a job. Read the latest
+			// undo data in this transaction so those references are not lost.
+			currentAction, err := txApp.FindRecordById("absorb_actions", action.Id)
+			if err != nil {
+				return err
+			}
+			var absorbedRecords []map[string]interface{}
+			if err := currentAction.UnmarshalJSONField("absorbed_records", &absorbedRecords); err != nil {
+				return fmt.Errorf("error reading absorbed records: %w", err)
+			}
+			var updatedRefs map[string]map[string]map[string]string
+			if err := currentAction.UnmarshalJSONField("updated_references", &updatedRefs); err != nil {
+				return fmt.Errorf("error reading updated references: %w", err)
+			}
 			// Step 4a: Recreate Absorbed Records
 			// Reconstruct each absorbed record with its original data, excluding
 			// system fields like created, updated, etc., from the absorbedRecords
@@ -595,12 +594,12 @@ func (rt *referenceTracker) serialize() ([]byte, error) {
 	return json.Marshal(rt.updates)
 }
 
-// validateMergedClientReferences checks the final state of every job, contact and
-// invoicing profile that a merge or undo rewrote. Their client relations must still
-// agree, including references created after the original merge. Undo skips
-// records that were deleted since the merge.
+// validateMergedClientReferences checks the final state of every job, request,
+// contact and invoicing profile that a merge or undo rewrote. Their client
+// relations must still agree, including references created after the original
+// merge. Undo skips records that were deleted since the merge.
 func validateMergedClientReferences(app core.App, updates map[string]map[string]map[string]string, skipDeleted bool) error {
-	for _, table := range []string{"jobs", "client_contacts", "client_invoicing_information"} {
+	for _, table := range []string{"jobs", "job_requests", "client_contacts", "client_invoicing_information"} {
 		ids := map[string]bool{}
 		for _, changes := range updates[table] {
 			for id := range changes {
@@ -618,11 +617,52 @@ func validateMergedClientReferences(app core.App, updates map[string]map[string]
 			if err := utilities.ValidateClientReferences(app, record); err != nil {
 				return fmt.Errorf("merge would leave %s %s linked to another client: %w", table, id, err)
 			}
-			if table != "client_invoicing_information" {
+			if table == "client_invoicing_information" {
+				if err := utilities.ValidateBillingName(app, record); err != nil {
+					return fmt.Errorf("merge would leave invoicing profile %s billing a client alias that does not exist: %w", id, err)
+				}
+			}
+			// A changed relation makes any open review of the request stale.
+			if table == "job_requests" {
+				if _, err = app.DB().NewQuery("UPDATE job_requests SET version = version + 1, last_edited = strftime('%Y-%m-%d %H:%M:%fZ','now'), updated = strftime('%Y-%m-%d %H:%M:%fZ','now') WHERE id = {:id}").Bind(dbx.Params{"id": id}).Execute(); err != nil {
+					return err
+				}
+			}
+		}
+	}
+	return nil
+}
+
+// Move pending merge-undo references with the request's data, before deleting
+// the request. The caller uses the same transaction as job creation.
+func transferRequestMergeReferences(app core.App, request, job *core.Record) error {
+	actions, err := app.FindRecordsByFilter("absorb_actions", "collection_name='clients' || collection_name='client_contacts'", "", 0, 0)
+	if err != nil {
+		return err
+	}
+	for _, action := range actions {
+		var updates map[string]map[string]map[string]string
+		if err := action.UnmarshalJSONField("updated_references", &updates); err != nil {
+			return err
+		}
+		tracker := referenceTracker{updates: updates}
+		changed := false
+		for field, records := range updates["job_requests"] {
+			oldValue, tracked := records[request.Id]
+			if !tracked {
 				continue
 			}
-			if err := utilities.ValidateBillingName(app, record); err != nil {
-				return fmt.Errorf("merge would leave invoicing profile %s billing a client alias that does not exist: %w", id, err)
+			// Do not restore a relation that the creator changed after the merge.
+			if job.Collection().Fields.GetByName(field) != nil && job.GetString(field) == action.GetString("target_id") {
+				tracker.trackUpdate("jobs", field, job.Id, oldValue)
+			}
+			delete(records, request.Id)
+			changed = true
+		}
+		if changed {
+			action.Set("updated_references", updates)
+			if err := app.Save(action); err != nil {
+				return err
 			}
 		}
 	}

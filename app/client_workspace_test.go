@@ -22,7 +22,7 @@ func newClientWorkspaceTestApp(t *testing.T) *tests.TestApp {
 	// These CSV rows test historical use in isolation. Loading them here keeps
 	// them out of the project queues and totals used by unrelated tests.
 	// Insert the stored rows directly, as the main CSV seed loader does.
-	for _, table := range []string{"jobs"} {
+	for _, table := range []string{"jobs", "job_requests"} {
 		f, err := os.Open("test_seed_data/client_workspace/" + table + ".csv")
 		if err != nil {
 			t.Fatal(err)
@@ -68,7 +68,7 @@ func TestClientWorkspaceDetailsAndUsage(t *testing.T) {
 				"id": "cwcontact000001", "client": workspaceClient, "given_name": "Alex", "surname": "Workspace",
 				"email": "alex.workspace@example.com", "phone": "807-555-0101", "address": "101 Test Street", "city": "Dryden",
 				"province_state": "ON", "postal_code": "P8N 1A1", "country": "Canada",
-				"job_count": float64(2), "profile_count": float64(2),
+				"job_count": float64(2), "request_count": float64(2), "profile_count": float64(2),
 			} {
 				if first[field] != want {
 					t.Errorf("contact %s = %#v; want %#v", field, first[field], want)
@@ -77,11 +77,11 @@ func TestClientWorkspaceDetailsAndUsage(t *testing.T) {
 			// Alex is used directly and through invoicing on the first record,
 			// and through invoicing alone on the second. Neither is counted twice.
 			second := contacts[1].(map[string]any)
-			if second["job_count"] != float64(1) || second["profile_count"] != float64(1) {
+			if second["job_count"] != float64(1) || second["request_count"] != float64(1) || second["profile_count"] != float64(1) {
 				t.Fatalf("wrong direct contact counts: %#v", second)
 			}
 			third := contacts[2].(map[string]any)
-			if third["job_count"] != float64(0) || third["profile_count"] != float64(0) {
+			if third["job_count"] != float64(0) || third["request_count"] != float64(0) || third["profile_count"] != float64(0) {
 				t.Fatalf("unused contact has references: %#v", third)
 			}
 			profiles := result["invoicing_profiles"].([]any)
@@ -91,12 +91,12 @@ func TestClientWorkspaceDetailsAndUsage(t *testing.T) {
 			for _, value := range profiles {
 				profile := value.(map[string]any)
 				if profile["id"] == "cwinvoice000001" {
-					for field, want := range map[string]any{"name": "Capital projects", "client": workspaceClient, "contact": "cwcontact000001", "fax": "807-555-0199", "invoicing_instructions": "Include the purchase order.", "job_count": float64(2)} {
+					for field, want := range map[string]any{"name": "Capital projects", "client": workspaceClient, "contact": "cwcontact000001", "fax": "807-555-0199", "invoicing_instructions": "Include the purchase order.", "job_count": float64(2), "request_count": float64(2)} {
 						if profile[field] != want {
 							t.Errorf("profile %s = %#v; want %#v", field, profile[field], want)
 						}
 					}
-				} else if profile["job_count"] != float64(0) {
+				} else if profile["job_count"] != float64(0) || profile["request_count"] != float64(0) {
 					t.Errorf("unused setup has references: %#v", profile)
 				}
 			}
@@ -180,6 +180,10 @@ func TestClientWorkspaceInvoicingNamesAndPermissions(t *testing.T) {
 		// PocketBase returns 400 when a create rule is not satisfied, and 404
 		// when the same rule prevents selecting a record to update or delete.
 		createStatus := http.StatusBadRequest
+		// Active time holders can create invoicing profiles from existing contacts.
+		if collection == "client_invoicing_information" {
+			createStatus = http.StatusOK
+		}
 		clientSetupJSON(t, app, http.MethodPost, strings.TrimSuffix(base, "/"), "time@test.com", validCreate, createStatus)
 		clientSetupJSON(t, app, http.MethodPatch, base+id, "time@test.com", map[string]any{}, http.StatusNotFound)
 		clientSetupJSON(t, app, http.MethodDelete, base+id, "time@test.com", nil, http.StatusNotFound)
@@ -211,4 +215,33 @@ func clientSetupJSON(t *testing.T, app *tests.TestApp, method, path, email strin
 		}
 	}
 	return result
+}
+
+// Client details report which contacts are marked as having no email address.
+func TestClientWorkspaceReportsContactsWithoutEmail(t *testing.T) {
+	app := newClientWorkspaceTestApp(t)
+	contact, err := app.FindRecordById("client_contacts", "cwcontact000003")
+	if err != nil {
+		t.Fatal(err)
+	}
+	contact.Set("email", "")
+	contact.Set("no_email", true)
+	if err := app.Save(contact); err != nil {
+		t.Fatal(err)
+	}
+	result := clientSetupJSON(t, app, http.MethodGet, "/api/clients/"+workspaceClient, "author@soup.com", nil, http.StatusOK)
+	marks := map[string]any{}
+	for _, value := range result["contacts"].([]any) {
+		row := value.(map[string]any)
+		marks[row["id"].(string)] = row["no_email"]
+	}
+	if marks["cwcontact000003"] != true || marks["cwcontact000001"] != false {
+		t.Fatalf("contact no-email marks = %#v", marks)
+	}
+
+	// Entering an email address clears the mark.
+	updated := clientSetupJSON(t, app, http.MethodPatch, "/api/collections/client_contacts/records/cwcontact000003", "author@soup.com", map[string]any{"email": "found@example.com"}, http.StatusOK)
+	if updated["no_email"] != false {
+		t.Fatalf("a contact with an email address kept the no-email mark: %#v", updated)
+	}
 }

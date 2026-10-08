@@ -58,8 +58,8 @@ func TestJobBillingOnProjectEdits(t *testing.T) {
 }
 
 // Closing an older project needs no profile, but setting it Active again runs
-// the billing checks: a profile is required, and its contact and profile must
-// belong to the job's client.
+// full project validation: a profile is required, and its contact and profile
+// must belong to the job's client.
 func TestJobBillingReopening(t *testing.T) {
 	token, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
@@ -70,7 +70,7 @@ func TestJobBillingReopening(t *testing.T) {
 		status               int
 	}{
 		{"without profile", "", `"invoicing_information":{"code":"required"`, http.StatusBadRequest},
-		{"with another client's contact", ", invoicing_information = 'painvoice000002', contact = '184qbpajciwrrp2'", `"contact":{"code":"client_mismatch"`, http.StatusBadRequest},
+		{"with another client's contact", ", invoicing_information = 'painvoice000002', contact = '184qbpajciwrrp2'", `"contact":{"code":"contact_client_mismatch"`, http.StatusBadRequest},
 		{"with valid billing details", ", invoicing_information = 'painvoice000002'", `"status":"Active"`, http.StatusOK},
 	} {
 		for _, collection := range []bool{false, true} {

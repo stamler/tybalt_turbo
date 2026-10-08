@@ -31,8 +31,8 @@ func TestProjectValueUpdates(t *testing.T) {
 		{"cancel without value", "pvactivezero001", `{"status":"Cancelled"}`, 200},
 		{"cancelled edit without value", "pvcancelzero001", `{"description":"Edited project"}`, 200},
 		{"remove T&M flag still needs value", "pvactivezero001", `{"time_and_materials":false}`, 400},
-		{"set positive value with T&M", "pvactivezero001", `{"project_value":1}`, 200},
-		{"set positive value without T&M", "pvactivezero001", `{"project_value":1,"time_and_materials":false}`, 200},
+		{"set positive value with T&M requires approval", "pvactivezero001", `{"project_value":1}`, 400},
+		{"set positive value without T&M requires approval", "pvactivezero001", `{"project_value":1,"time_and_materials":false}`, 400},
 		{"clear positive value fails", "pcactivedated01", `{"project_value":0}`, 400},
 		{"negative value fails", "pcactivedated01", `{"project_value":-1}`, 400},
 	}
@@ -42,9 +42,17 @@ func TestProjectValueUpdates(t *testing.T) {
 			if collectionAPI {
 				name, method, url, body = tc.name+" collection API", http.MethodPatch, "/api/collections/jobs/records/"+tc.id, tc.patch
 			}
+			want := tc.want
 			content := []string{`"id":"` + tc.id + `"`}
 			if tc.want == 400 {
 				content = []string{`"code":"value_required_for_status"`, `must have a project value greater than zero`}
+				if strings.Contains(tc.patch, "project_value") {
+					content = []string{`project value changes require approval`}
+					if collectionAPI {
+						want = http.StatusNotFound
+						content = []string{`The requested resource wasn't found.`}
+					}
+				}
 			}
 			scenario := tests.ApiScenario{
 				Name:            name,
@@ -52,7 +60,7 @@ func TestProjectValueUpdates(t *testing.T) {
 				URL:             url,
 				Body:            strings.NewReader(body),
 				Headers:         map[string]string{"Authorization": token},
-				ExpectedStatus:  tc.want,
+				ExpectedStatus:  want,
 				ExpectedContent: content,
 				TestAppFactory:  setupJobsWithBillingFixtures,
 			}

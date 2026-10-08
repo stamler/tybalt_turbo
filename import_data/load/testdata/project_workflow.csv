@@ -1,0 +1,7 @@
+name,enabled,attachments,requests,invoicing,blocked
+empty-off,false,0,0,0,false
+flag-on,true,0,0,0,true
+retained-evidence,false,1,0,0,true
+retained-requests,false,0,1,0,true
+retained-billing,false,0,0,1,true
+invalid-flag,"""true""",0,0,0,true

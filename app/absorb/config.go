@@ -46,6 +46,8 @@ var Configs = map[string]Config{
 			{"client_notes", "client"},
 			{"jobs", "client"},
 			{"jobs", "job_owner"},
+			{"job_requests", "client"},
+			{"job_requests", "job_owner"},
 			{"client_invoicing_information", "client"},
 		},
 		// clients has no parent - it's at the top of the hierarchy
@@ -53,6 +55,7 @@ var Configs = map[string]Config{
 	"client_contacts": {
 		RefConfigs: []RefConfig{
 			{"jobs", "contact"},
+			{"job_requests", "contact"},
 			{"client_invoicing_information", "contact"},
 		},
 		ParentConstraint: &ParentConstraint{

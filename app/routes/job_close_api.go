@@ -72,12 +72,10 @@ func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 				httpResponseStatusCode = http.StatusInternalServerError
 				return &CodeError{Code: "claim_check_failed", Message: claimErr.Error()}
 			}
-			managerID := jobRec.GetString("manager")
-			altManagerID := jobRec.GetString("alternate_manager")
-			isJobManager := authRecord.Id != "" && (authRecord.Id == managerID || authRecord.Id == altManagerID)
-			if !hasJobClaim && !isJobManager {
+			// Managers without the job claim may change allocations only.
+			if !hasJobClaim {
 				httpResponseStatusCode = http.StatusForbidden
-				return &CodeError{Code: "unauthorized", Message: "you are not authorized to close this job"}
+				return &CodeError{Code: "unauthorized", Message: "the job claim is required to close projects"}
 			}
 
 			if strings.HasPrefix(jobRec.GetString("number"), "P") {
@@ -185,7 +183,13 @@ func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 				jobRec.Set("_imported", false)
 			}
 
-			if err := txApp.Save(jobRec); err != nil {
+			// The project workflow guard accepts unvalidated project saves only
+			// when they name their purpose.
+			ctx := e.Request.Context()
+			if mode == "bypass" {
+				ctx = hooks.WithProjectWorkflowMutation(ctx, hooks.ProjectWorkflowMutationImportedClose)
+			}
+			if err := txApp.SaveWithContext(ctx, jobRec); err != nil {
 				httpResponseStatusCode = http.StatusBadRequest
 				var validationErrs validation.Errors
 				if errors.As(err, &validationErrs) {

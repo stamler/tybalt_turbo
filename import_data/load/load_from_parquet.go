@@ -334,7 +334,7 @@ func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTable
 	insertedCount := 0
 	failureCount := 0
 
-	// Keep the billing check and replacement writes in one transaction.
+	// Keep the local data check and replacement writes in one transaction.
 	// Other imports retain their existing behavior; failed rows still count and continue.
 	var billingTx *sql.Tx
 	if sqliteTableName == "jobs" || sqliteTableName == "clients" || sqliteTableName == "client_contacts" {
@@ -343,7 +343,7 @@ func FromParquet[T any](parquetFilePath string, sqliteDBPath string, sqliteTable
 			panic(err)
 		}
 		defer billingTx.Rollback()
-		if err = CheckClientBillingImport(billingTx); err != nil {
+		if err = CheckLocalDataImport(billingTx); err != nil {
 			panic(err)
 		}
 	}

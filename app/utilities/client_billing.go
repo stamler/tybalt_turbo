@@ -22,6 +22,10 @@ var clientRelationsFrom = map[string][]clientRelation{
 		{"client_contacts", "contact"},
 		{"client_invoicing_information", "invoicing_information"},
 	},
+	"job_requests": {
+		{"client_contacts", "contact"},
+		{"client_invoicing_information", "invoicing_information"},
+	},
 	"client_invoicing_information": {
 		{"client_contacts", "contact"},
 	},
@@ -31,10 +35,12 @@ var clientRelationsFrom = map[string][]clientRelation{
 var clientRelationsTo = map[string][]clientRelation{
 	"client_contacts": {
 		{"jobs", "contact"},
+		{"job_requests", "contact"},
 		{"client_invoicing_information", "contact"},
 	},
 	"client_invoicing_information": {
 		{"jobs", "invoicing_information"},
+		{"job_requests", "invoicing_information"},
 	},
 }
 
@@ -46,7 +52,7 @@ func clientReferenceError(field, code, message string) error {
 	}
 }
 
-// ValidateClientReferences checks that a job, contact or invoicing profile agrees
+// ValidateClientReferences checks that a job, request, contact or invoicing profile agrees
 // with its related records about the client: the contact and invoicing profile
 // it selects, and the jobs and profiles that select it, must all belong to its
 // client. Empty relations are left to required-field validation.

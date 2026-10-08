@@ -14,11 +14,12 @@ func TestInvoicingProfileCreatePermissions(t *testing.T) {
 		name, email string
 		status      int
 	}{
-		{"time", "time@test.com", http.StatusBadRequest},
-		{"job and time", "author@soup.com", http.StatusOK},
+		{"time", "time@test.com", http.StatusOK},
+		{"job without time", "invoice-job@example.com", http.StatusOK},
+		{"job and time", workflowAuthor, http.StatusOK},
 		{"no claim", "u_no_claims@example.com", http.StatusBadRequest},
 		{"admin without job or time", "admin.only@example.com", http.StatusBadRequest},
-		{"inactive time", "inactive@example.com", http.StatusBadRequest},
+		{"inactive time", "invoice-inactive@example.com", http.StatusBadRequest},
 		{"unauthenticated", "", http.StatusBadRequest},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
@@ -50,18 +51,18 @@ func TestInvoicingProfileCreationAuditAndMultipleProfiles(t *testing.T) {
 	defer app.Cleanup()
 	before := time.Now().UTC().Add(-time.Second)
 	const forgedDate = "2001-01-01 00:00:00.000Z"
-	result := clientSetupJSON(t, app, http.MethodPost, invoicingRecords, "author@soup.com", map[string]any{
+	result := clientSetupJSON(t, app, http.MethodPost, invoicingRecords, "time@test.com", map[string]any{
 		"client": workspaceClient, "contact": "cwcontact000002", "name": "Capital projects",
-		"creator": "rzr98oadsp9qc11", "created": forgedDate,
+		"creator": "f2j5a8vk006baub", "created": forgedDate,
 	}, http.StatusOK)
-	if result["creator"] != "f2j5a8vk006baub" {
+	if result["creator"] != "rzr98oadsp9qc11" {
 		t.Fatalf("caller could spoof creator: %#v", result)
 	}
 	created, err := time.Parse("2006-01-02 15:04:05.000Z", result["created"].(string))
 	if err != nil || created.Before(before) || created.After(time.Now().UTC().Add(time.Second)) {
 		t.Fatalf("creation time must come from the server: %#v (%v)", result["created"], err)
 	}
-	second := clientSetupJSON(t, app, http.MethodPost, invoicingRecords, "author@soup.com", map[string]any{
+	second := clientSetupJSON(t, app, http.MethodPost, invoicingRecords, "time@test.com", map[string]any{
 		"client": workspaceClient, "contact": "cwcontact000002", "name": "Maintenance",
 	}, http.StatusOK)
 	if result["id"] == second["id"] {
@@ -73,7 +74,7 @@ func TestInvoicingProfileCreationAuditAndMultipleProfiles(t *testing.T) {
 		profile := value.(map[string]any)
 		if profile["id"] == result["id"] {
 			found = true
-			if profile["creator"] != "f2j5a8vk006baub" || profile["creator_name"] != "Horace Silver" || profile["created"] != result["created"] {
+			if profile["creator"] != "rzr98oadsp9qc11" || profile["creator_name"] != "Tester Time" || profile["created"] != result["created"] {
 				t.Fatalf("client detail lost creator audit: %#v", profile)
 			}
 		}
@@ -87,24 +88,24 @@ func TestInvoicingProfileCreationAuditAndMultipleProfiles(t *testing.T) {
 
 	id := result["id"].(string)
 	for _, change := range []map[string]any{
-		{"creator": "rzr98oadsp9qc11"}, {"creator": ""},
+		{"creator": "f2j5a8vk006baub"}, {"creator": ""},
 	} {
-		clientSetupJSON(t, app, http.MethodPatch, invoicingRecords+"/"+id, "author@soup.com", change, http.StatusBadRequest)
+		clientSetupJSON(t, app, http.MethodPatch, invoicingRecords+"/"+id, "invoice-job@example.com", change, http.StatusBadRequest)
 	}
 	// PocketBase ignores supplied auto-date fields before the update hook.
 	// A successful request must still leave the original creation time intact.
-	timestampAttempt := clientSetupJSON(t, app, http.MethodPatch, invoicingRecords+"/"+id, "author@soup.com", map[string]any{"created": forgedDate}, http.StatusOK)
+	timestampAttempt := clientSetupJSON(t, app, http.MethodPatch, invoicingRecords+"/"+id, "invoice-job@example.com", map[string]any{"created": forgedDate}, http.StatusOK)
 	if timestampAttempt["created"] != result["created"] {
 		t.Fatal("caller changed the creation timestamp")
 	}
-	updated := clientSetupJSON(t, app, http.MethodPatch, invoicingRecords+"/"+id, "author@soup.com", map[string]any{"invoicing_instructions": "Send a PDF."}, http.StatusOK)
+	updated := clientSetupJSON(t, app, http.MethodPatch, invoicingRecords+"/"+id, "invoice-job@example.com", map[string]any{"invoicing_instructions": "Send a PDF."}, http.StatusOK)
 	if updated["creator"] != result["creator"] || updated["created"] != result["created"] {
 		t.Fatalf("job edit changed creation audit: %#v", updated)
 	}
-	clientSetupJSON(t, app, http.MethodDelete, invoicingRecords+"/"+id, "author@soup.com", nil, http.StatusNoContent)
+	clientSetupJSON(t, app, http.MethodDelete, invoicingRecords+"/"+id, "invoice-job@example.com", nil, http.StatusNoContent)
 }
 
-func TestInvoicingProfileCreationValidatesClientAndContact(t *testing.T) {
+func TestInvoicingProfileTimeCreationValidatesClientAndContact(t *testing.T) {
 	for _, scenario := range []struct{ name, client, contact string }{
 		{"missing contact", workspaceClient, ""},
 		{"unknown contact", workspaceClient, "missingcontact1"},
@@ -115,9 +116,36 @@ func TestInvoicingProfileCreationValidatesClientAndContact(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			app := testutils.SetupTestApp(t)
 			defer app.Cleanup()
-			clientSetupJSON(t, app, http.MethodPost, invoicingRecords, "author@soup.com", map[string]any{
+			clientSetupJSON(t, app, http.MethodPost, invoicingRecords, "time@test.com", map[string]any{
 				"client": scenario.client, "contact": scenario.contact,
 			}, http.StatusBadRequest)
 		})
+	}
+}
+
+func TestInvoicingProfileCreatorCannotEditOwnProfileOrClientContacts(t *testing.T) {
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+	created := clientSetupJSON(t, app, http.MethodPost, invoicingRecords, "time@test.com", map[string]any{
+		"client": workspaceClient, "contact": "cwcontact000002", "name": "Creator cannot edit",
+	}, http.StatusOK)
+	path := invoicingRecords + "/" + created["id"].(string)
+	clientSetupJSON(t, app, http.MethodPatch, path, "time@test.com", map[string]any{"name": "Unauthorized change"}, http.StatusNotFound)
+	clientSetupJSON(t, app, http.MethodDelete, path, "time@test.com", nil, http.StatusNotFound)
+	stored := workflowRecord(t, app, "client_invoicing_information", created["id"].(string))
+	if stored.GetString("name") != "Creator cannot edit" || stored.GetString("creator") != "rzr98oadsp9qc11" {
+		t.Fatal("creator changed the saved profile")
+	}
+	for _, scenario := range []struct {
+		collection, id string
+		create, update map[string]any
+	}{
+		{"clients", workspaceClient, map[string]any{"name": "Unauthorized client", "business_development_lead": "f2j5a8vk006baub"}, map[string]any{"name": "Unauthorized rename"}},
+		{"client_contacts", "cwcontact000002", map[string]any{"client": workspaceClient, "given_name": "Unauthorized", "surname": "Contact", "email": "unauthorized@example.com"}, map[string]any{"email": "unauthorized@example.com"}},
+	} {
+		base := "/api/collections/" + scenario.collection + "/records"
+		clientSetupJSON(t, app, http.MethodPost, base, "time@test.com", scenario.create, http.StatusBadRequest)
+		clientSetupJSON(t, app, http.MethodPatch, base+"/"+scenario.id, "time@test.com", scenario.update, http.StatusNotFound)
+		clientSetupJSON(t, app, http.MethodDelete, base+"/"+scenario.id, "time@test.com", nil, http.StatusNotFound)
 	}
 }

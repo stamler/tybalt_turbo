@@ -3,6 +3,7 @@ package hooks
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"tybalt/errs"
 	"tybalt/utilities"
@@ -19,14 +20,18 @@ var clientRecordUses = map[string][]struct{ collection, field string }{
 	"clients": {
 		{"jobs", "client"},
 		{"jobs", "job_owner"},
+		{"job_requests", "client"},
+		{"job_requests", "job_owner"},
 		{"client_invoicing_information", "client"},
 	},
 	"client_contacts": {
 		{"jobs", "contact"},
+		{"job_requests", "contact"},
 		{"client_invoicing_information", "contact"},
 	},
 	"client_invoicing_information": {
 		{"jobs", "invoicing_information"},
+		{"job_requests", "invoicing_information"},
 	},
 }
 
@@ -57,6 +62,10 @@ func AddClientSetupHooks(app core.App) {
 	})
 
 	validateReferences := func(e *core.RecordEvent) error {
+		// A contact with an email address is not marked as having none.
+		if e.Record.Collection().Name == "client_contacts" && strings.TrimSpace(e.Record.GetString("email")) != "" {
+			e.Record.Set("no_email", false)
+		}
 		if err := utilities.ValidateClientReferences(e.App, e.Record); err != nil {
 			return err
 		}

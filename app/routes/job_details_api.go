@@ -75,6 +75,11 @@ type jobDetailsRow struct {
 	InvoiceContactName        sql.NullString  `db:"invoice_contact_name"`
 	InvoiceContactEmail       sql.NullString  `db:"invoice_contact_email"`
 	InvoiceInstructions       sql.NullString  `db:"invoice_instructions"`
+	RequestCreator            sql.NullString  `db:"request_creator"`
+	RequestCreated            sql.NullString  `db:"request_created"`
+	RequestSubmitted          sql.NullString  `db:"request_submitted"`
+	CreatedBy                 sql.NullString  `db:"created_by"`
+	CreationCompleted         sql.NullString  `db:"creation_completed"`
 	ProposalOpeningDate       sql.NullString  `db:"proposal_opening_date"`
 	ProposalSubmissionDueDate sql.NullString  `db:"proposal_submission_due_date"`
 	ProposalValue             sql.NullFloat64 `db:"proposal_value"`
@@ -134,6 +139,11 @@ type JobDetails struct {
 	InvoiceContactName        string        `json:"invoice_contact_name"`
 	InvoiceContactEmail       string        `json:"invoice_contact_email"`
 	InvoiceInstructions       string        `json:"invoice_instructions"`
+	RequestCreator            string        `json:"request_creator"`
+	RequestCreated            string        `json:"request_created"`
+	RequestSubmitted          string        `json:"request_submitted"`
+	CreatedBy                 string        `json:"created_by"`
+	CreationCompleted         string        `json:"creation_completed"`
 	ProposalOpeningDate       string        `json:"proposal_opening_date"`
 	ProposalSubmissionDueDate string        `json:"proposal_submission_due_date"`
 	ProposalValue             float64       `json:"proposal_value"`
@@ -223,6 +233,11 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			InvoiceContactName:        ns(r.InvoiceContactName),
 			InvoiceContactEmail:       ns(r.InvoiceContactEmail),
 			InvoiceInstructions:       ns(r.InvoiceInstructions),
+			RequestCreator:            ns(r.RequestCreator),
+			RequestCreated:            ns(r.RequestCreated),
+			RequestSubmitted:          ns(r.RequestSubmitted),
+			CreatedBy:                 ns(r.CreatedBy),
+			CreationCompleted:         ns(r.CreationCompleted),
 			ProposalOpeningDate:       ns(r.ProposalOpeningDate),
 			ProposalSubmissionDueDate: ns(r.ProposalSubmissionDueDate),
 			ProposalValue:             r.ProposalValue.Float64,

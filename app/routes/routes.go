@@ -247,6 +247,8 @@ func AddRoutes(app core.App) {
 		vendorsGroup.POST("/{id}/absorb", CreateAbsorbRecordsHandler(app, "vendors"))
 		vendorsGroup.POST("/undo_absorb", CreateUndoAbsorbHandler(app, "vendors"))
 
+		registerJobRequestRoutes(se, app)
+
 		// Jobs endpoints – provide aggregated data in a single query to avoid PocketBase's N+1 expand problem
 		jobsGroup := se.Router.Group("/api/jobs")
 		jobsGroup.Bind(apis.RequireAuth("users"))
