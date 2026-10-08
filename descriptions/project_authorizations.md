@@ -682,8 +682,12 @@ against the full proposed value. On approval, record the approval and replace
 
 The selected approver can reject the pending change with a reason. Rejection
 leaves the effective job value intact. Corrections require `job`, clear the
-pending record's rejection fields, and require a fresh approval. A rejected
-change cannot be approved unchanged. An edit to pending data invalidates any
+pending record's rejection fields, and require a fresh approval. A correction
+is a change made after rejection to the proposed value, approver, PDF,
+allocations, job fields, or the job's related client, contact, or profile
+records. Changes made while the change was pending are part of what the
+approver rejected. Saving without a correction leaves the change rejected, so
+a rejected change cannot be approved unchanged. An edit to pending data invalidates any
 earlier review; approved job attachments cannot be edited this way.
 
 Show pending value approvals in a queue. The assigned approver must be able to

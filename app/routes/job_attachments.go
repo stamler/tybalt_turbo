@@ -482,9 +482,9 @@ func attachmentSaveHandler(app core.App) func(*core.RequestEvent) error {
 			if err != nil {
 				return err
 			}
-			// A save is unchanged only while the reviewed job and related records
-			// still match. A corrected contact or profile needs fresh approval, even
-			// after rejection.
+			// A save is unchanged only while the job and related records match the
+			// submitted data, or for a rejected change, the data as rejected. A
+			// correction after rejection needs fresh approval.
 			if !creating && !jobChanged && !allocationChanged && a.GetString("review_token") == currentToken && a.GetFloat("project_value") == value && a.GetString("assigned_approver") == assigned && (file == nil || hash == a.GetString("document_hash")) {
 				if file != nil {
 					if err = ensureAuthorizationFile(tx, a, file); err != nil {
@@ -555,6 +555,17 @@ func attachmentActionHandler(app core.App, approve bool) func(*core.RequestEvent
 				if strings.TrimSpace(input.RejectionReason) == "" {
 					return workflowError("Enter a rejection reason.")
 				}
+				job, err := tx.FindRecordById("jobs", a.GetString("job"))
+				if err != nil {
+					return err
+				}
+				// Record the data as rejected. Only a later correction can return the
+				// change for approval; changes made while it was pending do not count.
+				token, err := valueReviewToken(tx, job)
+				if err != nil {
+					return err
+				}
+				a.Set("review_token", token)
 				a.Set("status", "Rejected")
 				a.Set("rejector", e.Auth.Id)
 				a.Set("rejected", time.Now().UTC())

@@ -186,6 +186,32 @@ func TestJobValueRejectedForSharedDataResubmitsAfterCorrection(t *testing.T) {
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/approve", workflowApprover, attachmentActionData(t, app, id), http.StatusOK)
 }
 
+// Changes made while a value change was pending are part of what the approver
+// rejected. Saving it again without a further correction keeps it rejected.
+func TestJobValueRejectedAfterPendingChangeNeedsLaterCorrection(t *testing.T) {
+	app := newWorkflowTestApp(t, false)
+	id := createValueChange(t, app, legacyWorkflowJob, 10000, "Pending change review document")
+	clientSetupJSON(t, app, http.MethodPatch, "/api/collections/client_contacts/records/184qbpajciwrrp2", workflowAuthor, map[string]any{"email": "changed-while-pending@example.com"}, http.StatusOK)
+	rejection := attachmentActionData(t, app, id)
+	rejection["rejection_reason"] = "The billing contact email is still wrong."
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/reject", workflowApprover, rejection, http.StatusOK)
+	rejected := workflowRecord(t, app, "job_attachments", id)
+	fields := map[string]string{"job": legacyWorkflowJob, "project_value": "10000", "assigned_approver": "6bq4j0eb26631dy", "version": fmt.Sprint(rejected.GetInt("version"))}
+	document := "%PDF-1.4\nPending change review document\n%%EOF"
+	workflowUploadMethod(t, app, http.MethodPatch, "/api/job_attachments/"+id, workflowAuthor, document, fields, http.StatusOK)
+	after := workflowRecord(t, app, "job_attachments", id)
+	if after.GetString("status") != "Rejected" || after.GetString("rejection_reason") != rejected.GetString("rejection_reason") || after.GetInt("version") != rejected.GetInt("version") {
+		t.Fatalf("change made before rejection cleared it: status %s", after.GetString("status"))
+	}
+	// A correction made after rejection returns it for approval.
+	clientSetupJSON(t, app, http.MethodPatch, "/api/collections/client_contacts/records/184qbpajciwrrp2", workflowAuthor, map[string]any{"email": "corrected-after-rejection@example.com"}, http.StatusOK)
+	workflowUploadMethod(t, app, http.MethodPatch, "/api/job_attachments/"+id, workflowAuthor, document, fields, http.StatusOK)
+	if status := workflowRecord(t, app, "job_attachments", id).GetString("status"); status != "Pending" {
+		t.Fatalf("correction after rejection left status %s", status)
+	}
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/approve", workflowApprover, attachmentActionData(t, app, id), http.StatusOK)
+}
+
 func TestJobValueApprovalRestoresExactHistoricalNegativeValue(t *testing.T) {
 	app := newWorkflowTestApp(t, false)
 	// Simulate an older stored value. New proposals still reject negative values.
