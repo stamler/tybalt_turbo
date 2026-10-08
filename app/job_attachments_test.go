@@ -167,6 +167,25 @@ func TestJobValueSharedEditRequiresFreshReviewAndRejectedNoOpStaysRejected(t *te
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/approve", workflowApprover, attachmentActionData(t, app, id), http.StatusOK)
 }
 
+// A rejected value change can return for approval once its related data is
+// corrected, without changing the value, approver, or PDF.
+func TestJobValueRejectedForSharedDataResubmitsAfterCorrection(t *testing.T) {
+	app := newWorkflowTestApp(t, false)
+	id := createValueChange(t, app, legacyWorkflowJob, 10000, "Correction review document")
+	rejection := attachmentActionData(t, app, id)
+	rejection["rejection_reason"] = "The billing contact email is wrong."
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/reject", workflowApprover, rejection, http.StatusOK)
+	rejected := workflowRecord(t, app, "job_attachments", id)
+	clientSetupJSON(t, app, http.MethodPatch, "/api/collections/client_contacts/records/184qbpajciwrrp2", workflowAuthor, map[string]any{"email": "corrected-billing@example.com"}, http.StatusOK)
+	fields := map[string]string{"job": legacyWorkflowJob, "project_value": "10000", "assigned_approver": "6bq4j0eb26631dy", "version": fmt.Sprint(rejected.GetInt("version"))}
+	workflowUploadMethod(t, app, http.MethodPatch, "/api/job_attachments/"+id, workflowAuthor, "%PDF-1.4\nCorrection review document\n%%EOF", fields, http.StatusOK)
+	after := workflowRecord(t, app, "job_attachments", id)
+	if after.GetString("status") != "Pending" || after.GetString("rejection_reason") != "" || after.GetInt("version") <= rejected.GetInt("version") || after.GetString("review_token") == rejected.GetString("review_token") {
+		t.Fatalf("corrected value change stayed rejected: status %s, reason %q", after.GetString("status"), after.GetString("rejection_reason"))
+	}
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/approve", workflowApprover, attachmentActionData(t, app, id), http.StatusOK)
+}
+
 func TestJobValueApprovalRestoresExactHistoricalNegativeValue(t *testing.T) {
 	app := newWorkflowTestApp(t, false)
 	// Simulate an older stored value. New proposals still reject negative values.

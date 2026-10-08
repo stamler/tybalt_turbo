@@ -482,7 +482,10 @@ func attachmentSaveHandler(app core.App) func(*core.RequestEvent) error {
 			if err != nil {
 				return err
 			}
-			if !creating && !jobChanged && !allocationChanged && (a.GetString("status") == "Rejected" || a.GetString("review_token") == currentToken) && a.GetFloat("project_value") == value && a.GetString("assigned_approver") == assigned && (file == nil || hash == a.GetString("document_hash")) {
+			// A save is unchanged only while the reviewed job and related records
+			// still match. A corrected contact or profile needs fresh approval, even
+			// after rejection.
+			if !creating && !jobChanged && !allocationChanged && a.GetString("review_token") == currentToken && a.GetFloat("project_value") == value && a.GetString("assigned_approver") == assigned && (file == nil || hash == a.GetString("document_hash")) {
 				if file != nil {
 					if err = ensureAuthorizationFile(tx, a, file); err != nil {
 						return err
