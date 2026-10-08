@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
-	"time"
 
 	"tybalt/internal/testutils"
 	"tybalt/notifications"
@@ -60,14 +59,6 @@ func TestSendNextPendingNotification_SendsOneEmail(t *testing.T) {
 		t.Errorf("Expected remaining count to be 4, got %d", remaining)
 	}
 
-	// Sleep for 100ms to allow the goroutine called by
-	// SendNextPendingNotification to complete. This is a bit of a hack, but it's
-	// necessary since the email sending is async and we need to wait for it to
-	// complete before checking the TestMailer.Messages() inbox. TODO: Find a
-	// better way to do this, perhaps by using a channel to communicate the
-	// completion of the email sending.
-	time.Sleep(100 * time.Millisecond)
-
 	messageCount := len(app.TestMailer.Messages())
 	if messageCount != 1 {
 		t.Errorf("Expected 1 email to be sent, got %d", messageCount)
@@ -99,9 +90,6 @@ func TestSendNextPendingNotification_NoEmailsWhenNoPendingNotifications(t *testi
 		t.Errorf("Expected remaining count to be 0, got %d", remaining)
 	}
 
-	// Sleep briefly to allow any potential async operations to complete
-	time.Sleep(20 * time.Millisecond)
-
 	// Get the initial message count
 	initialMessageCount := len(app.TestMailer.Messages())
 
@@ -110,9 +98,6 @@ func TestSendNextPendingNotification_NoEmailsWhenNoPendingNotifications(t *testi
 	if err != nil {
 		t.Fatalf("Expected no error on second attempt, got %v", err)
 	}
-
-	// Sleep briefly to allow any potential async operations to complete
-	time.Sleep(20 * time.Millisecond)
 
 	// Verify no new messages were added to the TestMailer
 	finalMessageCount := len(app.TestMailer.Messages())
@@ -384,7 +369,6 @@ func TestSendNotifications_SendsAllPendingNotifications(t *testing.T) {
 		t.Fatalf("Expected no error, got %v", err)
 	}
 
-	time.Sleep(20 * time.Millisecond)
 	// Verify sentCount matches the number of emails in the TestMailer messages
 	// parameter
 	if sentCount != int64(len(app.TestMailer.Messages())) {
@@ -419,9 +403,6 @@ func TestSendNotifications_ErrorHandling(t *testing.T) {
 
 	// Call SendNotifications
 	sentCount, err := notifications.SendNotifications(app)
-
-	// Sleep briefly to allow any async operations to complete
-	time.Sleep(20 * time.Millisecond)
 
 	// Verify we got an error
 	if err == nil {
@@ -506,9 +487,6 @@ func TestSendNotificationByID_SendsTargetedNotification(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	// Wait for async goroutine
-	time.Sleep(100 * time.Millisecond)
-
 	// Verify exactly one email was sent
 	if count := len(app.TestMailer.Messages()); count != 1 {
 		t.Errorf("expected 1 email sent, got %d", count)
@@ -537,8 +515,6 @@ func TestSendNotificationByID_NoOpForNonExistentID(t *testing.T) {
 		t.Fatalf("expected no error for non-existent ID, got %v", err)
 	}
 
-	time.Sleep(50 * time.Millisecond)
-
 	if count := len(app.TestMailer.Messages()); count != 0 {
 		t.Errorf("expected 0 emails sent for non-existent ID, got %d", count)
 	}
@@ -555,7 +531,6 @@ func TestDispatchNotificationImmediate_CreatesAndSends(t *testing.T) {
 	if _, err := notifications.SendNotifications(app); err != nil {
 		t.Fatalf("failed to clear pending notifications: %v", err)
 	}
-	time.Sleep(100 * time.Millisecond)
 	initialMessages := len(app.TestMailer.Messages())
 
 	// Find a user to send to
@@ -580,9 +555,6 @@ func TestDispatchNotificationImmediate_CreatesAndSends(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected no error, got %v", err)
 	}
-
-	// Wait for async send
-	time.Sleep(200 * time.Millisecond)
 
 	// Verify exactly one new email was sent
 	newMessages := len(app.TestMailer.Messages()) - initialMessages

@@ -4,6 +4,7 @@ import (
 	"testing"
 	"tybalt/hooks"
 	"tybalt/internal/testseed"
+	"tybalt/notifications"
 	"tybalt/routes"
 
 	"github.com/pocketbase/pocketbase/core"
@@ -21,6 +22,11 @@ func SetupTestApp(t testing.TB) *tests.TestApp {
 
 	// Add the routes to the test app
 	routes.AddRoutes(testApp)
+
+	// Send notification email before the request returns. A background send can
+	// trigger app events after an API scenario ends, while PocketBase reads its
+	// event counts, and can crash the test run.
+	notifications.SetSendNotificationAsyncForTest(testApp, false)
 
 	return testApp
 }

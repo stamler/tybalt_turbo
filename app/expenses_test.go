@@ -1045,7 +1045,7 @@ func TestRejectExpense_QueuesNotifications(t *testing.T) {
 		ExpectedContent: []string{
 			`"message":"record rejected successfully"`,
 		},
-		TestAppFactory: setupTestAppWithSynchronousImmediateNotifications,
+		TestAppFactory: testutils.SetupTestApp,
 	}
 
 	// After the request, ensure that at least one new expense_rejected notification was created.
