@@ -138,6 +138,7 @@ func AddRoutes(app core.App) {
 		expensesGroup.PATCH("/{id}", createUpdateExpenseHandler(app))
 		expensesGroup.POST("/{id}/submit", createSubmitRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/recall", createRecallRecordHandler(app, "expenses"))
+		expensesGroup.POST("/{id}/copy_to_tomorrow", createCopyExpenseHandler(app))
 		expensesGroup.POST("/{id}/approve", createApproveRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/reject", createRejectRecordHandler(app, "expenses"))
 		expensesGroup.POST("/{id}/commit", createCommitRecordHandler(app, "expenses"))

@@ -133,6 +133,22 @@
     }
   }
 
+  // Only Allowance and Mileage expenses without a purchase order can be copied;
+  // the server enforces the same rules in /api/expenses/{id}/copy_to_tomorrow.
+  function canCopyToTomorrow(paymentType: string, purchaseOrder: string): boolean {
+    return (paymentType === "Allowance" || paymentType === "Mileage") && purchaseOrder === "";
+  }
+
+  async function copyToTomorrow(id: string) {
+    try {
+      await pb.send(`/api/expenses/${id}/copy_to_tomorrow`, {
+        method: "POST",
+      });
+    } catch (error: unknown) {
+      globalStore.addError(apiErrorMessage(error, "Copy to tomorrow failed"));
+    }
+  }
+
   function apiErrorMessage(error: unknown, fallback: string): string {
     const maybeError = error as {
       response?: { error?: string; message?: string };
@@ -296,6 +312,7 @@
     rejected,
     committed,
     payment_type,
+    purchase_order,
   }: ExpensesAugmentedResponse)}
     {#if $expensesEditingEnabled}
       {@const isOwner = creator === viewerId}
@@ -339,6 +356,14 @@
       {/if}
       {#if isOwner && !submitted}
         <DsActionButton action={() => submit(id)} icon="mdi:send" title="Submit" color="blue" />
+      {/if}
+      {#if uid === viewerId && canCopyToTomorrow(payment_type, purchase_order)}
+        <DsActionButton
+          action={() => copyToTomorrow(id)}
+          icon="mdi:content-copy"
+          title="Copy to tomorrow"
+          color="green"
+        />
       {/if}
       <!--
         Most review actions remain disabled in list views to encourage users to
