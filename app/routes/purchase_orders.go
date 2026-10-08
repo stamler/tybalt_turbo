@@ -1396,9 +1396,10 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 			meta := buildSecondApproversMeta(app, requesterQualifies, approvers, policy, req.Amount)
 			meta.Occurrences = occurrences
 			if meta.SecondApprovalRequired && !requesterQualifies && len(approvers) == 0 {
-				return e.JSON(http.StatusBadRequest, map[string]string{
-					"code":    "second_pool_empty",
-					"message": "no second-stage approvers can final-approve this amount; contact an administrator",
+				return e.JSON(http.StatusBadRequest, map[string]any{
+					"code":        "second_pool_empty",
+					"message":     "no second-stage approvers can final-approve this amount; contact an administrator",
+					"occurrences": occurrences,
 				})
 			}
 

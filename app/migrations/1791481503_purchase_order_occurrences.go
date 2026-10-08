@@ -7,7 +7,9 @@ import (
 
 // Store the permitted payment count of recurring purchase orders. Existing rows
 // keep the count from the former 7/14/30-day formula, which is the count their
-// approval_total and committed expense limit were based on.
+// approval_total and committed expense limit were based on. The column is
+// NOT NULL, so dates that julianday() cannot parse (such as month 13, which the
+// field pattern allows) store 0 rather than abort the migration.
 func init() {
 	m.Register(func(app core.App) error {
 		collection, err := app.FindCollectionByNameOrId("purchase_orders")
@@ -24,12 +26,12 @@ func init() {
 		}
 		_, err = app.DB().NewQuery(`
 			UPDATE purchase_orders
-			SET occurrences = CASE frequency
+			SET occurrences = COALESCE(CASE frequency
 				WHEN 'Weekly' THEN CAST((julianday(end_date) - julianday(date)) / 7 AS INTEGER)
 				WHEN 'Biweekly' THEN CAST((julianday(end_date) - julianday(date)) / 14 AS INTEGER)
 				WHEN 'Monthly' THEN CAST((julianday(end_date) - julianday(date)) / 30 AS INTEGER)
 				ELSE 0
-			END
+			END, 0)
 			WHERE type = 'Recurring' AND end_date != '' AND frequency != ''
 		`).Execute()
 		return err

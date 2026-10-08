@@ -310,6 +310,21 @@ func TestPurchaseOrdersApproversRoutes(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
+			Name:   "second_pool_empty still reports the recurring payment count",
+			Method: http.MethodGet,
+			URL: makeApproversURL("/api/purchase_orders/second_approvers", municipalDivision, fmt.Sprintf("%d", int(tier2)+1000000)) +
+				"&type=Recurring&start_date=2026-04-30&end_date=2026-05-31&frequency=Monthly",
+			Headers: map[string]string{
+				"Authorization": regularUserToken,
+			},
+			ExpectedStatus: http.StatusBadRequest,
+			ExpectedContent: []string{
+				`"code":"second_pool_empty"`,
+				`"occurrences":2`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
 			Name:   "second approvers metadata uses project_max for project kind",
 			Method: http.MethodGet,
 			URL: makeApproversURLWithKindAndJob(

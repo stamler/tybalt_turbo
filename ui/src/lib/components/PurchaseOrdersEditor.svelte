@@ -113,6 +113,8 @@
   let secondApproverStatus = $state("" as SecondApproverStatus | "");
   let secondApproverReasonMessage = $state("");
   let secondApproverMeta = $state<SecondApproversResponse["meta"] | null>(null);
+  // Payment count from the last approver check, 0 unless recurring.
+  let recurringOccurrences = $state(0);
   let approversLoaded = $state(false);
   let approversFetchError = $state(false);
   let approversLoading = $state(false);
@@ -132,6 +134,7 @@
       code?: string;
       message?: string;
       data?: Record<string, { code: string; message: string }>;
+      occurrences?: number;
     };
   };
   const kindOptions = $derived.by(() =>
@@ -221,9 +224,6 @@
       !legacyMode &&
       Boolean(item.division && item.total && item.kind) &&
       (!isRecurring || Boolean(item.end_date && item.frequency)),
-  );
-  const recurringOccurrences = $derived.by(() =>
-    isRecurring ? (secondApproverMeta?.occurrences ?? 0) : 0,
   );
   const showApproverFetchError = $derived.by(() => canFetchApprovers && approversFetchError);
   const approversPendingResolution = $derived.by(
@@ -355,6 +355,7 @@
     secondApproverStatus = "";
     secondApproverReasonMessage = "";
     secondApproverMeta = null;
+    recurringOccurrences = 0;
     approversLoaded = false;
     approversFetchError = fetchError;
     approversLoading = false;
@@ -624,6 +625,7 @@
       let nextSecondStatus = "" as SecondApproverStatus | "";
       let nextSecondReasonMessage = "";
       let nextSecondMeta: SecondApproversResponse["meta"] | null = null;
+      let nextOccurrences = 0;
 
       if (secondResult.status === "fulfilled") {
         const secondApproversResponse = secondResult.value;
@@ -631,6 +633,7 @@
         nextSecondStatus = secondApproversResponse.meta.status;
         nextSecondReasonMessage = secondApproversResponse.meta.reason_message ?? "";
         nextSecondMeta = secondApproversResponse.meta;
+        nextOccurrences = secondApproversResponse.meta.occurrences;
       } else {
         const e = secondResult.reason as MaybeAbortError;
         if (isAbortError(e)) {
@@ -645,6 +648,7 @@
           nextSecondStatus = "required_no_candidates";
           nextSecondReasonMessage = e?.data?.message ?? secondPoolEmptyMessage;
           nextSecondMeta = null;
+          nextOccurrences = e?.data?.occurrences ?? 0;
         } else {
           throw secondResult.reason;
         }
@@ -654,6 +658,7 @@
       secondApproverStatus = nextSecondStatus;
       secondApproverReasonMessage = nextSecondReasonMessage;
       secondApproverMeta = nextSecondMeta;
+      recurringOccurrences = nextOccurrences;
 
       const dualBypassSelfMode = isDualBypassMode(nextSecondStatus, requesterID, isOwnPOContextNow);
 
