@@ -259,6 +259,7 @@ func TestLegacyBillingAndValueSubmissionFailuresRollBackTogether(t *testing.T) {
 		{"client reassignment", workflowAuthor, `{"invoicing_information":"painvoice000001","client":"lb0fnenkeyitsny"}`, "", "%PDF-1.4\nClient bypass\n%%EOF", http.StatusBadRequest},
 		{"wrong client contact", workflowAuthor, `{"invoicing_information":"painvoice000001","contact":"nh5u9z3cyknjclv"}`, "", "%PDF-1.4\nWrong billing contact\n%%EOF", http.StatusBadRequest},
 		{"invalid allocation", workflowAuthor, `{"invoicing_information":"painvoice000001","description":"Must roll back"}`, `[{"division":"missingdivision","hours":20}]`, "%PDF-1.4\nInvalid allocation\n%%EOF", http.StatusBadRequest},
+		{"part-hour allocation", workflowAuthor, `{"invoicing_information":"painvoice000001","description":"Must roll back"}`, `[{"division":"fy4i9poneukvq9u","hours":0.25}]`, "%PDF-1.4\nPart-hour allocation\n%%EOF", http.StatusBadRequest},
 		{"duplicate PDF", workflowAuthor, `{"invoicing_information":"painvoice000001","description":"Must roll back"}`, `[{"division":"fy4i9poneukvq9u","hours":20}]`, string(duplicate), http.StatusBadRequest},
 	}
 	for _, scenario := range scenarios {

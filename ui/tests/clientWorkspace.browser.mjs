@@ -543,7 +543,9 @@ await runBrowserHarness(
     await page.getByLabel(/^Fee basis/).selectOption("tm");
     await page.getByRole("button", { name: "Add division", exact: true }).click();
     await page.getByLabel(/^Division/).selectOption("division1");
-    await page.getByLabel("Hours", { exact: true }).fill("12.5");
+    await page.getByLabel("Hours", { exact: true }).fill("12");
+    // Request hours become job allocations, which store whole hours.
+    assert.equal(await page.getByLabel("Hours", { exact: true }).getAttribute("step"), "1");
     await page
       .getByRole("link", { name: "Manage client contacts and invoicing", exact: true })
       .click();
@@ -554,7 +556,7 @@ await runBrowserHarness(
     assert.equal(await scope().inputValue(), "Unsaved scope kept while maintaining client data");
     assert.equal(await value().inputValue(), "56789");
     assert.equal(await page.getByLabel(/^Fee basis/).inputValue(), "tm");
-    assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "12.5");
+    assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "12");
     await page
       .getByRole("link", { name: "Manage client contacts and invoicing", exact: true })
       .click();
@@ -572,7 +574,7 @@ await runBrowserHarness(
     await scope().waitFor();
     assert.equal(await scope().inputValue(), "Unsaved scope kept while maintaining client data");
     assert.equal(await value().inputValue(), "56789");
-    assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "12.5");
+    assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "12");
     assert.match(
       await page
         .getByLabel(/^Project contact/)
@@ -603,7 +605,7 @@ await runBrowserHarness(
     assert.equal(await page.getByLabel(/^Invoicing profile/).inputValue(), "profile-copy");
     assert.equal(await scope().inputValue(), "Unsaved scope kept while maintaining client data");
     assert.equal(await value().inputValue(), "56789");
-    assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "12.5");
+    assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "12");
     assert.equal(client.invoicing_profiles[0].name, "Updated workflow setup");
     assert.deepEqual(
       profileWrites.slice(beforeCopy).map((write) => write.method),

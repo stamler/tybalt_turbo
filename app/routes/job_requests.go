@@ -373,6 +373,10 @@ func validateRequestAllocationInputs(app core.App, allocs []JobAllocationUpdate,
 		if math.IsNaN(a.Hours) || math.IsInf(a.Hours, 0) {
 			return workflowError("Invalid allocation hours.")
 		}
+		// Job allocations store whole hours, so a request must use them too.
+		if a.Hours != math.Trunc(a.Hours) {
+			return workflowError("Allocation hours must be whole numbers.")
+		}
 		d, err := app.FindRecordById("divisions", a.Division)
 		if err != nil {
 			return workflowError("Select a valid division.")

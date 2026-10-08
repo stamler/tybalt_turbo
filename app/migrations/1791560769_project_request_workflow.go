@@ -701,7 +701,8 @@ func init() {
           "name": "hours",
           "type": "number",
           "id": "pa5aedee0964c6b",
-          "min": 0
+          "min": 0,
+          "onlyInt": true
         }
       ],
       "listRule": "@request.auth.id != '' && @request.auth.admin_profiles_via_uid.active = true && (request.creator = @request.auth.id || @request.auth.user_claims_via_uid.cid.name ?= 'job' || (request.approver = @request.auth.id && @request.auth.user_claims_via_uid.cid.name ?= 'project_authorization'))",

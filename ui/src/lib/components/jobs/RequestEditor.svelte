@@ -346,8 +346,7 @@
                 value={row.id}>{row.code} — {row.name}</option
               >{/each}</select
           ></label
-        ><label
-          >Hours<input type="number" min="0" step="0.25" bind:value={allocation.hours} /></label
+        ><label>Hours<input type="number" min="0" step="1" bind:value={allocation.hours} /></label
         ><button
           type="button"
           class="rounded border px-3 py-2"

@@ -44,6 +44,7 @@ await runBrowserHarness(async (page, origin) => {
     "Unsaved corrected scope",
   );
   assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "42");
+  assert.equal(await page.getByLabel("Hours", { exact: true }).getAttribute("step"), "1");
   assert.equal(
     await page.getByLabel("Proposed project value (CAD, before tax)").inputValue(),
     "2400",

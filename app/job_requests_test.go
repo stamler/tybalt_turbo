@@ -166,6 +166,11 @@ func TestJobRequestDraftValidationAndVersion(t *testing.T) {
 			t.Fatal("failed edit changed request version")
 		}
 	}
+	// Job allocations store whole hours, so a request cannot hold part hours.
+	clientSetupJSON(t, app, http.MethodPatch, "/api/job_requests/"+id, workflowAuthor, map[string]any{"version": 1, "request": map[string]any{}, "allocations": []map[string]any{{"division": "fy4i9poneukvq9u", "hours": 0.25}}}, http.StatusBadRequest)
+	if allocations, err := app.FindRecordsByFilter("job_request_allocations", "request={:id}", "", 0, 0, dbx.Params{"id": id}); err != nil || len(allocations) != 0 {
+		t.Fatalf("part-hour allocation saved: %v %v", allocations, err)
+	}
 	clientSetupJSON(t, app, http.MethodPatch, "/api/job_requests/"+id, workflowAuthor, map[string]any{"version": 0, "request": map[string]any{"description": "Stale edit"}}, http.StatusConflict)
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/submit", workflowAuthor, map[string]any{"version": 1}, http.StatusBadRequest)
 	clientSetupJSON(t, app, http.MethodGet, "/api/job_requests/"+id, "u_no_claims@example.com", nil, http.StatusForbidden)
