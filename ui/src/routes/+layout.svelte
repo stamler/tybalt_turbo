@@ -13,7 +13,8 @@
   import { branches } from "$lib/stores/branches";
   import { tasks } from "$lib/stores/tasks";
   import { navSections as allNavSections } from "$lib/navConfig";
-  import { appConfig } from "$lib/stores/appConfig";
+  import { appConfig, jobRequestsEnabled } from "$lib/stores/appConfig";
+  import { canViewJobCreateQueue } from "$lib/jobRequests";
   import NavFlyout from "$lib/components/NavFlyout.svelte";
 
   // Initialize app config store globally (idempotent, so safe to call here)
@@ -32,6 +33,24 @@
         // Filter items within each section
         const filteredItems = section.items
           .filter((item) => {
+            if (item.href === "/job-requests?queue=abandoned")
+              return $globalStore.claims.includes("admin");
+            if (item.href.startsWith("/job-requests")) {
+              if (!$jobRequestsEnabled) return false;
+              if (item.href.endsWith("queue=creation"))
+                return canViewJobCreateQueue(
+                  $globalStore.claims,
+                  $jobRequestsEnabled,
+                  $globalStore.attentionCounts.counts,
+                );
+              if (item.href.endsWith("queue=approval"))
+                return $globalStore.claims.includes("project_authorization");
+              return $globalStore.claims.some((claim) =>
+                ["time", "job", "project_authorization"].includes(claim),
+              );
+            }
+            if (item.href === "/jobs/value-approvals")
+              return $globalStore.claims.includes("project_authorization");
             // Explicit access checks also apply when Show All UI is enabled.
             if (item.canView) {
               return item.canView(

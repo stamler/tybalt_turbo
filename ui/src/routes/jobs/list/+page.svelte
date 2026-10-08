@@ -6,6 +6,7 @@
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import FastCloseConfirmPopover from "$lib/components/FastCloseConfirmPopover.svelte";
+  import { jobRequestsEnabled, jobsEditingEnabled } from "$lib/stores/appConfig";
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
   import Icon from "@iconify/svelte";
@@ -30,6 +31,10 @@
 
   // Validate proposal and redirect to create project or edit page
   async function handleCreateReferencingProject(jobId: string) {
+    if ($jobRequestsEnabled) {
+      await goto(`/job-requests/new?proposal=${jobId}`);
+      return;
+    }
     if (validatingJobId !== null) return;
     validatingJobId = jobId;
     try {
@@ -193,16 +198,18 @@
     {#snippet actions(job: JobApiResponse)}
       {@const id = job.id}
       {@const number = job.number}
-      {#if number?.startsWith("P")}
+      {#if number?.startsWith("P") && ($jobRequestsEnabled ? $globalStore.claims.includes("time") : $globalStore.claims.includes("job"))}
         <DsActionButton
           action={() => handleCreateReferencingProject(id)}
           icon="mdi:briefcase-plus"
-          title="Create referencing project"
+          title={$jobRequestsEnabled
+            ? "Create Project Request from Proposal"
+            : "Create referencing project"}
           color="yellow"
           loading={validatingJobId === id}
         />
       {/if}
-      {#if !number?.startsWith("P") && job.status === "Active" && job.imported}
+      {#if !number?.startsWith("P") && job.status === "Active" && job.imported && $jobsEditingEnabled && $globalStore.claims.includes("job")}
         <DsActionButton
           action={() => openFastCloseConfirm(job)}
           icon="mdi:archive-check"
@@ -211,7 +218,12 @@
           loading={closingJobId === id}
         />
       {/if}
-      <DsActionButton action="/jobs/{id}/edit" icon="mdi:pencil" title="Edit" color="blue" />
+      {#if $globalStore.claims.includes("job")}<DsActionButton
+          action="/jobs/{id}/edit"
+          icon="mdi:pencil"
+          title="Edit"
+          color="blue"
+        />{/if}
     {/snippet}
   </DsSearchList>
 {/if}

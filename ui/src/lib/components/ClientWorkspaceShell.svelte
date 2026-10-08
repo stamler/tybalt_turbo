@@ -8,7 +8,7 @@
     currentWorkspaceUrl,
     type ClientWorkspaceTab,
   } from "$lib/clientWorkspace";
-  import { safeWorkflowReturn } from "$lib/clientWorkflowNavigation";
+  import { safeWorkflowReturn, workflowFormName } from "$lib/clientWorkflowNavigation";
 
   let {
     clientId,
@@ -38,9 +38,9 @@
   <h1 class="text-2xl font-bold">{clientName}</h1>
   {#if workflowReturn}
     <p class="rounded-sm border border-yellow-300 bg-yellow-50 p-2">
-      You are updating this client from a job form with unsaved changes.
+      You are updating this client from a {workflowFormName(workflowReturn)} with unsaved changes.
       <a href={workflowReturn} class="font-semibold text-blue-700 underline"
-        >Return to the job form</a
+        >Return to the {workflowFormName(workflowReturn)}</a
       >
     </p>
   {/if}

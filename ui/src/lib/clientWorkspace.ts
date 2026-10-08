@@ -14,7 +14,9 @@ export type WorkspaceContact = WorkspaceAddress & {
   given_name: string;
   surname: string;
   email: string;
+  no_email?: boolean;
   job_count: number;
+  request_count: number;
   profile_count: number;
 };
 export type WorkspaceInvoicing = {
@@ -29,6 +31,7 @@ export type WorkspaceInvoicing = {
   fax: string;
   invoicing_instructions: string;
   job_count: number;
+  request_count: number;
 };
 export type WorkspaceClient = WorkspaceAddress & {
   id: string;
@@ -186,12 +189,22 @@ export function currentWorkspaceUrl(
   return new URL(safeReturnTo(clientId, state.clientWorkspaceUrl), url);
 }
 
-export function invoicingEmptyMessage(canEdit: boolean, hasContacts: boolean): string {
+// Holders of time can create profiles from existing contacts; only holders of
+// job maintain clients and contacts.
+export function canCreateInvoicingProfile(claims: string[]): boolean {
+  return claims.includes("time") || claims.includes("job");
+}
+
+export function invoicingEmptyMessage(claims: string[], hasContacts: boolean): string {
   const intro = "This client has no invoicing profiles.";
-  if (!canEdit) return `${intro} Ask a client maintainer to create one.`;
-  return hasContacts
+  if (!hasContacts) {
+    return claims.includes("job")
+      ? `${intro} Add a client contact, then create a profile.`
+      : `${intro} Ask a client maintainer to add a contact first.`;
+  }
+  return canCreateInvoicingProfile(claims)
     ? `${intro} Create one using an existing client contact.`
-    : `${intro} Add a client contact, then create a profile.`;
+    : `${intro} Ask a client maintainer to create one.`;
 }
 
 export function profileCreatorName(

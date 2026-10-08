@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Job value navigation check</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { mount } from "svelte";
+      import JobDetails from "../../src/routes/jobs/[jid]/details/+page.svelte";
+      import { globalStore } from "$lib/stores/global";
+      import { pb } from "$lib/pocketbase";
+      import { props, navigate } from "./jobValueNavigation.svelte.ts";
+      import "/src/app.css";
+      globalStore.set({ claims: ["job"] });
+      pb.authStore.save("test-token", { id: "editor", collectionName: "users" });
+      document.addEventListener("click", (event) => {
+        const link = event.target.closest("a[href='/jobs/jobB/details']");
+        if (link) {
+          event.preventDefault();
+          navigate("jobB");
+        }
+      });
+      mount(JobDetails, { target: document.getElementById("app"), props });
+    </script>
+  </body>
+</html>

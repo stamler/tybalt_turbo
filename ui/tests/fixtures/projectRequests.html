@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Project request browser checks</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { mount, unmount } from "svelte";
+      import Print from "../../src/routes/job-requests/[id]/print/+page.svelte";
+      import Billing from "../../src/lib/components/clients/InvoicingEditor.svelte";
+      import History from "../../src/lib/components/jobs/JobValueHistory.svelte";
+      import { globalStore } from "$lib/stores/global";
+      import { pb } from "$lib/pocketbase";
+      import Editor from "../../src/lib/components/jobs/RequestEditor.svelte";
+      import "/src/app.css";
+      const query = new URLSearchParams(location.search);
+      const request = {
+        id: "request12345678",
+        version: 3,
+        description: query.has("long")
+          ? "Long project scope.\n".repeat(150) + "END OF SCOPE"
+          : "Inspect the bridge.\nPrepare the final report.",
+        location: "86VHQPRM+5C",
+        project_value: 120000,
+        time_and_materials: query.has("tm"),
+        time_and_materials_set: true,
+        project_status: "Active",
+        client: "client1",
+        contact: "contact1",
+        rate_sheet: "rate1",
+        fn_agreement_answer: "No",
+      };
+      const contact = {
+        id: "contact1",
+        client: "client1",
+        given_name: "Alex",
+        surname: "Client",
+        email: "alex@example.com",
+      };
+      const client = {
+        id: "client1",
+        name: "Example Client",
+        address: "1 Main Street",
+        city: "Thunder Bay",
+        province_state: "ON",
+      };
+      const rate_sheet = {
+        id: "rate1",
+        name: "Standard",
+        revision: 3,
+        effective_date: "2026-01-01",
+        active: true,
+      };
+      const related = {
+        client,
+        contact,
+        billing_contact: {
+          given_name: "Pat",
+          surname: "Billing",
+          email: "pat@example.com",
+          city: "Ottawa",
+        },
+        rate_sheet,
+        manager: { name: "TBT Manager", email: "manager@example.com" },
+        branch: { name: "Thunder Bay" },
+        invoicing_information: {
+          invoicing_instructions: "Send invoices to Accounts.\nInclude the client reference.",
+          fax: "555-0101",
+        },
+        rate_sheet_entries: [{ role_name: "Engineer", rate: 180, overtime_rate: 270 }],
+      };
+      if (query.has("draft")) {
+        request.project_value = 0;
+        related.contact.email = "";
+      }
+      if (query.has("billing")) {
+        globalStore.set({ claims: ["job"] });
+        const billingEditor = mount(Billing, {
+          target: document.getElementById("app"),
+          props: {
+            client,
+            contacts: [contact],
+            projectContact: contact.id,
+            onSaved: () => unmount(billingEditor),
+            onCancel: () => {},
+          },
+        });
+      } else if (query.has("values")) {
+        globalStore.set({ claims: ["job", "admin", "project_authorization"] });
+        pb.authStore.save("test-token", { id: "reviewer", collectionName: "users" });
+        mount(History, {
+          target: document.getElementById("app"),
+          props: {
+            jobId: "job1",
+            effectiveValue: query.has("legacy") ? 0 : 120000,
+            queue: query.has("queue"),
+          },
+        });
+      } else if (query.has("editor")) {
+        globalStore.set({
+          claims: query.has("viewer") ? [] : query.has("job") ? ["job"] : ["time"],
+        });
+        pb.authStore.save("test-token", { id: "requester", collectionName: "users" });
+        mount(Editor, {
+          target: document.getElementById("app"),
+          props: {
+            request,
+            options: {
+              clients: [client],
+              contacts: query.has("no-contacts") ? [] : [contact],
+              invoicing_profiles: query.has("profiles")
+                ? [
+                    {
+                      id: "profile1",
+                      client: "client1",
+                      contact: "contact1",
+                      name: "Standard invoices",
+                    },
+                  ]
+                : [],
+              rate_sheets: [rate_sheet],
+              divisions: [{ id: "div1", name: "Engineering", code: "ENG", active: true }],
+            },
+          },
+        });
+      } else
+        mount(Print, {
+          target: document.getElementById("app"),
+          props: {
+            data: {
+              detail: { request, related, allocations: [], permissions: {}, review_token: "" },
+              generated: "2026-09-30",
+            },
+          },
+        });
+    </script>
+  </body>
+</html>

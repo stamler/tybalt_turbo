@@ -165,6 +165,21 @@ export const navSections: NavSection[] = [
           { label: "Division", href: "/jobs/wip/division", canView: canViewWIPReports },
         ],
       },
+      { label: "Project Requests", href: "/job-requests", buttons: [] },
+      { label: "Request Approvals", href: "/job-requests?queue=approval", buttons: [] },
+      { label: "Job Create Queue", href: "/job-requests?queue=creation", buttons: [] },
+      {
+        label: "Value Approvals",
+        href: "/jobs/value-approvals",
+        buttons: [],
+        requiredClaim: "project_authorization",
+      },
+      {
+        label: "Abandoned Requests",
+        href: "/job-requests?queue=abandoned",
+        buttons: [],
+        requiredClaim: "admin",
+      },
       {
         label: "Rate Sheets",
         href: "/rate-sheets/list",

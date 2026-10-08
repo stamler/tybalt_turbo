@@ -38,7 +38,12 @@
     dirty?: boolean;
     busy?: boolean;
   } = $props();
-  let item = $state(untrack(() => editableFields(record, contactFields)));
+  let item = $state<WorkflowRecord>(
+    untrack(() => ({
+      ...editableFields(record, contactFields),
+      no_email: Boolean(record.no_email),
+    })),
+  );
   let saved = $state(untrack(() => JSON.stringify(item)));
   let errors = $state<FieldErrors>({});
   let error = $state("");
@@ -72,6 +77,8 @@
     try {
       const body: WorkflowRecord = { ...editableFields(item, contactFields), client: clientId };
       body.email = body.email.trim();
+      // An email address and the no-email mark cannot both apply.
+      body.no_email = item.no_email && !body.email;
       const result = record.id
         ? await pb.collection("client_contacts").update(record.id, body)
         : await pb.collection("client_contacts").create(body);
@@ -113,8 +120,8 @@
   <h2 class="text-xl font-bold">{record.id ? "Edit contact" : "Add contact"}</h2>
   {#if record.id}
     <p class="text-sm text-neutral-600">
-      Used by {record.job_count || 0} jobs and {record.profile_count || 0} invoicing profiles. Changes
-      apply wherever this contact is used.
+      Used by {record.job_count || 0} jobs, {record.request_count || 0} requests, and {record.profile_count ||
+        0} invoicing profiles. Changes apply wherever this contact is used.
     </p>
   {/if}
   {#if error}<p role="alert" class="text-red-700">{error}</p>{/if}
@@ -125,6 +132,15 @@
     <DsTextInput bind:value={item.given_name} {errors} fieldName="given_name" uiName="Given name" />
     <DsTextInput bind:value={item.surname} {errors} fieldName="surname" uiName="Surname" />
     <DsTextInput bind:value={item.email} {errors} fieldName="email" uiName="Email (optional)" />
+    <label class="flex items-center gap-2">
+      <input
+        type="checkbox"
+        checked={item.no_email && !item.email.trim()}
+        disabled={!!item.email.trim()}
+        onchange={(event) => (item.no_email = event.currentTarget.checked)}
+      />
+      No email address
+    </label>
     <DsTextInput bind:value={item.phone} {errors} fieldName="phone" uiName="Phone (optional)" />
     <details
       open={Boolean(

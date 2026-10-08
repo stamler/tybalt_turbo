@@ -13,6 +13,10 @@
   <div class="bg-neutral-100 px-3 py-2 text-sm text-neutral-600">
     {data.item.description}
   </div>
+  {#if data.item.name === "project_authorization"}<a
+      class="block p-4 text-blue-700 underline"
+      href="/claims/project-authorization-limits">Set project approval limits</a
+    >{/if}
   {#if data.item.holders.length > 0}
     <DsList items={data.item.holders} search={true} inListHeader="{data.item.name} holders">
       {#snippet searchBarExtra()}

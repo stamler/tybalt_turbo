@@ -1,3 +1,6 @@
+import { redirect } from "@sveltejs/kit";
+import { get } from "svelte/store";
+import { appConfig, jobRequestsEnabled } from "$lib/stores/appConfig";
 import type { JobsRecord, CategoriesResponse } from "$lib/pocketbase-types";
 import { JobsStatusOptions } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
@@ -6,6 +9,8 @@ import type { JobApiResponse } from "$lib/stores/jobs";
 import { pb } from "$lib/pocketbase";
 
 export const load: PageLoad<JobsPageData> = async ({ params }) => {
+  await appConfig.init();
+  if (get(jobRequestsEnabled)) redirect(307, `/job-requests/new?parent=${params.parent}`);
   const defaultItem: Partial<JobsRecord> = {
     number: "",
     description: "",

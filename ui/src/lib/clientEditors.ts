@@ -39,7 +39,9 @@ export function validateContact(record: WorkflowRecord): FieldErrors {
   return errors;
 }
 export function contactInUse(record: WorkflowRecord): boolean {
-  return [record.job_count, record.profile_count].some((value) => Number(value) > 0);
+  return [record.job_count, record.request_count, record.profile_count].some(
+    (value) => Number(value) > 0,
+  );
 }
 // Combine an API error message with its field messages for display beside a form.
 export function workflowError(error: any): string {

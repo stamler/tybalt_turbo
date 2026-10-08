@@ -16,6 +16,7 @@
   import { globalStore } from "$lib/stores/global";
   import {
     addressText,
+    canCreateInvoicingProfile,
     invoicingEmptyMessage,
     profileCreatorName,
     currentWorkspaceUrl,
@@ -36,6 +37,7 @@
   const workspaceUrl = $derived(currentWorkspaceUrl(data.client.id, page.url, page.state));
   const listState = $derived(parseClientWorkspaceQuery(workspaceUrl.searchParams));
   const canEdit = $derived($globalStore.claims.includes("job"));
+  const canCreateProfile = $derived(canCreateInvoicingProfile($globalStore.claims));
   const canMerge = $derived($globalStore.claims.includes("absorb"));
   const contacts = $derived(data.client.contacts as WorkspaceContact[]);
   const profiles = $derived(data.client.invoicing_profiles as WorkspaceInvoicing[]);
@@ -181,7 +183,13 @@
     const created = profile.created
       ? `Created ${shortDate(profile.created, true)}${creator ? ` by ${creator}` : ""}`
       : "";
-    return [countLabel(profile.job_count, "job"), created].filter(Boolean).join(" · ");
+    return [
+      countLabel(profile.job_count, "job"),
+      profile.request_count > 0 ? countLabel(profile.request_count, "request") : "",
+      created,
+    ]
+      .filter(Boolean)
+      .join(" · ");
   }
   // Unnamed profiles are known by their recipient.
   function profileName(profile: WorkspaceInvoicing) {
@@ -293,14 +301,18 @@
                   href={editorHref(`contacts/${contact.id}/edit`)}>{contactName(contact)}</a
                 >{:else}{contactName(contact)}{/if}
             {/snippet}
-            {#snippet line1(contact)}<a
-                class="break-all text-blue-700 hover:underline"
-                href={`mailto:${contact.email}`}>{contact.email}</a
-              >{#if contact.phone}<span class="ml-2 whitespace-nowrap text-neutral-600"
+            {#snippet line1(contact)}{#if contact.email}<a
+                  class="break-all text-blue-700 hover:underline"
+                  href={`mailto:${contact.email}`}>{contact.email}</a
+                >{:else if contact.no_email}<span class="text-neutral-600">No email address</span
+                >{/if}{#if contact.phone}<span class="ml-2 whitespace-nowrap text-neutral-600"
                   >{contact.phone}</span
                 >{/if}{/snippet}
             {#snippet line2(contact)}
               <span class="text-xs text-neutral-600">{countLabel(contact.job_count, "job")}</span>
+              {#if contact.request_count > 0}<span class="ml-2 text-xs text-neutral-600"
+                  >{countLabel(contact.request_count, "request")}</span
+                >{/if}
               {#if contact.profile_count > 0}<a
                   class="ml-2 text-xs text-blue-700 hover:underline"
                   href={href({ recipient: contact.id, invoicing_q: null, invoicing_page: 1 })}
@@ -335,16 +347,17 @@
                 </p>
                 <p>
                   An invoicing profile is required when creating or editing a project, including a
-                  parent project. It is optional for proposals. Existing jobs can keep their current
-                  details until edited. Many jobs can use the same profile.
+                  parent project, and before submitting a project request. It is optional for
+                  proposals. Existing jobs can keep their current details until edited. Many jobs
+                  can use the same profile.
                 </p>
                 <p>
-                  Changes apply to all jobs that use the profile. Create a separate profile when one
-                  job needs different invoice details.
+                  Changes apply to all jobs and requests that use the profile. Create a separate
+                  profile when one job needs different invoice details.
                 </p>
               </HelpPopover>
             </div>
-            {#if canEdit && contacts.length > 0}<DsActionButton
+            {#if canCreateProfile && contacts.length > 0}<DsActionButton
                 action={editorHref("invoicing/add")}
                 icon="mdi:plus"
                 title="Add invoicing profile"
@@ -384,7 +397,7 @@
             onStateChange={(next) => updateList("invoicing", next)}
             emptyMessage={profiles.length
               ? "No invoicing profiles match this filter."
-              : invoicingEmptyMessage(canEdit, contacts.length > 0)}
+              : invoicingEmptyMessage($globalStore.claims, contacts.length > 0)}
           >
             {#snippet headline(profile)}
               {#if canEdit}<a

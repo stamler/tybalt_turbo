@@ -1,0 +1,54 @@
+{
+  "job": {
+    "id": "job1",
+    "client": "client1",
+    "description": "Saved scope",
+    "updated": "job-version-1",
+    "contact": "contact1",
+    "invoicing_information": "profile1",
+    "manager": "manager1",
+    "branch": "branch1",
+    "rate_sheet": "rate1",
+    "status": "Active",
+    "project_value": 1000,
+    "project_award_date": "2026-09-01",
+    "project_completion_date": "2026-12-01",
+    "location": "86VHQPRM+5C",
+    "time_and_materials": false,
+    "fn_agreement": false
+  },
+  "allocations": [{ "division": "division1", "hours": 9 }],
+  "editing": {
+    "id": "attachment1",
+    "job": "job1",
+    "version": 7,
+    "status": "Draft",
+    "project_value": 2000,
+    "assigned_approver": "reviewer"
+  },
+  "options": {
+    "clients": [{ "id": "client1", "name": "Test client" }],
+    "contacts": [
+      {
+        "id": "contact1",
+        "client": "client1",
+        "given_name": "Updated",
+        "surname": "Contact",
+        "email": "updated@example.com"
+      }
+    ],
+    "invoicing_profiles": [
+      {
+        "id": "profile1",
+        "client": "client1",
+        "contact": "contact1",
+        "name": "Updated invoicing profile",
+        "invoicing_instructions": "Email the invoice."
+      }
+    ],
+    "users": [{ "id": "manager1", "name": "Manager" }],
+    "branches": [{ "id": "branch1", "name": "Main" }],
+    "rate_sheets": [{ "id": "rate1", "name": "Standard", "revision": 1, "active": true }],
+    "divisions": [{ "id": "division1", "code": "ENG", "name": "Engineering", "active": true }]
+  }
+}

@@ -61,19 +61,8 @@ await runBrowserHarness(async (page, origin) => {
     assert.equal(await date.getAttribute("required"), null);
     assert.equal(await date.evaluate((input) => input.checkValidity()), true);
   }
-  for (const state of ["Active", "Closed"]) {
-    await status.selectOption(state);
-    await value.fill("0");
-    assert.equal(await value.evaluate((input) => input.validity.rangeUnderflow), true);
-    await value.fill("");
-    assert.equal(await value.evaluate((input) => input.validity.valueMissing), true);
-    await value.fill("1");
-    assert.equal(await value.evaluate((input) => input.checkValidity()), true);
-  }
-  await status.selectOption("Cancelled");
-  await value.fill("0");
-  assert.equal(await value.evaluate((input) => input.checkValidity()), true);
-  await value.fill("100000");
+  assert.equal(await value.isDisabled(), true, "effective value changes require approval");
+  await page.getByText("Propose a value change from job details.", { exact: true }).waitFor();
   await status.selectOption("Active");
   assert.equal(await date.evaluate((input) => input.validity.valueMissing), true);
   await date.fill("2035-12-31");
@@ -100,6 +89,7 @@ await runBrowserHarness(async (page, origin) => {
   await page.getByText("Enter a valid completion date.", { exact: true }).waitFor();
   assert.equal(saves.length, 1);
   assert.equal(saves[0].job.project_completion_date, "2025-02-01");
+  assert.equal(Object.hasOwn(saves[0].job, "project_value"), false);
 
   await page.goto(`${origin}/tests/fixtures/projectCompletionDate.html?proposal`);
   await page.locator('input[name="proposal_opening_date"]').waitFor();

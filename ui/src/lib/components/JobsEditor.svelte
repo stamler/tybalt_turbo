@@ -29,7 +29,7 @@
   import { branches as branchesStore } from "$lib/stores/branches";
   import { divisions } from "$lib/stores/divisions";
   import { rateSheets } from "$lib/stores/rateSheets";
-  import { jobsEditingEnabled } from "$lib/stores/appConfig";
+  import { jobsEditingEnabled, jobRequestsEnabled } from "$lib/stores/appConfig";
   import DsEditingDisabledBanner from "./DsEditingDisabledBanner.svelte";
   import DsCheck from "$lib/components/DsCheck.svelte";
   import { onMount, untrack } from "svelte";
@@ -60,6 +60,15 @@
   };
 
   const hasJobClaim = $derived($globalStore.claims.includes("job"));
+  // Managers and alternate managers without the job claim can change allocations only.
+  const managerAllocationsOnly = $derived(
+    !hasJobClaim &&
+      data.editing &&
+      data.id !== null &&
+      !!pb.authStore.record?.id &&
+      (data.item.manager === pb.authStore.record.id ||
+        data.item.alternate_manager === pb.authStore.record.id),
+  );
 
   let errors = $state({} as Record<string, { message: string }>);
   const restored = untrack(() =>
@@ -299,6 +308,8 @@
 
   function jobPayloadForSave(job: JobsRecord | (JobsRecord & Record<string, unknown>)) {
     const payload = { ...(job as Record<string, unknown>) };
+    // Changes to an existing project's value require approval from job details.
+    if (data.editing && !isProposal) delete payload.project_value;
     return payload;
   }
 
@@ -545,7 +556,13 @@
       setFieldError("allocations", "Allocation hours must be whole numbers.");
       return;
     }
-    const allocationsOnly = data.editing && JSON.stringify($state.snapshot(item)) === loadedJob;
+    if (managerAllocationsOnly && !allocationsLoaded) {
+      setFieldError("global", "Allocations have not loaded. Reload the page before saving.");
+      return;
+    }
+    const allocationsOnly =
+      managerAllocationsOnly ||
+      (data.editing && JSON.stringify($state.snapshot(item)) === loadedJob);
     if (
       !isProposal &&
       !allocationsOnly &&
@@ -565,7 +582,12 @@
       );
       return;
     }
-    if (item.manager && item.alternate_manager && item.manager === item.alternate_manager) {
+    if (
+      !allocationsOnly &&
+      item.manager &&
+      item.alternate_manager &&
+      item.manager === item.alternate_manager
+    ) {
       setFieldError("alternate_manager", alternateManagerErrorMessage);
       return;
     }
@@ -588,6 +610,13 @@
           body: { job: jobPayloadForSave(item), allocations },
         })) as { id: string };
         jobId = resp.id;
+      }
+
+      // Managers without the job claim open the editor from job details.
+      if (managerAllocationsOnly) {
+        clearClientWorkflowDraft();
+        await goto(`/jobs/${jobId}/details`);
+        return;
       }
 
       // Add new categories
@@ -827,6 +856,26 @@
     <p>Job creation and editing is temporarily disabled during a system transition.</p>
     <p>Please check back later or contact an administrator if you need immediate assistance.</p>
   </DsEditingDisabledBanner>
+{:else if !hasJobClaim && !managerAllocationsOnly}
+  <p class="p-4">The job permission is required to edit or create a job.</p>
+{:else if isNewJob && !isProposal && $jobRequestsEnabled}
+  <div class="space-y-3 p-4">
+    <p>New projects require an approved Project Request.</p>
+    <a
+      class="text-blue-700 underline"
+      href={(item as any).parent
+        ? `/job-requests/new?parent=${(item as any).parent}`
+        : item.proposal
+          ? `/job-requests/new?proposal=${item.proposal}`
+          : "/job-requests/new"}>Create Project Request</a
+    ><button
+      class="ml-3 rounded border px-3 py-2"
+      onclick={() => {
+        item.project_award_date = "";
+        item.proposal_opening_date = new Date().toLocaleDateString("en-CA");
+      }}>Create a proposal</button
+    >
+  </div>
 {:else if isCancelledProposal}
   <DsEditingDisabledBanner>
     <p>This proposal has been cancelled and cannot be modified.</p>
@@ -845,150 +894,153 @@
   >
     <h1 class="w-full text-xl font-bold text-neutral-800">
       {#if data.editing && item.number}
-        Editing {item.number}
+        {managerAllocationsOnly ? "Edit allocations for" : "Editing"} {item.number}
       {:else}
         Create Job
       {/if}
     </h1>
 
-    {#if (data as JobsPageData).existingReferencingProjects && (data as JobsPageData).existingReferencingProjects!.length > 0}
-      <div class="w-full rounded-sm border border-yellow-400 bg-yellow-50 p-3 text-yellow-800">
-        <p class="font-semibold">This proposal is already referenced by existing project(s):</p>
-        <ul class="mt-1 list-inside list-disc">
-          {#each (data as JobsPageData).existingReferencingProjects! as project}
-            <li>
-              <a
-                href="/jobs/{project.id}/details"
-                class="text-blue-600 underline hover:text-blue-800"
-              >
-                {project.number}
-              </a>
-            </li>
-          {/each}
-        </ul>
-        <p class="mt-2 text-sm">
-          Creating another project will result in multiple projects referencing the same proposal.
-        </p>
-      </div>
-    {/if}
+    {#if managerAllocationsOnly}
+      <p class="w-full">{item.description}</p>
+    {:else}
+      {#if (data as JobsPageData).existingReferencingProjects && (data as JobsPageData).existingReferencingProjects!.length > 0}
+        <div class="w-full rounded-sm border border-yellow-400 bg-yellow-50 p-3 text-yellow-800">
+          <p class="font-semibold">This proposal is already referenced by existing project(s):</p>
+          <ul class="mt-1 list-inside list-disc">
+            {#each (data as JobsPageData).existingReferencingProjects! as project}
+              <li>
+                <a
+                  href="/jobs/{project.id}/details"
+                  class="text-blue-600 underline hover:text-blue-800"
+                >
+                  {project.number}
+                </a>
+              </li>
+            {/each}
+          </ul>
+          <p class="mt-2 text-sm">
+            Creating another project will result in multiple projects referencing the same proposal.
+          </p>
+        </div>
+      {/if}
 
-    {#if !hideProjectDate}
-      <span
-        class="flex w-full items-center gap-2 {errors.project_award_date !== undefined
-          ? 'bg-red-200'
-          : ''}"
-      >
-        <label for="project_award_date">Project Award Date</label>
-        <DsDateInput
-          class="flex-1 md:flex-none"
-          name="project_award_date"
-          max={dateInputMax}
-          bind:value={item.project_award_date}
-        />
-        {#if item.project_award_date}
-          <DsActionButton
-            icon="mdi:close"
-            title="Clear date"
-            color="red"
-            action={() => (item.project_award_date = "")}
-          />
-        {/if}
-        {#if errors.project_award_date !== undefined}
-          <span class="text-red-600">{errors.project_award_date.message}</span>
-        {/if}
-      </span>
-    {/if}
-
-    {#if !isProposal}
-      <span
-        class="flex w-full items-center gap-2 {errors.project_completion_date !== undefined
-          ? 'bg-red-200'
-          : ''}"
-      >
-        <label
-          for="project_completion_date"
-          title="Required for Active projects. An estimate is acceptable. Update this date when the expected completion date changes."
-          >Project Completion Date{item.status === JobsStatusOptions.Active ? " *" : ""}</label
+      {#if !hideProjectDate}
+        <span
+          class="flex w-full items-center gap-2 {errors.project_award_date !== undefined
+            ? 'bg-red-200'
+            : ''}"
         >
-        <DsDateInput
-          class="flex-1 md:flex-none"
-          name="project_completion_date"
-          min={item.project_award_date || undefined}
-          required={item.status === JobsStatusOptions.Active}
-          bind:value={item.project_completion_date}
-        />
-        {#if item.project_completion_date}
-          <DsActionButton
-            icon="mdi:close"
-            title="Clear completion date"
-            color="red"
-            action={() => (item.project_completion_date = "")}
+          <label for="project_award_date">Project Award Date</label>
+          <DsDateInput
+            class="flex-1 md:flex-none"
+            name="project_award_date"
+            max={dateInputMax}
+            bind:value={item.project_award_date}
           />
-        {/if}
-        {#if errors.project_completion_date !== undefined}
-          <span class="text-red-600">{errors.project_completion_date.message}</span>
-        {/if}
-      </span>
-    {/if}
+          {#if item.project_award_date}
+            <DsActionButton
+              icon="mdi:close"
+              title="Clear date"
+              color="red"
+              action={() => (item.project_award_date = "")}
+            />
+          {/if}
+          {#if errors.project_award_date !== undefined}
+            <span class="text-red-600">{errors.project_award_date.message}</span>
+          {/if}
+        </span>
+      {/if}
 
-    {#if !hideProposalDates}
-      <span
-        class="flex w-full items-center gap-2 {errors.proposal_opening_date !== undefined
-          ? 'bg-red-200'
-          : ''}"
-      >
-        <label for="proposal_opening_date">Proposal Opening Date</label>
-        <DsDateInput
-          class="flex-1 md:flex-none"
-          name="proposal_opening_date"
-          max={dateInputMax}
-          bind:value={item.proposal_opening_date}
-        />
-        {#if item.proposal_opening_date}
-          <DsActionButton
-            icon="mdi:close"
-            title="Clear date"
-            color="red"
-            action={() => (item.proposal_opening_date = "")}
+      {#if !isProposal}
+        <span
+          class="flex w-full items-center gap-2 {errors.project_completion_date !== undefined
+            ? 'bg-red-200'
+            : ''}"
+        >
+          <label
+            for="project_completion_date"
+            title="Required for Active projects. An estimate is acceptable. Update this date when the expected completion date changes."
+            >Project Completion Date{item.status === JobsStatusOptions.Active ? " *" : ""}</label
+          >
+          <DsDateInput
+            class="flex-1 md:flex-none"
+            name="project_completion_date"
+            min={item.project_award_date || undefined}
+            required={item.status === JobsStatusOptions.Active}
+            bind:value={item.project_completion_date}
           />
-        {/if}
-        {#if errors.proposal_opening_date !== undefined}
-          <span class="text-red-600">{errors.proposal_opening_date.message}</span>
-        {/if}
-      </span>
+          {#if item.project_completion_date}
+            <DsActionButton
+              icon="mdi:close"
+              title="Clear completion date"
+              color="red"
+              action={() => (item.project_completion_date = "")}
+            />
+          {/if}
+          {#if errors.project_completion_date !== undefined}
+            <span class="text-red-600">{errors.project_completion_date.message}</span>
+          {/if}
+        </span>
+      {/if}
 
-      <span
-        class="flex w-full items-center gap-2 {errors.proposal_submission_due_date !== undefined
-          ? 'bg-red-200'
-          : ''}"
-      >
-        <label for="proposal_submission_due_date">Proposal Submission Due Date</label>
-        <DsDateInput
-          class="flex-1 md:flex-none"
-          name="proposal_submission_due_date"
-          max={dateInputMax}
-          bind:value={item.proposal_submission_due_date}
-        />
-        {#if item.proposal_submission_due_date}
-          <DsActionButton
-            icon="mdi:close"
-            title="Clear date"
-            color="red"
-            action={() => (item.proposal_submission_due_date = "")}
+      {#if !hideProposalDates}
+        <span
+          class="flex w-full items-center gap-2 {errors.proposal_opening_date !== undefined
+            ? 'bg-red-200'
+            : ''}"
+        >
+          <label for="proposal_opening_date">Proposal Opening Date</label>
+          <DsDateInput
+            class="flex-1 md:flex-none"
+            name="proposal_opening_date"
+            max={dateInputMax}
+            bind:value={item.proposal_opening_date}
           />
-        {/if}
-        {#if errors.proposal_submission_due_date !== undefined}
-          <span class="text-red-600">{errors.proposal_submission_due_date.message}</span>
-        {/if}
-      </span>
-    {/if}
+          {#if item.proposal_opening_date}
+            <DsActionButton
+              icon="mdi:close"
+              title="Clear date"
+              color="red"
+              action={() => (item.proposal_opening_date = "")}
+            />
+          {/if}
+          {#if errors.proposal_opening_date !== undefined}
+            <span class="text-red-600">{errors.proposal_opening_date.message}</span>
+          {/if}
+        </span>
 
-    <div class="flex w-full flex-col gap-1 {errors.location !== undefined ? 'bg-red-200' : ''}">
-      <label for="location">Location</label>
-      <DSLocationPicker bind:value={item.location as string} {errors} fieldName="location" />
-    </div>
+        <span
+          class="flex w-full items-center gap-2 {errors.proposal_submission_due_date !== undefined
+            ? 'bg-red-200'
+            : ''}"
+        >
+          <label for="proposal_submission_due_date">Proposal Submission Due Date</label>
+          <DsDateInput
+            class="flex-1 md:flex-none"
+            name="proposal_submission_due_date"
+            max={dateInputMax}
+            bind:value={item.proposal_submission_due_date}
+          />
+          {#if item.proposal_submission_due_date}
+            <DsActionButton
+              icon="mdi:close"
+              title="Clear date"
+              color="red"
+              action={() => (item.proposal_submission_due_date = "")}
+            />
+          {/if}
+          {#if errors.proposal_submission_due_date !== undefined}
+            <span class="text-red-600">{errors.proposal_submission_due_date.message}</span>
+          {/if}
+        </span>
+      {/if}
 
-    <!---
+      <div class="flex w-full flex-col gap-1 {errors.location !== undefined ? 'bg-red-200' : ''}">
+        <label for="location">Location</label>
+        <DSLocationPicker bind:value={item.location as string} {errors} fieldName="location" />
+      </div>
+
+      <!---
   <DsTextInput
     bind:value={item.number as string}
     {errors}
@@ -998,356 +1050,366 @@
   />
   <p class="self-start text-xs text-neutral-600">Number is auto-assigned on creation.</p>
 -->
-    <DsTextInput
-      bind:value={item.description as string}
-      {errors}
-      fieldName="description"
-      uiName="Description"
-    />
+      <DsTextInput
+        bind:value={item.description as string}
+        {errors}
+        fieldName="description"
+        uiName="Description"
+      />
 
-    {#if $clients.index !== null}
-      <div class="flex w-full items-end gap-1">
-        <div class="flex-1">
-          <DsAutoComplete
-            bind:value={item.client as string}
-            index={$clients.index}
-            {errors}
-            fieldName="client"
-            uiName="Client"
-            disabled={(data as JobsPageData).editing === false &&
-              (item as any).parent &&
-              (item as any).parent !== ""}
-          >
-            {#snippet resultTemplate(client)}{clientLabel({
-                name: client.name,
-                alias: client.alias,
-              })}{/snippet}
-          </DsAutoComplete>
-        </div>
-        {#if !item.client && hasJobClaim}
-          <DsActionButton
-            action={openAddClientPopover}
-            icon="feather:plus-circle"
-            color="green"
-            title="Add new client"
-          />
-        {/if}
-      </div>
-    {/if}
-
-    <div class="flex w-full flex-col gap-1 {errors.contact !== undefined ? 'bg-red-200' : ''}">
-      <div class="flex w-full items-end gap-1">
-        <span class="flex flex-1 gap-2">
-          <label for="contact">Client Contact</label>
-          <select
-            id="contact"
-            name="contact"
-            bind:value={item.contact}
-            class="flex-1 rounded-sm border border-neutral-300 px-1"
-            disabled={item.client === "" || client_contacts.length === 0}
-          >
-            <option value=""
-              >{item.client === "" ? "Select a client first" : "Select a contact"}</option
+      {#if $clients.index !== null}
+        <div class="flex w-full items-end gap-1">
+          <div class="flex-1">
+            <DsAutoComplete
+              bind:value={item.client as string}
+              index={$clients.index}
+              {errors}
+              fieldName="client"
+              uiName="Client"
+              disabled={(data.editing && !isProposal) || Boolean((item as any).parent)}
             >
-            {#each client_contacts as contact}
-              <option value={contact.id}>{formatContactName(contact)}</option>
-            {/each}
-          </select>
-        </span>
-        {#if item.client && !item.contact && hasJobClaim}
-          <DsActionButton
-            action={() => manageClient("contact")}
-            icon="feather:plus-circle"
-            color="green"
-            title="Add new contact"
-          />
-        {/if}
-      </div>
-      {#if errors.contact !== undefined}
-        <span class="text-red-600">{errors.contact.message}</span>
-      {/if}
-    </div>
-
-    {#if isProposal && item.client && hasJobClaim}
-      <button
-        type="button"
-        class="self-start text-sm text-blue-700 underline"
-        onclick={() => manageClient()}>Manage client contacts and invoicing</button
-      >
-    {/if}
-    {#if !isProposal}
-      <div
-        id="invoicing-profile-field"
-        class="flex w-full flex-col gap-1 {errors.invoicing_information !== undefined
-          ? 'bg-red-200'
-          : ''}"
-      >
-        <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
-          {#if item.client && !invoicingProfilesLoading && !invoicingProfilesError && invoicingProfiles.length}
-            <label for="invoicing_information">Invoicing profile</label>
-            <select
-              id="invoicing_information"
-              name="invoicing_information"
-              class="min-w-0 flex-1 rounded-sm border border-neutral-300 px-1"
-              bind:value={item.invoicing_information}
-              ><option value="">Select invoicing profile</option
-              >{#each invoicingProfiles as profile}<option value={profile.id}
-                  >{invoicingProfileLabel(profile)}</option
-                >{/each}</select
-            >
-            {#if hasJobClaim}<button
-                type="button"
-                class="text-sm text-blue-700 underline"
-                onclick={() => manageClient()}>Manage client contacts and invoicing</button
-              >{/if}
-          {:else}
-            <span>Invoicing profile</span>
-            {#if !item.client}
-              <span class="text-neutral-600">Select a client first.</span>
-            {:else if invoicingProfilesLoading}
-              <span role="status" class="text-neutral-600">Loading invoicing profiles…</span>
-            {:else if invoicingProfilesError}
-              <span role="alert" class="text-red-700">
-                Could not load invoicing profiles.
-                <button
-                  type="button"
-                  class="ml-1 text-blue-700 underline"
-                  onclick={() => loadInvoicingProfiles(item.client)}>Try again</button
-                >
-              </span>
-            {:else}
-              <InvoicingProfileEmptyState
-                canEdit={hasJobClaim}
-                hasContacts={client_contacts.length > 0}
-                oncreate={() => manageClient("invoicing")}
-                onaddcontact={() => manageClient("contact")}
-              />
-            {/if}
+              {#snippet resultTemplate(client)}{clientLabel({
+                  name: client.name,
+                  alias: client.alias,
+                })}{/snippet}
+            </DsAutoComplete>
+          </div>
+          {#if !item.client && hasJobClaim}
+            <DsActionButton
+              action={openAddClientPopover}
+              icon="feather:plus-circle"
+              color="green"
+              title="Add new client"
+            />
           {/if}
         </div>
-        {#if returnedProfile && item.invoicing_information === returnedProfile}
-          <p role="status" class="text-sm text-green-800">
-            Invoicing profile selected. Save the job to keep it.
-          </p>
-        {:else if data.editing && !item.invoicing_information}
-          <p class="text-sm text-neutral-700">
-            {invoicingProfiles.length
-              ? "This project has no invoicing profile yet. Choose one to save changes to the project; division hours can be saved without one."
-              : "Division hours can still be saved without an invoicing profile."}
-          </p>
-        {/if}
-        {#if errors.invoicing_information !== undefined}
-          <span class="text-red-600">{errors.invoicing_information.message}</span>
-        {/if}
-      </div>
-    {/if}
-
-    {#if $profiles.index !== null}
-      <DsAutoComplete
-        bind:value={item.manager as string}
-        index={$profiles.index}
-        idField="uid"
-        {errors}
-        fieldName="manager"
-        uiName="Manager"
-      >
-        {#snippet resultTemplate(item)}
-          {item.surname}, {item.given_name}
-        {/snippet}
-      </DsAutoComplete>
-    {/if}
-    {#if $profiles.index !== null}
-      <DsAutoComplete
-        bind:value={item.alternate_manager as string}
-        index={$profiles.index}
-        idField="uid"
-        {errors}
-        fieldName="alternate_manager"
-        uiName="Alternate Manager"
-        excludeIds={item.manager ? [item.manager] : []}
-      >
-        {#snippet resultTemplate(item)}
-          {item.surname}, {item.given_name}
-        {/snippet}
-      </DsAutoComplete>
-    {/if}
-
-    <DsCheck
-      bind:value={item.fn_agreement as boolean}
-      {errors}
-      fieldName="fn_agreement"
-      uiName="Has First Nation's agreement"
-    />
-
-    <DsSelector
-      bind:value={item.status as string}
-      items={statusOptionsList}
-      {errors}
-      fieldName="status"
-      uiName="Status"
-    >
-      {#snippet optionTemplate(item)}{item.name}{/snippet}
-    </DsSelector>
-    {#if !isProposal}
-      <p
-        class="cursor-help self-start text-sm text-neutral-600"
-        title="Use the status Closed if the purpose of this job is to act as a reporting container for many sub jobs. These “Parent” jobs can be billed to if their status is set to “Active”, however they are created as “Closed” by default. For example MTO retainers are usually created as Closed."
-      >
-        Creating a parent job? Use Closed.
-      </p>
-    {/if}
-
-    {#if isProposal}
-      <div
-        class="flex w-full flex-col gap-1"
-        class:bg-red-200={errors.proposal_value !== undefined}
-      >
-        <label class="text-sm font-semibold" for="proposal_value">Proposal Value ($)</label>
-        <input
-          id="proposal_value"
-          name="proposal_value"
-          type="number"
-          class="rounded-sm border border-neutral-300 px-2 py-1"
-          bind:value={item.proposal_value as number}
-          min={0}
-          step={1}
-          disabled={isCancelledProposal}
-        />
-        {#if errors.proposal_value !== undefined}
-          <span class="text-sm text-red-600">{errors.proposal_value.message}</span>
-        {/if}
-      </div>
-    {:else}
-      <div class="flex w-full flex-col gap-1" class:bg-red-200={errors.project_value !== undefined}>
-        <label class="text-sm font-semibold" for="project_value">Project Value ($)</label>
-        <input
-          id="project_value"
-          name="project_value"
-          type="number"
-          class="rounded-sm border border-neutral-300 px-2 py-1"
-          bind:value={item.project_value as number}
-          required={item.status === JobsStatusOptions.Active ||
-            item.status === JobsStatusOptions.Closed}
-          min={item.status === JobsStatusOptions.Active || item.status === JobsStatusOptions.Closed
-            ? 1
-            : 0}
-          step={1}
-        />
-        {#if errors.project_value !== undefined}
-          <span class="text-sm text-red-600">{errors.project_value.message}</span>
-        {/if}
-      </div>
-    {/if}
-
-    <DsCheck
-      bind:value={item.time_and_materials as boolean}
-      {errors}
-      fieldName="time_and_materials"
-      uiName="Time and Materials"
-      disabled={isCancelledProposal && isProposal}
-    />
-    <p class="self-start text-xs text-neutral-600">
-      {#if isProposal}
-        Proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be
-        marked as Time and Materials. If both, interpret proposal value as a maximum.
-      {:else}
-        Projects with status Active or Closed must have a project value greater than zero. For Time
-        and Materials projects, interpret project value as a maximum.
-      {/if}
-    </p>
-
-    {#if !isProposal && !isNewJob}
-      <DsSelector
-        bind:value={item.authorizing_document}
-        items={authorizingDocumentOptions}
-        {errors}
-        fieldName="authorizing_document"
-        uiName="Authorizing Document"
-      >
-        {#snippet optionTemplate(item)}{item.name}{/snippet}
-      </DsSelector>
-    {/if}
-    <DsTextInput bind:value={item.client_po} {errors} fieldName="client_po" uiName="Client PO" />
-    <DsTextInput
-      bind:value={item.client_reference_number}
-      {errors}
-      fieldName="client_reference_number"
-      uiName="Client Reference Number"
-    />
-
-    {#if !isProposal}
-      <div
-        class="flex w-full flex-col gap-1"
-        class:bg-red-200={errors.outstanding_balance !== undefined}
-      >
-        <label class="text-sm font-semibold" for="outstanding_balance">Outstanding Balance</label>
-        <input
-          id="outstanding_balance"
-          name="outstanding_balance"
-          type="number"
-          class="rounded-sm border border-neutral-300 px-2 py-1"
-          bind:value={item.outstanding_balance as number}
-          min={0}
-          step={0.01}
-        />
-        {#if errors.outstanding_balance !== undefined}
-          <span class="text-sm text-red-600">{errors.outstanding_balance.message}</span>
-        {/if}
-      </div>
-      {#if item.outstanding_balance_date}
-        <p class="self-start text-sm text-neutral-600">
-          Last updated: {item.outstanding_balance_date}
-        </p>
       {/if}
 
-      {#if $rateSheets.index !== null}
-        <DsAutoComplete
-          bind:value={(item as Record<string, unknown>).rate_sheet as string}
-          index={$rateSheets.index}
-          filter={activeRateSheetFilter}
-          {errors}
-          fieldName="rate_sheet"
-          uiName="Rate Sheet"
+      <div class="flex w-full flex-col gap-1 {errors.contact !== undefined ? 'bg-red-200' : ''}">
+        <div class="flex w-full items-end gap-1">
+          <span class="flex flex-1 gap-2">
+            <label for="contact">Client Contact</label>
+            <select
+              id="contact"
+              name="contact"
+              bind:value={item.contact}
+              class="flex-1 rounded-sm border border-neutral-300 px-1"
+              disabled={item.client === "" || client_contacts.length === 0}
+            >
+              <option value=""
+                >{item.client === "" ? "Select a client first" : "Select a contact"}</option
+              >
+              {#each client_contacts as contact}
+                <option value={contact.id}>{formatContactName(contact)}</option>
+              {/each}
+            </select>
+          </span>
+          {#if item.client && !item.contact && hasJobClaim}
+            <DsActionButton
+              action={() => manageClient("contact")}
+              icon="feather:plus-circle"
+              color="green"
+              title="Add new contact"
+            />
+          {/if}
+        </div>
+        {#if errors.contact !== undefined}
+          <span class="text-red-600">{errors.contact.message}</span>
+        {/if}
+      </div>
+
+      {#if isProposal && item.client && hasJobClaim}
+        <button
+          type="button"
+          class="self-start text-sm text-blue-700 underline"
+          onclick={() => manageClient()}>Manage client contacts and invoicing</button
         >
-          {#snippet resultTemplate(sheet)}
-            {sheet.name} (rev. {sheet.revision}) - {sheet.effective_date}
+      {/if}
+      {#if !isProposal}
+        <div
+          id="invoicing-profile-field"
+          class="flex w-full flex-col gap-1 {errors.invoicing_information !== undefined
+            ? 'bg-red-200'
+            : ''}"
+        >
+          <div class="flex w-full flex-wrap items-center gap-x-2 gap-y-1">
+            {#if item.client && !invoicingProfilesLoading && !invoicingProfilesError && invoicingProfiles.length}
+              <label for="invoicing_information">Invoicing profile</label>
+              <select
+                id="invoicing_information"
+                name="invoicing_information"
+                class="min-w-0 flex-1 rounded-sm border border-neutral-300 px-1"
+                bind:value={item.invoicing_information}
+                ><option value="">Select invoicing profile</option
+                >{#each invoicingProfiles as profile}<option value={profile.id}
+                    >{invoicingProfileLabel(profile)}</option
+                  >{/each}</select
+              >
+              {#if hasJobClaim}<button
+                  type="button"
+                  class="text-sm text-blue-700 underline"
+                  onclick={() => manageClient()}>Manage client contacts and invoicing</button
+                >{/if}
+            {:else}
+              <span>Invoicing profile</span>
+              {#if !item.client}
+                <span class="text-neutral-600">Select a client first.</span>
+              {:else if invoicingProfilesLoading}
+                <span role="status" class="text-neutral-600">Loading invoicing profiles…</span>
+              {:else if invoicingProfilesError}
+                <span role="alert" class="text-red-700">
+                  Could not load invoicing profiles.
+                  <button
+                    type="button"
+                    class="ml-1 text-blue-700 underline"
+                    onclick={() => loadInvoicingProfiles(item.client)}>Try again</button
+                  >
+                </span>
+              {:else}
+                <InvoicingProfileEmptyState
+                  canCreate={hasJobClaim}
+                  canManageContacts={hasJobClaim}
+                  hasContacts={client_contacts.length > 0}
+                  oncreate={() => manageClient("invoicing")}
+                  onaddcontact={() => manageClient("contact")}
+                />
+              {/if}
+            {/if}
+          </div>
+          {#if returnedProfile && item.invoicing_information === returnedProfile}
+            <p role="status" class="text-sm text-green-800">
+              Invoicing profile selected. Save the job to keep it.
+            </p>
+          {:else if data.editing && !item.invoicing_information}
+            <p class="text-sm text-neutral-700">
+              {invoicingProfiles.length
+                ? "This project has no invoicing profile yet. Choose one to save changes to the project; division hours can be saved without one."
+                : "Division hours can still be saved without an invoicing profile."}
+            </p>
+          {/if}
+          {#if errors.invoicing_information !== undefined}
+            <span class="text-red-600">{errors.invoicing_information.message}</span>
+          {/if}
+        </div>
+      {/if}
+
+      {#if $profiles.index !== null}
+        <DsAutoComplete
+          bind:value={item.manager as string}
+          index={$profiles.index}
+          idField="uid"
+          {errors}
+          fieldName="manager"
+          uiName="Manager"
+        >
+          {#snippet resultTemplate(item)}
+            {item.surname}, {item.given_name}
           {/snippet}
         </DsAutoComplete>
       {/if}
-    {/if}
+      {#if $profiles.index !== null}
+        <DsAutoComplete
+          bind:value={item.alternate_manager as string}
+          index={$profiles.index}
+          idField="uid"
+          {errors}
+          fieldName="alternate_manager"
+          uiName="Alternate Manager"
+          excludeIds={item.manager ? [item.manager] : []}
+        >
+          {#snippet resultTemplate(item)}
+            {item.surname}, {item.given_name}
+          {/snippet}
+        </DsAutoComplete>
+      {/if}
 
-    {#if $jobs.index !== null}
-      {@const proposalHasCustomError =
-        errors.proposal !== undefined &&
-        (errors.proposal as { message: string; proposalId?: string }).proposalId}
-      {@const proposalErrors = proposalHasCustomError ? {} : errors}
-      <DsAutoComplete
-        bind:value={item.proposal as string}
-        index={$jobs.index}
-        filter={proposalFilter}
-        errors={proposalErrors}
-        fieldName="proposal"
-        uiName="Proposal"
+      <DsCheck
+        bind:value={item.fn_agreement as boolean}
+        {errors}
+        fieldName="fn_agreement"
+        uiName="Has First Nation's agreement"
+      />
+
+      <DsSelector
+        bind:value={item.status as string}
+        items={statusOptionsList}
+        {errors}
+        fieldName="status"
+        uiName="Status"
       >
-        {#snippet resultTemplate(job)}{formatJobLabel(job)}{/snippet}
-      </DsAutoComplete>
-    {/if}
-    {#if errors.proposal !== undefined && (errors.proposal as { message: string; proposalId?: string }).proposalId}
-      <div class="w-full rounded-sm border border-red-300 bg-red-50 p-3 text-red-800">
-        <p class="font-semibold">Cannot create project from proposal</p>
-        <p class="mt-1">{errors.proposal.message}</p>
-        <p class="mt-2">
-          <a
-            href="/jobs/{(errors.proposal as { message: string; proposalId?: string })
-              .proposalId}/edit"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="text-blue-600 underline hover:text-blue-800"
-          >
-            Edit the proposal in a new tab →
-          </a>
+        {#snippet optionTemplate(item)}{item.name}{/snippet}
+      </DsSelector>
+      {#if !isProposal}
+        <p
+          class="cursor-help self-start text-sm text-neutral-600"
+          title="Use the status Closed if the purpose of this job is to act as a reporting container for many sub jobs. These “Parent” jobs can be billed to if their status is set to “Active”, however they are created as “Closed” by default. For example MTO retainers are usually created as Closed."
+        >
+          Creating a parent job? Use Closed.
         </p>
-      </div>
+      {/if}
+
+      {#if isProposal}
+        <div
+          class="flex w-full flex-col gap-1"
+          class:bg-red-200={errors.proposal_value !== undefined}
+        >
+          <label class="text-sm font-semibold" for="proposal_value">Proposal Value ($)</label>
+          <input
+            id="proposal_value"
+            name="proposal_value"
+            type="number"
+            class="rounded-sm border border-neutral-300 px-2 py-1"
+            bind:value={item.proposal_value as number}
+            min={0}
+            step={1}
+            disabled={isCancelledProposal}
+          />
+          {#if errors.proposal_value !== undefined}
+            <span class="text-sm text-red-600">{errors.proposal_value.message}</span>
+          {/if}
+        </div>
+      {:else}
+        <div
+          class="flex w-full flex-col gap-1"
+          class:bg-red-200={errors.project_value !== undefined}
+        >
+          <label class="text-sm font-semibold" for="project_value">Project Value ($)</label>
+          <input
+            id="project_value"
+            name="project_value"
+            disabled={data.editing}
+            type="number"
+            class="rounded-sm border border-neutral-300 px-2 py-1"
+            bind:value={item.project_value as number}
+            required={item.status === JobsStatusOptions.Active ||
+              item.status === JobsStatusOptions.Closed}
+            min={item.status === JobsStatusOptions.Active ||
+            item.status === JobsStatusOptions.Closed
+              ? 1
+              : 0}
+            step={1}
+          />
+          {#if data.editing}<a
+              href={`/jobs/${data.id}/details`}
+              class="text-sm text-blue-700 underline">Propose a value change from job details.</a
+            >{/if}
+          {#if errors.project_value !== undefined}
+            <span class="text-sm text-red-600">{errors.project_value.message}</span>
+          {/if}
+        </div>
+      {/if}
+
+      <DsCheck
+        bind:value={item.time_and_materials as boolean}
+        {errors}
+        fieldName="time_and_materials"
+        uiName="Time and Materials"
+        disabled={isCancelledProposal && isProposal}
+      />
+      <p class="self-start text-xs text-neutral-600">
+        {#if isProposal}
+          Proposals with status Submitted, Awarded, or Not Awarded must have a proposal value or be
+          marked as Time and Materials. If both, interpret proposal value as a maximum.
+        {:else}
+          Project value is the full amount charged to the client, in CAD before tax. Both fixed-fee
+          and time and materials work require a positive whole-dollar value. Changes to an existing
+          job value require a PDF and approval.
+        {/if}
+      </p>
+
+      {#if !isProposal && !isNewJob}
+        <DsSelector
+          bind:value={item.authorizing_document}
+          items={authorizingDocumentOptions}
+          {errors}
+          fieldName="authorizing_document"
+          uiName="Authorizing Document"
+        >
+          {#snippet optionTemplate(item)}{item.name}{/snippet}
+        </DsSelector>
+      {/if}
+      <DsTextInput bind:value={item.client_po} {errors} fieldName="client_po" uiName="Client PO" />
+      <DsTextInput
+        bind:value={item.client_reference_number}
+        {errors}
+        fieldName="client_reference_number"
+        uiName="Client Reference Number"
+      />
+
+      {#if !isProposal}
+        <div
+          class="flex w-full flex-col gap-1"
+          class:bg-red-200={errors.outstanding_balance !== undefined}
+        >
+          <label class="text-sm font-semibold" for="outstanding_balance">Outstanding Balance</label>
+          <input
+            id="outstanding_balance"
+            name="outstanding_balance"
+            type="number"
+            class="rounded-sm border border-neutral-300 px-2 py-1"
+            bind:value={item.outstanding_balance as number}
+            min={0}
+            step={0.01}
+          />
+          {#if errors.outstanding_balance !== undefined}
+            <span class="text-sm text-red-600">{errors.outstanding_balance.message}</span>
+          {/if}
+        </div>
+        {#if item.outstanding_balance_date}
+          <p class="self-start text-sm text-neutral-600">
+            Last updated: {item.outstanding_balance_date}
+          </p>
+        {/if}
+
+        {#if $rateSheets.index !== null}
+          <DsAutoComplete
+            bind:value={(item as Record<string, unknown>).rate_sheet as string}
+            index={$rateSheets.index}
+            filter={activeRateSheetFilter}
+            {errors}
+            fieldName="rate_sheet"
+            uiName="Rate Sheet"
+          >
+            {#snippet resultTemplate(sheet)}
+              {sheet.name} (rev. {sheet.revision}) - {sheet.effective_date}
+            {/snippet}
+          </DsAutoComplete>
+        {/if}
+      {/if}
+
+      {#if $jobs.index !== null}
+        {@const proposalHasCustomError =
+          errors.proposal !== undefined &&
+          (errors.proposal as { message: string; proposalId?: string }).proposalId}
+        {@const proposalErrors = proposalHasCustomError ? {} : errors}
+        <DsAutoComplete
+          bind:value={item.proposal as string}
+          index={$jobs.index}
+          filter={proposalFilter}
+          errors={proposalErrors}
+          fieldName="proposal"
+          uiName="Proposal"
+        >
+          {#snippet resultTemplate(job)}{formatJobLabel(job)}{/snippet}
+        </DsAutoComplete>
+      {/if}
+      {#if errors.proposal !== undefined && (errors.proposal as { message: string; proposalId?: string }).proposalId}
+        <div class="w-full rounded-sm border border-red-300 bg-red-50 p-3 text-red-800">
+          <p class="font-semibold">Cannot create project from proposal</p>
+          <p class="mt-1">{errors.proposal.message}</p>
+          <p class="mt-2">
+            <a
+              href="/jobs/{(errors.proposal as { message: string; proposalId?: string })
+                .proposalId}/edit"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-blue-600 underline hover:text-blue-800"
+            >
+              Edit the proposal in a new tab →
+            </a>
+          </p>
+        </div>
+      {/if}
     {/if}
 
     {#if $divisions.index !== null}
@@ -1403,87 +1465,89 @@
       </div>
     {/if}
 
-    {#if $clients.index !== null}
-      <DsAutoComplete
-        bind:value={item.job_owner as string}
-        index={$clients.index}
-        {errors}
-        fieldName="job_owner"
-        uiName="Job Owner"
-      >
-        {#snippet resultTemplate(item)}{clientLabel({
-            name: item.name,
-            alias: item.alias,
-          })}{/snippet}
-      </DsAutoComplete>
-    {/if}
-
-    <div class="flex w-full gap-2 {errors.branch !== undefined ? 'bg-red-200' : ''}">
-      <span class="flex w-full gap-2">
-        <label for="branch">Branch</label>
-        <select
-          id="branch"
-          name="branch"
-          bind:value={item.branch}
-          class="flex-1 rounded-sm border border-neutral-300 px-1"
-        >
-          <option value="">Select a branch</option>
-          {#each $branchesStore.items as branch}
-            <option value={branch.id}>{branch.code ?? branch.name}</option>
-          {/each}
-        </select>
-      </span>
-      {#if errors.branch !== undefined}
-        <span class="text-red-600">{errors.branch.message}</span>
-      {/if}
-    </div>
-
-    <div class="flex w-full flex-col gap-2 {errors.categories !== undefined ? 'bg-red-200' : ''}">
-      <label for="categories">Categories</label>
-      <div class="flex flex-wrap gap-1">
-        {#each categories as category}
-          <span class="flex items-center rounded-full bg-neutral-200 px-2">
-            <span>{category.name}</span>
-            <button
-              class="text-neutral-500"
-              onclick={preventDefault(() => removeCategory(category.id))}
-            >
-              &times;
-            </button>
-          </span>
-        {/each}
-        {#each newCategories as categoryName}
-          <span class="flex items-center rounded-full bg-neutral-200 px-2">
-            <span>{categoryName}</span>
-            <button
-              class="text-neutral-500"
-              onclick={preventDefault(
-                () => (newCategories = newCategories.filter((name) => name !== categoryName)),
-              )}
-            >
-              &times;
-            </button>
-          </span>
-        {/each}
-      </div>
-      <div class="flex items-center gap-1">
-        <DsTextInput
-          bind:value={newCategory as string}
+    {#if !managerAllocationsOnly}
+      {#if $clients.index !== null}
+        <DsAutoComplete
+          bind:value={item.job_owner as string}
+          index={$clients.index}
           {errors}
-          fieldName="newCategory"
-          uiName="Add Category"
-        />
-        <DsActionButton
-          action={addCategory}
-          icon="feather:plus-circle"
-          color="green"
-          title="Add Category"
-        />
-      </div>
-      {#if errors.categories !== undefined}
-        <span class="text-red-600">{errors.categories.message}</span>
+          fieldName="job_owner"
+          uiName="Job Owner"
+        >
+          {#snippet resultTemplate(item)}{clientLabel({
+              name: item.name,
+              alias: item.alias,
+            })}{/snippet}
+        </DsAutoComplete>
       {/if}
-    </div>
+
+      <div class="flex w-full gap-2 {errors.branch !== undefined ? 'bg-red-200' : ''}">
+        <span class="flex w-full gap-2">
+          <label for="branch">Branch</label>
+          <select
+            id="branch"
+            name="branch"
+            bind:value={item.branch}
+            class="flex-1 rounded-sm border border-neutral-300 px-1"
+          >
+            <option value="">Select a branch</option>
+            {#each $branchesStore.items as branch}
+              <option value={branch.id}>{branch.code ?? branch.name}</option>
+            {/each}
+          </select>
+        </span>
+        {#if errors.branch !== undefined}
+          <span class="text-red-600">{errors.branch.message}</span>
+        {/if}
+      </div>
+
+      <div class="flex w-full flex-col gap-2 {errors.categories !== undefined ? 'bg-red-200' : ''}">
+        <label for="categories">Categories</label>
+        <div class="flex flex-wrap gap-1">
+          {#each categories as category}
+            <span class="flex items-center rounded-full bg-neutral-200 px-2">
+              <span>{category.name}</span>
+              <button
+                class="text-neutral-500"
+                onclick={preventDefault(() => removeCategory(category.id))}
+              >
+                &times;
+              </button>
+            </span>
+          {/each}
+          {#each newCategories as categoryName}
+            <span class="flex items-center rounded-full bg-neutral-200 px-2">
+              <span>{categoryName}</span>
+              <button
+                class="text-neutral-500"
+                onclick={preventDefault(
+                  () => (newCategories = newCategories.filter((name) => name !== categoryName)),
+                )}
+              >
+                &times;
+              </button>
+            </span>
+          {/each}
+        </div>
+        <div class="flex items-center gap-1">
+          <DsTextInput
+            bind:value={newCategory as string}
+            {errors}
+            fieldName="newCategory"
+            uiName="Add Category"
+          />
+          <DsActionButton
+            action={addCategory}
+            icon="feather:plus-circle"
+            color="green"
+            title="Add Category"
+          />
+        </div>
+        {#if errors.categories !== undefined}
+          <span class="text-red-600">{errors.categories.message}</span>
+        {/if}
+      </div>
+    {/if}
 
     <div class="flex w-full flex-col gap-2 {errors.global !== undefined ? 'bg-red-200' : ''}">
       <span class="flex w-full gap-2">

@@ -6,7 +6,11 @@ import type PocketBase from "pocketbase";
 import type { RecordService } from "pocketbase";
 
 export enum Collections {
+  JobRequestAllocations = "job_request_allocations",
+  JobAttachments = "job_attachments",
+  JobRequests = "job_requests",
   ClientInvoicingInformation = "client_invoicing_information",
+  ProjectAuthorizationProps = "project_authorization_props",
   Authorigins = "_authOrigins",
   Externalauths = "_externalAuths",
   Mfas = "_mfas",
@@ -263,6 +267,7 @@ export type ClientContactsRecord = {
   email: string;
   given_name: string;
   id: string;
+  no_email?: boolean;
   surname: string;
   updated: IsoDateString;
 };
@@ -536,6 +541,11 @@ export enum JobsStatusOptions {
 }
 export type JobsRecord = {
   invoicing_information?: RecordIdString;
+  request_creator: RecordIdString;
+  request_created: IsoDateString;
+  request_submitted: IsoDateString;
+  created_by: RecordIdString;
+  creation_completed: IsoDateString;
   _imported: boolean;
   alternate_manager: RecordIdString;
   authorizing_document: string;
@@ -1237,7 +1247,11 @@ export type ZipCacheResponse<Tfilenames = unknown, Thashes = unknown, Texpand = 
 // Types containing all Records and Responses, useful for creating typing helper functions
 
 export type CollectionRecords = {
+  job_request_allocations: JobRequestAllocationsRecord;
+  job_attachments: JobAttachmentsRecord;
+  job_requests: JobRequestsRecord;
   client_invoicing_information: ClientInvoicingInformationRecord;
+  project_authorization_props: ProjectAuthorizationPropsRecord;
   _authOrigins: AuthoriginsRecord;
   _externalAuths: ExternalauthsRecord;
   _mfas: MfasRecord;
@@ -1293,7 +1307,11 @@ export type CollectionRecords = {
 };
 
 export type CollectionResponses = {
+  job_request_allocations: JobRequestAllocationsResponse;
+  job_attachments: JobAttachmentsResponse;
+  job_requests: JobRequestsResponse;
   client_invoicing_information: ClientInvoicingInformationResponse;
+  project_authorization_props: ProjectAuthorizationPropsResponse;
   _authOrigins: AuthoriginsResponse;
   _externalAuths: ExternalauthsResponse;
   _mfas: MfasResponse;
@@ -1458,6 +1476,16 @@ export type ClientDetails = {
   referencing_jobs_count: number;
 };
 
+export type ProjectAuthorizationPropsRecord = {
+  id: string;
+  created: IsoDateString;
+  updated: IsoDateString;
+  user_claim: RecordIdString;
+  max_value: number;
+};
+export type ProjectAuthorizationPropsResponse<Texpand = unknown> = ProjectAuthorizationPropsRecord &
+  BaseSystemFields<Texpand>;
+
 export type ClientInvoicingInformationRecord = {
   id: string;
   created: IsoDateString;
@@ -1472,3 +1500,84 @@ export type ClientInvoicingInformationRecord = {
 };
 export type ClientInvoicingInformationResponse<Texpand = unknown> =
   ClientInvoicingInformationRecord & BaseSystemFields<Texpand>;
+
+export type JobRequestsRecord = {
+  id: string;
+  created: IsoDateString;
+  updated: IsoDateString;
+  creator: RecordIdString;
+  status: "Draft" | "Awaiting approval" | "Awaiting creation" | "Rejected" | "Recalled" | "";
+  project_status: "Active" | "Closed" | "";
+  version: number;
+  /** Server-owned identity of the current submission; empty until submitted or after recall/rejection. */
+  submission_token: string;
+  approver: RecordIdString;
+  submitted: IsoDateString;
+  rejected: IsoDateString;
+  last_edited: IsoDateString;
+  rejector: RecordIdString;
+  rejection_reason: string;
+  client: RecordIdString;
+  job_owner: RecordIdString;
+  contact: RecordIdString;
+  manager: RecordIdString;
+  alternate_manager: RecordIdString;
+  branch: RecordIdString;
+  rate_sheet: RecordIdString;
+  parent: RecordIdString;
+  proposal: RecordIdString;
+  invoicing_information: RecordIdString;
+  description: string;
+  location: string;
+  client_po: string;
+  client_reference_number: string;
+  project_award_date: string;
+  project_completion_date: string;
+  project_value: number;
+  time_and_materials: boolean;
+  time_and_materials_set: boolean;
+  fn_agreement_answer: "Yes" | "No" | "";
+};
+export type JobRequestsResponse<Texpand = unknown> = JobRequestsRecord & BaseSystemFields<Texpand>;
+
+export type JobAttachmentsRecord = {
+  id: string;
+  created: IsoDateString;
+  updated: IsoDateString;
+  request: RecordIdString;
+  job: RecordIdString;
+  document: string;
+  document_hash: string;
+  uploader: RecordIdString;
+  uploaded: IsoDateString;
+  project_value: number;
+  status: "Pending" | "Approved" | "Rejected" | "";
+  assigned_approver: RecordIdString;
+  approver: RecordIdString;
+  approved: IsoDateString;
+  previous_project_value: number;
+  approval_max_value: number;
+  request_version: number;
+  approval_sequence: number;
+  version: number;
+  initial_approval: boolean;
+  checklist_version: number;
+  checklist_answers: Record<string, boolean>;
+  rejector: RecordIdString;
+  rejected: IsoDateString;
+  rejection_reason: string;
+  review_token: string;
+};
+export type JobAttachmentsResponse<Texpand = unknown> = JobAttachmentsRecord &
+  BaseSystemFields<Texpand>;
+
+export type JobRequestAllocationsRecord = {
+  id: string;
+  created: IsoDateString;
+  updated: IsoDateString;
+  request: RecordIdString;
+  division: RecordIdString;
+  hours: number;
+};
+export type JobRequestAllocationsResponse<Texpand = unknown> = JobRequestAllocationsRecord &
+  BaseSystemFields<Texpand>;

@@ -173,3 +173,7 @@ export const appConfig = {
   init,
   unsubscribe,
 };
+
+export const jobRequestsEnabled = derived(store, ($store) =>
+  getConfigBool($store.items, "jobs", "require_job_request_approval", false),
+);

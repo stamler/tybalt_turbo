@@ -10,10 +10,13 @@ type DraftEnvelope = {
 
 const prefix = "client-workspace-draft:";
 const lifetime = 4 * 60 * 60 * 1000;
+// The in-memory copy also keeps a selected PDF while navigating in this tab.
+// Session storage keeps only text, so a browser reload requires reselecting it.
+const memory = new Map<string, DraftEnvelope>();
 
 function storedDraft(token: string): DraftEnvelope | null {
   try {
-    return JSON.parse(sessionStorage.getItem(prefix + token) || "null");
+    return memory.get(token) ?? JSON.parse(sessionStorage.getItem(prefix + token) || "null");
   } catch {
     return null;
   }
@@ -32,13 +35,24 @@ export function safeWorkflowReturn(value: string | null | undefined): string | n
     const url = new URL(value, "https://workspace.invalid");
     if (url.origin !== "https://workspace.invalid") return null;
     if (
-      !/^\/jobs\/(?:add(?:\/(?:from\/)?[a-zA-Z0-9_-]+)?|[a-zA-Z0-9_-]+\/edit)$/.test(url.pathname)
+      !/^\/job-requests\/(?:new|[a-zA-Z0-9_-]+)$/.test(url.pathname) &&
+      !/^\/jobs\/(?:value-approvals|add(?:\/(?:from\/)?[a-zA-Z0-9_-]+)?|[a-zA-Z0-9_-]+\/(?:edit|details))$/.test(
+        url.pathname,
+      )
     )
       return null;
     return `${url.pathname}${url.search}${url.hash}`;
   } catch {
     return null;
   }
+}
+
+// Name the form a workflow return leads back to.
+export function workflowFormName(workflowReturn: string): string {
+  if (workflowReturn.startsWith("/job-requests/")) return "project request";
+  if (/^\/jobs\/(?:value-approvals|[^/]+\/details)(?:[?#]|$)/.test(workflowReturn))
+    return "value change";
+  return "job form";
 }
 
 export type ClientWorkflowTarget = "workspace" | "contact" | "invoicing";
@@ -66,6 +80,11 @@ export function keepClientWorkflowDraft(
   };
   // Save the draft for reloads and same-tab navigation.
   sessionStorage.setItem(prefix + token, JSON.stringify(draft));
+  for (const [key, previous] of memory) {
+    if (previous.kind === kind && previous.user === user && previous.path === draft.path)
+      memory.delete(key);
+  }
+  memory.set(token, draft);
   // Remove unreadable and expired drafts, and earlier drafts for this form: old
   // workspace history entries must not bring a superseded draft back to life.
   for (const key of Object.keys(sessionStorage)) {
@@ -73,8 +92,10 @@ export function keepClientWorkflowDraft(
     const previous = storedDraft(key.slice(prefix.length));
     const superseded =
       previous?.kind === kind && previous.user === user && previous.path === draft.path;
-    if (!previous || superseded || Date.now() - previous.created > lifetime)
+    if (!previous || superseded || Date.now() - previous.created > lifetime) {
       sessionStorage.removeItem(key);
+      memory.delete(key.slice(prefix.length));
+    }
   }
   current.searchParams.set("client_draft", token);
   const formUrl = `${current.pathname}${current.search}${current.hash}`;
@@ -101,8 +122,18 @@ export function readClientWorkflowDraft<T>(kind: string, user: string): T | null
     : null;
 }
 
+// The draft kind and payload field that hold the profile for each originating form.
+function draftTarget(pathname: string): { kind: string; field: string } {
+  const [, section, id, action] = pathname.split("/");
+  if (section === "job-requests") return { kind: `request:${id}`, field: "item" };
+  if (id === "add") return { kind: "job:new", field: "item" };
+  if (id === "value-approvals") return { kind: "job-value:queue", field: "correctionJob" };
+  if (action === "details") return { kind: `job-value:${id}`, field: "correctionJob" };
+  return { kind: `job:${id}`, field: "item" };
+}
+
 // Select a created, copied, or reused profile only in the originating form.
-// Saving the profile does not save the job draft.
+// Saving the profile does not save the job, request, or value-change draft.
 export function selectClientWorkflowProfile(
   workflowReturn: string | null | undefined,
   user: string,
@@ -114,17 +145,18 @@ export function selectClientWorkflowProfile(
     return null;
   const url = new URL(destination, "https://workspace.invalid");
   const token = url.searchParams.get("client_draft");
-  const stored = token ? storedDraft(token) : null;
-  const formId = url.pathname.split("/")[2];
-  const kind = formId === "add" ? "job:new" : `job:${formId}`;
+  if (!token) return null;
+  const stored = storedDraft(token);
+  const { kind, field } = draftTarget(url.pathname);
   if (!isUsable(stored, user, url.pathname) || stored.kind !== kind) return null;
-  const payload = stored.payload as { item?: Record<string, unknown> } | null;
-  if (!payload?.item || payload.item.client !== clientId) return null;
+  const payload = stored.payload as Record<string, unknown> | null;
+  const item = payload?.[field] as Record<string, unknown> | undefined;
+  if (!item || item.client !== clientId) return null;
   const updated: DraftEnvelope = {
     ...stored,
     payload: {
       ...payload,
-      item: { ...payload.item, invoicing_information: profileId },
+      [field]: { ...item, invoicing_information: profileId },
       selectedProfile: profileId,
     },
   };
@@ -134,6 +166,7 @@ export function selectClientWorkflowProfile(
   } catch {
     return null;
   }
+  memory.set(token, updated);
   return destination;
 }
 
@@ -141,6 +174,7 @@ export function clearClientWorkflowDraft(): void {
   if (typeof window === "undefined") return;
   const token = new URL(window.location.href).searchParams.get("client_draft");
   if (!token) return;
+  memory.delete(token);
   try {
     sessionStorage.removeItem(prefix + token);
   } catch {

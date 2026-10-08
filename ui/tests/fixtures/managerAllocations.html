@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Manager allocation browser tests</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { mount } from "svelte";
+      import JobsEditor from "../../src/lib/components/JobsEditor.svelte";
+      import { globalStore } from "$lib/stores/global";
+      import { pb } from "$lib/pocketbase";
+      import item from "./projectCompletionDate.json";
+      import "/src/app.css";
+      const role = new URLSearchParams(location.search).get("role") || "manager";
+      globalStore.set({ claims: role === "job" ? ["job"] : [] });
+      pb.authStore.save("test-token", { id: "allocation-manager", collectionName: "users" });
+      // Change only the assignment to test both managers and a user with no access.
+      if (role === "manager" || role === "alternate_manager") item[role] = "allocation-manager";
+      mount(JobsEditor, {
+        target: document.getElementById("app"),
+        props: { data: { item, id: item.id, editing: true, categories: [] } },
+      });
+    </script>
+  </body>
+</html>

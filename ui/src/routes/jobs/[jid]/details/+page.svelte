@@ -7,6 +7,7 @@
   import { onMount } from "svelte";
   import DSTabBar, { type TabItem } from "$lib/components/DSTabBar.svelte";
   import InvoicingInstructions from "$lib/components/clients/InvoicingInstructions.svelte";
+  import JobValueHistory from "$lib/components/jobs/JobValueHistory.svelte";
   import JobDetailTab from "$lib/components/jobs/JobDetailTab.svelte";
   import TimeTabContent from "$lib/components/jobs/TimeTabContent.svelte";
   import ExpensesTabContent from "$lib/components/jobs/ExpensesTabContent.svelte";
@@ -20,7 +21,7 @@
   import { pb } from "$lib/pocketbase";
   import { goto, invalidateAll } from "$app/navigation";
   import { globalStore } from "$lib/stores/global";
-  import { jobsEditingEnabled } from "$lib/stores/appConfig";
+  import { jobsEditingEnabled, jobRequestsEnabled } from "$lib/stores/appConfig";
   import type { FilterDef } from "$lib/components/jobs/types";
   import { formatCurrency, shortDate } from "$lib/utilities";
   import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
@@ -45,6 +46,10 @@
 
   // Validate proposal and redirect to create project or edit page
   async function handleCreateReferencingProject() {
+    if ($jobRequestsEnabled) {
+      await goto(`/job-requests/new?proposal=${data.job.id}`);
+      return;
+    }
     if (validatingForProject) return;
     validatingForProject = true;
     try {
@@ -80,8 +85,19 @@
   let { data }: { data: PageData } = $props();
   let isProposal = $derived(data.job.number?.startsWith("P") ?? false);
   const canFastCloseImportedProject = $derived(
-    !isProposal && data.job.status === "Active" && data.job.imported === true,
+    !isProposal &&
+      data.job.status === "Active" &&
+      data.job.imported === true &&
+      $jobsEditingEnabled &&
+      $globalStore.claims.includes("job"),
   );
+  // With request approval, holders of time start projects through a request.
+  const canStartProject = $derived(
+    $jobRequestsEnabled
+      ? $globalStore.claims.includes("time")
+      : $globalStore.claims.includes("job"),
+  );
+  const currentUserID = $derived(pb.authStore.record?.id ?? "");
   const canSetNumber = $derived($jobsEditingEnabled && $globalStore.claims.includes("admin"));
   const hasNumberHierarchyWarning = $derived(
     Boolean(data.job.parent_number) ||
@@ -402,23 +418,29 @@
   <div class="flex items-center justify-between gap-2">
     <h1 class="text-2xl font-bold">Job Details</h1>
     <div class="flex items-center gap-2">
-      {#if data.job.number?.startsWith("P")}
+      {#if data.job.number?.startsWith("P") && canStartProject && data.job.status !== "Awarded"}
         <DsActionButton
           action={handleCreateReferencingProject}
           icon="mdi:briefcase-plus"
-          title="Create referencing project"
+          title={$jobRequestsEnabled
+            ? "Create Project Request from Proposal"
+            : "Create referencing project"}
           color="yellow"
           loading={validatingForProject}
         />
       {/if}
-      {#if data.job.number?.startsWith("P") && data.job.status === "Awarded"}
+      {#if data.job.number?.startsWith("P") && data.job.status === "Awarded" && canStartProject}
         <DsActionButton
-          action={`/jobs/add/from/${data.job.id}`}
+          action={$jobRequestsEnabled
+            ? `/job-requests/new?proposal=${data.job.id}`
+            : `/jobs/add/from/${data.job.id}`}
           icon="mdi:plus"
-          title="Create Project from Proposal"
+          title={$jobRequestsEnabled
+            ? "Create Project Request from Proposal"
+            : "Create Project from Proposal"}
           color="green"
         />
-      {:else if data.job.number?.startsWith("P") && data.job.status === "Submitted"}
+      {:else if data.job.number?.startsWith("P") && data.job.status === "Submitted" && $globalStore.claims.includes("job")}
         {#key data.job.id}
           <DsActionButton
             action={async () => {
@@ -455,12 +477,12 @@
           loading={closingImportedProject}
         />
       {/if}
-      <DsActionButton
-        action={`/jobs/${data.job.id}/edit`}
-        icon="mdi:pencil"
-        title="Edit Job"
-        color="blue"
-      />
+      {#if $globalStore.claims.includes("job") || (currentUserID && (data.job.manager?.id === currentUserID || data.job.alternate_manager?.id === currentUserID))}<DsActionButton
+          action={`/jobs/${data.job.id}/edit`}
+          icon="mdi:pencil"
+          title={$globalStore.claims.includes("job") ? "Edit Job" : "Edit allocations"}
+          color="blue"
+        />{/if}
     </div>
   </div>
 
@@ -523,8 +545,13 @@
       {#if canSetNumber}
         <DsActionButton action={openSetNumberModal} color="yellow">Change Number</DsActionButton>
       {/if}
-      {#if data.job.number && !data.job.number.startsWith("P") && /^\d{2}-\d{3,4}$/.test(data.job.number)}
-        <a href={`/jobs/add/${data.job.id}`} class="ml-2 text-blue-600 underline">Create Sub-Job</a>
+      {#if data.job.number && !data.job.number.startsWith("P") && /^\d{2}-\d{3,4}$/.test(data.job.number) && canStartProject}
+        <a
+          href={$jobRequestsEnabled
+            ? `/job-requests/new?parent=${data.job.id}`
+            : `/jobs/add/${data.job.id}`}
+          class="ml-2 text-blue-600 underline">Create Subjob</a
+        >
       {/if}
     </div>
     <div><span class="font-semibold">Description:</span> {data.job.description}</div>
@@ -798,6 +825,20 @@
       notesEndpoint={`/api/jobs/${data.job.id}/notes`}
     />
   </div>
+
+  {#if !isProposal && $globalStore.claims.some( (claim) => ["job", "admin", "project_authorization"].includes(claim) )}
+    {#if data.job.request_creator}<section class="rounded border p-4">
+        <h2 class="font-semibold">Project request origin</h2>
+        <p>
+          Requested by: {data.job.request_creator} · Created: {data.job.request_created} · Submitted:
+          {data.job.request_submitted}
+        </p>
+        <p>Job created by: {data.job.created_by} · Created: {data.job.creation_completed}</p>
+      </section>{/if}
+    {#key data.job.id}
+      <JobValueHistory jobId={data.job.id} effectiveValue={data.job.project_value} />
+    {/key}
+  {/if}
 
   <!-- Tab Bar -->
   <DSTabBar {tabs} />

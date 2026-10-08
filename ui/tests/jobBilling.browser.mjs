@@ -118,7 +118,6 @@ await runBrowserHarness(
     const assertDraft = async (profileId) => {
       await invoice().waitFor();
       assert.equal(await description().inputValue(), "Unsaved job scope");
-      assert.equal(await page.getByLabel("Project Value").inputValue(), "123456");
       assert.equal(await hours().inputValue(), "12");
       assert.equal(await invoice().inputValue(), profileId);
       assert.equal(
@@ -140,7 +139,11 @@ await runBrowserHarness(
     assert.equal(await invoice().count(), 0, "empty profile list has no selector");
     assert.equal(await manage().count(), 0, "empty profile list has one action");
     await description().fill("Unsaved job scope");
-    await page.getByLabel("Project Value").fill("123456");
+    assert.equal(
+      await page.getByLabel("Project Value").isDisabled(),
+      true,
+      "value changes to an existing project require approval",
+    );
     await hours().fill("12.5");
     assert.equal(await hours().evaluate((input) => input.validity.stepMismatch), true);
     await hours().fill("12");
@@ -240,19 +243,19 @@ await runBrowserHarness(
       .locator('form[enctype="multipart/form-data"]')
       .evaluate((form) => form.requestSubmit());
     await page.getByText("Keep the draft open for inspection.", { exact: true }).waitFor();
-    assert.equal(jobWrites[0].job.project_value, 123456, "existing values stay editable");
-    assert.equal(jobWrites[0].job.client, client.id, "job payload retains the editable client");
+    assert.equal(Object.hasOwn(jobWrites[0].job, "project_value"), false);
+    assert.equal(jobWrites[0].job.client, client.id, "job payload retains the client");
     assert.equal(jobWrites[0].job.invoicing_information, fixture.createdProfile.id);
     assert.equal(jobWrites[0].allocations[0].hours, 12);
     const clientField = page
       .locator("label")
       .filter({ hasText: /^Client$/ })
       .locator("..");
-    await clientField.getByRole("button", { name: "Clear", exact: true }).click();
-    await page.getByRole("textbox", { name: "Client", exact: true }).fill(fixture.otherClient.name);
-    await page.getByRole("button", { name: fixture.otherClient.name, exact: true }).click();
-    await page.getByText("This client has no invoicing profiles.", { exact: false }).waitFor();
-    assert.equal(await invoice().count(), 0, "switching clients must not retain a foreign profile");
+    assert.equal(
+      await clientField.getByRole("button", { name: "Clear", exact: true }).count(),
+      0,
+      "a project's client cannot change",
+    );
     failProfiles = true;
     await page.goto(edit);
     await page
@@ -272,6 +275,7 @@ await runBrowserHarness(
     await invoice().waitFor();
     const labels = await invoice().locator("option").allTextContents();
     assert.equal(new Set(labels).size, labels.length, "every profile option reads differently");
+    // The signed-in user manages this job but lacks the job claim.
     claims = ["time"];
     client.invoicing_profiles = [];
     // An existing project without a profile. Active projects need a completion
@@ -280,10 +284,9 @@ await runBrowserHarness(
     job.project_completion_date = "2027-01-01";
     await page.goto(edit);
     await page
-      .getByText("Ask a job maintainer to create an invoicing profile for this client.", {
-        exact: false,
-      })
+      .getByRole("heading", { name: `Edit allocations for ${job.number}`, exact: true })
       .waitFor();
+    assert.equal(await description().count(), 0, "managers without job change allocations only");
     assert.equal(await page.getByRole("button", { name: "Create one", exact: true }).count(), 0);
     assert.equal(await manage().count(), 0);
     // Changing only division hours needs no profile and sends only the allocations.
@@ -296,7 +299,12 @@ await runBrowserHarness(
     assert.equal(jobWrites.length, writesBefore + 1);
     assert.equal(jobWrites.at(-1).job, undefined, "an allocation-only save sends no job fields");
     assert.equal(jobWrites.at(-1).allocations[0].hours, 14);
-    // Any other change still requires a profile.
+    // A holder of job can also save only hours, but any other change requires a profile.
+    claims = ["job"];
+    await page.goto(edit);
+    await page
+      .getByText("Division hours can still be saved without an invoicing profile.", { exact: true })
+      .waitFor();
     await description().fill("Changed scope");
     await page
       .locator('form[enctype="multipart/form-data"]')

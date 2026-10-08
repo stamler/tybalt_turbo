@@ -1,3 +1,6 @@
+import { redirect } from "@sveltejs/kit";
+import { get } from "svelte/store";
+import { appConfig, jobRequestsEnabled } from "$lib/stores/appConfig";
 import type { JobsRecord, CategoriesResponse } from "$lib/pocketbase-types";
 import { JobsStatusOptions } from "$lib/pocketbase-types";
 import type { PageLoad } from "./$types";
@@ -14,6 +17,8 @@ function getTodayDateString(): string {
 }
 
 export const load: PageLoad<JobsPageData> = async ({ params, url }) => {
+  await appConfig.init();
+  if (get(jobRequestsEnabled)) redirect(307, `/job-requests/new?proposal=${params.proposal}`);
   const details = await pb.send(`/api/jobs/${params.proposal}/details`, { method: "GET" });
 
   // Check if setAwardToday query param is present

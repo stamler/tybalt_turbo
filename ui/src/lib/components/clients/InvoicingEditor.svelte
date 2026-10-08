@@ -11,7 +11,13 @@
   import DsSelector from "$lib/components/DSSelector.svelte";
   import ContactEditor from "./ContactEditor.svelte";
   import InvoicingInstructions from "./InvoicingInstructions.svelte";
-  import { addressText, billingName, contactName, countLabel } from "$lib/clientWorkspace";
+  import {
+    addressText,
+    billingName,
+    canCreateInvoicingProfile,
+    contactName,
+    countLabel,
+  } from "$lib/clientWorkspace";
   import {
     editableFields,
     invoicingFields,
@@ -60,7 +66,7 @@
     mode: "create" | "update" | "copy" | "reuse";
     unchanged: boolean;
   } | null>(null);
-  let decision = $state<{ jobs: number } | null>(null);
+  let decision = $state<{ jobs: number; requests: number } | null>(null);
   let dialog: HTMLDialogElement;
   const helpId = $props.id();
   const explanations = {
@@ -86,7 +92,10 @@
     decision = null;
     actionHelp = defaultHelp;
   }
-  const canEdit = $derived($globalStore.claims.includes("job"));
+  // Holders of time can create profiles; only holders of job change shared ones.
+  const canManage = $derived($globalStore.claims.includes("job"));
+  const canCreate = $derived(canCreateInvoicingProfile($globalStore.claims));
+  const canSave = $derived(record.id ? canManage : canCreate);
   const matchingProfiles = $derived(
     ((client.invoicing_profiles || []) as (WorkflowRecord & { id: string })[]).filter(
       (profile) =>
@@ -114,6 +123,10 @@
     }
     if (dirty && !window.confirm("Discard unsaved invoicing changes?")) cancel();
   });
+  // Contacts need not have an email address.
+  function contactLabel(contact: WorkflowRecord) {
+    return [contactName(contact), contact.email].filter(Boolean).join(" — ");
+  }
   function cancelEdit() {
     if (dirty && !window.confirm("Discard unsaved invoicing changes?")) return;
     saved = JSON.stringify(item);
@@ -168,7 +181,7 @@
       busy ||
       completed ||
       record.id ||
-      !canEdit ||
+      !canCreate ||
       !matchingProfiles.some((row) => row.id === profile.id)
     )
       return;
@@ -197,7 +210,7 @@
   }
   async function save(event?: Event, copy = false) {
     event?.preventDefault();
-    if (busy || completed || decision || !canEdit || !validate()) return;
+    if (busy || completed || decision || !canSave || (copy && !canManage) || !validate()) return;
     busy = true;
     savedForNavigation = false;
     error = "";
@@ -218,8 +231,9 @@
         if (!profile)
           throw new Error("This invoicing profile is no longer available. Reload the page.");
         const jobs = Number(profile.job_count || 0);
+        const requests = Number(profile.request_count || 0);
         if (jobs > 1) {
-          decision = { jobs };
+          decision = { jobs, requests };
           actionHelp = explanations.choose;
           return;
         }
@@ -233,7 +247,7 @@
     }
   }
   async function saveDecision(mode: "update" | "copy") {
-    if (busy || !decision || !canEdit) return;
+    if (busy || !decision || !canManage) return;
     busy = true;
     error = "";
     try {
@@ -281,11 +295,12 @@
       {record.id ? "Edit invoicing profile" : "Add invoicing profile"}
     </h2>
     {#if record.id}<p class="text-sm text-neutral-600">
-        Used by {countLabel(record.job_count || 0, "job")}. Changes apply wherever this profile is
-        used.
+        Used by {countLabel(record.job_count || 0, "job")}{record.request_count > 0
+          ? ` and ${countLabel(record.request_count, "request")}`
+          : ""}. Changes apply wherever this profile is used.
       </p>{/if}
     {#if error}<p role="alert" class="text-red-700">{error}</p>{/if}
-    <fieldset disabled={busy || !!decision || !canEdit} class="flex min-w-0 flex-col gap-3">
+    <fieldset disabled={busy || !!decision || !canSave} class="flex min-w-0 flex-col gap-3">
       <DsTextInput
         bind:value={item.name}
         {errors}
@@ -301,7 +316,7 @@
           fieldName="contact"
           uiName="Send invoices to"
         >
-          {#snippet resultTemplate(row)}{contactName(row as WorkflowRecord)} — {row.email}{/snippet}
+          {#snippet resultTemplate(row)}{contactLabel(row as WorkflowRecord)}{/snippet}
         </DsAutoComplete>
       {:else}
         <DsSelector
@@ -310,7 +325,7 @@
             { id: "", label: "Select a contact" },
             ...contacts.map((contact) => ({
               id: String(contact.id),
-              label: `${contactName(contact)} — ${contact.email}`,
+              label: contactLabel(contact),
             })),
           ]}
           {errors}
@@ -321,7 +336,7 @@
         </DsSelector>
       {/if}
       <div class="flex flex-wrap gap-2">
-        {#if canEdit}
+        {#if canManage}
           <DsActionButton
             action={() => {
               contactDraft = {};
@@ -374,7 +389,7 @@
               {/snippet}
               {#snippet actions(profile)}<DsActionButton
                   action={() => reuseProfile(profile)}
-                  disabled={busy || !canEdit}>Use this profile</DsActionButton
+                  disabled={busy || !canCreate}>Use this profile</DsActionButton
                 >{/snippet}
             </DsList>
           {/key}
@@ -433,17 +448,17 @@
     <div class="flex flex-wrap gap-2">
       <button
         type="submit"
-        disabled={busy || !!decision || !canEdit}
+        disabled={busy || !!decision || !canSave}
         aria-describedby={helpId + "-form"}
         onmouseenter={explain(record.id ? explanations.update : explanations.create)}
         onfocus={explain(record.id ? explanations.update : explanations.create)}
         class="rounded-xs bg-yellow-200 px-2 py-1 hover:bg-yellow-300 disabled:opacity-40"
         >Save invoicing profile</button
       >
-      {#if record.id && canEdit}
+      {#if record.id && canManage}
         <button
           type="button"
-          disabled={busy || !!decision || !canEdit}
+          disabled={busy || !!decision || !canManage}
           onclick={() => save(undefined, true)}
           aria-describedby={helpId + "-form"}
           onmouseenter={explain(explanations.copy)}
@@ -482,7 +497,9 @@
   {#if decision}
     <h2 id={helpId + "-title"} class="mb-3 text-xl font-semibold">Save invoicing profile</h2>
     <p id={helpId + "-usage"}>
-      This profile is used by {decision.jobs} jobs.
+      This profile is used by {countLabel(decision.jobs, "job")}{decision.requests > 0
+        ? ` and ${countLabel(decision.requests, "request")}`
+        : ""}.
     </p>
     <p class="mt-2">Update the shared profile, or save your changes as a new profile?</p>
     {#if error}<p role="alert" class="mt-2 text-red-700">{error}</p>{/if}

@@ -8,6 +8,7 @@ await runBrowserHarness(
     const writes = [];
     let failSave = false;
     let jobCount = 4;
+    let requestCount = 2;
     let failUsageRead = false;
     let holdSave = false;
     let releaseSave;
@@ -65,7 +66,9 @@ await runBrowserHarness(
                   id: "client1",
                   name: "Example Client",
                   contacts: [],
-                  invoicing_profiles: [{ id: "profile1", job_count: jobCount }],
+                  invoicing_profiles: [
+                    { id: "profile1", job_count: jobCount, request_count: requestCount },
+                  ],
                 },
               },
         );
@@ -82,11 +85,16 @@ await runBrowserHarness(
     });
     await page.goto(`${origin}/tests/fixtures/clientEditors.html?contact&new`);
     await page.getByRole("button", { name: "Save contact", exact: true }).click();
+    // Email is optional, so only the two name fields are required.
     assert.equal(await page.getByText("This field is required.", { exact: true }).count(), 2);
     assert.equal(writes.length, 0);
     await page.getByLabel("Given name", { exact: true }).fill("New");
     await page.getByLabel("Surname", { exact: true }).fill("Contact");
+    const noEmail = page.getByLabel("No email address", { exact: true });
+    await noEmail.check();
     await page.getByLabel("Email (optional)", { exact: true }).fill("not-email");
+    assert.equal(await noEmail.isDisabled(), true, "an email address replaces the no-email mark");
+    assert.equal(await noEmail.isChecked(), false);
     await page.getByRole("button", { name: "Save contact", exact: true }).click();
     await page.getByText("Enter a valid email address.", { exact: true }).waitFor();
     await page.getByLabel("Email (optional)", { exact: true }).fill("new@example.com");
@@ -135,6 +143,7 @@ await runBrowserHarness(
     releaseSave();
     await page.waitForFunction(() => window.saved.length === 1);
     assert.equal(writes.at(-1).body.client, "client1");
+    assert.equal(writes.at(-1).body.no_email, false, "a contact with an email is not marked");
     assert.equal(writes.at(-1).body.email, "new@example.com");
     assert.equal("id" in writes.at(-1).body, false);
 
@@ -216,7 +225,7 @@ await runBrowserHarness(
     const beforeCancel = writes.length;
     await page.getByRole("button", { name: "Save invoicing profile", exact: true }).click();
     await choice.waitFor();
-    assert.match(await choice.innerText(), /4 jobs/);
+    assert.match(await choice.innerText(), /4 jobs and 2 requests/);
     await choice.getByRole("button", { name: "Update shared profile", exact: true }).hover();
     await choice
       .getByText("Apply these changes everywhere this profile is used.", { exact: true })
@@ -260,10 +269,11 @@ await runBrowserHarness(
     assert.equal(writes.length, beforeCancel);
     failUsageRead = false;
     jobCount = 7;
+    requestCount = 1;
     failSave = true;
     await page.getByRole("button", { name: "Save invoicing profile", exact: true }).click();
     await choice.waitFor();
-    assert.match(await choice.innerText(), /7 jobs\./);
+    assert.match(await choice.innerText(), /7 jobs and 1 request\./);
     await choice.getByRole("button", { name: "Update shared profile", exact: true }).click();
     await choice.getByRole("alert").filter({ hasText: "Save failed. Try again." }).waitFor();
     failSave = false;
@@ -280,6 +290,7 @@ await runBrowserHarness(
 
     for (const count of [0, 1, 2]) {
       jobCount = count;
+      requestCount = 0;
       await page.goto(`${origin}/tests/fixtures/clientEditors.html?edit`);
       await page
         .getByLabel("Profile name (optional)", { exact: true })
@@ -365,10 +376,10 @@ await runBrowserHarness(
     assert.equal(writes.at(-1).body.contact, "contact100");
     assert.equal(await choice.isVisible(), false);
 
-    await page.goto(`${origin}/tests/fixtures/clientEditors.html?profiles`);
-    assert.equal(await page.getByRole("button", { name: "Add contact", exact: true }).count(), 1);
+    await page.goto(`${origin}/tests/fixtures/clientEditors.html?time&profiles`);
+    assert.equal(await page.getByRole("button", { name: "Add contact", exact: true }).count(), 0);
     await page.getByRole("button", { name: "Same as project contact", exact: true }).click();
-    assert.equal(await page.getByRole("button", { name: "Edit contact", exact: true }).count(), 1);
+    assert.equal(await page.getByRole("button", { name: "Edit contact", exact: true }).count(), 0);
     assert.equal(
       await page.getByRole("button", { name: "Save as new profile", exact: true }).count(),
       0,
@@ -419,7 +430,7 @@ await runBrowserHarness(
       .filter({ hasText: "Using the existing invoicing profile." })
       .waitFor();
 
-    await page.goto(`${origin}/tests/fixtures/clientEditors.html?profiles`);
+    await page.goto(`${origin}/tests/fixtures/clientEditors.html?time&profiles`);
     await page.getByRole("button", { name: "Same as project contact", exact: true }).click();
     await page
       .getByLabel("Invoice instructions (optional)", { exact: true })
@@ -443,7 +454,7 @@ await runBrowserHarness(
     assert.equal(await page.evaluate(() => window.savedModes[0]), "create");
     assert.equal(await choice.isVisible(), false, "new profiles need no shared-edit confirmation");
 
-    await page.goto(`${origin}/tests/fixtures/clientEditors.html?profiles-many`);
+    await page.goto(`${origin}/tests/fixtures/clientEditors.html?time&profiles-many`);
     await page.getByRole("button", { name: "Same as project contact", exact: true }).click();
     const beforeSearch = writes.length;
     await existingProfiles

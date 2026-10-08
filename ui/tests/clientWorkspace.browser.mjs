@@ -26,6 +26,7 @@ await runBrowserHarness(
     let failNotesRefresh = false;
     const client = structuredClone(fixture.client);
     const writes = [];
+    const requestWrites = [];
     const profileWrites = [];
     await page.addInitScript(
       ({ token, record }) =>
@@ -63,6 +64,18 @@ await runBrowserHarness(
             "access-control-allow-headers": "*",
           },
         });
+      if (path === "/api/job_requests/options")
+        return send({
+          ...fixture.options,
+          clients: [client],
+          contacts: client.contacts,
+          invoicing_profiles: client.invoicing_profiles,
+        });
+      if (path === "/api/project_authorization/approvers") return send({ items: [] });
+      if (path === "/api/job_requests" && request.method() === "POST") {
+        requestWrites.push(request.postDataJSON());
+        return send({ id: "unexpected-request" });
+      }
       if (
         path === "/api/collections/client_invoicing_information/records" &&
         request.method() === "POST"
@@ -78,6 +91,7 @@ await runBrowserHarness(
           creator: fixture.createdProfile.creator,
           creator_name: fixture.createdProfile.creator_name,
           job_count: 0,
+          request_count: 0,
         };
         profileWrites.push({ method: "POST", record, payload });
         client.invoicing_profiles.push(record);
@@ -147,7 +161,7 @@ await runBrowserHarness(
     await contacts().getByRole("searchbox").waitFor();
     assert.match(await invoicing().innerText(), /Created Oct 1, 2026 by Alex Adams/);
     // Without recorded creation details, a profile shows only its usage.
-    assert.match(await invoicing().innerText(), /^1 job$/m);
+    assert.match(await invoicing().innerText(), /^1 job · 1 request$/m);
     for (const name of [
       "Short instruction example",
       "Long instruction example",
@@ -224,7 +238,8 @@ await runBrowserHarness(
     assert.match(await helpPanel.innerText(), /required when creating or editing a project/);
     assert.match(await helpPanel.innerText(), /parent project/);
     assert.match(await helpPanel.innerText(), /optional for proposals/);
-    assert.match(await helpPanel.innerText(), /Changes apply to all jobs/);
+    assert.match(await helpPanel.innerText(), /before submitting a project request/);
+    assert.match(await helpPanel.innerText(), /Changes apply to all jobs and requests/);
     await helpPanel.getByRole("button", { name: "Close explanation" }).click();
     assert.equal(await helpPanel.isVisible(), false);
     await profileHelp.focus();
@@ -516,38 +531,141 @@ await runBrowserHarness(
     );
     assert.equal(await contacts().locator('a[href*="/edit"]').count(), 0);
     assert.equal(await page.getByTitle("Add contact", { exact: true }).count(), 0);
-    // Time-only users can inspect the workspace but cannot change shared records.
+    claims = ["job", "time"];
+    await page.goto(`${origin}/job-requests/new`);
+    const scope = () => page.getByLabel("Project / scope of work", { exact: true });
+    const value = () => page.getByLabel("Project value (CAD, before tax)", { exact: true });
+    await scope().fill("Unsaved scope kept while maintaining client data");
+    await page.getByLabel(/^Client\s*Select client/).selectOption(client.id);
+    await page.getByLabel(/^Project contact/).selectOption(client.contacts[0].id);
+    await page.getByLabel(/^Invoicing profile/).selectOption(client.invoicing_profiles[0].id);
+    await value().fill("56789");
+    await page.getByLabel(/^Fee basis/).selectOption("tm");
+    await page.getByRole("button", { name: "Add division", exact: true }).click();
+    await page.getByLabel(/^Division/).selectOption("division1");
+    await page.getByLabel("Hours", { exact: true }).fill("12.5");
+    await page
+      .getByRole("link", { name: "Manage client contacts and invoicing", exact: true })
+      .click();
+    await contacts().getByRole("searchbox").waitFor();
+    assert.ok(new URL(page.url()).searchParams.get("workflow_return").includes("client_draft="));
+    await page.goBack();
+    await scope().waitFor();
+    assert.equal(await scope().inputValue(), "Unsaved scope kept while maintaining client data");
+    assert.equal(await value().inputValue(), "56789");
+    assert.equal(await page.getByLabel(/^Fee basis/).inputValue(), "tm");
+    assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "12.5");
+    await page
+      .getByRole("link", { name: "Manage client contacts and invoicing", exact: true })
+      .click();
+    await contacts().getByRole("link", { name: "Contact001 Sample", exact: true }).click();
+    await page.getByRole("heading", { name: "Edit contact", exact: true }).waitFor();
+    await page.getByLabel("Email (optional)", { exact: true }).fill("workflow@example.test");
+    await page.getByRole("button", { name: "Save contact", exact: true }).click();
+    await invoicing().getByRole("link", { name: "Setup001", exact: true }).click();
+    await page.getByRole("heading", { name: "Edit invoicing profile", exact: true }).waitFor();
+    await page
+      .getByLabel("Profile name (optional)", { exact: true })
+      .fill("Updated workflow setup");
+    await page.getByRole("button", { name: "Save invoicing profile", exact: true }).click();
+    await page.getByRole("link", { name: "Return to the project request", exact: true }).click();
+    await scope().waitFor();
+    assert.equal(await scope().inputValue(), "Unsaved scope kept while maintaining client data");
+    assert.equal(await value().inputValue(), "56789");
+    assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "12.5");
+    assert.match(
+      await page
+        .getByLabel(/^Project contact/)
+        .locator("option:checked")
+        .innerText(),
+      /workflow@example.test/,
+    );
+    assert.match(
+      await page
+        .getByLabel(/^Invoicing profile/)
+        .locator("option:checked")
+        .innerText(),
+      /Updated workflow setup/,
+    );
+    client.invoicing_profiles[0].job_count = 7;
+    await page
+      .getByRole("link", { name: "Manage client contacts and invoicing", exact: true })
+      .click();
+    await invoicing().getByRole("link", { name: "Updated workflow setup", exact: true }).click();
+    await page.getByLabel("Profile name (optional)", { exact: true }).fill("Only this request");
+    await page.getByRole("button", { name: "Save invoicing profile", exact: true }).click();
+    const copyChoice = page.getByRole("dialog", { name: "Save invoicing profile", exact: true });
+    await copyChoice.waitFor();
+    assert.match(await copyChoice.innerText(), /7 jobs/);
+    const beforeCopy = profileWrites.length;
+    await copyChoice.getByRole("button", { name: "Save as new profile", exact: true }).click();
+    await scope().waitFor();
+    assert.equal(await page.getByLabel(/^Invoicing profile/).inputValue(), "profile-copy");
+    assert.equal(await scope().inputValue(), "Unsaved scope kept while maintaining client data");
+    assert.equal(await value().inputValue(), "56789");
+    assert.equal(await page.getByLabel("Hours", { exact: true }).inputValue(), "12.5");
+    assert.equal(client.invoicing_profiles[0].name, "Updated workflow setup");
+    assert.deepEqual(
+      profileWrites.slice(beforeCopy).map((write) => write.method),
+      ["POST"],
+    );
+    assert.deepEqual(requestWrites, [], "client maintenance must not save a request draft");
+    // The next navigation deliberately leaves the unsaved request after checking it.
+    page.once("dialog", (dialog) => dialog.accept());
     claims = ["time"];
     await page.goto(root);
     await contacts().getByRole("searchbox").waitFor();
+    assert.equal(await page.getByTitle("Add contact", { exact: true }).count(), 0);
+    assert.equal(await page.getByTitle("Edit client information", { exact: true }).count(), 0);
     assert.equal(await contacts().locator('a[href*="/edit"]').count(), 0);
     assert.equal(await invoicing().locator('a[href*="/edit"]').count(), 0);
-    assert.equal(await page.getByTitle("Add contact", { exact: true }).count(), 0);
-    assert.equal(await invoicing().getByTitle("Add invoicing profile", { exact: true }).count(), 0);
-    for (const path of [
-      "invoicing/add",
-      `invoicing/${client.invoicing_profiles[0].id}/edit`,
-      "contacts/add",
-    ]) {
-      await page.goto(`${origin}/clients/${client.id}/${path}`);
-      await page.getByText(/The job permission is required/).waitFor();
-    }
-    // Change only mock response collections to cover clients at each setup stage.
+    assert.equal(await invoicing().getByTitle("Add invoicing profile", { exact: true }).count(), 1);
+    await page.goto(
+      `${origin}/clients/${client.id}/invoicing/${client.invoicing_profiles[0].id}/edit`,
+    );
+    await page
+      .getByText("The job permission is required to manage clients.", { exact: true })
+      .waitFor();
+    await page.goto(`${origin}/clients/${client.id}/contacts/${client.contacts[0].id}/edit`);
+    await page
+      .getByText("The job permission is required to manage clients.", { exact: true })
+      .waitFor();
+    // Switch only the mock response collections to cover clients at different setup stages.
     const existingContacts = client.contacts;
     client.invoicing_profiles = [];
     await page.goto(root);
     await invoicing()
-      .getByText("This client has no invoicing profiles. Ask a client maintainer to create one.", {
-        exact: true,
-      })
+      .getByText(
+        "This client has no invoicing profiles. Create one using an existing client contact.",
+        { exact: true },
+      )
       .waitFor();
+    assert.equal(await invoicing().getByTitle("Add invoicing profile", { exact: true }).count(), 1);
     client.contacts = [];
     await page.goto(root);
     await invoicing()
-      .getByText("This client has no invoicing profiles. Ask a client maintainer to create one.", {
-        exact: true,
-      })
+      .getByText(
+        "This client has no invoicing profiles. Ask a client maintainer to add a contact first.",
+        { exact: true },
+      )
       .waitFor();
+    assert.equal(await invoicing().getByTitle("Add invoicing profile", { exact: true }).count(), 0);
+    assert.equal(await contacts().getByTitle("Add contact", { exact: true }).count(), 0);
+    await page.goto(`${origin}/job-requests/new`);
+    await page.getByLabel(/^Client\s*Select client/).selectOption(client.id);
+    await page
+      .getByText(/A job maintainer must add a client contact before you can create a profile/)
+      .waitFor();
+    assert.equal(await page.getByRole("button", { name: "Create one", exact: true }).count(), 0);
+    assert.equal(await page.getByRole("button", { name: "Add a contact", exact: true }).count(), 0);
+    assert.equal(await page.getByRole("combobox", { name: /^Invoicing profile/ }).count(), 0);
+    assert.equal(
+      await page
+        .getByRole("link", { name: "Manage client contacts and invoicing", exact: true })
+        .count(),
+      0,
+    );
+    page.once("dialog", (dialog) => dialog.accept());
     claims = ["job"];
     await page.goto(root);
     await invoicing()
@@ -558,7 +676,43 @@ await runBrowserHarness(
       .waitFor();
     assert.equal(await contacts().getByTitle("Add contact", { exact: true }).count(), 1);
     assert.equal(await invoicing().getByTitle("Add invoicing profile", { exact: true }).count(), 0);
+    claims = ["job", "time"];
+    await page.goto(`${origin}/job-requests/new`);
+    await scope().fill("Draft kept while adding the first client contact");
+    await page.getByLabel(/^Client\s*Select client/).selectOption(client.id);
+    await value().fill("24680");
+    assert.equal(await page.getByRole("button", { name: "Create one", exact: true }).count(), 0);
+    assert.equal(await page.getByRole("combobox", { name: /^Invoicing profile/ }).count(), 0);
+    await page.getByRole("button", { name: "Add a contact", exact: true }).click();
+    await page.getByRole("heading", { name: "Add contact", exact: true }).waitFor();
+    assert.equal(new URL(page.url()).pathname, `/clients/${client.id}/contacts/add`);
+    await page.getByLabel("Given name", { exact: true }).fill(fixture.createdContact.given_name);
+    await page.getByLabel("Surname", { exact: true }).fill(fixture.createdContact.surname);
+    await page.getByLabel("Email (optional)", { exact: true }).fill(fixture.createdContact.email);
+    const beforeNewContact = writes.length;
+    await page.getByRole("button", { name: "Save contact", exact: true }).click();
+    await contacts()
+      .getByRole("link", {
+        name: `${fixture.createdContact.given_name} ${fixture.createdContact.surname}`,
+        exact: true,
+      })
+      .waitFor();
+    await page.getByRole("link", { name: "Return to the project request", exact: true }).click();
+    await scope().waitFor();
+    assert.equal(await scope().inputValue(), "Draft kept while adding the first client contact");
+    assert.equal(await value().inputValue(), "24680");
+    assert.equal(await page.getByRole("button", { name: "Create one", exact: true }).count(), 1);
+    assert.equal(await page.getByRole("button", { name: "Add a contact", exact: true }).count(), 0);
+    assert.equal(writes.length, beforeNewContact + 1);
+    assert.deepEqual(
+      requestWrites,
+      [],
+      "adding the missing contact must not save the request draft",
+    );
+    page.once("dialog", (dialog) => dialog.accept());
     client.contacts = existingContacts;
+    claims = ["job"];
+    const beforeWorkspaceCreate = profileWrites.length;
     await page.goto(`${root}?project_contact=${client.contacts[1].id}`);
     await invoicing()
       .getByText(
@@ -570,7 +724,7 @@ await runBrowserHarness(
     await page.getByRole("heading", { name: "Add invoicing profile", exact: true }).waitFor();
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     await invoicing().getByTitle("Add invoicing profile", { exact: true }).waitFor();
-    assert.equal(profileWrites.length, 0, "cancelling creation must not write");
+    assert.equal(profileWrites.length, beforeWorkspaceCreate, "cancelling creation must not write");
     await invoicing().getByTitle("Add invoicing profile", { exact: true }).click();
     await page.getByRole("button", { name: "Same as project contact", exact: true }).click();
     await page
@@ -583,9 +737,9 @@ await runBrowserHarness(
     await invoicing()
       .getByRole("link", { name: fixture.createdProfile.name, exact: true })
       .waitFor();
-    assert.equal(profileWrites.length, 1);
+    assert.equal(profileWrites.length, beforeWorkspaceCreate + 1);
     assert.equal(
-      profileWrites[0].payload.creator,
+      profileWrites.at(-1).payload.creator,
       undefined,
       "server supplies creator attribution",
     );
@@ -599,9 +753,102 @@ await runBrowserHarness(
       .getByRole("status")
       .getByText("Profile highlighted.", { exact: true })
       .waitFor();
-    assert.equal(profileWrites.length, 1);
+    assert.equal(profileWrites.length, beforeWorkspaceCreate + 1);
     assert.equal(new URL(page.url()).searchParams.has("show_invoicing"), false);
     assert.equal(await invoicing().getByText("Profile saved.", { exact: true }).count(), 0);
+    // Start the time-only request flow from a client without profiles.
+    client.invoicing_profiles = [];
+    claims = [];
+    await page.goto(root);
+    await invoicing()
+      .getByText("This client has no invoicing profiles. Ask a client maintainer to create one.", {
+        exact: true,
+      })
+      .waitFor();
+    assert.equal(await invoicing().getByTitle("Add invoicing profile", { exact: true }).count(), 0);
+    assert.equal(await contacts().getByTitle("Add contact", { exact: true }).count(), 0);
+    assert.equal(await page.getByTitle("Edit client information", { exact: true }).count(), 0);
+
+    claims = ["time"];
+    await page.goto(`${origin}/job-requests/new`);
+    await scope().fill("Time-only draft kept while adding invoicing");
+    await page.getByLabel(/^Client\s*Select client/).selectOption(client.id);
+    await page.getByLabel(/^Project contact/).selectOption(client.contacts[1].id);
+    await value().fill("12345");
+    const beforeCreate = profileWrites.length;
+    const beforeContactWrites = writes.length;
+    assert.equal(
+      await page.getByRole("combobox", { name: /^Invoicing profile/ }).count(),
+      0,
+      "an empty profile selector is not shown",
+    );
+    assert.equal(
+      await page
+        .getByRole("link", { name: "Manage client contacts and invoicing", exact: true })
+        .count(),
+      0,
+      "the empty state uses one direct action",
+    );
+    await page.getByRole("button", { name: "Create one", exact: true }).click();
+    await page.getByRole("heading", { name: "Add invoicing profile", exact: true }).waitFor();
+    assert.equal(new URL(page.url()).pathname, `/clients/${client.id}/invoicing/add`);
+    assert.ok(
+      new URL(new URL(page.url()).searchParams.get("return_to"), origin).searchParams
+        .get("workflow_return")
+        .includes("client_draft="),
+    );
+    assert.equal(await page.getByRole("button", { name: "Add contact", exact: true }).count(), 0);
+    assert.equal(await page.getByRole("button", { name: "Edit contact", exact: true }).count(), 0);
+    await page.getByRole("button", { name: "Same as project contact", exact: true }).click();
+    await page
+      .getByLabel("Profile name (optional)", { exact: true })
+      .fill(fixture.createdProfile.name);
+    await page
+      .getByLabel("Invoice instructions (optional)", { exact: true })
+      .fill(fixture.createdProfile.invoicing_instructions);
+    await page.getByRole("button", { name: "Save invoicing profile", exact: true }).click();
+    await scope().waitFor();
+    assert.equal(await scope().inputValue(), "Time-only draft kept while adding invoicing");
+    assert.equal(await value().inputValue(), "12345");
+    assert.equal(
+      await page.getByLabel(/^Invoicing profile/).inputValue(),
+      fixture.createdProfile.id,
+    );
+    assert.deepEqual(
+      profileWrites.slice(beforeCreate).map((write) => write.method),
+      ["POST"],
+    );
+    assert.equal(profileWrites.at(-1).payload.contact, client.contacts[1].id);
+    assert.equal(
+      profileWrites.at(-1).payload.creator,
+      undefined,
+      "the server supplies creator attribution",
+    );
+    assert.equal(writes.length, beforeContactWrites, "a time-only user does not write contacts");
+    assert.deepEqual(requestWrites, [], "creating invoicing must leave the request unsaved");
+    await page
+      .getByRole("link", { name: "Manage client contacts and invoicing", exact: true })
+      .click();
+    await invoicing().getByTitle("Add invoicing profile", { exact: true }).click();
+    await page.getByRole("button", { name: "Same as project contact", exact: true }).click();
+    const beforeReuse = profileWrites.length;
+    await page.getByRole("button", { name: "Use this profile", exact: true }).click();
+    await scope().waitFor();
+    assert.equal(
+      await page.getByLabel(/^Invoicing profile/).inputValue(),
+      fixture.createdProfile.id,
+    );
+    assert.equal(await scope().inputValue(), "Time-only draft kept while adding invoicing");
+    assert.equal(await value().inputValue(), "12345");
+    assert.equal(profileWrites.length, beforeReuse, "reusing a profile must not write it");
+    assert.deepEqual(requestWrites, [], "reusing invoicing must leave the request unsaved");
+    await page
+      .getByRole("link", { name: "Manage client contacts and invoicing", exact: true })
+      .click();
+    await invoicing().getByText("by Workspace User", { exact: false }).waitFor();
+    assert.equal(await invoicing().locator('a[href*="/edit"]').count(), 0);
+    assert.match(await invoicing().innerText(), /Oct 2, 2026/);
+    // Other read-only viewers can inspect attribution but cannot create or edit profiles.
     claims = [];
     await page.goto(root);
     await invoicing().getByText("by Workspace User", { exact: false }).waitFor();

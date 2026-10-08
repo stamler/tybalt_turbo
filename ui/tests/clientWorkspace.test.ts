@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   addressText,
+  canCreateInvoicingProfile,
   invoicingEmptyMessage,
   profileCreatorName,
   contactName,
@@ -164,6 +165,7 @@ test("contact and invoicing searches include the intended human-readable fields"
     email: "accounts@example.test",
     phone: "555-0100",
     job_count: 3,
+    request_count: 1,
     profile_count: 2,
   };
   const profile: WorkspaceInvoicing = {
@@ -174,6 +176,7 @@ test("contact and invoicing searches include the intended human-readable fields"
     fax: "",
     invoicing_instructions: "Include purchase order and send PDF",
     job_count: 3,
+    request_count: 1,
   };
   for (const term of ["Alex", "Lee", "accounts@example.test", "555-0100"])
     assert.ok(contactSearchText(contact).includes(term));
@@ -207,13 +210,29 @@ test("shallow URL state survives Back without leaking between clients or editor 
   assert.equal(currentWorkspaceUrl("client1", editor, shallow).href, editor.href);
 });
 
-test("empty profile lists point each user to an available next step", () => {
-  assert.match(invoicingEmptyMessage(true, true), /Create one using an existing client contact/);
-  assert.match(invoicingEmptyMessage(true, false), /Add a client contact, then create a profile/);
-  for (const hasContacts of [true, false]) {
+test("profile creation accepts time or job, but not unrelated claims", () => {
+  for (const claims of [["time"], ["job"], ["time", "job"]]) {
+    assert.equal(canCreateInvoicingProfile(claims), true);
     assert.match(
-      invoicingEmptyMessage(false, hasContacts),
-      /Ask a client maintainer to create one/,
+      invoicingEmptyMessage(claims, true),
+      /Create one using an existing client contact/,
+    );
+  }
+  for (const claims of [[], ["report"], ["absorb"], ["admin"]]) {
+    assert.equal(canCreateInvoicingProfile(claims), false);
+    assert.match(invoicingEmptyMessage(claims, true), /Ask a client maintainer to create one/);
+  }
+});
+
+test("empty profile lists without contacts point each user to an available next step", () => {
+  assert.match(
+    invoicingEmptyMessage(["job"], false),
+    /Add a client contact, then create a profile/,
+  );
+  for (const claims of [["time"], []]) {
+    assert.match(
+      invoicingEmptyMessage(claims, false),
+      /Ask a client maintainer to add a contact first/,
     );
   }
 });

@@ -80,6 +80,7 @@
         surname: index === 0 ? "Client" : String(index + 1),
         email: `person${index + 1}@example.com`,
         job_count: query.has("used") ? 2 : 0,
+        request_count: 0,
         profile_count: 0,
       }));
       window.saved = [];
@@ -131,6 +132,7 @@
                   name: "Existing setup",
                   contact: "contact1",
                   job_count: 4,
+                  request_count: 2,
                 }
               : {},
             ...callbacks,

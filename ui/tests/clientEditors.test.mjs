@@ -151,7 +151,8 @@ test("contact validation and editable fields prevent accidental record ownership
   assert.equal("id" in body, false);
   assert.equal("job_count" in body, false);
   assert.equal(helpers.contactInUse({ profile_count: 1 }), true);
-  assert.equal(helpers.contactInUse({ job_count: 0, profile_count: 0 }), false);
+  assert.equal(helpers.contactInUse({ request_count: 1 }), true);
+  assert.equal(helpers.contactInUse({ job_count: 0, request_count: 0, profile_count: 0 }), false);
 });
 
 test("saved record links retain list filters and replace stale save banners", async () => {
@@ -208,19 +209,33 @@ test("missing client API status remains a route 404", async () => {
   );
 });
 
-test("time-only users cannot create or edit client records", async () => {
+test("time-only users can create invoicing profiles but cannot edit any existing record", async () => {
   const { modules } = await editorModules({ claims: ["time"] });
   const load = modules.get("loader").namespace.loadClientEditor;
+  const url = new URL("https://app.invalid/?project_contact=contact1");
+  const result = await load("client1", url, "invoicing");
+  assert.equal(result.client.id, "client1");
+  assert.equal(result.projectContact, "contact1");
+  assert.equal(result.record.id, undefined);
   for (const [kind, id] of [
-    ["invoicing", undefined],
     ["invoicing", "profile1"],
     ["contact", "contact1"],
     ["contact", undefined],
   ]) {
-    await assert.rejects(load("client1", new URL("https://app.invalid/"), kind, id), {
-      status: 403,
-    });
+    await assert.rejects(load("client1", url, kind, id), { status: 403 });
   }
+  const own = await editorModules({
+    claims: ["time"],
+    client: {
+      id: "client1",
+      contacts: [{ id: "contact1", client: "client1" }],
+      invoicing_profiles: [{ id: "profile1", client: "client1", creator: "test-user" }],
+    },
+  });
+  await assert.rejects(
+    own.modules.get("loader").namespace.loadClientEditor("client1", url, "invoicing", "profile1"),
+    { status: 403 },
+  );
 });
 
 test("profile creation rejects absent permissions and inactive-client API failures", async () => {
@@ -233,7 +248,7 @@ test("profile creation rejects absent permissions and inactive-client API failur
   );
   assert.deepEqual(denied.calls, ["claims"]);
   const inactive = await editorModules({
-    claims: ["job"],
+    claims: ["time"],
     fail: Object.assign(new Error("Active account required"), { status: 403 }),
   });
   await assert.rejects(

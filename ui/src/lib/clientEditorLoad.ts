@@ -4,7 +4,11 @@ import { error } from "@sveltejs/kit";
 import { get } from "svelte/store";
 import { pb } from "$lib/pocketbase";
 import { globalStore } from "$lib/stores/global";
-import { safeReturnTo, type WorkspaceClient } from "$lib/clientWorkspace";
+import {
+  canCreateInvoicingProfile,
+  safeReturnTo,
+  type WorkspaceClient,
+} from "$lib/clientWorkspace";
 
 async function loadClientContext(clientId: string): Promise<WorkspaceClient> {
   try {
@@ -27,8 +31,15 @@ export async function loadClientEditor(
   recordId?: string,
 ) {
   await globalStore.ensureClaims();
-  if (!get(globalStore).claims.includes("job"))
-    error(403, "The job permission is required to manage clients.");
+  const claims = get(globalStore).claims;
+  const creatingProfile = kind === "invoicing" && !recordId;
+  if (creatingProfile ? !canCreateInvoicingProfile(claims) : !claims.includes("job"))
+    error(
+      403,
+      creatingProfile
+        ? "The time or job permission is required to create invoicing profiles."
+        : "The job permission is required to manage clients.",
+    );
   const client = await loadClientContext(clientId);
   const rows = kind === "contact" ? client.contacts : client.invoicing_profiles;
   const record: WorkflowRecord | undefined = recordId
