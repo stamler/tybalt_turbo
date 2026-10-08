@@ -8,13 +8,22 @@ Configuration is read via helpers in `app/utilities/config.go`. Missing or inval
 
 ## Domain: `jobs`
 
-Controls job-related editing operations, including the admin-only manual job renumber flow.
+Controls job editing and the Project Request creation workflow.
 
-| Property             | Type | Default | Description                                                                                                |
-|----------------------|------|---------|------------------------------------------------------------------------------------------------------------|
-| `create_edit_absorb` | bool | `true`  | Enables job creation, updating, admin-only manual renumbering, and client/contact absorb. When `false`, these operations return HTTP 403. |
+| Property | Type | Default | Description |
+| --- | --- | --- | --- |
+| `create_edit_absorb` | bool | `true` | Enables job creation, updates, admin-only manual renumbering, and client/contact merges. When false, these operations return HTTP 403. |
+| `require_job_request_approval` | bool | `false` | Requires an approved Project Request for each new project and subjob, including imports and admin creation. When false, holders of `job` can create projects directly. |
 
-**Fail mode:** open (defaults to enabled)
+Missing settings use the defaults. An invalid request-approval Boolean or a database read error blocks creation. Proposals remain outside the
+request approval workflow. When request approval is disabled, retained requests
+keep their state and age. Hide the Job Create Queue and its badge, and block
+request creation and job creation from a request. Enable the setting again to
+restore the queue from retained request state.
+
+This flag does not restrict work on existing jobs. Project-value changes always
+require approval, including when this flag is false. See the
+[Project Authorization specification](project_authorizations.md).
 
 ---
 
@@ -111,7 +120,7 @@ Controls Litestream replica health checking and alerting.
 
 ```json
 // key: "jobs"
-{ "create_edit_absorb": true }
+{ "create_edit_absorb": true, "require_job_request_approval": false }
 
 // key: "expenses"
 {

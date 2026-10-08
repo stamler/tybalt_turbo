@@ -1,13 +1,12 @@
 # Project Authorization: Approval And Job Creation
 
-**Status: This work ships in stages. PA1 (client setup and removal of the
-legacy workflow) is the first stage; the request and approval workflow follows.
-Sections 1 to 6 describe the complete design. Section 7 records what each stage
-delivers and where a deployed stage still differs from that design. On September
-30, 2026, the allocation permission requirement was clarified: project managers
-and alternate managers retain allocation editing without `job`, through the
-existing job editor and save route. Production deployment and flag activation
-are pending.**
+**Status: This work ships in two stages. PA1 (client setup and removal of the
+legacy workflow) is deployed. PA2 adds the request and approval workflow and
+completes the design. Sections 1 to 6 describe the complete design. Section 7
+records what each stage delivers. On September 30, 2026, the allocation
+permission requirement was clarified: project managers and alternate managers
+retain allocation editing without `job`, through the existing job editor and
+save route. PA2 deployment and flag activation are pending.**
 
 This document records the implementation requirements. Section 1 describes the
 system before this change. Section 2 records confirmed requirements. Sections 3
@@ -141,10 +140,13 @@ descriptive document title such as **Project Authorization - {request ID}**.
 Unlike the existing PO print route, do not require an approved or Active record.
 
 Every request remains printable. When client name, description, location,
-project contact name/email, billing contact name/email, positive project value,
+project contact name, billing contact name, positive project value,
 explicit fee basis, or selected rate sheet is missing or invalid, mark the
 output **DRAFT - NOT FOR SIGNATURE**, list the missing items, and omit signature
-lines. For T&M, unavailable billing rates also make the output a draft. Show
+lines. A project or billing contact without an email also makes the output a
+draft, unless the contact is marked as having no email address; then show
+**No email address** and do not treat it as missing. For T&M, unavailable
+billing rates also make the output a draft. Show
 **Not provided** for missing required values, never zero as a substitute for
 an unknown value. Omit absent optional addresses, phone numbers, and references;
 they do not prevent a document from being ready for signature. A complete
@@ -464,8 +466,17 @@ request's workflow status.
 
 Clients and client contacts both have street, city, province/state, postal code,
 and country fields. All address fields are optional. Keep the general client
-phone field. Every client contact requires an email address, whether used for
-project contact, billing contact, both, or neither. Contact phone is optional.
+phone field. Contact email and phone are optional, and a supplied email must be
+valid. Some clients have no email address; on October 8, 2026, staff confirmed
+this is common enough that email cannot be required for every contact. A
+contact can instead be marked **No email address**. The mark records that the
+client has no email, rather than that nobody asked, and cannot be combined with
+an email address. Entering an email clears the mark.
+
+Require an email only where one is used. At request submission, approval, and
+creation, the project contact and the profile's billing contact must each have
+an email or be marked **No email address**. Ordinary job edits, value changes,
+and contact or profile saves do not require an email.
 
 Use `client_contacts` for both project and billing contacts. Each job has a
 project `contact` relation and an `invoicing_information` relation. The latter
@@ -485,8 +496,9 @@ The billing contact's optional address is available through that relation.
 
 Edits to a contact or profile appear wherever that record is referenced. A
 change to the job's contact relation selects another record; it does not itself
-change the profile's billing-contact relation. Validate contact email and
-same-client relations on shared-record edits as well as request/job saves.
+change the profile's billing-contact relation. Validate a supplied contact
+email, the **No email address** mark, and same-client relations on shared-record
+edits as well as request/job saves.
 Reject changes that would leave existing references with mismatched clients.
 
 Controlled client merges are an exception to the immutable job-client rule.
@@ -939,19 +951,22 @@ These changes are implemented by two sequential migrations:
    existing job/allocation write permissions stay as on main, apart from the
    removed authorization guards. This schema step does not depend on request
    collections.
-2. `1790969526_project_request_workflow.go` adds the request, approval, attachment,
-   and allocation workflow. It adds request references to deletion rules, makes
-   contact email required, and broadens profile creation to active `time` or
-   `job` users. Existing profiles and their job links remain intact.
+2. `1791560769_project_request_workflow.go` adds the request, approval, attachment,
+   and allocation workflow. It adds request references to deletion rules, adds
+   the contact **No email address** mark (`client_contacts.no_email`), and
+   broadens profile creation to active `time` or `job` users. Contact email
+   stays optional. Existing contacts, profiles, and job links remain intact.
 
-The first migration ships alone in the PA1 release, with the client workspace,
-invoicing profiles, and removal of the legacy workflow. The PA1 branch is the
-source of truth for that migration; rebase this branch onto main after PA1 merges
-and keep PA1's version. The second migration ships with the request workflow.
+The first migration shipped alone in the PA1 release, with the client workspace,
+invoicing profiles, and removal of the legacy workflow. It is deployed and must
+not change. The second migration ships with the request workflow in PA2.
 
-A local database that already ran `1790780817_project_request_workflow.go` must
-be rebuilt from the canonical fixtures or restored from a compatible pre-workflow
-database before running these renamed migrations. Do not delete its migration
+A local database that already ran this workflow under an earlier name,
+`1790780817_project_request_workflow.go`,
+`1790969526_project_request_workflow.go` or
+`1791488220_project_request_workflow.go`, must be rebuilt from the canonical
+fixtures or restored from a compatible pre-workflow database before running
+these renamed migrations. Do not delete its migration
 history row or run the split over the already-installed workflow. No existing
 local or production database is changed as part of this source split.
 
@@ -1082,7 +1097,7 @@ version controls to allocation rows. Successful allocation edits also update
 | Table | Change |
 | --- | --- |
 | `clients` | Add `address` (street), `city`, `province_state`, `postal_code`, `country`, and `phone` as `TEXT`. All address fields are optional. |
-| `client_contacts` | Add the same optional address fields and optional `phone` as `TEXT`; retain `email` and require it for every contact. Both project and billing contacts use this table. |
+| `client_contacts` | Add the same optional address fields and optional `phone` as `TEXT`. Keep `email` optional and validate it when supplied. Add `no_email` as `BOOLEAN`, default false, for a contact with no email address; it cannot be true while `email` is set. Both project and billing contacts use this table. |
 | New `client_invoicing_information` | Required `client` relation to `clients` and `contact` relation to `client_contacts`; the contact must belong to that client. Add optional `name` (up to 120 characters), `invoicing_instructions` (free-form notes), and `fax` as `TEXT`. Name and notes can be empty. Add optional `creator` relation to `users` for older records. New API records receive the authenticated creator and server creation time; neither can be changed later. |
 
 Do not add `hst_exempt` or separate approval fields to shared records. Add indexes
@@ -1434,9 +1449,14 @@ Acceptance tests must cover these cases:
   both project and billing contact references. Failed merges leave all records
   unchanged. Apply stale-review guards to affected requests, preserve approved
   document/value/approver history, and block ordinary job-client reassignment.
-* Optional address fields on clients and contacts, required email on every
-  contact, and optional contact phone. A job can use the same contact record for
-  project and billing contact or select different contacts from the same client.
+* Optional address fields on clients and contacts, optional contact email and
+  phone, and the **No email address** mark: a contact cannot have both, and
+  entering an email clears the mark. Requests cannot be submitted, approved, or
+  created while their project or billing contact has neither an email nor the
+  mark; job edits and contact saves never require an email. Printing shows
+  **No email address** for a marked contact without making the output a draft.
+  A job can use the same contact record for project and billing contact or
+  select different contacts from the same client.
   Profiles are reusable and hold a contact reference rather than copied data.
   Shared edits remain visible through their references and cannot break client
   ownership rules. Changing a job's contact does not rewrite its profile.
@@ -1551,13 +1571,12 @@ release work and have not been performed in this checkout.
 
 ## 7. Release Stages
 
-Each stage branches from main and carries this complete document. Until the last
-stage ships, sections 1 to 6 describe the target design, and this section says
-what main delivers. Update this section in each stage.
+Each stage branches from main and carries this complete document. This section
+says what each stage delivers.
 
 ### PA1: Client Setup And Legacy Removal
 
-PA1 ships `1790969510_client_setup.go` and:
+PA1 shipped `1790969510_client_setup.go` and:
 
 * The client workspace: separate Client details, Jobs, and Notes routes, client
   addresses and phone numbers, contacts, and reusable invoicing profiles with the
@@ -1575,14 +1594,15 @@ PA1 ships `1790969510_client_setup.go` and:
   nine job fields, setting, notification template, routes, and screens.
 * The import guard described in section 6.
 
-Until later stages, PA1 differs from the complete design in these ways:
+Until PA2, main differed from the complete design in these ways:
 
 * There are no job requests, approvals, attachments, value-change approvals,
   Job Create Queue, `project_authorization` claim, or creation flag. Holders of
   `job` create and edit projects directly, including client and project value.
 * Only active holders of `job` can create invoicing profiles. Holders of `time`
   alone cannot.
-* Contact email remains optional. A supplied email must be valid.
+* Contact email is optional and a supplied email must be valid, as in the
+  complete design, but there is no **No email address** mark yet.
 * Managers and alternate managers without `job` keep main's job editor. When
   only division hours change, it saves just the allocations, so a project with
   no profile needs none. Other changes to such a project require selecting an
@@ -1600,14 +1620,35 @@ The migration refuses to run down because the removed legacy data cannot be
 rebuilt. To roll back, restore the backup with the matching application
 version. Old S3 objects from the legacy workflow can be cleaned up separately.
 
-After PA1 merges, rebase the `project_authorization` branch onto main. Keep
-PA1's client setup migration and client code, and resolve conflicts in this
-document by taking the latest version. Then restore the request workflow on top,
-including `1790969526_project_request_workflow.go`.
+### PA2: Request And Approval Workflow
 
-### Later Stages
+PA2 is built on deployed main. It keeps PA1's migration, client workspace, and
+shared client checks, and adds `1791560769_project_request_workflow.go` with the
+rest of sections 2 to 6:
 
-The request, approval, job creation, and value-change workflow in sections 2 to
-6 ships after PA1, with `1790969526_project_request_workflow.go`. It also makes
-contact email required and lets active holders of `time` create invoicing
-profiles from existing contacts.
+* Job requests, the printable Project Authorization, approval by holders of
+  `project_authorization`, the Job Create Queue, and job creation from an
+  approved request, behind `jobs.require_job_request_approval`.
+* Project-value change approval and protected creation history on projects.
+* Managers and alternate managers without `job` can change allocations only.
+  Fast close also requires `job`; imported projects keep its existing bypass.
+* The contact **No email address** mark, and invoicing profile creation by
+  active holders of `time`.
+
+With PA2, main matches the complete design.
+
+Before deploying PA2:
+
+1. Back up the production database. Confirm that
+   `1790969510_client_setup.go` and `1791559630_client_alias.go` have run and
+   `1791560769_project_request_workflow.go` has not.
+2. Stop old application instances, then deploy the server and UI together. The
+   migration leaves `jobs.require_job_request_approval` false, so holders of
+   `job` keep creating projects directly.
+3. Project-value changes require approval in either flag state. Assign the
+   `project_authorization` claim and limits to approvers immediately after
+   deployment, before staff need to change a project value.
+4. Enable the flag after acceptance, following section 6.
+
+The migration refuses to run down. To roll back, restore the backup with the
+matching application version.

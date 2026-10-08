@@ -48,10 +48,9 @@ The staged implementation delivers a controlled fast-close path for legacy impor
 
 ### 2.2 Authorization
 
-Request is allowed only when authenticated and either:
-
-- user has `job` claim, or
-- user is the job `manager` or `alternate_manager`.
+Request is allowed only when the authenticated user has the `job` claim. Since
+the project request workflow, managers and alternate managers without `job` can
+change allocations only (see `project_authorizations.md`).
 
 ### 2.3 Eligibility checks
 

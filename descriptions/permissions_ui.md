@@ -23,7 +23,7 @@ Expose an aggregated, read-only “capabilities” view per user that the UI can
 ```json
 {
   "id": "<uid>",
-  "claims": ["admin", "busdev", "po_approver"],
+  "claims": ["admin", "busdev", "job", "po_approver"],
   "booleans": {
     "can.view.admin": true,
     "can.edit.clients": true,
@@ -97,10 +97,15 @@ Notes:
 
 #### Mapping (initial draft)
 
-- `admin` → `can.view.admin`, `can.view.reports`, `can.edit.clients`, `can.edit.users`.
-- `busdev` → `can.edit.clients` (lead fields), possibly `can.view.pipeline` if present.
+- `admin` → `can.view.admin`, `can.view.reports`, `can.edit.users`.
+- `job` → `can.edit.clients`.
+- `busdev` → possibly `can.view.pipeline` if present. This claim alone does not grant client editing.
 - `po_approver` (+ `po_approver_props`) → `can.create.purchase_orders`, `can.approve.purchase_orders`, limits for `po.approval_max_amount`, lists for `po.allowed_divisions`.
 - Add more as features require; prefer additive booleans with consistent naming.
+
+The confirmed [Project Authorization](project_authorizations.md) rules require
+the `job` claim to maintain clients, contacts, and invoicing profiles. Neither
+`admin` nor `busdev` alone grants this access.
 
 #### Testing
 
