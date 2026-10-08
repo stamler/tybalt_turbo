@@ -734,6 +734,7 @@ export type PurchaseOrdersRecord = {
   job: RecordIdString;
   kind: RecordIdString;
   legacy_manual_entry: boolean;
+  occurrences: number;
   parent_po: RecordIdString;
   payment_type: PurchaseOrdersPaymentTypeOptions;
   po_number: string;

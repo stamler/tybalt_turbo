@@ -131,6 +131,7 @@
     data?: {
       code?: string;
       message?: string;
+      data?: Record<string, { code: string; message: string }>;
     };
   };
   const kindOptions = $derived.by(() =>
@@ -216,7 +217,13 @@
     }),
   );
   const canFetchApprovers = $derived.by(
-    () => !legacyMode && Boolean(item.division && item.total && item.kind),
+    () =>
+      !legacyMode &&
+      Boolean(item.division && item.total && item.kind) &&
+      (!isRecurring || Boolean(item.end_date && item.frequency)),
+  );
+  const recurringOccurrences = $derived.by(() =>
+    isRecurring ? (secondApproverMeta?.occurrences ?? 0) : 0,
   );
   const showApproverFetchError = $derived.by(() => canFetchApprovers && approversFetchError);
   const approversPendingResolution = $derived.by(
@@ -328,6 +335,15 @@
       resetSuccessTimeout = null;
     }
   });
+
+  // The approver check validates the recurrence, so its end_date and frequency
+  // errors belong beside those inputs. Each check replaces the previous ones.
+  function setRecurrenceErrors(fieldErrors: MaybeAbortError["data"] = {}): void {
+    const nextErrors = { ...errors };
+    delete nextErrors.end_date;
+    delete nextErrors.frequency;
+    errors = { ...nextErrors, ...fieldErrors };
+  }
 
   function resetApproverState(fetchError: boolean): void {
     approvers = [];
@@ -652,10 +668,17 @@
       approversLoaded = true;
       approversFetchError = false;
       approversLoading = false;
+      setRecurrenceErrors();
     } catch (error) {
       if (requestId !== approverFetchRequestId) return;
       if (isAbortError(error)) {
         approversLoading = false;
+        return;
+      }
+      const e = error as MaybeAbortError;
+      if (e?.data?.code === "invalid_recurrence") {
+        resetApproverState(false);
+        setRecurrenceErrors(e.data.data);
         return;
       }
       console.error("Error fetching approvers:", error);
@@ -1148,6 +1171,9 @@
           <span class="text-red-600">{errors.end_date.message}</span>
         {/if}
       </span>
+      <div class="w-full text-sm text-neutral-600">
+        Payments on or after the end date are not included.
+      </div>
 
       <DsSelector
         bind:value={item.frequency as string}
@@ -1297,7 +1323,9 @@
       disabledCurrency={currencySelectionDisabled}
       helperText={legacyMode
         ? "Legacy entries remain CAD-only in this rollout."
-        : `Max in ${selectedCurrency?.code ?? "CAD"} including all taxes and shipping.`}
+        : recurringOccurrences > 0
+          ? `Max per payment in ${selectedCurrency?.code ?? "CAD"} including all taxes and shipping. ${recurringOccurrences} payments, ${(recurringOccurrences * Number(item.total)).toFixed(2)} ${selectedCurrency?.code ?? "CAD"} total.`
+          : `Max in ${selectedCurrency?.code ?? "CAD"} including all taxes and shipping.`}
       homeEquivalent={selectedCurrency && selectedCurrency.code !== "CAD"
         ? Number(item.total ?? 0) * Number(selectedCurrency.rate ?? 1)
         : null}

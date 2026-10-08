@@ -636,10 +636,9 @@ func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord
 		return 0, 0, parseErr
 	}
 	frequency := purchaseOrderRecord.GetString("frequency")
-	daysDiff := endDate.Sub(startDate).Hours() / 24
 
-	// error if daysDiff is negative or zero
-	if daysDiff <= 0 {
+	// error if end_date is on or before start_date
+	if !endDate.After(startDate) {
 		return 0, 0, &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "end_date is before start_date",
@@ -649,16 +648,8 @@ func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord
 		}
 	}
 
-	var occurrences float64
-
-	switch frequency {
-	case "Weekly":
-		occurrences = daysDiff / 7
-	case "Biweekly":
-		occurrences = daysDiff / 14
-	case "Monthly":
-		occurrences = daysDiff / 30 // Approximation
-	default:
+	occurrences, ok := RecurringOccurrences(startDate, endDate, frequency)
+	if !ok {
 		return 0, 0, &errs.HookError{
 			Status:  http.StatusBadRequest,
 			Message: "invalid frequency",
@@ -674,14 +665,43 @@ func CalculateRecurringPurchaseOrderTotalValue(app core.App, purchaseOrderRecord
 			Status:  http.StatusBadRequest,
 			Message: "recurring purchase order must occur at least twice",
 			Data: map[string]errs.CodeError{
-				"global": {Code: "fewer_than_two_occurrences", Message: "recurring purchase order must occur at least twice, adjust either the end_date or the frequency"},
+				"end_date": {Code: "fewer_than_two_occurrences", Message: "recurring purchase order must occur at least twice, adjust either the end date or the frequency"},
 			},
 		}
 	}
 
-	// calculate totalValue using the integer value of occurrences
-	totalValue := total * float64(int(occurrences))
-	return int(occurrences), totalValue, nil
+	return occurrences, total * float64(occurrences), nil
+}
+
+// RecurringOccurrences counts the payments scheduled from startDate up to but
+// not including endDate. startDate is the first payment. endDate is exclusive
+// so that a one-year term such as 2026-02-01 to 2027-02-01 has 12 monthly
+// payments. Monthly payments fall on startDate's day of the month, or on the
+// last day of shorter months, and are always measured from startDate so that a
+// start on the 31st does not drift after February. ok is false for an unknown
+// frequency.
+func RecurringOccurrences(startDate, endDate time.Time, frequency string) (count int, ok bool) {
+	if !endDate.After(startDate) {
+		return 0, true
+	}
+	// The last day that a payment may fall on.
+	last := endDate.AddDate(0, 0, -1)
+	switch frequency {
+	case "Weekly":
+		return int(last.Sub(startDate).Hours()/24)/7 + 1, true
+	case "Biweekly":
+		return int(last.Sub(startDate).Hours()/24)/14 + 1, true
+	case "Monthly":
+		months := (last.Year()-startDate.Year())*12 + int(last.Month()) - int(startDate.Month())
+		// Payment day in last's month, clamped to the month's final day.
+		daysInMonth := time.Date(last.Year(), last.Month()+1, 0, 0, 0, 0, 0, time.UTC).Day()
+		if min(startDate.Day(), daysInMonth) > last.Day() {
+			months--
+		}
+		return months + 1, true
+	default:
+		return 0, false
+	}
 }
 
 // RecurringPurchaseOrderExhausted reports whether saved committed expenses plus
@@ -704,11 +724,9 @@ func RecurringPurchaseOrderExhausted(app core.App, purchaseOrderRecord *core.Rec
 	}
 	committedExpensesCount := result.Count
 
-	// Calculate the total number of expenses allowed for the purchase order
-	maxExpenses, _, err := CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
-	if err != nil {
-		return false, err
-	}
+	// The permitted count is fixed when the purchase order is saved so that
+	// approved purchase orders keep the count that was approved.
+	maxExpenses := purchaseOrderRecord.GetInt("occurrences")
 
 	// Include unsaved commits when comparing the count with the permitted limit.
 	return committedExpensesCount+pendingCommits >= maxExpenses, nil

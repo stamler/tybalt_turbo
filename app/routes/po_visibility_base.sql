@@ -187,29 +187,10 @@ SELECT
   COALESCE(cur.rate_date, '') AS currency_rate_date,
   (SELECT COUNT(*) FROM expenses WHERE expenses.purchase_order = po.id AND expenses.committed != '') AS committed_expenses_count,
   COALESCE((SELECT SUM(expenses.total) FROM expenses WHERE expenses.purchase_order = po.id), 0) AS expenses_total,
+  CASE WHEN po.type = 'Recurring' THEN po.occurrences ELSE 0 END AS recurring_expected_occurrences,
   CASE
-    WHEN po.type = 'Recurring' AND po.end_date != '' AND po.frequency != '' THEN
-      CASE po.frequency
-        WHEN 'Weekly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 7 AS INTEGER)
-        WHEN 'Biweekly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 14 AS INTEGER)
-        WHEN 'Monthly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 30 AS INTEGER)
-        ELSE 0
-      END
-    ELSE 0
-  END AS recurring_expected_occurrences,
-  CASE
-    WHEN po.type = 'Recurring' AND po.end_date != '' AND po.frequency != '' THEN
-      MAX(
-        (
-          CASE po.frequency
-            WHEN 'Weekly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 7 AS INTEGER)
-            WHEN 'Biweekly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 14 AS INTEGER)
-            WHEN 'Monthly' THEN CAST((julianday(po.end_date) - julianday(po.date)) / 30 AS INTEGER)
-            ELSE 0
-          END
-        ) - (SELECT COUNT(*) FROM expenses WHERE expenses.purchase_order = po.id AND expenses.committed != ''),
-        0
-      )
+    WHEN po.type = 'Recurring' THEN
+      MAX(po.occurrences - (SELECT COUNT(*) FROM expenses WHERE expenses.purchase_order = po.id AND expenses.committed != ''), 0)
     ELSE 0
   END AS recurring_remaining_occurrences,
   CASE

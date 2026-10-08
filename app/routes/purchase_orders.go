@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 	"tybalt/constants"
+	"tybalt/errs"
 	"tybalt/notifications"
 	"tybalt/utilities"
 
@@ -72,6 +73,7 @@ type secondApproversMeta struct {
 	ReasonCode              string  `json:"reason_code"`
 	ReasonMessage           string  `json:"reason_message"`
 	EvaluatedAmount         float64 `json:"evaluated_amount"`
+	Occurrences             int     `json:"occurrences"` // recurring payment count, 0 otherwise
 	SecondApprovalThreshold float64 `json:"second_approval_threshold"`
 	LimitColumn             string  `json:"limit_column"`
 	SecondStageTimeoutHours float64 `json:"second_stage_timeout_hours"`
@@ -1321,8 +1323,9 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 		req.Kind = utilities.NormalizeExpenditureKindID(req.Kind, req.HasJob)
 
 		// Check for recurring purchase order query parameters and calculate the total value if necessary
+		occurrences := 0
 		if req.Type == "Recurring" {
-			req.Amount, err = calculateRecurringPurchaseOrderTotalValue(
+			occurrences, req.Amount, err = calculateRecurringPurchaseOrderTotalValue(
 				app,
 				req.Amount,
 				req.StartDate,
@@ -1330,6 +1333,16 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 				req.Frequency,
 			)
 			if err != nil {
+				// Return field errors so the UI can show them beside the date and
+				// frequency inputs instead of reporting an approver loading failure.
+				var hookErr *errs.HookError
+				if errors.As(err, &hookErr) {
+					return e.JSON(http.StatusBadRequest, map[string]any{
+						"code":    "invalid_recurrence",
+						"message": hookErr.Message,
+						"data":    hookErr.Data,
+					})
+				}
 				return e.JSON(http.StatusBadRequest, map[string]string{
 					"code":    "invalid_parameters",
 					"message": fmt.Sprintf("Error calculating recurring PO total: %v", err),
@@ -1381,6 +1394,7 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 				approvers = []utilities.Approver{}
 			}
 			meta := buildSecondApproversMeta(app, requesterQualifies, approvers, policy, req.Amount)
+			meta.Occurrences = occurrences
 			if meta.SecondApprovalRequired && !requesterQualifies && len(approvers) == 0 {
 				return e.JSON(http.StatusBadRequest, map[string]string{
 					"code":    "second_pool_empty",
@@ -1405,30 +1419,16 @@ func createGetApproversHandler(app core.App, forSecondApproval bool) func(e *cor
 	}
 }
 
-// calculate the total value of a recurring purchase order this is used to
-// determine the approvers for the purchase order it is used in the getApprovers
-// and getSecondApprovers handlers it is also used in the createPurchaseOrder
-// handler to validate the total value of the purchase order. It is a wrapper
-// around CalculateRecurringPurchaseOrderTotalValue function that assembles
-// query parameters into a temporary purchase_orders record.
-func calculateRecurringPurchaseOrderTotalValue(app core.App, amount float64, startDate string, endDate string, frequency string) (float64, error) {
-	// Validate required parameters
-	if startDate == "" || endDate == "" || frequency == "" {
-		return 0, fmt.Errorf("start_date, end_date, and frequency are required for recurring purchase orders")
-	}
-
-	// Create a temporary record for calculation
+// calculateRecurringPurchaseOrderTotalValue returns the payment count and
+// total value of a recurring purchase order. The approvers handlers use it to
+// find approvers for the total value. It wraps
+// utilities.CalculateRecurringPurchaseOrderTotalValue by assembling query
+// parameters into a temporary purchase_orders record.
+func calculateRecurringPurchaseOrderTotalValue(app core.App, amount float64, startDate string, endDate string, frequency string) (int, float64, error) {
 	tempPO := core.NewRecord(core.NewCollection("purchase_orders", "purchase_orders"))
 	tempPO.Set("date", startDate)
 	tempPO.Set("end_date", endDate)
 	tempPO.Set("frequency", frequency)
 	tempPO.Set("total", amount)
-
-	// Calculate the actual total for recurring PO
-	_, calculatedTotal, err := utilities.CalculateRecurringPurchaseOrderTotalValue(app, tempPO)
-	if err != nil {
-		return 0, fmt.Errorf("Error calculating recurring PO total: %v", err)
-	}
-
-	return calculatedTotal, nil
+	return utilities.CalculateRecurringPurchaseOrderTotalValue(app, tempPO)
 }

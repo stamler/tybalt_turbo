@@ -27,9 +27,10 @@ import (
 // ProcessPurchaseOrder to reduce the number of fields that need to be
 // validated.
 func CleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
-	// initialize approval_total to total. This will be changed if the PO is
-	// recurring.
+	// initialize approval_total to total and occurrences to zero. These will be
+	// changed if the PO is recurring.
 	purchaseOrderRecord.Set("approval_total", purchaseOrderRecord.GetFloat("total"))
+	purchaseOrderRecord.Set("occurrences", 0)
 	homeCurrencyID := ""
 	if homeCurrency, err := utilities.FindHomeCurrency(app); err == nil && homeCurrency != nil {
 		homeCurrencyID = homeCurrency.Id
@@ -45,7 +46,7 @@ func CleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 	}
 
 	if typeString == "Recurring" {
-		_, calculatedTotal, err := utilities.CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
+		occurrences, calculatedTotal, err := utilities.CalculateRecurringPurchaseOrderTotalValue(app, purchaseOrderRecord)
 		if err != nil {
 			var hookErr *errs.HookError
 			if errors.As(err, &hookErr) {
@@ -64,6 +65,7 @@ func CleanPurchaseOrder(app core.App, purchaseOrderRecord *core.Record) error {
 			}
 		}
 		purchaseOrderRecord.Set("approval_total", calculatedTotal)
+		purchaseOrderRecord.Set("occurrences", occurrences)
 	}
 
 	if strings.TrimSpace(purchaseOrderRecord.GetString("currency")) == "" {

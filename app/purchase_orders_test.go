@@ -616,6 +616,44 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		})
 	}
+	// Issue 138: a month-end start and a longer following month gives two
+	// monthly payments, and approval_total covers both.
+	{
+		b, ct, err := makeMultipart(`{
+            "uid": "rzr98oadsp9qc11",
+            "date": "2026-04-30",
+            "division": "vccd5fo56ctbigh",
+            "description": "test purchase order",
+            "payment_type": "Expense",
+            "total": 1000,
+            "vendor": "2zqxtsmymf670ha",
+            "approver": "etysnrlup2f6bak",
+            "priority_second_approver": "6bq4j0eb26631dy",
+            "status": "Unapproved",
+            "type": "Recurring",
+            "end_date": "2026-05-31",
+            "frequency": "Monthly"
+        }`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		scenarios = append(scenarios, tests.ApiScenario{
+			Name:           "recurring purchase order counts monthly payments by calendar month",
+			Method:         http.MethodPost,
+			URL:            "/api/collections/purchase_orders/records",
+			Body:           b,
+			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"approval_total":2000`,
+				`"occurrences":2`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordCreate": 2, // 1 for the PO, 1 for the notification
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		})
+	}
 	// recurring purchase order fails without end_date
 	{
 		b, ct, err := makeMultipart(`{
@@ -709,7 +747,7 @@ func TestPurchaseOrdersCreate(t *testing.T) {
 			Headers:        map[string]string{"Authorization": recordToken, "Content-Type": ct},
 			ExpectedStatus: 400,
 			ExpectedContent: []string{
-				`"global":{"code":"fewer_than_two_occurrences"`,
+				`"end_date":{"code":"fewer_than_two_occurrences"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordCreateRequest": 1,

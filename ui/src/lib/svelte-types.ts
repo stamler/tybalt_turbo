@@ -45,6 +45,7 @@ export type SecondApproversResponse = {
     reason_code: string;
     reason_message: string;
     evaluated_amount: number;
+    occurrences: number;
     second_approval_threshold: number;
     limit_column: string;
     second_stage_timeout_hours: number;

@@ -79,3 +79,45 @@ func containsAll(body string, snippets ...string) bool {
 	}
 	return true
 }
+
+func TestPurchaseOrderApproversRoutes_RecurringPaymentCount(t *testing.T) {
+	regularUserToken, err := testutils.GenerateRecordToken("users", "time@test.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	app := testutils.SetupTestApp(t)
+	defer app.Cleanup()
+
+	makeURL := func(endpoint string, endDate string) string {
+		params := url.Values{}
+		params.Set("division", "2rrfy6m2c8hazjy")
+		params.Set("amount", "1000")
+		params.Set("has_job", "false")
+		params.Set("type", "Recurring")
+		params.Set("start_date", "2026-04-30")
+		params.Set("end_date", endDate)
+		params.Set("frequency", "Monthly")
+		return "/api/purchase_orders/" + endpoint + "?" + params.Encode()
+	}
+	headers := map[string]string{"Authorization": regularUserToken}
+
+	// Two calendar-month payments are evaluated as the combined amount.
+	res := performTestAPIRequest(t, app, "GET", makeURL("second_approvers", "2026-05-31"), nil, headers)
+	mustStatus(t, res, 200)
+	body := mustReadBody(t, res)
+	if !containsAll(body, `"evaluated_amount":2000`, `"occurrences":2`) {
+		t.Fatalf("expected two payments evaluated as 2000, body=%s", body)
+	}
+
+	// A single payment is a recurrence error on end_date for both endpoints,
+	// not a generic failure.
+	for _, endpoint := range []string{"approvers", "second_approvers"} {
+		res := performTestAPIRequest(t, app, "GET", makeURL(endpoint, "2026-05-30"), nil, headers)
+		mustStatus(t, res, 400)
+		body := mustReadBody(t, res)
+		if !containsAll(body, `"code":"invalid_recurrence"`, `"end_date":{"code":"fewer_than_two_occurrences"`) {
+			t.Fatalf("expected recurrence error from %s, body=%s", endpoint, body)
+		}
+	}
+}

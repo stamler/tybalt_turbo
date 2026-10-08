@@ -42,6 +42,7 @@ func TestRecurringPurchaseOrderClosesOnFinalCommit(t *testing.T) {
 			po.Set("end_date", tc.endDate)
 			po.Set("approval_total", tc.limit*150)
 			po.Set("approval_total_home", tc.limit*150)
+			po.Set("occurrences", tc.limit)
 			if err := app.Save(po); err != nil {
 				t.Fatal(err)
 			}

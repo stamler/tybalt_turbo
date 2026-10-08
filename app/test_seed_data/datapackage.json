@@ -2153,6 +2153,11 @@
             "x-sqlite-type": "BOOLEAN"
           },
           {
+            "name": "occurrences",
+            "type": "number",
+            "x-sqlite-type": "NUMERIC"
+          },
+          {
             "name": "parent_po",
             "type": "string",
             "x-sqlite-type": "TEXT"
