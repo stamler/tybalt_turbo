@@ -72,3 +72,11 @@ One or more timesheets are awaiting your approval.
 Please review and approve or reject them here:
 
 {{.ActionURL}}",2025-11-17 19:30:28.346Z
+job_request_workflow,2026-09-30 00:00:00.000Z,Job request and value approval notices,,panotification1,Project authorization: {{.Action}},"Request {{.RequestID}}: {{.Description}}
+{{.Action}}
+
+{{.ActionURL}}",2026-09-30 00:00:00.000Z
+job_value_workflow,2026-09-30 00:00:00.000Z,Project value approval notices,,pavaluenotice01,Project {{.JobNumber}}: {{.Action}},"{{.Description}}
+{{.Action}}
+
+{{.ActionURL}}",2026-09-30 00:00:00.000Z

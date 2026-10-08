@@ -47,3 +47,5 @@ created,email,emailVisibility,id,name,password,tokenKey,updated,username,verifie
 2026-09-21 12:00:00.000Z,valuation2@example.com,0,uvaluation00002,Valuation 2,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,valuationfixturekey2,2026-09-21 12:00:00.000Z,valuation2,1
 2026-09-21 12:00:00.000Z,valuation3@example.com,0,uvaluation00003,Valuation 3,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,valuationfixturekey3,2026-09-21 12:00:00.000Z,valuation3,1
 2026-06-15 00:00:00.000Z,reimbursements@example.com,0,reimbtestuser01,Reimbursement Tester,a.vQd0,tok_reimbtestuser01,2026-06-15 00:00:00.000Z,reimbtestuser01,1
+2024-04-04 18:48:24.355Z,invoice-job@example.com,0,invoicejob00001,Invoice Maintainer,$2a$12$pJI2YW21.vQd0BS7kZUVAuCjhjFc/cx1piSslHL2cEBo/94dZniJi,Xgk-4h15bnWhh0ecL5bYK8p4-N67cXfw0jGioLqBmPwmC1qvlAFTgYW8pW3qnifs,2024-10-29 20:50:13.436Z,invoicejob,1
+2024-10-29 12:25:48.150Z,invoice-inactive@example.com,0,invoicetime0001,Inactive Invoice Creator,$2a$12$MFwqOVtoQBUWoy4N7BEd2u8OBvfvRadp3sN7uCzWKz1.i6t5EfDuO,Imjqm8fcdxBixoUn5xb69jpUyxhLzUfGKSokDJUZ-8c1Hn7YAQjMLmvzg2lSexXw,2024-10-29 12:25:48.150Z,invoiceinactive,1

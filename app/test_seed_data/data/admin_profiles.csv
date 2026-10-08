@@ -44,3 +44,5 @@ _imported,active,allow_personal_reimbursement,created,default_branch,default_cha
 0,1,0,2026-09-21 12:00:00.000Z,80875lm27v8wgi4,999,apvaluation0001,Doer of things,legacy_valuation1,,0,2024-01-07,50,50,990091,2023-12-21,1,no,0,uvaluation00001,0,2026-09-21 12:00:00.000Z,40
 0,1,0,2026-09-21 12:00:00.000Z,80875lm27v8wgi4,0,apvaluation0003,Doer of things,legacy_valuation3,,0,2024-01-07,50,50,990093,2023-12-21,1,no,0,uvaluation00003,0,2026-09-21 12:00:00.000Z,40
 0,1,1,2026-06-15 00:00:00.000Z,80875lm27v8wgi4,50,reimbtestadmn01,Reimbursement Tester,,,0,2024-01-07,0,0,930101,,0,no,0,reimbtestuser01,0,2026-06-15 00:00:00.000Z,40
+0,1,0,2024-07-31 17:19:12.919Z,80875lm27v8wgi4,50,invoiceadmin001,Doer of things,legacy_f2j5a8vk006baub,+1 (807) 251-5555,0,2024-01-07,50,50,9801,2023-12-21,1,no,0,invoicejob00001,0,2026-02-11 00:00:00.000Z,40
+0,0,1,2025-09-03 16:51:01.207Z,80875lm27v8wgi4,50,invoiceadmin002,,,,0,2025-01-01,0,0,9802,,0,no,0,invoicetime0001,0,2025-09-03 16:51:01.207Z,40

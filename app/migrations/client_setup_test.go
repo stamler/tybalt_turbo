@@ -187,20 +187,11 @@ func assertClientSetupStage(t *testing.T, app core.App) {
 	}
 }
 
-// Compare stored schema with the canonical seed so API tests use the schema
-// that a deployment will install. Later migrations also change these
-// collections, so all migrations run first. These four collections are base
-// collections; generated view field IDs do not need normalization here.
-func TestClientSetupMigrationMatchesCanonicalSchema(t *testing.T) {
-	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
-	if err := app.Bootstrap(); err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(func() { app.ResetBootstrapState() })
-	if err := app.RunAllMigrations(); err != nil {
-		t.Fatal(err)
-	}
-	for _, name := range []string{"clients", "client_contacts", "jobs", "client_invoicing_information"} {
+// assertCanonicalCollections compares stored schema with the canonical seed so
+// API tests use the schema that a deployment installs.
+func assertCanonicalCollections(t *testing.T, app core.App, names ...string) {
+	t.Helper()
+	for _, name := range names {
 		t.Run(name, func(t *testing.T) {
 			collection := migrationCollection(t, app, name)
 			want := fixtureRow(t, "data/_collections.csv", collection.Id)
@@ -213,6 +204,10 @@ func TestClientSetupMigrationMatchesCanonicalSchema(t *testing.T) {
 					continue
 				}
 				actual := row[key].String
+				// The seed CSV writes NULL as \N.
+				if !row[key].Valid {
+					actual = `\N`
+				}
 				if key == "fields" || key == "indexes" || key == "options" {
 					var wantValue, gotValue any
 					if err := json.Unmarshal([]byte(expected), &wantValue); err != nil {

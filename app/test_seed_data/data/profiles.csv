@@ -46,3 +46,5 @@ _imported,alternate_manager,created,default_division,default_expense_payment_typ
 0,,2026-09-21 12:00:00.000Z,kxedrbp7vj2mtjd,,,0,Valuation2,pvaluation00002,dkv192wxprcqmho,email_text,Summary,uvaluation00002,2026-09-21 12:00:00.000Z
 0,,2026-09-21 12:00:00.000Z,kxedrbp7vj2mtjd,,,0,Valuation3,pvaluation00003,dkv192wxprcqmho,email_text,Summary,uvaluation00003,2026-09-21 12:00:00.000Z
 0,,2026-06-15 00:00:00.000Z,vccd5fo56ctbigh,,,0,Reimbursement,reimbtestprof01,f2j5a8vk006baub,email_text,Tester,reimbtestuser01,2026-06-15 00:00:00.000Z
+0,f2j5a8vk006baub,2024-06-26 19:56:29.282Z,vccd5fo56ctbigh,,,0,Invoice,invoiceprof0001,f2j5a8vk006baub,email_text,Maintainer,invoicejob00001,2024-10-29 20:51:03.233Z
+0,wegviunlyr2jjjv,2024-10-29 12:26:28.033Z,kxedrbp7vj2mtjd,,,0,Inactive,invoiceprof0002,f2j5a8vk006baub,email_text,Invoice Creator,invoicetime0001,2024-10-29 12:26:28.033Z
