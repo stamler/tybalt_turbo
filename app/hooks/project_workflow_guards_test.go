@@ -313,3 +313,22 @@ func TestValidatedJobCannotChangeBeforeModelSave(t *testing.T) {
 		t.Fatalf("validated data failed to save: %v", err)
 	}
 }
+
+// A model save cannot switch a job between project and proposal numbers, even
+// within a workflow operation. Only the renumber action changes numbers.
+func TestJobNumberCannotSwitchJobType(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
+	AddProjectWorkflowHooks(app)
+	ctx := WithProjectWorkflowMutation(context.Background(), ProjectWorkflowMutationMerge)
+	for id, number := range map[string]string{"pcactivedated01": "P86-9002", "fcpropimpinprog": "88-9105"} {
+		job, err := app.FindRecordById("jobs", id)
+		if err != nil {
+			t.Fatal(err)
+		}
+		job.Set("number", number)
+		if err = app.SaveWithContext(ctx, job); err == nil {
+			t.Fatalf("%s changed type with number %s", id, number)
+		}
+	}
+}

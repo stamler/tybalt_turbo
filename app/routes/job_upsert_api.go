@@ -193,6 +193,13 @@ func createUpsertJobHandler(app core.App) func(e *core.RequestEvent) error {
 				}
 			}
 
+			// Only the dedicated renumber action may change a number. A new number
+			// can turn a project into a proposal and clear its approved value.
+			if number, ok := req.Job["number"]; ok && fmt.Sprint(number) != jobRec.GetString("number") {
+				httpResponseStatusCode = http.StatusBadRequest
+				return &CodeError{Code: "number_immutable", Message: "use Change Number to renumber a job"}
+			}
+
 			// Update job fields (ignore id/system fields)
 			if req.Job != nil {
 				for k, v := range req.Job {

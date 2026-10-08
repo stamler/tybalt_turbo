@@ -136,3 +136,32 @@ func TestProjectValueQuickClose(t *testing.T) {
 	}
 	scenario.Test(t)
 }
+
+// Only the renumber action may change a job number. A proposal number would
+// let a later save treat the project as a proposal and clear its value.
+func TestProjectNumberCannotChangeThroughJobSave(t *testing.T) {
+	token, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	scenario := tests.ApiScenario{
+		Name:            "proposal number rejected",
+		Method:          http.MethodPut,
+		URL:             "/api/jobs/pcactivedated01",
+		Body:            strings.NewReader(`{"job":{"number":"P86-9002"},"allocations":[{"division":"fy4i9poneukvq9u","hours":10}]}`),
+		Headers:         map[string]string{"Authorization": token},
+		ExpectedStatus:  http.StatusBadRequest,
+		ExpectedContent: []string{`"code":"number_immutable"`},
+		TestAppFactory:  setupJobsWithBillingFixtures,
+		AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
+			job, err := app.FindRecordById("jobs", "pcactivedated01")
+			if err != nil {
+				tb.Fatal(err)
+			}
+			if job.GetString("number") != "86-9002" || job.GetFloat("project_value") != 100000 {
+				tb.Fatalf("project changed: number %s, value %v", job.GetString("number"), job.GetFloat("project_value"))
+			}
+		},
+	}
+	scenario.Test(t)
+}

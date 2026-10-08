@@ -205,6 +205,11 @@ func AddProjectWorkflowHooks(app core.App) {
 	jobGuard := func(e *core.RecordEvent) error {
 		r := e.Record
 		op := ProjectWorkflowMutationFromContext(e.Context)
+		// The job type follows the stored number. A switch between project and
+		// proposal numbers would remove the project guards and clear the value.
+		if !r.IsNew() && typeFromNumber(r.GetString("number")) != typeFromNumber(r.Original().GetString("number")) {
+			return workflowError("a job number cannot switch between project and proposal")
+		}
 		if isProposalRecord(r) {
 			return e.Next()
 		}
