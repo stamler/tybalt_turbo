@@ -928,6 +928,7 @@ export type TimeOffRecord = {
   opening_date: string;
   opening_op: number;
   opening_ov: number;
+  salary: boolean;
   timesheet_op: number;
   timesheet_ov: number;
   used_op: number;

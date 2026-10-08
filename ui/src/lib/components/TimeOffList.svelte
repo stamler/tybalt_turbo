@@ -1,5 +1,6 @@
 <script lang="ts">
   import DsList from "$lib/components/DSList.svelte";
+  import DsLabel from "$lib/components/DsLabel.svelte";
   import type { TimeOffResponse } from "$lib/pocketbase-types";
 
   let { items = [], header = "Time Off" }: { items?: TimeOffResponse[]; header?: string } =
@@ -11,7 +12,10 @@
     {item.opening_date}
   {/snippet}
   {#snippet headline(item: TimeOffResponse)}
-    {item.name}
+    <span class="flex items-center gap-2">
+      {item.name}
+      <DsLabel color="gray">{item.salary ? "Salary" : "Hourly"}</DsLabel>
+    </span>
   {/snippet}
   {#snippet line1(item: TimeOffResponse)}
     <span class="opacity-30">PPTO Available</span>
