@@ -71,8 +71,7 @@ func TestProjectWorkflowActionsQueueNoticesForRequiredRecipients(t *testing.T) {
 			id := createValueChange(t, app, legacyWorkflowJob, 10000, "Notice lifecycle "+action)
 			link := "/jobs/" + legacyWorkflowJob + "/details"
 			assertQueuedWorkflowNotices(t, app, "job_value_workflow", "submitted", editor, link, editor, approver)
-			data := attachmentActionData(t, app, id)
-			data["rejection_reason"] = "Correct the proposed amount."
+			data := attachmentRejectData(t, app, id, "Correct the proposed amount.")
 			clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/"+action, workflowApprover, data, http.StatusOK)
 			result := "approved"
 			if action == "reject" {

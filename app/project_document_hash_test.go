@@ -224,11 +224,13 @@ func TestProjectAuthorizationMatchingUploadRestoresOnlyMissingFiles(t *testing.T
 					}
 					if rejected {
 						rejectPath := path + "/reject"
-						input := attachmentActionData(t, app, attachment.Id)
+						input := map[string]any{}
 						if kind == "request" {
 							clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+requestID+"/submit", actor, requestActionData(t, app, requestID), http.StatusOK)
 							rejectPath = "/api/job_requests/" + requestID + "/reject"
 							input = requestActionData(t, app, requestID)
+						} else {
+							input = attachmentRejectData(t, app, attachment.Id, "")
 						}
 						input["rejection_reason"] = "Correct the project details."
 						clientSetupJSON(t, app, http.MethodPost, rejectPath, workflowApprover, input, http.StatusOK)

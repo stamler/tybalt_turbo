@@ -30,6 +30,23 @@ func attachmentActionData(t *testing.T, app *tests.TestApp, id string) map[strin
 	a := workflowRecord(t, app, "job_attachments", id)
 	return map[string]any{"version": a.GetInt("version"), "document_hash": a.GetString("document_hash")}
 }
+
+// attachmentRejectData returns the rejection the approver's page sends,
+// including the review token of the job data it shows.
+func attachmentRejectData(t *testing.T, app *tests.TestApp, id, reason string) map[string]any {
+	t.Helper()
+	data := attachmentActionData(t, app, id)
+	data["rejection_reason"] = reason
+	job := workflowRecord(t, app, "job_attachments", id).GetString("job")
+	list := clientSetupJSON(t, app, http.MethodGet, "/api/job_attachments?job="+job, workflowApprover, nil, http.StatusOK)
+	for _, item := range list["items"].([]any) {
+		if row := item.(map[string]any); row["id"] == id {
+			data["review_token"] = row["current_review_token"]
+		}
+	}
+	return data
+}
+
 func TestJobValueApprovalAndHistoricalZeroRestoreWithRequestsDisabled(t *testing.T) {
 	app := newWorkflowTestApp(t, false)
 	job := workflowRecord(t, app, "jobs", legacyWorkflowJob)
@@ -90,9 +107,8 @@ func TestJobValueRejectionAndAdminHistoryDeletionOrder(t *testing.T) {
 	first := createValueChange(t, app, legacyWorkflowJob, 10000, "Approval one")
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+first+"/approve", workflowApprover, attachmentActionData(t, app, first), http.StatusOK)
 	second := createValueChange(t, app, legacyWorkflowJob, 9000, "Approval decrease")
-	reject := attachmentActionData(t, app, second)
-	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+second+"/reject", workflowApprover, reject, http.StatusBadRequest)
-	reject["rejection_reason"] = "Correct the value."
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+second+"/reject", workflowApprover, attachmentRejectData(t, app, second, ""), http.StatusBadRequest)
+	reject := attachmentRejectData(t, app, second, "Correct the value.")
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+second+"/reject", workflowApprover, reject, http.StatusOK)
 	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetFloat("project_value") != 10000 {
 		t.Fatal("rejection changed effective value")
@@ -148,8 +164,7 @@ func TestJobValueSharedEditRequiresFreshReviewAndRejectedNoOpStaysRejected(t *te
 	if refreshed.GetInt("version") <= oldVersion || refreshed.GetString("review_token") == before.GetString("review_token") {
 		t.Fatal("same-data pending save did not refresh review")
 	}
-	rejection := attachmentActionData(t, app, id)
-	rejection["rejection_reason"] = "Revise the scope."
+	rejection := attachmentRejectData(t, app, id, "Revise the scope.")
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/reject", workflowApprover, rejection, http.StatusOK)
 	rejected := workflowRecord(t, app, "job_attachments", id)
 	fields["version"] = fmt.Sprint(rejected.GetInt("version"))
@@ -172,8 +187,7 @@ func TestJobValueSharedEditRequiresFreshReviewAndRejectedNoOpStaysRejected(t *te
 func TestJobValueRejectedForSharedDataResubmitsAfterCorrection(t *testing.T) {
 	app := newWorkflowTestApp(t, false)
 	id := createValueChange(t, app, legacyWorkflowJob, 10000, "Correction review document")
-	rejection := attachmentActionData(t, app, id)
-	rejection["rejection_reason"] = "The billing contact email is wrong."
+	rejection := attachmentRejectData(t, app, id, "The billing contact email is wrong.")
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/reject", workflowApprover, rejection, http.StatusOK)
 	rejected := workflowRecord(t, app, "job_attachments", id)
 	clientSetupJSON(t, app, http.MethodPatch, "/api/collections/client_contacts/records/184qbpajciwrrp2", workflowAuthor, map[string]any{"email": "corrected-billing@example.com"}, http.StatusOK)
@@ -192,8 +206,7 @@ func TestJobValueRejectedAfterPendingChangeNeedsLaterCorrection(t *testing.T) {
 	app := newWorkflowTestApp(t, false)
 	id := createValueChange(t, app, legacyWorkflowJob, 10000, "Pending change review document")
 	clientSetupJSON(t, app, http.MethodPatch, "/api/collections/client_contacts/records/184qbpajciwrrp2", workflowAuthor, map[string]any{"email": "changed-while-pending@example.com"}, http.StatusOK)
-	rejection := attachmentActionData(t, app, id)
-	rejection["rejection_reason"] = "The billing contact email is still wrong."
+	rejection := attachmentRejectData(t, app, id, "The billing contact email is still wrong.")
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/reject", workflowApprover, rejection, http.StatusOK)
 	rejected := workflowRecord(t, app, "job_attachments", id)
 	fields := map[string]string{"job": legacyWorkflowJob, "project_value": "10000", "assigned_approver": "6bq4j0eb26631dy", "version": fmt.Sprint(rejected.GetInt("version"))}
@@ -210,6 +223,22 @@ func TestJobValueRejectedAfterPendingChangeNeedsLaterCorrection(t *testing.T) {
 		t.Fatalf("correction after rejection left status %s", status)
 	}
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/approve", workflowApprover, attachmentActionData(t, app, id), http.StatusOK)
+}
+
+// The approver rejects the data the page showed. A change made after the page
+// loaded needs a reload, so the rejection records only data the approver saw.
+func TestJobValueRejectionRequiresTheDataTheApproverSaw(t *testing.T) {
+	app := newWorkflowTestApp(t, false)
+	id := createValueChange(t, app, legacyWorkflowJob, 10000, "Viewed data review document")
+	shown := attachmentRejectData(t, app, id, "The billing contact email is wrong.")
+	clientSetupJSON(t, app, http.MethodPatch, "/api/collections/client_contacts/records/184qbpajciwrrp2", workflowAuthor, map[string]any{"email": "changed-after-loading@example.com"}, http.StatusOK)
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/reject", workflowApprover, shown, http.StatusConflict)
+	if status := workflowRecord(t, app, "job_attachments", id).GetString("status"); status != "Pending" {
+		t.Fatalf("stale rejection changed status to %s", status)
+	}
+	delete(shown, "review_token")
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/reject", workflowApprover, shown, http.StatusConflict)
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/reject", workflowApprover, attachmentRejectData(t, app, id, "The billing contact email is wrong."), http.StatusOK)
 }
 
 func TestJobValueApprovalRestoresExactHistoricalNegativeValue(t *testing.T) {

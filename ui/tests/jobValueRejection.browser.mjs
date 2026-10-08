@@ -11,6 +11,7 @@ await runBrowserHarness(async (page, origin) => {
     assigned_approver: "reviewer",
     version: 1,
     document_hash: `hash${id}`,
+    current_review_token: `token${id}`,
   }));
   const actions = [];
   const errors = [];
@@ -64,6 +65,7 @@ await runBrowserHarness(async (page, origin) => {
       body: {
         version: 1,
         document_hash: `hash${id}`,
+        review_token: `token${id}`,
         rejection_reason: id === "A" ? "A needs the signed appendix." : "B has the wrong value.",
       },
     })),

@@ -249,6 +249,15 @@ func attachmentListHandler(app core.App) func(*core.RequestEvent) error {
 				return err
 			}
 			row["related"] = related
+			if a.GetString("status") == "Pending" {
+				// Identify the job data shown with this change. A rejection records
+				// it, so only later changes count as corrections.
+				token, err := valueReviewToken(app, j)
+				if err != nil {
+					return err
+				}
+				row["current_review_token"] = token
+			}
 			for _, key := range []string{"uploader", "approver", "assigned_approver", "rejector"} {
 				if id := a.GetString(key); id != "" {
 					u, err := app.FindRecordById("users", id)
@@ -559,11 +568,14 @@ func attachmentActionHandler(app core.App, approve bool) func(*core.RequestEvent
 				if err != nil {
 					return err
 				}
-				// Record the data as rejected. Only a later correction can return the
-				// change for approval; changes made while it was pending do not count.
+				// Record the data the approver saw as rejected. Only a later
+				// correction can return the change for approval.
 				token, err := valueReviewToken(tx, job)
 				if err != nil {
 					return err
+				}
+				if input.ReviewToken != token {
+					return apis.NewApiError(http.StatusConflict, "The job or its related data changed. Reload it before rejecting.", nil)
 				}
 				a.Set("review_token", token)
 				a.Set("status", "Rejected")

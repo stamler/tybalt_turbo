@@ -314,6 +314,8 @@
           // A decision can change it even when the PDF hash stays the same.
           version: item.version,
           document_hash: item.document_hash,
+          // A rejection records the job data shown here.
+          review_token: item.current_review_token,
           rejection_reason: rejectionReasons[item.id] ?? "",
         },
       });

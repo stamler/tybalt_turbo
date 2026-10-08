@@ -23,8 +23,7 @@ func TestJobValueDeleteRequiresCurrentReview(t *testing.T) {
 			version := attachment.GetInt("version")
 			switch change {
 			case "approve", "reject":
-				action := attachmentActionData(t, app, id)
-				action["rejection_reason"] = "Correct the proposed value."
+				action := attachmentRejectData(t, app, id, "Correct the proposed value.")
 				clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/"+change, workflowApprover, action, http.StatusOK)
 			case "edit":
 				fields["version"] = fmt.Sprint(version)
