@@ -247,15 +247,15 @@ func attachmentListHandler(app core.App) func(*core.RequestEvent) error {
 				row["job_description"] = j.GetString("description")
 				row["effective_project_value"] = j.GetFloat("project_value")
 				row["job_record"] = recordPublic(j)
-				related, err := requestRelated(tx, j)
+				review, err := readValueReview(tx, j)
 				if err != nil {
 					return err
 				}
-				row["related"] = related
+				row["related"] = review.related
 				if a.GetString("status") == "Pending" {
 					// Identify the job data shown with this change. A rejection records
 					// it, so only later changes count as corrections.
-					token, err := valueReviewTokenFor(tx, j, related)
+					token, err := review.token()
 					if err != nil {
 						return err
 					}
@@ -291,15 +291,15 @@ func attachmentContextHandler(app core.App) func(*core.RequestEvent) error {
 			if err != nil {
 				return err
 			}
-			allocations, err := tx.FindRecordsByFilter("job_time_allocations", "job={:id}", "division", 0, 0, dbx.Params{"id": job.Id})
+			review, err := readValueReview(tx, job)
 			if err != nil {
 				return err
 			}
-			token, err := valueReviewToken(tx, job)
+			token, err := review.token()
 			if err != nil {
 				return err
 			}
-			result = map[string]any{"job": recordPublic(job), "allocations": allocations, "review_token": token}
+			result = map[string]any{"job": recordPublic(job), "allocations": review.allocations, "review_token": token}
 			return nil
 		})
 		if err != nil {
@@ -321,38 +321,57 @@ func storedValueAllocations(app core.App, jobID string) ([]*core.Record, []JobAl
 	return rows, inputs, nil
 }
 
-func valueReviewToken(app core.App, job *core.Record) (string, error) {
-	related, err := requestRelated(app, job)
-	if err != nil {
-		return "", err
-	}
-	return valueReviewTokenFor(app, job, related)
+// valueReview is the data a value change is reviewed against: the job, its
+// related records, its latest approval, and its allocations. Pages show this
+// data and send back its token, so a save, rejection, or approval applies only
+// to the data that was shown.
+type valueReview struct {
+	job         *core.Record
+	related     map[string]any
+	sequence    int
+	allocations []*core.Record
 }
 
-// valueReviewTokenFor identifies a job, its related records as already read,
-// its approval history, and its allocations. Pass the related records a
-// response shows, so the token describes exactly that data.
-func valueReviewTokenFor(app core.App, job *core.Record, related map[string]any) (string, error) {
+// readValueReview reads a job's review data. Callers read inside a transaction
+// so every part comes from one snapshot, and show data from the result rather
+// than reading it again.
+func readValueReview(app core.App, job *core.Record) (valueReview, error) {
+	review := valueReview{job: job}
+	var err error
+	if review.related, err = requestRelated(app, job); err != nil {
+		return review, err
+	}
 	// Bind review to the current approval history as well as the job data.
 	// Attachment version alone cannot detect changes to these related records.
 	rows, err := app.FindRecordsByFilter("job_attachments", "job={:id} && status='Approved'", "-approval_sequence", 1, 0, dbx.Params{"id": job.Id})
 	if err != nil {
-		return "", err
+		return review, err
 	}
-	sequence := 0
 	if len(rows) > 0 {
-		sequence = rows[0].GetInt("approval_sequence")
+		review.sequence = rows[0].GetInt("approval_sequence")
 	}
-	allocations, err := app.FindRecordsByFilter("job_time_allocations", "job={:id}", "division", 0, 0, dbx.Params{"id": job.Id})
-	if err != nil {
-		return "", err
-	}
-	b, err := json.Marshal(map[string]any{"job": job.PublicExport(), "sequence": sequence, "related": related, "allocations": allocations})
+	review.allocations, err = app.FindRecordsByFilter("job_time_allocations", "job={:id}", "division", 0, 0, dbx.Params{"id": job.Id})
+	return review, err
+}
+
+// token identifies the review data, and only the data already read.
+func (r valueReview) token() (string, error) {
+	b, err := json.Marshal(map[string]any{"job": r.job.PublicExport(), "sequence": r.sequence, "related": r.related, "allocations": r.allocations})
 	if err != nil {
 		return "", err
 	}
 	sum := sha256.Sum256(b)
 	return hex.EncodeToString(sum[:]), nil
+}
+
+// valueReviewToken reads a job's current review data and returns its token,
+// for actions that compare or record it without showing the data.
+func valueReviewToken(app core.App, job *core.Record) (string, error) {
+	review, err := readValueReview(app, job)
+	if err != nil {
+		return "", err
+	}
+	return review.token()
 }
 func validateValueJob(app core.App, job, actor *core.Record, value float64) error {
 	candidate, err := app.FindRecordById("jobs", job.Id)
