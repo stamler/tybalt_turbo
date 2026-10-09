@@ -7,6 +7,7 @@ import (
 
 	"tybalt/utilities"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -33,6 +34,29 @@ func TestClientAliasSavedAndReturned(t *testing.T) {
 	}
 
 	clientSetupJSON(t, app, http.MethodPatch, "/api/collections/clients/records/"+workspaceClient, actor, clientAliasPatch(strings.Repeat("x", 121)), http.StatusBadRequest)
+}
+
+// Job details return the client's and job owner's aliases so the page can show
+// both names. A client without an alias returns a blank one.
+func TestJobDetailsReturnClientAliases(t *testing.T) {
+	app := newClientWorkspaceTestApp(t)
+	const actor = "author@soup.com"
+	const path = "/api/jobs/cwjob0000000001/details"
+	job := clientSetupJSON(t, app, http.MethodGet, path, actor, nil, http.StatusOK)
+	if client := job["client"].(map[string]any); client["alias"] != "" {
+		t.Fatalf("client without an alias returned %#v", client["alias"])
+	}
+
+	clientSetupJSON(t, app, http.MethodPatch, "/api/collections/clients/records/"+workspaceClient, actor, clientAliasPatch("Workspace Diner"), http.StatusOK)
+	if _, err := app.DB().NewQuery("UPDATE jobs SET job_owner={:client} WHERE id='cwjob0000000001'").Bind(dbx.Params{"client": workspaceClient}).Execute(); err != nil {
+		t.Fatal(err)
+	}
+	job = clientSetupJSON(t, app, http.MethodGet, path, actor, nil, http.StatusOK)
+	for _, key := range []string{"client", "job_owner"} {
+		if alias := job[key].(map[string]any)["alias"]; alias != "Workspace Diner" {
+			t.Errorf("%s alias = %#v; want Workspace Diner", key, alias)
+		}
+	}
 }
 
 // A profile bills the alias only when its client has one, and the alias stays

@@ -48,6 +48,7 @@ type jobDetailsRow struct {
 	ClientReferenceNumber     sql.NullString  `db:"client_reference_number"`
 	ClientID                  string          `db:"client_id"`
 	ClientName                string          `db:"client_name"`
+	ClientAlias               sql.NullString  `db:"client_alias"`
 	ContactID                 sql.NullString  `db:"contact_id"`
 	ContactGivenName          sql.NullString  `db:"contact_given_name"`
 	ContactSurname            sql.NullString  `db:"contact_surname"`
@@ -59,6 +60,7 @@ type jobDetailsRow struct {
 	AlternateManagerSurname   sql.NullString  `db:"alternate_manager_surname"`
 	JobOwnerID                sql.NullString  `db:"job_owner_id"`
 	JobOwnerName              sql.NullString  `db:"job_owner_name"`
+	JobOwnerAlias             sql.NullString  `db:"job_owner_alias"`
 	ProposalID                sql.NullString  `db:"proposal_id"`
 	ProposalNumber            sql.NullString  `db:"proposal_number"`
 	BranchID                  sql.NullString  `db:"branch_id"`
@@ -93,8 +95,9 @@ type jobDetailsRow struct {
 }
 
 type ClientInfo struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
+	ID    string `json:"id"`
+	Name  string `json:"name"`
+	Alias string `json:"alias"`
 }
 
 type RateSheetInfo struct {
@@ -214,11 +217,11 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			AuthorizingDocument:       ns(r.AuthorizingDocument),
 			ClientPO:                  ns(r.ClientPO),
 			ClientReferenceNumber:     ns(r.ClientReferenceNumber),
-			Client:                    ClientInfo{ID: r.ClientID, Name: r.ClientName},
+			Client:                    ClientInfo{ID: r.ClientID, Name: r.ClientName, Alias: ns(r.ClientAlias)},
 			Contact:                   Person{ID: ns(r.ContactID), GivenName: ns(r.ContactGivenName), Surname: ns(r.ContactSurname)},
 			Manager:                   Person{ID: ns(r.ManagerID), GivenName: ns(r.ManagerGivenName), Surname: ns(r.ManagerSurname)},
 			AlternateManager:          Person{ID: ns(r.AlternateManagerID), GivenName: ns(r.AlternateManagerGivenName), Surname: ns(r.AlternateManagerSurname)},
-			JobOwner:                  ClientInfo{ID: ns(r.JobOwnerID), Name: ns(r.JobOwnerName)},
+			JobOwner:                  ClientInfo{ID: ns(r.JobOwnerID), Name: ns(r.JobOwnerName), Alias: ns(r.JobOwnerAlias)},
 			ProposalID:                ns(r.ProposalID),
 			ProposalNumber:            ns(r.ProposalNumber),
 			BranchID:                  ns(r.BranchID),

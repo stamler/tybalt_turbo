@@ -25,6 +25,7 @@
   import type { FilterDef } from "$lib/components/jobs/types";
   import { formatCurrency, shortDate } from "$lib/utilities";
   import ClientNotesSection from "$lib/components/ClientNotesSection.svelte";
+  import { clientLabel } from "$lib/clientWorkspace";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
   let awarding = $state(false);
   let validatingForProject = $state(false);
@@ -585,7 +586,7 @@
               href={`/clients/${data.job.client.id}/details`}
               class="text-blue-600 hover:underline"
             >
-              {data.job.client.name}
+              {clientLabel(data.job.client)}
             </a>
           </div>
         {/if}
@@ -637,7 +638,7 @@
               href={`/clients/${data.job.job_owner.id}/details`}
               class="text-blue-600 hover:underline"
             >
-              {data.job.job_owner.name}
+              {clientLabel(data.job.job_owner)}
             </a>
           </div>
         {/if}
