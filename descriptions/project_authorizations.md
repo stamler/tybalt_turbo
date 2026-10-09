@@ -96,12 +96,12 @@ together. Use this section order:
 | Section | Content and defaults |
 | --- | --- |
 | Document reference | Request ID, request version, and date generated. Label the ID **Request reference**, not project number. Show **Project number: To be assigned**. Repeat the request reference on continuation pages. |
-| Client | Client name and available postal address. Show the project owner's name separately when set and different from the client. The client remains the party asked to sign. |
+| Client | Client name, followed by its alias in parentheses when it has one, and available postal address. Show the project owner's name separately when set and different from the client. The client remains the party asked to sign. |
 | Project and scope | Full project description under **Project / scope of work**. Use the description as the project name as well; add no separate name field. Show the location, including the stored Plus Code. Preserve paragraph breaks. |
 | References | Linked proposal number and description when present; client PO and client reference number when supplied. For a subjob, show the parent project number and description. Omit unused optional references. |
 | Project contacts | Client project contact name, email, and available phone. Show the TBT project manager's name, available business email/phone, and branch name. Do not substitute the internal approver as the TBT contact or signatory. |
 | Fees | Prominent **Project value (CAD, before tax)** with thousands separators and whole dollars. Show **Fee basis: Fixed fee** when T&M is false, or **Fee basis: Time and materials** when true. State **Applicable taxes are additional.** Identify the selected rate sheet by name, revision, and effective date. |
-| Invoicing | **Bill to** client name; billing contact name, email, available phone, and billing fax when supplied. Use the billing contact's address when present, otherwise the client's address. Use one address source; do not combine partial addresses from different records. Show the invoicing instructions verbatim when present. Always show this section, even when the project and billing contacts are the same. |
+| Invoicing | **Bill to** the name the invoicing profile chooses: the client's official name, or its alias when the profile bills the alias (`utilities.BillingName`); billing contact name, email, available phone, and billing fax when supplied. Use the billing contact's address when present, otherwise the client's address. Use one address source; do not combine partial addresses from different records. Show the invoicing instructions verbatim when present. Always show this section, even when the project and billing contacts are the same. |
 | Agreement and signatures | The agreement text and two signature blocks defined below. |
 
 For T&M work, append the selected rate sheet's client billing rates, using the
@@ -125,7 +125,9 @@ Omit the T&M sentence for fixed-fee work. A proposal reference identifies the
 related proposal; the generated form does not add unseen terms or claim that
 the proposal text is included. Each signature block has blank lines for printed
 name, title, signature, and date. Label them **For the client: {client name}**
-and **For TBT Engineering Limited**. Leave signatory names blank because the
+and **For TBT Engineering Limited**. The client signature block always uses the
+official client name, even when the invoicing profile bills the alias, because
+the signature binds the legal entity. Leave signatory names blank because the
 project contacts need not be the people authorized to sign. These are spaces
 for signatures on the document, not electronic signature controls in Turbo.
 

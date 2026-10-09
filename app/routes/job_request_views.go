@@ -48,6 +48,20 @@ func requestRelated(app core.App, r *core.Record) (map[string]any, error) {
 			result["billing_contact"] = recordPublic(row)
 		}
 	}
+	// Bill the client name that the invoicing profile chooses: official or alias.
+	if id := r.GetString("client"); id != "" {
+		client, err := app.FindRecordById("clients", id)
+		if err != nil {
+			return nil, err
+		}
+		var profile *core.Record
+		if id := r.GetString("invoicing_information"); id != "" {
+			if profile, err = app.FindRecordById("client_invoicing_information", id); err != nil {
+				return nil, err
+			}
+		}
+		result["bill_to_name"] = utilities.BillingName(client, profile)
+	}
 	rates := []map[string]any{}
 	if id := r.GetString("rate_sheet"); id != "" {
 		rows, err := app.FindRecordsByFilter("rate_sheet_entries", "rate_sheet={:id}", "role", 0, 0, dbx.Params{"id": id})

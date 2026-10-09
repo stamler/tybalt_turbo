@@ -8,6 +8,7 @@
     wholeCAD,
     printMissing,
   } from "$lib/jobRequests";
+  import { clientLabel } from "$lib/clientWorkspace";
   let { data } = $props();
   const r = $derived(data.detail.request),
     d = $derived(data.detail.related);
@@ -74,7 +75,7 @@
             </section>{/if}
           <section>
             <h2>Client</h2>
-            <p><strong>{shown(d.client?.name)}</strong></p>
+            <p><strong>{shown(d.client && clientLabel(d.client))}</strong></p>
             {#if address(d.client)}<p>
                 {address(d.client)}
               </p>{/if}{#if d.job_owner?.id && d.job_owner.id !== d.client?.id}<p>
@@ -139,7 +140,7 @@
             <h2>Invoicing</h2>
             <div class="columns">
               <div>
-                <p><strong>Bill to:</strong> {shown(d.client?.name)}</p>
+                <p><strong>Bill to:</strong> {shown(d.bill_to_name)}</p>
                 <p>Billing contact: {shown(fullName(d.billing_contact))}</p>
                 <p>{shown(contactEmail(d.billing_contact))}</p>
                 {#if d.billing_contact?.phone}<p>

@@ -12,6 +12,7 @@
     wholeCAD,
   } from "$lib/jobRequests";
   import { workflowError, type WorkflowRecord } from "$lib/clientEditors";
+  import { clientLabel } from "$lib/clientWorkspace";
   let { data } = $props();
   let busy = $state(false),
     error = $state(""),
@@ -170,7 +171,7 @@
       <h2 class="text-lg font-semibold whitespace-pre-wrap">
         {request.description || "Untitled request"}
       </h2>
-      <p>Client: {related.client?.name || "Not provided"}</p>
+      <p>Client: {related.client ? clientLabel(related.client) : "Not provided"}</p>
       <p>
         Project contact: {fullName(related.contact) || "Not provided"} · {contactEmail(
           related.contact,
@@ -198,6 +199,7 @@
         Award date: {request.project_award_date || "Not provided"} · Completion date: {request.project_completion_date ||
           "Not provided"}
       </p>
+      <p>Bill to: {related.bill_to_name || "Not provided"}</p>
       <p>
         Billing contact: {fullName(related.billing_contact) || "Not provided"} · {contactEmail(
           related.billing_contact,
