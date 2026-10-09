@@ -135,6 +135,7 @@
     error = "";
     const fields = [
       "description",
+      "notes",
       "client",
       "contact",
       "manager",
@@ -195,6 +196,14 @@
   <fieldset disabled={saving} class="grid gap-4 md:grid-cols-2">
     <label class="md:col-span-2"
       >Project / scope of work<textarea rows="4" bind:value={item.description}></textarea></label
+    >
+    <label class="md:col-span-2"
+      >Notes (optional)<textarea rows="3" maxlength="1000" bind:value={item.notes}></textarea><span
+        class="text-xs font-normal text-neutral-600"
+        >For example, a property's legal description. You can include the notes when printing the
+        Project Authorization. They become the job's first note when the job is created. 10 to 1000
+        characters.</span
+      ></label
     >
     <label
       >Client<select bind:value={item.client} disabled={!!item.parent} onchange={clientChanged}

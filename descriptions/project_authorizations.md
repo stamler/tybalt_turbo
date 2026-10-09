@@ -97,7 +97,7 @@ together. Use this section order:
 | --- | --- |
 | Document reference | Request ID, request version, and date generated. Label the ID **Request reference**, not project number. Show **Project number: To be assigned**. Repeat the request reference on continuation pages. |
 | Client | Client name, followed by its alias in parentheses when it has one, and available postal address. Show the project owner's name separately when set and different from the client. The client remains the party asked to sign. |
-| Project and scope | Full project description under **Project / scope of work**. Use the description as the project name as well; add no separate name field. Show the location, including the stored Plus Code. Preserve paragraph breaks. |
+| Project and scope | Full project description under **Project / scope of work**. Use the description as the project name as well; add no separate name field. Show the location, including the stored Plus Code. Preserve paragraph breaks. Print the request notes after the description under **Additional details** only when staff choose to include them. |
 | References | Linked proposal number and description when present; client PO and client reference number when supplied. For a subjob, show the parent project number and description. Omit unused optional references. |
 | Project contacts | Client project contact name, email, and available phone. Show the TBT project manager's name, available business email/phone, and branch name. Do not substitute the internal approver as the TBT contact or signatory. |
 | Fees | Prominent **Project value (CAD, before tax)** with thousands separators and whole dollars. Show **Fee basis: Fixed fee** when T&M is false, or **Fee basis: Time and materials** when true. State **Applicable taxes are additional.** Identify the selected rate sheet by name, revision, and effective date. |
@@ -156,8 +156,9 @@ client document can be ready for signature before internal submission checks,
 PDF upload, approver selection, or approval are complete.
 
 Exclude internal allocations, approval limits, checklist answers, rejection
-reasons, audit history, and workflow status from the client document. A request
-version and generation date identify the output, but do not certify approval.
+reasons, audit history, and workflow status from the client document. Exclude
+request notes unless staff choose to include them. A request version and
+generation date identify the output, but do not certify approval.
 
 Staff obtain the client and TBT signatures, then upload the signed document as
 the request's existing authorization PDF. For T&M, include the rate appendix in
@@ -174,6 +175,29 @@ related records. Later contact or invoicing edits can affect a new printout;
 they must not rewrite an uploaded signed PDF. Keep the signed PDF as the
 retained evidence under the existing attachment rules. Printing is read-only:
 it must not change the request version, last-edited time, or workflow state.
+
+#### Request Notes
+
+A request has optional free-form notes, added on October 9, 2026, for any
+details that the structured fields do not hold. Some are for the client to see
+on the document they sign. For example, a survey client may not know the
+property's legal description, so TBT supplies it in the notes. Others are for
+staff only. Notes are blank or 10 to 1000 characters after surrounding
+spaces are trimmed, the limits of `client_notes.note`. They are request business
+data: only the creator edits them under the request edit rules, and an edit
+advances the version and invalidates an earlier review.
+
+Because some notes are internal, the printout omits them by default. When the
+saved request has notes, show an **Include notes** checkbox beside **Print
+Project Authorization**. It starts unchecked each time the request page loads.
+The choice applies to that printout only; it is not stored and does not change
+the request. When chosen, print the notes in the **Project / scope of work**
+section after the description, under **Additional details**, with line breaks
+preserved, so that the agreement's "work described above" covers them. Notes
+never make a printout a draft, and blank notes print nothing.
+
+When the job is created, non-blank notes become its first client note, as
+described in Job Creation.
 
 ### Authority Matrix And Project Value
 
@@ -863,11 +887,15 @@ Creation must complete in one database transaction:
 4. Transfer the approved attachment to the job and preserve its approval data.
    Copy request origin metadata and record who performed creation and when.
    Preserve only the final valid request approval used for this creation.
-5. Delete the request and its draft allocations.
+5. When the request has notes, create a `client_notes` record for the new job
+   with the job's client and the notes. Record the request creator as its
+   author (`uid`), not the creation actor, because the creator wrote the notes.
+   Leave `job_status_changed_to` blank.
+6. Delete the request and its draft allocations.
 
-A failure must leave no new job and preserve the request, attachment, and
-allocations. Concurrent or repeated creation must not create two jobs. The
-creation actor cannot substitute an unapproved PDF or value.
+A failure must leave no new job or client note and preserve the request,
+attachment, and allocations. Concurrent or repeated creation must not create
+two jobs. The creation actor cannot substitute an unapproved PDF or value.
 
 ### Project-Value Approval And Admin Deletion
 
@@ -949,7 +977,7 @@ legacy field does not prove approval. Keep `client_po` and
 
 ## 4. SQLite Schema Changes
 
-These changes are implemented by two sequential migrations:
+These changes are implemented by three sequential migrations:
 
 1. `1790969510_client_setup.go` adds client/contact fields, invoicing profiles,
    and the optional job-profile relation. It removes legacy authorization fields,
@@ -964,10 +992,14 @@ These changes are implemented by two sequential migrations:
    the contact **No email address** mark (`client_contacts.no_email`), and
    broadens profile creation to active `time` or `job` users. Contact email
    stays optional. Existing contacts, profiles, and job links remain intact.
+3. `1791570899_job_request_notes.go` adds the optional `job_requests.notes`
+   field. It is separate so that local databases that already ran the request
+   workflow migration need no rebuild.
 
 The first migration shipped alone in the PA1 release, with the client workspace,
 invoicing profiles, and removal of the legacy workflow. It is deployed and must
-not change. The second migration ships with the request workflow in PA2.
+not change. The second and third migrations ship with the request workflow in
+PA2.
 
 A local database that already ran this workflow under an earlier name,
 `1790780817_project_request_workflow.go`,
@@ -1034,6 +1066,7 @@ active authority without deleting approval history or its recorded limit.
 | `parent`, `proposal` | `TEXT`; optional relations to `jobs`, with project/proposal type checks. |
 | `invoicing_information` | `TEXT`; relation to `client_invoicing_information`. |
 | `description`, `location`, `client_po`, `client_reference_number` | `TEXT`; use existing job field definitions. |
+| `notes` | `TEXT`; optional, blank or 10 to 1000 characters, the `client_notes.note` limits. The server trims surrounding spaces. Business data covered by `version` and `review_token`. `jobs` has no matching column; creation copies the notes to the job's first `client_notes` record. |
 | `project_award_date` | `TEXT`; existing date format, `YYYY-MM-DD`. |
 | `project_value`, `time_and_materials` | `NUMERIC` integer and `BOOLEAN`; positive value in whole CAD dollars required even for T&M at submission. |
 | `fn_agreement_answer` | `TEXT`; select `Yes` or `No`. Empty is allowed only before submission. |
@@ -1324,6 +1357,13 @@ Acceptance tests must cover these cases:
   Upload a signed copy through the existing PDF flow, including the T&M appendix.
   Other sufficient authorization PDFs remain accepted. Later shared-record
   edits affect new printouts but leave the uploaded signed evidence unchanged.
+* Request notes are optional. Saves reject notes shorter than 10 or longer than
+  1000 characters after trimming and leave the version unchanged; a valid edit
+  advances the version. The printout omits the notes unless **Include notes**
+  is checked, and then shows them under **Additional details** in the scope
+  section. Job creation copies non-blank notes into one client note for the
+  new job, authored by the request creator; blank notes create none. A failed
+  note save fails creation and leaves no job.
 * Removal migrations succeed with old PA fields populated and with them empty.
   All nine old job fields, the old hash index, obsolete field guards, config
   key, and notification template are absent afterward. Remaining old S3 objects
@@ -1501,7 +1541,9 @@ Acceptance tests must cover these cases:
    require the existing project completion date, including an estimated date.
 3. Use **Print Project Authorization** to obtain signatures. Save edits before
    printing. Incomplete client documents show a draft warning and no signature
-   lines. T&M documents include the client rate appendix.
+   lines. T&M documents include the client rate appendix. Check **Include
+   notes** to print the request notes, such as a legal description, for the
+   client.
 4. Upload one authorization PDF and select **Submit**. The selected approver
    uses **Request Approvals**, reviews possible duplicate jobs, and confirms
    all six checklist statements before approval.
@@ -1631,8 +1673,8 @@ version. Old S3 objects from the legacy workflow can be cleaned up separately.
 ### PA2: Request And Approval Workflow
 
 PA2 is built on deployed main. It keeps PA1's migration, client workspace, and
-shared client checks, and adds `1791560769_project_request_workflow.go` with the
-rest of sections 2 to 6:
+shared client checks, and adds `1791560769_project_request_workflow.go` and
+`1791570899_job_request_notes.go` with the rest of sections 2 to 6:
 
 * Job requests, the printable Project Authorization, approval by holders of
   `project_authorization`, the Job Create Queue, and job creation from an
@@ -1642,6 +1684,8 @@ rest of sections 2 to 6:
   Fast close also requires `job`; imported projects keep its existing bypass.
 * The contact **No email address** mark, and invoicing profile creation by
   active holders of `time`.
+* Optional request notes, printed on request and copied to the job's first
+  client note.
 
 With PA2, main matches the complete design.
 
@@ -1649,7 +1693,8 @@ Before deploying PA2:
 
 1. Back up the production database. Confirm that
    `1790969510_client_setup.go` and `1791559630_client_alias.go` have run and
-   `1791560769_project_request_workflow.go` has not.
+   `1791560769_project_request_workflow.go` and
+   `1791570899_job_request_notes.go` have not.
 2. Stop old application instances, then deploy the server and UI together. The
    migration leaves `jobs.require_job_request_approval` false, so holders of
    `job` keep creating projects directly.
@@ -1658,5 +1703,5 @@ Before deploying PA2:
    deployment, before staff need to change a project value.
 4. Enable the flag after acceptance, following section 6.
 
-The migration refuses to run down. To roll back, restore the backup with the
-matching application version.
+The request workflow migration refuses to run down. To roll back, restore the
+backup with the matching application version.

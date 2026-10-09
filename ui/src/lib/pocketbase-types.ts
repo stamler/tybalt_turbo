@@ -1528,6 +1528,8 @@ export type JobRequestsRecord = {
   proposal: RecordIdString;
   invoicing_information: RecordIdString;
   description: string;
+  /** Optional, 10 to 1000 characters. Printed only on request; becomes the job's first client note. */
+  notes: string;
   location: string;
   client_po: string;
   client_reference_number: string;

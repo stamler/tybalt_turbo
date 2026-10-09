@@ -177,9 +177,18 @@ await runBrowserHarness(
     const text = await page.locator("article").innerText();
     for (const internal of ["approval limit", "allocations", "Draft ->", "labour cost"])
       assert.equal(text.includes(internal), false);
+    // Request notes may be internal, so they print only when staff choose them.
+    for (const notes of ["Additional details", "Lot 12, Concession 3"])
+      assert.equal(text.includes(notes), false);
     await page.screenshot({ path: "/tmp/project-request-complete.png", fullPage: true });
     await page.emulateMedia({ media: "print" });
     await page.pdf({ path: "/tmp/project-request-complete.pdf", preferCSSPageSize: true });
+    await page.goto(`${origin}/tests/fixtures/projectRequests.html?notes`);
+    await page.getByText("Additional details", { exact: true }).waitFor();
+    assert.match(
+      await page.locator("section").filter({ hasText: "Project / scope of work" }).innerText(),
+      /Additional details\n+Legal description: Lot 12, Concession 3,\nGeographic Township of Example/,
+    );
     await page.goto(`${origin}/tests/fixtures/projectRequests.html?tm`);
     await page.getByText("Client billing rate sheet — CAD", { exact: true }).waitFor();
     assert.match(await page.locator(".rates").innerText(), /Engineer/);
@@ -276,6 +285,9 @@ await runBrowserHarness(
         .getAttribute("href"),
       /project_contact=contact1/,
     );
+    await page
+      .getByLabel(/^Notes \(optional\)/)
+      .fill("Legal description: Part 2, Plan 55R-1234, City of Example");
     const value = page.getByLabel("Project value (CAD, before tax)");
     await value.fill("1.25");
     assert.equal(await value.evaluate((input) => input.validity.stepMismatch), true);
@@ -293,6 +305,10 @@ await runBrowserHarness(
     assert.equal(saves[0].request.time_and_materials, false);
     assert.equal(Object.hasOwn(saves[0].request, "time_and_materials_set"), false);
     assert.equal(saves[0].request.rate_sheet, "rate1");
+    assert.equal(
+      saves[0].request.notes,
+      "Legal description: Part 2, Plan 55R-1234, City of Example",
+    );
     assert.equal(saves[0].version, 3);
     await value.fill("130000");
     await page.getByRole("button", { name: "Save request", exact: true }).click();

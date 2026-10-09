@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -231,6 +232,77 @@ func TestJobRequestApprovalCreationLifecycle(t *testing.T) {
 		t.Fatalf("allocation transfer: %v, count %d", err, len(allocs))
 	}
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/create", workflowAuthor, map[string]any{"version": approved.GetInt("version")}, http.StatusNotFound)
+	if notes, err := app.FindRecordsByFilter("client_notes", "job={:id}", "", 0, 0, dbx.Params{"id": jobID}); err != nil || len(notes) != 0 {
+		t.Fatalf("request without notes created job notes: %v %v", notes, err)
+	}
+}
+
+// Request notes are reviewed request data. Job creation makes them the job's
+// first client note, written by the request creator.
+func TestJobRequestNotesBecomeFirstJobNote(t *testing.T) {
+	app := newWorkflowTestApp(t, true)
+	const id = "parequest000001"
+	const creator = "time@test.com"
+	for _, notes := range []any{"Too short", strings.Repeat("x", 1001), 42} {
+		clientSetupJSON(t, app, http.MethodPatch, "/api/job_requests/"+id, creator, map[string]any{"version": 1, "request": map[string]any{"notes": notes}}, http.StatusBadRequest)
+	}
+	if r := workflowRecord(t, app, "job_requests", id); r.GetInt("version") != 1 || r.GetString("notes") != "" {
+		t.Fatal("invalid notes changed the request")
+	}
+	const legal = "Legal description: Lot 12, Concession 3,\nGeographic Township of Example"
+	clientSetupJSON(t, app, http.MethodPatch, "/api/job_requests/"+id, creator, map[string]any{"version": 1, "request": map[string]any{"notes": "  " + legal + "\n"}}, http.StatusOK)
+	r := workflowRecord(t, app, "job_requests", id)
+	if r.GetString("notes") != legal || r.GetInt("version") != 2 {
+		t.Fatalf("notes=%q version=%d, want trimmed notes and a new version", r.GetString("notes"), r.GetInt("version"))
+	}
+	printed := clientSetupJSON(t, app, http.MethodGet, "/api/job_requests/"+id+"/print", creator, nil, http.StatusOK)
+	if printed["request"].(map[string]any)["notes"] != legal {
+		t.Fatal("print data does not include notes")
+	}
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/submit", creator, requestActionData(t, app, id), http.StatusOK)
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/approve", workflowApprover, requestActionData(t, app, id), http.StatusOK)
+	result := clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/create", workflowAuthor, requestActionData(t, app, id), http.StatusOK)
+	jobID, _ := result["job_id"].(string)
+	job := workflowRecord(t, app, "jobs", jobID)
+	notes, err := app.FindRecordsByFilter("client_notes", "job={:id}", "", 0, 0, dbx.Params{"id": jobID})
+	if err != nil || len(notes) != 1 {
+		t.Fatalf("job notes: %v, count %d, want 1", err, len(notes))
+	}
+	note := notes[0]
+	if note.GetString("note") != legal || note.GetString("uid") != r.GetString("creator") || note.GetString("client") != job.GetString("client") || note.GetString("job_status_changed_to") != "" {
+		t.Fatalf("job note does not carry the request notes and creator: %#v", note.PublicExport())
+	}
+}
+
+// A note that cannot be saved fails creation and leaves the request intact.
+func TestJobRequestNoteFailureRollsBackCreation(t *testing.T) {
+	app := newWorkflowTestApp(t, true)
+	const id = "parequest000001"
+	clientSetupJSON(t, app, http.MethodPatch, "/api/job_requests/"+id, "time@test.com", map[string]any{"version": 1, "request": map[string]any{"notes": "Legal description to copy to the job"}}, http.StatusOK)
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/submit", "time@test.com", requestActionData(t, app, id), http.StatusOK)
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/approve", workflowApprover, requestActionData(t, app, id), http.StatusOK)
+	noteSaves := 0
+	app.OnRecordCreate("client_notes").BindFunc(func(e *core.RecordEvent) error {
+		noteSaves++
+		return errors.New("note storage unavailable")
+	})
+	before, err := app.CountRecords("jobs")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response := performJSONRequest(t, app, http.MethodPost, "/api/job_requests/"+id+"/create", workflowToken(t, app, workflowAuthor), requestActionData(t, app, id))
+	if response.Code < 400 || noteSaves != 1 {
+		t.Fatalf("creation returned %d after %d note saves, want a failed note save", response.Code, noteSaves)
+	}
+	if after, err := app.CountRecords("jobs"); err != nil || after != before {
+		t.Fatalf("failed creation left a job: %v, before %d after %d", err, before, after)
+	}
+	if workflowRecord(t, app, "job_requests", id).GetString("status") != "Awaiting creation" {
+		t.Fatal("failed creation discarded approved request")
+	}
+	if workflowRecord(t, app, "job_attachments", "paattachment001").GetString("request") != id {
+		t.Fatal("failed creation moved the attachment")
+	}
 }
 
 // Contact email is optional, but a request's project and billing contacts must

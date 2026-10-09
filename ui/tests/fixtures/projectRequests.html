@@ -23,6 +23,7 @@
         description: query.has("long")
           ? "Long project scope.\n".repeat(150) + "END OF SCOPE"
           : "Inspect the bridge.\nPrepare the final report.",
+        notes: "Legal description: Lot 12, Concession 3,\nGeographic Township of Example",
         location: "86VHQPRM+5C",
         project_value: 120000,
         time_and_materials: query.has("tm"),
@@ -133,6 +134,7 @@
             data: {
               detail: { request, related, allocations: [], permissions: {}, review_token: "" },
               generated: "2026-09-30",
+              includeNotes: query.has("notes"),
             },
           },
         });

@@ -10,6 +10,7 @@ import (
 	"regexp"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"tybalt/errs"
@@ -26,7 +27,7 @@ import (
 const JOB_REQUEST_ABANDONMENT_DAYS = utilities.JOB_REQUEST_ABANDONMENT_DAYS
 const creationQueueFilter = "status = 'Awaiting creation'"
 
-var requestBusinessFields = []string{"project_status", "approver", "client", "job_owner", "contact", "manager", "alternate_manager", "branch", "rate_sheet", "parent", "proposal", "invoicing_information", "description", "location", "client_po", "client_reference_number", "project_award_date", "project_completion_date", "project_value", "time_and_materials", "fn_agreement_answer"}
+var requestBusinessFields = []string{"project_status", "approver", "client", "job_owner", "contact", "manager", "alternate_manager", "branch", "rate_sheet", "parent", "proposal", "invoicing_information", "description", "notes", "location", "client_po", "client_reference_number", "project_award_date", "project_completion_date", "project_value", "time_and_materials", "fn_agreement_answer"}
 var approvalChecklistKeys = []string{"fn_agreement_reviewed", "no_known_conflict", "no_executive_restriction", "no_duplicate_work", "pdf_sufficient", "allocations_complete"}
 
 type requestWrite struct {
@@ -252,6 +253,18 @@ func applyRequestData(r *core.Record, data map[string]any) error {
 		}
 		if key == "project_value" && !validWholeAmount(value, false) {
 			return workflowError("Project value must be a whole CAD dollar amount.")
+		}
+		if key == "notes" {
+			notes, ok := value.(string)
+			if !ok {
+				return workflowError("Notes must be text.")
+			}
+			// Job creation copies the notes into a client note, so apply its limits.
+			notes = strings.TrimSpace(notes)
+			if n := utf8.RuneCountInString(notes); n > 0 && (n < 10 || n > 1000) {
+				return workflowError("Notes must be 10 to 1000 characters, or blank.")
+			}
+			value = notes
 		}
 		if key == "time_and_materials" {
 			if _, ok := value.(bool); !ok {
@@ -766,6 +779,9 @@ func createJobFromRequest(app core.App, e *core.RequestEvent, r, a *core.Record)
 	if err = app.SaveWithContext(ctx, a); err != nil {
 		return "", err
 	}
+	if err = createRequestNote(app, ctx, r, job); err != nil {
+		return "", err
+	}
 	if err = transferRequestMergeReferences(app, r, job); err != nil {
 		return "", err
 	}
@@ -773,6 +789,25 @@ func createJobFromRequest(app core.App, e *core.RequestEvent, r, a *core.Record)
 		return "", err
 	}
 	return job.Id, nil
+}
+
+// createRequestNote makes the request's notes the new job's first client note.
+// The request creator wrote them, so the note keeps that author.
+func createRequestNote(app core.App, ctx context.Context, r, job *core.Record) error {
+	notes := strings.TrimSpace(r.GetString("notes"))
+	if notes == "" {
+		return nil
+	}
+	c, err := app.FindCollectionByNameOrId("client_notes")
+	if err != nil {
+		return err
+	}
+	note := core.NewRecord(c)
+	note.Set("client", job.GetString("client"))
+	note.Set("job", job.Id)
+	note.Set("uid", r.GetString("creator"))
+	note.Set("note", notes)
+	return app.SaveWithContext(ctx, note)
 }
 func queueRequestNotice(app core.App, r *core.Record, action, actor string) error {
 	seen := map[string]bool{}

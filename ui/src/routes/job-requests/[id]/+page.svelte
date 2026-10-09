@@ -17,7 +17,9 @@
   let busy = $state(false),
     error = $state(""),
     dirty = $state(false),
-    printing = $state(false);
+    printing = $state(false),
+    // Notes may be internal, so the printout leaves them out unless chosen.
+    printNotes = $state(false);
   let checklist = $state(emptyChecklist()),
     duplicateChecked = $state(false),
     rejectionReason = $state("");
@@ -117,7 +119,7 @@
     }
     if (saved && !(await editor?.save())) return;
     printing = false;
-    await goto(`/job-requests/${request.id}/print`);
+    await goto(`/job-requests/${request.id}/print${printNotes ? "?notes=1" : ""}`);
   }
 </script>
 
@@ -129,9 +131,14 @@
         {request.id} · Version {request.version} · {request.status || request.state}
       </p>
     </div>
-    <button class="rounded border px-4 py-2" onclick={() => print()}
-      >Print Project Authorization</button
-    >
+    <div class="flex flex-wrap items-center gap-3">
+      {#if request.notes}<label class="flex items-center gap-2 text-sm"
+          ><input type="checkbox" bind:checked={printNotes} />Include notes</label
+        >{/if}
+      <button class="rounded border px-4 py-2" onclick={() => print()}
+        >Print Project Authorization</button
+      >
+    </div>
   </div>
   <p class="text-sm text-neutral-600">
     Requested by {fullName(related.creator) || request.creator}. Selected approver: {fullName(
@@ -181,6 +188,7 @@
         Manager: {fullName(related.manager) || "Not provided"} · Branch: {related.branch?.name ||
           "Not provided"}
       </p>
+      {#if request.notes}<p class="whitespace-pre-wrap">Notes: {request.notes}</p>{/if}
       <p>Location: {request.location || "Not provided"}</p>
       <p>
         Project value: {wholeCAD(request.project_value)} · {request.time_and_materials_set

@@ -85,6 +85,8 @@
           <section>
             <h2>Project / scope of work</h2>
             <p class="preserve">{shown(r.description)}</p>
+            {#if data.includeNotes && r.notes?.trim()}<h3>Additional details</h3>
+              <p class="preserve">{r.notes}</p>{/if}
             <p><strong>Location (Plus Code):</strong> {shown(r.location)}</p>
           </section>
           {#if d.proposal || d.parent || r.client_po || r.client_reference_number}<section>
