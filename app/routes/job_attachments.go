@@ -219,55 +219,63 @@ func attachmentListHandler(app core.App) func(*core.RequestEvent) error {
 			filter += " && job={:job}"
 			params["job"] = query.Get("job")
 		}
-		// Approval sequence orders retained approvals per job. Creation time only
-		// breaks ties, including pending/rejected rows whose sequence is zero.
-		rows, err := app.FindRecordsByFilter("job_attachments", filter, "-approval_sequence,-created", 0, 0, params)
-		if err != nil {
-			return err
-		}
+		// Read each change, its job, and the token from one snapshot so a shown
+		// row and its review token always describe the same data.
 		items := []map[string]any{}
-		for _, a := range rows {
-			ok, err := attachmentCanView(app, a, e.Auth)
+		err := app.RunInTransaction(func(tx core.App) error {
+			// Approval sequence orders retained approvals per job. Creation time only
+			// breaks ties, including pending/rejected rows whose sequence is zero.
+			rows, err := tx.FindRecordsByFilter("job_attachments", filter, "-approval_sequence,-created", 0, 0, params)
 			if err != nil {
 				return err
 			}
-			if !ok {
-				continue
-			}
-			row := recordPublic(a)
-			row["document_url"] = "/api/job_attachments/" + a.Id + "/document"
-			j, err := app.FindRecordById("jobs", a.GetString("job"))
-			if err != nil {
-				return err
-			}
-			row["job_number"] = j.GetString("number")
-			row["job_description"] = j.GetString("description")
-			row["effective_project_value"] = j.GetFloat("project_value")
-			row["job_record"] = recordPublic(j)
-			related, err := requestRelated(app, j)
-			if err != nil {
-				return err
-			}
-			row["related"] = related
-			if a.GetString("status") == "Pending" {
-				// Identify the job data shown with this change. A rejection records
-				// it, so only later changes count as corrections.
-				token, err := valueReviewToken(app, j)
+			for _, a := range rows {
+				ok, err := attachmentCanView(tx, a, e.Auth)
 				if err != nil {
 					return err
 				}
-				row["current_review_token"] = token
-			}
-			for _, key := range []string{"uploader", "approver", "assigned_approver", "rejector"} {
-				if id := a.GetString(key); id != "" {
-					u, err := app.FindRecordById("users", id)
+				if !ok {
+					continue
+				}
+				row := recordPublic(a)
+				row["document_url"] = "/api/job_attachments/" + a.Id + "/document"
+				j, err := tx.FindRecordById("jobs", a.GetString("job"))
+				if err != nil {
+					return err
+				}
+				row["job_number"] = j.GetString("number")
+				row["job_description"] = j.GetString("description")
+				row["effective_project_value"] = j.GetFloat("project_value")
+				row["job_record"] = recordPublic(j)
+				related, err := requestRelated(tx, j)
+				if err != nil {
+					return err
+				}
+				row["related"] = related
+				if a.GetString("status") == "Pending" {
+					// Identify the job data shown with this change. A rejection records
+					// it, so only later changes count as corrections.
+					token, err := valueReviewTokenFor(tx, j, related)
 					if err != nil {
 						return err
 					}
-					row[key+"_name"] = workflowPerson(app, u)["name"]
+					row["current_review_token"] = token
 				}
+				for _, key := range []string{"uploader", "approver", "assigned_approver", "rejector"} {
+					if id := a.GetString(key); id != "" {
+						u, err := tx.FindRecordById("users", id)
+						if err != nil {
+							return err
+						}
+						row[key+"_name"] = workflowPerson(tx, u)["name"]
+					}
+				}
+				items = append(items, row)
 			}
-			items = append(items, row)
+			return nil
+		})
+		if err != nil {
+			return err
 		}
 		return e.JSON(http.StatusOK, map[string]any{"items": items})
 	}
@@ -314,6 +322,17 @@ func storedValueAllocations(app core.App, jobID string) ([]*core.Record, []JobAl
 }
 
 func valueReviewToken(app core.App, job *core.Record) (string, error) {
+	related, err := requestRelated(app, job)
+	if err != nil {
+		return "", err
+	}
+	return valueReviewTokenFor(app, job, related)
+}
+
+// valueReviewTokenFor identifies a job, its related records as already read,
+// its approval history, and its allocations. Pass the related records a
+// response shows, so the token describes exactly that data.
+func valueReviewTokenFor(app core.App, job *core.Record, related map[string]any) (string, error) {
 	// Bind review to the current approval history as well as the job data.
 	// Attachment version alone cannot detect changes to these related records.
 	rows, err := app.FindRecordsByFilter("job_attachments", "job={:id} && status='Approved'", "-approval_sequence", 1, 0, dbx.Params{"id": job.Id})
@@ -323,10 +342,6 @@ func valueReviewToken(app core.App, job *core.Record) (string, error) {
 	sequence := 0
 	if len(rows) > 0 {
 		sequence = rows[0].GetInt("approval_sequence")
-	}
-	related, err := requestRelated(app, job)
-	if err != nil {
-		return "", err
 	}
 	allocations, err := app.FindRecordsByFilter("job_time_allocations", "job={:id}", "division", 0, 0, dbx.Params{"id": job.Id})
 	if err != nil {

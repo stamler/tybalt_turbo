@@ -7,6 +7,7 @@ import (
 	"os"
 	"testing"
 
+	"github.com/pocketbase/dbx"
 	"github.com/pocketbase/pocketbase/tests"
 )
 
@@ -466,6 +467,57 @@ func TestJobValueSavesAndApprovalsRequireValidStoredAllocations(t *testing.T) {
 					t.Fatal("invalid stored allocations changed effective value")
 				}
 			})
+		}
+	}
+}
+
+// Each listed value change shows related data and a review token from the
+// same read, even while that data is being edited.
+func TestJobValueListTokenMatchesShownDataDuringEdits(t *testing.T) {
+	app := newWorkflowTestApp(t, false)
+	id := createValueChange(t, app, legacyWorkflowJob, 10000, "Concurrent review document")
+	profile := workflowRecord(t, app, "jobs", legacyWorkflowJob).GetString("invoicing_information")
+	setInstructions := func(text string) {
+		if _, err := app.DB().NewQuery("UPDATE client_invoicing_information SET invoicing_instructions = {:text} WHERE id = {:id}").Bind(dbx.Params{"text": text, "id": profile}).Execute(); err != nil {
+			t.Error(err)
+		}
+	}
+	listed := func() (string, string) {
+		list := clientSetupJSON(t, app, http.MethodGet, "/api/job_attachments?job="+legacyWorkflowJob, workflowApprover, nil, http.StatusOK)
+		for _, item := range list["items"].([]any) {
+			if row := item.(map[string]any); row["id"] == id {
+				billing := row["related"].(map[string]any)["invoicing_information"].(map[string]any)
+				return billing["invoicing_instructions"].(string), row["current_review_token"].(string)
+			}
+		}
+		t.Fatal("value change not listed")
+		return "", ""
+	}
+	tokens := map[string]string{}
+	for _, text := range []string{"Instructions A", "Instructions B"} {
+		setInstructions(text)
+		_, tokens[text] = listed()
+	}
+	stop, done := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; ; i++ {
+			select {
+			case <-stop:
+				return
+			default:
+				setInstructions([]string{"Instructions A", "Instructions B"}[i%2])
+			}
+		}
+	}()
+	defer func() {
+		close(stop)
+		<-done
+	}()
+	for i := 0; i < 200; i++ {
+		shown, token := listed()
+		if tokens[shown] != token {
+			t.Fatalf("listed %q with the review token of other data", shown)
 		}
 	}
 }
