@@ -25,6 +25,7 @@ export type WorkspaceInvoicing = {
   client: string;
   name: string;
   contact: string;
+  billing_name?: string;
   fax: string;
   invoicing_instructions: string;
   job_count: number;
@@ -32,6 +33,7 @@ export type WorkspaceInvoicing = {
 export type WorkspaceClient = WorkspaceAddress & {
   id: string;
   name: string;
+  alias?: string;
   business_development_lead: string;
   lead_given_name: string;
   lead_surname: string;
@@ -127,6 +129,21 @@ export function contactName(
   return contact
     ? [contact.given_name, contact.surname].filter(Boolean).join(" ")
     : "Contact unavailable";
+}
+// A client's official name, followed by its alias when it has one.
+export function clientLabel(client: { name?: string; alias?: string }): string {
+  const name = client.name ?? "";
+  const alias = client.alias?.trim();
+  return alias ? `${name} (${alias})` : name;
+}
+// The client name an invoicing profile bills: the alias when the profile chooses
+// it, otherwise the official name. Mirrors utilities.BillingName on the server.
+export function billingName(
+  client: { name: string; alias?: string },
+  profile?: { billing_name?: string },
+): string {
+  const alias = client.alias?.trim();
+  return profile?.billing_name === "alias" && alias ? alias : client.name;
 }
 // "1 job", "2 jobs": a count with its noun in the right number.
 export function countLabel(count: number, singular: string, plural = `${singular}s`): string {

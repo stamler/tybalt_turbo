@@ -65,6 +65,31 @@ func AddClientSetupHooks(app core.App) {
 	app.OnRecordCreate("client_contacts", "client_invoicing_information").BindFunc(validateReferences)
 	app.OnRecordUpdate("client_contacts", "client_invoicing_information").BindFunc(validateReferences)
 
+	// Request hooks return these errors with their field codes; the model hooks
+	// also guard saves made outside requests, such as from the dashboard or code.
+	guard := func(check func(core.App, *core.Record) error, collection string, create bool) {
+		requestGuard := func(e *core.RecordRequestEvent) error {
+			if err := check(e.App, e.Record); err != nil {
+				return AnnotateHookError(e.App, e, err)
+			}
+			return e.Next()
+		}
+		modelGuard := func(e *core.RecordEvent) error {
+			if err := check(e.App, e.Record); err != nil {
+				return err
+			}
+			return e.Next()
+		}
+		if create {
+			app.OnRecordCreateRequest(collection).BindFunc(requestGuard)
+			app.OnRecordCreate(collection).BindFunc(modelGuard)
+		}
+		app.OnRecordUpdateRequest(collection).BindFunc(requestGuard)
+		app.OnRecordUpdate(collection).BindFunc(modelGuard)
+	}
+	guard(utilities.ValidateBillingName, "client_invoicing_information", true)
+	guard(validateAliasRemoval, "clients", false)
+
 	app.OnRecordDelete("clients", "client_contacts", "client_invoicing_information").BindFunc(func(e *core.RecordEvent) error {
 		for _, use := range clientRecordUses[e.Record.Collection().Name] {
 			count, err := e.App.CountRecords(use.collection, dbx.HashExp{use.field: e.Record.Id})
@@ -80,4 +105,28 @@ func AddClientSetupHooks(app core.App) {
 		}
 		return e.Next()
 	})
+}
+
+// validateAliasRemoval keeps a client's alias while invoicing profiles bill it,
+// so clearing the alias never silently changes the name those profiles bill.
+func validateAliasRemoval(app core.App, client *core.Record) error {
+	if client.IsNew() || utilities.ClientAlias(client) != "" || utilities.ClientAlias(client.Original()) == "" {
+		return nil
+	}
+	count, err := utilities.CountProfilesBillingAlias(app, client.Id)
+	if err != nil {
+		return err
+	}
+	if count == 0 {
+		return nil
+	}
+	message := "An invoicing profile bills this alias. Change it to bill the client name first."
+	if count > 1 {
+		message = fmt.Sprintf("%d invoicing profiles bill this alias. Change them to bill the client name first.", count)
+	}
+	return &errs.HookError{
+		Status:  http.StatusBadRequest,
+		Message: message,
+		Data:    map[string]errs.CodeError{"alias": {Code: "alias_in_use", Message: message}},
+	}
 }

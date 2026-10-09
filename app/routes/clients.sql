@@ -2,6 +2,7 @@
 SELECT
   c.id,
   c.name,
+  COALESCE(c.alias, '') AS alias,
   COALESCE(cc_agg.contacts_json, '[]') AS contacts_json,
   COALESCE(j_count.referencing_jobs_count, 0) AS referencing_jobs_count,
   COALESCE(j_sum.total_outstanding_balance, 0) AS outstanding_balance

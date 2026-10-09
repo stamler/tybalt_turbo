@@ -188,11 +188,18 @@ func assertClientSetupStage(t *testing.T, app core.App) {
 }
 
 // Compare stored schema with the canonical seed so API tests use the schema
-// that a deployment will install. These four collections are base collections;
-// generated view field IDs do not need normalization here.
+// that a deployment will install. Later migrations also change these
+// collections, so all migrations run first. These four collections are base
+// collections; generated view field IDs do not need normalization here.
 func TestClientSetupMigrationMatchesCanonicalSchema(t *testing.T) {
-	app, setup := newClientSetupMigrationApp(t)
-	applyMigration(t, app, setup)
+	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
+	if err := app.Bootstrap(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { app.ResetBootstrapState() })
+	if err := app.RunAllMigrations(); err != nil {
+		t.Fatal(err)
+	}
 	for _, name := range []string{"clients", "client_contacts", "jobs", "client_invoicing_information"} {
 		t.Run(name, func(t *testing.T) {
 			collection := migrationCollection(t, app, name)

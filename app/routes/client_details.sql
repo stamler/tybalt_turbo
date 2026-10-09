@@ -28,6 +28,7 @@ invoicing_profiles AS (
 SELECT
   c.id,
   c.name,
+  COALESCE(c.alias, '') AS alias,
   c.address,
   c.city,
   c.province_state,
@@ -48,6 +49,7 @@ SELECT
   )) FROM contacts) AS contacts_json,
   (SELECT json_group_array(json_object(
     'id', id, 'name', name, 'client', client, 'contact', contact,
+    'billing_name', COALESCE(billing_name, ''),
     'fax', fax, 'invoicing_instructions', invoicing_instructions,
     'creator', creator, 'creator_name', creator_name, 'created', created,
     'job_count', job_count

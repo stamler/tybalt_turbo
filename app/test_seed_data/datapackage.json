@@ -935,6 +935,11 @@
             "name": "phone",
             "type": "string",
             "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "alias",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
           }
         ],
         "primaryKey": [
@@ -3167,6 +3172,11 @@
           },
           {
             "name": "creator",
+            "type": "string",
+            "x-sqlite-type": "TEXT"
+          },
+          {
+            "name": "billing_name",
             "type": "string",
             "x-sqlite-type": "TEXT"
           }

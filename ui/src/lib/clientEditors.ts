@@ -15,9 +15,10 @@ export const contactFields = [
   "phone",
   ...Object.keys(postalFields),
 ];
-export const invoicingFields = ["name", "contact", "fax", "invoicing_instructions"];
+export const invoicingFields = ["name", "contact", "billing_name", "fax", "invoicing_instructions"];
 export const clientFields = [
   "name",
+  "alias",
   "business_development_lead",
   "phone",
   ...Object.keys(postalFields),

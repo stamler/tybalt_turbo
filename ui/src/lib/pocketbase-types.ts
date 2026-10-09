@@ -292,6 +292,7 @@ export type ClientsRecord = {
   phone?: string;
 
   _imported: boolean;
+  alias?: string;
   business_development_lead: RecordIdString;
   created: IsoDateString;
   id: string;
@@ -1465,6 +1466,7 @@ export type ClientInvoicingInformationRecord = {
   name: string;
   client: RecordIdString;
   contact: RecordIdString;
+  billing_name: "" | "name" | "alias";
   invoicing_instructions: string;
   fax: string;
 };

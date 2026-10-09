@@ -28,6 +28,7 @@
     workspaceHref,
     type WorkspaceInvoicing,
     type WorkspaceContact,
+    billingName,
   } from "$lib/clientWorkspace";
   import type { ClientsRecord, JobsRecord } from "$lib/pocketbase-types";
 
@@ -224,6 +225,10 @@
             />{/if}
         </div>
         <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {#if data.client.alias?.trim()}<div>
+              <h3 class="text-sm font-semibold text-neutral-600">Alias</h3>
+              <p>{data.client.alias}</p>
+            </div>{/if}
           <div>
             <h3 class="text-sm font-semibold text-neutral-600">Address</h3>
             <p>{addressText(data.client) || "Not recorded"}</p>
@@ -396,6 +401,9 @@
                     href={editorHref(`contacts/${contact.id}/edit`)}>{contactName(contact)}</a
                   >{:else}{contactName(contact)}{/if}
               {/if}
+              {#if data.client.alias?.trim()}<p class="text-sm">
+                  Name on PAs and invoices: {billingName(data.client, profile)}
+                </p>{/if}
             {/snippet}
             {#snippet line2(profile)}
               {#key profile.id}

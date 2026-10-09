@@ -41,6 +41,7 @@
   import type { JobApiResponse } from "$lib/stores/jobs";
   import { JobsStatusOptions } from "$lib/pocketbase-types";
   import { busdevLeads } from "$lib/stores/busdevLeads";
+  import { clientLabel } from "$lib/clientWorkspace";
   let { data }: { data: JobsPageData } = $props();
 
   // initialize the stores, noop if already initialized
@@ -1017,7 +1018,10 @@
               (item as any).parent &&
               (item as any).parent !== ""}
           >
-            {#snippet resultTemplate(client)}{client.name}{/snippet}
+            {#snippet resultTemplate(client)}{clientLabel({
+                name: client.name,
+                alias: client.alias,
+              })}{/snippet}
           </DsAutoComplete>
         </div>
         {#if !item.client && hasJobClaim}
@@ -1407,7 +1411,10 @@
         fieldName="job_owner"
         uiName="Job Owner"
       >
-        {#snippet resultTemplate(item)}{item.name}{/snippet}
+        {#snippet resultTemplate(item)}{clientLabel({
+            name: item.name,
+            alias: item.alias,
+          })}{/snippet}
       </DsAutoComplete>
     {/if}
 

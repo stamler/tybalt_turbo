@@ -3,6 +3,7 @@
   import { clients } from "$lib/stores/clients";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import { pb } from "$lib/pocketbase";
+  import { clientLabel } from "$lib/clientWorkspace";
 
   // initialize the stores, noop if already initialized
   clients.init();
@@ -17,8 +18,10 @@
     uiName="search clients..."
     collectionName="clients"
   >
-    {#snippet headline({ id, name })}
-      <a href={`/clients/${id}/details`} class="text-blue-600 hover:underline">{name}</a>
+    {#snippet headline({ id, name, alias })}
+      <a href={`/clients/${id}/details`} class="text-blue-600 hover:underline"
+        >{clientLabel({ name, alias })}</a
+      >
     {/snippet}
     {#snippet byline({ referencing_jobs_count })}
       <span class="mr-2">

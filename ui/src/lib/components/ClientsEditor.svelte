@@ -82,7 +82,20 @@
     disabled={busy || !$globalStore.claims.includes("job")}
     class="flex min-w-0 flex-col gap-3"
   >
-    <DsTextInput bind:value={item.name} {errors} fieldName="name" uiName="Name" />
+    <DsTextInput
+      bind:value={item.name}
+      {errors}
+      fieldName="name"
+      uiName="Name"
+      placeholder="Official or numbered company name"
+    />
+    <DsTextInput
+      bind:value={item.alias}
+      {errors}
+      fieldName="alias"
+      uiName="Alias (optional)"
+      placeholder="Name the client is commonly known by"
+    />
     {#if $busdevLeads.items.length > 10 && $busdevLeads.index}
       <DSAutoComplete
         bind:value={item.business_development_lead}

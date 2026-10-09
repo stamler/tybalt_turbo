@@ -2,6 +2,7 @@
   import AbsorbEditor from "$lib/components/AbsorbEditor.svelte";
   import type { ClientsResponse } from "$lib/pocketbase-types";
   import { clients } from "$lib/stores/clients";
+  import { clientLabel } from "$lib/clientWorkspace";
   import { page } from "$app/stores";
 </script>
 
@@ -12,6 +13,6 @@
   autoCompleteIndex={$clients.index as unknown as any}
 >
   {#snippet recordSnippet(item: ClientsResponse)}
-    {item.name}
+    {clientLabel(item)}
   {/snippet}
 </AbsorbEditor>

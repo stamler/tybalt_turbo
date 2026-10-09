@@ -11,7 +11,7 @@
   import DsSelector from "$lib/components/DSSelector.svelte";
   import ContactEditor from "./ContactEditor.svelte";
   import InvoicingInstructions from "./InvoicingInstructions.svelte";
-  import { addressText, contactName, countLabel } from "$lib/clientWorkspace";
+  import { addressText, billingName, contactName, countLabel } from "$lib/clientWorkspace";
   import {
     editableFields,
     invoicingFields,
@@ -38,7 +38,14 @@
     ) => void | Promise<void>;
     onCancel: () => void;
   } = $props();
-  let item = $state(untrack(() => editableFields(record, invoicingFields)));
+  // A blank billing_name bills the official name, as does "name".
+  let item = $state(
+    untrack(() => {
+      const fields = editableFields(record, invoicingFields);
+      if (fields.billing_name !== "alias") fields.billing_name = "";
+      return fields;
+    }),
+  );
   let saved = $state(untrack(() => JSON.stringify(item)));
   let contacts = $state(untrack(() => [...initialContacts]));
   let contactDraft = $state<WorkflowRecord | null>(null);
@@ -90,6 +97,7 @@
   );
   const dirty = $derived(JSON.stringify(item) !== saved || contactDirty);
   const recipient = $derived(contacts.find((contact) => contact.id === item.contact));
+  const clientAlias = $derived(String(client.alias || "").trim());
   const contactIndex = $derived.by(() => {
     const index = new MiniSearch<WorkflowRecord>({
       fields: ["given_name", "surname", "email", "phone"],
@@ -165,7 +173,9 @@
     )
       return;
     if (
-      [item.name, item.fax, item.invoicing_instructions].some((value) => String(value).trim()) &&
+      [item.name, item.billing_name, item.fax, item.invoicing_instructions].some((value) =>
+        String(value).trim(),
+      ) &&
       !window.confirm("Use this existing profile and discard the unsaved profile fields?")
     )
       return;
@@ -370,9 +380,36 @@
           {/key}
         </section>
       {/if}
+      {#if clientAlias || item.billing_name === "alias"}
+        <fieldset class="flex flex-col gap-1">
+          <legend class="mb-1">Name on PAs and invoices</legend>
+          <label class="flex items-center gap-2">
+            <input type="radio" name="billing_name" value="" bind:group={item.billing_name} />
+            {client.name}
+            <span class="text-sm text-neutral-600">(name)</span>
+          </label>
+          <label class="flex items-center gap-2">
+            <input
+              type="radio"
+              name="billing_name"
+              value="alias"
+              bind:group={item.billing_name}
+              disabled={!clientAlias}
+            />
+            {clientAlias || "No alias"}
+            <span class="text-sm text-neutral-600">(alias)</span>
+          </label>
+          {#if errors.billing_name}<p class="text-red-600">{errors.billing_name.message}</p>{/if}
+        </fieldset>
+      {:else}
+        <p class="text-sm text-neutral-600">
+          PAs and invoices use the client name. To use a different name, add an alias to the client.
+        </p>
+      {/if}
       {#if recipient}
         <div class="rounded-sm bg-neutral-100 p-3 text-sm">
           <p class="font-semibold">Invoice address</p>
+          <p>{billingName(client as { name: string; alias?: string }, item)}</p>
           <p class="whitespace-pre-line">
             {addressText(recipient) || addressText(client) || "No postal address entered"}
           </p>

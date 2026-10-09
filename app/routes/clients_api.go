@@ -36,6 +36,7 @@ type Contact struct {
 type clientRow struct {
 	ID                   string  `db:"id"`
 	Name                 string  `db:"name"`
+	Alias                string  `db:"alias"`
 	ContactsJSON         string  `db:"contacts_json"`
 	ReferencingJobsCount int     `db:"referencing_jobs_count"`
 	OutstandingBalance   float64 `db:"outstanding_balance"`
@@ -44,6 +45,7 @@ type clientRow struct {
 type Client struct {
 	ID                   string    `json:"id"`
 	Name                 string    `json:"name"`
+	Alias                string    `json:"alias"`
 	Contacts             []Contact `json:"contacts"`
 	ReferencingJobsCount int       `json:"referencing_jobs_count"`
 	OutstandingBalance   float64   `json:"outstanding_balance"`
@@ -52,6 +54,7 @@ type Client struct {
 type clientDetailsRow struct {
 	ID                     string  `db:"id"`
 	Name                   string  `db:"name"`
+	Alias                  string  `db:"alias"`
 	BusinessDevelopmentUID string  `db:"business_development_lead"`
 	OutstandingBalance     float64 `db:"outstanding_balance"`
 	OutstandingBalanceDate string  `db:"outstanding_balance_date"`
@@ -87,6 +90,7 @@ type ClientInvoicingProfile struct {
 	Name                  string `json:"name"`
 	Client                string `json:"client"`
 	Contact               string `json:"contact"`
+	BillingName           string `json:"billing_name"`
 	Fax                   string `json:"fax"`
 	InvoicingInstructions string `json:"invoicing_instructions"`
 	JobCount              int    `json:"job_count"`
@@ -98,6 +102,7 @@ type ClientInvoicingProfile struct {
 type ClientDetails struct {
 	ID                     string                   `json:"id"`
 	Name                   string                   `json:"name"`
+	Alias                  string                   `json:"alias"`
 	BusinessDevelopmentUID string                   `json:"business_development_lead"`
 	LeadGivenName          string                   `json:"lead_given_name"`
 	LeadSurname            string                   `json:"lead_surname"`
@@ -166,6 +171,7 @@ func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 			return Client{
 				ID:                   r.ID,
 				Name:                 r.Name,
+				Alias:                r.Alias,
 				Contacts:             contacts,
 				ReferencingJobsCount: r.ReferencingJobsCount,
 				OutstandingBalance:   r.OutstandingBalance,
@@ -212,6 +218,7 @@ func queryClientDetails(app core.App, id string) (*ClientDetails, error) {
 	return &ClientDetails{
 		ID:                     row.ID,
 		Name:                   row.Name,
+		Alias:                  row.Alias,
 		BusinessDevelopmentUID: row.BusinessDevelopmentUID,
 		LeadGivenName:          row.LeadGivenName,
 		LeadSurname:            row.LeadSurname,

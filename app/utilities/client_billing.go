@@ -3,6 +3,7 @@ package utilities
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"tybalt/errs"
 
@@ -80,4 +81,43 @@ func ValidateClientReferences(app core.App, record *core.Record) error {
 		}
 	}
 	return nil
+}
+
+// ClientAlias returns the client's alias, or "" when it has none.
+func ClientAlias(client *core.Record) string {
+	return strings.TrimSpace(client.GetString("alias"))
+}
+
+// BillingName returns the client name that an invoicing profile bills: the
+// client's alias when the profile chooses it, otherwise its official name. A
+// blank choice means the official name.
+func BillingName(client, profile *core.Record) string {
+	if profile != nil && profile.GetString("billing_name") == "alias" {
+		if alias := ClientAlias(client); alias != "" {
+			return alias
+		}
+	}
+	return client.GetString("name")
+}
+
+// ValidateBillingName checks that an invoicing profile which bills the client's
+// alias belongs to a client that has one.
+func ValidateBillingName(app core.App, profile *core.Record) error {
+	if profile.GetString("billing_name") != "alias" {
+		return nil
+	}
+	client, err := app.FindRecordById("clients", profile.GetString("client"))
+	if err != nil {
+		// A missing client is reported by required-field and reference validation.
+		return nil
+	}
+	if ClientAlias(client) == "" {
+		return clientReferenceError("billing_name", "alias_missing", "This client has no alias. Add one to the client or bill its name.")
+	}
+	return nil
+}
+
+// CountProfilesBillingAlias counts the invoicing profiles that bill a client's alias.
+func CountProfilesBillingAlias(app core.App, clientID string) (int64, error) {
+	return app.CountRecords("client_invoicing_information", dbx.HashExp{"client": clientID, "billing_name": "alias"})
 }

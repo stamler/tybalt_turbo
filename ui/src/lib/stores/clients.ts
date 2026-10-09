@@ -12,6 +12,7 @@ export interface Contact {
 export interface ClientApiResponse {
   id: string;
   name: string;
+  alias: string;
   contacts: Contact[];
   referencing_jobs_count: number;
   outstanding_balance: number;
@@ -26,10 +27,11 @@ export const clients = createCollectionStore<any>(
   "clients",
   {},
   {
-    fields: ["name", "contacts"],
+    fields: ["name", "alias", "contacts"],
     storeFields: [
       "id",
       "name",
+      "alias",
       "contacts",
       "referencing_jobs_count",
       "outstanding_balance",

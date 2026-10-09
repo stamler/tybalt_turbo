@@ -114,6 +114,21 @@ func CreateAbsorbRecordsHandler(app core.App, collectionName string) func(e *cor
 			}
 		}
 
+		// Invoicing profiles move to the kept client. Those billing an alias need
+		// the kept client to have one; the merge's own validation would refuse it
+		// later, but without saying why.
+		if collectionName == "clients" && utilities.ClientAlias(targetRecord) == "" {
+			for _, id := range request.IdsToAbsorb {
+				count, err := utilities.CountProfilesBillingAlias(app, id)
+				if err != nil {
+					return apis.NewApiError(http.StatusInternalServerError, "Failed to check invoicing profiles", err)
+				}
+				if count > 0 {
+					return apis.NewBadRequestError("Invoicing profiles of a client being absorbed bill its alias. Give the kept client an alias first.", nil)
+				}
+			}
+		}
+
 		err = AbsorbRecords(app, collectionName, targetId, request.IdsToAbsorb)
 		if err != nil {
 			// Customize the error response as needed
@@ -602,6 +617,12 @@ func validateMergedClientReferences(app core.App, updates map[string]map[string]
 			}
 			if err := utilities.ValidateClientReferences(app, record); err != nil {
 				return fmt.Errorf("merge would leave %s %s linked to another client: %w", table, id, err)
+			}
+			if table != "client_invoicing_information" {
+				continue
+			}
+			if err := utilities.ValidateBillingName(app, record); err != nil {
+				return fmt.Errorf("merge would leave invoicing profile %s billing a client alias that does not exist: %w", id, err)
 			}
 		}
 	}
