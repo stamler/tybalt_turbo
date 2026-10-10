@@ -29,6 +29,13 @@
     permission = $derived(detail.permissions),
     related = $derived(detail.related);
   const allChecked = $derived(Object.values(checklist).every(Boolean));
+  // The page is reused when a link opens another request. Ask again there,
+  // but keep the choice when this request reloads, as Save and print does.
+  const requestId = $derived(request.id);
+  $effect(() => {
+    requestId;
+    printNotes = false;
+  });
   $effect(() => {
     // The server digest includes submission_token. Resubmission changes it even
     // when the request version/PDF are unchanged; require six fresh answers.
