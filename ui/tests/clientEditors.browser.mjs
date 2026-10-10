@@ -283,6 +283,7 @@ await runBrowserHarness(
     assert.deepEqual(writes.at(-1).body, {
       client: "client1",
       name: "Capital projects",
+      billing_name: "",
       contact: "contact-new",
       fax: "",
       invoicing_instructions: "Include our PO number.",
