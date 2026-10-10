@@ -37,6 +37,8 @@ func TestProjectMergeUndoAfterRequestLifecycle(t *testing.T) {
 						t.Fatal(err)
 					}
 				}
+				// Notes become a client note at creation, which undo must also restore.
+				clientSetupJSON(t, app, http.MethodPatch, "/api/job_requests/"+requestID, "time@test.com", map[string]any{"version": 1, "request": map[string]any{"notes": "Legal description to keep with the job"}}, http.StatusOK)
 				if err := routes.AbsorbRecords(app, collection, target, []string{source}); err != nil {
 					t.Fatal(err)
 				}
@@ -72,6 +74,13 @@ func TestProjectMergeUndoAfterRequestLifecycle(t *testing.T) {
 					}
 					if err := utilities.ValidateClientReferences(app, job); err != nil {
 						t.Fatalf("undo left invalid job relations: %v", err)
+					}
+					note, err := app.FindFirstRecordByData("client_notes", "job", jobID)
+					if err != nil {
+						t.Fatal(err)
+					}
+					if note.GetString("client") != job.GetString("client") {
+						t.Fatalf("undo left the job note under client %s, job client %s", note.GetString("client"), job.GetString("client"))
 					}
 					if !reflect.DeepEqual(evidence, workflowRecord(t, app, "job_attachments", "paattachment001").PublicExport()) {
 						t.Fatal("undo changed approval evidence")

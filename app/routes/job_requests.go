@@ -779,10 +779,11 @@ func createJobFromRequest(app core.App, e *core.RequestEvent, r, a *core.Record)
 	if err = app.SaveWithContext(ctx, a); err != nil {
 		return "", err
 	}
-	if err = createRequestNote(app, ctx, r, job); err != nil {
+	note, err := createRequestNote(app, ctx, r, job)
+	if err != nil {
 		return "", err
 	}
-	if err = transferRequestMergeReferences(app, r, job); err != nil {
+	if err = transferRequestMergeReferences(app, r, job, note); err != nil {
 		return "", err
 	}
 	if err = app.DeleteWithContext(ctx, r); err != nil {
@@ -791,23 +792,27 @@ func createJobFromRequest(app core.App, e *core.RequestEvent, r, a *core.Record)
 	return job.Id, nil
 }
 
-// createRequestNote makes the request's notes the new job's first client note.
-// The request creator wrote them, so the note keeps that author.
-func createRequestNote(app core.App, ctx context.Context, r, job *core.Record) error {
+// createRequestNote makes the request's notes the new job's first client note
+// and returns it, or nil when the notes are blank. The request creator wrote
+// them, so the note keeps that author.
+func createRequestNote(app core.App, ctx context.Context, r, job *core.Record) (*core.Record, error) {
 	notes := strings.TrimSpace(r.GetString("notes"))
 	if notes == "" {
-		return nil
+		return nil, nil
 	}
 	c, err := app.FindCollectionByNameOrId("client_notes")
 	if err != nil {
-		return err
+		return nil, err
 	}
 	note := core.NewRecord(c)
 	note.Set("client", job.GetString("client"))
 	note.Set("job", job.Id)
 	note.Set("uid", r.GetString("creator"))
 	note.Set("note", notes)
-	return app.SaveWithContext(ctx, note)
+	if err := app.SaveWithContext(ctx, note); err != nil {
+		return nil, err
+	}
+	return note, nil
 }
 func queueRequestNotice(app core.App, r *core.Record, action, actor string) error {
 	seen := map[string]bool{}

@@ -634,8 +634,9 @@ func validateMergedClientReferences(app core.App, updates map[string]map[string]
 }
 
 // Move pending merge-undo references with the request's data, before deleting
-// the request. The caller uses the same transaction as job creation.
-func transferRequestMergeReferences(app core.App, request, job *core.Record) error {
+// the request. note is the client note made from the request's notes, if any.
+// The caller uses the same transaction as job creation.
+func transferRequestMergeReferences(app core.App, request, job, note *core.Record) error {
 	actions, err := app.FindRecordsByFilter("absorb_actions", "collection_name='clients' || collection_name='client_contacts'", "", 0, 0)
 	if err != nil {
 		return err
@@ -655,6 +656,11 @@ func transferRequestMergeReferences(app core.App, request, job *core.Record) err
 			// Do not restore a relation that the creator changed after the merge.
 			if job.Collection().Fields.GetByName(field) != nil && job.GetString(field) == action.GetString("target_id") {
 				tracker.trackUpdate("jobs", field, job.Id, oldValue)
+				// The request's notes became a note under the job's client, so
+				// undo must move that note back with the job.
+				if field == "client" && note != nil && note.GetString("client") == action.GetString("target_id") {
+					tracker.trackUpdate("client_notes", "client", note.Id, oldValue)
+				}
 			}
 			delete(records, request.Id)
 			changed = true
