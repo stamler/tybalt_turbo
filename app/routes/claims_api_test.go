@@ -49,6 +49,31 @@ func TestClaimAssignableUsersRequiresAdminAndExcludesExistingHolders(t *testing.
 	}
 }
 
+// The approval limits page keys each holder's limit by their claim assignment,
+// so claim details return its ID and the holder's user ID with the name.
+func TestClaimDetailsReturnHolderAssignment(t *testing.T) {
+	app := testseed.NewSeededTestApp(t)
+	t.Cleanup(app.Cleanup)
+	hooks.AddHooks(app)
+	AddRoutes(app)
+
+	rec := performClaimsJSONRequest(t, app, http.MethodGet, "/api/claims/projectauth0001", authTokenForEmail(t, app, "author@soup.com"), nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("claim details status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var body ClaimDetails
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("failed to decode claim details response: %v", err)
+	}
+	if len(body.Holders) != 1 {
+		t.Fatalf("holders = %#v, want the one fixture approver", body.Holders)
+	}
+	holder := body.Holders[0]
+	if holder.UserClaimID != "paucapprover001" || holder.UID != "6bq4j0eb26631dy" || holder.GivenName != "Tier" || holder.Surname != "Two" {
+		t.Fatalf("holder = %#v", holder)
+	}
+}
+
 func TestBulkAssignClaimAddsMissingUsersAndSkipsExistingRows(t *testing.T) {
 	app := testseed.NewSeededTestApp(t)
 	t.Cleanup(app.Cleanup)

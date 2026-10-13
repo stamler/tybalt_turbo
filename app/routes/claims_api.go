@@ -26,6 +26,8 @@ type ClaimListItem struct {
 }
 
 type ClaimHolder struct {
+	UserClaimID    string `json:"user_claim_id" db:"user_claim_id"`
+	UID            string `json:"uid" db:"uid"`
 	AdminProfileID string `json:"admin_profile_id" db:"admin_profile_id"`
 	GivenName      string `json:"given_name" db:"given_name"`
 	Surname        string `json:"surname" db:"surname"`

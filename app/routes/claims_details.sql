@@ -6,6 +6,8 @@
 -- record. We still want to show them as claim holders even if the link to
 -- their admin profile won't work.
 SELECT
+  uc.id AS user_claim_id,
+  uc.uid,
   ap.id AS admin_profile_id,
   p.given_name,
   p.surname

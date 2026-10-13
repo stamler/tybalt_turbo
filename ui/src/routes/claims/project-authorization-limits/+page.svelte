@@ -1,7 +1,6 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import { invalidateAll } from "$app/navigation";
-  import { fullName } from "$lib/jobRequests";
   import { workflowError } from "$lib/clientEditors";
   import { globalStore } from "$lib/stores/global";
   let { data } = $props();
@@ -10,9 +9,9 @@
     error = $state("");
   $effect(() => {
     values = Object.fromEntries(
-      data.claims.map((claim) => [
-        claim.id,
-        data.props.find((prop) => prop.user_claim === claim.id)?.max_value || 0,
+      data.holders.map((holder) => [
+        holder.user_claim_id,
+        data.props.find((prop) => prop.user_claim === holder.user_claim_id)?.max_value || 0,
       ]),
     );
   });
@@ -41,12 +40,12 @@
     whole-dollar CAD limit here. A claim with no valid limit grants no authority.
   </p>
   {#if error}<p class="text-red-800" role="alert">{error}</p>{/if}
-  {#if $globalStore.claims.includes("admin")}{#each data.claims as claim}<form
+  {#if $globalStore.claims.includes("admin")}{#each data.holders as holder (holder.user_claim_id)}<form
         class="flex flex-wrap items-end gap-3 rounded border p-4"
-        onsubmit={(event) => save(claim.id, event)}
+        onsubmit={(event) => save(holder.user_claim_id, event)}
       >
         <label class="grow font-semibold"
-          >{fullName(data.profiles.find((profile) => profile.uid === claim.uid)) || claim.uid}<span
+          >{`${holder.given_name} ${holder.surname}`.trim() || holder.uid}<span
             class="mt-2 block text-sm font-normal">Maximum project value (CAD, before tax)</span
           ><input
             class="mt-1 w-full rounded border p-2"
@@ -54,7 +53,7 @@
             min="1"
             step="1"
             required
-            bind:value={values[claim.id]}
+            bind:value={values[holder.user_claim_id]}
           /></label
         ><button type="submit" disabled={busy} class="rounded bg-blue-700 px-4 py-2 text-white"
           >Save limit</button

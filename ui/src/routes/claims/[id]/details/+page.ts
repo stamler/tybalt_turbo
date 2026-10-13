@@ -2,11 +2,8 @@ import type { PageLoad } from "./$types";
 import { pb } from "$lib/pocketbase";
 import type { ClaimDetails, ClaimHolder } from "$lib/svelte-types";
 
-interface ApiClaimHolder {
-  admin_profile_id: string;
-  given_name: string;
-  surname: string;
-}
+// The API returns holders without the list ID this page derives.
+type ApiClaimHolder = Omit<ClaimHolder, "id">;
 
 interface ApiClaimDetails {
   id: string;

@@ -194,6 +194,8 @@ export interface ClaimListItem {
 
 export interface ClaimHolder {
   id: string;
+  user_claim_id: string;
+  uid: string;
   admin_profile_id: string;
   given_name: string;
   surname: string;
