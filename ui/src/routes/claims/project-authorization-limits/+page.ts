@@ -12,5 +12,5 @@ export const load: PageLoad = async () => {
     pb.send<{ holders: Omit<ClaimHolder, "id">[] }>(`/api/claims/${claim.id}`, { method: "GET" }),
     pb.collection("project_authorization_props").getFullList<ProjectAuthorizationPropsResponse>(),
   ]);
-  return { holders: details.holders, props };
+  return { claimId: claim.id, holders: details.holders, props };
 };
