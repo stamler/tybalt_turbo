@@ -373,7 +373,7 @@ that employee creates a new request.
 The PDF is the evidence on which the approver authorizes the project and its
 value. Show one required checkbox for each statement below. All boxes start
 unchecked; the selected approver must check each one for the current review.
-These are the six Boolean answers for request approval checklist version 1:
+These are the seven Boolean answers for request approval checklist version 2:
 
 | Answer key | Checkbox statement |
 | --- | --- |
@@ -382,10 +382,16 @@ These are the six Boolean answers for request approval checklist version 1:
 | `no_executive_restriction` | There is no executive restriction or moratorium that prevents this work. |
 | `no_duplicate_work` | I checked existing jobs and this request does not duplicate work already represented by a job. |
 | `pdf_sufficient` | The attached PDF is sufficient to authorize this project and its stated value. |
+| `rate_sheet_correct` | The selected rate sheet is correct for this client and project. |
 | `allocations_complete` | All necessary division allocations are present. |
 
-The server must require version 1 and all six answers to be Boolean `true`.
-Missing, false, or invalid answers prevent approval. An unchecked box does not
+On October 13, 2026, `rate_sheet_correct` was added so the approver confirms
+the rate sheet the requester selected. Version 1 had the other six answers.
+Approval requires version 2 and all seven answers to be Boolean `true`; a page
+that sends version 1 must be reloaded. Job creation accepts an approval stored
+under version 1 or 2 when all of that version's answers are true, so an
+earlier approval remains valid evidence. Missing, false, or invalid answers
+prevent approval. An unchecked box does not
 automatically reject the request; the selected approver can reject it with a
 reason. Do not permit approval while a known conflict or an executive
 restriction prevents the required confirmation.
@@ -408,7 +414,7 @@ in the same transaction as the approval and checklist. Approval keeps it until
 job creation transfers the final attachment and deletes the request.
 
 This field closes a specific stale-review case. An approver can leave a page
-open with six checked boxes while the creator recalls and resubmits the same
+open with all boxes checked while the creator recalls and resubmits the same
 data and PDF. Clearing saved approvals does not clear the old browser page.
 The request's business version and PDF hash can still match. A new
 `submission_token` makes the old approval action invalid even in that case.
@@ -420,7 +426,7 @@ with the current digest, then stores the accepted digest with the attachment's
 approver, time, and checklist. Creation compares both the caller's digest and
 that stored approved digest with the current request. Approval and creation
 reject requests with an empty submission token. An old digest causes a conflict
-response; the user must reload and complete the six boxes again.
+response; the user must reload and complete the checklist again.
 
 Reads, printing, and approval do not rotate `submission_token`. Failed workflow
 transactions do not persist a new or cleared token. Token changes alone do not
@@ -877,7 +883,7 @@ In a database transaction, check the flag, actor, approval authority, request
 state, selected approver identity, and the version reviewed. Reload and validate
 the complete request, related records, PDF/hash, and allocations. Check the
 proposal status, cleared rejection fields, and required checklist answers. Fail
-if reviewed data changed. Validate the exact version 1 checklist defined above;
+if reviewed data changed. Validate the exact version 2 checklist defined above;
 UI checkbox validation alone is not sufficient.
 
 Record approval against the exact attachment and project value. Retain the
@@ -1128,7 +1134,7 @@ job. No separate revision or value-change request table is needed.
 | `request_version` | `NUMERIC`; approved request version, retained after request deletion. |
 | `approval_sequence` | `NUMERIC`; server-owned order within a job. Set at creation or value-change approval. Do not order only by timestamps. |
 | `initial_approval` | `BOOLEAN`; true only for the approval used to create the job. Protected from admin deletion. |
-| `checklist_version`, `checklist_answers` | `NUMERIC` integer and PocketBase JSON field; request approval stores version 1 and its six named Boolean answers, all true. Value-change approval records the new PDF, full value, and authority. |
+| `checklist_version`, `checklist_answers` | `NUMERIC` integer and PocketBase JSON field; request approval stores version 2 and its seven named Boolean answers, all true; earlier approvals may store version 1 and its six. Value-change approval records the new PDF, full value, and authority. |
 | `rejector`, `rejected`, `rejection_reason` | `TEXT`; user relation, date, and required rejection reason. |
 
 Enforce one current request attachment and at most one unapproved value-change
@@ -1456,9 +1462,11 @@ Acceptance tests must cover these cases:
   approval, creation, value changes, and historical restoration. Reject
   fractional inputs, including direct API writes, without rounding or
   truncation. Retained values and limits must match the approved integers.
-* Request checklist version 1 starts unchecked and requires all six named
+* Request checklist version 2 starts unchecked and requires all seven named
   Boolean answers to be true. Test each missing or false answer, invalid answer
-  types, unsupported versions, and direct approval calls that bypass the UI.
+  types, unsupported versions, and direct approval calls that bypass the UI. An
+  approval page that sends version 1 must be reloaded, while creation accepts a
+  complete version 1 approval.
   A reviewed First Nations answer of either `Yes` or `No` is permitted.
   Recall and rejection clear checklist evidence; fresh approval requires all
   confirmations again. Preserve the final checklist through job creation.
@@ -1579,7 +1587,7 @@ Acceptance tests must cover these cases:
    client.
 4. Upload one authorization PDF and select **Submit**. The selected approver
    uses **Request Approvals**, reviews possible duplicate jobs, and confirms
-   all six checklist statements before approval.
+   all seven checklist statements, including the rate sheet, before approval.
 5. A holder of `job` opens **Job Create Queue**, checks the approved request and
    PDF, and checks existing jobs and other requests for duplicate work. Select
    **Create Job** to assign the number and transfer the approval evidence.

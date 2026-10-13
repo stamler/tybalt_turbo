@@ -8,6 +8,7 @@ import {
   wholeCAD,
   emptyChecklist,
   requestChecklist,
+  requestChecklistVersion,
   type RequestDetail,
 } from "../src/lib/jobRequests.ts";
 const complete = (): RequestDetail => ({
@@ -105,9 +106,11 @@ test("unknown and fractional values are not printed as zero or rounded", () => {
     assert.equal(wholeCAD(value), "Not provided");
   assert.equal(wholeCAD(120000), "$120,000");
 });
-test("all six named confirmations start unchecked on each review", () => {
+test("all seven named confirmations start unchecked on each review", () => {
   const first = emptyChecklist();
-  assert.equal(Object.keys(first).length, 6);
+  assert.equal(requestChecklistVersion, 2);
+  assert.equal(Object.keys(first).length, 7);
+  assert.equal(first.rate_sheet_correct, false);
   assert.deepEqual(Object.keys(first), Object.keys(requestChecklist));
   assert.ok(Object.values(first).every((value) => value === false));
   first.pdf_sufficient = true;

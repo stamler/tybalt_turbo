@@ -134,15 +134,18 @@ func uploadRequestDocument(t *testing.T, app *tests.TestApp, id string) {
 	workflowUpload(t, app, "/api/job_requests/"+id+"/document", workflowAuthor, "%PDF-1.4\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF", map[string]string{"version": fmt.Sprint(r.GetInt("version"))}, http.StatusOK)
 }
 
+// requestChecklistKeys are the answers of approval checklist version 2.
+var requestChecklistKeys = []string{"fn_agreement_reviewed", "no_known_conflict", "no_executive_restriction", "no_duplicate_work", "pdf_sufficient", "rate_sheet_correct", "allocations_complete"}
+
 func requestActionData(t *testing.T, app *tests.TestApp, id string) map[string]any {
 	t.Helper()
 	detail := clientSetupJSON(t, app, http.MethodGet, "/api/job_requests/"+id, workflowAuthor, nil, http.StatusOK)
 	r := workflowRecord(t, app, "job_requests", id)
 	answers := map[string]any{}
-	for _, key := range []string{"fn_agreement_reviewed", "no_known_conflict", "no_executive_restriction", "no_duplicate_work", "pdf_sufficient", "allocations_complete"} {
+	for _, key := range requestChecklistKeys {
 		answers[key] = true
 	}
-	result := map[string]any{"version": r.GetInt("version"), "review_token": detail["review_token"], "checklist_version": 1, "checklist_answers": answers, "duplicate_work_checked": true}
+	result := map[string]any{"version": r.GetInt("version"), "review_token": detail["review_token"], "checklist_version": 2, "checklist_answers": answers, "duplicate_work_checked": true}
 	attachment, err := app.FindFirstRecordByData("job_attachments", "request", id)
 	if err == nil {
 		result["document_hash"] = attachment.GetString("document_hash")
@@ -189,7 +192,7 @@ func TestJobRequestApprovalCreationLifecycle(t *testing.T) {
 		t.Fatal("printing changed edit time")
 	}
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/submit", workflowAuthor, requestActionData(t, app, id), http.StatusOK)
-	for _, key := range []string{"fn_agreement_reviewed", "no_known_conflict", "no_executive_restriction", "no_duplicate_work", "pdf_sufficient", "allocations_complete"} {
+	for _, key := range requestChecklistKeys {
 		data := requestActionData(t, app, id)
 		data["checklist_answers"].(map[string]any)[key] = false
 		clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/approve", workflowApprover, data, http.StatusBadRequest)
@@ -582,8 +585,9 @@ func TestJobRequestDraftRelationsAndChecklistShape(t *testing.T) {
 	const ready = "parequest000001"
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+ready+"/submit", "time@test.com", requestActionData(t, app, ready), http.StatusOK)
 	for _, mutation := range []func(map[string]any){
-		func(data map[string]any) { data["checklist_version"] = 2 },
+		func(data map[string]any) { data["checklist_version"] = 3 },
 		func(data map[string]any) { delete(data["checklist_answers"].(map[string]any), "pdf_sufficient") },
+		func(data map[string]any) { delete(data["checklist_answers"].(map[string]any), "rate_sheet_correct") },
 		func(data map[string]any) { data["checklist_answers"].(map[string]any)["pdf_sufficient"] = "true" },
 		func(data map[string]any) { data["checklist_answers"].(map[string]any)["unexpected_answer"] = true },
 	} {
@@ -591,6 +595,12 @@ func TestJobRequestDraftRelationsAndChecklistShape(t *testing.T) {
 		mutation(data)
 		clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+ready+"/approve", workflowApprover, data, http.StatusBadRequest)
 	}
+	// A page opened before the rate sheet statement was added sends the six
+	// version 1 answers. The approver must reload and confirm all seven.
+	outdated := requestActionData(t, app, ready)
+	outdated["checklist_version"] = 1
+	delete(outdated["checklist_answers"].(map[string]any), "rate_sheet_correct")
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+ready+"/approve", workflowApprover, outdated, http.StatusConflict)
 	reviewed := requestActionData(t, app, ready)
 	// Change the fixture billing instructions after the review, before approval.
 	if _, err := app.DB().NewQuery("UPDATE client_invoicing_information SET invoicing_instructions='Updated instructions' WHERE id='painvoice000001'").Execute(); err != nil {
@@ -613,5 +623,36 @@ func TestJobRequestCreationRetainsValidApprovalAfterAuthorityRemoval(t *testing.
 	a := workflowRecord(t, app, "job_attachments", "paattachment001")
 	if a.GetString("job") != jobID || a.GetString("approver") != "6bq4j0eb26631dy" || a.GetFloat("approval_max_value") != 1000000 {
 		t.Fatal("creation changed completed approval evidence after claim removal")
+	}
+}
+
+// An approval recorded under an earlier checklist version remains valid
+// evidence for job creation, as long as all of that version's answers are true.
+func TestJobRequestCreationAcceptsEarlierChecklistVersion(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		answers string
+		status  int
+	}{
+		{"complete", `{"fn_agreement_reviewed":true,"no_known_conflict":true,"no_executive_restriction":true,"no_duplicate_work":true,"pdf_sufficient":true,"allocations_complete":true}`, http.StatusOK},
+		{"incomplete", `{"fn_agreement_reviewed":true,"no_known_conflict":true,"no_executive_restriction":true,"no_duplicate_work":true,"pdf_sufficient":true}`, http.StatusBadRequest},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			app := newWorkflowTestApp(t, true)
+			const id = "parequest000001"
+			clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/submit", "time@test.com", requestActionData(t, app, id), http.StatusOK)
+			clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/approve", workflowApprover, requestActionData(t, app, id), http.StatusOK)
+			if a := workflowRecord(t, app, "job_attachments", "paattachment001"); a.GetInt("checklist_version") != 2 {
+				t.Fatalf("approval stored checklist version %d; want 2", a.GetInt("checklist_version"))
+			}
+			// Store the approval as version 1 recorded it, before the rate sheet statement.
+			if _, err := app.DB().NewQuery("UPDATE job_attachments SET checklist_version=1, checklist_answers={:answers} WHERE id='paattachment001'").Bind(dbx.Params{"answers": tc.answers}).Execute(); err != nil {
+				t.Fatal(err)
+			}
+			clientSetupJSON(t, app, http.MethodPost, "/api/job_requests/"+id+"/create", workflowAuthor, requestActionData(t, app, id), tc.status)
+			if a := workflowRecord(t, app, "job_attachments", "paattachment001"); tc.status == http.StatusOK && (a.GetString("job") == "" || a.GetInt("checklist_version") != 1) {
+				t.Fatal("creation did not keep the version 1 approval")
+			}
+		})
 	}
 }

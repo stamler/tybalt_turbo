@@ -61,7 +61,7 @@ func TestJobRequestSubmissionTokenRejectsOldReviewPages(t *testing.T) {
 			if workflowRecord(t, app, "job_attachments", attachment.Id).GetString("status") != "Pending" {
 				t.Fatal("old browser page changed the pending approval")
 			}
-			// A new page still needs all six confirmations; a current token alone
+			// A new page still needs all seven confirmations; a current token alone
 			// is not approval authority or a substitute for the checklist.
 			unchecked := requestActionData(t, app, submissionTokenRequest)
 			unchecked["checklist_answers"] = map[string]any{}
@@ -74,7 +74,7 @@ func TestJobRequestSubmissionTokenRejectsOldReviewPages(t *testing.T) {
 			clientSetupJSON(t, app, http.MethodPost, path+"/create", workflowAuthor, oldReview, http.StatusConflict)
 			clientSetupJSON(t, app, http.MethodPost, path+"/create", workflowAuthor, requestActionData(t, app, submissionTokenRequest), http.StatusOK)
 			attachment = workflowRecord(t, app, "job_attachments", attachment.Id)
-			if attachment.GetString("review_token") != currentReview["review_token"] || attachment.GetInt("checklist_version") != 1 || attachment.GetString("job") == "" {
+			if attachment.GetString("review_token") != currentReview["review_token"] || attachment.GetInt("checklist_version") != 2 || attachment.GetString("job") == "" {
 				t.Fatal("creation did not retain the final submission's approved digest and checklist")
 			}
 		})

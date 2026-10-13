@@ -10,6 +10,8 @@ export interface RequestDetail {
   permissions: Record<string, boolean>;
   enabled?: boolean;
 }
+// The server requires this version and every answer below for approval.
+export const requestChecklistVersion = 2;
 export const requestChecklist = {
   fn_agreement_reviewed: "I reviewed the First Nations agreement answer.",
   no_known_conflict: "I am not aware of a company conflict of interest for this project.",
@@ -18,6 +20,7 @@ export const requestChecklist = {
   no_duplicate_work:
     "I checked existing jobs and this request does not duplicate work already represented by a job.",
   pdf_sufficient: "The attached PDF is sufficient to authorize this project and its stated value.",
+  rate_sheet_correct: "The selected rate sheet is correct for this client and project.",
   allocations_complete: "All necessary division allocations are present.",
 };
 export function emptyChecklist(): Record<string, boolean> {

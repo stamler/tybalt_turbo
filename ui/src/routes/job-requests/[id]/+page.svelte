@@ -7,6 +7,7 @@
   import {
     emptyChecklist,
     requestChecklist,
+    requestChecklistVersion,
     contactEmail,
     fullName,
     wholeCAD,
@@ -62,7 +63,7 @@
             // an old page must fail after recall and resubmission.
             review_token: detail.review_token,
             document_hash: detail.attachment?.document_hash,
-            checklist_version: 1,
+            checklist_version: requestChecklistVersion,
             checklist_answers: checklist,
             rejection_reason: rejectionReason,
             duplicate_work_checked: duplicateChecked,

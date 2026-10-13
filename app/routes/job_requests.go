@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"reflect"
@@ -27,7 +28,16 @@ const JOB_REQUEST_ABANDONMENT_DAYS = utilities.JOB_REQUEST_ABANDONMENT_DAYS
 const creationQueueFilter = "status = 'Awaiting creation'"
 
 var requestBusinessFields = []string{"project_status", "approver", "client", "job_owner", "contact", "manager", "alternate_manager", "branch", "rate_sheet", "parent", "proposal", "invoicing_information", "description", "notes", "location", "client_po", "client_reference_number", "project_award_date", "project_completion_date", "project_value", "time_and_materials", "fn_agreement_answer"}
-var approvalChecklistKeys = []string{"fn_agreement_reviewed", "no_known_conflict", "no_executive_restriction", "no_duplicate_work", "pdf_sufficient", "allocations_complete"}
+
+// Request approval checklists by version. Approval requires the current
+// version. Job creation accepts any listed version, so an approval recorded
+// before a checklist change remains valid evidence.
+const currentApprovalChecklist = 2
+
+var approvalChecklists = map[int][]string{
+	1: {"fn_agreement_reviewed", "no_known_conflict", "no_executive_restriction", "no_duplicate_work", "pdf_sufficient", "allocations_complete"},
+	2: {"fn_agreement_reviewed", "no_known_conflict", "no_executive_restriction", "no_duplicate_work", "pdf_sufficient", "rate_sheet_correct", "allocations_complete"},
+}
 
 type requestWrite struct {
 	Request     map[string]any        `json:"request"`
@@ -511,14 +521,22 @@ func requestSaveHandler(app core.App) func(*core.RequestEvent) error {
 		return respondRequestDetail(app, e, id)
 	}
 }
-func validateChecklist(input workflowAction) error {
-	if input.ChecklistVersion != 1 {
-		return workflowError("Checklist version 1 is required.")
+
+// validateChecklist requires every answer of the checklist's version to be
+// true. approving limits it to the current version.
+func validateChecklist(input workflowAction, approving bool) error {
+	keys, known := approvalChecklists[input.ChecklistVersion]
+	if !known {
+		return workflowError(fmt.Sprintf("Checklist version %d is not supported.", input.ChecklistVersion))
 	}
-	if len(input.ChecklistAnswers) != len(approvalChecklistKeys) {
-		return workflowError("Use only the six checklist answers for version 1.")
+	// A page opened before a checklist change shows the old statements.
+	if approving && input.ChecklistVersion != currentApprovalChecklist {
+		return apis.NewApiError(http.StatusConflict, "The approval checklist changed. Reload the request and review it again.", nil)
 	}
-	for _, key := range approvalChecklistKeys {
+	if len(input.ChecklistAnswers) != len(keys) {
+		return workflowError(fmt.Sprintf("Use only the %d checklist answers for version %d.", len(keys), input.ChecklistVersion))
+	}
+	for _, key := range keys {
 		v, ok := input.ChecklistAnswers[key].(bool)
 		if !ok || !v {
 			return workflowError("Confirm: " + key)
@@ -631,7 +649,7 @@ func requestActionHandler(app core.App, action string) func(*core.RequestEvent) 
 				if err != nil {
 					return err
 				}
-				if err = validateChecklist(input); err != nil {
+				if err = validateChecklist(input, true); err != nil {
 					return err
 				}
 				a, err = validateRequestComplete(tx, r, true)
@@ -651,7 +669,7 @@ func requestActionHandler(app core.App, action string) func(*core.RequestEvent) 
 				a.Set("project_value", r.Get("project_value"))
 				a.Set("approval_max_value", limit)
 				a.Set("request_version", r.GetInt("version"))
-				a.Set("checklist_version", 1)
+				a.Set("checklist_version", currentApprovalChecklist)
 				a.Set("checklist_answers", input.ChecklistAnswers)
 				a.Set("review_token", token)
 				r.Set("status", "Awaiting creation")
@@ -689,7 +707,7 @@ func requestActionHandler(app core.App, action string) func(*core.RequestEvent) 
 				if err := a.UnmarshalJSONField("checklist_answers", &retainedAnswers); err != nil {
 					return workflowError("The saved checklist is invalid.")
 				}
-				if err := validateChecklist(workflowAction{ChecklistVersion: a.GetInt("checklist_version"), ChecklistAnswers: retainedAnswers}); err != nil {
+				if err := validateChecklist(workflowAction{ChecklistVersion: a.GetInt("checklist_version"), ChecklistAnswers: retainedAnswers}, false); err != nil {
 					return err
 				}
 				id, err := createJobFromRequest(tx, e, r, a)
