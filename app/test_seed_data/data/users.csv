@@ -46,3 +46,4 @@ created,email,emailVisibility,id,name,password,tokenKey,updated,username,verifie
 2026-09-21 12:00:00.000Z,valuation1@example.com,0,uvaluation00001,Valuation 1,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,valuationfixturekey1,2026-09-21 12:00:00.000Z,valuation1,1
 2026-09-21 12:00:00.000Z,valuation2@example.com,0,uvaluation00002,Valuation 2,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,valuationfixturekey2,2026-09-21 12:00:00.000Z,valuation2,1
 2026-09-21 12:00:00.000Z,valuation3@example.com,0,uvaluation00003,Valuation 3,$2a$10$ZZTOvoN0iMN5plyZkb7BTe/5catEnMkJE.ibCwVqcp4zDy.4ZE4Zu,valuationfixturekey3,2026-09-21 12:00:00.000Z,valuation3,1
+2026-06-15 00:00:00.000Z,reimbursements@example.com,0,reimbtestuser01,Reimbursement Tester,a.vQd0,tok_reimbtestuser01,2026-06-15 00:00:00.000Z,reimbtestuser01,1

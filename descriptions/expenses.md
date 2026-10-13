@@ -91,6 +91,15 @@ Current action placement:
 - Review actions are details-first for non-owners:
   - `Reject`/`Commit` controls are intentionally hidden in list view to encourage opening the details page first
 
+## The reimbursements page
+
+`/expenses/reimbursements` shows the signed-in user's own committed expenses that were repaid to them on payroll, as a list of pay days with totals (newest first). Each pay day expands to show its expenses, fetched on first expand from `/api/expenses/reimbursements/{payPeriodEnding}`. The most recent pay day that has already been paid starts open. Open pay days are kept in the `?open=` query string (comma-separated pay period endings) so Back from an expense restores the view; an empty `?open=` means everything was collapsed.
+
+- Reimbursed payment types: `Expense`, `PersonalReimbursement`, `Allowance`, `Mileage`, and legacy `Meals`. `OnAccount`, `CorporateCreditCard`, `FuelCard`, and legacy `FuelOnAccount` are company-paid and excluded, even though the payroll expense report includes every committed expense.
+- Pay day is always the Friday 13 days after the Saturday `pay_period_ending` (e.g. the period ending 2026-09-26 is paid 2026-10-09). Periods whose pay day has not yet arrived are labelled Upcoming.
+- Amounts come from `app/routes/expense_reimbursements.sql`, which repeats the payroll expense report's calculation (`app/reports/expenses.sql`) so the two always agree: Mileage is re-tiered by expense date instead of using the commit-time `total`, Allowance is priced from `expense_rates`, and foreign-currency expenses use the CAD `settled_total`. If one calculation changes, change the other to match.
+- Self-only: the API reads the caller's uid from the auth token and has no uid parameter.
+
 ## Schema Comparison: purchase_orders vs expenses
 
 | Property                 | Purchase Orders | Expenses |

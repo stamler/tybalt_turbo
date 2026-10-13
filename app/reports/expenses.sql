@@ -1,5 +1,7 @@
 -- This query does not depend on expense_mileage_totals and
 -- expense_allowance_totals views in order to be faster.
+-- app/routes/expense_reimbursements.sql repeats the Total calculation for the
+-- employee-facing reimbursements page; keep the two in sync.
 SELECT ap.payroll_id payrollId,
   e2.payment_type "Acct/Visa/Exp",
   j.number "Job #",

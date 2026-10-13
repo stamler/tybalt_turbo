@@ -159,6 +159,9 @@ func AddRoutes(app core.App) {
 		expensesGroup.POST("/{id}/settle", createSettleExpenseHandler(app))
 		expensesGroup.POST("/{id}/clear_settlement", createClearExpenseSettlementHandler(app))
 		expensesGroup.GET("/tracking/{committedWeekEnding}", createExpenseTrackingListHandler(app))
+		// The caller's own expenses repaid on payroll, grouped by pay period.
+		expensesGroup.GET("/reimbursements", createExpenseReimbursementPeriodsHandler(app))
+		expensesGroup.GET("/reimbursements/{payPeriodEnding}", createExpenseReimbursementsListHandler(app))
 
 		timeAmendmentsGroup := se.Router.Group("/api/time_amendments")
 		timeAmendmentsGroup.Bind(apis.RequireAuth("users"))
