@@ -141,10 +141,21 @@ func SendNotificationByID(app core.App, notificationID string) error {
 			return fmt.Errorf("notification %s rendered with unresolved legacy placeholder %s", notification.Id, unresolved)
 		}
 
+		// Subjects use the same data as the body, so they can name the record.
+		// A subject without placeholders renders unchanged.
+		subjectTemplate, err := template.New("subject").Option("missingkey=error").Parse(notification.Subject)
+		if err != nil {
+			return fmt.Errorf("error parsing subject template for notification %s: %s", notification.Id, err)
+		}
+		var subject bytes.Buffer
+		if err = subjectTemplate.Execute(&subject, templateData); err != nil {
+			return fmt.Errorf("error executing subject template for notification %s: %s", notification.Id, err)
+		}
+
 		message = &mailer.Message{
 			From:    mail.Address{Name: app.Settings().Meta.SenderName, Address: app.Settings().Meta.SenderAddress},
 			To:      []mail.Address{{Name: notification.RecipientName, Address: notification.RecipientEmail}},
-			Subject: notification.Subject,
+			Subject: subject.String(),
 			Text:    text.String(),
 		}
 

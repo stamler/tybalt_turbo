@@ -15,7 +15,6 @@ import (
 	"time"
 
 	"tybalt/hooks"
-	"tybalt/notifications"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -411,6 +410,7 @@ func attachmentSaveHandler(app core.App) func(*core.RequestEvent) error {
 		assigned := e.Request.FormValue("assigned_approver")
 		version, _ := strconv.Atoi(e.Request.FormValue("version"))
 		var result *core.Record
+		var notices []string
 		err = app.RunInTransaction(func(tx core.App) error {
 			if err := workflowClaim(tx, e.Auth, "job"); err != nil {
 				return err
@@ -537,6 +537,9 @@ func attachmentSaveHandler(app core.App) func(*core.RequestEvent) error {
 				result = a
 				return nil
 			}
+			// Tell the approver a revision replaces the earlier version only when
+			// they were also its approver.
+			revised := !creating && a.GetString("assigned_approver") == assigned
 			clearAttachmentApproval(a)
 			a.Set("project_value", value)
 			a.Set("assigned_approver", assigned)
@@ -556,7 +559,7 @@ func attachmentSaveHandler(app core.App) func(*core.RequestEvent) error {
 			if err = tx.SaveWithContext(hooks.WithProjectWorkflowMutation(e.Request.Context(), hooks.ProjectWorkflowMutationValue), a); err != nil {
 				return err
 			}
-			if err = queueValueNotice(tx, a, "submitted", e.Auth.Id); err != nil {
+			if notices, err = queueValueNotice(tx, a, "submitted", e.Auth.Id, revised); err != nil {
 				return err
 			}
 			result = a
@@ -565,6 +568,7 @@ func attachmentSaveHandler(app core.App) func(*core.RequestEvent) error {
 		if err != nil {
 			return err
 		}
+		sendWorkflowNotices(app, notices)
 		return e.JSON(http.StatusOK, result)
 	}
 }
@@ -575,6 +579,7 @@ func attachmentActionHandler(app core.App, approve bool) func(*core.RequestEvent
 			return workflowError("Invalid action data.")
 		}
 		var result *core.Record
+		var notices []string
 		err := app.RunInTransaction(func(tx core.App) error {
 			if err := workflowClaim(tx, e.Auth, "project_authorization"); err != nil {
 				return err
@@ -674,11 +679,11 @@ func attachmentActionHandler(app core.App, approve bool) func(*core.RequestEvent
 			if err = tx.SaveWithContext(ctx, a); err != nil {
 				return err
 			}
-			action := "rejected"
+			event := "rejected"
 			if approve {
-				action = "approved"
+				event = "approved"
 			}
-			if err = queueValueNotice(tx, a, action, e.Auth.Id); err != nil {
+			if notices, err = queueValueNotice(tx, a, event, e.Auth.Id, false); err != nil {
 				return err
 			}
 			result = a
@@ -687,6 +692,7 @@ func attachmentActionHandler(app core.App, approve bool) func(*core.RequestEvent
 		if err != nil {
 			return err
 		}
+		sendWorkflowNotices(app, notices)
 		return e.JSON(http.StatusOK, result)
 	}
 }
@@ -791,25 +797,6 @@ func ensureAuthorizationFile(app core.App, attachment *core.Record, identicalUpl
 		return fs.UploadFile(identicalUpload, path)
 	}
 	return workflowError("The authorization PDF is unavailable. Restore or replace it before approval.")
-}
-
-func queueValueNotice(app core.App, attachment *core.Record, action, actor string) error {
-	job, err := app.FindRecordById("jobs", attachment.GetString("job"))
-	if err != nil {
-		return err
-	}
-	seen := map[string]bool{}
-	for _, uid := range []string{attachment.GetString("assigned_approver"), attachment.GetString("uploader")} {
-		if uid == "" || seen[uid] {
-			continue
-		}
-		seen[uid] = true
-		_, err := notifications.DispatchNotification(app, notifications.DispatchArgs{TemplateCode: "job_value_workflow", RecipientUID: uid, System: true, ActorUID: actor, Mode: notifications.DeliveryDeferred, Data: map[string]any{"JobNumber": job.GetString("number"), "Description": job.GetString("description"), "Action": action, "ActionURL": notifications.BuildActionURL(app, "/jobs/"+job.Id+"/details")}})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // Corrections are saved with the proposed value review; the effective value stays unchanged.

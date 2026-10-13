@@ -785,6 +785,32 @@ or transfer old PDFs or approvals to `job_attachments`. The old S3 objects can
 remain orphaned for separate manual cleanup. Existing jobs need no approval
 backfill. This removal does not apply to new workflow attachments or approvals.
 
+### Workflow Emails
+
+On October 13, 2026, the workflow emails were revised: each must give the
+recipient everything they need to act or to know the result, and nothing else.
+Send one email per event, only to the people below, and never to the person
+who performed the action. Send it when the action commits; a failed send does
+not undo the action. Each event has its own notification template and switch.
+
+| Event | Recipient | Content |
+| --- | --- | --- |
+| Request submitted | Selected approver | Requester, client, project value, scope of work, and a link to review the request and PDF. If this approver was sent the request before, it says this replaces that version. |
+| Request approved | Requester | Approver, client, project value, scope of work, and that the project will be created and its number sent by email. |
+| Request rejected | Requester | Approver, client, the reason, scope of work, and a link to correct and resubmit. Rejecting an approved request says the approval was withdrawn and the project will not be created. |
+| Job created from request | Requester and project manager | Who created it, the new project number, client, and scope of work. For an `Active` project, that time, expenses and purchase orders can now be recorded; for a `Closed` one, that they cannot. A link to the project. |
+| Value change saved | Selected approver | Who saved it, project number, client, current and proposed values, the project description, and a link to review it. If the approver is unchanged from the earlier version, it says this replaces it. |
+| Value change approved | Uploader of the change's PDF | Approver, project number and client, previous and new values, and that the new value is in effect. |
+| Value change rejected | Uploader of the change's PDF | Approver, project number and client, proposed value, the reason, that the value is unchanged, and a link to correct it. |
+
+Name the project number in the subject. A request has no number, so name its
+client and the first line of its scope of work, which keeps requests for one
+client in separate email threads. Keep multi-line descriptions out of
+sentences. Show the client as "Name (Alias)" when it has an alias, and values
+in whole dollars with thousands separators. Recall and admin deletion send no
+email. The approved and rejected value emails go to the PDF uploader because
+the attachment does not record who last edited a pending change.
+
 ### Feature Flag
 
 Add `jobs.require_job_request_approval`, with a default of false.
@@ -977,7 +1003,7 @@ legacy field does not prove approval. Keep `client_po` and
 
 ## 4. SQLite Schema Changes
 
-These changes are implemented by three sequential migrations:
+These changes are implemented by four sequential migrations:
 
 1. `1790969510_client_setup.go` adds client/contact fields, invoicing profiles,
    and the optional job-profile relation. It removes legacy authorization fields,
@@ -995,11 +1021,15 @@ These changes are implemented by three sequential migrations:
 3. `1791570899_job_request_notes.go` adds the optional `job_requests.notes`
    field. It is separate so that local databases that already ran the request
    workflow migration need no rebuild.
+4. `1791913591_project_workflow_emails.go` replaces the request workflow's two
+   notice templates with the seven workflow emails and switches them on. A
+   replaced template that existing notifications reference is kept, switched
+   off.
 
 The first migration shipped alone in the PA1 release, with the client workspace,
 invoicing profiles, and removal of the legacy workflow. It is deployed and must
-not change. The second and third migrations ship with the request workflow in
-PA2.
+not change. The second, third, and fourth migrations ship with the request
+workflow in PA2.
 
 A local database that already ran this workflow under an earlier name,
 `1790780817_project_request_workflow.go`,
@@ -1357,6 +1387,9 @@ Acceptance tests must cover these cases:
   Upload a signed copy through the existing PDF flow, including the T&M appendix.
   Other sufficient authorization PDFs remain accepted. Later shared-record
   edits affect new printouts but leave the uploaded signed evidence unchanged.
+* Each workflow email goes only to its recipients in the Workflow Emails table,
+  never to the actor, as soon as the action commits, with the subject and text
+  filled in. Self-approval sends nothing. Seeded templates match the migration.
 * Request notes are optional. Saves reject notes shorter than 10 or longer than
   1000 characters after trimming and leave the version unchanged; a valid edit
   advances the version. The printout omits the notes unless **Include notes**
@@ -1673,8 +1706,9 @@ version. Old S3 objects from the legacy workflow can be cleaned up separately.
 ### PA2: Request And Approval Workflow
 
 PA2 is built on deployed main. It keeps PA1's migration, client workspace, and
-shared client checks, and adds `1791560769_project_request_workflow.go` and
-`1791570899_job_request_notes.go` with the rest of sections 2 to 6:
+shared client checks, and adds `1791560769_project_request_workflow.go`,
+`1791570899_job_request_notes.go`, and `1791913591_project_workflow_emails.go`
+with the rest of sections 2 to 6:
 
 * Job requests, the printable Project Authorization, approval by holders of
   `project_authorization`, the Job Create Queue, and job creation from an
@@ -1686,6 +1720,7 @@ shared client checks, and adds `1791560769_project_request_workflow.go` and
   active holders of `time`.
 * Optional request notes, printed on request and copied to the job's first
   client note.
+* The workflow emails, sent when each action commits.
 
 With PA2, main matches the complete design.
 
@@ -1693,8 +1728,9 @@ Before deploying PA2:
 
 1. Back up the production database. Confirm that
    `1790969510_client_setup.go` and `1791559630_client_alias.go` have run and
-   `1791560769_project_request_workflow.go` and
-   `1791570899_job_request_notes.go` have not.
+   `1791560769_project_request_workflow.go`,
+   `1791570899_job_request_notes.go`, and
+   `1791913591_project_workflow_emails.go` have not.
 2. Stop old application instances, then deploy the server and UI together. The
    migration leaves `jobs.require_job_request_approval` false, so holders of
    `job` keep creating projects directly.

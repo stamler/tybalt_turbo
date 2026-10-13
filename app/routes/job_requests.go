@@ -15,7 +15,6 @@ import (
 	validation "github.com/go-ozzo/ozzo-validation/v4"
 	"tybalt/errs"
 	"tybalt/hooks"
-	"tybalt/notifications"
 	"tybalt/utilities"
 
 	"github.com/pocketbase/dbx"
@@ -534,6 +533,7 @@ func requestActionHandler(app core.App, action string) func(*core.RequestEvent) 
 			return workflowError("Invalid action data.")
 		}
 		var result map[string]any
+		var notices []string
 		err := app.RunInTransaction(func(tx core.App) error {
 			if err := requestEnabled(tx); err != nil {
 				return err
@@ -696,6 +696,13 @@ func requestActionHandler(app core.App, action string) func(*core.RequestEvent) 
 				if err != nil {
 					return err
 				}
+				job, err := tx.FindRecordById("jobs", id)
+				if err != nil {
+					return err
+				}
+				if notices, err = queueRequestNotice(tx, r, "created", e.Auth.Id, job, false); err != nil {
+					return err
+				}
 				result = map[string]any{"id": id, "job_id": id}
 				return nil
 			}
@@ -707,8 +714,8 @@ func requestActionHandler(app core.App, action string) func(*core.RequestEvent) 
 			if err = tx.SaveWithContext(ctx, r); err != nil {
 				return err
 			}
-			if action == "submit" || action == "approve" || action == "reject" {
-				if err = queueRequestNotice(tx, r, action, e.Auth.Id); err != nil {
+			if event := map[string]string{"submit": "submitted", "approve": "approved", "reject": "rejected"}[action]; event != "" {
+				if notices, err = queueRequestNotice(tx, r, event, e.Auth.Id, nil, action == "reject" && state == "Awaiting creation"); err != nil {
 					return err
 				}
 			}
@@ -717,6 +724,7 @@ func requestActionHandler(app core.App, action string) func(*core.RequestEvent) 
 		if err != nil {
 			return err
 		}
+		sendWorkflowNotices(app, notices)
 		if result != nil {
 			return e.JSON(http.StatusOK, result)
 		}
@@ -813,20 +821,6 @@ func createRequestNote(app core.App, ctx context.Context, r, job *core.Record) (
 		return nil, err
 	}
 	return note, nil
-}
-func queueRequestNotice(app core.App, r *core.Record, action, actor string) error {
-	seen := map[string]bool{}
-	for _, uid := range []string{r.GetString("approver"), r.GetString("creator")} {
-		if uid == "" || seen[uid] {
-			continue
-		}
-		seen[uid] = true
-		_, err := notifications.DispatchNotification(app, notifications.DispatchArgs{TemplateCode: "job_request_workflow", RecipientUID: uid, System: true, ActorUID: actor, Mode: notifications.DeliveryDeferred, Data: map[string]any{"RequestID": r.Id, "Description": r.GetString("description"), "Action": action, "ActionURL": notifications.BuildActionURL(app, "/job-requests/"+r.Id)}})
-		if err != nil {
-			return err
-		}
-	}
-	return nil
 }
 func requestDeleteHandler(app core.App) func(*core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {

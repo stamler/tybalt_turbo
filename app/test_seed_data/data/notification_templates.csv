@@ -72,11 +72,79 @@ One or more timesheets are awaiting your approval.
 Please review and approve or reject them here:
 
 {{.ActionURL}}",2025-11-17 19:30:28.346Z
-job_request_workflow,2026-09-30 00:00:00.000Z,Job request and value approval notices,,panotification1,Project authorization: {{.Action}},"Request {{.RequestID}}: {{.Description}}
-{{.Action}}
+job_value_submitted,2026-10-13 00:00:00.000Z,Asks the selected approver to review a project value change,,pavalsubmitted0,Approval needed: project {{.JobNumber}} value change,"Hello {{.RecipientName}},
 
-{{.ActionURL}}",2026-09-30 00:00:00.000Z
-job_value_workflow,2026-09-30 00:00:00.000Z,Project value approval notices,,pavaluenotice01,Project {{.JobNumber}}: {{.Action}},"{{.Description}}
-{{.Action}}
+{{.UserName}} has asked you to approve a new project value.{{if .Revised}} This replaces a version of this change sent to you earlier.{{end}}
 
-{{.ActionURL}}",2026-09-30 00:00:00.000Z
+Project: {{.JobNumber}}
+Client: {{.ClientName}}
+Current value: {{.CurrentValue}}
+Proposed value: {{.ProposedValue}}
+
+Description:
+{{.Description}}
+
+Review the change and its authorization PDF, then approve or reject it here:
+
+{{.ActionURL}}",2026-10-13 00:00:00.000Z
+job_value_approved,2026-10-13 00:00:00.000Z,Tells the uploader of a project value change that it was approved,,pavalapproved00,Approved: project {{.JobNumber}} value change,"Hello {{.RecipientName}},
+
+{{.UserName}} approved the new value for project {{.JobNumber}} ({{.ClientName}}).
+
+Previous value: {{.PreviousValue}}
+New value: {{.ProposedValue}}
+
+The new value is now in effect. View the project here:
+
+{{.ActionURL}}",2026-10-13 00:00:00.000Z
+job_value_rejected,2026-10-13 00:00:00.000Z,Tells the uploader of a project value change that it was rejected and why,,pavalrejected00,Rejected: project {{.JobNumber}} value change,"Hello {{.RecipientName}},
+
+{{.UserName}} rejected the proposed value of {{.ProposedValue}} for project {{.JobNumber}} ({{.ClientName}}) for the following reason:
+
+{{.RejectionReason}}
+
+The project value remains {{.CurrentValue}}. You can correct the change and send it for approval again here:
+
+{{.ActionURL}}",2026-10-13 00:00:00.000Z
+job_request_submitted,2026-10-13 00:00:00.000Z,Asks the selected approver to review a project request,,pareqsubmitted0,Approval needed: project request for {{.ClientName}} — {{.Title}},"Hello {{.RecipientName}},
+
+{{.UserName}} has asked you to approve a project request for {{.ClientName}} with a project value of {{.ProjectValue}}.{{if .Revised}} This replaces a version of this request sent to you earlier.{{end}}
+
+Project / scope of work:
+{{.Description}}
+
+Review the request and its authorization PDF, then approve or reject it here:
+
+{{.ActionURL}}",2026-10-13 00:00:00.000Z
+job_request_approved,2026-10-13 00:00:00.000Z,Tells the requester that a project request was approved,,pareqapproved00,Approved: project request for {{.ClientName}} — {{.Title}},"Hello {{.RecipientName}},
+
+{{.UserName}} approved your project request for {{.ClientName}} with a project value of {{.ProjectValue}}.
+
+Project / scope of work:
+{{.Description}}
+
+The project will now be created and given a number. You will receive another email with the project number when that happens. View the request here:
+
+{{.ActionURL}}",2026-10-13 00:00:00.000Z
+job_request_rejected,2026-10-13 00:00:00.000Z,Tells the requester that a project request was rejected and why,,pareqrejected00,Rejected: project request for {{.ClientName}} — {{.Title}},"Hello {{.RecipientName}},
+
+{{.UserName}} {{if .Withdrawn}}withdrew approval of{{else}}rejected{{end}} your project request for {{.ClientName}} for the following reason:
+
+{{.RejectionReason}}
+
+Project / scope of work:
+{{.Description}}
+
+{{if .Withdrawn}}The project will not be created. {{end}}You can correct the request and submit it again here:
+
+{{.ActionURL}}",2026-10-13 00:00:00.000Z
+job_request_created,2026-10-13 00:00:00.000Z,Gives the requester and project manager the number of a project created from a request,,pareqcreated000,Project {{.JobNumber}} created for {{.ClientName}},"Hello {{.RecipientName}},
+
+{{.UserName}} created project {{.JobNumber}} for {{.ClientName}} from {{if .ForRequester}}your project request{{else}}a project request by {{.RequesterName}}. You are its project manager{{end}}.
+
+Project / scope of work:
+{{.Description}}
+
+{{if .Active}}Time, expenses, and purchase orders can now be recorded against {{.JobNumber}}.{{else}}The project is Closed, so time, expenses, and purchase orders cannot be recorded against it.{{end}} View the project here:
+
+{{.ActionURL}}",2026-10-13 00:00:00.000Z

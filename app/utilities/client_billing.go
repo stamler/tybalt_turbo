@@ -94,6 +94,15 @@ func ClientAlias(client *core.Record) string {
 	return strings.TrimSpace(client.GetString("alias"))
 }
 
+// ClientLabel returns the client's official name, followed by its alias in
+// parentheses when it has one, as client pickers and lists show it.
+func ClientLabel(client *core.Record) string {
+	if alias := ClientAlias(client); alias != "" {
+		return client.GetString("name") + " (" + alias + ")"
+	}
+	return client.GetString("name")
+}
+
 // BillingName returns the client name that an invoicing profile bills: the
 // client's alias when the profile chooses it, otherwise its official name. A
 // blank choice means the official name.
