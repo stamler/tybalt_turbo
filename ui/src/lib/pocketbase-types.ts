@@ -58,6 +58,7 @@ export enum Collections {
   UserClaims = "user_claims",
   UserClaimsSummary = "user_claims_summary",
   UserPoApproverProfile = "user_po_approver_profile",
+  UserViewGrants = "user_view_grants",
   Users = "users",
   Vendors = "vendors",
   ZipCache = "zip_cache",
@@ -1027,6 +1028,13 @@ export type UserPoApproverProfileRecord = {
   staff_and_social_max: number;
 };
 
+export type UserViewGrantsRecord = {
+  id: string;
+  reason?: string;
+  uid?: RecordIdString;
+  viewer?: RecordIdString;
+};
+
 export type UsersRecord = {
   created: IsoDateString;
   email: string;
@@ -1235,6 +1243,8 @@ export type UserClaimsSummaryResponse<Texpand = unknown> = Required<UserClaimsSu
   BaseSystemFields<Texpand>;
 export type UserPoApproverProfileResponse<Texpand = unknown> =
   Required<UserPoApproverProfileRecord> & BaseSystemFields<Texpand>;
+export type UserViewGrantsResponse<Texpand = unknown> = Required<UserViewGrantsRecord> &
+  BaseSystemFields<Texpand>;
 export type UsersResponse<Texpand = UsersRecordExpands> = Required<UsersRecord> &
   AuthSystemFields<Texpand>;
 export type VendorsResponse<Texpand = unknown> = Required<VendorsRecord> &
@@ -1301,6 +1311,7 @@ export type CollectionRecords = {
   user_claims: UserClaimsRecord;
   user_claims_summary: UserClaimsSummaryRecord;
   user_po_approver_profile: UserPoApproverProfileRecord;
+  user_view_grants: UserViewGrantsRecord;
   users: UsersRecord;
   vendors: VendorsRecord;
   zip_cache: ZipCacheRecord;
@@ -1360,6 +1371,7 @@ export type CollectionResponses = {
   user_claims: UserClaimsResponse;
   user_claims_summary: UserClaimsSummaryResponse;
   user_po_approver_profile: UserPoApproverProfileResponse;
+  user_view_grants: UserViewGrantsResponse;
   users: UsersResponse;
   vendors: VendorsResponse;
   zip_cache: ZipCacheResponse;
@@ -1424,6 +1436,7 @@ export type TypedPocketBase = PocketBase & {
   collection(idOrName: "user_claims"): RecordService<UserClaimsResponse>;
   collection(idOrName: "user_claims_summary"): RecordService<UserClaimsSummaryResponse>;
   collection(idOrName: "user_po_approver_profile"): RecordService<UserPoApproverProfileResponse>;
+  collection(idOrName: "user_view_grants"): RecordService<UserViewGrantsResponse>;
   collection(idOrName: "users"): RecordService<UsersResponse>;
   collection(idOrName: "vendors"): RecordService<VendorsResponse>;
   collection(idOrName: "zip_cache"): RecordService<ZipCacheResponse>;
