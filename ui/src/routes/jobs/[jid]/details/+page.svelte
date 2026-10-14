@@ -513,6 +513,7 @@
     <ChangeClientPopover
       bind:show={showChangeClient}
       job={data.job}
+      subjobs={data.job.children ?? []}
       onchanged={() => invalidateAll()}
     />
   {/if}

@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Change client checks</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { mount } from "svelte";
+      import ChangeClientPopover from "../../src/lib/components/jobs/ChangeClientPopover.svelte";
+      import { pb } from "$lib/pocketbase";
+      import "/src/app.css";
+      const query = new URLSearchParams(location.search);
+      pb.authStore.save(
+        `${btoa(JSON.stringify({ alg: "none" }))}.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.fixture`,
+        { id: "editor", collectionName: "users" },
+      );
+      window.changed = [];
+      mount(ChangeClientPopover, {
+        target: document.getElementById("app"),
+        props: {
+          show: true,
+          job: { id: "project1", number: "26-1001", client: { id: "oldclient", name: "Old Co" } },
+          // ?known passes the subjobs the opener already has, as the details page does.
+          ...(query.has("known") ? { subjobs: [{ id: "sub1", number: "26-1001-01" }] } : {}),
+          onchanged: (selection) => window.changed.push(selection),
+        },
+      });
+    </script>
+  </body>
+</html>

@@ -36,6 +36,7 @@ func clientChangeBody(overrides map[string]any) map[string]any {
 		"contact":               clientChangeContact,
 		"invoicing_information": clientChangeProfile,
 		"reason":                clientChangeReason,
+		"subjobs":               []string{clientChangeSubjob},
 	}
 	for k, v := range overrides {
 		body[k] = v
@@ -149,6 +150,9 @@ func TestChangeJobClientRefusals(t *testing.T) {
 		{"contact of the old client", clientChangeJob, horaceEmail, clientChangeBody(map[string]any{"contact": "184qbpajciwrrp2"}), http.StatusBadRequest, "contact"},
 		{"profile of the old client", clientChangeJob, horaceEmail, clientChangeBody(map[string]any{"invoicing_information": "painvoice000001"}), http.StatusBadRequest, "invoicing_information"},
 		{"unknown client", clientChangeJob, horaceEmail, clientChangeBody(map[string]any{"client": "nosuchclient000"}), http.StatusBadRequest, "not found"},
+		{"subjobs not confirmed", clientChangeJob, horaceEmail, clientChangeBody(map[string]any{"subjobs": []string{}}), http.StatusConflict, `"subjobs":{"code":"unconfirmed"`},
+		{"confirmation missing", clientChangeJob, horaceEmail, clientChangeBody(map[string]any{"subjobs": nil}), http.StatusConflict, `"subjobs":{"code":"unconfirmed"`},
+		{"other subjobs confirmed", clientChangeJob, horaceEmail, clientChangeBody(map[string]any{"subjobs": []string{"testsubjob01id"}}), http.StatusConflict, `"subjobs":{"code":"unconfirmed"`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -242,5 +246,19 @@ func TestProjectClientStaysFixedOutsideTheChangeAction(t *testing.T) {
 	}
 	if err := hooks.ProcessJobWorkflow(app, job, actor, hooks.ProjectWorkflowMutationChangeClient); err == nil || !strings.Contains(err.Error(), "client merge") {
 		t.Fatalf("project validation accepted a client change outside a merge: %v", err)
+	}
+}
+
+// A subjob added after the user confirmed the list is not moved without
+// being confirmed, and a project without subjobs needs no confirmation.
+func TestChangeJobClientConfirmsTheSubjobsItMoves(t *testing.T) {
+	app := newClientChangeApp(t)
+	execSQL(t, app, "INSERT INTO jobs (id, number, parent, client, contact, invoicing_information, manager, status, description) VALUES ('ccsubjob0000002', '26-9876-02', '"+clientChangeJob+"', '"+clientChangeOldClient+"', '184qbpajciwrrp2', 'painvoice000001', 'f2j5a8vk006baub', 'Active', 'Added after the dialog opened')")
+	postClientChange(t, app, clientChangeJob, horaceEmail, clientChangeBody(nil), http.StatusConflict)
+
+	execSQL(t, app, "DELETE FROM jobs WHERE parent = '"+clientChangeJob+"'")
+	postClientChange(t, app, clientChangeJob, horaceEmail, clientChangeBody(map[string]any{"subjobs": []string{}}), http.StatusOK)
+	if workflowRecord(t, app, "jobs", clientChangeJob).GetString("client") != clientChangeNewClient {
+		t.Error("a project without subjobs did not move")
 	}
 }

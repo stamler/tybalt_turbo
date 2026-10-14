@@ -547,7 +547,10 @@ clients remain. Active holders of `job` use it from the project's details page,
 on a top-level project; a subjob always uses its parent's client. They choose
 the new client, a contact and an invoicing profile of that client, and give a
 reason of 20 to 500 characters, short enough that the notes quoting it with
-both client names and the subjob numbers fit the note limit. In one transaction:
+both client names and the subjob numbers fit the note limit. When the project
+has subjobs, they tick "I understand that the client will also be changed for"
+followed by the subjob numbers, and the server refuses unless the subjobs they
+confirmed are exactly the ones it moves. In one transaction:
 
 * The project and its subjobs take the new client, contact, and profile. Only
   these relations are validated, so a legacy project or an older subjob that

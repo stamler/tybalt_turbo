@@ -31,6 +31,8 @@ type jobChangeClientRequest struct {
 	Contact              string `json:"contact"`
 	InvoicingInformation string `json:"invoicing_information"`
 	Reason               string `json:"reason"`
+	// Subjobs lists the subjobs the user confirmed will move with the project.
+	Subjobs []string `json:"subjobs"`
 }
 
 func jobChangeClientError(status int, field, code, message string) *errs.HookError {
@@ -154,6 +156,9 @@ func changeJobClient(tx core.App, e *core.RequestEvent, jobID string, req jobCha
 	if err != nil {
 		return nil, err
 	}
+	if err := checkSubjobsConfirmed(children, req.Subjobs); err != nil {
+		return nil, err
+	}
 	jobs := append([]*core.Record{job}, children...)
 	ids := make([]any, len(jobs))
 	for i, j := range jobs {
@@ -231,6 +236,24 @@ func changeJobClient(tx core.App, e *core.RequestEvent, jobID string, req jobCha
 	}
 
 	return queueClientChangeNotice(tx, job, jobs, ids, e.Auth.Id, oldLabel, newLabel, subjobs, req.Reason)
+}
+
+// checkSubjobsConfirmed refuses the change unless the user confirmed exactly
+// the subjobs that will move. A subjob added since the dialog opened, or a
+// confirmation that was never given, would move a job the user did not see.
+func checkSubjobsConfirmed(children []*core.Record, confirmed []string) error {
+	want := map[string]bool{}
+	for _, child := range children {
+		want[child.Id] = true
+	}
+	got := map[string]bool{}
+	for _, id := range confirmed {
+		got[id] = true
+	}
+	if !maps.Equal(want, got) {
+		return jobChangeClientError(http.StatusConflict, "subjobs", "unconfirmed", "The subjobs confirmed do not match this project's subjobs, which may have changed. Review the current list and confirm again.")
+	}
+	return nil
 }
 
 // checkJobClientChangeBlockers refuses the change while work for the old

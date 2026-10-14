@@ -10,6 +10,7 @@
     submitLabel = "Submit",
     onSubmit,
     onCancel,
+    submitDisabled = false,
     children,
   }: {
     show: boolean;
@@ -20,6 +21,8 @@
     submitLabel?: string;
     onSubmit: () => void;
     onCancel?: () => void;
+    // Keeps the submit button disabled until the form can be submitted.
+    submitDisabled?: boolean;
     children: Snippet;
   } = $props();
 
@@ -61,7 +64,8 @@
           type="button"
           class="rounded-sm bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
           onclick={onSubmit}
-          disabled={submitting}
+          disabled={submitting || submitDisabled}
+          class:pointer-events-none={submitting || submitDisabled}
         >
           {submitting ? "Saving..." : submitLabel}
         </button>

@@ -7,6 +7,7 @@
   import { ClientResponseError } from "pocketbase";
   import { clientLabel } from "$lib/clientWorkspace";
   import { formatContactName, invoicingProfileLabel } from "$lib/utilities";
+  import { untrack } from "svelte";
   import type {
     ClientContactsResponse,
     ClientInvoicingInformationResponse,
@@ -17,9 +18,12 @@
   const REASON_MIN = 20;
   const REASON_MAX = 500;
 
+  type Subjob = { id: string; number: string };
+
   let {
     show = $bindable(),
     job,
+    subjobs,
     onchanged,
   }: {
     show: boolean;
@@ -28,6 +32,9 @@
       number: string;
       client: { id: string; name?: string; alias?: string };
     };
+    // The project's subjobs, when the opener already has them. Otherwise the
+    // dialog loads them.
+    subjobs?: Subjob[];
     // Receives the saved selections, so a form showing the job can take them.
     onchanged: (selection: {
       client: string;
@@ -52,21 +59,43 @@
   let errors = $state({} as Record<string, { message: string }>);
   let globalError = $state<string | null>(null);
   let loadId = 0;
-  let children = $state<{ id: string; number: string }[]>([]);
+  // The subjobs move with the project, so the user confirms them by number
+  // before saving. The server checks that they confirmed the subjobs it moves.
+  let children = $state<Subjob[]>(untrack(() => subjobs ?? []));
+  let subjobsState = $state<"loading" | "loaded" | "error">(
+    untrack(() => (subjobs ? "loaded" : "loading")),
+  );
+  let subjobsConfirmed = $state(false);
+  let subjobsLoadId = 0;
+  // Change Client stays disabled until the subjobs are known and, when there
+  // are any, confirmed.
+  const awaitingSubjobConfirmation = $derived(
+    subjobsState !== "loaded" || (children.length > 0 && !subjobsConfirmed),
+  );
+  const subjobNumbers = $derived(children.map((child) => child.number).join(", "));
 
-  // The subjobs move with the project, so name them before the user confirms.
-  $effect(() => {
-    const parent = job.id;
-    pb.collection("jobs")
-      .getFullList({
-        filter: pb.filter("parent={:parent}", { parent }),
+  // Loading the subjobs again clears the confirmation, which applied to the
+  // list the user saw.
+  async function loadSubjobs() {
+    const id = ++subjobsLoadId;
+    subjobsState = "loading";
+    subjobsConfirmed = false;
+    try {
+      const rows = await pb.collection("jobs").getFullList({
+        filter: pb.filter("parent={:parent}", { parent: job.id }),
         fields: "id,number",
         sort: "number",
         requestKey: null,
-      })
-      .then((rows) => (children = rows as { id: string; number: string }[]))
-      .catch(() => (children = []));
-  });
+      });
+      if (id !== subjobsLoadId) return;
+      children = rows.map((row) => ({ id: row.id, number: row.number }));
+      subjobsState = "loaded";
+    } catch {
+      if (id === subjobsLoadId) subjobsState = "error";
+    }
+  }
+  if (!untrack(() => subjobs)) loadSubjobs();
+
   const reasonLength = $derived(reason.trim().length);
   const newClientName = $derived(
     client ? clientLabel($clients.items.find((row) => row.id === client) ?? {}) : "",
@@ -112,10 +141,10 @@
   }
 
   async function submit() {
-    if (submitting) return;
-    submitting = true;
+    if (submitting || awaitingSubjobConfirmation) return;
     errors = {};
     globalError = null;
+    submitting = true;
     try {
       await pb.send(`/api/jobs/${job.id}/change-client`, {
         method: "POST",
@@ -124,6 +153,7 @@
           contact,
           invoicing_information: invoicingInformation,
           reason,
+          subjobs: subjobsConfirmed ? children.map((child) => child.id) : [],
         },
       });
       show = false;
@@ -132,6 +162,12 @@
       const response = error instanceof ClientResponseError ? error.data : {};
       errors = (response?.data as Record<string, { message: string }> | undefined) ?? {};
       globalError = response?.message ?? "The client could not be changed. Try again.";
+      // The subjobs changed since they were loaded. Show the current list to
+      // confirm instead.
+      if (errors.subjobs) {
+        globalError = null;
+        loadSubjobs();
+      }
     } finally {
       submitting = false;
     }
@@ -145,6 +181,7 @@
   error={globalError}
   {submitting}
   submitLabel="Change Client"
+  submitDisabled={awaitingSubjobConfirmation}
   onSubmit={submit}
   onCancel={close}
 >
@@ -244,13 +281,32 @@
     {#if errors.reason}<span class="text-sm text-red-600">{errors.reason.message}</span>{/if}
   </label>
 
+  <div class="flex flex-col gap-1">
+    {#if subjobsState === "loading"}
+      <p role="status" class="text-sm text-neutral-600">Checking for subjobs…</p>
+    {:else if subjobsState === "error"}
+      <p role="alert" class="text-sm text-red-700">
+        Could not load this project's subjobs.
+        <button type="button" class="ml-1 text-blue-700 underline" onclick={loadSubjobs}
+          >Try again</button
+        >
+      </p>
+    {:else if children.length}
+      <label
+        class="flex items-start gap-2 rounded-sm border p-3 text-sm {errors.subjobs
+          ? 'border-red-400 bg-red-200 text-red-900'
+          : 'border-amber-300 bg-amber-50 text-amber-900'}"
+      >
+        <input type="checkbox" class="mt-1" bind:checked={subjobsConfirmed} disabled={submitting} />
+        <span>I understand that the client will also be changed for {subjobNumbers}.</span>
+      </label>
+    {/if}
+    {#if errors.subjobs}<span class="text-sm text-red-600">{errors.subjobs.message}</span>{/if}
+  </div>
+
   <div class="rounded-sm border border-neutral-300 bg-neutral-50 p-3 text-sm text-neutral-700">
     {#if children.length}
-      <p>
-        Subjob{children.length === 1 ? "" : "s"}
-        {children.map((child) => child.number).join(", ")}
-        will move too, with the same contact and invoicing profile.
-      </p>
+      <p>Subjobs take the same contact and invoicing profile as the project.</p>
     {/if}
     <p class={children.length ? "mt-1" : ""}>
       The change is saved as soon as you confirm. The reason is saved as a client note under both
