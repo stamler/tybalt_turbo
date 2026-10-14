@@ -112,6 +112,9 @@ These cases intentionally rewrite or remove one seeded row so the same business 
 - [hooks/validate_expenses_test.go](app/hooks/validate_expenses_test.go)
   - updates one parent `purchase_orders.currency`
   - reason: validates PO-linked expense currency inheritance against a foreign-currency parent variant
+- [vendors_test.go](app/vendors_test.go)
+  - `TestVendorsApi_Referenced` points one Unapproved `purchase_orders` row at the unused vendor `ctswqva5onxj75q`
+  - reason: the delete-rule tests need that vendor unreferenced, while this scenario needs a vendor whose only reference is excluded from the displayed counts
 
 ## 7. Identity / External Auth State Matrices
 

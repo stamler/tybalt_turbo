@@ -18,6 +18,7 @@ type vendorRow struct {
 	Alias               string `db:"alias"`
 	ExpensesCount       int    `db:"expenses_count"`
 	PurchaseOrdersCount int    `db:"purchase_orders_count"`
+	Referenced          bool   `db:"referenced"`
 }
 
 type Vendor struct {
@@ -26,6 +27,9 @@ type Vendor struct {
 	Alias               string `json:"alias"`
 	ExpensesCount       int    `json:"expenses_count"`
 	PurchaseOrdersCount int    `json:"purchase_orders_count"`
+	// Referenced is true when any expense or purchase order uses the vendor,
+	// so the vendors deleteRule refuses to delete it.
+	Referenced bool `json:"referenced"`
 }
 
 func createGetVendorsHandler(app core.App) func(e *core.RequestEvent) error {

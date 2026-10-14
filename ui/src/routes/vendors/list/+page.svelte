@@ -5,10 +5,27 @@
   import { pb } from "$lib/pocketbase";
   import { vendors } from "$lib/stores/vendors";
   import { expensesEditingEnabled } from "$lib/stores/appConfig";
+  import { globalStore } from "$lib/stores/global";
   import { trimmedOrEmpty } from "$lib/utilities";
 
   // initialize the stores, noop if already initialized
   vendors.init();
+
+  async function del(id: string, name: string): Promise<void> {
+    try {
+      await pb.collection("vendors").delete(id);
+    } catch (error: unknown) {
+      // PocketBase answers 404 when the delete rule refuses the request: the
+      // user is not a payables admin, or a purchase order or expense started
+      // using the vendor after the list loaded.
+      const status = (error as { status?: number })?.status;
+      globalStore.addError(
+        status === 404
+          ? `${name} could not be deleted. Only payables admins can delete vendors, and a vendor that purchase orders or expenses use must be absorbed into another vendor instead.`
+          : `${name} could not be deleted: ${(error as { message?: string })?.message ?? "unknown error"}`,
+      );
+    }
+  }
 </script>
 
 {#if $vendors.index !== null}
@@ -46,7 +63,7 @@
       </span>
     {/snippet}
 
-    {#snippet actions({ id }: VendorApiResponse)}
+    {#snippet actions({ id, name, referenced }: VendorApiResponse)}
       {#if $expensesEditingEnabled}
         <DsActionButton
           action={`/vendors/${id}/edit`}
@@ -60,12 +77,15 @@
           title="Absorb other vendors into this one"
           color="yellow"
         />
-        <DsActionButton
-          action={() => pb.collection("vendors").delete(id)}
-          icon="mdi:delete"
-          title="Delete"
-          color="red"
-        />
+        <!-- Vendors that purchase orders or expenses use cannot be deleted; absorb them instead. -->
+        {#if !referenced}
+          <DsActionButton
+            action={() => del(id, name)}
+            icon="mdi:delete"
+            title="Delete"
+            color="red"
+          />
+        {/if}
       {/if}
     {/snippet}
   </DsSearchList>

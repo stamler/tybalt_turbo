@@ -7,6 +7,9 @@ export interface VendorApiResponse {
   alias: string;
   expenses_count: number;
   purchase_orders_count: number;
+  // true when any purchase order or expense uses the vendor, so the server
+  // refuses to delete it
+  referenced: boolean;
 }
 
 const fetchAllVendors = async (): Promise<VendorApiResponse[]> =>
@@ -21,7 +24,7 @@ export const vendors = createCollectionStore<any>(
   },
   {
     fields: ["name", "alias"],
-    storeFields: ["id", "name", "alias", "expenses_count", "purchase_orders_count"],
+    storeFields: ["id", "name", "alias", "expenses_count", "purchase_orders_count", "referenced"],
   },
 
   async (item) => {

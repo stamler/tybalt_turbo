@@ -169,3 +169,95 @@ func TestVendorsAbsorb_ReferencedVendors(t *testing.T) {
 	}
 	scenario.Test(t)
 }
+
+// TestVendorsApi_Referenced verifies that the vendors API reports whether any
+// purchase order or expense uses a vendor. The displayed counts include only
+// Active purchase orders and committed expenses, so they cannot tell the UI
+// whether the vendors deleteRule will refuse a delete.
+func TestVendorsApi_Referenced(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "book@keeper.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:           "vendor used by purchase orders is referenced",
+			Method:         http.MethodGet,
+			URL:            "/api/vendors/z66xe6vqhwtokt4",
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"purchase_orders_count":4`,
+				`"referenced":true`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "vendor used by an expense is referenced",
+			Method:         http.MethodGet,
+			URL:            "/api/vendors/phvendor0000001",
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"expenses_count":1`,
+				`"purchase_orders_count":0`,
+				`"referenced":true`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "unused vendor is not referenced",
+			Method:         http.MethodGet,
+			URL:            "/api/vendors/ctswqva5onxj75q",
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"expenses_count":0`,
+				`"purchase_orders_count":0`,
+				`"referenced":false`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			Name:           "vendor used only by an unapproved purchase order is referenced",
+			Method:         http.MethodGet,
+			URL:            "/api/vendors/ctswqva5onxj75q",
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"purchase_orders_count":0`,
+				`"referenced":true`,
+			},
+			TestAppFactory: func(tb testing.TB) *tests.TestApp {
+				app := testutils.SetupTestApp(tb)
+				// Point one Unapproved purchase order at the unused vendor. The
+				// count of Active purchase orders stays 0, but the delete rule
+				// would refuse to delete the vendor.
+				if _, err := app.NonconcurrentDB().NewQuery(
+					"UPDATE purchase_orders SET vendor = 'ctswqva5onxj75q' WHERE id = '46efdq319b22480'",
+				).Execute(); err != nil {
+					tb.Fatal(err)
+				}
+				return app
+			},
+		},
+		{
+			Name:           "vendor list includes referenced",
+			Method:         http.MethodGet,
+			URL:            "/api/vendors",
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"id":"ctswqva5onxj75q","name":"Inactive Vendor","alias":`,
+				`"referenced":false`,
+				`"referenced":true`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
+}
