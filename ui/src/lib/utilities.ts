@@ -23,6 +23,18 @@ export function saveErrorMessage(error: unknown, fallback: string): string {
   return fields.length ? fields.join(" ") : response?.message || fallback;
 }
 
+// The HTTP status of a failed PocketBase request, if it has one.
+export function errorStatus(error: unknown): number | undefined {
+  return (error as { status?: number } | null)?.status;
+}
+
+// The code the API gave one field of a failed request, such as "in_use".
+export function errorFieldCode(error: unknown, field: string): string | undefined {
+  const response = (error as { response?: { data?: Record<string, { code?: string }> } } | null)
+    ?.response;
+  return response?.data?.[field]?.code;
+}
+
 export const DATE_INPUT_MIN = "2024-06-01";
 // Keep this aligned with the backend payroll cadence in app/constants/constants.go:
 // opening dates are the Sunday immediately after PAYROLL_EPOCH.

@@ -63,6 +63,17 @@ export function createCollectionStore<T extends BaseSystemFields>(
     }));
   }
 
+  // Remove a record from the store and its index. The record may already be
+  // gone, for example when a page removes a record it deleted and the realtime
+  // delete event arrives afterwards, and MiniSearch throws when discarding an
+  // id it does not have.
+  function remove(id: string) {
+    store.update((state) => {
+      if (state.index?.has(id)) state.index.discard(id);
+      return { ...state, items: state.items.filter((i) => i.id !== id) };
+    });
+  }
+
   // Set up PocketBase realtime subscription
   let unsubscribeFunc: UnsubscribeFunc | null = null;
 
@@ -89,12 +100,7 @@ export function createCollectionStore<T extends BaseSystemFields>(
               emitCollectionEvent(collectionName, "update", e.record.id);
             }
           } else if (e.action === "delete") {
-            // Remove the deleted record from the store and discard it from the index
-            store.update((state) => ({
-              ...state,
-              items: state.items.filter((i) => i.id !== e.record.id),
-              index: state.index?.discard(e.record.id) || state.index,
-            }));
+            remove(e.record.id);
             emitCollectionEvent(collectionName, "delete", e.record.id);
           }
           store.update((state) => ({ ...state, loading: false }));
@@ -194,6 +200,9 @@ export function createCollectionStore<T extends BaseSystemFields>(
 
     // Refresh the data manually if needed
     refresh,
+
+    // Remove a record, such as one the page just deleted
+    remove,
 
     // Clean up subscription when the store is no longer needed
     unsubscribe: () => {

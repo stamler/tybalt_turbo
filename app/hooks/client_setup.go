@@ -14,8 +14,9 @@ import (
 
 // clientRecordUses lists the records that keep a reference to each client record.
 // Deletion is refused while any exist, instead of letting PocketBase clear the
-// optional ones. Contacts are not listed under clients: they cascade with their
-// client, and their own uses are checked as they are deleted.
+// optional ones or refuse the required ones with a generic error. Contacts are
+// not listed under clients: they cascade with their client, and their own uses
+// are checked as they are deleted.
 var clientRecordUses = map[string][]struct{ collection, field string }{
 	"clients": {
 		{"jobs", "client"},
@@ -23,6 +24,7 @@ var clientRecordUses = map[string][]struct{ collection, field string }{
 		{"job_requests", "client"},
 		{"job_requests", "job_owner"},
 		{"client_invoicing_information", "client"},
+		{"client_notes", "client"},
 	},
 	"client_contacts": {
 		{"jobs", "contact"},
@@ -99,21 +101,43 @@ func AddClientSetupHooks(app core.App) {
 	guard(utilities.ValidateBillingName, "client_invoicing_information", true)
 	guard(validateAliasRemoval, "clients", false)
 
-	app.OnRecordDelete("clients", "client_contacts", "client_invoicing_information").BindFunc(func(e *core.RecordEvent) error {
-		for _, use := range clientRecordUses[e.Record.Collection().Name] {
-			count, err := e.App.CountRecords(use.collection, dbx.HashExp{use.field: e.Record.Id})
-			if err != nil {
-				return err
-			}
-			if count > 0 {
-				return &errs.HookError{
-					Status:  http.StatusBadRequest,
-					Message: fmt.Sprintf("this record is still used by %s", use.collection),
-				}
-			}
+	// The request hook returns the in_use error to the caller. PocketBase
+	// replaces errors from the model hook with a generic message, and the model
+	// hook still guards deletes made outside requests and cascaded deletes.
+	app.OnRecordDeleteRequest("clients", "client_contacts", "client_invoicing_information").BindFunc(func(e *core.RecordRequestEvent) error {
+		if err := recordInUse(e.App, e.Record); err != nil {
+			return AnnotateHookError(e.App, e, err)
 		}
 		return e.Next()
 	})
+	app.OnRecordDelete("clients", "client_contacts", "client_invoicing_information").BindFunc(func(e *core.RecordEvent) error {
+		if err := recordInUse(e.App, e.Record); err != nil {
+			return err
+		}
+		return e.Next()
+	})
+}
+
+// recordInUse returns an in_use error while any record listed in
+// clientRecordUses still uses record.
+func recordInUse(app core.App, record *core.Record) error {
+	inUse := func(message string) error {
+		return &errs.HookError{
+			Status:  http.StatusBadRequest,
+			Message: message,
+			Data:    map[string]errs.CodeError{"id": {Code: "in_use", Message: message}},
+		}
+	}
+	for _, use := range clientRecordUses[record.Collection().Name] {
+		count, err := app.CountRecords(use.collection, dbx.HashExp{use.field: record.Id})
+		if err != nil {
+			return err
+		}
+		if count > 0 {
+			return inUse(fmt.Sprintf("this record is still used by %s", use.collection))
+		}
+	}
+	return nil
 }
 
 // validateAliasRemoval keeps a client's alias while invoicing profiles bill it,

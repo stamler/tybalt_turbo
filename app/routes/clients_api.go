@@ -40,6 +40,7 @@ type clientRow struct {
 	ContactsJSON         string  `db:"contacts_json"`
 	ReferencingJobsCount int     `db:"referencing_jobs_count"`
 	OutstandingBalance   float64 `db:"outstanding_balance"`
+	Referenced           bool    `db:"referenced"`
 }
 
 type Client struct {
@@ -49,6 +50,9 @@ type Client struct {
 	Contacts             []Contact `json:"contacts"`
 	ReferencingJobsCount int       `json:"referencing_jobs_count"`
 	OutstandingBalance   float64   `json:"outstanding_balance"`
+	// Referenced is true when any job, job request, invoicing profile or note
+	// uses the client, so deleting it is refused.
+	Referenced bool `json:"referenced"`
 }
 
 type clientDetailsRow struct {
@@ -62,6 +66,7 @@ type clientDetailsRow struct {
 	LeadSurname            string  `db:"lead_surname"`
 	LeadEmail              string  `db:"lead_email"`
 	ReferencingJobsCount   int     `db:"referencing_jobs_count"`
+	Referenced             bool    `db:"referenced"`
 	Address                string  `db:"address"`
 	City                   string  `db:"city"`
 	ProvinceState          string  `db:"province_state"`
@@ -121,6 +126,9 @@ type ClientDetails struct {
 	PostalCode             string                   `json:"postal_code"`
 	Country                string                   `json:"country"`
 	Phone                  string                   `json:"phone"`
+	// Referenced is true when any job, job request, invoicing profile or note
+	// uses the client, so deleting it is refused.
+	Referenced bool `json:"referenced"`
 }
 
 type BusdevLead struct {
@@ -178,6 +186,7 @@ func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 				Contacts:             contacts,
 				ReferencingJobsCount: r.ReferencingJobsCount,
 				OutstandingBalance:   r.OutstandingBalance,
+				Referenced:           r.Referenced,
 			}
 		}
 
@@ -231,6 +240,7 @@ func queryClientDetails(app core.App, id string) (*ClientDetails, error) {
 		Contacts:               contacts,
 		InvoicingProfiles:      profiles,
 		ReferencingJobsCount:   row.ReferencingJobsCount,
+		Referenced:             row.Referenced,
 		Address:                row.Address,
 		City:                   row.City,
 		ProvinceState:          row.ProvinceState,

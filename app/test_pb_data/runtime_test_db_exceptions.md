@@ -115,6 +115,11 @@ These cases intentionally rewrite or remove one seeded row so the same business 
 - [vendors_test.go](app/vendors_test.go)
   - `TestVendorsApi_Referenced` points one Unapproved `purchase_orders` row at the unused vendor `ctswqva5onxj75q`
   - reason: the delete-rule tests need that vendor unreferenced, while this scenario needs a vendor whose only reference is excluded from the displayed counts
+- [clients_test.go](app/clients_test.go)
+  - `TestClientsApi_Referenced` points one `jobs`, `job_requests`, `client_invoicing_information` or `client_notes` row at the unused client `cwclient0000002`, one use per scenario
+  - reason: other tests need that client unused so it can be deleted, while each scenario needs a client with exactly one kind of use
+  - `TestClientsApi_JobOwnerCountsAndBalances` sets `jobs.job_owner` and `jobs.outstanding_balance` on two jobs
+  - reason: no fixture job has an owner or a balance, and the clients list counts owned jobs without adding their balances
 
 ## 7. Identity / External Auth State Matrices
 

@@ -64,7 +64,15 @@ SELECT
     'creator', creator, 'creator_name', creator_name, 'created', created,
     'job_count', job_count, 'request_count', request_count
   )) FROM invoicing_profiles) AS invoicing_profiles_json,
-  COALESCE(j_count.referencing_jobs_count, 0) AS referencing_jobs_count
+  COALESCE(j_count.referencing_jobs_count, 0) AS referencing_jobs_count,
+  -- The same uses the clients list reports as referenced: jobs (through the job
+  -- count), job requests, invoicing profiles and notes. The request checks are
+  -- separate so the client check can use its index.
+  (j_count.client IS NOT NULL
+    OR EXISTS (SELECT 1 FROM job_requests r WHERE r.client = c.id)
+    OR EXISTS (SELECT 1 FROM job_requests r WHERE r.job_owner = c.id)
+    OR EXISTS (SELECT 1 FROM client_profiles)
+    OR EXISTS (SELECT 1 FROM client_notes n WHERE n.client = c.id)) AS referenced
 FROM clients c
 LEFT JOIN profiles p ON p.uid = c.business_development_lead
 LEFT JOIN users lead ON lead.id = c.business_development_lead
