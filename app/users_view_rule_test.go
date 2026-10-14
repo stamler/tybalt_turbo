@@ -39,17 +39,15 @@ const previousUsersViewRule = `@request.auth.id != "" &&
 )`
 
 // usersViewRuleQuery builds the query PocketBase runs to check rule for the
-// caller, as CanAccessRecord does. A blank id selects every visible user.
-func usersViewRuleQuery(t testing.TB, app core.App, caller *core.Record, rule string, id string) *dbx.SelectQuery {
+// caller, as CanAccessRecord does, without its single-record filter, so it
+// selects every user the caller can see.
+func usersViewRuleQuery(t testing.TB, app core.App, caller *core.Record, rule string) *dbx.SelectQuery {
 	t.Helper()
 	users, err := app.FindCollectionByNameOrId("users")
 	if err != nil {
 		t.Fatal(err)
 	}
 	query := app.RecordQuery(users).Select("users.id")
-	if id != "" {
-		query.AndWhere(dbx.HashExp{"users.id": id})
-	}
 	resolver := core.NewRecordFieldResolver(app, users, &core.RequestInfo{Auth: caller}, true)
 	expr, err := search.FilterData(rule).BuildExpr(resolver)
 	if err != nil {
@@ -64,28 +62,11 @@ func usersViewRuleQuery(t testing.TB, app core.App, caller *core.Record, rule st
 func visibleUserIds(t testing.TB, app core.App, caller *core.Record, rule string) []string {
 	t.Helper()
 	var ids []string
-	if err := usersViewRuleQuery(t, app, caller, rule, "").Column(&ids); err != nil {
+	if err := usersViewRuleQuery(t, app, caller, rule).Column(&ids); err != nil {
 		t.Fatal(err)
 	}
 	slices.Sort(ids)
 	return ids
-}
-
-func canViewUser(t testing.TB, app core.App, caller *core.Record, target *core.Record) bool {
-	t.Helper()
-	users, err := app.FindCollectionByNameOrId("users")
-	if err != nil {
-		t.Fatal(err)
-	}
-	info := &core.RequestInfo{}
-	if caller != nil {
-		info.Auth = caller
-	}
-	ok, err := app.CanAccessRecord(target, info, users.ViewRule)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return ok
 }
 
 // usersVisibleByPreviousRule restates the previous rule with EXISTS
@@ -139,145 +120,66 @@ func TestUsersViewRuleMatchesPreviousRuleForSeedData(t *testing.T) {
 	}
 }
 
+// Each access path, and the near misses that must stay denied, using seeded
+// fixtures. The uvg* users, expense uvgexpsubmit001, and purchase orders
+// uvgactivepo0001 and uvgclosedpo0001 exist for these cases.
 func TestUsersViewRuleAccessPaths(t *testing.T) {
-	newUser := func(t *testing.T, app core.App, id string) *core.Record {
-		t.Helper()
-		users, err := app.FindCollectionByNameOrId("users")
-		if err != nil {
-			t.Fatal(err)
-		}
-		user := core.NewRecord(users)
-		user.Id = id
-		user.SetEmail(id + "@example.com")
-		user.SetPassword("password123")
-		if err := app.SaveNoValidate(user); err != nil {
-			t.Fatal(err)
-		}
-		return user
-	}
-	grantClaim := func(t *testing.T, app core.App, user *core.Record, claimName string) {
-		t.Helper()
-		claim, err := app.FindFirstRecordByData("claims", "name", claimName)
-		if err != nil {
-			t.Fatal(err)
-		}
-		userClaims, err := app.FindCollectionByNameOrId("user_claims")
-		if err != nil {
-			t.Fatal(err)
-		}
-		record := core.NewRecord(userClaims)
-		record.Set("uid", user.Id)
-		record.Set("cid", claim.Id)
-		if err := app.SaveNoValidate(record); err != nil {
-			t.Fatal(err)
-		}
-	}
-	addExpense := func(t *testing.T, app core.App, uid, approver *core.Record, committed bool) {
-		t.Helper()
-		expenses, err := app.FindCollectionByNameOrId("expenses")
-		if err != nil {
-			t.Fatal(err)
-		}
-		record := core.NewRecord(expenses)
-		record.Set("uid", uid.Id)
-		record.Set("approver", approver.Id)
-		record.Set("date", "2026-01-05")
-		if committed {
-			record.Set("committed", "2026-01-10 12:00:00.000Z")
-		}
-		if err := app.SaveNoValidate(record); err != nil {
-			t.Fatal(err)
-		}
-	}
-	addPurchaseOrder := func(t *testing.T, app core.App, status string, field string, user *core.Record) {
-		t.Helper()
-		purchaseOrders, err := app.FindCollectionByNameOrId("purchase_orders")
-		if err != nil {
-			t.Fatal(err)
-		}
-		record := core.NewRecord(purchaseOrders)
-		// The uid and approver are required on real purchase orders. Use a seeded
-		// user who is already visible so only field identifies the new user.
-		record.Set("uid", "f2j5a8vk006baub")
-		record.Set("approver", "f2j5a8vk006baub")
-		record.Set("status", status)
-		record.Set(field, user.Id)
-		if err := app.SaveNoValidate(record); err != nil {
-			t.Fatal(err)
-		}
-	}
+	app := testseed.NewSeededTestApp(t)
+	defer app.Cleanup()
 
+	users, err := app.FindCollectionByNameOrId("users")
+	if err != nil {
+		t.Fatal(err)
+	}
 	cases := []struct {
-		name  string
-		setup func(t *testing.T, app core.App, caller, target *core.Record)
-		want  bool
+		name   string
+		caller string // blank for a guest
+		target string
+		want   bool
 	}{
-		{"unrelated user is denied", func(t *testing.T, app core.App, caller, target *core.Record) {}, false},
-		{"record has po_approver claim", func(t *testing.T, app core.App, caller, target *core.Record) {
-			grantClaim(t, app, target, "po_approver")
-		}, true},
-		{"record has tapr claim", func(t *testing.T, app core.App, caller, target *core.Record) {
-			grantClaim(t, app, target, "tapr")
-		}, true},
-		{"caller has tapr claim", func(t *testing.T, app core.App, caller, target *core.Record) {
-			grantClaim(t, app, caller, "tapr")
-		}, true},
-		{"record has an unrelated claim", func(t *testing.T, app core.App, caller, target *core.Record) {
-			grantClaim(t, app, target, "time")
-		}, false},
-		{"caller approved a committed expense of the record", func(t *testing.T, app core.App, caller, target *core.Record) {
-			addExpense(t, app, target, caller, true)
-		}, true},
-		{"caller approved an uncommitted expense of the record", func(t *testing.T, app core.App, caller, target *core.Record) {
-			addExpense(t, app, target, caller, false)
-		}, false},
-		{"caller approved a committed expense of another user", func(t *testing.T, app core.App, caller, target *core.Record) {
-			addExpense(t, app, newUser(t, app, "uvrotherowner01"), caller, true)
-		}, false},
-		{"another user approved a committed expense of the record", func(t *testing.T, app core.App, caller, target *core.Record) {
-			addExpense(t, app, target, newUser(t, app, "uvrotherapprov1"), true)
-		}, false},
-		{"record is uid of an active purchase order", func(t *testing.T, app core.App, caller, target *core.Record) {
-			addPurchaseOrder(t, app, "Active", "uid", target)
-		}, true},
-		{"record is approver of an active purchase order", func(t *testing.T, app core.App, caller, target *core.Record) {
-			addPurchaseOrder(t, app, "Active", "approver", target)
-		}, true},
-		{"record is second_approver of an active purchase order", func(t *testing.T, app core.App, caller, target *core.Record) {
-			addPurchaseOrder(t, app, "Active", "second_approver", target)
-		}, true},
-		{"record is uid of an unapproved purchase order", func(t *testing.T, app core.App, caller, target *core.Record) {
-			addPurchaseOrder(t, app, "Unapproved", "uid", target)
-		}, false},
-		{"record is second_approver of a closed purchase order", func(t *testing.T, app core.App, caller, target *core.Record) {
-			addPurchaseOrder(t, app, "Closed", "second_approver", target)
-		}, false},
+		{"caller views self", "u_no_claims", "u_no_claims", true},
+		{"user with no claims or grants is denied", "u_no_claims", "u_no_ppto_claim", false},
+		{"user with only an unrelated claim is denied", "u_no_claims", "invoicejob00001", false},
+		{"record has po_approver claim", "u_no_claims", "66ct66w380ob6w8", true},
+		{"record has tapr claim", "u_no_claims", "u_self_apv_yes", true},
+		{"caller has tapr claim", "u_self_apv_yes", "invoicejob00001", true},
+		{"caller approved a committed expense of the record", "4r70mfovf22m9uh", "4ssj9f1yg250o9y", true},
+		{"caller approved an uncommitted expense of the record", "uvgexpapprove01", "uvgexpowner0001", false},
+		{"caller approved a committed expense of another user", "4r70mfovf22m9uh", "u_no_claims", false},
+		// 4ssj9f1yg250o9y is also uid on Unapproved, Closed and Cancelled POs.
+		{"another user approved the record's expense; record only on non-Active POs", "u_no_claims", "4ssj9f1yg250o9y", false},
+		{"record is uid of an active purchase order", "u_no_claims", "rzr98oadsp9qc11", true},
+		{"record is approver of an active purchase order", "u_no_claims", "uvgpoapprover01", true},
+		{"record is second_approver of an active purchase order", "u_no_claims", "uvgposecond0001", true},
+		{"record is second_approver of a closed purchase order", "u_no_claims", "uvgclosedsec001", false},
+		{"guest is denied", "", "rzr98oadsp9qc11", false},
 	}
-
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			app := testseed.NewSeededTestApp(t)
-			defer app.Cleanup()
-
-			caller := newUser(t, app, "uvrcaller000001")
-			target := newUser(t, app, "uvrtarget000001")
-			tc.setup(t, app, caller, target)
-
-			if got := canViewUser(t, app, caller, target); got != tc.want {
-				t.Fatalf("caller can view target = %v, want %v", got, tc.want)
+			var caller *core.Record
+			if tc.caller != "" {
+				found, err := app.FindRecordById("users", tc.caller)
+				if err != nil {
+					t.Fatal(err)
+				}
+				caller = found
 			}
-			var previous []string
-			if err := usersViewRuleQuery(t, app, caller, previousUsersViewRule, target.Id).Column(&previous); err != nil {
+			target, err := app.FindRecordById("users", tc.target)
+			if err != nil {
 				t.Fatal(err)
 			}
-			if len(previous) > 0 != tc.want {
-				t.Fatalf("previous rule allowed = %v, want %v", len(previous) > 0, tc.want)
-			}
-			if !canViewUser(t, app, caller, caller) {
-				t.Fatal("a caller must be able to view their own user record")
-			}
-			if canViewUser(t, app, nil, target) {
-				t.Fatal("a guest must not be able to view users")
+			info := &core.RequestInfo{Auth: caller}
+			for _, rule := range []struct {
+				name string
+				rule string
+			}{{"current rule", *users.ViewRule}, {"previous rule", previousUsersViewRule}} {
+				got, err := app.CanAccessRecord(target, info, &rule.rule)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got != tc.want {
+					t.Errorf("%s: caller can view target = %v, want %v", rule.name, got, tc.want)
+				}
 			}
 		})
 	}
@@ -297,7 +199,7 @@ func TestUsersViewRuleHasNoUnconditionedJoins(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sql := usersViewRuleQuery(t, app, caller, *users.ViewRule, "rzr98oadsp9qc11").Build().SQL()
+	sql := usersViewRuleQuery(t, app, caller, *users.ViewRule).Build().SQL()
 
 	if strings.Contains(sql, "__collection_") {
 		t.Fatalf("rule must not use @collection joins:\n%s", sql)
@@ -379,9 +281,32 @@ func TestUsersViewRuleApi(t *testing.T) {
 			TestAppFactory: testutils.SetupTestApp,
 		},
 		{
-			Name:           "the grants view is not readable through the API",
+			// uvgexpapprove01 may read the submitted expense but not its owner.
+			Name:               "expanding an expense uid omits a user the caller cannot view",
+			Method:             http.MethodGet,
+			URL:                "/api/collections/expenses/records/uvgexpsubmit001?expand=uid",
+			Headers:            map[string]string{"Authorization": token("users.view.expense.approver@example.com")},
+			ExpectedStatus:     http.StatusOK,
+			ExpectedContent:    []string{`"id":"uvgexpsubmit001"`, `"uid":"uvgexpowner0001"`, `"expand":{}`},
+			NotExpectedContent: []string{`"expand":{"uid"`},
+			TestAppFactory:     testutils.SetupTestApp,
+		},
+		{
+			Name:           "the grants view is not listable through the API",
 			Method:         http.MethodGet,
 			URL:            "/api/collections/user_view_grants/records",
+			Headers:        map[string]string{"Authorization": taprToken},
+			ExpectedStatus: http.StatusForbidden,
+			ExpectedContent: []string{
+				`"data":{}`,
+			},
+			TestAppFactory: testutils.SetupTestApp,
+		},
+		{
+			// An active_po row id is the user id, so it is easy to guess.
+			Name:           "a grants view record is not readable through the API",
+			Method:         http.MethodGet,
+			URL:            "/api/collections/user_view_grants/records/rzr98oadsp9qc11",
 			Headers:        map[string]string{"Authorization": taprToken},
 			ExpectedStatus: http.StatusForbidden,
 			ExpectedContent: []string{

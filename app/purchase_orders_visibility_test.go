@@ -109,7 +109,7 @@ func TestPurchaseOrdersVisibilityRules(t *testing.T) {
 			},
 			ExpectedStatus: http.StatusOK,
 			ExpectedContent: []string{
-				`"totalItems":47`, // Includes ten manual-closure, sixteen active WIP, and five print PO fixtures.
+				`"totalItems":48`, // Includes ten manual-closure, sixteen active WIP, five print PO, and one users view rule fixtures.
 			},
 			TestAppFactory: testutils.SetupTestApp,
 		},

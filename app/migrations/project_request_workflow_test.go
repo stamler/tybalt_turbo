@@ -260,4 +260,5 @@ func TestProjectMigrationsMatchCanonicalSchema(t *testing.T) {
 	}
 	assertCanonicalCollections(t, app, "clients", "client_contacts", "jobs", "client_invoicing_information",
 		"job_requests", "job_request_allocations", "job_attachments", "project_authorization_props", "job_time_allocations")
+	assertCanonicalUserViewGrants(t, app)
 }

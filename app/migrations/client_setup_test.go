@@ -20,6 +20,13 @@ const clientSetupMigration = "1790969510_client_setup.go"
 
 func newClientSetupMigrationApp(t *testing.T) (core.App, *core.Migration) {
 	t.Helper()
+	return newAppBeforeMigration(t, clientSetupMigration)
+}
+
+// newAppBeforeMigration applies every migration older than file and returns
+// the app with the registered migration for file, which is not yet applied.
+func newAppBeforeMigration(t *testing.T, file string) (core.App, *core.Migration) {
+	t.Helper()
 	app := core.NewBaseApp(core.BaseAppConfig{DataDir: t.TempDir()})
 	if err := app.Bootstrap(); err != nil {
 		t.Fatal(err)
@@ -29,24 +36,24 @@ func newClientSetupMigrationApp(t *testing.T) (core.App, *core.Migration) {
 		t.Fatal(err)
 	}
 	previous := core.MigrationsList{}
-	var setup *core.Migration
+	var target *core.Migration
 	for _, migration := range core.AppMigrations.Items() {
 		switch migration.File {
-		case clientSetupMigration:
-			setup = migration
+		case file:
+			target = migration
 		default:
-			if migration.File < clientSetupMigration {
+			if migration.File < file {
 				previous.Add(migration)
 			}
 		}
 	}
-	if setup == nil {
-		t.Fatal("client setup migration must be registered")
+	if target == nil {
+		t.Fatalf("migration %s must be registered", file)
 	}
 	if _, err := core.NewMigrationsRunner(app, previous).Up(); err != nil {
 		t.Fatal(err)
 	}
-	return app, setup
+	return app, target
 }
 
 func applyMigration(t *testing.T, app core.App, migration *core.Migration) {
