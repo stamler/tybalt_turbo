@@ -1,6 +1,8 @@
 -- get time entries for a job, ordered by date descending. We will modify this
 -- accept the option to filter by d.id, tt.id, p.uid, c.id as requested by the
 -- caller
+-- Branch, division, and profile can be missing, so blank their codes and
+-- names; the Go row fields are plain strings and cannot hold NULL.
 SELECT te.description,
 	te.hours,
 	te.id,
@@ -8,11 +10,11 @@ SELECT te.description,
 	te.date,
 	te.week_ending,
 	te.tsid,
-	b.code AS branch_code,
-	d.code AS division_code,
-	tt.code AS time_type_code,
-	p.surname AS surname,
-	p.given_name AS given_name,
+	COALESCE(b.code, '') AS branch_code,
+	COALESCE(d.code, '') AS division_code,
+	COALESCE(tt.code, '') AS time_type_code,
+	COALESCE(p.surname, '') AS surname,
+	COALESCE(p.given_name, '') AS given_name,
 	COALESCE(c.name, 'No Category') AS category_name
 FROM time_entries te
 LEFT JOIN branches b ON te.branch = b.id

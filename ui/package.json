@@ -35,7 +35,6 @@
     "test:client-workspace-browser": "node tests/clientWorkspace.browser.mjs",
     "test:ds-list-browser": "node tests/dsList.browser.mjs",
     "test:job-billing-browser": "node tests/jobBilling.browser.mjs",
-    "test:client-workflow-browser": "node tests/clientWorkflowDraft.browser.mjs",
     "test:change-client-browser": "node tests/changeClient.browser.mjs"
   },
   "devDependencies": {

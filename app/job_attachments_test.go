@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 
 	"github.com/pocketbase/dbx"
@@ -271,45 +272,39 @@ func clearLegacyJobBilling(t *testing.T, app *tests.TestApp) {
 	}
 }
 
-func TestLegacyZeroValueCanCompleteBillingWithPendingApproval(t *testing.T) {
+// An older project with no value and no invoicing profile gets its profile in
+// the job editor, then a value through approval. Approval keeps the historical
+// zero as the previous value.
+func TestLegacyZeroValueCompletesBillingInEditorThenProposesValue(t *testing.T) {
 	app := newWorkflowTestApp(t, false)
 	clearLegacyJobBilling(t, app)
 	fields := map[string]string{"job": legacyWorkflowJob, "project_value": "10000", "assigned_approver": "6bq4j0eb26631dy"}
-	document := "%PDF-1.4\nLegacy zero billing correction\n%%EOF"
+	document := "%PDF-1.4\nLegacy zero billing\n%%EOF"
 	workflowUpload(t, app, "/api/job_attachments", workflowAuthor, document, fields, http.StatusBadRequest)
-	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetFloat("project_value") != 0 {
-		t.Fatal("incomplete save changed effective value")
+	if count, err := app.CountRecords("job_attachments", dbx.HashExp{"job": legacyWorkflowJob}); err != nil || count != 0 {
+		t.Fatalf("refused value change was retained: %v %d", err, count)
 	}
-	fields["job_updates"] = `{"invoicing_information":"painvoice000001","contact":"184qbpajciwrrp2","description":"Legacy project billing completed"}`
-	fields["job_updated"] = workflowRecord(t, app, "jobs", legacyWorkflowJob).GetString("updated")
-	fields["job_review_token"] = valueContextToken(t, app, legacyWorkflowJob)
-	fields["allocations"] = `[{"division":"fy4i9poneukvq9u","hours":20}]`
-	savedUpdated := fields["job_updated"]
-	fields["job_updated"] = "2000-01-01 00:00:00.000Z"
-	workflowUpload(t, app, "/api/job_attachments", workflowAuthor, document, fields, http.StatusConflict)
-	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetString("invoicing_information") != "" {
-		t.Fatal("stale correction changed billing")
+	edit := func(job string, status int) {
+		t.Helper()
+		body := `{"job":` + job + `,"allocations":[{"division":"fy4i9poneukvq9u","hours":10}]}`
+		response := performTestAPIRequest(t, app, http.MethodPut, "/api/jobs/"+legacyWorkflowJob, strings.NewReader(body), map[string]string{"Authorization": workflowToken(t, app, workflowAuthor), "Content-Type": "application/json"})
+		mustStatus(t, response, status)
 	}
-	fields["job_updated"] = savedUpdated
+	// Making the zero-value project Closed still requires a value.
+	edit(`{"status":"Closed"}`, http.StatusBadRequest)
+	edit(`{"invoicing_information":"painvoice000001"}`, http.StatusOK)
+	job := workflowRecord(t, app, "jobs", legacyWorkflowJob)
+	if job.GetString("invoicing_information") != "painvoice000001" || job.GetFloat("project_value") != 0 || job.GetString("status") != "Active" {
+		t.Fatal("editor did not save billing on the zero-value project")
+	}
 	response := workflowUpload(t, app, "/api/job_attachments", workflowAuthor, document, fields, http.StatusOK)
 	result := map[string]any{}
 	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
 		t.Fatal(err)
 	}
 	id, _ := result["id"].(string)
-	if id == "" {
-		t.Fatal("pending response has no id")
-	}
-	job := workflowRecord(t, app, "jobs", legacyWorkflowJob)
-	if job.GetFloat("project_value") != 0 || job.GetString("invoicing_information") != "painvoice000001" || job.GetString("description") != "Legacy project billing completed" {
-		t.Fatal("pending save did not keep old value and complete billing")
-	}
-	allocations, err := app.FindRecordsByFilter("job_time_allocations", "job='pawflegacy00001'", "", 0, 0)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(allocations) != 1 || allocations[0].GetFloat("hours") != 20 {
-		t.Fatal("pending save did not update allocations")
+	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetFloat("project_value") != 0 {
+		t.Fatal("pending change replaced effective value")
 	}
 	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/approve", workflowApprover, attachmentActionData(t, app, id), http.StatusOK)
 	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetFloat("project_value") != 10000 {
@@ -320,118 +315,118 @@ func TestLegacyZeroValueCanCompleteBillingWithPendingApproval(t *testing.T) {
 	}
 }
 
-func TestLegacyBillingAndValueSubmissionFailuresRollBackTogether(t *testing.T) {
+// Many older projects have no authorizing document. Their value change saves
+// without one, and its approval records PA as the project's authorization.
+func TestOlderProjectWithoutAuthorizingDocumentGetsPAOnApproval(t *testing.T) {
+	app := newWorkflowTestApp(t, false)
+	if _, err := app.DB().NewQuery("UPDATE jobs SET authorizing_document='' WHERE id='pawflegacy00001'").Execute(); err != nil {
+		t.Fatal(err)
+	}
+	id := createValueChange(t, app, legacyWorkflowJob, 10000, "No authorizing document")
+	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetString("authorizing_document") != "" {
+		t.Fatal("pending change set the authorizing document")
+	}
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/approve", workflowApprover, attachmentActionData(t, app, id), http.StatusOK)
+	job := workflowRecord(t, app, "jobs", legacyWorkflowJob)
+	if job.GetFloat("project_value") != 10000 || job.GetString("authorizing_document") != "PA" {
+		t.Fatalf("approval left value %v and authorizing document %q", job.GetFloat("project_value"), job.GetString("authorizing_document"))
+	}
+}
+
+// A rejected value change is corrected in the job editor. Saving the job
+// without a change leaves the value change rejected; a real correction returns
+// it for approval.
+func TestJobValueRejectedThenCorrectedInEditor(t *testing.T) {
+	app := newWorkflowTestApp(t, false)
+	id := createValueChange(t, app, legacyWorkflowJob, 10000, "Editor correction document")
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/reject", workflowApprover, attachmentRejectData(t, app, id, "Fix the description."), http.StatusOK)
+	rejected := workflowRecord(t, app, "job_attachments", id)
+	rows, err := app.FindRecordsByFilter("job_time_allocations", "job={:id}", "division", 0, 0, dbx.Params{"id": legacyWorkflowJob})
+	if err != nil {
+		t.Fatal(err)
+	}
+	allocations := []map[string]any{}
+	for _, row := range rows {
+		allocations = append(allocations, map[string]any{"division": row.GetString("division"), "hours": row.GetFloat("hours")})
+	}
+	edit := func(description string) {
+		t.Helper()
+		body, err := json.Marshal(map[string]any{"job": map[string]any{"description": description}, "allocations": allocations})
+		if err != nil {
+			t.Fatal(err)
+		}
+		response := performTestAPIRequest(t, app, http.MethodPut, "/api/jobs/"+legacyWorkflowJob, strings.NewReader(string(body)), map[string]string{"Authorization": workflowToken(t, app, workflowAuthor), "Content-Type": "application/json"})
+		mustStatus(t, response, http.StatusOK)
+	}
+	fields := map[string]string{"job": legacyWorkflowJob, "project_value": "10000", "assigned_approver": "6bq4j0eb26631dy", "version": fmt.Sprint(rejected.GetInt("version"))}
+	document := "%PDF-1.4\nEditor correction document\n%%EOF"
+	// The editor saves the same data, replacing the allocation rows.
+	edit(workflowRecord(t, app, "jobs", legacyWorkflowJob).GetString("description"))
+	workflowUploadMethod(t, app, http.MethodPatch, "/api/job_attachments/"+id, workflowAuthor, document, fields, http.StatusOK)
+	if after := workflowRecord(t, app, "job_attachments", id); after.GetString("status") != "Rejected" || after.GetInt("version") != rejected.GetInt("version") {
+		t.Fatalf("job save without a change cleared the rejection: status %s", after.GetString("status"))
+	}
+	edit("Corrected description")
+	workflowUploadMethod(t, app, http.MethodPatch, "/api/job_attachments/"+id, workflowAuthor, document, fields, http.StatusOK)
+	if status := workflowRecord(t, app, "job_attachments", id).GetString("status"); status != "Pending" {
+		t.Fatalf("correction in the job editor left status %s", status)
+	}
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/approve", workflowApprover, attachmentActionData(t, app, id), http.StatusOK)
+}
+
+// A refused value change leaves the job, its allocations, and its history as
+// they were.
+func TestJobValueSaveFailuresLeaveNothing(t *testing.T) {
 	duplicate, err := os.ReadFile("test_seed_data/files/job_attachments/paattachment001/authorization.pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
 	scenarios := []struct {
-		name, email, updates, allocations, document string
-		status                                      int
+		name, email, document string
+		incomplete            bool
+		status                int
 	}{
-		{"unauthorized editor", workflowApprover, `{"invoicing_information":"painvoice000001"}`, "", "%PDF-1.4\nUnauthorized billing edit\n%%EOF", http.StatusForbidden},
-		{"direct value bypass", workflowAuthor, `{"invoicing_information":"painvoice000001","project_value":7000}`, "", "%PDF-1.4\nValue bypass\n%%EOF", http.StatusBadRequest},
-		{"client reassignment", workflowAuthor, `{"invoicing_information":"painvoice000001","client":"lb0fnenkeyitsny"}`, "", "%PDF-1.4\nClient bypass\n%%EOF", http.StatusBadRequest},
-		{"wrong client contact", workflowAuthor, `{"invoicing_information":"painvoice000001","contact":"nh5u9z3cyknjclv"}`, "", "%PDF-1.4\nWrong billing contact\n%%EOF", http.StatusBadRequest},
-		{"invalid allocation", workflowAuthor, `{"invoicing_information":"painvoice000001","description":"Must roll back"}`, `[{"division":"missingdivision","hours":20}]`, "%PDF-1.4\nInvalid allocation\n%%EOF", http.StatusBadRequest},
-		{"part-hour allocation", workflowAuthor, `{"invoicing_information":"painvoice000001","description":"Must roll back"}`, `[{"division":"fy4i9poneukvq9u","hours":0.25}]`, "%PDF-1.4\nPart-hour allocation\n%%EOF", http.StatusBadRequest},
-		{"duplicate PDF", workflowAuthor, `{"invoicing_information":"painvoice000001","description":"Must roll back"}`, `[{"division":"fy4i9poneukvq9u","hours":20}]`, string(duplicate), http.StatusBadRequest},
+		{"unauthorized editor", workflowApprover, "%PDF-1.4\nUnauthorized\n%%EOF", false, http.StatusForbidden},
+		{"missing invoicing profile", workflowAuthor, "%PDF-1.4\nIncomplete billing\n%%EOF", true, http.StatusBadRequest},
+		{"duplicate PDF", workflowAuthor, string(duplicate), false, http.StatusBadRequest},
 	}
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			app := newWorkflowTestApp(t, false)
-			clearLegacyJobBilling(t, app)
-			before := workflowRecord(t, app, "jobs", legacyWorkflowJob)
-			fields := map[string]string{"job": legacyWorkflowJob, "project_value": "10000", "assigned_approver": "6bq4j0eb26631dy", "job_updates": scenario.updates, "job_updated": before.GetString("updated"), "job_review_token": valueContextToken(t, app, legacyWorkflowJob)}
-			if scenario.allocations != "" {
-				fields["allocations"] = scenario.allocations
+			if scenario.incomplete {
+				clearLegacyJobBilling(t, app)
 			}
+			before := workflowRecord(t, app, "jobs", legacyWorkflowJob)
+			fields := map[string]string{"job": legacyWorkflowJob, "project_value": "10000", "assigned_approver": "6bq4j0eb26631dy"}
 			workflowUpload(t, app, "/api/job_attachments", scenario.email, scenario.document, fields, scenario.status)
 			after := workflowRecord(t, app, "jobs", legacyWorkflowJob)
-			for _, field := range []string{"invoicing_information", "description", "client", "contact", "updated"} {
+			for _, field := range []string{"invoicing_information", "description", "client", "contact", "updated", "project_value"} {
 				if before.GetString(field) != after.GetString(field) {
 					t.Fatalf("failed submission changed %s", field)
 				}
 			}
-			if after.GetFloat("project_value") != 0 {
-				t.Fatal("failed submission changed effective value")
-			}
-			allocations, err := app.FindRecordsByFilter("job_time_allocations", "job='pawflegacy00001'", "", 0, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(allocations) != 1 || allocations[0].GetFloat("hours") != 10 {
-				t.Fatal("failed submission changed allocations")
-			}
-			attachments, err := app.FindRecordsByFilter("job_attachments", "job='pawflegacy00001'", "", 0, 0)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(attachments) != 0 {
-				t.Fatal("failed submission retained attachment")
+			if count, err := app.CountRecords("job_attachments", dbx.HashExp{"job": legacyWorkflowJob}); err != nil || count != 0 {
+				t.Fatalf("failed submission retained attachment: %v %d", err, count)
 			}
 		})
 	}
 }
 
-func valueContextToken(t *testing.T, app *tests.TestApp, job string) string {
-	t.Helper()
-	context := clientSetupJSON(t, app, http.MethodGet, "/api/job_attachments/context?job="+job, workflowAuthor, nil, http.StatusOK)
-	token, ok := context["review_token"].(string)
-	if !ok || token == "" {
-		t.Fatalf("missing value review token: %#v", context)
-	}
-	return token
-}
-
-func TestJobValueCorrectionContextRequiresJobClaimAndIsReadOnly(t *testing.T) {
+// Project details are edited in the job editor. Any sent with a value change
+// are ignored, so they cannot change the client, value, or billing.
+func TestJobValueSaveIgnoresProjectDetails(t *testing.T) {
 	app := newWorkflowTestApp(t, false)
 	before := workflowRecord(t, app, "jobs", legacyWorkflowJob)
-	path := "/api/job_attachments/context?job=" + legacyWorkflowJob
-	clientSetupJSON(t, app, http.MethodGet, path, "", nil, http.StatusUnauthorized)
-	clientSetupJSON(t, app, http.MethodGet, path, workflowApprover, nil, http.StatusForbidden)
-	result := clientSetupJSON(t, app, http.MethodGet, path, workflowAuthor, nil, http.StatusOK)
-	job, ok := result["job"].(map[string]any)
-	if !ok || job["id"] != legacyWorkflowJob {
-		t.Fatal("context does not contain selected job")
+	fields := map[string]string{"job": legacyWorkflowJob, "project_value": "10000", "assigned_approver": "6bq4j0eb26631dy", "job_updates": `{"client":"lb0fnenkeyitsny","project_value":7000,"description":"Changed"}`, "allocations": `[{"division":"fy4i9poneukvq9u","hours":99}]`}
+	workflowUpload(t, app, "/api/job_attachments", workflowAuthor, "%PDF-1.4\nIgnored details\n%%EOF", fields, http.StatusOK)
+	after := workflowRecord(t, app, "jobs", legacyWorkflowJob)
+	for _, field := range []string{"client", "project_value", "description", "invoicing_information"} {
+		if before.GetString(field) != after.GetString(field) {
+			t.Fatalf("value change changed %s", field)
+		}
 	}
-	allocations, ok := result["allocations"].([]any)
-	if !ok || len(allocations) != 1 {
-		t.Fatal("context does not contain saved allocations")
-	}
-	token, ok := result["review_token"].(string)
-	if !ok || token == "" {
-		t.Fatal("context has no review token")
-	}
-	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetString("updated") != before.GetString("updated") {
-		t.Fatal("reading correction context changed job")
-	}
-}
-
-func TestJobValueCorrectionsRejectStaleAllocationContext(t *testing.T) {
-	app := newWorkflowTestApp(t, false)
-	clearLegacyJobBilling(t, app)
-	before := workflowRecord(t, app, "jobs", legacyWorkflowJob)
-	fields := map[string]string{"job": legacyWorkflowJob, "project_value": "10000", "assigned_approver": "6bq4j0eb26631dy", "job_updates": `{"invoicing_information":"painvoice000001"}`, "job_updated": before.GetString("updated"), "job_review_token": valueContextToken(t, app, legacyWorkflowJob)}
-	// Change the saved allocation without touching jobs.updated, as a separate edit can do.
-	if _, err := app.DB().NewQuery("UPDATE job_time_allocations SET hours=15 WHERE id='pawflegacyalloc'").Execute(); err != nil {
-		t.Fatal(err)
-	}
-	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetString("updated") != fields["job_updated"] {
-		t.Fatal("fixture mutation unexpectedly changed job timestamp")
-	}
-	document := "%PDF-1.4\nStale allocation correction\n%%EOF"
-	workflowUpload(t, app, "/api/job_attachments", workflowAuthor, document, fields, http.StatusConflict)
-	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetString("invoicing_information") != "" {
-		t.Fatal("stale correction changed billing")
-	}
-	if workflowRecord(t, app, "job_time_allocations", "pawflegacyalloc").GetFloat("hours") != 15 {
-		t.Fatal("stale correction changed concurrent allocation edit")
-	}
-	fields["job_review_token"] = valueContextToken(t, app, legacyWorkflowJob)
-	workflowUpload(t, app, "/api/job_attachments", workflowAuthor, document, fields, http.StatusOK)
-	if workflowRecord(t, app, "jobs", legacyWorkflowJob).GetFloat("project_value") != 0 {
-		t.Fatal("fresh pending correction replaced effective value")
+	if hours := workflowRecord(t, app, "job_time_allocations", "pawflegacyalloc").GetFloat("hours"); hours != 10 {
+		t.Fatalf("value change changed allocation hours to %v", hours)
 	}
 }
 
@@ -530,7 +525,7 @@ func TestJobValueHistoryVisibleToProjectManagers(t *testing.T) {
 			app := newWorkflowTestApp(t, false)
 			id := createValueChange(t, app, legacyWorkflowJob, 10000, "Manager view "+field)
 			// Tester Time holds time but not job.
-			if _, err := app.DB().NewQuery("UPDATE jobs SET "+field+"='rzr98oadsp9qc11' WHERE id={:id}").Bind(dbx.Params{"id": legacyWorkflowJob}).Execute(); err != nil {
+			if _, err := app.DB().NewQuery("UPDATE jobs SET " + field + "='rzr98oadsp9qc11' WHERE id={:id}").Bind(dbx.Params{"id": legacyWorkflowJob}).Execute(); err != nil {
 				t.Fatal(err)
 			}
 			list := clientSetupJSON(t, app, http.MethodGet, "/api/job_attachments?job="+legacyWorkflowJob, "time@test.com", nil, http.StatusOK)

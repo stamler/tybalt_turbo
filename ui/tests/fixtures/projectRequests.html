@@ -98,6 +98,14 @@
             jobId: "job1",
             effectiveValue: query.has("legacy") ? 0 : 120000,
             queue: query.has("queue"),
+            job: {
+              status: "Active",
+              project_completion_date: "2027-01-01",
+              invoicing_information: query.has("incomplete") ? "" : "profile1",
+              location: query.has("incomplete") ? "" : "87M2MJ7V+2V",
+              branch_id: "branch1",
+              allocations: [{ division: "division1", hours: 10 }],
+            },
           },
         });
       } else if (query.has("editor")) {

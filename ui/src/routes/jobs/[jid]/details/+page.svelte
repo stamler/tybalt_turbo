@@ -10,7 +10,7 @@
   import JobValueLine from "$lib/components/jobs/JobValueLine.svelte";
   import JobValueProposal from "$lib/components/jobs/JobValueProposal.svelte";
   import JobValueStatus from "$lib/components/jobs/JobValueStatus.svelte";
-  import { JobValue, valueDate } from "$lib/jobValue.svelte";
+  import { JobValue, valueBlockers, valueDate } from "$lib/jobValue.svelte";
   import JobDetailTab from "$lib/components/jobs/JobDetailTab.svelte";
   import TimeTabContent from "$lib/components/jobs/TimeTabContent.svelte";
   import ExpensesTabContent from "$lib/components/jobs/ExpensesTabContent.svelte";
@@ -880,7 +880,11 @@
 
   {#if jobValue}
     {#key data.job.id}
-      <JobValueProposal value={jobValue} effectiveValue={data.job.project_value ?? 0} />
+      <JobValueProposal
+        value={jobValue}
+        effectiveValue={data.job.project_value ?? 0}
+        missing={valueBlockers(data.job)}
+      />
     {/key}
   {/if}
 

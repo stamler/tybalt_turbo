@@ -36,8 +36,6 @@ test("workflow returns accept only local project and request forms", () => {
     "/jobs/add/parent1",
     "/jobs/add/from/proposal1",
     "/jobs/job1/edit",
-    "/jobs/job1/details#value",
-    "/jobs/value-approvals",
   ])
     assert.equal(safeWorkflowReturn(path), path);
   for (const path of [
@@ -45,6 +43,8 @@ test("workflow returns accept only local project and request forms", () => {
     "//example.com/jobs/add",
     "/\\example.com/jobs/add",
     "/clients/client1/details",
+    "/jobs/job1/details#value",
+    "/jobs/value-approvals",
     "/jobs",
     "/jobs/job1/delete",
     "/job-requests/request1/print",
@@ -59,8 +59,6 @@ test("workflow returns accept only local project and request forms", () => {
 test("workflow returns name the originating form", () => {
   assert.equal(workflowFormName("/job-requests/new?parent=abc"), "project request");
   assert.equal(workflowFormName("/job-requests/request1"), "project request");
-  assert.equal(workflowFormName("/jobs/job1/details#value"), "value change");
-  assert.equal(workflowFormName("/jobs/value-approvals"), "value change");
   assert.equal(workflowFormName("/jobs/add/parent1"), "job form");
   assert.equal(workflowFormName("/jobs/job1/edit"), "job form");
 });
@@ -69,7 +67,7 @@ test("copied profiles change only the matching unfinished form and preserve its 
   const storage = new Map<string, string>();
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, "window");
   const originalStorage = Object.getOwnPropertyDescriptor(globalThis, "sessionStorage");
-  const location = { href: "https://app.example/jobs/job1/details#value" };
+  const location = { href: "https://app.example/jobs/job1/edit" };
   let storageBlocked = false;
   Object.defineProperty(globalThis, "window", { configurable: true, value: { location } });
   Object.defineProperty(globalThis, "sessionStorage", {
@@ -84,8 +82,6 @@ test("copied profiles change only the matching unfinished form and preserve its 
       ["/jobs/add/parent1", "job:new", "item"],
       ["/jobs/add/from/proposal1", "job:new", "item"],
       ["/jobs/job1/edit", "job:job1", "item"],
-      ["/jobs/job1/details#value", "job-value:job1", "correctionJob"],
-      ["/jobs/value-approvals", "job-value:queue", "correctionJob"],
     ]) {
       location.href = "https://app.example" + source;
       const documentFile = new File(["%PDF-1.4"], "authorization.pdf", { type: "application/pdf" });
@@ -98,10 +94,7 @@ test("copied profiles change only the matching unfinished form and preserve its 
       const draft = {
         [field]: item,
         allocations: [{ division: "division1", hours: 12 }],
-        correctionAllocations: [{ division: "division1", hours: 15 }],
-        jobReviewToken: "original-review-token",
-        jobUpdated: "2026-10-01 12:00:00",
-        editing: { id: "attachment1", version: 7 },
+        editing: { id: "request1", version: 7 },
         originalAllocations: "original allocations",
         saved: "original saved baseline",
         documentFile,
@@ -172,7 +165,6 @@ test("copied profiles change only the matching unfinished form and preserve its 
       const token = new URL(destination, "https://app.example").searchParams.get("client_draft")!;
       const reloadCopy = JSON.parse(storage.get("client-workspace-draft:" + token)!);
       assert.equal(reloadCopy.payload[field].invoicing_information, "copy");
-      assert.equal(reloadCopy.payload.jobReviewToken, "original-review-token");
       assert.equal(reloadCopy.payload.editing.version, 7);
       clearClientWorkflowDraft();
     }
@@ -253,7 +245,7 @@ test("drafts preserve values, require the same user and source, and clear after 
     location.href = "https://app.example" + returnUrl;
     assert.deepEqual(readClientWorkflowDraft("request:new", "user1"), draft);
     assert.equal(readClientWorkflowDraft("request:new", "user2"), null);
-    assert.equal(readClientWorkflowDraft("job-value:job1", "user1"), null);
+    assert.equal(readClientWorkflowDraft("job:job1", "user1"), null);
     location.href = location.href.replace("/job-requests/new", "/job-requests/other");
     assert.equal(readClientWorkflowDraft("request:new", "user1"), null);
     location.href = "https://app.example" + returnUrl;

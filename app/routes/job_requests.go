@@ -76,7 +76,6 @@ func registerJobRequestRoutes(se *core.ServeEvent, app core.App) {
 	a.Bind(apis.RequireAuth("users"))
 	a.BindFunc(workflowResponseErrors)
 	a.GET("", attachmentListHandler(app))
-	a.GET("/context", attachmentContextHandler(app))
 	a.POST("", attachmentSaveHandler(app))
 	a.PATCH("/{id}", attachmentSaveHandler(app))
 	a.GET("/{id}/document", attachmentDocumentHandler(app))

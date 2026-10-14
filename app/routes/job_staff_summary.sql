@@ -1,7 +1,8 @@
 -- Appended to job_priced_time_entries.sql. Price entries before grouping
--- because an employee can use more than one role on the same job.
+-- because an employee can use more than one role on the same job. A missing
+-- employee profile gives blank names; the Go row fields cannot hold NULL.
 , base AS (
-  SELECT te.number, p.given_name, p.surname, te.uid,
+  SELECT te.number, COALESCE(p.given_name, '') AS given_name, COALESCE(p.surname, '') AS surname, te.uid,
     te.rate_sheet_name, te.rate_sheet_revision,
     SUM(te.hours) AS hours,
     COALESCE(SUM(te.value), 0) AS value,

@@ -262,7 +262,9 @@ func TestJSONFieldsCannotSelectInternalWorkflowPolicy(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Simulate unknown JSON fields passed through the generic custom job writer.
+	// Closing the zero-value project needs a value unless that policy applies.
 	job.Set("@projectWorkflowOperation", "restore_value")
+	job.Set("status", "Closed")
 	job.Set("description", "Attempted zero-value validation bypass")
 	if err = ProcessJobCore(app, job, actor); err == nil {
 		t.Fatal("JSON field selected the historical restoration policy")

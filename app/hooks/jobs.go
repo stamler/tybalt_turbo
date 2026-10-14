@@ -1004,6 +1004,17 @@ func validateJobValueRequirement(record *core.Record, derived jobType, status st
 		if projectWorkflowOperation(record) == ProjectWorkflowMutationRestoreValue {
 			return nil
 		}
+		// Older projects imported with a zero or negative value cannot pass this
+		// rule, yet their billing details (such as the invoicing profile a value
+		// change needs) can only be completed in the job editor. Allow edits that
+		// keep both the stored value and the status. A new value still comes only
+		// through approval (validateProjectJobWrite), and a status change, such as
+		// to Closed, still needs a positive value below.
+		if !record.IsNew() && record.GetInt("project_value") <= 0 &&
+			record.GetInt("project_value") == record.Original().GetInt("project_value") &&
+			status == record.Original().GetString("status") {
+			return nil
+		}
 		if status == "Active" || status == "Closed" {
 			projectValue := record.GetInt("project_value")
 			if projectValue <= 0 {

@@ -36,9 +36,7 @@ export function safeWorkflowReturn(value: string | null | undefined): string | n
     if (url.origin !== "https://workspace.invalid") return null;
     if (
       !/^\/job-requests\/(?:new|[a-zA-Z0-9_-]+)$/.test(url.pathname) &&
-      !/^\/jobs\/(?:value-approvals|add(?:\/(?:from\/)?[a-zA-Z0-9_-]+)?|[a-zA-Z0-9_-]+\/(?:edit|details))$/.test(
-        url.pathname,
-      )
+      !/^\/jobs\/(?:add(?:\/(?:from\/)?[a-zA-Z0-9_-]+)?|[a-zA-Z0-9_-]+\/edit)$/.test(url.pathname)
     )
       return null;
     return `${url.pathname}${url.search}${url.hash}`;
@@ -50,8 +48,6 @@ export function safeWorkflowReturn(value: string | null | undefined): string | n
 // Name the form a workflow return leads back to.
 export function workflowFormName(workflowReturn: string): string {
   if (workflowReturn.startsWith("/job-requests/")) return "project request";
-  if (/^\/jobs\/(?:value-approvals|[^/]+\/details)(?:[?#]|$)/.test(workflowReturn))
-    return "value change";
   return "job form";
 }
 
@@ -124,11 +120,9 @@ export function readClientWorkflowDraft<T>(kind: string, user: string): T | null
 
 // The draft kind and payload field that hold the profile for each originating form.
 function draftTarget(pathname: string): { kind: string; field: string } {
-  const [, section, id, action] = pathname.split("/");
+  const [, section, id] = pathname.split("/");
   if (section === "job-requests") return { kind: `request:${id}`, field: "item" };
   if (id === "add") return { kind: "job:new", field: "item" };
-  if (id === "value-approvals") return { kind: "job-value:queue", field: "correctionJob" };
-  if (action === "details") return { kind: `job-value:${id}`, field: "correctionJob" };
   return { kind: `job:${id}`, field: "item" };
 }
 

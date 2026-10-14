@@ -653,9 +653,9 @@ profiles. Create one to continue.” Make **Create one** a direct action to the
 profile editor, with the unfinished form preserved. If there are no contacts,
 show job maintainers an **Add a contact** action to the contact editor; direct
 requesters to a job maintainer. When profiles exist, show the selector and
-client-management link, with the link beside the label on the job form. Use the
-same pattern in value-change corrections. Distinguish loading and failed loads
-from an empty profile list, and retain the retry action.
+client-management link, with the link beside the label on the job form.
+Distinguish loading and failed loads from an empty profile list, and retain the
+retry action.
 
 When creating a profile, show existing profiles for the selected recipient and
 offer **Use this profile** without writing or changing that record. Requesters
@@ -706,15 +706,12 @@ whether the address comes from the contact or the client. A profile name helps
 users distinguish profiles that share a recipient; it is optional and does not
 change document or approval rules.
 
-Opening client maintenance from a job, request, or value-change form preserves
-that form's unsaved values in the current browser tab. Returning refreshes the
-available contacts and profiles without changing either selection, except
-when creating, copying, or explicitly reusing a profile selects it in the draft.
-Preserve the original request and attachment versions. Refresh a value-change
-review token after shared client edits only if the job and its saved division
-allocations still match the original context. Otherwise require the user to
-reopen the value form and review the current job. A selected PDF stays available during
-normal navigation; after a browser reload, require the user to select it again.
+Opening client maintenance from a job or request form preserves that form's
+unsaved values in the current browser tab. Returning refreshes the available
+contacts and profiles without changing either selection, except when creating,
+copying, or explicitly reusing a profile selects it in the draft. Preserve the
+original request version. A selected PDF stays available during normal
+navigation; after a browser reload, require the user to select it again.
 
 ### Project-Value Changes And Continued Work
 
@@ -751,8 +748,11 @@ records. A rejection records the job and related data the approver's page
 showed; if that data changed after the page loaded, the approver must reload
 before rejecting. Changes made while the change was pending are therefore part
 of what the approver rejected. Saving without a correction leaves the change
-rejected, so a rejected change cannot be approved unchanged. An edit to pending data invalidates any
-earlier review; approved job attachments cannot be edited this way.
+rejected, so a rejected change cannot be approved unchanged, and the form says
+so instead of closing. The reviewed data leaves out timestamps and allocation
+row identities, so saving the job without changing it is not a correction. An
+edit to pending data invalidates any earlier review; approved job attachments
+cannot be edited this way.
 
 Show pending value approvals in a queue. The assigned approver must be able to
 view the job and PDF evidence needed for that approval. Holders of `job` and
@@ -763,7 +763,15 @@ see the changes assigned to them or approved by them.
 On the job page, show the effective value with a download of the PDF behind it
 and a history of approvals: approver, date, and amount, newest first. Approval
 limits and checklist answers are retained but not shown there. Holders of `job`
-propose a new value from the same line. A pending or rejected change appears as
+propose a new value from the same line. The proposal form takes only the value,
+approver, and PDF; project details are changed in the job editor, and such an
+edit after a rejection counts as a correction. When the job lacks a detail that
+approval requires, such as an invoicing profile, division hours, a completion
+date for an Active project, a location, or a branch, the form names it and links
+to the job editor instead of saving. A refusal that names other job fields also
+links to the job editor. Many older projects have no authorizing document; their
+value change does not need one, and approval records `PA`, since the approval
+authorizes the project. A pending or rejected change appears as
 a status line under the job status, with the actions open to the viewer: review
 for the assigned approver, correction for holders of `job`, and deletion for
 admins. Admins delete the latest approval from the history. Pending or rejected
@@ -776,9 +784,14 @@ An older T&M job can have a zero effective value. Validate a pending change
 against the proposed positive value, while retaining the historical effective
 value until approval. Other job fields must pass their normal validation.
 Ordinary job edits must pass the new validation, including a status-only edit
-that sets a project to `Active`. An edit that only sets a project to `Closed` or
-`Cancelled` keeps the existing status rules and does not require the new
-validation, so staff can retire older projects without completing their data.
+that sets a project to `Active`. An older project whose stored value is still
+zero or negative can be edited without setting a value, for example to add the
+invoicing profile a value change needs; setting a value, or changing its status
+to `Active` or `Closed`, still requires a positive value. An edit that only sets
+a project to `Closed` or `Cancelled` keeps the existing status rules and does
+not require the new validation, so staff can retire older projects without
+completing their billing data. A project without a positive value can be
+`Cancelled` but not `Closed`.
 An `Active` project can receive new time, expenses, and purchase orders, so it
 must have complete billing data. The stale and unused job lists show any error
 beside the job it affects. The client relation is immutable except through the controlled merge process or **Change Client**.
@@ -976,9 +989,11 @@ two jobs. The creation actor cannot substitute an unapproved PDF or value.
 When a proposed value and attachment are saved, require `job`, a selected
 approver qualified for the full proposed value, a unique PDF, and valid job
 data. Evaluate the positive-value rule against the proposed value, not the
-job's unchanged historical value. Validate the other job fields normally.
-Store the change against the existing job. Do not write its proposed value to
-the job or create a request.
+job's unchanged historical value. Validate the other job fields as stored,
+treating a project with no authorizing document as `PA`; approval records `PA`
+on the job with the new value. Ignore any job fields or allocations sent with
+the change. Store the change against the existing job. Do not write its
+proposed value to the job or create a request.
 
 At approval, check that the actor is the selected approver and still has
 sufficient authority. Recheck the pending record, reviewed data, rejection
@@ -1537,6 +1552,12 @@ Acceptance tests must cover these cases:
   effective project value or approved evidence.
 * An older T&M job with zero effective value can receive a pending positive
   value without changing the stored zero. Approval applies the positive value.
+  Its other fields can be edited in the job editor without a value, but setting
+  a value or making it `Active` or `Closed` is refused. A project with no
+  authorizing document can save a value change, and approval records `PA`.
+* A value change ignores job fields and allocations sent with it. A job editor
+  save without a change leaves a rejected change rejected; a real edit there
+  returns it for approval when the value change is saved again.
   Admin deletion can restore the exact historical zero with no attachment and
   no new approval. Reject arbitrary restored values and continue to reject
   zero values on new requests and proposed changes.
@@ -1642,16 +1663,16 @@ The creator can recall a submitted or approved request before creation. The
 selected approver can reject it with a reason. Rejected requests require a real
 edit before resubmission. Both actions clear the earlier approval.
 
-On an existing job, use **Propose a new project value**. Upload the new PDF and
-select an approver. The effective value stays unchanged until approval. Use
-**Value Approvals** to review these changes. The creation flag does not disable
-this process. Shared-record edits can make an open review stale; reload and
-review the saved data again. A job editor can save a pending value change again
-to refresh its review, without changing its amount or PDF. The value proposal
-form also permits corrections to job details and allocations in the same
-transaction. This lets staff complete billing data for an older zero-value job
-while keeping its historical effective value unchanged until approval. A failed
-save leaves both the job and its approval evidence unchanged.
+On an existing job, use **Propose new value**. Upload the new PDF and select an
+approver. The effective value stays unchanged until approval. Use **Value
+Approvals** to review these changes. The creation flag does not disable this
+process. Shared-record edits can make an open review stale; reload and review
+the saved data again. A job editor can save a pending value change again to
+refresh its review, without changing its amount or PDF. Project details are
+changed in the job editor, which also lets staff complete billing data for an
+older zero-value job while keeping its historical effective value unchanged
+until approval. A failed save leaves both the job and its approval evidence
+unchanged.
 
 Holders of `job` maintain client details, contacts, and reusable invoicing profiles
 from the **Client details** tab of the client's workspace. Active holders of

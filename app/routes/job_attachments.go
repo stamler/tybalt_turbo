@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"context"
 	"crypto/sha256"
 	"database/sql"
 	"encoding/hex"
@@ -9,7 +8,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
@@ -288,51 +286,23 @@ func attachmentListHandler(app core.App) func(*core.RequestEvent) error {
 		return e.JSON(http.StatusOK, map[string]any{"items": items})
 	}
 }
-func attachmentContextHandler(app core.App) func(*core.RequestEvent) error {
-	return func(e *core.RequestEvent) error {
-		var result map[string]any
-		err := app.RunInTransaction(func(tx core.App) error {
-			if err := workflowClaim(tx, e.Auth, "job"); err != nil {
-				return err
-			}
-			job, err := tx.FindRecordById("jobs", e.Request.URL.Query().Get("job"))
-			if err != nil {
-				return err
-			}
-			review, err := readValueReview(tx, job)
-			if err != nil {
-				return err
-			}
-			token, err := review.token()
-			if err != nil {
-				return err
-			}
-			result = map[string]any{"job": recordPublic(job), "allocations": review.allocations, "review_token": token}
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		return e.JSON(http.StatusOK, result)
-	}
-}
 
-func storedValueAllocations(app core.App, jobID string) ([]*core.Record, []JobAllocationUpdate, error) {
+func storedValueAllocations(app core.App, jobID string) ([]JobAllocationUpdate, error) {
 	rows, err := app.FindRecordsByFilter("job_time_allocations", "job={:id}", "division", 0, 0, dbx.Params{"id": jobID})
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	inputs := make([]JobAllocationUpdate, 0, len(rows))
 	for _, row := range rows {
 		inputs = append(inputs, JobAllocationUpdate{Division: row.GetString("division"), Hours: row.GetFloat("hours")})
 	}
-	return rows, inputs, nil
+	return inputs, nil
 }
 
 // valueReview is the data a value change is reviewed against: the job, its
-// related records, its latest approval, and its allocations. Pages show this
-// data and send back its token, so a save, rejection, or approval applies only
-// to the data that was shown.
+// related records, its latest approval, and its allocations. A save records its
+// token, rejection compares it with the token of the page shown, and approval
+// compares it with the saved token, so each applies only to that data.
 type valueReview struct {
 	job         *core.Record
 	related     map[string]any
@@ -362,9 +332,19 @@ func readValueReview(app core.App, job *core.Record) (valueReview, error) {
 	return review, err
 }
 
-// token identifies the review data, and only the data already read.
+// token identifies the review data, and only the data already read. It leaves
+// out the job's timestamps and import flag and the allocation rows' identities,
+// which change when the job is saved or synced without a change to its data.
 func (r valueReview) token() (string, error) {
-	b, err := json.Marshal(map[string]any{"job": r.job.PublicExport(), "sequence": r.sequence, "related": r.related, "allocations": r.allocations})
+	job := r.job.PublicExport()
+	for _, key := range []string{"created", "updated", "_imported"} {
+		delete(job, key)
+	}
+	allocations := make([]map[string]any, 0, len(r.allocations))
+	for _, row := range r.allocations {
+		allocations = append(allocations, map[string]any{"division": row.GetString("division"), "hours": row.GetFloat("hours")})
+	}
+	b, err := json.Marshal(map[string]any{"job": job, "sequence": r.sequence, "related": r.related, "allocations": allocations})
 	if err != nil {
 		return "", err
 	}
@@ -381,12 +361,23 @@ func valueReviewToken(app core.App, job *core.Record) (string, error) {
 	}
 	return review.token()
 }
+
+// setApprovedValue sets the job as an approved value change leaves it. The
+// approval is the project's authorization, so it also records PA on older
+// projects that have no authorizing document.
+func setApprovedValue(job *core.Record, value any) {
+	job.Set("project_value", value)
+	job.Set("authorizing_document", "PA")
+}
+
+// validateValueJob checks that the job would pass validation once the value
+// is approved.
 func validateValueJob(app core.App, job, actor *core.Record, value float64) error {
 	candidate, err := app.FindRecordById("jobs", job.Id)
 	if err != nil {
 		return err
 	}
-	candidate.Set("project_value", value)
+	setApprovedValue(candidate, value)
 	return hooks.ProcessJobWorkflow(app, candidate, actor, hooks.ProjectWorkflowMutationApproveValue)
 }
 
@@ -403,18 +394,6 @@ func attachmentSaveHandler(app core.App) func(*core.RequestEvent) error {
 		value, err := strconv.ParseFloat(e.Request.FormValue("project_value"), 64)
 		if err != nil || !validWholeAmount(value, true) {
 			return workflowError("Enter a positive whole-dollar project value.")
-		}
-		var jobUpdates map[string]any
-		var allocations []JobAllocationUpdate
-		if raw := e.Request.FormValue("job_updates"); raw != "" {
-			if err := json.Unmarshal([]byte(raw), &jobUpdates); err != nil {
-				return workflowError("Invalid job correction data.")
-			}
-		}
-		if raw := e.Request.FormValue("allocations"); raw != "" {
-			if err := json.Unmarshal([]byte(raw), &allocations); err != nil {
-				return workflowError("Invalid allocation data.")
-			}
 		}
 		assigned := e.Request.FormValue("assigned_approver")
 		version, _ := strconv.Atoi(e.Request.FormValue("version"))
@@ -457,70 +436,17 @@ func attachmentSaveHandler(app core.App) func(*core.RequestEvent) error {
 			if strings.HasPrefix(job.GetString("number"), "P") {
 				return workflowError("Proposals do not use project-value approval.")
 			}
-			if jobUpdates != nil || allocations != nil {
-				if e.Request.FormValue("job_updated") != job.GetString("updated") {
-					return apis.NewApiError(http.StatusConflict, "The job changed. Reload it before saving corrections.", nil)
-				}
-				token, err := valueReviewToken(tx, job)
-				if err != nil {
-					return err
-				}
-				if e.Request.FormValue("job_review_token") != token {
-					return apis.NewApiError(http.StatusConflict, "The job or its related data changed. Reload it before saving corrections.", nil)
-				}
-			}
-			jobChanged, err := applyValueJobCorrections(job, jobUpdates)
+			// The job's stored details and allocations must already be valid. They
+			// are edited in the job editor, not with a value change, so any job
+			// fields or allocations sent here are ignored rather than applied.
+			allocations, err := storedValueAllocations(tx, job.Id)
 			if err != nil {
 				return err
 			}
-			allocationChanged := false
-			existingAllocations, finalAllocations, err := storedValueAllocations(tx, job.Id)
-			if err != nil {
+			if err = validateRequestAllocationInputs(tx, allocations, true); err != nil {
 				return err
 			}
-			if allocations != nil {
-				finalAllocations = allocations
-				existing := []existingJobAllocation{}
-				for _, row := range existingAllocations {
-					existing = append(existing, existingJobAllocation{row.GetString("division"), row.GetFloat("hours")})
-				}
-				allocationChanged = allocationsDiffer(existing, allocations)
-			}
-			if err = validateRequestAllocationInputs(tx, finalAllocations, true); err != nil {
-				return err
-			}
-			if jobChanged || allocationChanged {
-				effective := job.Get("project_value")
-				job.Set("project_value", value)
-				if err = hooks.ProcessJobWorkflow(tx, job, e.Auth, hooks.ProjectWorkflowMutationApproveValue); err != nil {
-					return err
-				}
-				job.Set("project_value", effective)
-				ctx := hooks.WithProjectWorkflowMutation(e.Request.Context(), hooks.ProjectWorkflowMutationValue)
-				if err = saveHistoricalEffectiveValue(tx, ctx, job); err != nil {
-					return err
-				}
-				if allocationChanged {
-					for _, row := range existingAllocations {
-						if err = tx.Delete(row); err != nil {
-							return err
-						}
-					}
-					collection, err := tx.FindCollectionByNameOrId("job_time_allocations")
-					if err != nil {
-						return err
-					}
-					for _, allocation := range allocations {
-						row := core.NewRecord(collection)
-						row.Set("job", job.Id)
-						row.Set("division", allocation.Division)
-						row.Set("hours", allocation.Hours)
-						if err = tx.Save(row); err != nil {
-							return err
-						}
-					}
-				}
-			} else if err = validateValueJob(tx, job, e.Auth, value); err != nil {
+			if err = validateValueJob(tx, job, e.Auth, value); err != nil {
 				return err
 			}
 			count, err := tx.CountRecords("job_attachments", dbx.And(dbx.HashExp{"job": job.Id}, dbx.Not(dbx.HashExp{"id": a.Id}), dbx.Not(dbx.HashExp{"status": "Approved"})))
@@ -534,10 +460,12 @@ func attachmentSaveHandler(app core.App) func(*core.RequestEvent) error {
 			if err != nil {
 				return err
 			}
-			// A save is unchanged only while the job and related records match the
-			// submitted data, or for a rejected change, the data as rejected. A
-			// correction after rejection needs fresh approval.
-			if !creating && !jobChanged && !allocationChanged && a.GetString("review_token") == currentToken && a.GetFloat("project_value") == value && a.GetString("assigned_approver") == assigned && (file == nil || hash == a.GetString("document_hash")) {
+			// A save is unchanged while the job and related records match the data
+			// recorded at the last save or, for a rejected change, the data as
+			// rejected. It keeps the current state, so a rejected change stays
+			// rejected (the form explains why); any correction, here or in the job
+			// editor, needs fresh approval.
+			if !creating && a.GetString("review_token") == currentToken && a.GetFloat("project_value") == value && a.GetString("assigned_approver") == assigned && (file == nil || hash == a.GetString("document_hash")) {
 				if file != nil {
 					if err = ensureAuthorizationFile(tx, a, file); err != nil {
 						return err
@@ -650,14 +578,14 @@ func attachmentActionHandler(app core.App, approve bool) func(*core.RequestEvent
 					return apis.NewApiError(http.StatusConflict, "The job changed. Ask a job editor to save and review this value change again.", nil)
 				}
 				previous := job.GetFloat("project_value")
-				_, allocations, err := storedValueAllocations(tx, job.Id)
+				allocations, err := storedValueAllocations(tx, job.Id)
 				if err != nil {
 					return err
 				}
 				if err = validateRequestAllocationInputs(tx, allocations, true); err != nil {
 					return err
 				}
-				job.Set("project_value", a.Get("project_value"))
+				setApprovedValue(job, a.Get("project_value"))
 				if err = hooks.ProcessJobWorkflow(tx, job, e.Auth, hooks.ProjectWorkflowMutationApproveValue); err != nil {
 					return err
 				}
@@ -806,42 +734,4 @@ func ensureAuthorizationFile(app core.App, attachment *core.Record, identicalUpl
 		return fs.UploadFile(identicalUpload, path)
 	}
 	return workflowError("The authorization PDF is unavailable. Restore or replace it before approval.")
-}
-
-// Corrections are saved with the proposed value review; the effective value stays unchanged.
-func applyValueJobCorrections(job *core.Record, updates map[string]any) (bool, error) {
-	allowed := map[string]bool{}
-	for _, field := range []string{"status", "description", "contact", "invoicing_information", "manager", "alternate_manager", "branch", "rate_sheet", "location", "project_award_date", "project_completion_date", "job_owner", "fn_agreement", "time_and_materials", "client_po", "client_reference_number", "authorizing_document"} {
-		allowed[field] = true
-	}
-	changed := false
-	for key, value := range updates {
-		if !allowed[key] {
-			return false, workflowError("Field is not editable in a value proposal: " + key)
-		}
-		if key == "fn_agreement" || key == "time_and_materials" {
-			if _, valid := value.(bool); !valid {
-				return false, workflowError("Use a Boolean value for " + key)
-			}
-		}
-		before := job.Get(key)
-		job.Set(key, value)
-		if !reflect.DeepEqual(before, job.Get(key)) {
-			changed = true
-		}
-	}
-	return changed, nil
-}
-func saveHistoricalEffectiveValue(app core.App, ctx context.Context, job *core.Record) error {
-	historical := job.GetFloat("project_value")
-	if historical >= 0 {
-		return app.SaveWithContext(ctx, job)
-	}
-	job.Set("project_value", 0)
-	err := app.Validate(job)
-	job.Set("project_value", historical)
-	if err != nil {
-		return err
-	}
-	return app.SaveNoValidateWithContext(ctx, job)
 }

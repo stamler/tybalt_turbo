@@ -39,27 +39,6 @@ await runBrowserHarness(async (page, origin) => {
       }
       return send(history(job));
     }
-    if (url.pathname === "/api/job_attachments/context")
-      return send({
-        job: {
-          id: url.searchParams.get("job"),
-          client: "client",
-          description: "Project details",
-          updated: "version1",
-        },
-        allocations: [],
-        review_token: "reviewA",
-      });
-    if (url.pathname === "/api/job_requests/options")
-      return send({
-        clients: [],
-        contacts: [],
-        invoicing_profiles: [],
-        users: [],
-        branches: [],
-        rate_sheets: [],
-        divisions: [],
-      });
     return send({ items: [], rows: [], totals: {}, filters: {}, totalItems: 0, totalPages: 1 });
   });
   const editor = page.getByRole("button", { name: "Save proposed value", exact: true });

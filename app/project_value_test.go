@@ -21,16 +21,18 @@ func TestProjectValueUpdates(t *testing.T) {
 		name, id, patch string
 		want            int
 	}{
-		{"active unchanged save needs value", "pvactivezero001", `{}`, 400},
-		{"closed unchanged save needs value", "pvclosedzero001", `{}`, 400},
-		{"active T&M edit needs value", "pvactivezero001", `{"description":"Edited project"}`, 400},
-		{"closed T&M edit needs value", "pvclosedzero001", `{"description":"Edited project"}`, 400},
+		// An older project with no value can be edited, keeping its status and
+		// zero value; setting a value or changing its status still needs one.
+		{"active unchanged save keeps zero value", "pvactivezero001", `{}`, 200},
+		{"closed unchanged save keeps zero value", "pvclosedzero001", `{}`, 200},
+		{"active edit keeps zero value", "pvactivezero001", `{"description":"Edited project"}`, 200},
+		{"closed edit keeps zero value", "pvclosedzero001", `{"description":"Edited project"}`, 200},
 		{"close T&M project needs value", "pvactivezero001", `{"status":"Closed"}`, 400},
 		{"reopen T&M project needs value", "pvclosedzero001", `{"status":"Active"}`, 400},
 		{"reactivate T&M project needs value", "pvcancelzero001", `{"status":"Active"}`, 400},
 		{"cancel without value", "pvactivezero001", `{"status":"Cancelled"}`, 200},
 		{"cancelled edit without value", "pvcancelzero001", `{"description":"Edited project"}`, 200},
-		{"remove T&M flag still needs value", "pvactivezero001", `{"time_and_materials":false}`, 400},
+		{"remove T&M flag keeps zero value", "pvactivezero001", `{"time_and_materials":false}`, 200},
 		{"set positive value with T&M requires approval", "pvactivezero001", `{"project_value":1}`, 400},
 		{"set positive value without T&M requires approval", "pvactivezero001", `{"project_value":1,"time_and_materials":false}`, 400},
 		{"clear positive value fails", "pcactivedated01", `{"project_value":0}`, 400},

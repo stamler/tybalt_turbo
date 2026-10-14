@@ -1,5 +1,7 @@
 -- get expenses for a job, ordered by date descending. Accepts optional filters
 -- by division id, payment_type, uid, and category id similar to job_time_entries.sql
+-- Branch, division, and profile can be missing, so blank their codes and
+-- names; the Go row fields are plain strings and cannot hold NULL.
 SELECT e.description,
        e.total,
        COALESCE(e.currency, '') AS currency,
@@ -9,11 +11,11 @@ SELECT e.description,
        e.id,
        e.date,
        e.committed_week_ending,
-       b.code AS branch_code,
-       d.code AS division_code,
+       COALESCE(b.code, '') AS branch_code,
+       COALESCE(d.code, '') AS division_code,
        e.payment_type AS payment_type,
-       p.surname AS surname,
-       p.given_name AS given_name,
+       COALESCE(p.surname, '') AS surname,
+       COALESCE(p.given_name, '') AS given_name,
        COALESCE(c.name, 'No Category') AS category_name
 FROM   expenses e
 LEFT   JOIN branches  b ON e.branch  = b.id

@@ -6,7 +6,8 @@ await runBrowserHarness(
     const valueActions = [];
     const profileSaves = [];
     const valueSaves = [];
-    let emptyValueProfiles = false;
+    // A refusal the value change save returns instead of saving.
+    let valueSaveError = null;
     let attachmentItems = [
       {
         id: "initial",
@@ -61,15 +62,6 @@ await runBrowserHarness(
         fn_agreement: false,
         time_and_materials: true,
       };
-      if (path === "/api/job_attachments/context")
-        return route.fulfill({
-          contentType: "application/json",
-          body: JSON.stringify({
-            job: legacyJob,
-            allocations: [{ id: "allocation1", division: "division1", hours: 20 }],
-            review_token: "job-review-v1",
-          }),
-        });
       if (path.includes("/collections/jobs/records/job1"))
         return route.fulfill({ contentType: "application/json", body: JSON.stringify(legacyJob) });
       if (path.includes("/collections/job_time_allocations/records"))
@@ -89,9 +81,7 @@ await runBrowserHarness(
             contacts: [
               { id: "contact1", client: "client1", name: "Alex Client", email: "alex@example.com" },
             ],
-            invoicing_profiles: emptyValueProfiles
-              ? []
-              : [{ id: "profile1", client: "client1", contact: "contact1" }],
+            invoicing_profiles: [{ id: "profile1", client: "client1", contact: "contact1" }],
             users: [{ id: "reviewer", name: "Reviewer" }],
             branches: [{ id: "branch1", name: "Thunder Bay" }],
             rate_sheets: [{ id: "rate1", name: "Standard", revision: 1, active: true }],
@@ -104,6 +94,21 @@ await runBrowserHarness(
           body: JSON.stringify({
             items: [{ id: "reviewer", name: "Reviewer", max_value: 200000 }],
           }),
+        });
+      if (
+        valueSaveError &&
+        (path === "/api/job_attachments" || path === "/api/job_attachments/rejected")
+      )
+        return route.fulfill({
+          status: 400,
+          contentType: "application/json",
+          body: JSON.stringify(valueSaveError),
+        });
+      // Saving a rejected change without a correction returns it still rejected.
+      if (path === "/api/job_attachments/rejected" && route.request().method() === "PATCH")
+        return route.fulfill({
+          contentType: "application/json",
+          body: JSON.stringify(attachmentItems[0]),
         });
       if (path === "/api/job_attachments" && route.request().method() === "POST") {
         valueSaves.push(route.request().postData());
@@ -370,39 +375,25 @@ await runBrowserHarness(
     );
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
     attachmentItems = [];
-    emptyValueProfiles = true;
+    // The form takes only the value, approver, and PDF. Project details missing
+    // for approval are named, with a link to the job editor, before saving.
+    await page.goto(`${origin}/tests/fixtures/projectRequests.html?values&legacy&incomplete`);
+    await page.getByRole("button", { name: "Propose new value", exact: true }).click();
+    await page
+      .getByRole("alert")
+      .filter({ hasText: "Approval needs an invoicing profile and a location on this project." })
+      .waitFor();
+    assert.equal(
+      await page.getByRole("link", { name: "Edit the project", exact: true }).getAttribute("href"),
+      "/jobs/job1/edit",
+    );
+    assert.equal(
+      await page.getByRole("button", { name: "Save proposed value", exact: true }).isDisabled(),
+      true,
+    );
+    assert.equal(await page.getByText("Project and billing details").count(), 0);
     await page.goto(`${origin}/tests/fixtures/projectRequests.html?values&legacy`);
     await page.getByRole("button", { name: "Propose new value", exact: true }).click();
-    await page.getByRole("heading", { name: "Invoicing profile", exact: true }).waitFor();
-    assert.equal(
-      await page.getByRole("combobox", { name: "Invoicing profile", exact: true }).count(),
-      0,
-    );
-    assert.equal(
-      await page
-        .getByRole("button", { name: "Manage client contacts and invoicing", exact: true })
-        .count(),
-      0,
-    );
-    await page.getByLabel("Proposed project value (CAD, before tax)").fill("750");
-    await page.evaluate(() => history.replaceState({}, "", "/jobs/job1/details"));
-    await page.getByRole("button", { name: /Create one/ }).click();
-    await page.waitForFunction(() => !!window.lastNavigation);
-    const valueProfileUrl = new URL(await page.evaluate(() => window.lastNavigation), origin);
-    assert.equal(valueProfileUrl.pathname, "/clients/client1/invoicing/add");
-    const valueWorkspace = new URL(valueProfileUrl.searchParams.get("return_to"), origin);
-    const valueReturn = new URL(valueWorkspace.searchParams.get("workflow_return"), origin);
-    const valueDraft = await page.evaluate(
-      (token) => JSON.parse(sessionStorage.getItem(`client-workspace-draft:${token}`)),
-      valueReturn.searchParams.get("client_draft"),
-    );
-    assert.equal(valueDraft.kind, "job-value:job1");
-    assert.equal(valueDraft.payload.value, 750);
-    assert.equal(valueDraft.payload.correctionJob.client, "client1");
-    emptyValueProfiles = false;
-    await page.goto(`${origin}/tests/fixtures/projectRequests.html?values&legacy`);
-    await page.getByRole("button", { name: "Propose new value", exact: true }).click();
-    await page.getByLabel("Invoicing profile", { exact: true }).selectOption("profile1");
     await page.getByLabel("Proposed project value (CAD, before tax)").fill("500");
     await page.getByLabel("Selected approver", { exact: true }).selectOption("reviewer");
     await page.getByLabel("Authorization PDF", { exact: true }).setInputFiles({
@@ -417,15 +408,66 @@ await runBrowserHarness(
     assert.equal(valueSaves.length, 1);
     const part = (name) =>
       valueSaves[0].match(new RegExp(`name="${name}"\\r\\n\\r\\n([^\\r]+)`))?.[1];
-    const updates = JSON.parse(part("job_updates"));
-    assert.equal(updates.invoicing_information, "profile1");
-    for (const forbidden of ["client", "project_value", "number"])
-      assert.equal(Object.hasOwn(updates, forbidden), false);
-    assert.equal(part("job_review_token"), "job-review-v1");
-    assert.equal(part("job_updated"), "2026-09-30 12:00:00.000Z");
+    assert.equal(part("job"), "job1");
     assert.equal(part("project_value"), "500");
-    assert.deepEqual(JSON.parse(part("allocations")), [{ division: "division1", hours: 20 }]);
+    assert.equal(part("assigned_approver"), "reviewer");
+    for (const removed of ["job_updates", "job_updated", "job_review_token", "allocations"])
+      assert.equal(part(removed), undefined, `${removed} is no longer sent`);
     assert.match(await page.locator("#app").innerText(), /Project Value:\s*\$0/);
+    // Only a refusal that names project fields links to the job editor.
+    attachmentItems = [];
+    await page.goto(`${origin}/tests/fixtures/projectRequests.html?values&legacy`);
+    await page.getByRole("button", { name: "Propose new value", exact: true }).click();
+    await page.getByLabel("Proposed project value (CAD, before tax)").fill("500");
+    await page.getByLabel("Selected approver", { exact: true }).selectOption("reviewer");
+    await page.getByLabel("Authorization PDF", { exact: true }).setInputFiles({
+      name: "authorization.pdf",
+      mimeType: "application/pdf",
+      buffer: Buffer.from("%PDF-1.4\nTest document\n%%EOF"),
+    });
+    valueSaveError = { message: "This PDF already belongs to a project request or job approval." };
+    await page.getByRole("button", { name: "Save proposed value", exact: true }).click();
+    await page.getByRole("alert").filter({ hasText: "This PDF already belongs" }).waitFor();
+    assert.equal(
+      await page.getByRole("link", { name: "Edit the project", exact: true }).count(),
+      0,
+    );
+    valueSaveError = {
+      message: "branch is required",
+      data: { branch: { code: "required", message: "branch is required" } },
+    };
+    await page.getByRole("button", { name: "Save proposed value", exact: true }).click();
+    await page.getByRole("alert").filter({ hasText: "branch: branch is required" }).waitFor();
+    assert.equal(
+      await page.getByRole("link", { name: "Edit the project", exact: true }).count(),
+      1,
+    );
+    valueSaveError = null;
+    // A rejected change saved again without a correction says why it stays rejected.
+    attachmentItems = [
+      {
+        id: "rejected",
+        job: "job1",
+        status: "Rejected",
+        project_value: 500,
+        assigned_approver: "reviewer",
+        rejection_reason: "Wrong scope.",
+        version: 2,
+        document_hash: "hash789",
+      },
+    ];
+    await page.goto(`${origin}/tests/fixtures/projectRequests.html?values&legacy`);
+    await page.getByRole("button", { name: "Correct value change", exact: true }).click();
+    await page.getByLabel("Selected approver", { exact: true }).selectOption("reviewer");
+    await page.getByRole("button", { name: "Save proposed value", exact: true }).click();
+    await page
+      .getByRole("alert")
+      .filter({ hasText: "Nothing has changed since this value change was rejected" })
+      .waitFor();
+    assert.equal(
+      await page.getByRole("link", { name: "Edit the project", exact: true }).count(),
+      1,
+    );
     await page.goto(`${origin}/tests/fixtures/projectRequests.html?billing`);
     await page.getByRole("button", { name: "Same as project contact", exact: true }).click();
     assert.equal(
