@@ -26,6 +26,9 @@ const (
 	ProjectWorkflowMutationDelete       ProjectWorkflowMutation = "delete"
 	// ProjectWorkflowMutationImportedClose is the fast-close bypass for imported projects.
 	ProjectWorkflowMutationImportedClose ProjectWorkflowMutation = "imported_close"
+	// ProjectWorkflowMutationChangeClient moves a project and its subjobs to
+	// another client, with a recorded reason.
+	ProjectWorkflowMutationChangeClient ProjectWorkflowMutation = "change_client"
 )
 
 type projectWorkflowContextKey struct{}
@@ -239,7 +242,9 @@ func AddProjectWorkflowHooks(app core.App) {
 			}
 		}
 		if !r.IsNew() {
-			if r.GetString("client") != r.Original().GetString("client") && op != ProjectWorkflowMutationMerge {
+			// The change client action validates only the client relations it
+			// sets, so validateProjectJobWrite does not accept it.
+			if r.GetString("client") != r.Original().GetString("client") && op != ProjectWorkflowMutationMerge && op != ProjectWorkflowMutationChangeClient {
 				return workflowError("project client is immutable")
 			}
 			if r.GetFloat("project_value") != r.Original().GetFloat("project_value") && op != ProjectWorkflowMutationApproveValue && op != ProjectWorkflowMutationRestoreValue {

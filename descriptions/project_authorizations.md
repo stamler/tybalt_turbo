@@ -254,7 +254,8 @@ user as well as the applicable claim or ownership rule.
 | Create an invoicing profile using an existing client contact | Active holders of `time` or `job`. No separate profile approval is required. |
 | Edit existing invoicing profiles, or maintain clients and contacts | Holders of `job`. A profile creator without `job` cannot edit it. |
 | Add or remove division allocations, or change allocated hours on an existing job | Holders of `job`, or the user assigned to `jobs.manager` or `jobs.alternate_manager` on that job. Managers and alternate managers do not need `job` for these allocation edits. Existing allocation validation applies. |
-| Edit other job fields, including proposing a new project value and uploading its PDF | Holders of `job`, subject to validation and additional field permissions. Client is immutable except through the controlled merge process. |
+| Edit other job fields, including proposing a new project value and uploading its PDF | Holders of `job`, subject to validation and additional field permissions. Client is immutable except through the controlled merge process or **Change Client**. |
+| Change a project's client with **Change Client** | Active holders of `job`, with a written reason. |
 | Select or change the approver for a pending project-value change | Holders of `job`. |
 | Approve or reject a pending project-value change | Its selected approver. Approval requires `project_authorization` and a limit that covers the full proposed value. Rejection requires a reason. |
 | Delete the latest approved project-value change or clear a pending approval for admin correction | Holders of `admin`, subject to the deletion rules below. |
@@ -540,6 +541,32 @@ together in one transaction, including owner references. Validate same-client
 relationships against the final merged state, rather than an intermediate state.
 If any part fails, roll back the entire merge.
 
+**Change Client** is the other exception, for a project whose client was chosen
+in error or whose work now belongs to another client. It is not a merge: both
+clients remain. Active holders of `job` use it from the project's details page,
+on a top-level project; a subjob always uses its parent's client. They choose
+the new client, a contact and an invoicing profile of that client, and give a
+reason of 20 to 500 characters, short enough that the notes quoting it with
+both client names and the subjob numbers fit the note limit. In one transaction:
+
+* The project and its subjobs take the new client, contact, and profile. Only
+  these relations are validated, so a legacy project or an older subjob that
+  does not meet today's rules for other fields can still move.
+* Client notes about these jobs move to the new client.
+* A note on the project under the new client records the old and new client,
+  the subjobs that moved, and the reason. A general note under the old client
+  records where the project went and why.
+* The managers of the moved jobs and everyone who approved one of their values
+  are emailed, other than the person who made the change and anyone no longer
+  active.
+
+Approved requests and value changes keep the client they were approved for. The
+change is refused while one of the jobs has a value change that is not approved,
+while a subjob request for the project is open, or while a client or contact
+merge that moved one of the jobs, its notes, or the chosen contact or profile
+can still be undone. Proposals
+keep their ordinary client editing.
+
 The merge process can update affected request relations under this exception;
 ordinary request edits remain creator-only. Apply request version and
 stale-review checks to changed relations. Keep approver assignments and approved PDFs, values,
@@ -740,7 +767,7 @@ that sets a project to `Active`. An edit that only sets a project to `Closed` or
 validation, so staff can retire older projects without completing their data.
 An `Active` project can receive new time, expenses, and purchase orders, so it
 must have complete billing data. The stale and unused job lists show any error
-beside the job it affects. The client relation is immutable except through the controlled merge process.
+beside the job it affects. The client relation is immutable except through the controlled merge process or **Change Client**.
 
 ### Admin Deletion And Retained History
 
@@ -808,6 +835,7 @@ not undo the action. Each event has its own notification template and switch.
 | Value change saved | Selected approver | Who saved it, project number, client, current and proposed values, the project description, and a link to review it. If the approver is unchanged from the earlier version, it says this replaces it. |
 | Value change approved | Uploader of the change's PDF | Approver, project number and client, previous and new values, and that the new value is in effect. |
 | Value change rejected | Uploader of the change's PDF | Approver, project number and client, proposed value, the reason, that the value is unchanged, and a link to correct it. |
+| Client changed | Managers of the project and its subjobs, and approvers of their values | Who changed it, project number, old and new client, the subjobs that moved, the reason, the scope of work, why the recipient is told, and a link to the project. |
 
 Name the project number in the subject. A request has no number, so name its
 client and the first line of its scope of work, which keeps requests for one
@@ -1538,6 +1566,10 @@ Acceptance tests must cover these cases:
   both project and billing contact references. Failed merges leave all records
   unchanged. Apply stale-review guards to affected requests, preserve approved
   document/value/approver history, and block ordinary job-client reassignment.
+* **Change Client** moves a project, its subjobs, and their notes to another
+  client with a recorded reason and emails, and is refused for proposals,
+  subjobs, users without active `job`, and jobs with open value changes,
+  subjob requests, or undoable merges.
 * Optional address fields on clients and contacts, optional contact email and
   phone, and the **No email address** mark: a contact cannot have both, and
   entering an email clears the mark. Requests cannot be submitted, approved, or

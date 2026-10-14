@@ -271,15 +271,24 @@ func createJobAuditNote(
 	if clientID == "" {
 		return fmt.Errorf("client is required to create audit note")
 	}
+	return createClientNote(txApp, clientID, jobRec.Id, userID, note, jobStatusChangedTo)
+}
 
+// createClientNote inserts a client note. A note without a job is marked as not
+// applying to one.
+func createClientNote(txApp core.App, clientID, jobID, userID, note, jobStatusChangedTo string) error {
 	notesCol, err := txApp.FindCollectionByNameOrId("client_notes")
 	if err != nil {
 		return fmt.Errorf("client_notes collection not found: %w", err)
 	}
 
 	noteRec := core.NewRecord(notesCol)
-	noteRec.Set("job", jobRec.Id)
 	noteRec.Set("client", clientID)
+	if jobID != "" {
+		noteRec.Set("job", jobID)
+	} else {
+		noteRec.Set("job_not_applicable", true)
+	}
 	noteRec.Set("uid", userID)
 	noteRec.Set("note", strings.TrimSpace(note))
 	if strings.TrimSpace(jobStatusChangedTo) != "" {

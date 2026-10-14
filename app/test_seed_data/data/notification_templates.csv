@@ -148,3 +148,16 @@ Project / scope of work:
 {{if .Active}}Time, expenses, and purchase orders can now be recorded against {{.JobNumber}}.{{else}}The project is Closed, so time, expenses, and purchase orders cannot be recorded against it.{{end}} View the project here:
 
 {{.ActionURL}}",2026-10-13 00:00:00.000Z
+job_client_changed,2026-10-14 00:00:00.000Z,Tells project managers and value approvers that a project moved to another client,,jobclientchg000,Client changed: project {{.JobNumber}},"Hello {{.RecipientName}},
+
+{{.UserName}} changed the client of project {{.JobNumber}} from {{.OldClientName}} to {{.NewClientName}}.{{if .SubjobNumbers}} Its subjobs moved with it: {{.SubjobNumbers}}.{{end}}
+
+Reason:
+{{.Reason}}
+
+Project / scope of work:
+{{.Description}}
+
+{{if .ForApprover}}You approved a value for this project when its client was {{.OldClientName}}.{{else}}You manage this project or one of its subjobs.{{end}} The project now uses the contact and invoicing profile chosen for {{.NewClientName}}. View the project here:
+
+{{.ActionURL}}",2026-10-14 00:00:00.000Z

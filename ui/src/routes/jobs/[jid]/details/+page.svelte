@@ -18,6 +18,7 @@
   import DSLocationPicker from "$lib/components/DSLocationPicker.svelte";
   import DSDateInput from "$lib/components/DSDateInput.svelte";
   import FastCloseConfirmPopover from "$lib/components/FastCloseConfirmPopover.svelte";
+  import ChangeClientPopover from "$lib/components/jobs/ChangeClientPopover.svelte";
   import { pb } from "$lib/pocketbase";
   import { goto, invalidateAll } from "$app/navigation";
   import { globalStore } from "$lib/stores/global";
@@ -34,6 +35,7 @@
   let fastCloseContextLoading = $state(false);
   let fastCloseContextError = $state<string | null>(null);
   let showSetNumberModal = $state(false);
+  let showChangeClient = $state(false);
   let setNumberSubmitting = $state(false);
   let setNumberValue = $state("");
   let setNumberGlobalError = $state<string | null>(null);
@@ -100,6 +102,15 @@
   );
   const currentUserID = $derived(pb.authStore.record?.id ?? "");
   const canSetNumber = $derived($jobsEditingEnabled && $globalStore.claims.includes("admin"));
+  // A subjob uses its parent's client, so only a top-level project's client
+  // can be changed, and it moves its subjobs with it.
+  const canChangeClient = $derived(
+    !isProposal &&
+      !data.job.parent_number &&
+      Boolean(data.job.client?.id) &&
+      $jobsEditingEnabled &&
+      $globalStore.claims.includes("job"),
+  );
   const hasNumberHierarchyWarning = $derived(
     Boolean(data.job.parent_number) ||
       (Array.isArray(data.job.children) && data.job.children.length > 0),
@@ -498,6 +509,10 @@
     onCancel={closeFastCloseConfirm}
   />
 
+  {#if canChangeClient && showChangeClient}
+    <ChangeClientPopover bind:show={showChangeClient} job={data.job} onchanged={invalidateAll} />
+  {/if}
+
   <DSPopover
     bind:show={showSetNumberModal}
     title="Change Job Number"
@@ -580,7 +595,7 @@
         {/if}
 
         {#if data.job.client}
-          <div>
+          <div class="flex flex-wrap items-center gap-x-2">
             <span class="font-semibold">Client:</span>
             <a
               href={`/clients/${data.job.client.id}/details`}
@@ -588,6 +603,11 @@
             >
               {clientLabel(data.job.client)}
             </a>
+            {#if canChangeClient}
+              <DsActionButton action={() => (showChangeClient = true)} color="yellow"
+                >Change Client</DsActionButton
+              >
+            {/if}
           </div>
         {/if}
 

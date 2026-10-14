@@ -277,6 +277,7 @@ func AddRoutes(app core.App) {
 		jobsGroup.GET("/stale", createGetStaleJobsHandler(app))
 		jobsGroup.POST("/{id}/set-status", createSetJobStatusHandler(app))
 		jobsGroup.POST("/{id}/set-number", createSetJobNumberHandler(app))
+		jobsGroup.POST("/{id}/change-client", createChangeJobClientHandler(app))
 		jobsGroup.POST("/{id}/close", createCloseJobHandler(app))
 		jobsGroup.GET("/{id}/validate-proposal", createValidateProposalHandler(app))
 

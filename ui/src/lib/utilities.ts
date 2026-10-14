@@ -2,6 +2,7 @@ import type {
   TimeEntriesResponse,
   CategoriesResponse,
   ClientContactsResponse,
+  ClientInvoicingInformationResponse,
   BaseSystemFields,
   PurchaseOrdersAugmentedResponse,
   ProfilesResponse,
@@ -612,6 +613,40 @@ export async function fetchClientContacts(clientId: string): Promise<ClientConta
     console.error("Error fetching client_contacts:", error);
     return Promise.resolve([] as ClientContactsResponse[]);
   }
+}
+
+// Name a contact as client pickers list it, surname first.
+export function formatContactName(contact: ClientContactsResponse) {
+  const surname = contact.surname?.trim();
+  const given = contact.given_name?.trim();
+  if (surname && given) return `${surname}, ${given}`;
+  if (surname) return surname;
+  if (given) return given;
+  return contact.email ?? contact.id;
+}
+
+// Name a profile by its name or recipient, then its instructions.
+function invoicingProfileText(
+  profile: ClientInvoicingInformationResponse,
+  contacts: ClientContactsResponse[],
+) {
+  const recipient = contacts.find((contact) => contact.id === profile.contact);
+  const name = profile.name || (recipient ? formatContactName(recipient) : "Invoice recipient");
+  return profile.invoicing_instructions ? `${name} — ${profile.invoicing_instructions}` : name;
+}
+
+// Label a profile in a list of the client's profiles. Add the creation date and
+// time when two profiles in the list would otherwise read the same.
+export function invoicingProfileLabel(
+  profile: ClientInvoicingInformationResponse,
+  profiles: ClientInvoicingInformationResponse[],
+  contacts: ClientContactsResponse[],
+) {
+  const text = invoicingProfileText(profile, contacts);
+  const repeated = profiles.some(
+    (other) => other.id !== profile.id && invoicingProfileText(other, contacts) === text,
+  );
+  return repeated ? `${text} (created ${formatDateTime(profile.created)})` : text;
 }
 
 function csvEscape(value: unknown): string {

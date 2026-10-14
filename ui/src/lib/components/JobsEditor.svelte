@@ -3,7 +3,8 @@
     dateInputMaxMonthsAhead,
     fetchClientContacts,
     formatJobLabel,
-    formatDateTime,
+    formatContactName,
+    invoicingProfileLabel,
   } from "$lib/utilities";
   import { globalStore } from "$lib/stores/global";
   import InvoicingProfileEmptyState from "./clients/InvoicingProfileEmptyState.svelte";
@@ -370,35 +371,11 @@
     }
   });
 
-  // Name a profile by its name or recipient, then its instructions. Add the
-  // creation date and time when two profiles would otherwise read the same.
-  function invoicingProfileText(profile: ClientInvoicingInformationResponse) {
-    const recipient = client_contacts.find((contact) => contact.id === profile.contact);
-    const name = profile.name || (recipient ? formatContactName(recipient) : "Invoice recipient");
-    return profile.invoicing_instructions ? `${name} — ${profile.invoicing_instructions}` : name;
-  }
-  function invoicingProfileLabel(profile: ClientInvoicingInformationResponse) {
-    const text = invoicingProfileText(profile);
-    const repeated = invoicingProfiles.some(
-      (other) => other.id !== profile.id && invoicingProfileText(other) === text,
-    );
-    return repeated ? `${text} (created ${formatDateTime(profile.created)})` : text;
-  }
-
   // After returning from client maintenance, show the newly selected profile.
   onMount(() => {
     if (returnedProfile)
       document.getElementById("invoicing-profile-field")?.scrollIntoView({ block: "center" });
   });
-
-  function formatContactName(contact: ClientContactsResponse) {
-    const surname = contact.surname?.trim();
-    const given = contact.given_name?.trim();
-    if (surname && given) return `${surname}, ${given}`;
-    if (surname) return surname;
-    if (given) return given;
-    return contact.email ?? contact.id;
-  }
 
   // Watch for changes to the client and fetch contacts accordingly
   // When the client changes, fetch its contacts. The requestId guard ensures that
@@ -1084,6 +1061,12 @@
           {/if}
         </div>
       {/if}
+      {#if data.editing && !isProposal && !(item as any).parent && hasJobClaim}
+        <p class="self-start text-xs text-neutral-600">
+          To move this project to another client, use Change Client beside the client on the
+          project's details page.
+        </p>
+      {/if}
 
       <div class="flex w-full flex-col gap-1 {errors.contact !== undefined ? 'bg-red-200' : ''}">
         <div class="flex w-full items-end gap-1">
@@ -1142,7 +1125,7 @@
                 bind:value={item.invoicing_information}
                 ><option value="">Select invoicing profile</option
                 >{#each invoicingProfiles as profile}<option value={profile.id}
-                    >{invoicingProfileLabel(profile)}</option
+                    >{invoicingProfileLabel(profile, invoicingProfiles, client_contacts)}</option
                   >{/each}</select
               >
               {#if hasJobClaim}<button
