@@ -39,9 +39,12 @@ SELECT
   ip.invoicing_instructions AS invoice_instructions,
   j.request_creator, j.request_created, j.request_submitted,
   j.created_by, j.creation_completed,
+  trim(rcp.given_name || ' ' || rcp.surname) AS request_creator_name,
+  trim(cbp.given_name || ' ' || cbp.surname) AS created_by_name,
   j.proposal_opening_date AS proposal_opening_date,
   j.proposal_submission_due_date AS proposal_submission_due_date,
   j.proposal_value AS proposal_value,
+  j.project_value AS project_value,
   j.time_and_materials AS time_and_materials,
   j.outstanding_balance AS outstanding_balance,
   j.outstanding_balance_date AS outstanding_balance_date,
@@ -93,4 +96,6 @@ LEFT JOIN profiles am          ON am.uid = j.alternate_manager
 LEFT JOIN clients jo           ON jo.id  = j.job_owner
 LEFT JOIN branches br          ON br.id  = j.branch
 LEFT JOIN rate_sheets rs       ON rs.id  = j.rate_sheet
+LEFT JOIN profiles rcp         ON rcp.uid = j.request_creator
+LEFT JOIN profiles cbp         ON cbp.uid = j.created_by
 WHERE j.id = {:id}; 

@@ -81,10 +81,13 @@ type jobDetailsRow struct {
 	RequestCreated            sql.NullString  `db:"request_created"`
 	RequestSubmitted          sql.NullString  `db:"request_submitted"`
 	CreatedBy                 sql.NullString  `db:"created_by"`
+	RequestCreatorName        sql.NullString  `db:"request_creator_name"`
+	CreatedByName             sql.NullString  `db:"created_by_name"`
 	CreationCompleted         sql.NullString  `db:"creation_completed"`
 	ProposalOpeningDate       sql.NullString  `db:"proposal_opening_date"`
 	ProposalSubmissionDueDate sql.NullString  `db:"proposal_submission_due_date"`
 	ProposalValue             sql.NullFloat64 `db:"proposal_value"`
+	ProjectValue              sql.NullFloat64 `db:"project_value"`
 	TimeAndMaterials          sql.NullBool    `db:"time_and_materials"`
 	OutstandingBalance        sql.NullFloat64 `db:"outstanding_balance"`
 	OutstandingBalanceDate    sql.NullString  `db:"outstanding_balance_date"`
@@ -146,10 +149,13 @@ type JobDetails struct {
 	RequestCreated            string        `json:"request_created"`
 	RequestSubmitted          string        `json:"request_submitted"`
 	CreatedBy                 string        `json:"created_by"`
+	RequestCreatorName        string        `json:"request_creator_name"`
+	CreatedByName             string        `json:"created_by_name"`
 	CreationCompleted         string        `json:"creation_completed"`
 	ProposalOpeningDate       string        `json:"proposal_opening_date"`
 	ProposalSubmissionDueDate string        `json:"proposal_submission_due_date"`
 	ProposalValue             float64       `json:"proposal_value"`
+	ProjectValue              float64       `json:"project_value"`
 	TimeAndMaterials          bool          `json:"time_and_materials"`
 	OutstandingBalance        float64       `json:"outstanding_balance"`
 	OutstandingBalanceDate    string        `json:"outstanding_balance_date"`
@@ -240,10 +246,13 @@ func createGetJobDetailsHandler(app core.App) func(e *core.RequestEvent) error {
 			RequestCreated:            ns(r.RequestCreated),
 			RequestSubmitted:          ns(r.RequestSubmitted),
 			CreatedBy:                 ns(r.CreatedBy),
+			RequestCreatorName:        ns(r.RequestCreatorName),
+			CreatedByName:             ns(r.CreatedByName),
 			CreationCompleted:         ns(r.CreationCompleted),
 			ProposalOpeningDate:       ns(r.ProposalOpeningDate),
 			ProposalSubmissionDueDate: ns(r.ProposalSubmissionDueDate),
 			ProposalValue:             r.ProposalValue.Float64,
+			ProjectValue:              r.ProjectValue.Float64,
 			TimeAndMaterials:          r.TimeAndMaterials.Bool,
 			OutstandingBalance:        r.OutstandingBalance.Float64,
 			OutstandingBalanceDate:    ns(r.OutstandingBalanceDate),

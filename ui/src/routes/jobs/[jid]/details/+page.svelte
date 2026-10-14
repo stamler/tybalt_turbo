@@ -7,7 +7,10 @@
   import { onMount } from "svelte";
   import DSTabBar, { type TabItem } from "$lib/components/DSTabBar.svelte";
   import InvoicingInstructions from "$lib/components/clients/InvoicingInstructions.svelte";
-  import JobValueHistory from "$lib/components/jobs/JobValueHistory.svelte";
+  import JobValueLine from "$lib/components/jobs/JobValueLine.svelte";
+  import JobValueProposal from "$lib/components/jobs/JobValueProposal.svelte";
+  import JobValueStatus from "$lib/components/jobs/JobValueStatus.svelte";
+  import { JobValue, valueDate } from "$lib/jobValue.svelte";
   import JobDetailTab from "$lib/components/jobs/JobDetailTab.svelte";
   import TimeTabContent from "$lib/components/jobs/TimeTabContent.svelte";
   import ExpensesTabContent from "$lib/components/jobs/ExpensesTabContent.svelte";
@@ -87,6 +90,13 @@
 
   let { data }: { data: PageData } = $props();
   let isProposal = $derived(data.job.number?.startsWith("P") ?? false);
+  // Value changes for this project, one instance per job so a late response
+  // for the previous job cannot replace this one. The list only holds changes
+  // the signed-in user may see.
+  const jobValue = $derived(isProposal ? null : new JobValue(data.job.id));
+  $effect(() => {
+    jobValue?.reload();
+  });
   const canFastCloseImportedProject = $derived(
     !isProposal &&
       data.job.status === "Active" &&
@@ -579,6 +589,9 @@
     {#if data.job.status}
       <div><span class="font-semibold">Status:</span> {data.job.status}</div>
     {/if}
+    {#if jobValue}
+      {#key data.job.id}<JobValueStatus value={jobValue} />{/key}
+    {/if}
 
     <details class="space-y-2">
       <summary class="cursor-pointer font-semibold text-neutral-700">Additional Details</summary>
@@ -790,10 +803,23 @@
             </div>
           {/if}
         {:else}
-          <div>
+          <div class="flex flex-wrap items-center gap-2">
             <span class="font-semibold">Project Value:</span>
             {formatCurrency(data.job.project_value ?? 0)}
+            {#if jobValue}
+              {#key data.job.id}<JobValueLine value={jobValue} />{/key}
+            {/if}
           </div>
+          {#if data.job.request_creator}
+            <div>
+              <span class="font-semibold">Project Request:</span>
+              requested by {data.job.request_creator_name || data.job.request_creator} on {valueDate(
+                data.job.request_submitted || data.job.request_created,
+              )} · created by {data.job.created_by_name || data.job.created_by} on {valueDate(
+                data.job.creation_completed,
+              )}
+            </div>
+          {/if}
         {/if}
 
         <div>
@@ -852,17 +878,9 @@
     />
   </div>
 
-  {#if !isProposal && $globalStore.claims.some( (claim) => ["job", "admin", "project_authorization"].includes(claim) )}
-    {#if data.job.request_creator}<section class="rounded border p-4">
-        <h2 class="font-semibold">Project request origin</h2>
-        <p>
-          Requested by: {data.job.request_creator} · Created: {data.job.request_created} · Submitted:
-          {data.job.request_submitted}
-        </p>
-        <p>Job created by: {data.job.created_by} · Created: {data.job.creation_completed}</p>
-      </section>{/if}
+  {#if jobValue}
     {#key data.job.id}
-      <JobValueHistory jobId={data.job.id} effectiveValue={data.job.project_value} />
+      <JobValueProposal value={jobValue} effectiveValue={data.job.project_value ?? 0} />
     {/key}
   {/if}
 

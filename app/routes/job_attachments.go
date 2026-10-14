@@ -169,6 +169,15 @@ func attachmentCanView(app core.App, a, auth *core.Record) (bool, error) {
 			return true, nil
 		}
 	}
+	// The project's manager and alternate manager can see its value history
+	// and authorization PDFs.
+	job, err := app.FindRecordById("jobs", a.GetString("job"))
+	if err != nil {
+		return false, err
+	}
+	if auth.Id == job.GetString("manager") || auth.Id == job.GetString("alternate_manager") {
+		return true, nil
+	}
 	ok, err := utilities.HasClaim(app, auth, "project_authorization")
 	if err != nil {
 		return false, err

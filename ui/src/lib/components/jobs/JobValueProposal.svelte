@@ -1,8 +1,7 @@
 <script lang="ts">
   import JobValueCorrectionFields from "./JobValueCorrectionFields.svelte";
   import { pb } from "$lib/pocketbase";
-  import { globalStore } from "$lib/stores/global";
-  import { goto, invalidateAll, replaceState } from "$app/navigation";
+  import { goto, replaceState } from "$app/navigation";
   import { onMount } from "svelte";
   import {
     clearClientWorkflowDraft,
@@ -10,24 +9,18 @@
     keepClientWorkflowDraft,
     readClientWorkflowDraft,
   } from "$lib/clientWorkflowNavigation";
-  import { wholeCAD } from "$lib/jobRequests";
   import { workflowError, type WorkflowRecord } from "$lib/clientEditors";
-  let {
-    jobId,
-    effectiveValue,
-    queue = false,
-  }: { jobId?: string; effectiveValue?: number; queue?: boolean } = $props();
-  let items = $state<WorkflowRecord[]>([]),
-    busy = $state(false),
-    error = $state(""),
-    loading = $state(true),
-    editing = $state<WorkflowRecord | null>(null),
-    creating = $state(false);
+  import { JobValue, valueCAD } from "$lib/jobValue.svelte";
+  // The form for proposing a new project value or correcting a pending or
+  // rejected one. It opens as a modal when value.proposing is set.
+  let { value: jobValue, effectiveValue }: { value: JobValue; effectiveValue: number } = $props();
+  const jobId = $derived(jobValue.jobId);
+  let busy = $state(false),
+    error = $state("");
   let value = $state<number | undefined>(),
     approver = $state(""),
     documentFile = $state<File | null>(null),
     approvers = $state<WorkflowRecord[]>([]);
-  let rejectionReasons = $state<Record<string, string>>({});
   let correctionJob = $state<WorkflowRecord | null>(null),
     correctionOptions = $state<WorkflowRecord>({}),
     correctionAllocations = $state<WorkflowRecord[]>([]),
@@ -37,6 +30,7 @@
     jobReviewToken = $state(""),
     originalAllocations = $state(""),
     correctionStale = $state(false);
+  const editing = $derived(jobValue.editing);
   function allocationSignature(rows: WorkflowRecord[]) {
     return JSON.stringify(
       rows
@@ -62,7 +56,6 @@
     "client_po",
     "client_reference_number",
   ];
-  let confirmedReview = $state<Record<string, boolean>>({});
   type ValueDraft = {
     jobId?: string;
     editing: WorkflowRecord | null;
@@ -77,13 +70,16 @@
     jobReviewToken: string;
     originalAllocations: string;
   };
+  // Restore a form the user left to add a client contact or invoicing profile.
+  let restored = false;
   onMount(() => {
     const draft = readClientWorkflowDraft<ValueDraft>(
       `job-value:${jobId || "queue"}`,
       pb.authStore.record?.id || "",
     );
     if (!draft || draft.jobId !== jobId) return;
-    editing = draft.editing;
+    restored = true;
+    jobValue.openProposal(draft.editing);
     value = draft.value;
     approver = draft.approver;
     documentFile = draft.documentFile instanceof File ? draft.documentFile : null;
@@ -93,10 +89,18 @@
     jobUpdated = draft.jobUpdated;
     jobReviewToken = draft.jobReviewToken;
     originalAllocations = draft.originalAllocations;
-    creating = true;
     if (draft.documentName && !documentFile)
       error = "Select the PDF again after reloading the page.";
     refreshCorrectionOptions();
+  });
+  // Load a fresh form whenever the proposal opens, unless a draft was restored.
+  $effect(() => {
+    if (!jobValue.proposing) return;
+    if (restored) {
+      restored = false;
+      return;
+    }
+    load(jobValue.editing);
   });
   async function manageClient(target: ClientWorkflowTarget = "workspace") {
     if (!correctionJob) return;
@@ -128,28 +132,6 @@
       error = workflowError(e);
     }
   }
-  const canEdit = $derived($globalStore.claims.includes("job")),
-    admin = $derived($globalStore.claims.includes("admin"));
-  const pending = $derived(items.find((item) => item.status !== "Approved"));
-  // Sequence orders approved entries within this job, so only the latest later
-  // approval can offer value restoration. The server enforces the same rule.
-  const latest = $derived(
-    Math.max(
-      0,
-      ...items.filter((item) => item.status === "Approved").map((item) => item.approval_sequence),
-    ),
-  );
-  const money = (amount: number) =>
-    new Intl.NumberFormat("en-CA", {
-      style: "currency",
-      currency: "CAD",
-      maximumFractionDigits: 0,
-    }).format(amount);
-  $effect(() => {
-    jobId;
-    queue;
-    reload();
-  });
   $effect(() => {
     let current = true;
     approvers = [];
@@ -168,24 +150,7 @@
       current = false;
     };
   });
-  async function reload() {
-    loading = true;
-    try {
-      const result = await pb.send(
-        `/api/job_attachments?${queue ? "queue=approval" : `job=${jobId}`}`,
-        { method: "GET", requestKey: null },
-      );
-      items = result.items;
-      confirmedReview = {};
-    } catch (e) {
-      error = workflowError(e);
-    } finally {
-      loading = false;
-    }
-  }
-  async function edit(item: WorkflowRecord | null) {
-    editing = item;
-    creating = true;
+  async function load(item: WorkflowRecord | null) {
     value = item?.project_value;
     approver = item?.assigned_approver || "";
     documentFile = null;
@@ -247,9 +212,9 @@
       correctionLoading = false;
     }
   }
-  async function refresh() {
-    await reload();
-    await Promise.all([globalStore.refreshAttentionCounts(), invalidateAll()]);
+  function close() {
+    jobValue.proposing = false;
+    clearClientWorkflowDraft();
   }
   async function save(event: Event) {
     event.preventDefault();
@@ -285,84 +250,27 @@
         method: editing ? "PATCH" : "POST",
         body,
       });
-      creating = false;
-      clearClientWorkflowDraft();
-      await refresh();
+      close();
+      await jobValue.refresh();
     } catch (e) {
       error = workflowError(e);
     } finally {
       busy = false;
-    }
-  }
-  async function action(item: WorkflowRecord, name: string) {
-    if (
-      name === "delete" &&
-      !window.confirm(
-        item.status === "Approved"
-          ? `Delete this approval and restore the previous project value of ${money(item.previous_project_value)}? The PDF and history will be deleted.`
-          : "Delete this pending value change and its PDF?",
-      )
-    )
-      return;
-    busy = true;
-    error = "";
-    try {
-      await pb.send(`/api/job_attachments/${item.id}${name === "delete" ? "" : `/${name}`}`, {
-        method: name === "delete" ? "DELETE" : "POST",
-        body: {
-          // Use the displayed revision for approval, rejection, and deletion.
-          // A decision can change it even when the PDF hash stays the same.
-          version: item.version,
-          document_hash: item.document_hash,
-          // A rejection records the job data shown here.
-          review_token: item.current_review_token,
-          rejection_reason: rejectionReasons[item.id] ?? "",
-        },
-      });
-      delete rejectionReasons[item.id];
-      await refresh();
-    } catch (e) {
-      error = workflowError(e);
-    } finally {
-      busy = false;
-    }
-  }
-  async function openPDF(item: WorkflowRecord) {
-    error = "";
-    try {
-      const response = await fetch(`${pb.baseURL}/api/job_attachments/${item.id}/document`, {
-        headers: { Authorization: pb.authStore.token },
-      });
-      if (!response.ok) throw new Error("Cannot load this PDF.");
-      const url = URL.createObjectURL(await response.blob());
-      window.open(url, "_blank");
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch (e) {
-      error = workflowError(e);
     }
   }
 </script>
 
-<section class="space-y-4 rounded border border-neutral-300 p-4">
-  <h2 class="text-lg font-semibold">
-    {queue ? "Pending project-value approvals" : "Project value and approval history"}
-  </h2>
-  {#if effectiveValue !== undefined}<p class="text-lg">
-      Effective project value: <strong>{money(effectiveValue)}</strong> CAD, before tax
-    </p>{/if}
-  {#if error}<p role="alert" class="rounded bg-red-50 p-3 text-red-800">{error}</p>{/if}
-  {#if loading}<p>Loading approval history…</p>{/if}
-  {#if !queue && canEdit && !pending && !creating}<button
-      class="rounded bg-blue-700 px-4 py-2 text-white"
-      onclick={() => edit(null)}>Propose a new project value</button
-    >{/if}
-  {#if creating}<form class="space-y-3 rounded bg-neutral-50 p-4" onsubmit={save}>
-      <h3 class="font-semibold">
-        {editing ? "Correct pending value change" : "New project-value change"}
-      </h3>
-      <p class="text-sm">
-        The effective job value stays unchanged until approval. Approval covers the full new value.
+{#if jobValue.proposing}
+  <div class="fixed inset-0 z-9999 flex items-start justify-center overflow-y-auto bg-black/50 p-4">
+    <form class="my-8 w-full max-w-2xl space-y-3 rounded-lg bg-white p-6 shadow-xl" onsubmit={save}>
+      <h2 class="text-xl font-bold">
+        {editing ? "Correct value change" : "Propose new project value"}
+      </h2>
+      <p class="text-sm text-neutral-600">
+        The project value stays {valueCAD(effectiveValue)} until the change is approved. Approval covers
+        the full new value.
       </p>
+      {#if error}<p role="alert" class="rounded bg-red-50 p-3 text-red-800">{error}</p>{/if}
       <label
         >Proposed project value (CAD, before tax)<input
           type="number"
@@ -373,8 +281,8 @@
         /></label
       ><label
         >Selected approver<select aria-label="Selected approver" bind:value={approver} required
-          ><option value="">Select approver</option>{#each approvers as row}<option value={row.id}
-              >{row.name} — up to {money(row.max_value)}</option
+          ><option value="">Select approver</option>{#each approvers as row (row.id)}<option
+              value={row.id}>{row.name}</option
             >{/each}</select
         ></label
       ><label
@@ -398,94 +306,19 @@
           class="text-sm text-blue-700 underline"
           onclick={refreshCorrectionOptions}>Refresh contacts and invoicing profiles</button
         >{/if}
-      <button
-        disabled={busy || correctionLoading || correctionStale || !correctionJob}
-        class="rounded bg-blue-700 px-4 py-2 text-white"
-        type="submit">Save proposed value</button
-      >
-      <button
-        type="button"
-        disabled={busy}
-        class="rounded border px-4 py-2"
-        onclick={() => {
-          creating = false;
-          clearClientWorkflowDraft();
-        }}>Cancel</button
-      >
-    </form>{/if}
-  {#each items as item}<article class="space-y-2 border-t py-3">
-      <div class="flex flex-wrap justify-between gap-2">
-        <h3 class="font-semibold">
-          {item.status} · {wholeCAD(item.project_value)}{item.initial_approval
-            ? " · Initial approval"
-            : ""}
-        </h3>
-        <button onclick={() => openPDF(item)} class="text-blue-700 underline">Open PDF</button>
-      </div>
-      {#if queue}<p>
-          Effective project value: <strong>{money(item.effective_project_value)}</strong> CAD, before
-          tax
-        </p>
-        <p>
-          Client: {item.related?.client?.name || "Not provided"} · Manager: {item.related?.manager
-            ?.name || "Not provided"}
-        </p>
-        <a href={`/jobs/${item.job}/details`} class="text-blue-700 underline"
-          >{item.job_number || item.job} — {item.job_description || "Job details"}</a
-        >{/if}
-      {#if item.status === "Approved"}<p>
-          Approved by {item.approver_name || item.approver} on {item.approved}. Recorded limit: {money(
-            item.approval_max_value,
-          )}.
-        </p>
-        <p class="text-sm">
-          Approval sequence: {item.approval_sequence}{!item.initial_approval
-            ? ` · Previous value: ${money(item.previous_project_value)}`
-            : ""}
-        </p>
-        {#if item.checklist_version}<details>
-            <summary>Approval checklist version {item.checklist_version}</summary
-            >{#each Object.entries(item.checklist_answers || {}) as [key, checked]}<p>
-                {key.replaceAll("_", " ")}: {checked ? "Confirmed" : "Not confirmed"}
-              </p>{/each}
-          </details>{/if}{:else}<p>
-          Selected approver: {item.assigned_approver_name || item.assigned_approver}
-        </p>{/if}
-      {#if item.rejection_reason}<p class="text-red-800">
-          Rejection reason: {item.rejection_reason}
-        </p>{/if}
-      {#if canEdit && item.status !== "Approved" && !queue}<button
-          class="rounded border px-3 py-2"
-          onclick={() => edit(item)}>Correct value change</button
-        >{/if}
-      {#if item.assigned_approver === pb.authStore.record?.id && $globalStore.claims.includes("project_authorization") && item.status === "Pending"}<div
-          class="space-y-2"
+      <div class="flex justify-end gap-2 border-t pt-3">
+        <button type="button" disabled={busy} class="rounded border px-4 py-2" onclick={close}
+          >Cancel</button
         >
-          <label class="review"
-            ><input type="checkbox" bind:checked={confirmedReview[item.id]} />I reviewed this PDF
-            and its full proposed value.</label
-          ><button
-            disabled={busy || !confirmedReview[item.id]}
-            class="rounded bg-green-700 px-3 py-2 text-white disabled:opacity-40"
-            onclick={() => action(item, "approve")}>Approve value</button
-          ><label
-            >Rejection reason<textarea bind:value={rejectionReasons[item.id]}></textarea></label
-          ><button
-            disabled={busy || !rejectionReasons[item.id]?.trim()}
-            class="rounded border border-red-700 px-3 py-2 text-red-800 disabled:opacity-40"
-            onclick={() => action(item, "reject")}>Reject</button
-          >
-        </div>{/if}
-      {#if admin && !item.initial_approval && (item.status !== "Approved" || (!pending && item.approval_sequence === latest))}<button
-          disabled={busy}
-          class="rounded border border-red-700 px-3 py-2 text-red-800"
-          onclick={() => action(item, "delete")}
-          >Delete {item.status === "Approved"
-            ? "latest approval and restore value"
-            : "pending change"}</button
-        >{/if}
-    </article>{:else}{#if !loading}<p>No value approval records.</p>{/if}{/each}
-</section>
+        <button
+          disabled={busy || correctionLoading || correctionStale || !correctionJob}
+          class="rounded bg-blue-700 px-4 py-2 text-white disabled:opacity-40"
+          type="submit">Save proposed value</button
+        >
+      </div>
+    </form>
+  </div>
+{/if}
 
 <style>
   label {
@@ -496,16 +329,11 @@
     font-size: 0.9rem;
   }
   input,
-  select,
-  textarea {
+  select {
     border: 1px solid #a3a3a3;
     padding: 0.5rem;
     border-radius: 0.2rem;
     background: white;
     font-weight: 400;
-  }
-  .review {
-    flex-direction: row;
-    align-items: center;
   }
 </style>

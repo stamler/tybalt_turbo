@@ -71,8 +71,8 @@ await runBrowserHarness(async (page, origin) => {
   await page.goto(`${origin}/tests/fixtures/jobValueNavigation.html`);
   await correction.click();
   await editor.waitFor();
-  await page.getByText("Additional Details", { exact: true }).click();
-  await parent.click();
+  // Navigate while the proposal modal is open, as a back or link navigation would.
+  await page.evaluate(() => window.navigateTo("jobB"));
   await editor.waitFor({ state: "hidden" });
   await page.getByText("Description: Project B", { exact: true }).waitFor();
   assert.equal(await page.getByLabel("Proposed project value (CAD, before tax)").count(), 0);

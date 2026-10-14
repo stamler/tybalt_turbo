@@ -18,6 +18,8 @@ await runBrowserHarness(
         approval_sequence: 1,
         initial_approval: true,
         approver: "reviewer",
+        approver_name: "Tier Two",
+        approved: "2026-09-01 10:00:00.000Z",
       },
       {
         id: "pending",
@@ -25,6 +27,8 @@ await runBrowserHarness(
         status: "Pending",
         project_value: 150000,
         assigned_approver: "reviewer",
+        assigned_approver_name: "Tier Two",
+        effective_project_value: 120000,
         version: 4,
         document_hash: "hash123",
       },
@@ -140,6 +144,9 @@ await runBrowserHarness(
               approval_sequence: 2,
               previous_project_value: 120000,
               approval_max_value: 200000,
+              approver: "reviewer",
+              approver_name: "Tier Two",
+              approved: "2026-10-14 12:00:00.000Z",
             },
           ];
         }
@@ -320,42 +327,52 @@ await runBrowserHarness(
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: "/tmp/project-request-form-mobile.png", fullPage: true });
     await page.goto(`${origin}/tests/fixtures/projectRequests.html?values`);
-    await page.getByRole("button", { name: "Approve value", exact: true }).waitFor();
-    assert.match(await page.locator("section").innerText(), /Effective project value: \$120,000/);
-    assert.match(await page.locator("section").innerText(), /Pending · \$150,000/);
-    assert.equal(
-      await page.getByRole("button", { name: "Approve value", exact: true }).isDisabled(),
-      true,
+    const review = page.getByRole("button", { name: "Review", exact: true });
+    const historyButton = page.getByRole("button", { name: "Value history", exact: true });
+    const deleteLatest = page.getByRole("button", { name: "Delete latest approval", exact: true });
+    await review.waitFor();
+    assert.match(await page.locator("#app").innerText(), /Project Value:\s*\$120,000/);
+    assert.match(
+      await page.locator("#app").innerText(),
+      /Value change to \$150,000 pending · awaiting/,
     );
     assert.equal(
       await page.getByRole("button", { name: "Delete pending change", exact: true }).count(),
       1,
     );
-    assert.equal(
-      await page
-        .getByRole("button", { name: "Delete latest approval and restore value", exact: true })
-        .count(),
-      0,
-    );
+    // While a change is pending, history offers no approval to undo.
+    await historyButton.click();
+    await page.getByRole("dialog", { name: "Value history" }).waitFor();
+    assert.equal(await deleteLatest.count(), 0);
+    await page.keyboard.press("Escape");
+    await review.click();
+    const approve = page.getByRole("button", { name: "Approve value", exact: true });
+    assert.equal(await approve.isDisabled(), true);
     await page.getByLabel("I reviewed this PDF and its full proposed value.").check();
-    await page.getByRole("button", { name: "Approve value", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Delete latest approval and restore value", exact: true })
-      .waitFor();
+    await approve.click();
+    await approve.waitFor({ state: "hidden" });
     assert.equal(valueActions.length, 1);
     assert.equal(valueActions[0].version, 4);
     assert.equal(valueActions[0].document_hash, "hash123");
-    assert.equal(
-      await page
-        .getByRole("button", { name: "Delete latest approval and restore value", exact: true })
-        .count(),
-      1,
-      "initial approval has no delete action",
+    // Only the newest approval can be undone; the initial approval has no delete action.
+    await historyButton.click();
+    const historyRows = page.getByRole("dialog", { name: "Value history" }).locator("li");
+    assert.deepEqual(
+      (await historyRows.allInnerTexts()).map((text) => text.replace(/\s+/g, " ").trim()),
+      ["$150,000 Tier Two · 2026-10-14", "$120,000 Tier Two · 2026-09-01"],
     );
+    assert.equal(await deleteLatest.count(), 1);
+    await deleteLatest.click();
+    await page.getByRole("heading", { name: "Delete latest approval?", exact: true }).waitFor();
+    assert.match(
+      await page.locator(".fixed").last().innerText(),
+      /The project value returns to \$120,000\. This cannot be undone\./,
+    );
+    await page.getByRole("button", { name: "Cancel", exact: true }).click();
     attachmentItems = [];
     emptyValueProfiles = true;
     await page.goto(`${origin}/tests/fixtures/projectRequests.html?values&legacy`);
-    await page.getByRole("button", { name: "Propose a new project value", exact: true }).click();
+    await page.getByRole("button", { name: "Propose new value", exact: true }).click();
     await page.getByRole("heading", { name: "Invoicing profile", exact: true }).waitFor();
     assert.equal(
       await page.getByRole("combobox", { name: "Invoicing profile", exact: true }).count(),
@@ -384,7 +401,7 @@ await runBrowserHarness(
     assert.equal(valueDraft.payload.correctionJob.client, "client1");
     emptyValueProfiles = false;
     await page.goto(`${origin}/tests/fixtures/projectRequests.html?values&legacy`);
-    await page.getByRole("button", { name: "Propose a new project value", exact: true }).click();
+    await page.getByRole("button", { name: "Propose new value", exact: true }).click();
     await page.getByLabel("Invoicing profile", { exact: true }).selectOption("profile1");
     await page.getByLabel("Proposed project value (CAD, before tax)").fill("500");
     await page.getByLabel("Selected approver", { exact: true }).selectOption("reviewer");
@@ -408,7 +425,7 @@ await runBrowserHarness(
     assert.equal(part("job_updated"), "2026-09-30 12:00:00.000Z");
     assert.equal(part("project_value"), "500");
     assert.deepEqual(JSON.parse(part("allocations")), [{ division: "division1", hours: 20 }]);
-    assert.match(await page.locator("section").innerText(), /Effective project value: \$0/);
+    assert.match(await page.locator("#app").innerText(), /Project Value:\s*\$0/);
     await page.goto(`${origin}/tests/fixtures/projectRequests.html?billing`);
     await page.getByRole("button", { name: "Same as project contact", exact: true }).click();
     assert.equal(

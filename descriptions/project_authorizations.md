@@ -755,7 +755,18 @@ rejected, so a rejected change cannot be approved unchanged. An edit to pending 
 earlier review; approved job attachments cannot be edited this way.
 
 Show pending value approvals in a queue. The assigned approver must be able to
-view the job and PDF evidence needed for that approval. Pending or rejected
+view the job and PDF evidence needed for that approval. Holders of `job` and
+admins can view every job's value history and PDFs, and on October 14, 2026 the
+job's manager and alternate manager were added for their own jobs. Approvers
+see the changes assigned to them or approved by them.
+
+On the job page, show the effective value with a download of the PDF behind it
+and a history of approvals: approver, date, and amount, newest first. Approval
+limits and checklist answers are retained but not shown there. Holders of `job`
+propose a new value from the same line. A pending or rejected change appears as
+a status line under the job status, with the actions open to the viewer: review
+for the assigned approver, correction for holders of `job`, and deletion for
+admins. Admins delete the latest approval from the history. Pending or rejected
 changes do not block time, work records, expenses, billing, or purchase orders
 against the job. Those actions retain their other validation and permissions.
 

@@ -521,3 +521,40 @@ func TestJobValueListTokenMatchesShownDataDuringEdits(t *testing.T) {
 		}
 	}
 }
+
+// A project's manager and alternate manager can see its value history and
+// PDFs without the job claim. Other users without a claim still cannot.
+func TestJobValueHistoryVisibleToProjectManagers(t *testing.T) {
+	for _, field := range []string{"manager", "alternate_manager"} {
+		t.Run(field, func(t *testing.T) {
+			app := newWorkflowTestApp(t, false)
+			id := createValueChange(t, app, legacyWorkflowJob, 10000, "Manager view "+field)
+			// Tester Time holds time but not job.
+			if _, err := app.DB().NewQuery("UPDATE jobs SET "+field+"='rzr98oadsp9qc11' WHERE id={:id}").Bind(dbx.Params{"id": legacyWorkflowJob}).Execute(); err != nil {
+				t.Fatal(err)
+			}
+			list := clientSetupJSON(t, app, http.MethodGet, "/api/job_attachments?job="+legacyWorkflowJob, "time@test.com", nil, http.StatusOK)
+			if items := list["items"].([]any); len(items) != 1 || items[0].(map[string]any)["id"] != id {
+				t.Fatalf("manager history = %#v", items)
+			}
+			mustStatus(t, performJSONRequest(t, app, http.MethodGet, "/api/job_attachments/"+id+"/document", workflowToken(t, app, "time@test.com"), nil), http.StatusOK)
+
+			hidden := clientSetupJSON(t, app, http.MethodGet, "/api/job_attachments?job="+legacyWorkflowJob, "u_no_claims@example.com", nil, http.StatusOK)
+			if items := hidden["items"].([]any); len(items) != 0 {
+				t.Fatalf("unrelated user sees history: %#v", items)
+			}
+			clientSetupJSON(t, app, http.MethodGet, "/api/job_attachments/"+id+"/document", "u_no_claims@example.com", nil, http.StatusForbidden)
+		})
+	}
+}
+
+// Job details report the approved project value, which the job page shows.
+func TestJobDetailsReturnApprovedProjectValue(t *testing.T) {
+	app := newWorkflowTestApp(t, false)
+	id := createValueChange(t, app, legacyWorkflowJob, 10000, "Details value")
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+id+"/approve", workflowApprover, attachmentActionData(t, app, id), http.StatusOK)
+	details := clientSetupJSON(t, app, http.MethodGet, "/api/jobs/"+legacyWorkflowJob+"/details", workflowAuthor, nil, http.StatusOK)
+	if details["project_value"] != float64(10000) {
+		t.Fatalf("project_value = %#v; want 10000", details["project_value"])
+	}
+}

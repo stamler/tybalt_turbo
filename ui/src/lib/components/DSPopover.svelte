@@ -8,6 +8,7 @@
     error = null,
     submitting = false,
     submitLabel = "Submit",
+    danger = false,
     onSubmit,
     onCancel,
     submitDisabled = false,
@@ -19,6 +20,8 @@
     error?: string | null;
     submitting?: boolean;
     submitLabel?: string;
+    // A destructive action shows a red confirm button.
+    danger?: boolean;
     onSubmit: () => void;
     onCancel?: () => void;
     // Keeps the submit button disabled until the form can be submitted.
@@ -62,7 +65,9 @@
         </button>
         <button
           type="button"
-          class="rounded-sm bg-blue-500 px-4 py-2 text-white hover:bg-blue-600 disabled:opacity-50"
+          class="rounded-sm px-4 py-2 text-white disabled:opacity-50 {danger
+            ? 'bg-red-700 hover:bg-red-800'
+            : 'bg-blue-500 hover:bg-blue-600'}"
           onclick={onSubmit}
           disabled={submitting || submitDisabled}
           class:pointer-events-none={submitting || submitDisabled}

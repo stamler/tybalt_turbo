@@ -22,6 +22,8 @@
           navigate("jobB");
         }
       });
+      // The proposal modal covers the page, so tests navigate through this.
+      window.navigateTo = navigate;
       mount(JobDetails, { target: document.getElementById("app"), props });
     </script>
   </body>
