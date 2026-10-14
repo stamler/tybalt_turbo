@@ -510,7 +510,11 @@
   />
 
   {#if canChangeClient && showChangeClient}
-    <ChangeClientPopover bind:show={showChangeClient} job={data.job} onchanged={invalidateAll} />
+    <ChangeClientPopover
+      bind:show={showChangeClient}
+      job={data.job}
+      onchanged={() => invalidateAll()}
+    />
   {/if}
 
   <DSPopover

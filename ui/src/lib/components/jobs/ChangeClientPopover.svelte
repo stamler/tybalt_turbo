@@ -27,9 +27,13 @@
       id: string;
       number: string;
       client: { id: string; name?: string; alias?: string };
-      children?: { id: string; number: string }[];
     };
-    onchanged: () => void | Promise<void>;
+    // Receives the saved selections, so a form showing the job can take them.
+    onchanged: (selection: {
+      client: string;
+      contact: string;
+      invoicing_information: string;
+    }) => void | Promise<void>;
   } = $props();
 
   // The parent mounts this dialog only while it is open, so each open starts a
@@ -48,8 +52,21 @@
   let errors = $state({} as Record<string, { message: string }>);
   let globalError = $state<string | null>(null);
   let loadId = 0;
+  let children = $state<{ id: string; number: string }[]>([]);
 
-  const children = $derived(job.children ?? []);
+  // The subjobs move with the project, so name them before the user confirms.
+  $effect(() => {
+    const parent = job.id;
+    pb.collection("jobs")
+      .getFullList({
+        filter: pb.filter("parent={:parent}", { parent }),
+        fields: "id,number",
+        sort: "number",
+        requestKey: null,
+      })
+      .then((rows) => (children = rows as { id: string; number: string }[]))
+      .catch(() => (children = []));
+  });
   const reasonLength = $derived(reason.trim().length);
   const newClientName = $derived(
     client ? clientLabel($clients.items.find((row) => row.id === client) ?? {}) : "",
@@ -110,7 +127,7 @@
         },
       });
       show = false;
-      await onchanged();
+      await onchanged({ client, contact, invoicing_information: invoicingInformation });
     } catch (error: unknown) {
       const response = error instanceof ClientResponseError ? error.data : {};
       errors = (response?.data as Record<string, { message: string }> | undefined) ?? {};
@@ -236,9 +253,9 @@
       </p>
     {/if}
     <p class={children.length ? "mt-1" : ""}>
-      The reason is saved as a client note under both clients. The project's managers and the people
-      who approved its value are emailed. Approved requests and value changes keep the client they
-      were approved for.
+      The change is saved as soon as you confirm. The reason is saved as a client note under both
+      clients. The project's managers and the people who approved its value are emailed. Approved
+      requests and value changes keep the client they were approved for.
     </p>
   </div>
 </DSPopover>

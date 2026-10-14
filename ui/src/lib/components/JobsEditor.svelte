@@ -22,6 +22,7 @@
   import { goto, replaceState } from "$app/navigation";
   import type { JobsPageData } from "$lib/svelte-types";
   import DsActionButton from "./DSActionButton.svelte";
+  import ChangeClientPopover from "./jobs/ChangeClientPopover.svelte";
   import DSLocationPicker from "./DSLocationPicker.svelte";
   import DSPopover from "./DSPopover.svelte";
   import { profiles } from "$lib/stores/profiles";
@@ -161,7 +162,7 @@
   // The job fields as loaded, after the defaults above. A save that leaves them
   // unchanged sends only allocations, which an older project can save without a
   // profile. A draft kept during client maintenance carries the original value.
-  const loadedJob = untrack(() => restored?.loadedJob ?? JSON.stringify($state.snapshot(item)));
+  let loadedJob = untrack(() => restored?.loadedJob ?? JSON.stringify($state.snapshot(item)));
   // A profile created, copied, or reused during client maintenance is selected in
   // the restored draft but not yet saved with the job.
   const returnedProfile = restored?.selectedProfile ?? "";
@@ -212,6 +213,41 @@
     }
     return false;
   });
+
+  // A saved project keeps its client. Change Client moves a top-level project,
+  // with its subjobs, and saves at once; the rest of the form is unaffected.
+  let showChangeClient = $state(false);
+  const canChangeClient = $derived(
+    data.editing &&
+      Boolean(data.id) &&
+      !isProposal &&
+      !(item as any).parent &&
+      Boolean(item.client) &&
+      hasJobClaim,
+  );
+  const changeClientJob = $derived({
+    id: data.id ?? "",
+    number: item.number ?? "",
+    client: $clients.items.find((row) => row.id === item.client) ?? { id: item.client },
+  });
+
+  // Take the saved selections into the form, and into the copy of the job as
+  // loaded, so they do not count as unsaved edits. The profile client is set
+  // first so the client change does not clear the new profile.
+  function clientChanged(selection: {
+    client: string;
+    contact: string;
+    invoicing_information: string;
+  }) {
+    profileClient = selection.client;
+    item.client = selection.client;
+    item.contact = selection.contact;
+    item.invoicing_information = selection.invoicing_information;
+    const loaded = JSON.parse(loadedJob);
+    Object.assign(loaded, selection);
+    loadedJob = JSON.stringify(loaded);
+    for (const field of ["client", "contact", "invoicing_information"]) clearFieldError(field);
+  }
 
   // Check if this is a cancelled proposal (terminal state - no edits allowed)
   const isCancelledProposal = $derived(isProposal && item.status === JobsStatusOptions.Cancelled);
@@ -1051,6 +1087,11 @@
                 })}{/snippet}
             </DsAutoComplete>
           </div>
+          {#if canChangeClient}
+            <DsActionButton action={() => (showChangeClient = true)} color="yellow"
+              >Change Client</DsActionButton
+            >
+          {/if}
           {#if !item.client && hasJobClaim}
             <DsActionButton
               action={openAddClientPopover}
@@ -1061,11 +1102,12 @@
           {/if}
         </div>
       {/if}
-      {#if data.editing && !isProposal && !(item as any).parent && hasJobClaim}
-        <p class="self-start text-xs text-neutral-600">
-          To move this project to another client, use Change Client beside the client on the
-          project's details page.
-        </p>
+      {#if showChangeClient}
+        <ChangeClientPopover
+          bind:show={showChangeClient}
+          job={changeClientJob}
+          onchanged={clientChanged}
+        />
       {/if}
 
       <div class="flex w-full flex-col gap-1 {errors.contact !== undefined ? 'bg-red-200' : ''}">
