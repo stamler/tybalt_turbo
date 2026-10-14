@@ -424,6 +424,9 @@ func TestIsExpensesEditingEnabled(t *testing.T) {
 // disabled via app_config.
 func TestExpensesEditingDisabledBlocks(t *testing.T) {
 	const vendorID = "2zqxtsmymf670ha"
+	// The vendors delete rule refuses referenced vendors before the editing
+	// gate runs, so the delete scenario uses a vendor with no references.
+	const unreferencedVendorID = "ctswqva5onxj75q"
 
 	// Each sub-table defines a user, and the scenarios that user should exercise.
 	type userScenarios struct {
@@ -489,7 +492,7 @@ func TestExpensesEditingDisabledBlocks(t *testing.T) {
 				{
 					Name:   "vendor delete blocked when editing disabled",
 					Method: http.MethodDelete,
-					URL:    "/api/collections/vendors/records/" + vendorID,
+					URL:    "/api/collections/vendors/records/" + unreferencedVendorID,
 				},
 			},
 		},
