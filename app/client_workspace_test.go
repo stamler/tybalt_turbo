@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"strings"
@@ -151,6 +152,47 @@ func TestClientWorkspaceEmptyMissingAndUnauthenticated(t *testing.T) {
 	// Use an existing inactive account fixture with a valid token to verify
 	// that the combined response follows the invoicing collection's read rule.
 	clientSetupJSON(t, app, http.MethodGet, "/api/clients/"+workspaceClient, "inactive@example.com", nil, http.StatusForbidden)
+}
+
+// BN Rail's seeded jobs have committed time in CB and CI. Its E entries are
+// not on a timesheet, and some CB entries are on uncommitted timesheets, so
+// neither counts.
+func TestClientWorkspaceTimeDivisions(t *testing.T) {
+	app := newClientWorkspaceTestApp(t)
+	divisions := func(client string) string {
+		auth, err := app.FindAuthRecordByEmail("users", "author@soup.com")
+		if err != nil {
+			t.Fatal(err)
+		}
+		token, err := auth.NewAuthToken()
+		if err != nil {
+			t.Fatal(err)
+		}
+		res := performJSONRequest(t, app, http.MethodGet, "/api/clients/"+client+"/time_divisions", token, nil)
+		mustStatus(t, res, http.StatusOK)
+		var items []map[string]any
+		if err := json.Unmarshal(res.Body.Bytes(), &items); err != nil || items == nil {
+			t.Fatalf("time divisions must be an array, got %s", res.Body.String())
+		}
+		got := []string{}
+		for _, item := range items {
+			got = append(got, fmt.Sprintf("%s=%v", item["code"], item["hours"]))
+		}
+		return strings.Join(got, ",")
+	}
+	if got, want := divisions("eldtxi3i4h00k8r"), "CB=2016,CI=3"; got != want {
+		t.Errorf("time divisions = %s; want %s", got, want)
+	}
+	if got := divisions("cwclient0000002"); got != "" {
+		t.Errorf("client without time has divisions %s", got)
+	}
+	// A client that only owns the jobs does not get their divisions.
+	if _, err := app.DB().NewQuery("UPDATE jobs SET job_owner = 'cwclient0000002' WHERE client = 'eldtxi3i4h00k8r'").Execute(); err != nil {
+		t.Fatal(err)
+	}
+	if got := divisions("cwclient0000002"); got != "" {
+		t.Errorf("job owner time divisions = %s; want none", got)
+	}
 }
 
 func TestClientWorkspaceInvoicingNamesAndPermissions(t *testing.T) {

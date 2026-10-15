@@ -22,6 +22,9 @@ var clientsQuery string
 //go:embed client_details.sql
 var clientDetailsQuery string
 
+//go:embed client_time_divisions.sql
+var clientTimeDivisionsQuery string
+
 //go:embed busdev_leads.sql
 var busdevLeadsQuery string
 
@@ -131,6 +134,14 @@ type ClientDetails struct {
 	Referenced bool `json:"referenced"`
 }
 
+// ClientTimeDivision is a division with committed time on the client's jobs.
+type ClientTimeDivision struct {
+	ID    string  `db:"id" json:"id"`
+	Code  string  `db:"code" json:"code"`
+	Name  string  `db:"name" json:"name"`
+	Hours float64 `db:"hours" json:"hours"`
+}
+
 type BusdevLead struct {
 	ID        string `json:"id"`
 	GivenName string `json:"given_name"`
@@ -195,6 +206,21 @@ func createGetClientsHandler(app core.App) func(e *core.RequestEvent) error {
 			resp[i] = toClient(r)
 		}
 		return e.JSON(http.StatusOK, resp)
+	}
+}
+
+// createGetClientTimeDivisionsHandler lists the divisions with committed time
+// on the client's jobs. It is separate from the client details because summing
+// the hours reads every entry, and only the details tab shows them.
+func createGetClientTimeDivisionsHandler(app core.App) func(e *core.RequestEvent) error {
+	return func(e *core.RequestEvent) error {
+		divisions := []ClientTimeDivision{}
+		if err := app.DB().NewQuery(clientTimeDivisionsQuery).Bind(dbx.Params{
+			"id": e.Request.PathValue("id"),
+		}).All(&divisions); err != nil {
+			return e.Error(http.StatusInternalServerError, "failed to load client time divisions", err)
+		}
+		return e.JSON(http.StatusOK, divisions)
 	}
 }
 

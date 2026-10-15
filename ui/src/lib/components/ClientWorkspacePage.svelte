@@ -5,6 +5,8 @@
   import { goto, replaceState } from "$app/navigation";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsList from "$lib/components/DSList.svelte";
+  import DsLabel from "$lib/components/DsLabel.svelte";
+  import DSToggle from "$lib/components/DSToggle.svelte";
   import HelpPopover from "$lib/components/jobs/TimeSummaryHelp.svelte";
   import DSTabBar from "$lib/components/DSTabBar.svelte";
   import ClientWorkspaceShell from "$lib/components/ClientWorkspaceShell.svelte";
@@ -28,6 +30,7 @@
     savedListPosition,
     workspaceHref,
     type WorkspaceInvoicing,
+    type WorkspaceTimeDivision,
     type WorkspaceContact,
     billingName,
   } from "$lib/clientWorkspace";
@@ -41,6 +44,7 @@
   const canMerge = $derived($globalStore.claims.includes("absorb"));
   const contacts = $derived(data.client.contacts as WorkspaceContact[]);
   const profiles = $derived(data.client.invoicing_profiles as WorkspaceInvoicing[]);
+  const timeDivisions = $derived(data.timeDivisions as WorkspaceTimeDivision[]);
   const jobs = $derived(data.jobs as JobsRecord[]);
   const filteredProfiles = $derived(
     listState.recipient
@@ -149,6 +153,47 @@
     [data.client.lead_given_name, data.client.lead_surname].filter(Boolean).join(" ") ||
       "Not assigned",
   );
+  function hoursText(hours: number) {
+    return `${hours.toLocaleString(undefined, { maximumFractionDigits: 2 })} hours`;
+  }
+  const divisionHours = $derived(timeDivisions.reduce((sum, d) => sum + d.hours, 0));
+  // Both scales make the busiest division the darkest chip.
+  const maxDivisionHours = $derived(Math.max(0, ...timeDivisions.map((d) => d.hours)));
+  const minDivisionHours = $derived(Math.min(...timeDivisions.map((d) => d.hours)));
+  // The help popover switches the shading scale. Log is the default; the choice
+  // is remembered between clients.
+  const divisionScaleKey = "clientDivisionScale";
+  let divisionScale = $state(readDivisionScale());
+  function readDivisionScale() {
+    try {
+      return localStorage.getItem(divisionScaleKey) === "linear" ? "linear" : "log";
+    } catch {
+      return "log";
+    }
+  }
+  $effect(() => {
+    try {
+      localStorage.setItem(divisionScaleKey, divisionScale);
+    } catch {
+      // Without storage the choice lasts until the page is left.
+    }
+  });
+  // Linear shades by hours relative to the busiest division. Logarithmic
+  // spreads the range from the fewest to the most hours, so small divisions
+  // differ from one another; equal steps mean equal ratios of hours.
+  function divisionShade(hours: number) {
+    if (divisionScale === "linear") return hours / maxDivisionHours;
+    if (maxDivisionHours === minDivisionHours) return 1;
+    return (
+      (Math.log(hours) - Math.log(minDivisionHours)) /
+      (Math.log(maxDivisionHours) - Math.log(minDivisionHours))
+    );
+  }
+  function shareText(hours: number) {
+    const percent = (hours / divisionHours) * 100;
+    const share = percent < 1 ? "under 1%" : `${Math.round(percent)}%`;
+    return `${hoursText(hours)} committed on this client's jobs, ${share} of the hours across all divisions.`;
+  }
 
   function href(changes: Record<string, string | number | null>) {
     return workspaceHref(data.client.id, workspaceUrl.searchParams, changes, data.tab);
@@ -256,6 +301,57 @@
                 As of {shortDate(data.client.outstanding_balance_date, true)}
               </p>{/if}
           </div>
+          {#if timeDivisions.length}<div class="sm:col-span-2 xl:col-span-4">
+              <div class="flex items-center gap-1">
+                <h3 class="text-sm font-semibold text-neutral-600">Divisions</h3>
+                <HelpPopover title="About these divisions" iconOnly>
+                  <p>
+                    Each division shown has at least one committed time entry on a job for this
+                    client. Projects and proposals both count. Each job counts toward its own
+                    client, so a child project counts here when this is its client.
+                  </p>
+                  <p>
+                    Only jobs where this is the client count. Jobs where this client is only the job
+                    owner do not.
+                  </p>
+                  <p>
+                    Time on timesheets that have not been committed, and entries without hours, are
+                    left out. Select a division to see its name and committed hours.
+                  </p>
+                  <p>Darker divisions have more hours. Choose how the shades are spread:</p>
+                  <DSToggle
+                    bind:value={divisionScale}
+                    ariaLabel="Division shading scale"
+                    showOptionDescriptions
+                    fullWidth
+                    options={[
+                      {
+                        id: "log",
+                        label: "Log",
+                        description:
+                          "Shades run from the fewest hours to the most on a log scale, so small divisions differ from one another. Each step darker multiplies the hours by the same amount.",
+                      },
+                      {
+                        id: "linear",
+                        label: "Linear",
+                        description:
+                          "Shades follow hours compared with the busiest division. Divisions with a small share all look light.",
+                      },
+                    ]}
+                  />
+                </HelpPopover>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                {#each timeDivisions as division (division.id)}
+                  <HelpPopover title={`${division.code} · ${division.name}`}>
+                    {#snippet trigger()}<DsLabel shade={divisionShade(division.hours)}
+                        >{division.code}</DsLabel
+                      >{/snippet}
+                    <p>{shareText(division.hours)}</p>
+                  </HelpPopover>
+                {/each}
+              </div>
+            </div>{/if}
         </div>
       </section>
       <div class="grid min-w-0 items-start gap-6 xl:grid-cols-2">

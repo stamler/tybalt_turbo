@@ -307,6 +307,13 @@
             {/each}
           </div>
         </DSCard>
+        <DSCard title="shade (how much, lightest to darkest)" span="full">
+          <div class="flex flex-wrap gap-2">
+            {#each [0, 0.2, 0.3, 0.5, 0.7, 0.8, 1] as shade (shade)}
+              <DsLabel {shade}>{shade}</DsLabel>
+            {/each}
+          </div>
+        </DSCard>
       </DSCardGrid>
     </DSSection>
 

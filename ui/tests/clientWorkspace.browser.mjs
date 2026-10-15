@@ -111,6 +111,12 @@ await runBrowserHarness(
       if (path === "/api/users/defaults" || path === "/api/nav/badges") return send({});
       if (path === `/api/clients/${client.id}`) return send(client);
       if (path === "/api/clients/missing") return send({ message: "Client not found" }, 404);
+      if (path === `/api/clients/${client.id}/time_divisions`)
+        return send([
+          { id: "div-cb", code: "CB", name: "Building Structural", hours: 2016 },
+          { id: "div-ci", code: "CI", name: "Civil", hours: 3.5 },
+          { id: "div-e", code: "E", name: "Environmental", hours: 100 },
+        ]);
       if (path === `/api/clients/${client.id}/notes`)
         return failNotesRefresh ? send({ message: "Notes refresh failed" }, 500) : send(notes);
       if (path === "/api/collections/client_notes/records" && request.method() === "POST") {
@@ -159,6 +165,47 @@ await runBrowserHarness(
     const invoicing = () => page.getByRole("region", { name: "Invoicing profiles", exact: true });
     await page.goto(root);
     await contacts().getByRole("searchbox").waitFor();
+    const information = page.getByRole("region", { name: "Client information", exact: true });
+    const chips = information.getByRole("button", { name: /^(CB|CI|E) · / });
+    assert.deepEqual(await chips.allInnerTexts(), ["CB", "CI", "E"]);
+    const background = (code) =>
+      chips
+        .filter({ hasText: new RegExp(`^${code}$`) })
+        .locator("span")
+        .evaluate((el) => getComputedStyle(el).backgroundColor);
+    const lightness = async (code) =>
+      (await background(code))
+        .match(/[\d.]+/g)
+        .slice(0, 3)
+        .map(Number)
+        .reduce((a, b) => a + b);
+    // Log shading is the default. It spreads the fewest hours to the most, so
+    // E sits between CB and CI.
+    assert.ok((await lightness("CB")) < (await lightness("E")), "log: CB is darker than E");
+    assert.ok((await lightness("E")) < (await lightness("CI")), "log: E is darker than CI");
+    // A click, not a hover delay, shows each division's hours and share.
+    for (const [name, text] of [
+      ["CB · Building Structural", "2,016 hours committed on this client's jobs, 95% of"],
+      ["CI · Civil", "3.5 hours committed on this client's jobs, under 1% of"],
+    ]) {
+      await information.getByRole("button", { name, exact: true }).click();
+      assert.match(await page.getByRole("dialog", { name }).innerText(), new RegExp(text));
+      await page.keyboard.press("Escape");
+    }
+    // The help popover explains the counting and switches to linear shading,
+    // where E's 5% share of CB's hours looks as light as CI.
+    await information.getByRole("button", { name: "About these divisions" }).click();
+    const help = page.getByRole("dialog", { name: "About these divisions" });
+    assert.match(await help.innerText(), /job owner do not/);
+    await help.getByRole("radio", { name: "Linear" }).click();
+    assert.match(await help.innerText(), /Divisions with a small share all look light/);
+    await page.keyboard.press("Escape");
+    assert.equal(await lightness("E"), await lightness("CI"), "linear: E is as light as CI");
+    assert.ok((await lightness("CB")) < (await lightness("E")), "linear: CB is darker than E");
+    // The choice is remembered for the next client page.
+    await page.reload();
+    await chips.first().waitFor();
+    assert.equal(await lightness("E"), await lightness("CI"), "linear is remembered");
     assert.match(await invoicing().innerText(), /Created Oct 1, 2026 by Alex Adams/);
     // Without recorded creation details, a profile shows only its usage.
     assert.match(await invoicing().innerText(), /^1 job · 1 request$/m);

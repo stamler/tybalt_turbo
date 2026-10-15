@@ -47,6 +47,9 @@ export type WorkspaceClient = WorkspaceAddress & {
   invoicing_profiles: WorkspaceInvoicing[];
 };
 
+// A division with committed time on jobs whose client is this client.
+export type WorkspaceTimeDivision = { id: string; code: string; name: string; hours: number };
+
 export function positivePage(value: string | null): number {
   const number = Number(value);
   return Number.isSafeInteger(number) && number > 0 ? number : 1;

@@ -26,6 +26,7 @@
     title,
     style,
     size = "md",
+    shade,
   }: {
     children: Snippet;
     color?: LabelColor | string;
@@ -33,6 +34,9 @@
     title?: string;
     style?: "inverted";
     size?: "md" | "sm";
+    // A neutral shade from 0 (lightest) to 1 (darkest), for showing how much
+    // of something each label has. It replaces color and tone.
+    shade?: number;
   } = $props();
 
   // Full class strings so Tailwind sees every class.
@@ -83,6 +87,18 @@
     },
   };
 
+  // Lightest to darkest, each with readable text.
+  // Neutral 500 is skipped: neither dark nor white text reads well on it.
+  const shades = [
+    "border-neutral-300 bg-white text-neutral-700",
+    "border-neutral-300 bg-neutral-100 text-neutral-800",
+    "border-neutral-300 bg-neutral-200 text-neutral-800",
+    "border-neutral-400 bg-neutral-300 text-neutral-900",
+    "border-neutral-500 bg-neutral-400 text-neutral-950",
+    "border-neutral-600 bg-neutral-600 text-white",
+    "border-neutral-800 bg-neutral-800 text-white",
+  ];
+
   const toneColors: Record<LabelTone, LabelColor> = {
     neutral: "neutral",
     info: "blue",
@@ -99,6 +115,11 @@
   const palette = $derived(
     colors[(tone ? toneColors[tone] : color) as LabelColor] ?? colors.neutral,
   );
+  const regular = $derived(
+    shade === undefined
+      ? palette.regular
+      : shades[Math.min(shades.length - 1, Math.max(0, Math.ceil(shade * shades.length) - 1))],
+  );
 </script>
 
 {#if style === "inverted"}
@@ -109,10 +130,7 @@
     {@render children()}
   </span>
 {:else}
-  <span
-    class="inline-flex items-center gap-1 rounded-sm border {palette.regular} {sizes[size]}"
-    {title}
-  >
+  <span class="inline-flex items-center gap-1 rounded-sm border {regular} {sizes[size]}" {title}>
     {@render children()}
   </span>
 {/if}

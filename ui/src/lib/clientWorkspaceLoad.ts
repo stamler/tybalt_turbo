@@ -8,6 +8,7 @@ import {
   parseClientWorkspaceQuery,
   positivePage,
   type WorkspaceClient,
+  type WorkspaceTimeDivision,
   type ClientWorkspaceTab,
 } from "$lib/clientWorkspace";
 
@@ -18,6 +19,15 @@ export async function loadClientWorkspace(
   const clientId = params.cid;
   const { view } = parseClientWorkspaceQuery(url.searchParams);
   await globalStore.ensureClaims();
+  // Only the details tab shows divisions. Start the request with the client's so
+  // the tab waits for the slower of the two, not both in turn.
+  const timeDivisions =
+    tab === "details"
+      ? pb.send<WorkspaceTimeDivision[]>(`/api/clients/${clientId}/time_divisions`, {
+          method: "GET",
+          requestKey: null,
+        })
+      : Promise.resolve([] as WorkspaceTimeDivision[]);
   // Route loads and hover preloads can read the same endpoint at once.
   // SvelteKit discards stale results; SDK cancellation must not cancel another load.
   let client: WorkspaceClient;
@@ -27,11 +37,13 @@ export async function loadClientWorkspace(
       requestKey: null,
     });
   } catch (failure) {
+    // The client error is the one to report; drop the divisions request.
+    timeDivisions.catch(() => {});
     if (failure instanceof ClientResponseError && failure.status === 404)
       error(404, "Client not found.");
     throw failure;
   }
-  const base = { client, tab, view };
+  const base = { client, tab, view, timeDivisions: await timeDivisions };
   // Load only what the open tab shows, so switching tabs stays quick.
   if (tab === "jobs") return { ...base, ...(await loadJobLists(clientId, view, url)), ...noNotes };
   if (tab === "notes") return { ...base, ...noJobs, ...(await loadNotes(clientId)) };

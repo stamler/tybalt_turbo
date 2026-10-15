@@ -10,6 +10,7 @@
     iconOnly = false,
     icon = "mdi:help-circle-outline",
     symbol,
+    trigger,
   }: {
     label?: string;
     title: string;
@@ -18,9 +19,11 @@
     iconOnly?: boolean;
     icon?: string;
     symbol?: string;
+    // Replaces the label and icon, for example with a DsLabel chip.
+    trigger?: Snippet;
   } = $props();
   const id = $props.id();
-  let trigger: HTMLButtonElement;
+  let button: HTMLButtonElement;
   let panel: HTMLDivElement;
   let open = $state(false);
   // Build contents on first use, then retain loaded details between opens.
@@ -28,7 +31,7 @@
   let position = $state({ top: 0, left: 0 });
 
   function placePanel() {
-    const anchor = trigger.getBoundingClientRect();
+    const anchor = button.getBoundingClientRect();
     const bounds = panel.getBoundingClientRect();
     const below = anchor.bottom + 8;
     const above = anchor.top - bounds.height - 8;
@@ -73,22 +76,28 @@
 </script>
 
 <button
-  bind:this={trigger}
+  bind:this={button}
   type="button"
   popovertarget={id}
   aria-label={label ? `${label}: ${title}` : title}
   aria-haspopup="dialog"
   aria-controls={id}
   aria-expanded={open}
-  class="inline-flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-sm px-1.5 py-1 text-sm hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-blue-600 {warning
-    ? 'text-amber-800'
-    : 'text-neutral-600'}"
+  class={trigger
+    ? "inline-flex cursor-pointer rounded-sm focus-visible:outline-2 focus-visible:outline-blue-600"
+    : `inline-flex min-h-8 min-w-8 items-center justify-center gap-1 rounded-sm px-1.5 py-1 text-sm hover:bg-neutral-100 focus-visible:outline-2 focus-visible:outline-blue-600 ${
+        warning ? "text-amber-800" : "text-neutral-600"
+      }`}
 >
-  {#if label && !iconOnly}<span>{label}</span>{/if}
-  {#if symbol}
-    <span aria-hidden="true" class="font-semibold">{symbol}</span>
+  {#if trigger}
+    {@render trigger()}
   {:else}
-    <Icon {icon} width="16" aria-hidden="true" />
+    {#if label && !iconOnly}<span>{label}</span>{/if}
+    {#if symbol}
+      <span aria-hidden="true" class="font-semibold">{symbol}</span>
+    {:else}
+      <Icon {icon} width="16" aria-hidden="true" />
+    {/if}
   {/if}
 </button>
 
