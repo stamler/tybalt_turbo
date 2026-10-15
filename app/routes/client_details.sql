@@ -79,9 +79,9 @@ LEFT JOIN users lead ON lead.id = c.business_development_lead
 LEFT JOIN (
   SELECT client, COUNT(*) AS referencing_jobs_count
   FROM (
-    SELECT id AS job_id, client FROM jobs WHERE client IS NOT NULL AND client != ''
+    SELECT id AS job_id, client FROM jobs WHERE client = {:id}
     UNION
-    SELECT id AS job_id, job_owner AS client FROM jobs WHERE job_owner IS NOT NULL AND job_owner != ''
+    SELECT id AS job_id, job_owner AS client FROM jobs WHERE job_owner = {:id}
   ) j
   GROUP BY client
 ) j_count ON j_count.client = c.id
@@ -90,7 +90,7 @@ LEFT JOIN (
     SUM(outstanding_balance) AS total_outstanding_balance,
     MAX(outstanding_balance_date) AS latest_outstanding_balance_date
   FROM jobs
-  WHERE client IS NOT NULL AND client != ''
+  WHERE client = {:id}
   GROUP BY client
 ) j_sum ON j_sum.client = c.id
 WHERE c.id = {:id};
