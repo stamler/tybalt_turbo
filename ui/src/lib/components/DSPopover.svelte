@@ -1,5 +1,9 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
+  import DSActionButton from "./DSActionButton.svelte";
+  import DSModal from "./DSModal.svelte";
+
+  // A confirm or small form dialog: DSModal with a Cancel and submit footer.
 
   let {
     show = $bindable(),
@@ -38,43 +42,25 @@
   }
 </script>
 
-{#if show}
-  <div class="fixed inset-0 z-9999 flex items-center justify-center bg-black/50">
-    <div class="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
-      <h2 class="mb-2 text-xl font-bold">{title}</h2>
-      {#if subtitle}
-        <p class="mb-4 text-sm text-neutral-600">{subtitle}</p>
-      {/if}
-
-      <div class="mb-4 flex flex-col gap-4">
-        {@render children()}
-      </div>
-
-      {#if error}
-        <p class="mb-4 text-sm text-red-600">{error}</p>
-      {/if}
-
-      <div class="flex justify-end gap-2">
-        <button
-          type="button"
-          class="rounded-sm bg-neutral-200 px-4 py-2 text-neutral-700 hover:bg-neutral-300"
-          onclick={handleCancel}
-          disabled={submitting}
-        >
-          Cancel
-        </button>
-        <button
-          type="button"
-          class="rounded-sm px-4 py-2 text-white disabled:opacity-50 {danger
-            ? 'bg-red-700 hover:bg-red-800'
-            : 'bg-blue-500 hover:bg-blue-600'}"
-          onclick={onSubmit}
-          disabled={submitting || submitDisabled}
-          class:pointer-events-none={submitting || submitDisabled}
-        >
-          {submitting ? "Saving..." : submitLabel}
-        </button>
-      </div>
-    </div>
+<DSModal bind:show {title} {subtitle} size="sm" dismissible={!submitting} onclose={handleCancel}>
+  <div class="flex flex-col gap-4">
+    {@render children()}
   </div>
-{/if}
+
+  {#if error}
+    <p class="mt-4 text-sm text-red-600">{error}</p>
+  {/if}
+
+  {#snippet footer()}
+    <DSActionButton variant="secondary" action={handleCancel} disabled={submitting}>
+      Cancel
+    </DSActionButton>
+    <DSActionButton
+      variant={danger ? "danger" : "primary"}
+      action={onSubmit}
+      disabled={submitting || submitDisabled}
+    >
+      {submitting ? "Saving..." : submitLabel}
+    </DSActionButton>
+  {/snippet}
+</DSModal>

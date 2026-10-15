@@ -1,6 +1,6 @@
 # UI Design System Proposal
 
-Status: accepted 2026-10-15 with the section 7 recommendations. Phase 1 (rules and check) is implemented; phases 2–6 are not.
+Status: accepted 2026-10-15 with the section 7 recommendations. Phases 1 (rules and check) and 2 (building blocks and the `/dev/components` gallery) are implemented; phases 3–6 are not.
 
 ## 1. Why
 
@@ -89,7 +89,8 @@ All new components use the `DS` prefix (decision D5). Existing components keep t
 - `"chip"` (default): today's compact button.
 - `"primary"`: filled blue, white text, `px-4 py-2`. For form submits and dialog confirms.
 - `"danger"`: filled red. For destructive confirms.
-- `"plain"`: text-only.
+- `"secondary"`: filled grey. For Cancel beside a primary or danger button (added in phase 2 so `DSPopover` keeps its look).
+- `"plain"`: text-only, styled like a link.
 
 Colour classes move into a static map. This replaces the raw buttons inside `DSPopover` and most of the 144 raw buttons elsewhere.
 
@@ -192,7 +193,7 @@ The one modal shell, built on native `<dialog>` with `showModal()`. That gives t
   subtitle?: string;
   size?: "sm" | "md" | "lg";       // max-w-md / max-w-lg / max-w-2xl
   dismissible?: boolean;           // backdrop click and Escape close it (default true; false while submitting)
-  onclose?: () => void;
+  onclose?: () => void;            // called instead of setting show=false on Escape or backdrop click
   children: Snippet;
   footer?: Snippet;                // usually DSActionButtons, right-aligned
 }
@@ -210,6 +211,7 @@ An anchored panel that closes on outside click or Escape. It replaces the four h
   open?: boolean;           // $bindable
   label: string;            // accessible name for the trigger and panel
   align?: "start" | "end";
+  hideWhenEmpty?: boolean;  // hide the trigger while no DSMenuItem is inside (DSPageHeader's menu)
   trigger: Snippet<[{ toggle: () => void; open: boolean }]>;
   children: Snippet;
 }
@@ -246,17 +248,17 @@ A `/dev/components` route, visible only to the admin claim, renders every `DS` c
 
 `npm run check:ui`, also the first step of `npm run lint`. It scans every `.svelte` file under `ui/src` except the `DS*` / `Ds*` components at the top of `src/lib/components/`, which own the styling.
 
-| Rule                 | Flags                                                            | Use instead            | Status              |
-| -------------------- | ---------------------------------------------------------------- | ---------------------- | ------------------- |
-| `raw-button`         | `<button`                                                        | `DSActionButton`       | error               |
-| `raw-details`        | `<details`                                                       | `DSCollapsible`        | error               |
-| `off-palette-grey`   | `*-gray-*`, `*-slate-*`, `*-zinc-*`, `*-stone-*`                 | `neutral`              | error               |
-| `off-scale-radius`   | bare `rounded`, `rounded-(md\|lg\|xl\|2xl\|3xl)`                 | `rounded-sm`           | error               |
-| `hand-styled-link`   | a class with `text-blue-NNN` and `underline` / `hover:underline` | `class="link"`         | error               |
-| `hand-built-overlay` | `fixed inset-0`                                                  | `DSModal` / `DSFlyout` | warning until built |
-| `hand-tinted-box`    | `bg-(amber\|yellow\|red\|green\|blue\|…)-50` (not `hover:`)      | `DSCallout`            | warning until built |
-| `hand-written-field` | `<span class="…font-semibold…">Label:</span>`                    | `DSField`              | warning until built |
-| `raw-page-title`     | `<h1`                                                            | `DSPageHeader`         | warning until built |
+| Rule                 | Flags                                                            | Use instead            | Status          |
+| -------------------- | ---------------------------------------------------------------- | ---------------------- | --------------- |
+| `raw-button`         | `<button`                                                        | `DSActionButton`       | error           |
+| `raw-details`        | `<details`                                                       | `DSCollapsible`        | error           |
+| `off-palette-grey`   | `*-gray-*`, `*-slate-*`, `*-zinc-*`, `*-stone-*`                 | `neutral`              | error           |
+| `off-scale-radius`   | bare `rounded`, `rounded-(md\|lg\|xl\|2xl\|3xl)`                 | `rounded-sm`           | error           |
+| `hand-styled-link`   | a class with `text-blue-NNN` and `underline` / `hover:underline` | `class="link"`         | error           |
+| `hand-built-overlay` | `fixed inset-0`                                                  | `DSModal` / `DSFlyout` | error (phase 2) |
+| `hand-tinted-box`    | `bg-(amber\|yellow\|red\|green\|blue\|…)-50` (not `hover:`)      | `DSCallout`            | error (phase 2) |
+| `hand-written-field` | `<span class="…font-semibold…">Label:</span>`                    | `DSField`              | error (phase 2) |
+| `raw-page-title`     | `<h1`                                                            | `DSPageHeader`         | error (phase 2) |
 
 Existing occurrences are counted per file in `ui/scripts/check-ui-baseline.json`. A file that goes above its count fails (or warns, for rules whose replacement isn't built yet). `--update` lowers counts after a cleanup but never raises one or adds a file; `--init` rewrites the baseline and is for humans only, for example after moving a file. A deliberate exception gets `ui-check-allow: <reason>` on the same line or the line above. When a planned component lands, flip its rule from `pending` to an error.
 

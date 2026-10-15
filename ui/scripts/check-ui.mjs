@@ -23,7 +23,7 @@ const scanRoot = join(uiRoot, "src");
 const componentsDir = join(scanRoot, "lib", "components");
 
 // pending: the replacement component is not built yet, so an increase is a
-// warning instead of a failure. Flip to false once it lands.
+// warning instead of a failure. Remove it once the component lands.
 const rules = [
   {
     id: "raw-button",
@@ -54,26 +54,22 @@ const rules = [
   {
     id: "hand-built-overlay",
     pattern: /\bfixed inset-0\b/g,
-    use: "DSPopover for confirms; DSModal / DSFlyout once built",
-    pending: true,
+    use: "DSModal (DSPopover for confirms) or DSFlyout",
   },
   {
     id: "hand-tinted-box",
     pattern: /(?<![\w:-])bg-(?:amber|yellow|red|green|blue|orange|sky|emerald|rose)-50\b/g,
-    use: "DSCallout once built",
-    pending: true,
+    use: "DSCallout",
   },
   {
     id: "hand-written-field",
     pattern: /<span class="[^"]*\bfont-semibold\b[^"]*">[^<{]+:\s*<\/span>/g,
-    use: "DSField once built",
-    pending: true,
+    use: "DSFieldList / DSField",
   },
   {
     id: "raw-page-title",
     pattern: /<h1\b/g,
-    use: "DSPageHeader once built",
-    pending: true,
+    use: "DSPageHeader",
   },
 ];
 

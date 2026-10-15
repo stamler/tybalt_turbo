@@ -218,6 +218,7 @@ export const navSections: NavSection[] = [
       },
       { label: "Admin Profiles", href: "/admin_profiles/list", buttons: [] },
       { label: "Claims", href: "/claims/list", buttons: [] },
+      { label: "UI Components", href: "/dev/components", buttons: [], requiredClaim: "admin" },
     ],
   },
   {

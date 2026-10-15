@@ -17,24 +17,28 @@ Full rationale and component APIs: ../descriptions/ui_design_system.md.
 
 ## Which component for what
 
-| Need                         | Use                                                                                                                                    |
-| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| Any button                   | DSActionButton                                                                                                                         |
-| Confirm or small form dialog | DSPopover                                                                                                                              |
-| Chip or tag                  | DsLabel                                                                                                                                |
-| Show/hide block              | DSCollapsible                                                                                                                          |
-| Tabs                         | DSTabBar                                                                                                                               |
-| Lists of records             | DSList / DSSearchList                                                                                                                  |
-| Inputs                       | DSTextInput, DSSelector, DSAutoComplete, DSDateInput, DSCurrencyInput, DSToggle, DsCheck, DsFileSelect, DSLocationPicker, DSTokenInput |
-| Files                        | DsFileLink, DsFileSelect                                                                                                               |
-| Editing-disabled notice      | DsEditingDisabledBanner                                                                                                                |
+| Need                                | Use                                                                                                                                    |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Any button                          | DSActionButton (`variant`: chip, primary, danger, secondary, plain)                                                                    |
+| Top of a detail page                | DSPageHeader (title, badges, context line, actions, ⋯ menu)                                                                            |
+| Grey box of related fields          | DSCard inside DSCardGrid                                                                                                               |
+| Page section with a heading, no box | DSSection                                                                                                                              |
+| Label and value                     | DSFieldList / DSField                                                                                                                  |
+| Notice, warning or error box        | DSCallout (`tone`: info, success, warning, danger)                                                                                     |
+| Confirm or small form dialog        | DSPopover                                                                                                                              |
+| Any other modal                     | DSModal                                                                                                                                |
+| Anchored panel or menu              | DSFlyout with DSMenuItem                                                                                                               |
+| Chip or tag                         | DsLabel (`tone` for meaning, `color` for categories, `size="sm"`)                                                                      |
+| Job, PO or expense status           | DSStatusLabel                                                                                                                          |
+| Show/hide block                     | DSCollapsible                                                                                                                          |
+| Tabs                                | DSTabBar                                                                                                                               |
+| Lists of records                    | DSList / DSSearchList                                                                                                                  |
+| Inputs                              | DSTextInput, DSSelector, DSAutoComplete, DSDateInput, DSCurrencyInput, DSToggle, DsCheck, DsFileSelect, DSLocationPicker, DSTokenInput |
+| Files                               | DsFileLink, DsFileSelect                                                                                                               |
+| Editing-disabled notice             | DsEditingDisabledBanner                                                                                                                |
 
-Planned but not built yet (APIs in the design doc): DSPageHeader, DSCard /
-DSCardGrid, DSSection, DSFieldList / DSField, DSCallout, DSModal, DSFlyout /
-DSMenuItem, DSStatusLabel, and the primary/danger/plain variants of
-DSActionButton. Until one exists, match the nearest existing page and say in
-your summary that the pattern should move to that component. Do not build
-one of these as a side effect of an unrelated task.
+Every component is shown in each variant at /dev/components (admins only;
+source in src/routes/dev/components/+page.svelte).
 
 ## Look
 
@@ -53,9 +57,11 @@ one of these as a side effect of an unrelated task.
 
 ## Never
 
-- Hand-build an overlay (`fixed inset-0`) or a z-index stack.
+- Hand-build an overlay (`fixed inset-0`) or a z-index stack; use DSModal
+  or DSFlyout.
 - Write a raw `<button>`; use DSActionButton.
-- Write `<span class="font-semibold">Label:</span> value` rows in new code.
+- Write `<span class="font-semibold">Label:</span> value` rows; use DSField.
+- Hand-tint a notice box (`bg-amber-50` and friends); use DSCallout.
 
 ## The check
 
