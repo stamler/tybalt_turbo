@@ -135,7 +135,7 @@ export function valueBlockers(job: {
   project_completion_date?: string;
   location?: string;
   branch_id?: string;
-  allocations?: unknown[];
+  allocations?: unknown[] | null;
 }): string[] {
   const missing: string[] = [];
   if (!job.invoicing_information) missing.push("an invoicing profile");

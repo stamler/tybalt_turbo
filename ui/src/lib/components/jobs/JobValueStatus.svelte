@@ -1,6 +1,8 @@
 <script lang="ts">
   import { pb } from "$lib/pocketbase";
   import { globalStore } from "$lib/stores/global";
+  import DSActionButton from "$lib/components/DSActionButton.svelte";
+  import DSCallout from "$lib/components/DSCallout.svelte";
   import DSPopover from "$lib/components/DSPopover.svelte";
   import JobValueReview from "./JobValueReview.svelte";
   import { JobValue, valueCAD } from "$lib/jobValue.svelte";
@@ -22,39 +24,31 @@
 </script>
 
 {#if item}
-  <div
-    class="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-sm border px-3 py-2 {item.status ===
-    'Rejected'
-      ? 'border-red-300 bg-red-50'
-      : 'border-amber-300 bg-amber-50'}"
+  <DSCallout
+    tone={item.status === "Rejected" ? "danger" : "warning"}
+    title={`Value change to ${valueCAD(item.project_value)} ${item.status === "Rejected" ? "rejected" : "pending"}`}
   >
-    <p class="grow">
+    <p>
       {#if item.status === "Rejected"}
-        <span class="font-semibold">Value change to {valueCAD(item.project_value)} rejected</span>
-        by {item.rejector_name || item.rejector}: {item.rejection_reason}
+        Rejected by {item.rejector_name || item.rejector}: {item.rejection_reason}
       {:else}
-        <span class="font-semibold">Value change to {valueCAD(item.project_value)} pending</span>
-        · awaiting {item.assigned_approver_name || item.assigned_approver}
+        Awaiting {item.assigned_approver_name || item.assigned_approver}
       {/if}
     </p>
-    <div class="flex flex-wrap gap-2">
-      {#if isApprover}<button
-          type="button"
-          class="rounded bg-blue-700 px-3 py-1 text-white"
-          onclick={() => (reviewing = true)}>Review</button
+    {#snippet actions()}
+      {#if isApprover}<DSActionButton variant="primary" action={() => (reviewing = true)}
+          >Review</DSActionButton
         >{/if}
-      {#if claims.includes("job")}<button
-          type="button"
-          class="rounded border border-neutral-400 bg-white px-3 py-1"
-          onclick={() => value.openProposal(item)}>Correct value change</button
+      {#if claims.includes("job")}<DSActionButton
+          variant="secondary"
+          action={() => value.openProposal(item)}>Correct value change</DSActionButton
         >{/if}
-      {#if claims.includes("admin")}<button
-          type="button"
-          class="rounded border border-red-700 bg-white px-3 py-1 text-red-800"
-          onclick={() => (confirmingDelete = true)}>Delete pending change</button
+      {#if claims.includes("admin")}<DSActionButton
+          variant="danger"
+          action={() => (confirmingDelete = true)}>Delete pending change</DSActionButton
         >{/if}
-    </div>
-  </div>
+    {/snippet}
+  </DSCallout>
   {#if value.error && !reviewing && !confirmingDelete}<p role="alert" class="text-sm text-red-800">
       {value.error}
     </p>{/if}

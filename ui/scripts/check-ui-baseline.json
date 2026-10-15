@@ -23,7 +23,7 @@
     "src/lib/components/jobs/JobValueLine.svelte": 2,
     "src/lib/components/jobs/JobValueProposal.svelte": 2,
     "src/lib/components/jobs/JobValueReview.svelte": 3,
-    "src/lib/components/jobs/JobValueStatus.svelte": 4,
+    "src/lib/components/jobs/JobValueStatus.svelte": 1,
     "src/lib/components/jobs/POsTabContent.svelte": 1,
     "src/lib/components/jobs/RequestEditor.svelte": 3,
     "src/lib/components/jobs/TimeSummaryHelp.svelte": 2,
@@ -54,8 +54,7 @@
     "src/routes/time/tracking/[weekEnding]/+page.svelte": 1
   },
   "raw-details": {
-    "src/lib/components/clients/ContactEditor.svelte": 2,
-    "src/routes/jobs/[jid]/details/+page.svelte": 1
+    "src/lib/components/clients/ContactEditor.svelte": 2
   },
   "off-palette-grey": {
     "src/lib/components/ExpensesList.svelte": 1,
@@ -93,7 +92,7 @@
     "src/lib/components/jobs/JobValueProposal.svelte": 5,
     "src/lib/components/jobs/JobValueQueue.svelte": 1,
     "src/lib/components/jobs/JobValueReview.svelte": 3,
-    "src/lib/components/jobs/JobValueStatus.svelte": 4,
+    "src/lib/components/jobs/JobValueStatus.svelte": 1,
     "src/lib/components/jobs/RequestEditor.svelte": 4,
     "src/lib/components/jobs/TimeSummaryHelp.svelte": 1,
     "src/lib/components/jobs/WIPSummary.svelte": 1,
@@ -145,7 +144,6 @@
     "src/routes/job-requests/+page.svelte": 8,
     "src/routes/job-requests/[id]/+page.svelte": 5,
     "src/routes/job-requests/[id]/print/+page.svelte": 1,
-    "src/routes/jobs/[jid]/details/+page.svelte": 10,
     "src/routes/jobs/stale/+page.svelte": 1,
     "src/routes/jobs/unused/+page.svelte": 1,
     "src/routes/pos/[poid]/details/+page.svelte": 6,
@@ -189,7 +187,7 @@
     "src/lib/components/jobs/JobValueLine.svelte": 1,
     "src/lib/components/jobs/JobValueProposal.svelte": 2,
     "src/lib/components/jobs/JobValueQueue.svelte": 1,
-    "src/lib/components/jobs/JobValueStatus.svelte": 3,
+    "src/lib/components/jobs/JobValueStatus.svelte": 1,
     "src/lib/components/jobs/RequestEditor.svelte": 1,
     "src/lib/components/jobs/WIPReport.svelte": 1,
     "src/routes/admin_profiles/po_approvers/+page.svelte": 1,
@@ -198,7 +196,6 @@
     "src/routes/expenses/settlement/+page.svelte": 1,
     "src/routes/job-requests/+page.svelte": 1,
     "src/routes/job-requests/[id]/+page.svelte": 3,
-    "src/routes/jobs/[jid]/details/+page.svelte": 1,
     "src/routes/machine_secrets/+page.svelte": 2,
     "src/routes/pos/[poid]/details/+page.svelte": 3,
     "src/routes/pos/approval-limits/+page.svelte": 1,
@@ -213,7 +210,6 @@
     "src/lib/components/jobs/TimeTabContent.svelte": 2,
     "src/routes/admin_profiles/[id]/details/+page.svelte": 27,
     "src/routes/expenses/[eid]/details/+page.svelte": 27,
-    "src/routes/jobs/[jid]/details/+page.svelte": 31,
     "src/routes/pos/[poid]/details/+page.svelte": 26
   },
   "raw-page-title": {
@@ -241,7 +237,6 @@
     "src/routes/job-requests/[id]/+page.svelte": 1,
     "src/routes/job-requests/[id]/print/+page.svelte": 1,
     "src/routes/job-requests/new/+page.svelte": 1,
-    "src/routes/jobs/[jid]/details/+page.svelte": 1,
     "src/routes/jobs/value-approvals/+page.svelte": 1,
     "src/routes/login/+page.svelte": 1,
     "src/routes/machine_secrets/+page.svelte": 1,

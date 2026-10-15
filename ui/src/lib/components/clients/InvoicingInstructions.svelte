@@ -1,7 +1,8 @@
 <script lang="ts">
   import Icon from "@iconify/svelte";
 
-  let { text }: { text: string } = $props();
+  // hideWhenEmpty renders nothing instead of "No additional instructions".
+  let { text, hideWhenEmpty = false }: { text: string; hideWhenEmpty?: boolean } = $props();
   let expanded = $state(false);
   const textId = $props.id();
   const instructions = $derived(text.trim());
@@ -31,6 +32,6 @@
           >{/if}
       </button>{/if}
   </p>
-{:else}
+{:else if !hideWhenEmpty}
   <p class="text-sm text-neutral-600">No additional instructions</p>
 {/if}

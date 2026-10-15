@@ -1,6 +1,6 @@
 # UI Design System Proposal
 
-Status: accepted 2026-10-15 with the section 7 recommendations. Phases 1 (rules and check) and 2 (building blocks and the `/dev/components` gallery) are implemented; phases 3–6 are not.
+Status: accepted 2026-10-15 with the section 7 recommendations. Phases 1 (rules and check), 2 (building blocks and the `/dev/components` gallery) and 3 (job details pilot) are implemented; phases 4–6 are not.
 
 ## 1. Why
 
@@ -318,26 +318,26 @@ Notes ────────────────────────�
 
 ### Where every current field goes
 
-| Current element                                                                                                                                 | New home                                                 |
-| ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| "Job Details" H1                                                                                                                                | removed; `DSPageHeader` title is the job number          |
-| Job Number, Description                                                                                                                         | header title, subtitle                                   |
-| "proposal" label, Status                                                                                                                        | header badges (`DsLabel`, `DSStatusLabel`)               |
-| Time & Materials                                                                                                                                | header badge "T&M" when yes; otherwise omitted           |
-| Parent Job, Proposal (on projects)                                                                                                              | header context line                                      |
-| Edit, Create Subjob, Award, Create project from proposal                                                                                        | header actions                                           |
-| Change Number, Change Client, Close imported project                                                                                            | header `⋯` menu                                          |
-| `JobValueStatus` banner                                                                                                                         | `DSCallout` directly under the header                    |
-| Client, Contact, Job Owner, Manager, Alternate Manager, Branch                                                                                  | Client & team card                                       |
-| Project Value + `JobValueLine` actions, Outstanding Balance, Rate Sheet, Client PO, Client Reference Number, Authorizing Document, FN Agreement | Value & contract card                                    |
-| Proposal Value, Opening Date, Submission Due (proposals)                                                                                        | Value & contract card, replacing the project fields      |
-| Invoicing profile block                                                                                                                         | Invoicing card (below)                                   |
-| Children, Projects (on proposals), Divisions, Categories                                                                                        | Structure card; divisions become chips ("Civil · 120 h") |
-| Project Award Date, Completion Date, Project Request line                                                                                       | Dates card, all via `shortDate`                          |
-| Location map                                                                                                                                    | `DSCollapsible` "Location", closed by default            |
-| "Additional Details" `<details>`                                                                                                                | removed (decision D3)                                    |
-| `ClientNotesSection` inside the grey box                                                                                                        | its own `DSSection` "Notes"                              |
-| Tabs                                                                                                                                            | unchanged                                                |
+| Current element                                                                                                                                 | New home                                                                                                 |
+| ----------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| "Job Details" H1                                                                                                                                | removed; `DSPageHeader` title is the job number                                                          |
+| Job Number, Description                                                                                                                         | header title, subtitle                                                                                   |
+| "proposal" label, Status                                                                                                                        | header badges (`DsLabel`, `DSStatusLabel`)                                                               |
+| Time & Materials                                                                                                                                | header badge "T&M" when yes; otherwise omitted                                                           |
+| Parent Job, Proposal (on projects)                                                                                                              | header context line                                                                                      |
+| Edit, Create Subjob, Award, Create project from proposal                                                                                        | header actions                                                                                           |
+| Change Number, Change Client, Close imported project                                                                                            | header `⋯` menu                                                                                          |
+| `JobValueStatus` banner                                                                                                                         | `DSCallout` directly under the header                                                                    |
+| Client, Contact, Job Owner, Manager, Alternate Manager, Branch                                                                                  | Client & team card                                                                                       |
+| Project Value + `JobValueLine` actions, Outstanding Balance, Rate Sheet, Client PO, Client Reference Number, Authorizing Document, FN Agreement | Value & contract card                                                                                    |
+| Proposal Value (proposals)                                                                                                                      | Value card, replacing the project fields; proposal opening and submission-due dates go in the Dates card |
+| Invoicing profile block                                                                                                                         | Invoicing card (below)                                                                                   |
+| Children, Projects (on proposals), Divisions, Categories                                                                                        | Structure card; divisions become chips ("Civil · 120 h")                                                 |
+| Project Award Date, Completion Date, Project Request line                                                                                       | Dates card, all via `shortDate`                                                                          |
+| Location map                                                                                                                                    | `DSCollapsible` "Location", closed by default                                                            |
+| "Additional Details" `<details>`                                                                                                                | removed (decision D3)                                                                                    |
+| `ClientNotesSection` inside the grey box                                                                                                        | its own `DSSection` "Notes"                                                                              |
+| Tabs                                                                                                                                            | unchanged                                                                                                |
 
 ### Invoicing card
 
@@ -382,7 +382,7 @@ Each phase is its own commit or PR.
 
 1. **Rules and check (done):** `ui/CLAUDE.md`, the `link` utility, `ui/scripts/check-ui.mjs` with its baseline. No visual change.
 2. **Building blocks:** the new components, the `DSActionButton` / `DsLabel` / `DSPopover` changes, and the gallery route.
-3. **Pilot:** job details, as specified in section 6.
+3. **Pilot (done):** job details, as specified in section 6. It lives in `JobHeader`, `JobSummary` and `JobInvoicingCard` under `src/lib/components/jobs/`.
 4. **Other detail pages:** expense, PO, admin profile, rate sheet, vendor, claims, onto `DSPageHeader` / `DSCard` / `DSField`.
 5. **Overlays:** the seven modals and four flyouts move onto `DSModal` / `DSFlyout`.
 6. **Sweep:** remaining raw buttons, callouts, grey shades and radii. Delete unused components, trim the `app.css` safelist, and empty the baseline.

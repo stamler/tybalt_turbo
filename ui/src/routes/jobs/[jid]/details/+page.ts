@@ -2,10 +2,13 @@ import { pb } from "$lib/pocketbase";
 import type { PageLoad } from "./$types";
 import { error } from "@sveltejs/kit";
 import type { ClientNote } from "$lib/types/notes";
+import type { JobDetails } from "$lib/components/jobs/types";
 
 export const load: PageLoad = async ({ params }) => {
   try {
-    const job = await pb.send(`/api/jobs/${params.jid}/details`, { method: "GET" });
+    const job = (await pb.send(`/api/jobs/${params.jid}/details`, {
+      method: "GET",
+    })) as JobDetails;
     const notes = (await pb.send(`/api/jobs/${params.jid}/notes`, {
       method: "GET",
     })) as ClientNote[];

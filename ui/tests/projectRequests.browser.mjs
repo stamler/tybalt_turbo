@@ -346,7 +346,7 @@ await runBrowserHarness(
     assert.match(await page.locator("#app").innerText(), /Project Value:\s*\$120,000/);
     assert.match(
       await page.locator("#app").innerText(),
-      /Value change to \$150,000 pending · awaiting/,
+      /Value change to \$150,000 pending\s*Awaiting/,
     );
     assert.equal(
       await page.getByRole("button", { name: "Delete pending change", exact: true }).count(),
