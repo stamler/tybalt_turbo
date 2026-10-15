@@ -785,7 +785,7 @@ against the proposed positive value, while retaining the historical effective
 value until approval. Other job fields must pass their normal validation.
 Ordinary job edits must pass the new validation, including a status-only edit
 that sets a project to `Active`. An older project whose stored value is still
-zero or negative can be edited without setting a value, for example to add the
+zero can be edited without setting a value, for example to add the
 invoicing profile a value change needs; setting a value, or changing its status
 to `Active` or `Closed`, still requires a positive value. An edit that only sets
 a project to `Closed` or `Cancelled` keeps the existing status rules and does
