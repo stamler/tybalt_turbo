@@ -5,8 +5,7 @@
   import { goto, replaceState } from "$app/navigation";
   import DsActionButton from "$lib/components/DSActionButton.svelte";
   import DsList from "$lib/components/DSList.svelte";
-  import DsLabel from "$lib/components/DsLabel.svelte";
-  import DSToggle from "$lib/components/DSToggle.svelte";
+  import DsLabel, { type LabelShade } from "$lib/components/DsLabel.svelte";
   import HelpPopover from "$lib/components/jobs/TimeSummaryHelp.svelte";
   import DSTabBar from "$lib/components/DSTabBar.svelte";
   import ClientWorkspaceShell from "$lib/components/ClientWorkspaceShell.svelte";
@@ -157,41 +156,34 @@
     return `${hours.toLocaleString(undefined, { maximumFractionDigits: 2 })} hours`;
   }
   const divisionHours = $derived(timeDivisions.reduce((sum, d) => sum + d.hours, 0));
-  // Both scales make the busiest division the darkest chip.
-  const maxDivisionHours = $derived(Math.max(0, ...timeDivisions.map((d) => d.hours)));
-  const minDivisionHours = $derived(Math.min(...timeDivisions.map((d) => d.hours)));
-  // The help popover switches the shading scale. Log is the default; the choice
-  // is remembered between clients.
-  const divisionScaleKey = "clientDivisionScale";
-  let divisionScale = $state(readDivisionScale());
-  function readDivisionScale() {
-    try {
-      return localStorage.getItem(divisionScaleKey) === "linear" ? "linear" : "log";
-    } catch {
-      return "log";
-    }
+  // Chips are shaded by fixed bands of their share of the client's hours, so a
+  // shade means the same share on every client. Each value is the lowest share
+  // in its band; the bands run lightest to darkest.
+  const shareBands = [
+    { from: 0, label: "under 0.1%" },
+    { from: 0.1, label: "0.1–0.5%" },
+    { from: 0.5, label: "0.5–2%" },
+    { from: 2, label: "2–5%" },
+    { from: 5, label: "5–10%" },
+    { from: 10, label: "10–25%" },
+    { from: 25, label: "25% or more" },
+  ] as const;
+  function sharePercent(hours: number) {
+    return (hours / divisionHours) * 100;
   }
-  $effect(() => {
-    try {
-      localStorage.setItem(divisionScaleKey, divisionScale);
-    } catch {
-      // Without storage the choice lasts until the page is left.
-    }
-  });
-  // Linear shades by hours relative to the busiest division. Logarithmic
-  // spreads the range from the fewest to the most hours, so small divisions
-  // differ from one another; equal steps mean equal ratios of hours.
   function divisionShade(hours: number) {
-    if (divisionScale === "linear") return hours / maxDivisionHours;
-    if (maxDivisionHours === minDivisionHours) return 1;
-    return (
-      (Math.log(hours) - Math.log(minDivisionHours)) /
-      (Math.log(maxDivisionHours) - Math.log(minDivisionHours))
-    );
+    const percent = sharePercent(hours);
+    return (shareBands.findLastIndex((band) => percent >= band.from) + 1) as LabelShade;
   }
   function shareText(hours: number) {
-    const percent = (hours / divisionHours) * 100;
-    const share = percent < 1 ? "under 1%" : `${Math.round(percent)}%`;
+    const percent = sharePercent(hours);
+    // Round down, so the share shown never falls in a darker band than the chip.
+    const share =
+      percent < 0.1
+        ? "under 0.1%"
+        : percent < 10
+          ? `${Math.floor(percent * 10) / 10}%`
+          : `${Math.floor(percent)}%`;
     return `${hoursText(hours)} committed on this client's jobs, ${share} of the hours across all divisions.`;
   }
 
@@ -318,27 +310,12 @@
                     Time on timesheets that have not been committed, and entries without hours, are
                     left out. Select a division to see its name and committed hours.
                   </p>
-                  <p>Darker divisions have more hours. Choose how the shades are spread:</p>
-                  <DSToggle
-                    bind:value={divisionScale}
-                    ariaLabel="Division shading scale"
-                    showOptionDescriptions
-                    fullWidth
-                    options={[
-                      {
-                        id: "log",
-                        label: "Log",
-                        description:
-                          "Shades run from the fewest hours to the most on a log scale, so small divisions differ from one another. Each step darker multiplies the hours by the same amount.",
-                      },
-                      {
-                        id: "linear",
-                        label: "Linear",
-                        description:
-                          "Shades follow hours compared with the busiest division. Divisions with a small share all look light.",
-                      },
-                    ]}
-                  />
+                  <p>Darker divisions have a larger share of this client's hours:</p>
+                  <div class="flex flex-wrap gap-2">
+                    {#each shareBands as band, i (band.from)}
+                      <DsLabel shade={(i + 1) as LabelShade} size="sm">{band.label}</DsLabel>
+                    {/each}
+                  </div>
                 </HelpPopover>
               </div>
               <div class="flex flex-wrap gap-2">

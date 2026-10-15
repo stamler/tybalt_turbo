@@ -28,7 +28,7 @@
   import DsCheck from "$lib/components/DsCheck.svelte";
   import DsEditingDisabledBanner from "$lib/components/DsEditingDisabledBanner.svelte";
   import DsFileLink from "$lib/components/DsFileLink.svelte";
-  import DsLabel from "$lib/components/DsLabel.svelte";
+  import DsLabel, { type LabelShade } from "$lib/components/DsLabel.svelte";
 
   const isAdmin = $derived($globalStore.claims.includes("admin"));
 
@@ -307,9 +307,9 @@
             {/each}
           </div>
         </DSCard>
-        <DSCard title="shade (how much, lightest to darkest)" span="full">
+        <DSCard title="shade (how much, 1 lightest to 7 darkest)" span="full">
           <div class="flex flex-wrap gap-2">
-            {#each [0, 0.2, 0.3, 0.5, 0.7, 0.8, 1] as shade (shade)}
+            {#each [1, 2, 3, 4, 5, 6, 7] as LabelShade[] as shade (shade)}
               <DsLabel {shade}>{shade}</DsLabel>
             {/each}
           </div>

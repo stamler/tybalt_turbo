@@ -1,5 +1,7 @@
 <script lang="ts" module>
   export type LabelTone = "neutral" | "info" | "success" | "warning" | "danger";
+  // Neutral shades for amounts, 1 lightest to 7 darkest.
+  export type LabelShade = 1 | 2 | 3 | 4 | 5 | 6 | 7;
   // Categorical colours distinguish kinds of thing and carry no meaning. Use
   // tone when the colour means something.
   export type LabelColor =
@@ -34,9 +36,9 @@
     title?: string;
     style?: "inverted";
     size?: "md" | "sm";
-    // A neutral shade from 0 (lightest) to 1 (darkest), for showing how much
+    // A neutral shade from 1 (lightest) to 7 (darkest), for showing how much
     // of something each label has. It replaces color and tone.
-    shade?: number;
+    shade?: LabelShade;
   } = $props();
 
   // Full class strings so Tailwind sees every class.
@@ -115,11 +117,7 @@
   const palette = $derived(
     colors[(tone ? toneColors[tone] : color) as LabelColor] ?? colors.neutral,
   );
-  const regular = $derived(
-    shade === undefined
-      ? palette.regular
-      : shades[Math.min(shades.length - 1, Math.max(0, Math.ceil(shade * shades.length) - 1))],
-  );
+  const regular = $derived(shade === undefined ? palette.regular : shades[shade - 1]);
 </script>
 
 {#if style === "inverted"}

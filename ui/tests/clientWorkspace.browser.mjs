@@ -168,44 +168,41 @@ await runBrowserHarness(
     const information = page.getByRole("region", { name: "Client information", exact: true });
     const chips = information.getByRole("button", { name: /^(CB|CI|E) · / });
     assert.deepEqual(await chips.allInnerTexts(), ["CB", "CI", "E"]);
-    const background = (code) =>
-      chips
-        .filter({ hasText: new RegExp(`^${code}$`) })
-        .locator("span")
-        .evaluate((el) => getComputedStyle(el).backgroundColor);
-    const lightness = async (code) =>
-      (await background(code))
-        .match(/[\d.]+/g)
-        .slice(0, 3)
-        .map(Number)
-        .reduce((a, b) => a + b);
-    // Log shading is the default. It spreads the fewest hours to the most, so
-    // E sits between CB and CI.
-    assert.ok((await lightness("CB")) < (await lightness("E")), "log: CB is darker than E");
-    assert.ok((await lightness("E")) < (await lightness("CI")), "log: E is darker than CI");
+    const background = (locator) => locator.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const chip = (code) => chips.filter({ hasText: new RegExp(`^${code}$`) }).locator("span");
     // A click, not a hover delay, shows each division's hours and share.
     for (const [name, text] of [
       ["CB · Building Structural", "2,016 hours committed on this client's jobs, 95% of"],
-      ["CI · Civil", "3.5 hours committed on this client's jobs, under 1% of"],
+      ["CI · Civil", "3.5 hours committed on this client's jobs, 0.1% of"],
     ]) {
       await information.getByRole("button", { name, exact: true }).click();
       assert.match(await page.getByRole("dialog", { name }).innerText(), new RegExp(text));
       await page.keyboard.press("Escape");
     }
-    // The help popover explains the counting and switches to linear shading,
-    // where E's 5% share of CB's hours looks as light as CI.
+    // The help popover explains the counting and lists the share bands. Each
+    // chip has its band's shade: CB 95%, E 4.7% and CI 0.17% of the hours.
     await information.getByRole("button", { name: "About these divisions" }).click();
     const help = page.getByRole("dialog", { name: "About these divisions" });
     assert.match(await help.innerText(), /job owner do not/);
-    await help.getByRole("radio", { name: "Linear" }).click();
-    assert.match(await help.innerText(), /Divisions with a small share all look light/);
+    const bands = help.locator("span").filter({ hasText: /%/ });
+    assert.deepEqual(await bands.allInnerTexts(), [
+      "under 0.1%",
+      "0.1–0.5%",
+      "0.5–2%",
+      "2–5%",
+      "5–10%",
+      "10–25%",
+      "25% or more",
+    ]);
+    const bandShades = await Promise.all((await bands.all()).map(background));
+    assert.equal(new Set(bandShades).size, 7, "each band has its own shade");
+    for (const [code, band] of [
+      ["CB", 6],
+      ["E", 3],
+      ["CI", 1],
+    ])
+      assert.equal(await background(chip(code)), bandShades[band], `${code} has band ${band + 1}`);
     await page.keyboard.press("Escape");
-    assert.equal(await lightness("E"), await lightness("CI"), "linear: E is as light as CI");
-    assert.ok((await lightness("CB")) < (await lightness("E")), "linear: CB is darker than E");
-    // The choice is remembered for the next client page.
-    await page.reload();
-    await chips.first().waitFor();
-    assert.equal(await lightness("E"), await lightness("CI"), "linear is remembered");
     assert.match(await invoicing().innerText(), /Created Oct 1, 2026 by Alex Adams/);
     // Without recorded creation details, a profile shows only its usage.
     assert.match(await invoicing().innerText(), /^1 job · 1 request$/m);
