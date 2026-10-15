@@ -91,11 +91,11 @@ PocketBase-based Go application. Entry point is `main.go`, which registers:
 
 ### Frontend: `ui/`
 
-SvelteKit 2 + Svelte 5 + TypeScript + Tailwind CSS 4. PocketBase SDK is used directly for data fetching (see `src/lib/pocketbase.ts`).
+SvelteKit 2 + Svelte 5 + TypeScript + Tailwind CSS 4. PocketBase SDK is used directly for data fetching (see `src/lib/pocketbase.ts`). UI conventions and the shared-component rules are in `ui/CLAUDE.md`; follow them for any UI change and run `npm run check:ui`.
 
 - `src/lib/components/` — Shared UI components
 - `src/lib/stores/` — Svelte reactive stores for shared state
-- `src/lib/types/` — TypeScript types (auto-generated PocketBase types in `pocketbase-types.ts`)
+- `src/lib/types/` — hand-written TypeScript types (auto-generated PocketBase types are in `src/lib/pocketbase-types.ts`)
 - `src/lib/utilities.ts` — Business logic helpers
 - `src/lib/navConfig.ts` — Navigation structure
 - `src/lib/poVisibility.ts` — Purchase order visibility rules

@@ -1,0 +1,78 @@
+# UI conventions (ui/)
+
+The app must look like one product. Consistency comes from reusing shared
+components, not from re-creating their look with Tailwind on each page.
+Full rationale and component APIs: ../descriptions/ui_design_system.md.
+
+## Before writing any markup
+
+1. Find the closest existing page that does something similar and match it.
+2. Use the components below. If none fits, extend one with a prop, or add a
+   new `DS*` component in src/lib/components/ and use that. Never style a
+   one-off version on the page, and never copy a component's markup into a
+   page to tweak it.
+3. Pages may use layout utilities only (flex, grid, gap, space, padding,
+   width). Colours, borders, radius, shadows and text sizes live inside
+   components.
+
+## Which component for what
+
+| Need                         | Use                                                                                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Any button                   | DSActionButton                                                                                                                         |
+| Confirm or small form dialog | DSPopover                                                                                                                              |
+| Chip or tag                  | DsLabel                                                                                                                                |
+| Show/hide block              | DSCollapsible                                                                                                                          |
+| Tabs                         | DSTabBar                                                                                                                               |
+| Lists of records             | DSList / DSSearchList                                                                                                                  |
+| Inputs                       | DSTextInput, DSSelector, DSAutoComplete, DSDateInput, DSCurrencyInput, DSToggle, DsCheck, DsFileSelect, DSLocationPicker, DSTokenInput |
+| Files                        | DsFileLink, DsFileSelect                                                                                                               |
+| Editing-disabled notice      | DsEditingDisabledBanner                                                                                                                |
+
+Planned but not built yet (APIs in the design doc): DSPageHeader, DSCard /
+DSCardGrid, DSSection, DSFieldList / DSField, DSCallout, DSModal, DSFlyout /
+DSMenuItem, DSStatusLabel, and the primary/danger/plain variants of
+DSActionButton. Until one exists, match the nearest existing page and say in
+your summary that the pattern should move to that component. Do not build
+one of these as a side effect of an unrelated task.
+
+## Look
+
+- Greys are `neutral` only. Never gray, slate, zinc or stone.
+- Meaning maps to colour: warning = amber, danger = red, success = green,
+  info = blue. Components should take a `tone`, not a raw colour.
+- Radius is `rounded-sm`. Only pills use `rounded-full`; only a modal panel
+  uses `rounded-lg`.
+- Links use the `link` utility: `<a class="link" href=...>`.
+- Dates go through shortDate(); money through formatCurrency() or
+  formatCurrencyAmount() (src/lib/utilities.ts). Never print raw date
+  strings or numbers.
+- Hide empty fields rather than printing "No X" or a blank label.
+- A detail page's title is the record itself (its number or name), not
+  "X Details".
+
+## Never
+
+- Hand-build an overlay (`fixed inset-0`) or a z-index stack.
+- Write a raw `<button>`; use DSActionButton.
+- Write `<span class="font-semibold">Label:</span> value` rows in new code.
+
+## The check
+
+`npm run check:ui` (also the first step of `npm run lint`) runs
+scripts/check-ui.mjs. It fails when a file gains a pattern above the
+recorded baseline in scripts/check-ui-baseline.json. Run it after UI changes.
+
+- Fix a failure by using the component it names.
+- A deliberate exception needs `ui-check-allow: <reason>` on the same line
+  or the line above (`<!-- ui-check-allow: ... -->` in markup).
+- After removing violations, run `node scripts/check-ui.mjs --update` to
+  lower the baseline. Never edit the baseline by hand or run `--init` to
+  make a failure go away.
+
+## Where things are
+
+- Shared components: src/lib/components/ (domain folders: clients/, jobs/)
+- Generated PocketBase types: src/lib/pocketbase-types.ts
+- Formatting helpers: src/lib/utilities.ts
+- Global CSS and the `link` utility: src/app.css

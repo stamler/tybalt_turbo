@@ -12,6 +12,22 @@
 @source inline("active:shadow-inner");
 @source inline("shadow-none");
 
+/* The one link style. Use class="link" on <a> instead of text-blue-* and underline classes. */
+@utility link {
+  color: var(--color-blue-700);
+  cursor: pointer;
+
+  &:hover {
+    text-decoration-line: underline;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--color-blue-600);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
 /*
   The default border color has changed to `currentcolor` in Tailwind CSS v4,
   so we've added these compatibility styles to make sure everything still
