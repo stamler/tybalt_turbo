@@ -168,8 +168,9 @@ func TestJobsUpdate_NumberUnchanged_AllowsOtherFieldUpdates(t *testing.T) {
 	}
 }
 
-// jobs: project authorization source of truth is PA review, so legacy PO is no longer valid.
-func TestJobsUpdate_AuthorizingDocumentPA_Validations(t *testing.T) {
+// jobs: authorizing_document is fixed at PA for projects. It is kept for the
+// legacy writeback and is not a choice, so any other value is normalized.
+func TestJobsUpdate_AuthorizingDocumentNormalizedToPA(t *testing.T) {
 	// Use a user with the 'job' claim: author@soup.com (uid f2j5a8vk006baub)
 	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
@@ -178,47 +179,11 @@ func TestJobsUpdate_AuthorizingDocumentPA_Validations(t *testing.T) {
 
 	scenarios := []tests.ApiScenario{
 		{
-			Name:   "PO set fails even when client_po is blank",
+			Name:   "PO sent on a project is saved as PA",
 			Method: http.MethodPatch,
 			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
 			Body: strings.NewReader(`{
                 "authorizing_document": "PO",
-                "client_po": ""
-            }`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"authorizing_document":{"code":"must_be_pa"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdateRequest": 1,
-			},
-			TestAppFactory: setupJobsWithBillingFixtures,
-		},
-		{
-			Name:   "PO set fails even when client_po is present",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
-			Body: strings.NewReader(`{
-                "authorizing_document": "PO",
-                "client_po": " 12 "
-            }`),
-			Headers:        map[string]string{"Authorization": recordToken},
-			ExpectedStatus: 400,
-			ExpectedContent: []string{
-				`"data":{"authorizing_document":{"code":"must_be_pa"`,
-			},
-			ExpectedEvents: map[string]int{
-				"OnRecordUpdateRequest": 1,
-			},
-			TestAppFactory: setupJobsWithBillingFixtures,
-		},
-		{
-			Name:   "PA set with short client_po succeeds and preserves client_po",
-			Method: http.MethodPatch,
-			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
-			Body: strings.NewReader(`{
-                "authorizing_document": "PA",
                 "client_po": " 12 "
             }`),
 			Headers:        map[string]string{"Authorization": recordToken},
@@ -226,6 +191,23 @@ func TestJobsUpdate_AuthorizingDocumentPA_Validations(t *testing.T) {
 			ExpectedContent: []string{
 				`"authorizing_document":"PA"`,
 				`"client_po":"12"`,
+			},
+			ExpectedEvents: map[string]int{
+				"OnRecordUpdateRequest": 1,
+			},
+			TestAppFactory: setupJobsWithBillingFixtures,
+		},
+		{
+			Name:   "Unauthorized sent on a project is saved as PA",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/jobs/records/cjf0kt0defhq480",
+			Body: strings.NewReader(`{
+                "authorizing_document": "Unauthorized"
+            }`),
+			Headers:        map[string]string{"Authorization": recordToken},
+			ExpectedStatus: 200,
+			ExpectedContent: []string{
+				`"authorizing_document":"PA"`,
 			},
 			ExpectedEvents: map[string]int{
 				"OnRecordUpdateRequest": 1,
@@ -255,7 +237,9 @@ func setupTestAppWithLegacyPOAuthorizingDocument(tb testing.TB) *tests.TestApp {
 	return app
 }
 
-func TestJobsAPI_LegacyAuthorizingDocumentFailsWithoutOtherJobChanges(t *testing.T) {
+// An older project with PO is saved without the editor changing it, and the
+// save stores PA.
+func TestJobsAPI_LegacyAuthorizingDocumentNormalizedOnSave(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
 		t.Fatal(err)
@@ -265,7 +249,7 @@ func TestJobsAPI_LegacyAuthorizingDocumentFailsWithoutOtherJobChanges(t *testing
 	const divisionID = "fy4i9poneukvq9u"
 
 	scenario := tests.ApiScenario{
-		Name:   "saving existing project with unchanged legacy PO authorizing document fails",
+		Name:   "saving existing project with unchanged legacy PO authorizing document stores PA",
 		Method: http.MethodPut,
 		URL:    "/api/jobs/" + jobID,
 		Body: strings.NewReader(`{
@@ -276,13 +260,64 @@ func TestJobsAPI_LegacyAuthorizingDocumentFailsWithoutOtherJobChanges(t *testing
 				{ "division": "` + divisionID + `", "hours": 1 }
 			]
 		}`),
-		Headers:        map[string]string{"Authorization": recordToken},
-		ExpectedStatus: 400,
-		ExpectedContent: []string{
-			`"data":{"authorizing_document":{"code":"must_be_pa"`,
-			`"message":"Select PA as the authorizing document before saving this project. Client PO is now a reference field, not an authorization type."`,
+		Headers:         map[string]string{"Authorization": recordToken},
+		ExpectedStatus:  200,
+		ExpectedContent: []string{`"id":"` + jobID + `"`},
+		TestAppFactory:  setupTestAppWithLegacyPOAuthorizingDocument,
+		AfterTestFunc: func(tb testing.TB, app *tests.TestApp, res *http.Response) {
+			job, err := app.FindRecordById("jobs", jobID)
+			if err != nil {
+				tb.Fatalf("failed to load job: %v", err)
+			}
+			if got := job.GetString("authorizing_document"); got != "PA" {
+				tb.Fatalf("authorizing_document = %q, want PA", got)
+			}
+			if got := job.GetString("client_po"); got != "LEGACY-PO" {
+				tb.Fatalf("client_po = %q, want LEGACY-PO", got)
+			}
 		},
-		TestAppFactory: setupTestAppWithLegacyPOAuthorizingDocument,
+	}
+
+	scenario.Test(t)
+}
+
+// Closing an older project with PO stays a status-only save: normalizing the
+// authorizing document does not make it a full edit.
+func TestJobsUpdate_LegacyAuthorizingDocumentProjectCanBeClosed(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const jobID = "cjf0kt0defhq480"
+
+	scenario := tests.ApiScenario{
+		Name:   "status-only close of a legacy PO project succeeds",
+		Method: http.MethodPatch,
+		URL:    "/api/collections/jobs/records/" + jobID,
+		Body: strings.NewReader(`{
+			"status": "Closed"
+		}`),
+		Headers:        map[string]string{"Authorization": recordToken},
+		ExpectedStatus: 200,
+		ExpectedContent: []string{
+			`"status":"Closed"`,
+			`"authorizing_document":"PA"`,
+		},
+		ExpectedEvents: map[string]int{
+			"OnRecordUpdateRequest": 1,
+		},
+		TestAppFactory: func(tb testing.TB) *tests.TestApp {
+			app := setupTestAppWithLegacyPOAuthorizingDocument(tb)
+			if _, err := app.DB().NewQuery(`
+				UPDATE jobs
+				SET invoicing_information = ''
+				WHERE id = {:id}
+			`).Bind(dbx.Params{"id": jobID}).Execute(); err != nil {
+				tb.Fatalf("failed to clear invoicing profile: %v", err)
+			}
+			return app
+		},
 	}
 
 	scenario.Test(t)

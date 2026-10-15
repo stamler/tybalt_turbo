@@ -353,7 +353,7 @@ func isProposalRecord(record *core.Record) bool {
 // new workflow requires. Setting a project Active does not qualify: an Active
 // project can receive new time, expenses, and purchase orders.
 func isProjectRetirement(record *core.Record) bool {
-	if record.IsNew() || isProposalRecord(record) || utilities.RecordHasMeaningfulChanges(record, "status") {
+	if record.IsNew() || isProposalRecord(record) || hasChangesBesidesStatus(record) {
 		return false
 	}
 	status := record.GetString("status")
@@ -363,6 +363,10 @@ func isProjectRetirement(record *core.Record) bool {
 // cleanJob removes or normalizes fields that are not applicable based on the
 // job type. In particular, proposals must not carry authorizing_document,
 // client_po, or client_reference_number.
+//
+// authorizing_document is fixed by job type: PA for projects and blank for
+// proposals. It is kept only for the legacy writeback and is not approval
+// evidence, so older projects with PO or Unauthorized become PA on their next save.
 func cleanJob(app core.App, record *core.Record) error {
 	isProposal := isProposalRecord(record)
 
@@ -375,9 +379,7 @@ func cleanJob(app core.App, record *core.Record) error {
 	if !isProposal {
 		// Projects should NOT have proposal_value (but keep time_and_materials - it's shared)
 		record.Set("proposal_value", 0)
-		if record.IsNew() {
-			record.Set("authorizing_document", "PA")
-		}
+		record.Set("authorizing_document", "PA")
 
 		// Centralize outstanding balance normalization for projects only
 		if err := cleanJobOutstandingBalance(record); err != nil {
@@ -506,13 +508,13 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 	if !isCreate && !forceFullValidation {
 		// ProcessJobCore relaxes a project write only for a retirement, which it
 		// decides before cleanJob normalizes the record. Retiring needs no billing
-		// data: no PA, invoicing profile or project value.
+		// data: no invoicing profile or project value.
 		if derived == jobTypeProject {
 			return derived, nil
 		}
 
 		// If no field other than status changed, treat this as a status-only update.
-		if !utilities.RecordHasMeaningfulChanges(record, "status") {
+		if !hasChangesBesidesStatus(record) {
 			newStatus := status
 			oldStatus := original.GetString("status")
 			if newStatus != "" && newStatus != oldStatus {
@@ -664,10 +666,6 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 				"branch": {Code: "required", Message: "branch is required"},
 			},
 		}
-	}
-
-	if err := validateProjectAuthorizingDocument(record, derived); err != nil {
-		return 0, err
 	}
 
 	// Enforce status constraints
@@ -918,7 +916,7 @@ func requireInvoicingProfile(record *core.Record, derived jobType) error {
 	if derived != jobTypeProject || record.GetString("invoicing_information") != "" {
 		return nil
 	}
-	statusOnly := !record.IsNew() && !utilities.RecordHasMeaningfulChanges(record, "status")
+	statusOnly := !record.IsNew() && !hasChangesBesidesStatus(record)
 	if statusOnly && !activatesJob(record) {
 		return nil
 	}
@@ -940,23 +938,12 @@ func validateInvoicingProfile(app core.App, record *core.Record, derived jobType
 	return utilities.ValidateClientReferences(app, record)
 }
 
-func validateProjectAuthorizingDocument(record *core.Record, derived jobType) error {
-	if derived != jobTypeProject {
-		return nil
-	}
-	if record.GetString("authorizing_document") == "PA" {
-		return nil
-	}
-	return &errs.HookError{
-		Status:  http.StatusBadRequest,
-		Message: "project authorizing document must be PA",
-		Data: map[string]errs.CodeError{
-			"authorizing_document": {
-				Code:    "must_be_pa",
-				Message: "Select PA as the authorizing document before saving this project. Client PO is now a reference field, not an authorization type.",
-			},
-		},
-	}
+// hasChangesBesidesStatus reports whether an update changes any field other
+// than status. authorizing_document is skipped because cleanJob sets it by job
+// type, so sending or normalizing it does not turn a status-only save into a
+// full edit.
+func hasChangesBesidesStatus(record *core.Record) bool {
+	return utilities.RecordHasMeaningfulChanges(record, "status", "authorizing_document")
 }
 
 // jobHasClientNoteForStatus checks if a client_note exists for the given job

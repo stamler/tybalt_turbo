@@ -202,8 +202,10 @@ func TestCloseJob_IncompleteProjectCloses(t *testing.T) {
 			if got := project.GetString("status"); got != "Closed" {
 				tb.Fatalf("expected project status Closed, got %q", got)
 			}
-			if got := project.GetString("authorizing_document"); got != "" {
-				tb.Fatalf("close must not fill the authorizing document, got %q", got)
+			// Like any project save, the close sets the legacy authorizing
+			// document to PA. It fills no other billing data.
+			if got := project.GetString("authorizing_document"); got != "PA" {
+				tb.Fatalf("close should store the authorizing document as PA, got %q", got)
 			}
 
 			var result struct {

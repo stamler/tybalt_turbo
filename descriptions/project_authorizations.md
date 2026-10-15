@@ -1063,7 +1063,11 @@ existing jobs or change direct-creation behavior outside the request workflow.
 Keep `Cancelled` as a valid status in the `jobs` collection.
 
 Keep `authorizing_document = "PA"` for projects and blank for proposals. This
-legacy field does not prove approval. Keep `client_po` and
+legacy field does not prove approval. It is not a user choice: the server sets
+it by job type on every job save, so an older project with `PO` or
+`Unauthorized` is stored as `PA` on its next save. The normalization does not
+make a status-only save count as a full edit. The job editor neither shows nor
+edits the field. Keep `client_po` and
 `client_reference_number` as reference fields.
 
 ## 4. SQLite Schema Changes

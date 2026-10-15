@@ -281,12 +281,6 @@
     return statuses.map((status) => ({ id: status, name: status }));
   });
 
-  const authorizingDocumentOptions = [
-    { id: "Unauthorized", name: "Unauthorized" },
-    { id: "PO", name: "PO" },
-    { id: "PA", name: "PA" },
-  ];
-
   // Filter functions for autocomplete - applied to search results, not indices
   const proposalFilter = (job: JobApiResponse) => job.number?.startsWith("P") ?? false;
   const activeRateSheetFilter = (sheet: { active: boolean }) => sheet.active;
@@ -459,13 +453,6 @@
       setFieldError("alternate_manager", alternateManagerErrorMessage);
     } else if (errors.alternate_manager?.message === alternateManagerErrorMessage) {
       clearFieldError("alternate_manager");
-    }
-  });
-
-  $effect(() => {
-    if (!isProposal && isNewJob && item.authorizing_document !== "PA") {
-      item.authorizing_document = "PA";
-      if (errors.authorizing_document) clearFieldError("authorizing_document");
     }
   });
 
@@ -1342,17 +1329,6 @@
         {/if}
       </p>
 
-      {#if !isProposal && !isNewJob}
-        <DsSelector
-          bind:value={item.authorizing_document}
-          items={authorizingDocumentOptions}
-          {errors}
-          fieldName="authorizing_document"
-          uiName="Authorizing Document"
-        >
-          {#snippet optionTemplate(item)}{item.name}{/snippet}
-        </DsSelector>
-      {/if}
       <DsTextInput bind:value={item.client_po} {errors} fieldName="client_po" uiName="Client PO" />
       <DsTextInput
         bind:value={item.client_reference_number}

@@ -7,8 +7,9 @@ job page's "⋯" menu or the jobs list. Closing has no side effects on time,
 expenses, or purchase orders, so it does not need the project's billing data.
 
 - Closing requires the `job` claim, and jobs editing must be enabled.
-- No invoicing profile, project value, authorizing document, or location is
-  needed. This is the same retirement rule as a status-only close in the job
+- No invoicing profile, project value, or location is needed. An older project
+  with `PO` or `Unauthorized` as its authorizing document is stored as `PA`, as
+  on any project save. This is the same retirement rule as a status-only close in the job
   editor, so the editor and the action cannot disagree.
 - A referenced proposal must be `Awarded` when the transaction ends. An imported
   proposal that is still `In Progress` or `Submitted` is awarded by the close.
@@ -117,8 +118,8 @@ their own status and shape.
 
 A save that changes only a project's status to `Closed` or `Cancelled` is a
 retirement. `ProcessJobCore` decides this before `cleanJob` normalizes the
-record, and `validateJob` then skips every billing check: no PA, invoicing
-profile, or project value. A save that changes any other field, or that sets a
+record, and `validateJob` then skips every billing check: no invoicing profile
+or project value. A save that changes any other field, or that sets a
 project `Active`, gets full validation.
 
 The editor cannot reconcile a referenced proposal. That is the reason to use

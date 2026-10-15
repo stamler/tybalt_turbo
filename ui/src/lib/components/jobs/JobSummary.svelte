@@ -110,7 +110,6 @@
           {/if}
           <DSField label="Client PO" value={job.client_po} />
           <DSField label="Client reference number" value={job.client_reference_number} />
-          <DSField label="Authorizing document" value={job.authorizing_document} />
         {/if}
         <DSField label="FN agreement" value={job.fn_agreement ? "Yes" : "No"} />
       </DSFieldList>
