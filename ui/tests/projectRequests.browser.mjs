@@ -377,7 +377,7 @@ await runBrowserHarness(
     await deleteLatest.click();
     await page.getByRole("heading", { name: "Delete latest approval?", exact: true }).waitFor();
     assert.match(
-      await page.locator(".fixed").last().innerText(),
+      await page.getByRole("dialog", { name: "Delete latest approval?", exact: true }).innerText(),
       /The project value returns to \$120,000\. This cannot be undone\./,
     );
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
