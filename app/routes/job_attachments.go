@@ -258,6 +258,9 @@ func attachmentListHandler(app core.App) func(*core.RequestEvent) error {
 					return err
 				}
 				row["related"] = review.related
+				// The approval that set the job's value. The viewer may see only some
+				// of a job's approvals, so the newest one they see is not always it.
+				row["current"] = a.GetString("status") == "Approved" && review.sequence > 0 && a.GetInt("approval_sequence") == review.sequence
 				if a.GetString("status") == "Pending" {
 					// Identify the job data shown with this change. A rejection records
 					// it, so only later changes count as corrections.

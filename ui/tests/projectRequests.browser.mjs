@@ -17,6 +17,7 @@ await runBrowserHarness(
         previous_project_value: 0,
         approval_max_value: 200000,
         approval_sequence: 1,
+        current: true,
         initial_approval: true,
         approver: "reviewer",
         approver_name: "Tier Two",
@@ -142,11 +143,12 @@ await runBrowserHarness(
         if (route.request().method() === "POST") {
           valueActions.push(route.request().postDataJSON());
           attachmentItems = [
-            attachmentItems[0],
+            { ...attachmentItems[0], current: false },
             {
               ...attachmentItems[1],
               status: "Approved",
               approval_sequence: 2,
+              current: true,
               previous_project_value: 120000,
               approval_max_value: 200000,
               approver: "reviewer",
@@ -335,7 +337,12 @@ await runBrowserHarness(
     const review = page.getByRole("button", { name: "Review", exact: true });
     const historyButton = page.getByRole("button", { name: "Value history", exact: true });
     const deleteLatest = page.getByRole("button", { name: "Delete latest approval", exact: true });
+    const currentPdf = page.getByRole("button", {
+      name: "Download the authorization PDF for this value",
+      exact: true,
+    });
     await review.waitFor();
+    assert.equal(await currentPdf.count(), 1);
     assert.match(await page.locator("#app").innerText(), /Project Value:\s*\$120,000/);
     assert.match(
       await page.locator("#app").innerText(),
@@ -374,6 +381,12 @@ await runBrowserHarness(
       /The project value returns to \$120,000\. This cannot be undone\./,
     );
     await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    // A viewer who sees only an earlier approval gets its history, but not as
+    // the PDF for the current value.
+    attachmentItems = [{ ...attachmentItems[0], current: false }];
+    await page.goto(`${origin}/tests/fixtures/projectRequests.html?values`);
+    await historyButton.waitFor();
+    assert.equal(await currentPdf.count(), 0);
     attachmentItems = [];
     // The form takes only the value, approver, and PDF. Project details missing
     // for approval are named, with a link to the job editor, before saving.

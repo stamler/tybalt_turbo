@@ -38,8 +38,9 @@ export class JobValue {
       .filter((item) => item.status === "Approved")
       .sort((a, b) => b.approval_sequence - a.approval_sequence),
   );
-  // The approval that set the current value.
-  current = $derived(this.approved[0]);
+  // The approval that set the current value. The server marks it, since the
+  // history can leave it out when the viewer may see only some approvals.
+  current = $derived(this.approved.find((item) => item.current));
   // A pending or rejected change; a job has at most one.
   inProgress = $derived(this.items.find((item) => item.status !== "Approved"));
 

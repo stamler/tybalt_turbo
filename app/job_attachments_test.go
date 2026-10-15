@@ -543,6 +543,40 @@ func TestJobValueHistoryVisibleToProjectManagers(t *testing.T) {
 	}
 }
 
+// An approver who sees only an earlier approval must not be shown it as the
+// approval that set the current value.
+func TestJobValueListMarksCurrentApprovalForEveryViewer(t *testing.T) {
+	app := newWorkflowTestApp(t, false)
+	grantTesterTimeApproval(t, app)
+	response := workflowUpload(t, app, "/api/job_attachments", workflowAuthor, "%PDF-1.4\nEarlier approval\n%%EOF", map[string]string{"job": legacyWorkflowJob, "project_value": "5000", "assigned_approver": "rzr98oadsp9qc11"}, http.StatusOK)
+	earlier := map[string]any{}
+	if err := json.Unmarshal(response.Body.Bytes(), &earlier); err != nil {
+		t.Fatal(err)
+	}
+	first := earlier["id"].(string)
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+first+"/approve", "time@test.com", attachmentActionData(t, app, first), http.StatusOK)
+	second := createValueChange(t, app, legacyWorkflowJob, 120000, "Current approval")
+	clientSetupJSON(t, app, http.MethodPost, "/api/job_attachments/"+second+"/approve", workflowApprover, attachmentActionData(t, app, second), http.StatusOK)
+
+	current := func(email string) map[any]any {
+		list := clientSetupJSON(t, app, http.MethodGet, "/api/job_attachments?job="+legacyWorkflowJob, email, nil, http.StatusOK)
+		result := map[any]any{}
+		for _, item := range list["items"].([]any) {
+			row := item.(map[string]any)
+			result[row["id"]] = row["current"]
+		}
+		return result
+	}
+	if got := current(workflowAuthor); len(got) != 2 || got[first] != false || got[second] != true {
+		t.Fatalf("full history current = %#v", got)
+	}
+	// Tester Time holds project_authorization but not job, so they see only
+	// the approval they made, which no longer sets the value.
+	if got := current("time@test.com"); len(got) != 1 || got[first] != false {
+		t.Fatalf("partial history current = %#v", got)
+	}
+}
+
 // Job details report the approved project value, which the job page shows.
 func TestJobDetailsReturnApprovedProjectValue(t *testing.T) {
 	app := newWorkflowTestApp(t, false)

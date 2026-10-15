@@ -758,7 +758,9 @@ Show pending value approvals in a queue. The assigned approver must be able to
 view the job and PDF evidence needed for that approval. Holders of `job` and
 admins can view every job's value history and PDFs, and on October 14, 2026 the
 job's manager and alternate manager were added for their own jobs. Approvers
-see the changes assigned to them or approved by them.
+see the changes assigned to them or approved by them. Because a viewer may see
+only some of a job's approvals, the history marks the approval that set the
+current value; the newest approval a viewer sees is not always that one.
 
 On the job page, show the effective value with a download of the PDF behind it
 and a history of approvals: approver, date, and amount, newest first. Approval
