@@ -5,8 +5,18 @@
   // keeps its own confirmation and rejection reason.
   let { value, item, ondone }: { value: JobValue; item: WorkflowRecord; ondone?: () => void } =
     $props();
-  let reviewed = $state(false),
-    reason = $state("");
+  // The revision under review. A correction, such as a replacement PDF, saves a
+  // new version, which clears the confirmation and reason given for the earlier
+  // one, so approval always follows a review of the data it sends.
+  const revision = $derived(`${item.id}:${item.version}`);
+  let reviewed = $derived.by(() => {
+      void revision;
+      return false;
+    }),
+    reason = $derived.by(() => {
+      void revision;
+      return "";
+    });
   async function decide(name: "approve" | "reject") {
     if (await value.act(item, name, name === "reject" ? reason : "")) ondone?.();
   }

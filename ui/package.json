@@ -29,6 +29,7 @@
     "test:job-requests-browser": "node tests/projectRequests.browser.mjs",
     "test:job-value-navigation-browser": "node tests/jobValueNavigation.browser.mjs",
     "test:job-value-rejection-browser": "node tests/jobValueRejection.browser.mjs",
+    "test:job-value-review-browser": "node tests/jobValueReview.browser.mjs",
     "test:client-workspace": "node --test --experimental-strip-types tests/clientWorkspace.test.ts tests/clientWorkflowNavigation.test.ts",
     "test:client-editors": "node --experimental-vm-modules --test tests/clientEditors.test.mjs",
     "test:client-editors-browser": "node tests/clientEditors.browser.mjs",
