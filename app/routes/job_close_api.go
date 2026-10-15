@@ -26,23 +26,19 @@ type closeJobResponse struct {
 	ID               string                  `json:"id"`
 	Status           string                  `json:"status"`
 	Imported         bool                    `json:"imported"`
-	Mode             string                  `json:"mode"`
 	ProjectNoteAdded bool                    `json:"project_note_created"`
 	Proposal         *closeJobProposalResult `json:"proposal,omitempty"`
 }
 
-// createCloseJobHandler handles the dedicated "fast close" workflow.
+// createCloseJobHandler handles the "Close project" action for any Active
+// project.
 //
-// Why this endpoint exists:
-// The normal job update flow supports status-only edits and can still trip over
-// legacy-data completeness issues depending on the payload and normalization
-// path. Product policy for fast close is explicit:
-//  1. Imported legacy jobs may close with a controlled bypass.
-//  2. Non-imported jobs must use strict/full validation.
-//  3. Close operations must emit audit notes deterministically.
-//
-// Putting this in a dedicated endpoint keeps the policy boundary narrow and
-// avoids changing the behavior of existing update/edit routes.
+// Closing has no side effects on time, expenses or purchase orders, so it needs
+// no billing data. It uses the same retirement rule as a status-only close in
+// the editor (hooks.ProcessJobCore): the job claim, but no invoicing profile,
+// project value or authorizing document. The endpoint adds what the editor
+// cannot do in one save: it reconciles the referenced proposal and writes the
+// audit notes in the same transaction as the close.
 func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 	return func(e *core.RequestEvent) error {
 		authRecord := e.Auth
@@ -88,11 +84,6 @@ func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 				return &CodeError{Code: "invalid_status_for_close", Message: "only Active projects can be closed"}
 			}
 
-			mode := "validated"
-			if jobRec.GetBool("_imported") {
-				mode = "bypass"
-			}
-
 			var proposalResult *closeJobProposalResult
 			proposalRef := strings.TrimSpace(jobRec.GetString("proposal"))
 			if proposalRef != "" {
@@ -121,8 +112,8 @@ func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 					// We only auto-award imported proposals in the intermediate
 					// workflow states that represent "not yet final" outcomes.
 					//
-					// This avoids rewriting explicit terminal business decisions
-					// while still allowing legacy reconciliation for imported data.
+					// This avoids rewriting explicit business decisions made in
+					// this app while still reconciling imported legacy data.
 					if (refStatus == "In Progress" || refStatus == "Submitted") && proposalRec.GetBool("_imported") {
 						proposalRec.Set("status", "Awarded")
 						proposalRec.Set("_imported", false)
@@ -138,12 +129,12 @@ func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 						// We intentionally do not set job_status_changed_to for this
 						// audit note. That field currently models proposal close-out
 						// comment workflows (No Bid/Cancelled), while this note is a
-						// reconciliation artifact for fast close.
+						// reconciliation artifact for the project close.
 						if err := createJobAuditNote(
 							txApp,
 							proposalRec,
 							authRecord.Id,
-							fmt.Sprintf("Proposal auto-awarded during imported fast close of project %s (%s)", jobRec.GetString("number"), jobRec.Id),
+							fmt.Sprintf("Proposal auto-awarded when project %s (%s) was closed", jobRec.GetString("number"), jobRec.Id),
 							"",
 						); err != nil {
 							httpResponseStatusCode = http.StatusBadRequest
@@ -167,29 +158,20 @@ func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 				}
 			}
 
+			// A status-only change is a retirement, so ProcessJobCore skips the
+			// billing checks. It also clears _imported, because the status changed.
 			jobRec.Set("status", "Closed")
-
-			if mode == "validated" {
-				if err := hooks.ProcessJobCoreStrict(txApp, jobRec, authRecord); err != nil {
-					var hookErr *errs.HookError
-					if errors.As(err, &hookErr) {
-						httpResponseStatusCode = hookErr.Status
-					} else {
-						httpResponseStatusCode = http.StatusBadRequest
-					}
-					return err
+			if err := hooks.ProcessJobCore(txApp, jobRec, authRecord); err != nil {
+				var hookErr *errs.HookError
+				if errors.As(err, &hookErr) {
+					httpResponseStatusCode = hookErr.Status
+				} else {
+					httpResponseStatusCode = http.StatusBadRequest
 				}
-			} else {
-				jobRec.Set("_imported", false)
+				return err
 			}
 
-			// The project workflow guard accepts unvalidated project saves only
-			// when they name their purpose.
-			ctx := e.Request.Context()
-			if mode == "bypass" {
-				ctx = hooks.WithProjectWorkflowMutation(ctx, hooks.ProjectWorkflowMutationImportedClose)
-			}
-			if err := txApp.SaveWithContext(ctx, jobRec); err != nil {
+			if err := txApp.SaveWithContext(e.Request.Context(), jobRec); err != nil {
 				httpResponseStatusCode = http.StatusBadRequest
 				var validationErrs validation.Errors
 				if errors.As(err, &validationErrs) {
@@ -216,7 +198,7 @@ func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 				txApp,
 				jobRec,
 				authRecord.Id,
-				"Project closed via imported fast close flow",
+				"Project closed with the Close project action",
 				"",
 			); err != nil {
 				httpResponseStatusCode = http.StatusBadRequest
@@ -230,7 +212,6 @@ func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 				ID:               jobRec.Id,
 				Status:           jobRec.GetString("status"),
 				Imported:         jobRec.GetBool("_imported"),
-				Mode:             mode,
 				ProjectNoteAdded: true,
 				Proposal:         proposalResult,
 			}
@@ -257,7 +238,7 @@ func createCloseJobHandler(app core.App) func(e *core.RequestEvent) error {
 
 // createJobAuditNote inserts a client note tied to a job.
 //
-// We keep this helper in route code (instead of hooks) because fast-close
+// We keep this helper in route code (instead of hooks) because closing a project
 // requires deterministic audit creation inside the same explicit transaction as
 // status mutations, and route handlers already coordinate that transaction.
 func createJobAuditNote(

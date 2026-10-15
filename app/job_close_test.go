@@ -2,6 +2,7 @@ package main
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"tybalt/internal/testutils"
@@ -12,23 +13,23 @@ import (
 )
 
 // =============================================================================
-// Fast Close Endpoint Tests
+// Close Project Endpoint Tests
 // =============================================================================
 //
 // These tests intentionally rely on static fixture rows in app/test_pb_data/data.db.
 // They do not mutate fixture state for setup during test execution.
 
-func TestCloseJob_ImportedBypassClosesAndCreatesProjectNote(t *testing.T) {
+func TestCloseJob_ImportedProjectClosesAndCreatesProjectNote(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	const projectID = "fcprojimpnoprop1"
-	const projectNoteText = "Project closed via imported fast close flow"
+	const projectNoteText = "Project closed with the Close project action"
 
 	scenario := tests.ApiScenario{
-		Name:   "imported project closes via bypass and writes project note",
+		Name:   "imported project closes and writes project note",
 		Method: http.MethodPost,
 		URL:    "/api/jobs/" + projectID + "/close",
 		Headers: map[string]string{
@@ -38,7 +39,6 @@ func TestCloseJob_ImportedBypassClosesAndCreatesProjectNote(t *testing.T) {
 		ExpectedContent: []string{
 			`"id":"` + projectID + `"`,
 			`"status":"Closed"`,
-			`"mode":"bypass"`,
 			`"project_note_created":true`,
 		},
 		TestAppFactory: testutils.SetupTestApp,
@@ -85,8 +85,8 @@ func TestCloseJob_ImportedAutoAwardCreatesProposalNoteAndCloses(t *testing.T) {
 	const projectID = "fcprojimpauto01"
 	const proposalID = "fcpropimpinprog"
 	const projectNumber = "88-9102"
-	const projectNoteText = "Project closed via imported fast close flow"
-	const proposalNoteText = "Proposal auto-awarded during imported fast close of project " + projectNumber + " (" + projectID + ")"
+	const projectNoteText = "Project closed with the Close project action"
+	const proposalNoteText = "Proposal auto-awarded when project " + projectNumber + " (" + projectID + ") was closed"
 
 	scenario := tests.ApiScenario{
 		Name:   "imported project close auto-awards imported proposal and writes both notes",
@@ -99,7 +99,6 @@ func TestCloseJob_ImportedAutoAwardCreatesProposalNoteAndCloses(t *testing.T) {
 		ExpectedContent: []string{
 			`"id":"` + projectID + `"`,
 			`"status":"Closed"`,
-			`"mode":"bypass"`,
 			`"project_note_created":true`,
 			`"auto_awarded":true`,
 			`"proposal_note_created":true`,
@@ -168,24 +167,31 @@ func TestCloseJob_ImportedAutoAwardCreatesProposalNoteAndCloses(t *testing.T) {
 	scenario.Test(t)
 }
 
-func TestCloseJob_NonImportedUsesStrictValidation(t *testing.T) {
+// A project that was not imported closes without its billing data. The
+// fixture has no authorizing document, project value, location or invoicing
+// profile, so it would fail full validation.
+func TestCloseJob_IncompleteProjectCloses(t *testing.T) {
 	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	const projectID = "test_job_w_rs"
+	const projectNoteText = "Project closed with the Close project action"
 
 	scenario := tests.ApiScenario{
-		Name:   "non-imported close fails strict validation for incomplete project",
+		Name:   "non-imported incomplete project closes and writes project note",
 		Method: http.MethodPost,
 		URL:    "/api/jobs/" + projectID + "/close",
 		Headers: map[string]string{
 			"Authorization": recordToken,
 		},
-		ExpectedStatus: http.StatusBadRequest,
+		ExpectedStatus: http.StatusOK,
 		ExpectedContent: []string{
-			`"data":{"location":{"code":"invalid_or_missing"`,
+			`"id":"` + projectID + `"`,
+			`"status":"Closed"`,
+			`"imported":false`,
+			`"project_note_created":true`,
 		},
 		TestAppFactory: testutils.SetupTestApp,
 		AfterTestFunc: func(tb testing.TB, app *tests.TestApp, _ *http.Response) {
@@ -193,13 +199,88 @@ func TestCloseJob_NonImportedUsesStrictValidation(t *testing.T) {
 			if err != nil {
 				tb.Fatalf("failed to reload project: %v", err)
 			}
-			if got := project.GetString("status"); got != "Active" {
-				tb.Fatalf("expected strict-validation failure to keep status Active, got %q", got)
+			if got := project.GetString("status"); got != "Closed" {
+				tb.Fatalf("expected project status Closed, got %q", got)
+			}
+			if got := project.GetString("authorizing_document"); got != "" {
+				tb.Fatalf("close must not fill the authorizing document, got %q", got)
+			}
+
+			var result struct {
+				Count int64 `db:"count"`
+			}
+			if err := app.DB().NewQuery(`
+				SELECT COUNT(*) AS count
+				FROM client_notes
+				WHERE job = {:job} AND note = {:note}
+			`).Bind(dbx.Params{
+				"job":  projectID,
+				"note": projectNoteText,
+			}).One(&result); err != nil {
+				tb.Fatalf("failed to count project notes after request: %v", err)
+			}
+			if result.Count != 1 {
+				tb.Fatalf("expected exactly one project close note, got %d", result.Count)
 			}
 		},
 	}
 
 	scenario.Test(t)
+}
+
+// The editor's status-only close uses the same retirement rule as the action.
+func TestCloseJob_EditorStatusOnlyCloseMatchesAction(t *testing.T) {
+	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	const projectID = "test_job_w_rs"
+
+	scenarios := []tests.ApiScenario{
+		{
+			Name:   "job editor closes incomplete project",
+			Method: http.MethodPut,
+			URL:    "/api/jobs/" + projectID,
+			Body:   strings.NewReader(`{"job":{"status":"Closed"},"allocations":[{"division":"fy4i9poneukvq9u","hours":10}]}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus:  http.StatusOK,
+			ExpectedContent: []string{`"id":"` + projectID + `"`},
+			TestAppFactory:  testutils.SetupTestApp,
+		},
+		{
+			Name:   "collection API closes incomplete project",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/jobs/records/" + projectID,
+			Body:   strings.NewReader(`{"status":"Closed"}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus:  http.StatusOK,
+			ExpectedContent: []string{`"status":"Closed"`},
+			TestAppFactory:  testutils.SetupTestApp,
+		},
+		{
+			// Retirement relaxes only the status change. Any other edit still
+			// needs the full billing data.
+			Name:   "collection API close with another edit stays strict",
+			Method: http.MethodPatch,
+			URL:    "/api/collections/jobs/records/" + projectID,
+			Body:   strings.NewReader(`{"status":"Closed","description":"Edited"}`),
+			Headers: map[string]string{
+				"Authorization": recordToken,
+			},
+			ExpectedStatus:  http.StatusBadRequest,
+			ExpectedContent: []string{`"location":{"code":"invalid_or_missing"`},
+			TestAppFactory:  testutils.SetupTestApp,
+		},
+	}
+
+	for _, scenario := range scenarios {
+		scenario.Test(t)
+	}
 }
 
 func TestCloseJob_ProposalTerminalStatusBlocksClose(t *testing.T) {
@@ -211,7 +292,7 @@ func TestCloseJob_ProposalTerminalStatusBlocksClose(t *testing.T) {
 	const projectID = "fcprojimpterm01"
 
 	scenario := tests.ApiScenario{
-		Name:   "terminal proposal status blocks imported close",
+		Name:   "terminal proposal status blocks close",
 		Method: http.MethodPost,
 		URL:    "/api/jobs/" + projectID + "/close",
 		Headers: map[string]string{
@@ -340,7 +421,7 @@ func TestCloseJob_FailsWhenProposalWouldNeedAutoAwardButIsNotImported(t *testing
 	const proposalID = "fcpropnimpinpr"
 
 	scenario := tests.ApiScenario{
-		Name:   "in-progress non-imported proposal cannot be auto-awarded by fast close",
+		Name:   "in-progress non-imported proposal cannot be auto-awarded by close",
 		Method: http.MethodPost,
 		URL:    "/api/jobs/" + projectID + "/close",
 		Headers: map[string]string{
@@ -391,32 +472,6 @@ func TestCloseJob_ResponseOmitsProposalBlockWhenNoProposal(t *testing.T) {
 		ExpectedContent: []string{
 			`"id":"` + projectID + `"`,
 			`"project_note_created":true`,
-		},
-		TestAppFactory: testutils.SetupTestApp,
-	}
-
-	scenario.Test(t)
-}
-
-func TestCloseJob_ValidationErrorShapeForNonImportedMatchesHookPattern(t *testing.T) {
-	recordToken, err := testutils.GenerateRecordToken("users", "author@soup.com")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	const projectID = "test_job_w_rs"
-
-	scenario := tests.ApiScenario{
-		Name:   "strict close returns hook-style field errors",
-		Method: http.MethodPost,
-		URL:    "/api/jobs/" + projectID + "/close",
-		Headers: map[string]string{
-			"Authorization": recordToken,
-		},
-		ExpectedStatus: http.StatusBadRequest,
-		ExpectedContent: []string{
-			`"message":"invalid or missing location"`,
-			`"data":{"location":{"code":"invalid_or_missing"`,
 		},
 		TestAppFactory: testutils.SetupTestApp,
 	}

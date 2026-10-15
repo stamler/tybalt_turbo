@@ -127,7 +127,7 @@
             {/snippet}
             {#snippet menu()}
               <DSMenuItem label="Change client" icon="mdi:swap-horizontal" action={() => {}} />
-              <DSMenuItem label="Fast close" icon="mdi:lock-outline" action={() => {}} />
+              <DSMenuItem label="Close project" icon="mdi:archive-check" action={() => {}} />
               <DSMenuItem
                 label="Delete"
                 icon="mdi:delete-outline"

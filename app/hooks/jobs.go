@@ -502,77 +502,55 @@ func validateJob(app core.App, record *core.Record, forceFullValidation bool) (j
 		return 0, err
 	}
 
-	// Preserve the existing proposal status-only path. Project writes use full validation.
+	// Status-only updates skip the full validation below.
 	if !isCreate && !forceFullValidation {
-		if err := validateProjectAuthorizingDocument(record, derived); err != nil {
-			return 0, err
+		// ProcessJobCore relaxes a project write only for a retirement, which it
+		// decides before cleanJob normalizes the record. Retiring needs no billing
+		// data: no PA, invoicing profile or project value.
+		if derived == jobTypeProject {
+			return derived, nil
 		}
 
 		// If no field other than status changed, treat this as a status-only update.
 		if !utilities.RecordHasMeaningfulChanges(record, "status") {
-			// Closing or cancelling skips the billing checks; setting a project Active does not.
-			if derived == jobTypeProject && activatesJob(record) {
-				if err := validateInvoicingProfile(app, record, derived); err != nil {
-					return 0, err
-				}
-			}
 			newStatus := status
 			oldStatus := original.GetString("status")
 			if newStatus != "" && newStatus != oldStatus {
-				if derived == jobTypeProject {
-					// Projects: allowed statuses are Active, Closed, Cancelled
-					if newStatus == "Awarded" || newStatus == "Not Awarded" || newStatus == "Submitted" || newStatus == "In Progress" || newStatus == "No Bid" {
-						return 0, &errs.HookError{
-							Status:  http.StatusBadRequest,
-							Message: "invalid status for project",
-							Data: map[string]errs.CodeError{
-								"status": {Code: "invalid_status_for_type", Message: "projects may be Active, Closed or Cancelled"},
-							},
-						}
-					}
-				} else { // proposal
-					// Proposals: allowed statuses are In Progress, Submitted, Awarded, Not Awarded, Cancelled, No Bid
-					// Disallowed: Active, Closed
-					if newStatus == "Active" || newStatus == "Closed" {
-						return 0, &errs.HookError{
-							Status:  http.StatusBadRequest,
-							Message: "invalid status for proposal",
-							Data: map[string]errs.CodeError{
-								"status": {Code: "invalid_status_for_type", Message: "proposals may be In Progress, Submitted, Awarded, Not Awarded, Cancelled or No Bid"},
-							},
-						}
-					}
-					if err := validateJobValueRequirement(record, derived, newStatus, "status"); err != nil {
-						return 0, err
-					}
-					// For No Bid or Cancelled: require a client_note with matching status_change_to
-					if newStatus == "No Bid" || newStatus == "Cancelled" {
-						jobID := record.Id
-						hasNote, err := jobHasClientNoteForStatus(app, jobID, newStatus)
-						if err != nil {
-							return 0, &errs.HookError{
-								Status:  http.StatusInternalServerError,
-								Message: "failed to check for client notes",
-								Data: map[string]errs.CodeError{
-									"status": {Code: "note_check_failed", Message: "unable to verify client notes exist"},
-								},
-							}
-						}
-						if !hasNote {
-							return 0, &errs.HookError{
-								Status:  http.StatusBadRequest,
-								Message: "a comment is required to set this status",
-								Data: map[string]errs.CodeError{
-									"status": {Code: "comment_required_for_status", Message: "a comment must be added before setting status to " + newStatus},
-								},
-							}
-						}
+				// Proposals: allowed statuses are In Progress, Submitted, Awarded, Not Awarded, Cancelled, No Bid
+				// Disallowed: Active, Closed
+				if newStatus == "Active" || newStatus == "Closed" {
+					return 0, &errs.HookError{
+						Status:  http.StatusBadRequest,
+						Message: "invalid status for proposal",
+						Data: map[string]errs.CodeError{
+							"status": {Code: "invalid_status_for_type", Message: "proposals may be In Progress, Submitted, Awarded, Not Awarded, Cancelled or No Bid"},
+						},
 					}
 				}
-			}
-			if derived == jobTypeProject {
-				if err := validateJobValueRequirement(record, derived, status, "project_value"); err != nil {
+				if err := validateJobValueRequirement(record, derived, newStatus, "status"); err != nil {
 					return 0, err
+				}
+				// For No Bid or Cancelled: require a client_note with matching status_change_to
+				if newStatus == "No Bid" || newStatus == "Cancelled" {
+					hasNote, err := jobHasClientNoteForStatus(app, record.Id, newStatus)
+					if err != nil {
+						return 0, &errs.HookError{
+							Status:  http.StatusInternalServerError,
+							Message: "failed to check for client notes",
+							Data: map[string]errs.CodeError{
+								"status": {Code: "note_check_failed", Message: "unable to verify client notes exist"},
+							},
+						}
+					}
+					if !hasNote {
+						return 0, &errs.HookError{
+							Status:  http.StatusBadRequest,
+							Message: "a comment is required to set this status",
+							Data: map[string]errs.CodeError{
+								"status": {Code: "comment_required_for_status", Message: "a comment must be added before setting status to " + newStatus},
+							},
+						}
+					}
 				}
 			}
 			return derived, nil

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Close project checks</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module">
+      import { mount } from "svelte";
+      import JobHeader from "../../src/lib/components/jobs/JobHeader.svelte";
+      import { globalStore } from "$lib/stores/global";
+      import { pb } from "$lib/pocketbase";
+      import "/src/app.css";
+      // ?status sets the job status, ?proposal links a proposal, ?noclaim drops
+      // the job claim. The project is not imported.
+      const query = new URLSearchParams(location.search);
+      globalStore.set({ claims: query.has("noclaim") ? [] : ["job"] });
+      pb.authStore.save(
+        `${btoa(JSON.stringify({ alg: "none" }))}.${btoa(JSON.stringify({ exp: Math.floor(Date.now() / 1000) + 3600 }))}.fixture`,
+        { id: "editor", collectionName: "users" },
+      );
+      mount(JobHeader, {
+        target: document.getElementById("app"),
+        props: {
+          job: {
+            id: "project1",
+            number: "26-1001",
+            description: "Clarke St Boiler Replacement",
+            status: query.get("status") ?? "Active",
+            imported: false,
+            parent_id: "",
+            parent_number: "",
+            proposal_id: query.has("proposal") ? "proposal1" : "",
+            proposal_number: query.has("proposal") ? "P26-0001" : "",
+            client: { id: "client1", name: "Client Co", alias: "" },
+            manager: { id: "", given_name: "", surname: "" },
+            alternate_manager: { id: "", given_name: "", surname: "" },
+            children: [],
+          },
+        },
+      });
+    </script>
+  </body>
+</html>

@@ -290,8 +290,6 @@ func TestLegacyZeroValueCompletesBillingInEditorThenProposesValue(t *testing.T) 
 		response := performTestAPIRequest(t, app, http.MethodPut, "/api/jobs/"+legacyWorkflowJob, strings.NewReader(body), map[string]string{"Authorization": workflowToken(t, app, workflowAuthor), "Content-Type": "application/json"})
 		mustStatus(t, response, status)
 	}
-	// Making the zero-value project Closed still requires a value.
-	edit(`{"status":"Closed"}`, http.StatusBadRequest)
 	edit(`{"invoicing_information":"painvoice000001"}`, http.StatusOK)
 	job := workflowRecord(t, app, "jobs", legacyWorkflowJob)
 	if job.GetString("invoicing_information") != "painvoice000001" || job.GetFloat("project_value") != 0 || job.GetString("status") != "Active" {

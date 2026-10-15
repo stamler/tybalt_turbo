@@ -358,7 +358,7 @@ Notes ────────────────────────�
 
 ### Breaking up the file
 
-- `lib/components/jobs/JobHeader.svelte`: header, actions, menu, and the change-number and fast-close dialogs they open.
+- `lib/components/jobs/JobHeader.svelte`: header, actions, menu, and the change-number, change-client and close-project dialogs they open.
 - `lib/components/jobs/JobSummary.svelte`: the card grid.
 - `lib/components/jobs/JobInvoicingCard.svelte`.
 - The page keeps loading, tabs and filter definitions, and should land well under 400 lines.

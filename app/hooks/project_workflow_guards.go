@@ -24,8 +24,6 @@ const (
 	ProjectWorkflowMutationMerge        ProjectWorkflowMutation = "merge"
 	ProjectWorkflowMutationValue        ProjectWorkflowMutation = "value"
 	ProjectWorkflowMutationDelete       ProjectWorkflowMutation = "delete"
-	// ProjectWorkflowMutationImportedClose is the fast-close bypass for imported projects.
-	ProjectWorkflowMutationImportedClose ProjectWorkflowMutation = "imported_close"
 	// ProjectWorkflowMutationChangeClient moves a project and its subjobs to
 	// another client, with a recorded reason.
 	ProjectWorkflowMutationChangeClient ProjectWorkflowMutation = "change_client"

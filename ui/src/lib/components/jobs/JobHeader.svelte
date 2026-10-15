@@ -7,7 +7,7 @@
   import DSTextInput from "$lib/components/DSTextInput.svelte";
   import DsLabel from "$lib/components/DsLabel.svelte";
   import DSCallout from "$lib/components/DSCallout.svelte";
-  import FastCloseConfirmPopover from "$lib/components/FastCloseConfirmPopover.svelte";
+  import CloseProjectConfirmPopover from "$lib/components/CloseProjectConfirmPopover.svelte";
   import ChangeClientPopover from "$lib/components/jobs/ChangeClientPopover.svelte";
   import { pb } from "$lib/pocketbase";
   import { goto, invalidateAll } from "$app/navigation";
@@ -51,12 +51,9 @@
       $jobsEditingEnabled &&
       claims.includes("job"),
   );
-  const canFastCloseImportedProject = $derived(
-    !isProposal &&
-      job.status === "Active" &&
-      job.imported === true &&
-      $jobsEditingEnabled &&
-      claims.includes("job"),
+  // Closing needs no billing data, so any Active project can be closed.
+  const canCloseProject = $derived(
+    !isProposal && job.status === "Active" && $jobsEditingEnabled && claims.includes("job"),
   );
   const showProposalLink = $derived(!isProposal && Boolean(job.proposal_id));
   const hasNumberHierarchyWarning = $derived(
@@ -176,13 +173,13 @@
 
   let showChangeClient = $state(false);
 
-  // Fast close of an imported project ---------------------------------------
+  // Close project -----------------------------------------------------------
 
-  let showFastClose = $state(false);
-  let fastCloseLoading = $state(false);
-  let fastCloseError = $state<string | null>(null);
-  let fastCloseSubmitting = $state(false);
-  let fastCloseProposal = $state<{
+  let showClose = $state(false);
+  let closeLoading = $state(false);
+  let closeError = $state<string | null>(null);
+  let closeSubmitting = $state(false);
+  let closeProposal = $state<{
     id: string;
     number: string;
     status: string;
@@ -191,15 +188,15 @@
 
   // Load the referenced proposal first so the confirmation can show exactly
   // what closing will do to it.
-  async function openFastClose() {
-    showFastClose = true;
-    fastCloseLoading = true;
-    fastCloseError = null;
-    fastCloseProposal = null;
+  async function openClose() {
+    showClose = true;
+    closeLoading = true;
+    closeError = null;
+    closeProposal = null;
     try {
       if (job.proposal_id) {
         const proposal = await pb.send(`/api/jobs/${job.proposal_id}`, { method: "GET" });
-        fastCloseProposal = {
+        closeProposal = {
           id: proposal.id,
           number: job.proposal_number || proposal.number || job.proposal_id,
           status: proposal.status,
@@ -207,33 +204,33 @@
         };
       }
     } catch (error: unknown) {
-      fastCloseError = saveErrorMessage(error, "Unable to load referenced proposal details.");
+      closeError = saveErrorMessage(error, "Unable to load referenced proposal details.");
     } finally {
-      fastCloseLoading = false;
+      closeLoading = false;
     }
   }
 
-  function closeFastClose() {
-    showFastClose = false;
-    fastCloseLoading = false;
-    fastCloseError = null;
-    fastCloseProposal = null;
+  function cancelClose() {
+    showClose = false;
+    closeLoading = false;
+    closeError = null;
+    closeProposal = null;
   }
 
   // Closes through /api/jobs/{id}/close rather than patching the record, so
   // the backend applies the close, its notes and any proposal auto-award in
   // one transaction, the same policy as the jobs list.
-  async function submitFastClose() {
-    if (fastCloseSubmitting || fastCloseLoading) return;
-    fastCloseSubmitting = true;
+  async function submitClose() {
+    if (closeSubmitting || closeLoading) return;
+    closeSubmitting = true;
     try {
       await pb.send(`/api/jobs/${job.id}/close`, { method: "POST" });
       await invalidateAll();
-      closeFastClose();
+      cancelClose();
     } catch (error: unknown) {
-      globalStore.addError(saveErrorMessage(error, "Failed to close imported project"));
+      globalStore.addError(saveErrorMessage(error, "Failed to close project"));
     } finally {
-      fastCloseSubmitting = false;
+      closeSubmitting = false;
     }
   }
 </script>
@@ -322,13 +319,8 @@
         action={() => (showChangeClient = true)}
       />
     {/if}
-    {#if canFastCloseImportedProject}
-      <DSMenuItem
-        label="Close imported project"
-        icon="mdi:archive-check"
-        tone="danger"
-        action={openFastClose}
-      />
+    {#if canCloseProject}
+      <DSMenuItem label="Close project" icon="mdi:archive-check" tone="danger" action={openClose} />
     {/if}
   {/snippet}
 </DSPageHeader>
@@ -369,15 +361,15 @@
   {/if}
 </DSPopover>
 
-<FastCloseConfirmPopover
-  bind:show={showFastClose}
+<CloseProjectConfirmPopover
+  bind:show={showClose}
   jobNumber={job.number ?? "Project"}
-  proposal={fastCloseProposal}
-  loadingContext={fastCloseLoading}
-  contextError={fastCloseError}
-  submitting={fastCloseSubmitting}
-  onSubmit={submitFastClose}
-  onCancel={closeFastClose}
+  proposal={closeProposal}
+  loadingContext={closeLoading}
+  contextError={closeError}
+  submitting={closeSubmitting}
+  onSubmit={submitClose}
+  onCancel={cancelClose}
 />
 
 {#if canChangeClient && showChangeClient}

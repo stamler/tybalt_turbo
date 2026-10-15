@@ -789,11 +789,11 @@ Ordinary job edits must pass the new validation, including a status-only edit
 that sets a project to `Active`. An older project whose stored value is still
 zero can be edited without setting a value, for example to add the
 invoicing profile a value change needs; setting a value, or changing its status
-to `Active` or `Closed`, still requires a positive value. An edit that only sets
-a project to `Closed` or `Cancelled` keeps the existing status rules and does
-not require the new validation, so staff can retire older projects without
-completing their billing data. A project without a positive value can be
-`Cancelled` but not `Closed`.
+to `Active`, still requires a positive value. An edit that only sets a project
+to `Closed` or `Cancelled` does not require the new validation, including the
+authorizing document and project value, so staff can retire older projects
+without completing their billing data. The **Close project** action applies the
+same rule (see `project_close.md`).
 An `Active` project can receive new time, expenses, and purchase orders, so it
 must have complete billing data. The stale and unused job lists show any error
 beside the job it affects. The client relation is immutable except through the controlled merge process or **Change Client**.
@@ -1792,7 +1792,8 @@ with the rest of sections 2 to 6:
   approved request, behind `jobs.require_job_request_approval`.
 * Project-value change approval and protected creation history on projects.
 * Managers and alternate managers without `job` can change allocations only.
-  Fast close also requires `job`; imported projects keep its existing bypass.
+  **Close project** also requires `job`, and closes any `Active` project without
+  its billing data (see `project_close.md`).
 * The contact **No email address** mark, and invoicing profile creation by
   active holders of `time`.
 * Optional request notes, printed on request and copied to the job's first

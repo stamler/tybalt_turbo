@@ -22,12 +22,13 @@ func TestProjectValueUpdates(t *testing.T) {
 		want            int
 	}{
 		// An older project with no value can be edited, keeping its status and
-		// zero value; setting a value or changing its status still needs one.
+		// zero value, and closed or cancelled; setting a value or making it
+		// Active still needs one.
 		{"active unchanged save keeps zero value", "pvactivezero001", `{}`, 200},
 		{"closed unchanged save keeps zero value", "pvclosedzero001", `{}`, 200},
 		{"active edit keeps zero value", "pvactivezero001", `{"description":"Edited project"}`, 200},
 		{"closed edit keeps zero value", "pvclosedzero001", `{"description":"Edited project"}`, 200},
-		{"close T&M project needs value", "pvactivezero001", `{"status":"Closed"}`, 400},
+		{"close T&M project without value", "pvactivezero001", `{"status":"Closed"}`, 200},
 		{"reopen T&M project needs value", "pvclosedzero001", `{"status":"Active"}`, 400},
 		{"reactivate T&M project needs value", "pvcancelzero001", `{"status":"Active"}`, 400},
 		{"cancel without value", "pvactivezero001", `{"status":"Cancelled"}`, 200},
@@ -128,12 +129,12 @@ func TestProjectValueQuickClose(t *testing.T) {
 		t.Fatal(err)
 	}
 	scenario := tests.ApiScenario{
-		Name:            "non-imported Time and Materials project needs a value for quick close",
+		Name:            "non-imported Time and Materials project closes without a value",
 		Method:          http.MethodPost,
 		URL:             "/api/jobs/pvactivezero001/close",
 		Headers:         map[string]string{"Authorization": token},
-		ExpectedStatus:  http.StatusBadRequest,
-		ExpectedContent: []string{`"code":"value_required_for_status"`},
+		ExpectedStatus:  http.StatusOK,
+		ExpectedContent: []string{`"status":"Closed"`},
 		TestAppFactory:  setupJobsWithBillingFixtures,
 	}
 	scenario.Test(t)
