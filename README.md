@@ -72,7 +72,7 @@ flyctl deploy
 1. Clone and install dependencies:
 
 ```bash
-git clone https://github.com/stamler/tybalt_turbo.git
+git clone https://github.com/tbt-eng/tybalt_turbo.git
 cd tybalt_turbo
 
 # Backend dependencies

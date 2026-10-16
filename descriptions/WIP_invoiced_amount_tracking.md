@@ -1,6 +1,6 @@
 # Invoiced Amount Tracking for Job POs, Expenses Feature (Phase 2)
 
-Tracking issue: [Track client-invoiced amounts against job POs #151](https://github.com/stamler/tybalt_turbo/issues/151)
+Tracking issue: [Track client-invoiced amounts against job POs #151](https://github.com/tbt-eng/tybalt_turbo/issues/151)
 
 TO ADD LATER FEB 25 2026:
 

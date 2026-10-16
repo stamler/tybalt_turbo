@@ -1,6 +1,6 @@
 ### UI permissions: reflect user claims in navigation and controls
 
-Links: [UI should reflect user permissions #58](https://github.com/stamler/tybalt_turbo/issues/58)
+Links: [UI should reflect user permissions #58](https://github.com/tbt-eng/tybalt_turbo/issues/58)
 
 #### Goals
 

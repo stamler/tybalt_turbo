@@ -1,6 +1,6 @@
 ### Notification Templates for Timesheets and Expenses
 
-Proposed notification templates for the unimplemented notifications described in [Issue #86](https://github.com/stamler/tybalt_turbo/issues/86).
+Proposed notification templates for the unimplemented notifications described in [Issue #86](https://github.com/tbt-eng/tybalt_turbo/issues/86).
 
 All link placeholders use the form `__LINK_TO_<THING>__` and should be replaced with real URLs when wiring up the notifications.
 
