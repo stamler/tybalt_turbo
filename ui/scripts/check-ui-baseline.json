@@ -68,7 +68,7 @@
     "src/routes/expenses/reimbursements/+page.svelte": 1,
     "src/routes/expenses/tracking/[committedWeekEnding]/+page.svelte": 1,
     "src/routes/jobs/list/+page.svelte": 1,
-    "src/routes/pos/[poid]/details/+page.svelte": 4,
+    "src/routes/pos/[poid]/details/+page.svelte": 3,
     "src/routes/pos/search/+page.svelte": 1,
     "src/routes/reports/expense/queue/+page.svelte": 1,
     "src/routes/reports/payables-spreadsheet/+page.svelte": 7,
@@ -209,7 +209,7 @@
     "src/lib/components/jobs/TimeTabContent.svelte": 2,
     "src/routes/admin_profiles/[id]/details/+page.svelte": 27,
     "src/routes/expenses/[eid]/details/+page.svelte": 27,
-    "src/routes/pos/[poid]/details/+page.svelte": 26
+    "src/routes/pos/[poid]/details/+page.svelte": 25
   },
   "raw-page-title": {
     "src/lib/components/AbsorbList.svelte": 1,

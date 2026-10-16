@@ -65,6 +65,26 @@
   const canConvertToCumulative = $derived(
     isPayablesAdmin && data.po.status === "Active" && data.po.type === "One-Time",
   );
+  // A Recurring PO closes on its count of committed expenses, not its amount.
+  const showRemainingOccurrences = $derived(
+    data.po.type === "Recurring" && data.po.recurring_expected_occurrences > 0,
+  );
+  // Commit-time auto-close leaves closer blank and sets closed_by_system. Say
+  // which limit closed the PO so the owner knows why it is no longer usable.
+  const systemClosureReason = $derived.by(() => {
+    switch (data.po.type) {
+      case "One-Time":
+        return "when its expense was committed";
+      case "Recurring":
+        return data.po.recurring_expected_occurrences > 0
+          ? `after all ${data.po.recurring_expected_occurrences} expenses were committed`
+          : "after all expected expenses were committed";
+      case "Cumulative":
+        return "when committed expenses reached the PO total";
+      default:
+        return "";
+    }
+  });
 
   async function refreshDetails() {
     await invalidateAll();
@@ -287,11 +307,21 @@
           <span class="font-semibold">Total:</span>
           {formatCurrencyAmount(data.po.total, data.po.currency_code)}
         </div>
-        <div>
-          <span class="font-semibold">Provisional Remaining:</span>
-          {formatCurrencyAmount(data.po.remaining_amount, data.po.currency_code)}
-          <span class="text-sm text-slate-500">(includes uncommitted expenses)</span>
-        </div>
+        {#if showRemainingOccurrences || data.po.status !== "Closed"}
+          <div>
+            <span class="font-semibold">Remaining:</span>
+            {#if showRemainingOccurrences}
+              {data.po.recurring_remaining_occurrences} of {data.po.recurring_expected_occurrences}
+              expenses{#if data.po.status !== "Closed"},{/if}
+            {/if}
+            {#if data.po.status !== "Closed"}
+              {formatCurrencyAmount(data.po.remaining_amount, data.po.currency_code)}
+              <span class="text-sm text-neutral-500"
+                >provisional (includes uncommitted expenses)</span
+              >
+            {/if}
+          </div>
+        {/if}
         {#if data.po.type === "Recurring"}
           <div>
             <span class="font-semibold">Approval Total:</span>
@@ -401,15 +431,12 @@
       {#if data.po.closed}
         <div>
           <span class="font-semibold">Closed:</span>
-          {shortDate(data.po.closed)}{#if data.po.closer}
-            by {data.po.closer_name || data.po.closer}{/if}
-        </div>
-      {/if}
-
-      {#if data.po.closed_by_system !== undefined}
-        <div>
-          <span class="font-semibold">Closed By System:</span>
-          {data.po.closed_by_system ? "Yes" : "No"}
+          {shortDate(data.po.closed, true)}
+          {#if data.po.closer}
+            by {data.po.closer_name || data.po.closer}
+          {:else if data.po.closed_by_system}
+            automatically {systemClosureReason}
+          {/if}
         </div>
       {/if}
 

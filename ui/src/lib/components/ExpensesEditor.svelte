@@ -134,8 +134,12 @@
     }
     return "";
   });
+  const linkedPurchaseOrderStatus = $derived.by(() => data.linked_purchase_order?.status ?? "");
   const linkedRecurringRemainingOccurrences = $derived.by(
     () => data.linked_purchase_order?.recurring_remaining_occurrences ?? null,
+  );
+  const linkedRecurringExpectedOccurrences = $derived.by(
+    () => data.linked_purchase_order?.recurring_expected_occurrences ?? null,
   );
   const linkedRemainingAmount = $derived.by(
     () => data.linked_purchase_order?.remaining_amount ?? null,
@@ -489,12 +493,17 @@
     <span
       class="w-full rounded-sm border border-cyan-300 bg-cyan-50 px-2 py-1 text-sm text-cyan-900"
     >
-      {linkedRecurringRemainingOccurrences} recurrence{linkedRecurringRemainingOccurrences === 1
-        ? ""
-        : "s"} remaining before this PO closes.
+      {#if linkedRecurringExpectedOccurrences}
+        {linkedRecurringRemainingOccurrences} of {linkedRecurringExpectedOccurrences} expenses remaining
+        before this PO closes.
+      {:else}
+        {linkedRecurringRemainingOccurrences} expense{linkedRecurringRemainingOccurrences === 1
+          ? ""
+          : "s"} remaining before this PO closes.
+      {/if}
     </span>
   {/if}
-  {#if item.purchase_order !== "" && linkedPurchaseOrderType === "Cumulative" && linkedRemainingAmount !== null}
+  {#if item.purchase_order !== "" && linkedPurchaseOrderType === "Cumulative" && linkedPurchaseOrderStatus !== "Closed" && linkedRemainingAmount !== null}
     <span
       class="w-full rounded-sm border border-cyan-300 bg-cyan-50 px-2 py-1 text-sm text-cyan-900"
     >

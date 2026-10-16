@@ -67,6 +67,9 @@ func TestRecurringPurchaseOrderClosesOnFinalCommit(t *testing.T) {
 				if result.Count != wantCount || po.GetString("status") != wantStatus {
 					t.Fatalf("committed count=%d, PO status=%s; want %d, %s", result.Count, po.GetString("status"), wantCount, wantStatus)
 				}
+				if wantStatus == "Active" {
+					assertPurchaseOrderNotClosed(t, po)
+				}
 			}
 			commit := func(index int) (int, string) {
 				t.Helper()
@@ -124,6 +127,7 @@ func TestRecurringPurchaseOrderClosesOnFinalCommit(t *testing.T) {
 				t.Fatalf("final commit: status=%d, body=%s", status, body)
 			}
 			assertState(tc.limit, "Closed")
+			assertPurchaseOrderClosedBySystemAtCommit(t, app, po.Id, finalID)
 
 			if status, body := commit(tc.limit + 1); status != http.StatusBadRequest || !strings.Contains(body, "purchase_order_not_active") {
 				t.Fatalf("extra commit: status=%d, body=%s", status, body)
@@ -172,6 +176,7 @@ func TestRecurringPurchaseOrderClosesOnFinalCommit(t *testing.T) {
 				t.Fatalf("recommit final expense: status=%d, body=%s", status, body)
 			}
 			assertState(tc.limit, "Closed")
+			assertPurchaseOrderClosedBySystemAtCommit(t, app, po.Id, finalID)
 		})
 	}
 }
@@ -231,7 +236,47 @@ func TestOtherPurchaseOrderTypesKeepCommitClosureRules(t *testing.T) {
 				if got := po.GetString("status"); got != wantStatus {
 					t.Fatalf("commit %d: PO status=%s, want %s", i, got, wantStatus)
 				}
+				if wantStatus == "Active" {
+					assertPurchaseOrderNotClosed(t, po)
+				} else {
+					assertPurchaseOrderClosedBySystemAtCommit(t, app, po.Id,
+						fmt.Sprintf("recurcloseexp%02d", tc.finalEntry))
+				}
 			}
 		})
+	}
+}
+
+// assertPurchaseOrderNotClosed checks that an open purchase order carries no
+// closure record.
+func assertPurchaseOrderNotClosed(t testing.TB, po *core.Record) {
+	t.Helper()
+	if po.GetString("closed") != "" || po.GetString("closer") != "" || po.GetBool("closed_by_system") {
+		t.Fatalf("open PO has closure fields: closed=%q, closer=%q, closed_by_system=%v",
+			po.GetString("closed"), po.GetString("closer"), po.GetBool("closed_by_system"))
+	}
+}
+
+// assertPurchaseOrderClosedBySystemAtCommit checks that an automatic closure
+// records the commit timestamp of the closing expense, no closer, and
+// closed_by_system = true.
+func assertPurchaseOrderClosedBySystemAtCommit(t testing.TB, app core.App, poID string, closingExpenseID string) {
+	t.Helper()
+	po, err := app.FindRecordById("purchase_orders", poID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	expense, err := app.FindRecordById("expenses", closingExpenseID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	committed := expense.GetString("committed")
+	if committed == "" {
+		t.Fatalf("closing expense %s is not committed", closingExpenseID)
+	}
+	if po.GetString("status") != "Closed" || po.GetString("closed") != committed ||
+		po.GetString("closer") != "" || !po.GetBool("closed_by_system") {
+		t.Fatalf("auto-closed PO: status=%q, closed=%q, closer=%q, closed_by_system=%v; want Closed, %q, \"\", true",
+			po.GetString("status"), po.GetString("closed"), po.GetString("closer"), po.GetBool("closed_by_system"), committed)
 	}
 }

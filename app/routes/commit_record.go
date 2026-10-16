@@ -236,7 +236,7 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 					var dirtyPurchaseOrderRecord bool
 					switch purchaseOrderType {
 					case "One-Time":
-						purchaseOrderRecord.Set("status", "Closed")
+						closePurchaseOrderBySystem(purchaseOrderRecord, now)
 						dirtyPurchaseOrderRecord = true
 					case "Recurring":
 						// Pass 1 for this commit because its committed state is not saved yet.
@@ -246,7 +246,7 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 							return err
 						}
 						if exhausted {
-							purchaseOrderRecord.Set("status", "Closed")
+							closePurchaseOrderBySystem(purchaseOrderRecord, now)
 							dirtyPurchaseOrderRecord = true
 						}
 					case "Cumulative":
@@ -270,7 +270,7 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 							// Set the status to Closed since the total of all committed
 							// expenses plus the pending expense matches or exceeds the
 							// purchase order total
-							purchaseOrderRecord.Set("status", "Closed")
+							closePurchaseOrderBySystem(purchaseOrderRecord, now)
 							dirtyPurchaseOrderRecord = true
 						}
 					}
@@ -312,4 +312,14 @@ func createCommitRecordHandler(app core.App, collectionName string) func(e *core
 
 		return e.JSON(http.StatusOK, map[string]string{"message": "Record committed successfully"})
 	}
+}
+
+// closePurchaseOrderBySystem records an automatic closure triggered by
+// committing an expense. The closed timestamp matches the commit timestamp and
+// closer stays blank because no person closed the purchase order.
+func closePurchaseOrderBySystem(purchaseOrderRecord *core.Record, closedAt time.Time) {
+	purchaseOrderRecord.Set("status", "Closed")
+	purchaseOrderRecord.Set("closed", closedAt)
+	purchaseOrderRecord.Set("closer", "")
+	purchaseOrderRecord.Set("closed_by_system", true)
 }

@@ -559,7 +559,7 @@ Automatic closure rules:
 - `Recurring`: closes when all expected expenses are committed.
 - `Cumulative`: closes when committed total reaches PO total.
 
-Automatic close sets `closed_by_system = true`. It does not use the manual pending-expense check and can still leave other expenses pending when the amount or recurrence limit is reached.
+Automatic close sets `status = Closed`, `closed` to the commit timestamp of the closing expense and `closed_by_system = true`, and leaves `closer` blank. The PO details page shows it as closed automatically and names the limit that was reached. Uncommitting an expense that reopens the PO clears all three fields. It does not use the manual pending-expense check and can still leave other expenses pending when the amount or recurrence limit is reached.
 
 ## API Endpoints (Non-approver-list)
 
