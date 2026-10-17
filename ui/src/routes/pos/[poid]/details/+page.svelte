@@ -69,6 +69,13 @@
   const showRemainingOccurrences = $derived(
     data.po.type === "Recurring" && data.po.recurring_expected_occurrences > 0,
   );
+  // Imported legacy POs carry closed_by_system = true with a placeholder date
+  // before this cutover, so their cause of closure is unknown.
+  const TURBO_CLOSURE_CUTOVER = Date.parse("2026-03-12T00:00:00Z");
+  const showSystemClosureReason = $derived(
+    data.po.closed_by_system &&
+      Date.parse(data.po.closed.replace(" ", "T")) >= TURBO_CLOSURE_CUTOVER,
+  );
   // Commit-time auto-close leaves closer blank and sets closed_by_system. Say
   // which limit closed the PO so the owner knows why it is no longer usable.
   const systemClosureReason = $derived.by(() => {
@@ -434,7 +441,7 @@
           {shortDate(data.po.closed, true)}
           {#if data.po.closer}
             by {data.po.closer_name || data.po.closer}
-          {:else if data.po.closed_by_system}
+          {:else if showSystemClosureReason}
             automatically {systemClosureReason}
           {/if}
         </div>
